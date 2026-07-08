@@ -29,3 +29,9 @@ done/
 Thumbs.db
 .idea/
 .vscode/
+
+# RepoDossier exports
+full.txt
+ai.txt
+docs.txt
+changed.txt
