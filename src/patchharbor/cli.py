@@ -10,6 +10,9 @@ try:
 except ImportError:
     __version__ = "0.1.0"
 
+from patchharbor.patch_lint import PatchLintError
+from patchharbor.patch_lint_api import lint_patch_file, render_patch_lint_result
+
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
@@ -32,6 +35,15 @@ def build_parser() -> argparse.ArgumentParser:
         "--repo",
         default=".",
         help="repository path to check; defaults to the current working directory",
+    )
+
+    lint_script = subparsers.add_parser(
+        "lint-script",
+        help="lint a patch script file",
+    )
+    lint_script.add_argument(
+        "path",
+        help="patch script file to lint",
     )
 
     return parser
@@ -73,12 +85,32 @@ def _run_doctor(repo: str) -> int:
     return 0
 
 
+def _run_lint_script(path: str) -> int:
+    print("PatchHarbor lint-script")
+    print(f"script: {Path(path).expanduser()}")
+
+    try:
+        result = lint_patch_file(path)
+    except PatchLintError as exc:
+        print("status: error")
+        print(f"problem: {exc}")
+        return 2
+
+    for line in render_patch_lint_result(result):
+        print(line)
+
+    return 1 if result.has_findings else 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
 
     if args.command == "doctor":
         return _run_doctor(args.repo)
+
+    if args.command == "lint-script":
+        return _run_lint_script(args.path)
 
     parser.print_help()
     return 0
