@@ -12,6 +12,8 @@ except ImportError:
 
 from patchharbor.patch_lint import PatchLintError
 from patchharbor.patch_lint_api import lint_patch_file, render_patch_lint_result
+from patchharbor.runner_core import RunnerCoreError, RunnerExecutionConfig, run_patch_script
+from patchharbor.runner_display import render_runner_result
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -44,6 +46,55 @@ def build_parser() -> argparse.ArgumentParser:
     lint_script.add_argument(
         "path",
         help="patch script file to lint",
+    )
+
+    run_script = subparsers.add_parser(
+        "run-script",
+        help="run preflight checks and optionally execute an explicit patch script file",
+    )
+    run_script.add_argument(
+        "path",
+        help="patch script file to run",
+    )
+    run_script.add_argument(
+        "--no-execute",
+        action="store_true",
+        help="perform preflight, syntax, and optional lint checks without executing the script",
+    )
+    run_script.add_argument(
+        "--lint",
+        action="store_true",
+        help="run PatchHarbor patch lint before execution",
+    )
+    run_script.add_argument(
+        "--successful-patch-id",
+        action="append",
+        default=[],
+        help="patch id that has already succeeded; may be provided multiple times for repeat checks",
+    )
+    run_script.add_argument(
+        "--max-age-seconds",
+        type=float,
+        default=None,
+        help="maximum allowed script age in seconds; omitted disables freshness checking",
+    )
+    run_script.add_argument(
+        "--timeout-seconds",
+        type=float,
+        default=None,
+        help="timeout in seconds for bash syntax and script execution",
+    )
+    run_script.add_argument(
+        "--workdir",
+        default=None,
+        help="working directory for script execution",
+    )
+    run_script.add_argument(
+        "--env",
+        action="append",
+        default=[],
+        metavar="KEY=VALUE",
+        help="environment variable to pass to the script; may be provided multiple times",
     )
 
     return parser
@@ -88,7 +139,6 @@ def _run_doctor(repo: str) -> int:
 def _run_lint_script(path: str) -> int:
     print("PatchHarbor lint-script")
     print(f"script: {Path(path).expanduser()}")
-
     try:
         result = lint_patch_file(path)
     except PatchLintError as exc:
@@ -102,15 +152,55 @@ def _run_lint_script(path: str) -> int:
     return 1 if result.has_findings else 0
 
 
+def _run_run_script(args: argparse.Namespace) -> int:
+    print("PatchHarbor run-script")
+    print(f"script: {Path(args.path).expanduser()}")
+
+    try:
+        environment = _parse_env_pairs(args.env)
+        config = RunnerExecutionConfig(
+            working_directory=args.workdir,
+            environment=environment,
+            successful_patch_ids=tuple(args.successful_patch_id),
+            max_age_seconds=args.max_age_seconds,
+            timeout_seconds=args.timeout_seconds,
+            run_lint=args.lint,
+            execute=not args.no_execute,
+        )
+        result = run_patch_script(args.path, config)
+    except (RunnerCoreError, ValueError) as exc:
+        print("status: error")
+        print(str(exc))
+        return 2
+
+    for line in render_runner_result(result):
+        print(line)
+
+    return 0 if result.ok else 1
+
+
+def _parse_env_pairs(values: Sequence[str]) -> dict[str, str]:
+    environment: dict[str, str] = {}
+    for value in values:
+        if "=" not in value:
+            raise ValueError(f"environment value must use KEY=VALUE syntax: {value}")
+        key, env_value = value.split("=", 1)
+        if not key:
+            raise ValueError("environment variable name must not be empty")
+        environment[key] = env_value
+    return environment
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
 
     if args.command == "doctor":
         return _run_doctor(args.repo)
-
     if args.command == "lint-script":
         return _run_lint_script(args.path)
+    if args.command == "run-script":
+        return _run_run_script(args)
 
     parser.print_help()
     return 0
