@@ -76,3 +76,8 @@ PATCHHARBOR.16b2 does not:
 PATCHHARBOR.16b3 should add recovery acceptance.
 
 That later patch should document and test how a contributor recognizes the safe recovery path after a failed dual-repo smoke.
+
+
+## PATCHHARBOR.16b3 applied
+
+- Dual repo recovery acceptance now lives in `docs/dual-repo-recovery-acceptance.md` and `tests/test_dual_repo_recovery_acceptance.py`.

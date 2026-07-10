@@ -87,3 +87,8 @@ That later patch should prove that failed or partial smokes do not blur the sour
 ## PATCHHARBOR.16b2 applied
 
 - Dual repo failure-boundary acceptance now lives in `docs/dual-repo-failure-boundary-acceptance.md` and `tests/test_dual_repo_failure_boundary_acceptance.py`.
+
+
+## PATCHHARBOR.16b3 applied
+
+- Dual repo recovery acceptance now lives in `docs/dual-repo-recovery-acceptance.md` and `tests/test_dual_repo_recovery_acceptance.py`; it proves a clean recovery run after a contained runner failure.
