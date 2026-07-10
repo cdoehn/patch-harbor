@@ -183,3 +183,8 @@ Release and branch hygiene are handled by later milestones.
 ## PATCHHARBOR.16b3-fix1 applied
 
 - Plan repair: PATCHHARBOR.16b3-fix1 adds the plan-correct Final Migration Acceptance in `docs/final-migration-acceptance.md` and `tests/test_final_migration_acceptance.py`; Milestone 16 is now closed and the next operative step is PATCHHARBOR.17a1.
+
+
+## PATCHHARBOR.17a1 applied
+
+- PATCHHARBOR.17a1 documents the PatchHarbor release version decision in `docs/patchharbor-version-decision.md` and `tests/test_patchharbor_version_decision.py`; next operative step is PATCHHARBOR.17a2.

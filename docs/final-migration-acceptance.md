@@ -73,3 +73,8 @@ After PATCHHARBOR.16b3-fix1 is green, proceed to:
     PATCHHARBOR.17a1 – PatchHarbor Version Decision
 
 Milestone 17 should use the same rule: `planning/milestones_migration.md` is the operative plan.
+
+
+## PATCHHARBOR.17a1 applied
+
+- PATCHHARBOR.17a1 documents the PatchHarbor release version decision in `docs/patchharbor-version-decision.md` and `tests/test_patchharbor_version_decision.py`; package metadata is unchanged.
