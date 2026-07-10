@@ -124,3 +124,8 @@ After these rollback notes are green, the next plan-repair patch is PATCHHARBOR.
 ## PATCHHARBOR.16b2-fix1 applied
 
 - Plan repair: PATCHHARBOR.16b2-fix1 adds the plan-correct Migration Completion Checklist in `docs/migration-completion-checklist.md` and `tests/test_migration_completion_checklist.py`.
+
+
+## PATCHHARBOR.16b3-fix1 applied
+
+- Plan repair: PATCHHARBOR.16b3-fix1 adds `docs/final-migration-acceptance.md` and `tests/test_final_migration_acceptance.py`; rollback notes remain supporting evidence.

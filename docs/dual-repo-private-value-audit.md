@@ -86,3 +86,8 @@ After this patch is green, the next plan-repair patch is PATCHHARBOR.16b1-fix1 â
 ## PATCHHARBOR.16b2-fix1 applied
 
 - Plan repair: PATCHHARBOR.16b2-fix1 adds `docs/migration-completion-checklist.md` and `tests/test_migration_completion_checklist.py`; final migration acceptance remains the next plan-repair step.
+
+
+## PATCHHARBOR.16b3-fix1 applied
+
+- Plan repair: PATCHHARBOR.16b3-fix1 adds `docs/final-migration-acceptance.md` and `tests/test_final_migration_acceptance.py`; private-value audit remains supporting evidence.

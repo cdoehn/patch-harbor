@@ -84,3 +84,8 @@ Allowed read-only source checks:
 ## Handoff
 
 After this checklist is green, the next plan-repair patch is PATCHHARBOR.16b3-fix1 – Final Migration Acceptance.
+
+
+## PATCHHARBOR.16b3-fix1 applied
+
+- Plan repair: PATCHHARBOR.16b3-fix1 adds the plan-correct Final Migration Acceptance in `docs/final-migration-acceptance.md` and `tests/test_final_migration_acceptance.py`; next operative plan step is PATCHHARBOR.17a1.
