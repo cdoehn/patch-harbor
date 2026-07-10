@@ -65,3 +65,8 @@ The smoke must not:
 PATCHHARBOR.16a4 should add the dual-repo export smoke.
 
 That later smoke can exercise RepoDossier export behavior in a controlled way, but PATCHHARBOR.16a3 only checks wrapper presence, syntax, boundary markers, and source immutability.
+
+
+## PATCHHARBOR.16a4 applied
+
+- Dual repo export smoke now lives in `docs/dual-repo-export-smoke.md` and `tests/test_dual_repo_export_smoke.py`.

@@ -143,3 +143,8 @@ Release and branch hygiene are handled by later milestones.
 ## PATCHHARBOR.16a3 applied
 
 - Dual repo source-wrapper smoke now lives in `docs/dual-repo-source-wrapper-smoke.md` and `tests/test_dual_repo_source_wrapper_smoke.py`; it verifies source wrapper syntax and boundary markers while RepoDossier remains unchanged.
+
+
+## PATCHHARBOR.16a4 applied
+
+- Dual repo export smoke now lives in `docs/dual-repo-export-smoke.md` and `tests/test_dual_repo_export_smoke.py`; it exercises safe RepoDossier export list/dry-run behavior while source status remains unchanged.
