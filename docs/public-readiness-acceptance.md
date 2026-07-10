@@ -168,3 +168,8 @@ Release and branch hygiene are handled by later milestones.
 ## PATCHHARBOR.16a4-fix2 applied
 
 - Plan repair: PATCHHARBOR.16a4-fix2 adds the plan-correct Dual Repo Private Value Audit in `docs/dual-repo-private-value-audit.md` and `tests/test_dual_repo_private_value_audit.py`; next repair is PATCHHARBOR.16b1-fix1 Migration Rollback Notes.
+
+
+## PATCHHARBOR.16b1-fix1 applied
+
+- Plan repair: PATCHHARBOR.16b1-fix1 adds the plan-correct Migration Rollback Notes in `docs/migration-rollback-notes.md` and `tests/test_migration_rollback_notes.py`; next repair is PATCHHARBOR.16b2-fix1 Migration Completion Checklist.

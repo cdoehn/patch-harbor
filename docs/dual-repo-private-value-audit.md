@@ -76,3 +76,8 @@ The existing export-smoke documents and tests are retained as useful Milestone 1
 ## Handoff
 
 After this patch is green, the next plan-repair patch is PATCHHARBOR.16b1-fix1 – Migration Rollback Notes.
+
+
+## PATCHHARBOR.16b1-fix1 applied
+
+- Plan repair: PATCHHARBOR.16b1-fix1 adds the plan-correct Migration Rollback Notes in `docs/migration-rollback-notes.md` and `tests/test_migration_rollback_notes.py`.

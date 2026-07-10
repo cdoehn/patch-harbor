@@ -97,3 +97,8 @@ That later patch should prove that failed or partial smokes do not blur the sour
 ## PATCHHARBOR.16a4-fix2 applied
 
 - Plan repair: PATCHHARBOR.16a4-fix2 adds `docs/dual-repo-private-value-audit.md` and `tests/test_dual_repo_private_value_audit.py` so Milestone 16 again matches the operative `planning/milestones_migration.md` 16a4 slot.
+
+
+## PATCHHARBOR.16b1-fix1 applied
+
+- Plan repair: PATCHHARBOR.16b1-fix1 adds `docs/migration-rollback-notes.md` and `tests/test_migration_rollback_notes.py` so Milestone 16b again follows the operative plan.

@@ -86,3 +86,8 @@ That later patch should document and test how a contributor recognizes the safe 
 ## PATCHHARBOR.16a4-fix2 applied
 
 - Plan repair: PATCHHARBOR.16a4-fix2 adds `docs/dual-repo-private-value-audit.md` and `tests/test_dual_repo_private_value_audit.py`; failure-boundary evidence remains unchanged.
+
+
+## PATCHHARBOR.16b1-fix1 applied
+
+- Plan repair: PATCHHARBOR.16b1-fix1 adds `docs/migration-rollback-notes.md` and `tests/test_migration_rollback_notes.py`; failure-boundary evidence remains unchanged.
