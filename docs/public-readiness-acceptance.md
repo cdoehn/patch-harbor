@@ -163,3 +163,8 @@ Release and branch hygiene are handled by later milestones.
 ## PATCHHARBOR.16b3 applied
 
 - Dual repo recovery acceptance now lives in `docs/dual-repo-recovery-acceptance.md` and `tests/test_dual_repo_recovery_acceptance.py`; it verifies recovery after a contained runner failure while RepoDossier stays unchanged.
+
+
+## PATCHHARBOR.16a4-fix2 applied
+
+- Plan repair: PATCHHARBOR.16a4-fix2 adds the plan-correct Dual Repo Private Value Audit in `docs/dual-repo-private-value-audit.md` and `tests/test_dual_repo_private_value_audit.py`; next repair is PATCHHARBOR.16b1-fix1 Migration Rollback Notes.

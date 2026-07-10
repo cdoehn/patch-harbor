@@ -78,3 +78,8 @@ PATCHHARBOR.16b3 does not:
 PATCHHARBOR.16c1 should add the final dual-repo milestone acceptance.
 
 That later patch should aggregate 16a and 16b evidence into a Milestone 16 readiness statement.
+
+
+## PATCHHARBOR.16a4-fix2 applied
+
+- Plan repair: PATCHHARBOR.16a4-fix2 adds `docs/dual-repo-private-value-audit.md` and `tests/test_dual_repo_private_value_audit.py`; recovery evidence remains unchanged.

@@ -68,3 +68,8 @@ That later acceptance can aggregate 16a1 through 16a4 and enforce the source-onl
 ## PATCHHARBOR.16b1 applied
 
 - Dual repo boundary acceptance now lives in `docs/dual-repo-boundary-acceptance.md` and `tests/test_dual_repo_boundary_acceptance.py`; it accepts the 16a smoke series as the current source/target boundary contract.
+
+
+## PATCHHARBOR.16a4-fix2 applied
+
+- Plan repair: PATCHHARBOR.16a4-fix2 adds the plan-correct Dual Repo Private Value Audit in `docs/dual-repo-private-value-audit.md` and `tests/test_dual_repo_private_value_audit.py`; this export smoke is retained as already green Milestone 16 evidence.

@@ -92,3 +92,8 @@ That later patch should prove that failed or partial smokes do not blur the sour
 ## PATCHHARBOR.16b3 applied
 
 - Dual repo recovery acceptance now lives in `docs/dual-repo-recovery-acceptance.md` and `tests/test_dual_repo_recovery_acceptance.py`; it proves a clean recovery run after a contained runner failure.
+
+
+## PATCHHARBOR.16a4-fix2 applied
+
+- Plan repair: PATCHHARBOR.16a4-fix2 adds `docs/dual-repo-private-value-audit.md` and `tests/test_dual_repo_private_value_audit.py` so Milestone 16 again matches the operative `planning/milestones_migration.md` 16a4 slot.

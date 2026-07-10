@@ -81,3 +81,8 @@ That later patch should document and test how a contributor recognizes the safe 
 ## PATCHHARBOR.16b3 applied
 
 - Dual repo recovery acceptance now lives in `docs/dual-repo-recovery-acceptance.md` and `tests/test_dual_repo_recovery_acceptance.py`.
+
+
+## PATCHHARBOR.16a4-fix2 applied
+
+- Plan repair: PATCHHARBOR.16a4-fix2 adds `docs/dual-repo-private-value-audit.md` and `tests/test_dual_repo_private_value_audit.py`; failure-boundary evidence remains unchanged.
