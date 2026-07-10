@@ -213,3 +213,8 @@ Release and branch hygiene are handled by later milestones.
 ## PATCHHARBOR.17c1 applied
 
 - PATCHHARBOR.17c1 adds the migration branch inventory in `docs/migration-branch-inventory.md` and `tests/test_migration_branch_inventory.py`; next operative step is PATCHHARBOR.17c2.
+
+
+## PATCHHARBOR.17c2 applied
+
+- PATCHHARBOR.17c2 adds local branch cleanup commands in `docs/local-branch-cleanup-commands.md` and `tests/test_local_branch_cleanup_commands.py`; next operative step is PATCHHARBOR.17c3.

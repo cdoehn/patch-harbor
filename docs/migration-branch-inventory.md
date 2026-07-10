@@ -117,3 +117,8 @@ The next operative plan step is:
     PATCHHARBOR.17c2 – Local Branch Cleanup Commands
 
 PATCHHARBOR.17c2 should document local branch cleanup commands, but still must not delete remote branches.
+
+
+## PATCHHARBOR.17c2 applied
+
+- PATCHHARBOR.17c2 adds local branch cleanup commands in `docs/local-branch-cleanup-commands.md` and `tests/test_local_branch_cleanup_commands.py`; this inventory remains read-only and does not execute deletion commands.

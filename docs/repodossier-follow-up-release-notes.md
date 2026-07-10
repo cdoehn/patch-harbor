@@ -82,3 +82,8 @@ PATCHHARBOR.17c1 should document the migration branch inventory before local or 
 ## PATCHHARBOR.17c1 applied
 
 - PATCHHARBOR.17c1 adds the migration branch inventory in `docs/migration-branch-inventory.md` and `tests/test_migration_branch_inventory.py`; it documents read-only branch inventory commands without storing concrete branch names.
+
+
+## PATCHHARBOR.17c2 applied
+
+- PATCHHARBOR.17c2 adds local branch cleanup commands in `docs/local-branch-cleanup-commands.md` and `tests/test_local_branch_cleanup_commands.py`; no remote cleanup is performed.
