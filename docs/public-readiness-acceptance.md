@@ -148,3 +148,8 @@ Release and branch hygiene are handled by later milestones.
 ## PATCHHARBOR.16a4 applied
 
 - Dual repo export smoke now lives in `docs/dual-repo-export-smoke.md` and `tests/test_dual_repo_export_smoke.py`; it exercises safe RepoDossier export list/dry-run behavior while source status remains unchanged.
+
+
+## PATCHHARBOR.16b1 applied
+
+- Dual repo boundary acceptance now lives in `docs/dual-repo-boundary-acceptance.md` and `tests/test_dual_repo_boundary_acceptance.py`; it aggregates PATCHHARBOR.16a1 through PATCHHARBOR.16a4.

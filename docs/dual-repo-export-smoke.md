@@ -63,3 +63,8 @@ The smoke must not:
 PATCHHARBOR.16b1 should add the dual-repo boundary acceptance.
 
 That later acceptance can aggregate 16a1 through 16a4 and enforce the source-only/target-only boundary as a milestone-level contract.
+
+
+## PATCHHARBOR.16b1 applied
+
+- Dual repo boundary acceptance now lives in `docs/dual-repo-boundary-acceptance.md` and `tests/test_dual_repo_boundary_acceptance.py`; it accepts the 16a smoke series as the current source/target boundary contract.

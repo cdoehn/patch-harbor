@@ -70,3 +70,8 @@ That later smoke can exercise RepoDossier export behavior in a controlled way, b
 ## PATCHHARBOR.16a4 applied
 
 - Dual repo export smoke now lives in `docs/dual-repo-export-smoke.md` and `tests/test_dual_repo_export_smoke.py`.
+
+
+## PATCHHARBOR.16b1 applied
+
+- Dual repo boundary acceptance now lives in `docs/dual-repo-boundary-acceptance.md` and `tests/test_dual_repo_boundary_acceptance.py`.

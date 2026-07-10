@@ -68,3 +68,8 @@ That later smoke can validate source wrapper bridge behavior, but PATCHHARBOR.16
 ## PATCHHARBOR.16a3 applied
 
 - Dual repo source-wrapper smoke now lives in `docs/dual-repo-source-wrapper-smoke.md` and `tests/test_dual_repo_source_wrapper_smoke.py`; it checks source wrappers without executing `c` or `r`.
+
+
+## PATCHHARBOR.16b1 applied
+
+- Dual repo boundary acceptance now lives in `docs/dual-repo-boundary-acceptance.md` and `tests/test_dual_repo_boundary_acceptance.py`.
