@@ -129,3 +129,10 @@ PATCHHARBOR.15c records public API and public-readiness acceptance.
 - Public documentation inventory now lives in `docs/public-docs-inventory.md`.
 - 15a1 records migration artifacts; 15a2 records current public documentation boundaries.
 - No migration artifact is deleted by PATCHHARBOR.15a2.
+
+
+## PATCHHARBOR.15b1 applied
+
+- Runner documentation consolidation now lives in `docs/runner.md`.
+- Historical runner migration documents are retained for later 15b4 historical marking.
+- No migration artifact is deleted by PATCHHARBOR.15b1.

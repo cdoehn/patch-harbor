@@ -109,3 +109,10 @@ PATCHHARBOR.15a2 does not:
 - mark docs historical
 
 Those changes happen in later 15b and 15c patches.
+
+
+## PATCHHARBOR.15b1 applied
+
+- Consolidated runner documentation now lives in `docs/runner.md`.
+- `docs/download-runner-api-inventory.md`, `docs/download-runner-lifecycle-plan-acceptance.md`, `docs/runner-compatibility-acceptance.md`, and `docs/runner-compatibility-migration.md` remain as inputs and acceptance history.
+- No migration artifact is deleted by PATCHHARBOR.15b1.
