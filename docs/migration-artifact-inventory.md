@@ -157,3 +157,8 @@ PATCHHARBOR.15c records public API and public-readiness acceptance.
 - Historical migration documents are marked with `PATCHHARBOR.15b4 historical-migration-doc`.
 - The historical documents are retained for traceability and are not deleted.
 - Current public contracts are consolidated into `docs/runner.md`, `docs/compatibility.md`, and `docs/cli.md`.
+
+
+## PATCHHARBOR.15c1 applied
+
+- Public API inventory now lives in `docs/public-api-inventory.md`; migration artifacts remain historical and are not deleted by PATCHHARBOR.15c1.

@@ -150,3 +150,8 @@ Historical migration docs are marked historical by PATCHHARBOR.15b4.
 ## PATCHHARBOR.15b4 applied
 
 - Historical runner migration inputs were marked historical by PATCHHARBOR.15b4; this document is the current runner contract.
+
+
+## PATCHHARBOR.15c1 applied
+
+- Public API inventory now lives in `docs/public-api-inventory.md`; runner docs remain the public runner behavior contract.

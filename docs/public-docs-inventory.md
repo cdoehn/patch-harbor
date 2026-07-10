@@ -137,3 +137,8 @@ Those changes happen in later 15b and 15c patches.
 - Migration documents are marked with the `PATCHHARBOR.15b4 historical-migration-doc` HTML marker.
 - Current public runner, compatibility, and CLI docs remain in `docs/runner.md`, `docs/compatibility.md`, and `docs/cli.md`.
 - No migration artifact is deleted by PATCHHARBOR.15b4.
+
+
+## PATCHHARBOR.15c1 applied
+
+- Public API inventory now lives in `docs/public-api-inventory.md` and defines the public CLI, Python, and compatibility API surfaces for 15c stability testing.

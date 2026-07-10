@@ -157,3 +157,8 @@ Historical migration docs are marked historical by PATCHHARBOR.15b4.
 ## PATCHHARBOR.15b4 applied
 
 - Historical CLI and migration inputs were marked historical by PATCHHARBOR.15b4; this document is the current CLI contract.
+
+
+## PATCHHARBOR.15c1 applied
+
+- Public API inventory now lives in `docs/public-api-inventory.md`; CLI docs remain the public command contract.
