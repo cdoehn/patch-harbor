@@ -12,6 +12,8 @@ except ImportError:
 
 from patchharbor.patch_lint import PatchLintError
 from patchharbor.patch_lint_api import lint_patch_file, render_patch_lint_result
+from patchharbor.public_audit import PublicAuditModelError, PublicAuditPattern, PublicAuditTarget
+from patchharbor.public_audit_checks import PublicAuditCheckError, scan_public_audit_targets
 from patchharbor.runner_core import RunnerCoreError, RunnerExecutionConfig, run_patch_script
 from patchharbor.runner_display import render_runner_result
 
@@ -97,6 +99,35 @@ def build_parser() -> argparse.ArgumentParser:
         help="environment variable to pass to the script; may be provided multiple times",
     )
 
+    audit_public = subparsers.add_parser(
+        "audit-public",
+        help="scan repository targets for user-provided public-audit patterns",
+    )
+    audit_public.add_argument(
+        "--repo",
+        default=".",
+        help="repository path to scan; defaults to the current working directory",
+    )
+    audit_public.add_argument(
+        "--pattern",
+        action="append",
+        default=[],
+        metavar="NAME=VALUE",
+        help="pattern to scan for; may be NAME=VALUE or NAME:SEVERITY=VALUE",
+    )
+    audit_public.add_argument(
+        "--target",
+        action="append",
+        default=[],
+        metavar="PATH",
+        help="relative target file to scan; defaults to git tracked files",
+    )
+    audit_public.add_argument(
+        "--encoding",
+        default="utf-8",
+        help="text encoding for scanned files; defaults to utf-8",
+    )
+
     return parser
 
 
@@ -179,6 +210,89 @@ def _run_run_script(args: argparse.Namespace) -> int:
     return 0 if result.ok else 1
 
 
+def _run_audit_public(args: argparse.Namespace) -> int:
+    print("PatchHarbor audit-public")
+    print(f"repository: {Path(args.repo).expanduser()}")
+
+    try:
+        repo_path = Path(args.repo).expanduser()
+        root = _require_git_root(repo_path)
+        patterns = _parse_public_audit_patterns(args.pattern)
+        targets = _public_audit_targets(root, args.target)
+        result = scan_public_audit_targets(root, targets, patterns, encoding=args.encoding)
+    except (PublicAuditModelError, PublicAuditCheckError, ValueError) as exc:
+        print("status: error")
+        print(f"problem: {exc}")
+        return 2
+
+    print(f"repository root: {root}")
+    print(f"scanned targets: {result.scanned_targets}")
+    print(f"skipped targets: {result.skipped_targets}")
+    print(f"findings: {result.finding_count}")
+
+    if result.finding_count:
+        for finding in result.findings:
+            column = "" if finding.column is None else f":{finding.column}"
+            print(
+                f"{finding.path}:{finding.line}{column}: "
+                f"{finding.severity}/{finding.pattern.name}: {finding.text}"
+            )
+
+    if result.failed:
+        print("status: failed")
+        return 1
+    if result.finding_count:
+        print("status: warning")
+        return 0
+
+    print("status: ok")
+    return 0
+
+
+def _parse_public_audit_patterns(values: Sequence[str]) -> tuple[PublicAuditPattern, ...]:
+    if not values:
+        raise ValueError("at least one --pattern is required")
+    patterns: list[PublicAuditPattern] = []
+    for value in values:
+        if "=" not in value:
+            raise ValueError(f"public audit pattern must use NAME=VALUE syntax: {value}")
+        name_part, pattern_value = value.split("=", 1)
+        if ":" in name_part:
+            name, severity = name_part.split(":", 1)
+        else:
+            name, severity = name_part, "error"
+        patterns.append(PublicAuditPattern(name=name, value=pattern_value, severity=severity))
+    return tuple(patterns)
+
+
+def _public_audit_targets(root: Path, values: Sequence[str]) -> tuple[PublicAuditTarget, ...]:
+    if values:
+        return tuple(PublicAuditTarget(value) for value in values)
+
+    result = subprocess.run(
+        ["git", "-C", str(root), "ls-files"],
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    if result.returncode != 0:
+        raise ValueError("git ls-files failed while discovering public audit targets")
+    targets = tuple(PublicAuditTarget(line) for line in result.stdout.splitlines() if line.strip())
+    if not targets:
+        raise ValueError("public audit target discovery found no tracked files")
+    return targets
+
+
+def _require_git_root(path: Path) -> Path:
+    if not path.exists():
+        raise ValueError(f"repository path does not exist: {path}")
+    root = _git_root(path)
+    if root is None:
+        raise ValueError(f"repository path is not a git repository: {path.resolve()}")
+    return root
+
+
 def _parse_env_pairs(values: Sequence[str]) -> dict[str, str]:
     environment: dict[str, str] = {}
     for value in values:
@@ -201,6 +315,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _run_lint_script(args.path)
     if args.command == "run-script":
         return _run_run_script(args)
+    if args.command == "audit-public":
+        return _run_audit_public(args)
 
     parser.print_help()
     return 0
