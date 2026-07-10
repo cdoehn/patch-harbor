@@ -91,3 +91,8 @@ That later patch should document and test how a contributor recognizes the safe 
 ## PATCHHARBOR.16b1-fix1 applied
 
 - Plan repair: PATCHHARBOR.16b1-fix1 adds `docs/migration-rollback-notes.md` and `tests/test_migration_rollback_notes.py`; failure-boundary evidence remains unchanged.
+
+
+## PATCHHARBOR.16b2-fix1 applied
+
+- Plan repair: PATCHHARBOR.16b2-fix1 adds `docs/migration-completion-checklist.md` and `tests/test_migration_completion_checklist.py`; retained failure-boundary evidence remains unchanged.

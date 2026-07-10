@@ -81,3 +81,8 @@ After this patch is green, the next plan-repair patch is PATCHHARBOR.16b1-fix1 â
 ## PATCHHARBOR.16b1-fix1 applied
 
 - Plan repair: PATCHHARBOR.16b1-fix1 adds the plan-correct Migration Rollback Notes in `docs/migration-rollback-notes.md` and `tests/test_migration_rollback_notes.py`.
+
+
+## PATCHHARBOR.16b2-fix1 applied
+
+- Plan repair: PATCHHARBOR.16b2-fix1 adds `docs/migration-completion-checklist.md` and `tests/test_migration_completion_checklist.py`; final migration acceptance remains the next plan-repair step.

@@ -88,3 +88,8 @@ That later patch should aggregate 16a and 16b evidence into a Milestone 16 readi
 ## PATCHHARBOR.16b1-fix1 applied
 
 - Plan repair: PATCHHARBOR.16b1-fix1 adds `docs/migration-rollback-notes.md` and `tests/test_migration_rollback_notes.py`; recovery evidence remains unchanged.
+
+
+## PATCHHARBOR.16b2-fix1 applied
+
+- Plan repair: PATCHHARBOR.16b2-fix1 adds `docs/migration-completion-checklist.md` and `tests/test_migration_completion_checklist.py`; retained recovery evidence remains unchanged.

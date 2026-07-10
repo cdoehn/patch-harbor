@@ -119,3 +119,8 @@ Do not:
 ## Handoff
 
 After these rollback notes are green, the next plan-repair patch is PATCHHARBOR.16b2-fix1 – Migration Completion Checklist.
+
+
+## PATCHHARBOR.16b2-fix1 applied
+
+- Plan repair: PATCHHARBOR.16b2-fix1 adds the plan-correct Migration Completion Checklist in `docs/migration-completion-checklist.md` and `tests/test_migration_completion_checklist.py`.

@@ -173,3 +173,8 @@ Release and branch hygiene are handled by later milestones.
 ## PATCHHARBOR.16b1-fix1 applied
 
 - Plan repair: PATCHHARBOR.16b1-fix1 adds the plan-correct Migration Rollback Notes in `docs/migration-rollback-notes.md` and `tests/test_migration_rollback_notes.py`; next repair is PATCHHARBOR.16b2-fix1 Migration Completion Checklist.
+
+
+## PATCHHARBOR.16b2-fix1 applied
+
+- Plan repair: PATCHHARBOR.16b2-fix1 adds the plan-correct Migration Completion Checklist in `docs/migration-completion-checklist.md` and `tests/test_migration_completion_checklist.py`; next repair is PATCHHARBOR.16b3-fix1 Final Migration Acceptance.
