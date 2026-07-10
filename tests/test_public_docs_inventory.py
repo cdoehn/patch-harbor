@@ -126,12 +126,12 @@ class PatchHarborPublicDocsInventoryTests(unittest.TestCase):
             for path in [INVENTORY, MIGRATION_INVENTORY, Path(__file__).resolve()]
         )
         forbidden = [
-            "/home/" + "christian",
-            "christian" + "@",
-            "christian.doehn" + "@" + "gmail.com",
-            "Think" + "Pad",
-            "Blade-" + "15",
-            "~/" + "Projekte",
+            "/home/" + "exampleuser",
+            "user" + "@",
+            "example.user" + "@" + "example.invalid",
+            "Example" + "Laptop",
+            "Example" + "Machine",
+            "~/" + "Projects",
         ]
         for value in forbidden:
             with self.subTest(value=value):

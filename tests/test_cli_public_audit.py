@@ -169,12 +169,12 @@ class PatchHarborPublicAuditCliTests(unittest.TestCase):
             "audit_public_" + "repo.py",
             "FORBIDDEN_" + "PATTERNS",
             "market_" + "research",
-            "/home/" + "christian",
-            "christian" + "@",
-            "christian.doehn" + "@" + "gmail.com",
-            "Think" + "Pad",
-            "Blade-" + "15",
-            "~/" + "Projekte",
+            "/home/" + "exampleuser",
+            "user" + "@",
+            "example.user" + "@" + "example.invalid",
+            "Example" + "Laptop",
+            "Example" + "Machine",
+            "~/" + "Projects",
             chr(96) * 3,
         ]
         for value in forbidden:

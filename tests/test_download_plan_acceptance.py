@@ -159,11 +159,11 @@ class DownloadRunnerLifecyclePlanAcceptanceTests(unittest.TestCase):
         ]
         text = "\n".join(path.read_text(encoding="utf-8") for path in checked)
         forbidden = [
-            "/home/" + "christian",
-            "christian" + "@",
-            "christian.doehn" + "@" + "gmail.com",
-            "Think" + "Pad",
-            "~/" + "Projekte",
+            "/home/" + "exampleuser",
+            "user" + "@",
+            "example.user" + "@" + "example.invalid",
+            "Example" + "Laptop",
+            "~/" + "Projects",
             chr(96) * 3,
         ]
         for value in forbidden:

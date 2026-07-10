@@ -71,12 +71,12 @@ def _source_status(source: Path) -> str:
 
 def _private_patterns() -> list[tuple[str, str]]:
     return [
-        ("local-home", "/home/" + "christian"),
-        ("local-email", "christian.doehn" + "@" + "gmail.com"),
-        ("local-user-at", "christian" + "@"),
-        ("thinkpad", "Think" + "Pad"),
-        ("blade", "Blade-" + "15"),
-        ("local-project-shortcut", "~/" + "Projekte"),
+        ("local-home", "/home/" + "exampleuser"),
+        ("local-email", "example.user" + "@" + "example.invalid"),
+        ("local-user-at", "user" + "@"),
+        ("thinkpad", "Example" + "Laptop"),
+        ("blade", "Example" + "Machine"),
+        ("local-project-shortcut", "~/" + "Projects"),
     ]
 
 

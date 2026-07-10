@@ -83,12 +83,12 @@ class PatchHarborReadmeInstallationTests(unittest.TestCase):
     def test_readme_installation_does_not_store_private_local_values(self) -> None:
         text = self.readme() + "\n" + Path(__file__).read_text(encoding="utf-8")
         forbidden = [
-            "/home/" + "christian",
-            "christian" + "@",
-            "christian.doehn" + "@" + "gmail.com",
-            "Think" + "Pad",
-            "Blade-" + "15",
-            "~/" + "Projekte",
+            "/home/" + "exampleuser",
+            "user" + "@",
+            "example.user" + "@" + "example.invalid",
+            "Example" + "Laptop",
+            "Example" + "Machine",
+            "~/" + "Projects",
             chr(96) * 3,
         ]
         for value in forbidden:

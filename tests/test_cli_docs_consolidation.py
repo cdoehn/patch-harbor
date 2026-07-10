@@ -106,12 +106,12 @@ class PatchHarborCliDocsConsolidationTests(unittest.TestCase):
             for path in [CLI_DOC, PUBLIC_DOCS_INVENTORY, MIGRATION_ARTIFACT_INVENTORY, RUNNER_DOC, COMPAT_DOC, Path(__file__).resolve()]
         )
         forbidden = [
-            "/home/" + "christian",
-            "christian" + "@",
-            "christian.doehn" + "@" + "gmail.com",
-            "Think" + "Pad",
-            "Blade-" + "15",
-            "~/" + "Projekte",
+            "/home/" + "exampleuser",
+            "user" + "@",
+            "example.user" + "@" + "example.invalid",
+            "Example" + "Laptop",
+            "Example" + "Machine",
+            "~/" + "Projects",
         ]
         for value in forbidden:
             with self.subTest(value=value):

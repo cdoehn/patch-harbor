@@ -95,11 +95,11 @@ class PatchHarborRunnerCompatibilityInventoryTests(unittest.TestCase):
     def test_inventory_does_not_store_local_private_values(self) -> None:
         text = INVENTORY.read_text(encoding="utf-8")
         forbidden = [
-            "/home/" + "christian",
-            "christian" + "@",
-            "christian.doehn" + "@" + "gmail.com",
-            "Think" + "Pad",
-            "~/" + "Projekte",
+            "/home/" + "exampleuser",
+            "user" + "@",
+            "example.user" + "@" + "example.invalid",
+            "Example" + "Laptop",
+            "~/" + "Projects",
             chr(96) * 3,
         ]
         for value in forbidden:

@@ -132,11 +132,11 @@ class PatchHarborMetadataTests(unittest.TestCase):
             ]
         )
         forbidden = [
-            "/home/" + "christian",
-            "christian" + "@",
-            "christian.doehn" + "@" + "gmail.com",
-            "Think" + "Pad",
-            "~/" + "Projekte",
+            "/home/" + "exampleuser",
+            "user" + "@",
+            "example.user" + "@" + "example.invalid",
+            "Example" + "Laptop",
+            "~/" + "Projects",
         ]
         for value in forbidden:
             with self.subTest(value=value):

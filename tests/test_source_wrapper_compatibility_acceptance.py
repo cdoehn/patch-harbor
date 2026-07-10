@@ -112,11 +112,11 @@ class PatchHarborSourceWrapperCompatibilityAcceptanceTests(unittest.TestCase):
         ]
         text = "\n".join(path.read_text(encoding="utf-8") for path in checked)
         forbidden = [
-            "/home/" + "christian",
-            "christian" + "@",
-            "christian.doehn" + "@" + "gmail.com",
-            "Think" + "Pad",
-            "~/" + "Projekte",
+            "/home/" + "exampleuser",
+            "user" + "@",
+            "example.user" + "@" + "example.invalid",
+            "Example" + "Laptop",
+            "~/" + "Projects",
             "run_latest_" + "download_patch",
             chr(96) * 3,
         ]

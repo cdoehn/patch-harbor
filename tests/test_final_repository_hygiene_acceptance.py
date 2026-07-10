@@ -75,12 +75,12 @@ def _git(repo: Path, *args: str) -> subprocess.CompletedProcess[str]:
 
 def _private_patterns() -> list[str]:
     return [
-        "/home/" + "christian",
-        "christian.doehn" + "@" + "gmail.com",
-        "christian" + "@",
-        "Think" + "Pad",
-        "Blade-" + "15",
-        "~/" + "Projekte",
+        "/home/" + "exampleuser",
+        "example.user" + "@" + "example.invalid",
+        "user" + "@",
+        "Example" + "Laptop",
+        "Example" + "Machine",
+        "~/" + "Projects",
     ]
 
 

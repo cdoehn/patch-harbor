@@ -66,11 +66,11 @@ class PatchHarborConsoleTests(unittest.TestCase):
     def test_test_file_does_not_store_local_private_values(self) -> None:
         text = __import__("pathlib").Path(__file__).read_text(encoding="utf-8")
         forbidden = [
-            "/home/" + "christian",
-            "christian" + "@",
-            "christian.doehn" + "@" + "gmail.com",
-            "Think" + "Pad",
-            "~/" + "Projekte",
+            "/home/" + "exampleuser",
+            "user" + "@",
+            "example.user" + "@" + "example.invalid",
+            "Example" + "Laptop",
+            "~/" + "Projects",
         ]
         for value in forbidden:
             with self.subTest(value=value):

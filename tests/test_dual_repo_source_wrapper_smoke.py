@@ -157,12 +157,12 @@ class PatchHarborDualRepoSourceWrapperSmokeTests(unittest.TestCase):
             for path in [SMOKE_DOC, DISCOVERY_DOC, PATCH_RUNNER_DOC, PUBLIC_READINESS, Path(__file__).resolve()]
         )
         forbidden = [
-            "/home/" + "christian",
-            "christian" + "@",
-            "christian.doehn" + "@" + "gmail.com",
-            "Think" + "Pad",
-            "Blade-" + "15",
-            "~/" + "Projekte",
+            "/home/" + "exampleuser",
+            "user" + "@",
+            "example.user" + "@" + "example.invalid",
+            "Example" + "Laptop",
+            "Example" + "Machine",
+            "~/" + "Projects",
         ]
         for value in forbidden:
             with self.subTest(value=value):
