@@ -228,3 +228,13 @@ PATCHHARBOR.15c1 does not:
 PATCHHARBOR.15c2 adds public API stability tests.
 
 PATCHHARBOR.15c3 adds final public readiness acceptance.
+
+
+## PATCHHARBOR.15c2 applied
+
+- Public API stability tests now live in `tests/test_public_api_stability.py`.
+- The tests import every public module listed in this inventory.
+- The tests assert every listed public object exists.
+- The tests assert documented public dataclass models remain dataclasses.
+- The tests assert public CLI commands remain available in parser and help output.
+- The tests exercise representative lint, runner, workflow, and compatibility public APIs.

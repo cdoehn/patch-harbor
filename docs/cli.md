@@ -162,3 +162,8 @@ Historical migration docs are marked historical by PATCHHARBOR.15b4.
 ## PATCHHARBOR.15c1 applied
 
 - Public API inventory now lives in `docs/public-api-inventory.md`; CLI docs remain the public command contract.
+
+
+## PATCHHARBOR.15c2 applied
+
+- Public API stability tests now live in `tests/test_public_api_stability.py` and protect public CLI commands listed in this document.

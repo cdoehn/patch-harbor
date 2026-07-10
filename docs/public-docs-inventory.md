@@ -142,3 +142,8 @@ Those changes happen in later 15b and 15c patches.
 ## PATCHHARBOR.15c1 applied
 
 - Public API inventory now lives in `docs/public-api-inventory.md` and defines the public CLI, Python, and compatibility API surfaces for 15c stability testing.
+
+
+## PATCHHARBOR.15c2 applied
+
+- Public API stability tests now live in `tests/test_public_api_stability.py` and protect the surfaces inventoried in `docs/public-api-inventory.md`.
