@@ -152,3 +152,8 @@ PATCHHARBOR.15b3 does not:
 - change package metadata
 
 Historical migration docs are marked historical by PATCHHARBOR.15b4.
+
+
+## PATCHHARBOR.15b4 applied
+
+- Historical CLI and migration inputs were marked historical by PATCHHARBOR.15b4; this document is the current CLI contract.

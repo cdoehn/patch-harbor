@@ -64,17 +64,17 @@ This anchor records the first explicit 15b milestone references in intended orde
 
 | Path | Historical reason | Future action |
 | --- | --- | --- |
-| `docs/migration.md` | extraction narrative and migration boundary | mark historical in PATCHHARBOR.15b4 |
-| `docs/dev-script-inventory.md` | early source helper inventory | mark historical in PATCHHARBOR.15b4 |
-| `docs/workflow-rules-migration.md` | workflow rules extraction notes | mark historical in PATCHHARBOR.15b4 |
-| `docs/patch-linting-migration.md` | lint extraction notes | mark historical in PATCHHARBOR.15b4 |
-| `docs/runner-compatibility-migration.md` | runner extraction notes | mark historical in PATCHHARBOR.15b4 |
-| `docs/source-wrapper-compatibility-migration.md` | source wrapper extraction notes | mark historical in PATCHHARBOR.15b4 |
-| `docs/source-side-adoption-inventory.md` | adoption planning inventory | mark historical in PATCHHARBOR.15b4 |
-| `docs/source-side-adoption-preflight-inventory.md` | adoption preflight planning | mark historical in PATCHHARBOR.15b4 |
-| `docs/source-side-alias-compatibility-plan.md` | alias compatibility planning bridge | mark historical after compatibility docs are consolidated |
-| `docs/source-side-runner-compatibility-tests.md` | test-planning bridge | mark historical after runner docs are consolidated |
-| `docs/source-side-runner-wrapper-draft.md` | draft wrapper document | mark historical in PATCHHARBOR.15b4 |
+| `docs/migration.md` | extraction narrative and migration boundary | marked historical by PATCHHARBOR.15b4 |
+| `docs/dev-script-inventory.md` | early source helper inventory | marked historical by PATCHHARBOR.15b4 |
+| `docs/workflow-rules-migration.md` | workflow rules extraction notes | marked historical by PATCHHARBOR.15b4 |
+| `docs/patch-linting-migration.md` | lint extraction notes | marked historical by PATCHHARBOR.15b4 |
+| `docs/runner-compatibility-migration.md` | runner extraction notes | marked historical by PATCHHARBOR.15b4 |
+| `docs/source-wrapper-compatibility-migration.md` | source wrapper extraction notes | marked historical by PATCHHARBOR.15b4 |
+| `docs/source-side-adoption-inventory.md` | adoption planning inventory | marked historical by PATCHHARBOR.15b4 |
+| `docs/source-side-adoption-preflight-inventory.md` | adoption preflight planning | marked historical by PATCHHARBOR.15b4 |
+| `docs/source-side-alias-compatibility-plan.md` | alias compatibility planning bridge | marked historical by PATCHHARBOR.15b4 after compatibility docs were consolidated |
+| `docs/source-side-runner-compatibility-tests.md` | test-planning bridge | marked historical by PATCHHARBOR.15b4 after runner docs were consolidated |
+| `docs/source-side-runner-wrapper-draft.md` | draft wrapper document | marked historical by PATCHHARBOR.15b4 |
 
 ## Consolidation plan
 
@@ -130,3 +130,10 @@ Those changes happen in later 15b and 15c patches.
 - Consolidated CLI documentation now lives in `docs/cli.md`.
 - `docs/cli-command-inventory.md`, `docs/cli-exit-code-contract.md`, `docs/patch-linting-acceptance.md`, and `docs/packaging-acceptance.md` remain as inputs and acceptance history.
 - No migration artifact is deleted by PATCHHARBOR.15b3.
+
+
+## PATCHHARBOR.15b4 applied
+
+- Migration documents are marked with the `PATCHHARBOR.15b4 historical-migration-doc` HTML marker.
+- Current public runner, compatibility, and CLI docs remain in `docs/runner.md`, `docs/compatibility.md`, and `docs/cli.md`.
+- No migration artifact is deleted by PATCHHARBOR.15b4.

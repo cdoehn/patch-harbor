@@ -132,3 +132,8 @@ Historical migration docs are marked historical by PATCHHARBOR.15b4.
 
 - CLI command documentation now lives in `docs/cli.md`.
 - Compatibility docs keep boundary rules and link to CLI docs for public command names and exit-code summary.
+
+
+## PATCHHARBOR.15b4 applied
+
+- Historical compatibility and source-adoption inputs were marked historical by PATCHHARBOR.15b4; this document is the current compatibility contract.

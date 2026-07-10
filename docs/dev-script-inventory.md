@@ -1,3 +1,10 @@
+<!-- PATCHHARBOR.15b4 historical-migration-doc -->
+
+> Historical migration document.
+>
+> This file records PatchHarbor extraction and adoption history. It is retained for traceability, but it is not the current public command contract.
+> Current public runner docs live in `docs/runner.md`; compatibility docs live in `docs/compatibility.md`; CLI docs live in `docs/cli.md`.
+
 # PatchHarbor Dev-Script migration inventory
 
 This inventory tracks the reusable Dev-Script candidates that should be extracted into PatchHarbor.

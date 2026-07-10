@@ -145,3 +145,8 @@ Historical migration docs are marked historical by PATCHHARBOR.15b4.
 
 - CLI command documentation now lives in `docs/cli.md`.
 - Runner docs keep runner-specific behavior and link to CLI docs for command naming, examples, and exit-code summary.
+
+
+## PATCHHARBOR.15b4 applied
+
+- Historical runner migration inputs were marked historical by PATCHHARBOR.15b4; this document is the current runner contract.

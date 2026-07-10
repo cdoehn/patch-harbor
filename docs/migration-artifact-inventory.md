@@ -150,3 +150,10 @@ PATCHHARBOR.15c records public API and public-readiness acceptance.
 - CLI documentation consolidation now lives in `docs/cli.md`.
 - Historical CLI inventory and exit-code documents are retained for later 15b4 historical marking or public-doc source preservation.
 - No migration artifact is deleted by PATCHHARBOR.15b3.
+
+
+## PATCHHARBOR.15b4 applied
+
+- Historical migration documents are marked with `PATCHHARBOR.15b4 historical-migration-doc`.
+- The historical documents are retained for traceability and are not deleted.
+- Current public contracts are consolidated into `docs/runner.md`, `docs/compatibility.md`, and `docs/cli.md`.
