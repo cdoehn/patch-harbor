@@ -133,3 +133,8 @@ PATCHHARBOR.17c3 may document remote cleanup commands, but this patch must not.
 ## PATCHHARBOR.17c3 applied
 
 - PATCHHARBOR.17c3 adds remote branch cleanup command templates in `docs/remote-branch-cleanup-commands.md` and `tests/test_remote_branch_cleanup_commands.py`; local cleanup remains local-only.
+
+
+## PATCHHARBOR.17c4 applied
+
+- PATCHHARBOR.17c4 adds final repository hygiene acceptance in `docs/final-repository-hygiene-acceptance.md` and `tests/test_final_repository_hygiene_acceptance.py`; local cleanup commands remain documentation only.

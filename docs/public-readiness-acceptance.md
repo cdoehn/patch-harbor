@@ -223,3 +223,8 @@ Release and branch hygiene are handled by later milestones.
 ## PATCHHARBOR.17c3 applied
 
 - PATCHHARBOR.17c3 adds remote branch cleanup command templates in `docs/remote-branch-cleanup-commands.md` and `tests/test_remote_branch_cleanup_commands.py`; next operative step is PATCHHARBOR.17c4.
+
+
+## PATCHHARBOR.17c4 applied
+
+- PATCHHARBOR.17c4 adds final repository hygiene acceptance in `docs/final-repository-hygiene-acceptance.md` and `tests/test_final_repository_hygiene_acceptance.py`; next operative step must be read from `planning/milestones_migration.md`.

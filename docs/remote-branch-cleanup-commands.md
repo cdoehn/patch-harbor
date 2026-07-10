@@ -133,3 +133,8 @@ The next operative plan step is:
     PATCHHARBOR.17c4 – Final Repository Hygiene Acceptance
 
 PATCHHARBOR.17c4 should aggregate branch inventory, local cleanup commands, and remote cleanup commands into final repository hygiene acceptance.
+
+
+## PATCHHARBOR.17c4 applied
+
+- PATCHHARBOR.17c4 adds final repository hygiene acceptance in `docs/final-repository-hygiene-acceptance.md` and `tests/test_final_repository_hygiene_acceptance.py`; remote cleanup remains manual and unexecuted.
