@@ -160,3 +160,8 @@ Historical migration docs are marked historical by PATCHHARBOR.15b4.
 ## PATCHHARBOR.15c2 applied
 
 - Public API stability tests now live in `tests/test_public_api_stability.py` and protect public runner API surfaces listed in `docs/public-api-inventory.md`.
+
+
+## PATCHHARBOR.15c3 applied
+
+- Public readiness acceptance now lives in `docs/public-readiness-acceptance.md`; runner docs remain the public runner behavior contract for Milestone 16.

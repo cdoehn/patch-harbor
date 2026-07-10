@@ -147,3 +147,8 @@ Those changes happen in later 15b and 15c patches.
 ## PATCHHARBOR.15c2 applied
 
 - Public API stability tests now live in `tests/test_public_api_stability.py` and protect the surfaces inventoried in `docs/public-api-inventory.md`.
+
+
+## PATCHHARBOR.15c3 applied
+
+- Public readiness acceptance now lives in `docs/public-readiness-acceptance.md`; Milestone 15 public docs are consolidated for Milestone 16 E2E work.

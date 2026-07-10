@@ -238,3 +238,8 @@ PATCHHARBOR.15c3 adds final public readiness acceptance.
 - The tests assert documented public dataclass models remain dataclasses.
 - The tests assert public CLI commands remain available in parser and help output.
 - The tests exercise representative lint, runner, workflow, and compatibility public APIs.
+
+
+## PATCHHARBOR.15c3 applied
+
+- Public readiness acceptance now lives in `docs/public-readiness-acceptance.md` and closes the 15c public API/readiness series.

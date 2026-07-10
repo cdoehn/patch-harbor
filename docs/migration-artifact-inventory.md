@@ -167,3 +167,8 @@ PATCHHARBOR.15c records public API and public-readiness acceptance.
 ## PATCHHARBOR.15c2 applied
 
 - Public API stability tests now live in `tests/test_public_api_stability.py`; migration artifacts remain historical and are not deleted by PATCHHARBOR.15c2.
+
+
+## PATCHHARBOR.15c3 applied
+
+- Public readiness acceptance now lives in `docs/public-readiness-acceptance.md`; migration artifacts remain historical and are not deleted by PATCHHARBOR.15c3.
