@@ -139,3 +139,9 @@ Historical migration docs are marked historical by PATCHHARBOR.15b4.
 
 - Compatibility boundaries now live in `docs/compatibility.md`.
 - Runner docs keep the runner-specific contract and link to compatibility docs for source-wrapper boundaries.
+
+
+## PATCHHARBOR.15b3 applied
+
+- CLI command documentation now lives in `docs/cli.md`.
+- Runner docs keep runner-specific behavior and link to CLI docs for command naming, examples, and exit-code summary.

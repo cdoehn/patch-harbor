@@ -126,3 +126,9 @@ PATCHHARBOR.15b2 does not:
 CLI docs are consolidated by PATCHHARBOR.15b3.
 
 Historical migration docs are marked historical by PATCHHARBOR.15b4.
+
+
+## PATCHHARBOR.15b3 applied
+
+- CLI command documentation now lives in `docs/cli.md`.
+- Compatibility docs keep boundary rules and link to CLI docs for public command names and exit-code summary.

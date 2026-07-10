@@ -123,3 +123,10 @@ Those changes happen in later 15b and 15c patches.
 - Consolidated compatibility documentation now lives in `docs/compatibility.md`.
 - `docs/source-wrapper-compatibility-acceptance.md`, `docs/source-side-adoption-acceptance.md`, `docs/workflow-rules-acceptance.md`, and `docs/source-side-alias-compatibility-plan.md` remain as inputs and acceptance history.
 - No migration artifact is deleted by PATCHHARBOR.15b2.
+
+
+## PATCHHARBOR.15b3 applied
+
+- Consolidated CLI documentation now lives in `docs/cli.md`.
+- `docs/cli-command-inventory.md`, `docs/cli-exit-code-contract.md`, `docs/patch-linting-acceptance.md`, and `docs/packaging-acceptance.md` remain as inputs and acceptance history.
+- No migration artifact is deleted by PATCHHARBOR.15b3.

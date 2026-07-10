@@ -143,3 +143,10 @@ PATCHHARBOR.15c records public API and public-readiness acceptance.
 - Compatibility documentation consolidation now lives in `docs/compatibility.md`.
 - Historical compatibility and source-adoption migration documents are retained for later 15b4 historical marking.
 - No migration artifact is deleted by PATCHHARBOR.15b2.
+
+
+## PATCHHARBOR.15b3 applied
+
+- CLI documentation consolidation now lives in `docs/cli.md`.
+- Historical CLI inventory and exit-code documents are retained for later 15b4 historical marking or public-doc source preservation.
+- No migration artifact is deleted by PATCHHARBOR.15b3.
