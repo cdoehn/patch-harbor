@@ -82,3 +82,8 @@ PATCHHARBOR.16b1 does not:
 PATCHHARBOR.16b2 should add failure-boundary acceptance for the same dual-repo system.
 
 That later patch should prove that failed or partial smokes do not blur the source/target boundary and that recovery instructions remain clear.
+
+
+## PATCHHARBOR.16b2 applied
+
+- Dual repo failure-boundary acceptance now lives in `docs/dual-repo-failure-boundary-acceptance.md` and `tests/test_dual_repo_failure_boundary_acceptance.py`.

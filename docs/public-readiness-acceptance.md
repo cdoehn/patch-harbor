@@ -153,3 +153,8 @@ Release and branch hygiene are handled by later milestones.
 ## PATCHHARBOR.16b1 applied
 
 - Dual repo boundary acceptance now lives in `docs/dual-repo-boundary-acceptance.md` and `tests/test_dual_repo_boundary_acceptance.py`; it aggregates PATCHHARBOR.16a1 through PATCHHARBOR.16a4.
+
+
+## PATCHHARBOR.16b2 applied
+
+- Dual repo failure-boundary acceptance now lives in `docs/dual-repo-failure-boundary-acceptance.md` and `tests/test_dual_repo_failure_boundary_acceptance.py`; it verifies failed runner smokes remain limited to temporary repositories and RepoDossier stays unchanged.
