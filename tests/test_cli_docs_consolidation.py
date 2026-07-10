@@ -32,6 +32,7 @@ class PatchHarborCliDocsConsolidationTests(unittest.TestCase):
             "patchharbor run-script",
             "patchharbor audit-public",
             "patchharbor check-env",
+            "patchharbor rules",
         ]
         for item in expected:
             with self.subTest(item=item):

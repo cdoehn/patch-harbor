@@ -40,6 +40,7 @@ It does not freeze exact help text wrapping, terminal colors, column widths, or 
 | `run-script` | `_run_run_script(args)` | `RunnerExecutionConfig`, `run_patch_script`, `render_runner_result` | run PatchHarbor preflight, optional lint, and optional script execution |
 | `audit-public` | `_run_audit_public(args)` | `PublicAuditPattern`, `PublicAuditTarget`, `scan_public_audit_targets` | scan repository targets for caller-provided public-audit patterns |
 | `check-env` | `_run_check_env(args)` | `EnvironmentCheck`, `EnvironmentCheckSpec`, `EnvironmentCheckResult` | run generic repository environment checks |
+| `rules` | `_run_rules(args)` | `WorkflowRule`, `WorkflowRuleSet`, workflow-rules file store | add, delete, list, or dump workflow rules in JSON |
 
 ## Command details
 
@@ -176,6 +177,38 @@ High-level result categories:
 | failed | at least one required check fails |
 | error | repository path or check specification is invalid |
 
+
+### `rules`
+
+Purpose:
+
+- Manages the existing workflow-rules JSON document model.
+- Preserves document `version`, core rule fields, and existing additional rule fields.
+- Adds, deletes, lists, or dumps rules without introducing a second rule format.
+- Writes changes atomically so invalid input does not overwrite the existing file.
+
+Subcommands and options:
+
+| Surface | Required | Meaning |
+| --- | --- | --- |
+| `rules add` | yes | add one rule with a unique id |
+| `--id ID` | for add | stable unique rule id |
+| `--description TEXT` | for add | human-readable rule description |
+| `--category CATEGORY` | no | category; defaults to `general` |
+| `--severity error|warning|info` | no | severity; defaults to `error` |
+| `--enabled` / `--disabled` | no | enabled state; defaults to enabled |
+| `rules delete ID` | yes | delete exactly one rule by id |
+| `rules list` | no | show all rules as a human-readable table |
+| `rules dump` | no | print only the complete JSON document |
+| `--file PATH` | no | rules file; defaults to `patch-workflow-rules.json` |
+
+High-level result categories:
+
+| Category | Meaning |
+| --- | --- |
+| ok | requested operation completed |
+| error | invalid JSON/model data, duplicate id, unknown id, or file I/O failure |
+
 ## Current implementation dependencies
 
 | Area | Files |
@@ -187,6 +220,7 @@ High-level result categories:
 | runner command model/API | `src/patchharbor/runner_core.py`, `src/patchharbor/runner_display.py`, `src/patchharbor/runner_preflight.py`, `src/patchharbor/runner_status.py` |
 | public audit model/API | `src/patchharbor/public_audit.py`, `src/patchharbor/public_audit_checks.py` |
 | environment model/API | `src/patchharbor/environment_check.py` |
+| workflow-rules model/store | `src/patchharbor/workflow_rules.py`, `src/patchharbor/workflow_rule_store.py` |
 
 ## Current CLI test coverage
 
@@ -197,6 +231,7 @@ High-level result categories:
 | runner CLI | `tests/test_cli_runner.py` |
 | public audit CLI | `tests/test_cli_public_audit.py` |
 | environment CLI | `tests/test_cli_environment_check.py` |
+| workflow-rules CLI | `tests/test_cli_workflow_rules.py` |
 
 ## Non-goals for PATCHHARBOR.13a1
 

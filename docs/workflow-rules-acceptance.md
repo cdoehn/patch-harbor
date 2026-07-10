@@ -54,3 +54,16 @@ Those belong to later phases after the generic foundation is accepted.
 RepoDossier remains unchanged during this phase.
 
 PatchHarbor keeps reusable logic generic and tested before source-repository wrappers are changed.
+
+## Workflow-rules CLI hotfix
+
+The workflow-rules foundation now also has a small file-management CLI:
+
+    patchharbor rules add
+    patchharbor rules delete
+    patchharbor rules list
+    patchharbor rules dump
+
+The CLI deliberately reuses the accepted JSON model instead of creating a reduced or parallel format. New rules use the existing `id`, `description`, `category`, `severity`, and `enabled` fields. Existing rule-specific extension fields are preserved when the file is rewritten.
+
+The default file name is `patch-workflow-rules.json`. `--file PATH` selects an existing rules file explicitly. Writes use a temporary file followed by replacement so invalid input or an interrupted validation path does not overwrite the current document.

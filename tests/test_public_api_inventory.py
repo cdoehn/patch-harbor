@@ -118,6 +118,7 @@ class PatchHarborPublicApiInventoryTests(unittest.TestCase):
             "patchharbor run-script",
             "patchharbor audit-public",
             "patchharbor check-env",
+            "patchharbor rules",
             "docs/cli.md",
         ]
         for item in expected:

@@ -43,6 +43,7 @@ PUBLIC_COMMANDS = [
     "run-script",
     "audit-public",
     "check-env",
+    "rules",
 ]
 
 
@@ -98,6 +99,7 @@ class PatchHarborPublicReadinessAcceptanceTests(unittest.TestCase):
             "patchharbor run-script",
             "patchharbor audit-public",
             "patchharbor check-env",
+            "patchharbor rules",
         ]:
             with self.subTest(command=command):
                 self.assertIn(command, text)

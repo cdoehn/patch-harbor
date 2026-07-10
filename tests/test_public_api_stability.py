@@ -108,6 +108,7 @@ PUBLIC_COMMANDS = [
     "run-script",
     "audit-public",
     "check-env",
+    "rules",
 ]
 
 

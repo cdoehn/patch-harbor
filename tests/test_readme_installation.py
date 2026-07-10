@@ -59,6 +59,7 @@ class PatchHarborReadmeInstallationTests(unittest.TestCase):
             "patchharbor run-script",
             "patchharbor audit-public",
             "patchharbor check-env",
+            "patchharbor rules",
         ]
 
         for command in commands:

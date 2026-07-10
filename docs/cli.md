@@ -17,6 +17,7 @@ PatchHarbor exposes these public commands:
 | `patchharbor run-script` | execute a patch script through PatchHarbor runner behavior | `docs/runner.md` |
 | `patchharbor audit-public` | check for private/local values before public release | `docs/compatibility.md` |
 | `patchharbor check-env` | check local development environment assumptions | `docs/compatibility.md` |
+| `patchharbor rules` | add, delete, list, or dump workflow rules stored as JSON | `docs/workflow-rules-acceptance.md` |
 
 ## Command examples
 
@@ -47,6 +48,17 @@ Audit for private/local values:
 Check the development environment:
 
     patchharbor check-env --repo .
+
+Add and inspect workflow rules:
+
+    patchharbor rules add --id finish-current --description "Finish the current milestone first" --category workflow --severity error
+    patchharbor rules list
+    patchharbor rules delete finish-current
+    patchharbor rules dump
+
+Use an existing rules file explicitly:
+
+    patchharbor rules list --file scripts/dev/patch-workflow-rules.json
 
 ## Exit-code contract
 

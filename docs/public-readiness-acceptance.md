@@ -67,6 +67,7 @@ The public CLI command surface remains:
 | `patchharbor run-script` | public |
 | `patchharbor audit-public` | public |
 | `patchharbor check-env` | public |
+| `patchharbor rules` | public |
 
 ## Historical migration boundary
 

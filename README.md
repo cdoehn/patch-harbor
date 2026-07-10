@@ -68,6 +68,7 @@ After installation, the current target-side command surface is:
 - `patchharbor run-script`
 - `patchharbor audit-public`
 - `patchharbor check-env`
+- `patchharbor rules`
 
 ## Installation
 
@@ -110,6 +111,7 @@ After installation, the current target-side command surface is:
 - `patchharbor run-script`
 - `patchharbor audit-public`
 - `patchharbor check-env`
+- `patchharbor rules`
 
 ## Installation
 
@@ -152,6 +154,7 @@ After installation, the current target-side command surface is:
 - `patchharbor run-script`
 - `patchharbor audit-public`
 - `patchharbor check-env`
+- `patchharbor rules`
 
 ## Development
 
@@ -166,6 +169,7 @@ Useful smoke checks:
     python3 -m patchharbor --version
     python3 -m patchharbor doctor --repo .
     python3 -m patchharbor check-env --repo . --no-defaults
+    python3 -m patchharbor rules list
 
 ## Next migration step
 Continue packaging hardening with a pipx smoke script and packaging acceptance documentation before starting source cleanup.

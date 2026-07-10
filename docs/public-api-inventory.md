@@ -28,6 +28,7 @@ The public command-line API is:
 | `patchharbor run-script` | public | run a patch script through PatchHarbor runner behavior |
 | `patchharbor audit-public` | public | audit files for private/local values |
 | `patchharbor check-env` | public | check local development environment assumptions |
+| `patchharbor rules` | public | manage workflow rules in the existing JSON format |
 
 The command-line API is documented in:
 

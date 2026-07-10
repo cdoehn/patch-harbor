@@ -146,6 +146,28 @@ Functional notes:
 - Required failures fail the process with `1`.
 - Check spec input uses `NAME=VALUE` or `NAME:optional=VALUE`.
 
+
+### `rules`
+
+Implementation:
+
+    _run_rules(args)
+
+Exit-code contract:
+
+| Condition | Exit code | Required output category |
+| --- | --- | --- |
+| add, delete, list, or dump succeeds | `0` | requested output or success message |
+| duplicate id, unknown id, invalid JSON/model, missing delete file, or file I/O failure | `2` | `problem:` on stderr |
+| invalid command-line option or severity | `2` | argparse usage error |
+
+Functional notes:
+
+- `rules dump` writes only JSON to stdout on success.
+- Invalid existing JSON is never overwritten.
+- `rules list` and `rules dump` treat a missing file as an empty version-1 ruleset without creating it.
+- `rules add` creates the file and parent directories when needed.
+
 ## Command-to-test mapping
 
 | Command | Existing tests expected to cover exit codes |
@@ -155,6 +177,7 @@ Functional notes:
 | `run-script` | `tests/test_cli_runner.py` |
 | `audit-public` | `tests/test_cli_public_audit.py` |
 | `check-env` | `tests/test_cli_environment_check.py` |
+| `rules` | `tests/test_cli_workflow_rules.py` |
 
 ## Acceptance for future exit-code tests
 

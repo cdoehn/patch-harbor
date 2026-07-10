@@ -101,3 +101,7 @@ PATCHHARBOR.17b2 should prove that the release candidate can be built and inspec
 ## PATCHHARBOR.17c1 applied
 
 - PATCHHARBOR.17c1 adds the migration branch inventory in `docs/migration-branch-inventory.md` and `tests/test_migration_branch_inventory.py`; branch cleanup has not started yet.
+
+## Workflow-rules CLI hotfix
+
+A later hotfix adds `patchharbor rules` with `add`, `delete`, `list`, and `dump` operations. It reuses the existing workflow-rules JSON model and does not change package version metadata in this commit.

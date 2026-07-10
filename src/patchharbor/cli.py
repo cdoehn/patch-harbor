@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import importlib.util
+import json
 import shlex
 import subprocess
 import sys
@@ -20,6 +21,12 @@ from patchharbor.public_audit import PublicAuditModelError, PublicAuditPattern, 
 from patchharbor.public_audit_checks import PublicAuditCheckError, scan_public_audit_targets
 from patchharbor.runner_core import RunnerCoreError, RunnerExecutionConfig, run_patch_script
 from patchharbor.runner_display import render_runner_result
+from patchharbor.workflow_rule_store import (
+    DEFAULT_WORKFLOW_RULES_PATH,
+    load_workflow_rules_file,
+    write_workflow_rules_file,
+)
+from patchharbor.workflow_rules import VALID_SEVERITIES, WorkflowRule, WorkflowRulesError, WorkflowRuleSet
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -181,6 +188,59 @@ def build_parser() -> argparse.ArgumentParser:
         default=[],
         metavar="NAME",
         help="mark a named check as optional; may be provided multiple times",
+    )
+
+    rules = subparsers.add_parser(
+        "rules",
+        help="manage a workflow-rules JSON file",
+    )
+    rules_subparsers = rules.add_subparsers(dest="rules_command", required=True)
+    rules_common = argparse.ArgumentParser(add_help=False)
+    rules_common.add_argument(
+        "--file",
+        default=str(DEFAULT_WORKFLOW_RULES_PATH),
+        help="workflow-rules JSON file; defaults to patch-workflow-rules.json",
+    )
+
+    rules_add = rules_subparsers.add_parser(
+        "add",
+        parents=[rules_common],
+        help="add one workflow rule",
+    )
+    rules_add.add_argument("--id", required=True, help="unique stable rule id")
+    rules_add.add_argument("--description", required=True, help="human-readable rule description")
+    rules_add.add_argument("--category", default="general", help="rule category; defaults to general")
+    rules_add.add_argument(
+        "--severity",
+        choices=sorted(VALID_SEVERITIES),
+        default="error",
+        help="diagnostic severity; defaults to error",
+    )
+    enabled_group = rules_add.add_mutually_exclusive_group()
+    enabled_group.add_argument(
+        "--enabled", dest="enabled", action="store_true", help="store the rule as enabled"
+    )
+    enabled_group.add_argument(
+        "--disabled", dest="enabled", action="store_false", help="store the rule as disabled"
+    )
+    rules_add.set_defaults(enabled=True)
+
+    rules_delete = rules_subparsers.add_parser(
+        "delete",
+        parents=[rules_common],
+        help="delete one workflow rule by id",
+    )
+    rules_delete.add_argument("id", help="rule id to delete")
+
+    rules_subparsers.add_parser(
+        "list",
+        parents=[rules_common],
+        help="show all workflow rules in a human-readable table",
+    )
+    rules_subparsers.add_parser(
+        "dump",
+        parents=[rules_common],
+        help="write the complete workflow-rules JSON document to stdout",
     )
 
     return parser
@@ -527,6 +587,84 @@ def _run_environment_command_check(root: Path, spec: EnvironmentCheckSpec) -> En
     )
 
 
+def _run_rules(args: argparse.Namespace) -> int:
+    file_path = Path(args.file).expanduser()
+    try:
+        if args.rules_command == "add":
+            ruleset = load_workflow_rules_file(file_path, missing_ok=True)
+            if args.id in ruleset.by_id():
+                raise WorkflowRulesError(f"workflow rule id already exists: {args.id}")
+            rule = WorkflowRule(
+                id=args.id,
+                description=args.description,
+                category=args.category,
+                severity=args.severity,
+                enabled=args.enabled,
+            )
+            updated = WorkflowRuleSet(
+                version=ruleset.version,
+                rules=(*ruleset.rules, rule),
+                source=ruleset.source,
+            )
+            write_workflow_rules_file(file_path, updated)
+            print(f"added workflow rule: {rule.id}")
+            print(f"file: {file_path}")
+            return 0
+
+        if args.rules_command == "delete":
+            ruleset = load_workflow_rules_file(file_path)
+            if args.id not in ruleset.by_id():
+                raise WorkflowRulesError(f"workflow rule id does not exist: {args.id}")
+            updated = WorkflowRuleSet(
+                version=ruleset.version,
+                rules=tuple(rule for rule in ruleset.rules if rule.id != args.id),
+                source=ruleset.source,
+            )
+            write_workflow_rules_file(file_path, updated)
+            print(f"deleted workflow rule: {args.id}")
+            print(f"file: {file_path}")
+            return 0
+
+        ruleset = load_workflow_rules_file(file_path, missing_ok=True)
+        if args.rules_command == "dump":
+            print(json.dumps(ruleset.to_mapping(), indent=2, ensure_ascii=False))
+            return 0
+        if args.rules_command == "list":
+            _print_workflow_rules(ruleset)
+            return 0
+    except WorkflowRulesError as exc:
+        print(f"problem: {exc}", file=sys.stderr)
+        return 2
+
+    print(f"problem: unsupported rules command: {args.rules_command}", file=sys.stderr)
+    return 2
+
+
+def _print_workflow_rules(ruleset: WorkflowRuleSet) -> None:
+    if not ruleset.rules:
+        print("No workflow rules configured.")
+        return
+
+    headers = ("ID", "SEVERITY", "ENABLED", "CATEGORY", "DESCRIPTION")
+    rows = [
+        (rule.id, rule.severity, "yes" if rule.enabled else "no", rule.category, rule.description)
+        for rule in ruleset.rules
+    ]
+    widths = [
+        max(len(headers[index]), *(len(row[index]) for row in rows))
+        for index in range(len(headers) - 1)
+    ]
+    print(
+        f"{headers[0]:<{widths[0]}}  {headers[1]:<{widths[1]}}  "
+        f"{headers[2]:<{widths[2]}}  {headers[3]:<{widths[3]}}  {headers[4]}"
+    )
+    for row in rows:
+        print(
+            f"{row[0]:<{widths[0]}}  {row[1]:<{widths[1]}}  "
+            f"{row[2]:<{widths[2]}}  {row[3]:<{widths[3]}}  {row[4]}"
+        )
+
+
 def _parse_env_pairs(values: Sequence[str]) -> dict[str, str]:
     environment: dict[str, str] = {}
     for value in values:
@@ -553,6 +691,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _run_audit_public(args)
     if args.command == "check-env":
         return _run_check_env(args)
+    if args.command == "rules":
+        return _run_rules(args)
 
     parser.print_help()
     return 0

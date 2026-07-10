@@ -14,7 +14,7 @@ sys.path.insert(0, str(SRC))
 from patchharbor.cli import build_parser
 
 
-EXPECTED_SUBCOMMANDS = {"doctor", "lint-script", "run-script", "audit-public", "check-env"}
+EXPECTED_SUBCOMMANDS = {"doctor", "lint-script", "run-script", "audit-public", "check-env", "rules"}
 DISPLAY_ONLY_HELP_SNAPSHOT_REASON = (
     "display-only help snapshot; command-surface tests below remain active"
 )
@@ -69,6 +69,7 @@ class PatchHarborCliHelpSnapshotTests(unittest.TestCase):
             "run-script": ["--no-execute", "--lint", "--env", "--workdir"],
             "audit-public": ["--repo", "--pattern", "--target", "--encoding"],
             "check-env": ["--repo", "--no-defaults", "--command", "--file", "--git-config", "--python-module", "--optional"],
+            "rules": ["add", "delete", "list", "dump"],
         }
 
         for command, markers in expectations.items():
