@@ -248,3 +248,8 @@ PATCHHARBOR.15c3 adds final public readiness acceptance.
 ## PATCHHARBOR.16a1 applied
 
 - Dual repo discovery smoke now lives in `docs/dual-repo-discovery-smoke.md` and is tested by `tests/test_dual_repo_discovery_smoke.py`; public API stability remains covered by `tests/test_public_api_stability.py`.
+
+
+## PATCHHARBOR.16a2 applied
+
+- Dual repo patch-runner smoke now lives in `docs/dual-repo-patch-runner-smoke.md` and is tested by `tests/test_dual_repo_patch_runner_smoke.py`; public API stability remains covered by `tests/test_public_api_stability.py`.

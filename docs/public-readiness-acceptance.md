@@ -133,3 +133,8 @@ Release and branch hygiene are handled by later milestones.
 ## PATCHHARBOR.16a1 applied
 
 - Dual repo discovery smoke now lives in `docs/dual-repo-discovery-smoke.md` and `tests/test_dual_repo_discovery_smoke.py`; it starts Milestone 16 E2E validation without mutating RepoDossier.
+
+
+## PATCHHARBOR.16a2 applied
+
+- Dual repo patch-runner smoke now lives in `docs/dual-repo-patch-runner-smoke.md` and `tests/test_dual_repo_patch_runner_smoke.py`; it validates PatchHarbor runner execution in a temporary repository while RepoDossier remains unchanged.

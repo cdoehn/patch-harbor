@@ -76,3 +76,8 @@ The smoke is accepted when:
 PATCHHARBOR.16a2 should add the dual-repo patch-runner smoke.
 
 That later smoke can exercise runner behavior more deeply, but PATCHHARBOR.16a1 only proves discovery and public-readiness boundary checks.
+
+
+## PATCHHARBOR.16a2 applied
+
+- Dual repo patch-runner smoke now lives in `docs/dual-repo-patch-runner-smoke.md` and `tests/test_dual_repo_patch_runner_smoke.py`.
