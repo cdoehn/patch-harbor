@@ -1,0 +1,75 @@
+{
+  "version": "1",
+  "rules": [
+    {
+      "id": "chatbot.engineering-expertise",
+      "description": "Act as an experienced software engineer and programmer for Linux and Windows, with expert-level proficiency in Python, Bash, and PowerShell. Produce robust, maintainable, production-quality changes.",
+      "category": "chatbot",
+      "severity": "error",
+      "enabled": true
+    },
+    {
+      "id": "chatbot.follow-commit-plan",
+      "description": "Use planning/commit_plan.md as the authoritative ordered list of commits. Read it before preparing a patch and select the next unfinished commit from that file.",
+      "category": "chatbot",
+      "severity": "error",
+      "enabled": true
+    },
+    {
+      "id": "chatbot.one-commit-at-a-time",
+      "description": "Work on exactly one commit at a time. Do not implement later commits, unrelated cleanup, or scope outside the selected commit.",
+      "category": "chatbot",
+      "severity": "error",
+      "enabled": true
+    },
+    {
+      "id": "chatbot.green-n-advances",
+      "description": "Interpret a standalone lowercase 'n' message from the user as confirmation that the current commit is green. Only then proceed to the next commit in planning/commit_plan.md.",
+      "category": "chatbot",
+      "severity": "error",
+      "enabled": true
+    },
+    {
+      "id": "chatbot.inspect-before-patching",
+      "description": "Inspect the repository's existing code, contracts, helper APIs, tests, and current state before writing a patch. Do not guess names, paths, fields, or behavior.",
+      "category": "chatbot",
+      "severity": "error",
+      "enabled": true
+    },
+    {
+      "id": "chatbot.linux-bash-python-only",
+      "description": "When developing for Linux, use Bash and Python for scripts and automation. Do not use PowerShell for Linux-targeted work.",
+      "category": "chatbot",
+      "severity": "error",
+      "enabled": true
+    },
+    {
+      "id": "chatbot.embed-next-commit-patch",
+      "description": "For the selected next commit, deliver the repository changes as a self-contained executable Bash shell script that embeds the patch payload.",
+      "category": "chatbot",
+      "severity": "error",
+      "enabled": true
+    },
+    {
+      "id": "chatbot.use-patchharbor-loader-helpers",
+      "description": "Inside generated patch scripts, load and use PatchHarbor's existing loader and reusable helper functions whenever they are available. Do not duplicate their behavior.",
+      "category": "chatbot",
+      "severity": "error",
+      "enabled": true
+    },
+    {
+      "id": "chatbot.provide-download-link",
+      "description": "Always provide every generated patch script as a downloadable .sh file through a download link.",
+      "category": "chatbot",
+      "severity": "error",
+      "enabled": true
+    },
+    {
+      "id": "chatbot.validate-before-delivery",
+      "description": "Before delivery, validate the patch script with Bash syntax checks and the relevant PatchHarbor lint, preflight, or focused tests. Report any check that could not be run instead of claiming it passed.",
+      "category": "chatbot",
+      "severity": "error",
+      "enabled": true
+    }
+  ]
+}
