@@ -138,3 +138,8 @@ Release and branch hygiene are handled by later milestones.
 ## PATCHHARBOR.16a2 applied
 
 - Dual repo patch-runner smoke now lives in `docs/dual-repo-patch-runner-smoke.md` and `tests/test_dual_repo_patch_runner_smoke.py`; it validates PatchHarbor runner execution in a temporary repository while RepoDossier remains unchanged.
+
+
+## PATCHHARBOR.16a3 applied
+
+- Dual repo source-wrapper smoke now lives in `docs/dual-repo-source-wrapper-smoke.md` and `tests/test_dual_repo_source_wrapper_smoke.py`; it verifies source wrapper syntax and boundary markers while RepoDossier remains unchanged.

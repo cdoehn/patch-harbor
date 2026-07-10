@@ -81,3 +81,8 @@ That later smoke can exercise runner behavior more deeply, but PATCHHARBOR.16a1 
 ## PATCHHARBOR.16a2 applied
 
 - Dual repo patch-runner smoke now lives in `docs/dual-repo-patch-runner-smoke.md` and `tests/test_dual_repo_patch_runner_smoke.py`.
+
+
+## PATCHHARBOR.16a3 applied
+
+- Dual repo source-wrapper smoke now lives in `docs/dual-repo-source-wrapper-smoke.md` and `tests/test_dual_repo_source_wrapper_smoke.py`.

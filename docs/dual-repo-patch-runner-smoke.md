@@ -63,3 +63,8 @@ The smoke must not:
 PATCHHARBOR.16a3 should add the dual-repo source-wrapper smoke.
 
 That later smoke can validate source wrapper bridge behavior, but PATCHHARBOR.16a2 only validates PatchHarbor runner behavior with dual-repo discovery and a temporary execution repository.
+
+
+## PATCHHARBOR.16a3 applied
+
+- Dual repo source-wrapper smoke now lives in `docs/dual-repo-source-wrapper-smoke.md` and `tests/test_dual_repo_source_wrapper_smoke.py`; it checks source wrappers without executing `c` or `r`.
