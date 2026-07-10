@@ -78,3 +78,8 @@ Milestone 17 should use the same rule: `planning/milestones_migration.md` is the
 ## PATCHHARBOR.17a1 applied
 
 - PATCHHARBOR.17a1 documents the PatchHarbor release version decision in `docs/patchharbor-version-decision.md` and `tests/test_patchharbor_version_decision.py`; package metadata is unchanged.
+
+
+## PATCHHARBOR.17a2 applied
+
+- PATCHHARBOR.17a2 documents the RepoDossier follow-up release version decision in `docs/repodossier-follow-up-version-decision.md` and `tests/test_repodossier_follow_up_version_decision.py`; next operative step is PATCHHARBOR.17b1.

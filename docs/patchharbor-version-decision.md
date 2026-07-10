@@ -58,3 +58,8 @@ PATCHHARBOR.17a1 does not:
 - create release notes
 - build a release artifact
 - clean local or remote branches
+
+
+## PATCHHARBOR.17a2 applied
+
+- PATCHHARBOR.17a2 documents the RepoDossier follow-up release version decision in `docs/repodossier-follow-up-version-decision.md` and `tests/test_repodossier_follow_up_version_decision.py`; source metadata is unchanged.
