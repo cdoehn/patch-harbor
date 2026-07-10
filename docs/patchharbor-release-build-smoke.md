@@ -70,3 +70,8 @@ PATCHHARBOR.17b2 verifies that the package described by those release notes can 
 The next operative plan step is:
 
     PATCHHARBOR.17b3 – RepoDossier Follow-up Release Notes
+
+
+## PATCHHARBOR.17b3 applied
+
+- PATCHHARBOR.17b3 adds RepoDossier follow-up release notes in `docs/repodossier-follow-up-release-notes.md` and `tests/test_repodossier_follow_up_release_notes.py`; PatchHarbor build-smoke evidence remains unchanged.

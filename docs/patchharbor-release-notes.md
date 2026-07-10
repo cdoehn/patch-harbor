@@ -91,3 +91,8 @@ PATCHHARBOR.17b2 should prove that the release candidate can be built and inspec
 ## PATCHHARBOR.17b2 applied
 
 - PATCHHARBOR.17b2 adds the PatchHarbor release build smoke in `docs/patchharbor-release-build-smoke.md` and `tests/test_patchharbor_release_build_smoke.py`; the smoke builds a local wheel without publishing.
+
+
+## PATCHHARBOR.17b3 applied
+
+- PATCHHARBOR.17b3 adds RepoDossier follow-up release notes in `docs/repodossier-follow-up-release-notes.md` and `tests/test_repodossier_follow_up_release_notes.py`.
