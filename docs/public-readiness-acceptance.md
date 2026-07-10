@@ -208,3 +208,8 @@ Release and branch hygiene are handled by later milestones.
 ## PATCHHARBOR.17b3 applied
 
 - PATCHHARBOR.17b3 adds RepoDossier follow-up release notes in `docs/repodossier-follow-up-release-notes.md` and `tests/test_repodossier_follow_up_release_notes.py`; next operative step is PATCHHARBOR.17c1.
+
+
+## PATCHHARBOR.17c1 applied
+
+- PATCHHARBOR.17c1 adds the migration branch inventory in `docs/migration-branch-inventory.md` and `tests/test_migration_branch_inventory.py`; next operative step is PATCHHARBOR.17c2.

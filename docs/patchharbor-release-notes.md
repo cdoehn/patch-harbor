@@ -96,3 +96,8 @@ PATCHHARBOR.17b2 should prove that the release candidate can be built and inspec
 ## PATCHHARBOR.17b3 applied
 
 - PATCHHARBOR.17b3 adds RepoDossier follow-up release notes in `docs/repodossier-follow-up-release-notes.md` and `tests/test_repodossier_follow_up_release_notes.py`.
+
+
+## PATCHHARBOR.17c1 applied
+
+- PATCHHARBOR.17c1 adds the migration branch inventory in `docs/migration-branch-inventory.md` and `tests/test_migration_branch_inventory.py`; branch cleanup has not started yet.

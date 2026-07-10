@@ -77,3 +77,8 @@ The next operative plan step is:
     PATCHHARBOR.17c1 – Branch Inventory
 
 PATCHHARBOR.17c1 should document the migration branch inventory before local or remote branch cleanup commands are documented.
+
+
+## PATCHHARBOR.17c1 applied
+
+- PATCHHARBOR.17c1 adds the migration branch inventory in `docs/migration-branch-inventory.md` and `tests/test_migration_branch_inventory.py`; it documents read-only branch inventory commands without storing concrete branch names.
