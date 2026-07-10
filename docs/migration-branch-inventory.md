@@ -122,3 +122,8 @@ PATCHHARBOR.17c2 should document local branch cleanup commands, but still must n
 ## PATCHHARBOR.17c2 applied
 
 - PATCHHARBOR.17c2 adds local branch cleanup commands in `docs/local-branch-cleanup-commands.md` and `tests/test_local_branch_cleanup_commands.py`; this inventory remains read-only and does not execute deletion commands.
+
+
+## PATCHHARBOR.17c3 applied
+
+- PATCHHARBOR.17c3 adds remote branch cleanup command templates in `docs/remote-branch-cleanup-commands.md` and `tests/test_remote_branch_cleanup_commands.py`; no remote action is executed by tests.

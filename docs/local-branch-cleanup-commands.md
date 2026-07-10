@@ -128,3 +128,8 @@ The next operative plan step is:
     PATCHHARBOR.17c3 – Remote Branch Cleanup Commands
 
 PATCHHARBOR.17c3 may document remote cleanup commands, but this patch must not.
+
+
+## PATCHHARBOR.17c3 applied
+
+- PATCHHARBOR.17c3 adds remote branch cleanup command templates in `docs/remote-branch-cleanup-commands.md` and `tests/test_remote_branch_cleanup_commands.py`; local cleanup remains local-only.
