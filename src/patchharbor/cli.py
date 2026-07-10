@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import argparse
+import importlib.util
+import shlex
 import subprocess
+import sys
 from pathlib import Path
 from typing import Sequence
 
@@ -11,6 +14,7 @@ except ImportError:
     __version__ = "0.1.0"
 
 from patchharbor.patch_lint import PatchLintError
+from patchharbor.environment_check import EnvironmentCheck, EnvironmentCheckError, EnvironmentCheckResult, EnvironmentCheckSpec
 from patchharbor.patch_lint_api import lint_patch_file, render_patch_lint_result
 from patchharbor.public_audit import PublicAuditModelError, PublicAuditPattern, PublicAuditTarget
 from patchharbor.public_audit_checks import PublicAuditCheckError, scan_public_audit_targets
@@ -126,6 +130,57 @@ def build_parser() -> argparse.ArgumentParser:
         "--encoding",
         default="utf-8",
         help="text encoding for scanned files; defaults to utf-8",
+    )
+
+    check_env = subparsers.add_parser(
+        "check-env",
+        help="run generic repository environment checks",
+    )
+    check_env.add_argument(
+        "--repo",
+        default=".",
+        help="repository path to check; defaults to the current working directory",
+    )
+    check_env.add_argument(
+        "--no-defaults",
+        action="store_true",
+        help="do not add the default generic git/python checks",
+    )
+    check_env.add_argument(
+        "--command",
+        dest="env_command",
+        action="append",
+        default=[],
+        metavar="NAME=COMMAND",
+        help="command check; may be NAME=COMMAND or NAME:optional=COMMAND",
+    )
+    check_env.add_argument(
+        "--file",
+        action="append",
+        default=[],
+        metavar="NAME=PATH",
+        help="file-exists check; may be NAME=PATH or NAME:optional=PATH",
+    )
+    check_env.add_argument(
+        "--git-config",
+        action="append",
+        default=[],
+        metavar="NAME=KEY",
+        help="git config key check; may be NAME=KEY or NAME:optional=KEY",
+    )
+    check_env.add_argument(
+        "--python-module",
+        action="append",
+        default=[],
+        metavar="NAME=MODULE",
+        help="Python import check; may be NAME=MODULE or NAME:optional=MODULE",
+    )
+    check_env.add_argument(
+        "--optional",
+        action="append",
+        default=[],
+        metavar="NAME",
+        help="mark a named check as optional; may be provided multiple times",
     )
 
     return parser
@@ -293,6 +348,185 @@ def _require_git_root(path: Path) -> Path:
     return root
 
 
+def _run_check_env(args: argparse.Namespace) -> int:
+    print("PatchHarbor check-env")
+    print(f"repository: {Path(args.repo).expanduser()}")
+
+    try:
+        repo_path = Path(args.repo).expanduser()
+        root = _require_git_root(repo_path)
+        specs = _environment_check_specs_from_args(args)
+        result = _run_environment_check_specs(root, specs)
+    except (EnvironmentCheckError, ValueError) as exc:
+        print("status: error")
+        print(f"problem: {exc}")
+        return 2
+
+    print(f"repository root: {root}")
+    print(f"checks: {result.total_count}")
+    for check in result.checks:
+        marker = "OK" if check.ok else ("FAIL" if check.required else "WARN")
+        print(f"[{marker}] {check.name}: {check.detail}")
+        if check.failed and check.hint:
+            print(f"hint: {check.hint}")
+
+    if result.required_failed_count:
+        print("status: failed")
+        return 1
+    if result.optional_failed_count:
+        print("status: warning")
+        return 0
+
+    print("status: ok")
+    return 0
+
+
+def _environment_check_specs_from_args(args: argparse.Namespace) -> tuple[EnvironmentCheckSpec, ...]:
+    optional_names = set(args.optional)
+    specs: list[EnvironmentCheckSpec] = []
+
+    if not args.no_defaults:
+        specs.extend(
+            [
+                EnvironmentCheckSpec(name="git repository", check_type="custom", category="repository"),
+                EnvironmentCheckSpec(name="git user.name", check_type="git-config", path="user.name", category="git"),
+                EnvironmentCheckSpec(name="git user.email", check_type="git-config", path="user.email", category="git"),
+                EnvironmentCheckSpec(name="python", check_type="command", command=(sys.executable, "--version"), category="runtime"),
+            ]
+        )
+
+    specs.extend(_parse_environment_check_option_values("command", args.env_command, optional_names=optional_names))
+    specs.extend(_parse_environment_check_option_values("file", args.file, optional_names=optional_names))
+    specs.extend(_parse_environment_check_option_values("git-config", args.git_config, optional_names=optional_names))
+    specs.extend(_parse_environment_check_option_values("python-module", args.python_module, optional_names=optional_names))
+    return tuple(specs)
+
+
+def _parse_environment_check_option_values(
+    check_type: str,
+    values: Sequence[str],
+    *,
+    optional_names: set[str],
+) -> tuple[EnvironmentCheckSpec, ...]:
+    specs: list[EnvironmentCheckSpec] = []
+    for value in values:
+        name, required, payload = _parse_environment_check_assignment(value, optional_names=optional_names)
+        if check_type == "command":
+            command = tuple(shlex.split(payload))
+            specs.append(EnvironmentCheckSpec(name=name, check_type=check_type, command=command, required=required, category="tooling"))
+        elif check_type == "file":
+            specs.append(EnvironmentCheckSpec(name=name, check_type=check_type, path=payload, required=required, category="files"))
+        elif check_type == "git-config":
+            specs.append(EnvironmentCheckSpec(name=name, check_type=check_type, path=payload, required=required, category="git"))
+        elif check_type == "python-module":
+            specs.append(EnvironmentCheckSpec(name=name, check_type=check_type, path=payload, required=required, category="python"))
+        else:
+            raise ValueError(f"unknown environment check type: {check_type}")
+    return tuple(specs)
+
+
+def _parse_environment_check_assignment(value: str, *, optional_names: set[str]) -> tuple[str, bool, str]:
+    if "=" not in value:
+        raise ValueError(f"environment check value must use NAME=VALUE syntax: {value}")
+    name_part, payload = value.split("=", 1)
+    if not payload.strip():
+        raise ValueError(f"environment check value must not be empty: {value}")
+
+    required = True
+    if ":" in name_part:
+        name, mode = name_part.split(":", 1)
+        if mode not in {"required", "optional"}:
+            raise ValueError(f"environment check mode must be required or optional: {value}")
+        required = mode == "required"
+    else:
+        name = name_part
+
+    if name in optional_names:
+        required = False
+    if not name.strip():
+        raise ValueError(f"environment check name must not be empty: {value}")
+    return name, required, payload
+
+
+def _run_environment_check_specs(root: Path, specs: Sequence[EnvironmentCheckSpec]) -> EnvironmentCheckResult:
+    checks: list[EnvironmentCheck] = []
+    for spec in specs:
+        checks.append(_run_environment_check_spec(root, spec))
+    return EnvironmentCheckResult(tuple(checks), metadata={"repo": str(root)})
+
+
+def _run_environment_check_spec(root: Path, spec: EnvironmentCheckSpec) -> EnvironmentCheck:
+    if spec.check_type == "custom":
+        return EnvironmentCheck(spec.name, True, str(root), required=spec.required, category=spec.category, metadata=spec.metadata)
+    if spec.check_type == "command":
+        return _run_environment_command_check(root, spec)
+    if spec.check_type == "file":
+        target = (root / spec.path).resolve()
+        ok = target.exists()
+        detail = str(target) if ok else f"missing: {spec.path}"
+        return EnvironmentCheck(spec.name, ok, detail, hint=spec.hint, required=spec.required, category=spec.category, metadata=spec.metadata)
+    if spec.check_type == "git-config":
+        result = subprocess.run(
+            ["git", "-C", str(root), "config", "--get", spec.path],
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+        value = result.stdout.strip()
+        ok = result.returncode == 0 and bool(value)
+        return EnvironmentCheck(
+            spec.name,
+            ok,
+            value or "not configured",
+            hint=spec.hint,
+            required=spec.required,
+            category=spec.category,
+            metadata=spec.metadata,
+        )
+    if spec.check_type == "python-module":
+        found = importlib.util.find_spec(spec.path) is not None
+        detail = f"module available: {spec.path}" if found else f"module not found: {spec.path}"
+        return EnvironmentCheck(spec.name, found, detail, hint=spec.hint, required=spec.required, category=spec.category, metadata=spec.metadata)
+    raise ValueError(f"unsupported environment check type: {spec.check_type}")
+
+
+def _run_environment_command_check(root: Path, spec: EnvironmentCheckSpec) -> EnvironmentCheck:
+    try:
+        result = subprocess.run(
+            list(spec.command),
+            cwd=root,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+    except OSError as exc:
+        command_name = spec.command[0] if spec.command else "<empty>"
+        detail = f"{command_name} not found in PATH" if isinstance(exc, FileNotFoundError) else f"{command_name} could not run: {exc.strerror}"
+        return EnvironmentCheck(
+            spec.name,
+            False,
+            detail,
+            hint=spec.hint,
+            required=spec.required,
+            category=spec.category,
+            metadata=spec.metadata,
+        )
+
+    output_lines = (result.stdout or result.stderr).strip().splitlines()
+    detail = output_lines[0] if output_lines else f"exit {result.returncode}"
+    return EnvironmentCheck(
+        spec.name,
+        result.returncode == 0,
+        detail,
+        hint=spec.hint if result.returncode != 0 else "",
+        required=spec.required,
+        category=spec.category,
+        metadata=spec.metadata,
+    )
+
+
 def _parse_env_pairs(values: Sequence[str]) -> dict[str, str]:
     environment: dict[str, str] = {}
     for value in values:
@@ -317,6 +551,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _run_run_script(args)
     if args.command == "audit-public":
         return _run_audit_public(args)
+    if args.command == "check-env":
+        return _run_check_env(args)
 
     parser.print_help()
     return 0
