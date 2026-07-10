@@ -68,3 +68,8 @@ PATCHHARBOR.17a1 does not:
 ## PATCHHARBOR.17b1 applied
 
 - PATCHHARBOR.17b1 adds PatchHarbor release notes in `docs/patchharbor-release-notes.md` and `tests/test_patchharbor_release_notes.py`; package metadata remains unchanged.
+
+
+## PATCHHARBOR.17b2 applied
+
+- PATCHHARBOR.17b2 adds the PatchHarbor release build smoke in `docs/patchharbor-release-build-smoke.md` and `tests/test_patchharbor_release_build_smoke.py`; version metadata remains unchanged.

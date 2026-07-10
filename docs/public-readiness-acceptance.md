@@ -198,3 +198,8 @@ Release and branch hygiene are handled by later milestones.
 ## PATCHHARBOR.17b1 applied
 
 - PATCHHARBOR.17b1 adds PatchHarbor release notes in `docs/patchharbor-release-notes.md` and `tests/test_patchharbor_release_notes.py`; next operative step is PATCHHARBOR.17b2.
+
+
+## PATCHHARBOR.17b2 applied
+
+- PATCHHARBOR.17b2 adds the PatchHarbor release build smoke in `docs/patchharbor-release-build-smoke.md` and `tests/test_patchharbor_release_build_smoke.py`; next operative step is PATCHHARBOR.17b3.

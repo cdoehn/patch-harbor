@@ -86,3 +86,8 @@ The next operative plan step is:
     PATCHHARBOR.17b2 – PatchHarbor Release Build Smoke
 
 PATCHHARBOR.17b2 should prove that the release candidate can be built and inspected without publishing it.
+
+
+## PATCHHARBOR.17b2 applied
+
+- PATCHHARBOR.17b2 adds the PatchHarbor release build smoke in `docs/patchharbor-release-build-smoke.md` and `tests/test_patchharbor_release_build_smoke.py`; the smoke builds a local wheel without publishing.
