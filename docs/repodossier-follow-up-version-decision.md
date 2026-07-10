@@ -61,3 +61,8 @@ PATCHHARBOR.17a2 does not:
 - create release notes
 - build a release artifact
 - clean local or remote branches
+
+
+## PATCHHARBOR.17b1 applied
+
+- PATCHHARBOR.17b1 adds PatchHarbor release notes in `docs/patchharbor-release-notes.md` and `tests/test_patchharbor_release_notes.py`; RepoDossier follow-up metadata remains unchanged.

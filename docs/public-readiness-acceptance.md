@@ -193,3 +193,8 @@ Release and branch hygiene are handled by later milestones.
 ## PATCHHARBOR.17a2 applied
 
 - PATCHHARBOR.17a2 documents the RepoDossier follow-up release version decision in `docs/repodossier-follow-up-version-decision.md` and `tests/test_repodossier_follow_up_version_decision.py`; next operative step is PATCHHARBOR.17b1.
+
+
+## PATCHHARBOR.17b1 applied
+
+- PATCHHARBOR.17b1 adds PatchHarbor release notes in `docs/patchharbor-release-notes.md` and `tests/test_patchharbor_release_notes.py`; next operative step is PATCHHARBOR.17b2.

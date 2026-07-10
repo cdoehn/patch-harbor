@@ -63,3 +63,8 @@ PATCHHARBOR.17a1 does not:
 ## PATCHHARBOR.17a2 applied
 
 - PATCHHARBOR.17a2 documents the RepoDossier follow-up release version decision in `docs/repodossier-follow-up-version-decision.md` and `tests/test_repodossier_follow_up_version_decision.py`; source metadata is unchanged.
+
+
+## PATCHHARBOR.17b1 applied
+
+- PATCHHARBOR.17b1 adds PatchHarbor release notes in `docs/patchharbor-release-notes.md` and `tests/test_patchharbor_release_notes.py`; package metadata remains unchanged.
