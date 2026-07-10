@@ -136,3 +136,10 @@ PATCHHARBOR.15c records public API and public-readiness acceptance.
 - Runner documentation consolidation now lives in `docs/runner.md`.
 - Historical runner migration documents are retained for later 15b4 historical marking.
 - No migration artifact is deleted by PATCHHARBOR.15b1.
+
+
+## PATCHHARBOR.15b2 applied
+
+- Compatibility documentation consolidation now lives in `docs/compatibility.md`.
+- Historical compatibility and source-adoption migration documents are retained for later 15b4 historical marking.
+- No migration artifact is deleted by PATCHHARBOR.15b2.

@@ -133,3 +133,9 @@ Compatibility docs are consolidated by PATCHHARBOR.15b2.
 CLI docs are consolidated by PATCHHARBOR.15b3.
 
 Historical migration docs are marked historical by PATCHHARBOR.15b4.
+
+
+## PATCHHARBOR.15b2 applied
+
+- Compatibility boundaries now live in `docs/compatibility.md`.
+- Runner docs keep the runner-specific contract and link to compatibility docs for source-wrapper boundaries.

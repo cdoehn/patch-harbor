@@ -116,3 +116,10 @@ Those changes happen in later 15b and 15c patches.
 - Consolidated runner documentation now lives in `docs/runner.md`.
 - `docs/download-runner-api-inventory.md`, `docs/download-runner-lifecycle-plan-acceptance.md`, `docs/runner-compatibility-acceptance.md`, and `docs/runner-compatibility-migration.md` remain as inputs and acceptance history.
 - No migration artifact is deleted by PATCHHARBOR.15b1.
+
+
+## PATCHHARBOR.15b2 applied
+
+- Consolidated compatibility documentation now lives in `docs/compatibility.md`.
+- `docs/source-wrapper-compatibility-acceptance.md`, `docs/source-side-adoption-acceptance.md`, `docs/workflow-rules-acceptance.md`, and `docs/source-side-alias-compatibility-plan.md` remain as inputs and acceptance history.
+- No migration artifact is deleted by PATCHHARBOR.15b2.
