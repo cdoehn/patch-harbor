@@ -243,3 +243,8 @@ PATCHHARBOR.15c3 adds final public readiness acceptance.
 ## PATCHHARBOR.15c3 applied
 
 - Public readiness acceptance now lives in `docs/public-readiness-acceptance.md` and closes the 15c public API/readiness series.
+
+
+## PATCHHARBOR.16a1 applied
+
+- Dual repo discovery smoke now lives in `docs/dual-repo-discovery-smoke.md` and is tested by `tests/test_dual_repo_discovery_smoke.py`; public API stability remains covered by `tests/test_public_api_stability.py`.

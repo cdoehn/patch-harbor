@@ -128,3 +128,8 @@ PATCHHARBOR.15c3 does not:
 - change release versioning
 
 Release and branch hygiene are handled by later milestones.
+
+
+## PATCHHARBOR.16a1 applied
+
+- Dual repo discovery smoke now lives in `docs/dual-repo-discovery-smoke.md` and `tests/test_dual_repo_discovery_smoke.py`; it starts Milestone 16 E2E validation without mutating RepoDossier.
