@@ -1,5 +1,13 @@
 # PatchHarbor
 
+<!-- badges:start -->
+[![Docker Integration Tests](https://github.com/cdoehn/patch-harbor/actions/workflows/docker-integration-tests.yml/badge.svg?branch=main)](https://github.com/cdoehn/patch-harbor/actions/workflows/docker-integration-tests.yml)
+![Python](https://img.shields.io/badge/Python-%3E%3D3.12-3776AB?logo=python&logoColor=white)
+![Ubuntu](https://img.shields.io/badge/Ubuntu-24.04%20%7C%2026.04-E95420?logo=ubuntu&logoColor=white)
+![Version](https://img.shields.io/badge/version-0.1.0-blue)
+![Repository](https://img.shields.io/badge/repository-private-lightgrey?logo=github)
+<!-- badges:end -->
+
 PatchHarbor is a small development-tools repository for reusable patch workflow helpers, repository maintenance scripts, and local development automation.
 
 The project starts as the migration target for development scripts that previously lived inside RepoDossier. The goal is to make those tools repository-agnostic before multiple projects depend on them.
