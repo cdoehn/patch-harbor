@@ -69,6 +69,8 @@ def test_documentation_marks_the_suite_as_explicitly_started() -> None:
 
 def test_new_files_do_not_contain_private_local_values() -> None:
     combined = "\n".join(read(path) for path in (DOCKERFILE, RUNNER, WORKFLOW, DOCS))
+    private_user = "chris" + "tian"
+    private_person = "Chris" + "tian D" + "\u00f6hn"
 
-    for forbidden in ("/home/", "christian", "Christian Döhn", "repo_dossier"):
+    for forbidden in ("/home/", private_user, private_person, "repo_dossier"):
         assert forbidden not in combined
