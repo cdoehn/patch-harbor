@@ -1,0 +1,27 @@
+name: Docker integration tests
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  docker-integration:
+    name: Ubuntu ${{ matrix.ubuntu }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    strategy:
+      fail-fast: false
+      matrix:
+        ubuntu:
+          - "24.04"
+          - "26.04"
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Build image and run tests
+        run: ./scripts/run_docker_integration_tests.sh "${{ matrix.ubuntu }}"
