@@ -31,7 +31,7 @@
     },
     {
       "id": "chatbot.inspect-before-patching",
-      "description": "Inspect the repository's existing code, contracts, helper APIs, tests, and current state before writing a patch. Do not guess names, paths, fields, or behavior.",
+      "description": "Inspect the repository's existing code, contracts, helper APIs, tests, and current state before writing a patch. Do not guess names, paths, fields, commands, or behavior.",
       "category": "chatbot",
       "severity": "error",
       "enabled": true
@@ -44,15 +44,15 @@
       "enabled": true
     },
     {
-      "id": "chatbot.embed-next-commit-patch",
-      "description": "For the selected next commit, deliver the repository changes as a self-contained executable Bash shell script that embeds the patch payload.",
+      "id": "chatbot.deliver-next-commit-script",
+      "description": "For the selected next commit, deliver the repository changes as a self-contained executable Bash shell script that carries the repository-specific patch payload.",
       "category": "chatbot",
       "severity": "error",
       "enabled": true
     },
     {
-      "id": "chatbot.use-patchharbor-loader-helpers",
-      "description": "Inside generated patch scripts, load and use PatchHarbor's existing loader and reusable helper functions whenever they are available. Do not duplicate their behavior.",
+      "id": "chatbot.use-patchharbor-interfaces",
+      "description": "Use the current PatchHarbor CLI, loader, and reusable helper APIs whenever they are available. Do not duplicate or replace behavior already provided by PatchHarbor.",
       "category": "chatbot",
       "severity": "error",
       "enabled": true
@@ -65,9 +65,128 @@
       "enabled": true
     },
     {
-      "id": "chatbot.validate-before-delivery",
-      "description": "Before delivery, validate the patch script with Bash syntax checks and the relevant PatchHarbor lint, preflight, or focused tests. Report any check that could not be run instead of claiming it passed.",
+      "id": "chatbot.select-focused-tests",
+      "description": "Select and include focused automated tests that cover the changed behavior. The tests must fail the patch execution when the changed behavior is broken.",
       "category": "chatbot",
+      "severity": "error",
+      "enabled": true
+    },
+    {
+      "id": "chatbot.use-stable-prerequisites",
+      "description": "Choose stable repository-specific prerequisites based on files, APIs, contracts, and content. Do not rely exclusively on an original commit hash because applying a patch can create a different local hash.",
+      "category": "chatbot",
+      "severity": "error",
+      "enabled": true
+    },
+    {
+      "id": "chatbot.validate-against-current-patchharbor",
+      "description": "Before delivery, verify the generated script against the current PatchHarbor repository or an equivalent installed PatchHarbor version whenever the repository and dependencies are available.",
+      "category": "chatbot",
+      "severity": "error",
+      "enabled": true
+    },
+    {
+      "id": "chatbot.report-verification-honestly",
+      "description": "Do not claim that syntax, lint, runner, repository, or test checks passed unless they were actually executed against the relevant versions. Clearly report every unavailable or unexecuted check.",
+      "category": "chatbot",
+      "severity": "error",
+      "enabled": true
+    },
+    {
+      "id": "chatbot.follow-patchharbor-contract",
+      "description": "Know and follow the current PatchHarbor script contract. Provide the repository-specific payload, prerequisites, planning references, and focused tests without bypassing, duplicating, or conflicting with behavior owned or validated by PatchHarbor.",
+      "category": "chatbot",
+      "severity": "error",
+      "enabled": true
+    },
+    {
+      "id": "patchharbor-contract.context-display-disabled",
+      "description": "PatchHarbor patch scripts must keep the context display disabled. Include exactly one display metadata record with context set to 0 and do not add a conflicting display configuration.",
+      "category": "patchharbor-contract",
+      "severity": "error",
+      "enabled": true
+    },
+    {
+      "id": "patchharbor-contract.runner-owned-logging",
+      "description": "PatchHarbor owns execution logging and stores the complete run output in a timestamped log file in the user's Downloads directory. Do not implement a second independent logging system inside generated patch scripts unless explicitly required.",
+      "category": "patchharbor-contract",
+      "severity": "error",
+      "enabled": true
+    },
+    {
+      "id": "patchharbor-contract.required-patch-metadata",
+      "description": "Provide exactly one valid patchharbor-meta patch record with non-empty id, title, and commit fields. PatchHarbor validates this metadata.",
+      "category": "patchharbor-contract",
+      "severity": "error",
+      "enabled": true
+    },
+    {
+      "id": "patchharbor-contract.required-progress-metadata",
+      "description": "Provide roadmap and milestone progress metadata using real paths and labels read from the repository planning files. PatchHarbor validates the records; do not guess their values.",
+      "category": "patchharbor-contract",
+      "severity": "error",
+      "enabled": true
+    },
+    {
+      "id": "patchharbor-contract.unique-patch-id",
+      "description": "Every patch script requires a unique and stable patch ID. Never reuse the ID of a successfully applied patch, and assign every corrected script a distinct fix ID.",
+      "category": "patchharbor-contract",
+      "severity": "error",
+      "enabled": true
+    },
+    {
+      "id": "patchharbor-contract.runner-entrypoint",
+      "description": "Route generated scripts through patchharbor run-script --lint whenever PatchHarbor is available. Follow the current runner contract, including any required recursion guard, instead of creating a competing execution path.",
+      "category": "patchharbor-contract",
+      "severity": "error",
+      "enabled": true
+    },
+    {
+      "id": "patchharbor-contract.bash-and-lint-validation",
+      "description": "Linux patch scripts must use Bash with strict error handling and must pass the Bash syntax and PatchHarbor lint checks required by the current runner contract. Do not deliver known lint findings.",
+      "category": "patchharbor-contract",
+      "severity": "error",
+      "enabled": true
+    },
+    {
+      "id": "patchharbor-contract.noninteractive-git-output",
+      "description": "Use non-interactive Git output, including git --no-pager for git log and git diff or an equivalent PatchHarbor helper. Patch scripts must never wait for an interactive pager.",
+      "category": "patchharbor-contract",
+      "severity": "error",
+      "enabled": true
+    },
+    {
+      "id": "patchharbor-contract.footer-and-status",
+      "description": "Use the footer and execution-status mechanism required by the current PatchHarbor runner contract. Do not add a second competing footer or status-reporting implementation.",
+      "category": "patchharbor-contract",
+      "severity": "error",
+      "enabled": true
+    },
+    {
+      "id": "patchharbor-contract.repository-preflight",
+      "description": "Do not bypass PatchHarbor's standard repository preflight. Add only repository-specific prerequisites that PatchHarbor cannot infer, and stop before mutation when a prerequisite fails.",
+      "category": "patchharbor-contract",
+      "severity": "error",
+      "enabled": true
+    },
+    {
+      "id": "patchharbor-contract.repeat-protection",
+      "description": "Respect PatchHarbor's repeat protection and already-applied handling. A repeated successful patch must not create duplicate commits or repeat repository mutations.",
+      "category": "patchharbor-contract",
+      "severity": "error",
+      "enabled": true
+    },
+    {
+      "id": "patchharbor-contract.rollback-and-exit-status",
+      "description": "Respect PatchHarbor's rollback and exit-status contract. Failed application or tests must not leave a partial operation or untested commit, and exit code 0 is reserved for success or an already-applied result.",
+      "category": "patchharbor-contract",
+      "severity": "error",
+      "enabled": true
+    },
+    {
+      "id": "patchharbor-contract.no-literal-markdown-fences",
+      "description": "Do not place literal triple-backtick Markdown fence sequences inside generated patch scripts when the PatchHarbor linter forbids them. Construct such payload text safely when it is genuinely required.",
+      "category": "patchharbor-contract",
       "severity": "error",
       "enabled": true
     }
