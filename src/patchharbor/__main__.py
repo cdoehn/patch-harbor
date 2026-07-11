@@ -1,7 +1,0 @@
-"""Command-line module entrypoint for PatchHarbor."""
-
-from .cli import main
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
