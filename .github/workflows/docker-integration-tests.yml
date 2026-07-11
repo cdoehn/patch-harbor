@@ -1,4 +1,4 @@
-name: Docker Integration Tests
+name: Docker integration tests
 
 on:
   workflow_dispatch:
