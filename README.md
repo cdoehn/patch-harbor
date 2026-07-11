@@ -179,5 +179,55 @@ Useful smoke checks:
     python3 -m patchharbor check-env --repo . --no-defaults
     python3 -m patchharbor rules list
 
+## Timeout-protected development commands
+
+Use `scripts/run_with_timeout.sh` for tests, builds, linters, packaging checks,
+installation checks, smoke tests, and other commands that could block
+indefinitely. The wrapper requires GNU `timeout` and runs each attempt with a
+bounded maximum duration.
+
+General form:
+
+    scripts/run_with_timeout.sh [options] -- COMMAND [ARG...]
+
+Important options:
+
+- `--timeout DURATION` sets the maximum runtime for one attempt.
+- `--kill-after DURATION` sends `SIGKILL` if the command does not stop after
+  the initial `SIGTERM`.
+- `--attempts NUMBER` sets the total number of attempts, including the first
+  run.
+- `--retry-delay DURATION` waits before restarting a timed-out command.
+
+Choose the values from the expected workload rather than using one global
+timeout. A focused unit test can normally use a shorter limit than a complete
+test suite, package build, installation test, or container integration test.
+Keep the number of attempts bounded.
+
+For example, run focused tests with a two-minute limit per attempt:
+
+    scripts/run_with_timeout.sh \
+      --timeout 2m \
+      --kill-after 10s \
+      --attempts 2 \
+      --retry-delay 2s \
+      -- python3 -m unittest tests.test_run_with_timeout_script
+
+The wrapper retries only exit statuses that indicate a timeout. Ordinary
+command failures are returned immediately. Its internal retries use the same
+timeout. When the selected limit was plausibly too short rather than the
+process being stuck, invoke the wrapper again with a larger bounded timeout,
+for example:
+
+    scripts/run_with_timeout.sh \
+      --timeout 5m \
+      --kill-after 15s \
+      --attempts 1 \
+      -- python3 -m unittest discover -s tests -p 'test_*.py'
+
+Do not increase the timeout indefinitely. Report the chosen timeout, attempt
+count, and final result so that a real hang is not mistaken for a slow but
+healthy command.
+
 ## Next migration step
 Continue packaging hardening with a pipx smoke script and packaging acceptance documentation before starting source cleanup.

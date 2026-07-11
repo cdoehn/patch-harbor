@@ -23,6 +23,7 @@ EXPECTED_RULE_IDS = (
     'chatbot.validate-against-current-patchharbor',
     'chatbot.report-verification-honestly',
     'chatbot.follow-patchharbor-contract',
+    'chatbot.timeout-protect-long-running-commands',
     'patchharbor-contract.context-display-disabled',
     'patchharbor-contract.runner-owned-logging',
     'patchharbor-contract.required-patch-metadata',
@@ -46,11 +47,11 @@ class PatchHarborDefaultWorkflowRulesTests(unittest.TestCase):
         self.assertEqual(ruleset.version, "1")
         self.assertEqual(ruleset.rule_ids(), EXPECTED_RULE_IDS)
         self.assertEqual(len(ruleset.enabled_rules()), len(EXPECTED_RULE_IDS))
-        self.assertEqual(len(ruleset.rules), 27)
+        self.assertEqual(len(ruleset.rules), 28)
 
         categories = {rule.category for rule in ruleset.rules}
         self.assertEqual(categories, {"chatbot", "patchharbor-contract"})
-        self.assertEqual(sum(rule.category == "chatbot" for rule in ruleset.rules), 14)
+        self.assertEqual(sum(rule.category == "chatbot" for rule in ruleset.rules), 15)
         self.assertEqual(
             sum(rule.category == "patchharbor-contract" for rule in ruleset.rules),
             13,

@@ -100,6 +100,14 @@
       "enabled": true
     },
     {
+      "id": "chatbot.timeout-protect-long-running-commands",
+      "description": "Before running tests, builds, linters, packaging checks, installation checks, smoke tests, or other potentially long-running commands, estimate a task-appropriate maximum runtime and execute the command through scripts/run_with_timeout.sh with self-chosen timeout, kill-after, attempts, and retry-delay values. If a timeout was plausibly too short rather than a hang, rerun with a larger bounded timeout. Never retry ordinary failures, use unbounded restarts, or increase timeouts indefinitely, and report the chosen limits and outcomes. Generated PatchHarbor patch scripts must write their complete execution output to a timestamped log file in the user's Downloads directory so failed runs can be uploaded for diagnosis.",
+      "category": "chatbot",
+      "severity": "error",
+      "enabled": true,
+      "tool": "scripts/run_with_timeout.sh"
+    },
+    {
       "id": "patchharbor-contract.context-display-disabled",
       "description": "PatchHarbor patch scripts must keep the context display disabled. Include exactly one display metadata record with context set to 0 and do not add a conflicting display configuration.",
       "category": "patchharbor-contract",

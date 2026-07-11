@@ -431,4 +431,46 @@ patchharbor --help
 Das von pipx verwaltete Python-Environment bleibt für den Benutzer vollständig transparent. Eine Aktivierung mit `source`, `activate` oder einem vergleichbaren Befehl ist nicht erforderlich.
 
 Der Commit liefert die Paketkonfiguration, den CLI-Zugriff, die Dokumentation und die automatisierte Absicherung dieses Installationswegs als eine zusammenhängende Änderung.
+---
+
+## Commit 2: Entwicklungsbefehle gegen Hänger absichern
+
+### Commit-Betreff
+
+    feat(tooling): add timeout guard for development commands
+
+### Ziel des Commits
+
+Dieser Commit nimmt `scripts/run_with_timeout.sh` als generisches Linux-Werkzeug
+auf, dokumentiert seine Verwendung in der README und ergänzt eine verbindliche
+Workflow-Regel für potenziell lang laufende Entwicklungsbefehle.
+
+### Umfang
+
+- Timeout-Werkzeug mit begrenzten Wiederholungen aufnehmen;
+- README mit Optionen, Beispielen und Timeout-Eskalation ergänzen;
+- Workflow-Regel für Tests, Builds, Linting, Packaging, Installation und
+  Smoke-Tests ergänzen;
+- fokussierte Tests für Erfolg, normale Fehler, Timeouts, Dokumentation und
+  Regeldefinition ergänzen.
+
+### Nicht-Ziele
+
+- keine Änderung am PatchHarbor-Runner;
+- keine unbegrenzten Wiederholungen oder automatische Endlosschleifen;
+- keine Wiederholung normaler Programmfehler;
+- keine Änderungen an Packaging- oder CLI-Verträgen.
+
+### Akzeptanzkriterien
+
+1. `scripts/run_with_timeout.sh` ist ausführbar und besteht `bash -n`.
+2. Erfolgreiche Befehle werden einmal ausgeführt und liefern Exit-Code 0.
+3. Normale Fehler werden unverändert und ohne Neustart zurückgegeben.
+4. Timeout-Fälle werden höchstens entsprechend `--attempts` neu gestartet.
+5. Die README beschreibt Parameterwahl und einen erneuten Lauf mit größerem,
+   weiterhin begrenztem Timeout.
+6. Die aktivierte Workflow-Regel verlangt das Werkzeug für potenziell lang
+   laufende Befehle und verbietet unbegrenzte Neustarts.
+7. Die fokussierten Tests werden selbst über `run_with_timeout.sh` ausgeführt.
+8. Der Commit enthält keine unabhängigen Refactorings.
 
