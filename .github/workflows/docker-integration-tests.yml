@@ -7,43 +7,21 @@ permissions:
   contents: read
 
 jobs:
-  integration-tests:
-    name: PatchHarbor Integration Tests
-    runs-on: ubuntu-24.04
+  docker-integration:
+    name: Ubuntu ${{ matrix.ubuntu }}
+    runs-on: ubuntu-latest
     timeout-minutes: 30
 
+    strategy:
+      fail-fast: false
+      matrix:
+        ubuntu:
+          - "24.04"
+          - "26.04"
+
     steps:
-      - name: Repository auschecken
+      - name: Check out repository
         uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
 
-      - name: Umgebung anzeigen
-        run: |
-          docker --version
-          git --no-pager log -1 --oneline
-
-      - name: Docker-Integrationstests ausführen
-        shell: bash
-        run: |
-          chmod +x scripts/run_docker_integration_tests.sh
-          timeout \
-            --signal=TERM \
-            --kill-after=60s \
-            25m \
-            bash scripts/run_docker_integration_tests.sh
-
-      - name: Docker-Diagnose bei Fehler
-        if: failure()
-        shell: bash
-        run: |
-          echo "=== Container ==="
-          docker ps -a || true
-          echo "=== Images ==="
-          docker images || true
-
-      - name: Docker aufräumen
-        if: always()
-        shell: bash
-        run: |
-          docker ps -aq | xargs -r docker rm -f || true
+      - name: Build image and run tests
+        run: ./scripts/run_docker_integration_tests.sh "${{ matrix.ubuntu }}"
