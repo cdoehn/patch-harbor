@@ -21,14 +21,12 @@ jobs:
       - name: Umgebung anzeigen
         run: |
           docker --version
-          docker buildx version
           git --no-pager log -1 --oneline
 
       - name: Docker-Integrationstests ausführen
         shell: bash
         run: |
           chmod +x scripts/run_docker_integration_tests.sh
-
           timeout \
             --signal=TERM \
             --kill-after=60s \
@@ -37,14 +35,15 @@ jobs:
 
       - name: Docker-Diagnose bei Fehler
         if: failure()
+        shell: bash
         run: |
           echo "=== Container ==="
           docker ps -a || true
-
           echo "=== Images ==="
           docker images || true
 
       - name: Docker aufräumen
         if: always()
+        shell: bash
         run: |
           docker ps -aq | xargs -r docker rm -f || true
