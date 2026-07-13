@@ -336,11 +336,11 @@ def test_directory_candidates_are_sorted_and_selected_by_index(tmp_path: Path) -
 
     assert completed.returncode == 0
     assert completed.stderr == ""
-    assert completed.stdout.index(f"1. {newest.name}") < completed.stdout.index(
-        f"2. {alpha.name}"
+    assert completed.stdout.index(f"1 {newest.name}") < completed.stdout.index(
+        f"2 {alpha.name}"
     )
-    assert completed.stdout.index(f"2. {alpha.name}") < completed.stdout.index(
-        f"3. {beta.name}"
+    assert completed.stdout.index(f"2 {alpha.name}") < completed.stdout.index(
+        f"3 {beta.name}"
     )
     assert completed.stdout.endswith("alpha\n")
 
@@ -366,7 +366,7 @@ def test_empty_directory_selection_aborts(tmp_path: Path) -> None:
     completed = _run_patchharbor(inbox, tmp_path, input_text="\n")
 
     assert completed.returncode == 2
-    assert "Available PatchHarbor scripts:" in completed.stdout
+    assert "Select [1-2]:" in completed.stdout
     assert completed.stderr == "patchharbor: no script selected\n"
 
 
@@ -402,7 +402,7 @@ def test_invalid_directory_selection_is_retried(tmp_path: Path) -> None:
     )
 
     assert completed.returncode == 0
-    assert completed.stdout.count("Invalid selection.") == 2
+    assert completed.stdout.count("Enter 1-2.") == 2
     assert completed.stdout.endswith("second\n")
     assert completed.stderr == ""
 

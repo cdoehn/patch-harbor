@@ -13,7 +13,6 @@ from patchharbor.files import temporary_script_file
 from patchharbor.parser import ScriptFormatError, validate_required_marker
 
 
-
 @dataclass(frozen=True)
 class ScriptSource:
     """Neutral script input handed to the parsing and execution pipeline."""
@@ -88,13 +87,17 @@ def run_script_source(
             ExitCode.EXECUTION_ERROR,
         ) from exc
 
+
 @dataclass(frozen=True)
 class DirectoryCandidate:
     """Stable display and sorting data for one directory candidate."""
 
     path: Path
-    display_name: str
     modified_ns: int
+
+    @property
+    def display_name(self) -> str:
+        return self.path.name
 
 
 def discover_directory_candidates(
@@ -119,7 +122,6 @@ def discover_directory_candidates(
             candidates.append(
                 DirectoryCandidate(
                     path=entry,
-                    display_name=entry.name,
                     modified_ns=entry.stat().st_mtime_ns,
                 )
             )
@@ -147,34 +149,30 @@ def select_directory_candidate(
     if len(candidates) == 1:
         return candidates[0]
 
-    print("Available PatchHarbor scripts:", file=output_stream)
     for index, candidate in enumerate(candidates, start=1):
-        print(f"  {index}. {candidate.display_name}", file=output_stream)
+        print(f"{index} {candidate.display_name}", file=output_stream)
 
+    count = len(candidates)
     while True:
         print(
-            f"Choose one script by number [1-{len(candidates)}]: ",
+            f"Select [1-{count}]: ",
             end="",
             file=output_stream,
             flush=True,
         )
-        line = input_stream.readline()
-        if line == "" or line.strip() == "":
+        value = input_stream.readline().strip()
+        if not value:
             raise PatchHarborError(
                 "no script selected",
                 ExitCode.USAGE_ERROR,
             )
 
-        value = line.strip()
         if value.isascii() and value.isdecimal():
-            selected_index = int(value)
-            if 1 <= selected_index <= len(candidates):
-                return candidates[selected_index - 1]
+            index = int(value) - 1
+            if 0 <= index < count:
+                return candidates[index]
 
-        print(
-            f"Invalid selection. Enter an ASCII number from 1 to {len(candidates)}.",
-            file=output_stream,
-        )
+        print(f"Enter 1-{count}.", file=output_stream)
 
 
 def _read_selected_candidate(candidate: DirectoryCandidate) -> ScriptSource:

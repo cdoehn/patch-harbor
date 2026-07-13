@@ -51,8 +51,8 @@ def test_discovery_is_non_recursive_ignores_symlinks_and_sorts(tmp_path: Path) -
 
 def test_selection_uses_candidate_data_without_rescanning(tmp_path: Path) -> None:
     candidates = (
-        DirectoryCandidate(tmp_path / "first.sh", "first.sh", 2),
-        DirectoryCandidate(tmp_path / "second.sh", "second.sh", 1),
+        DirectoryCandidate(tmp_path / "first.sh", 2),
+        DirectoryCandidate(tmp_path / "second.sh", 1),
     )
     output = StringIO()
 
