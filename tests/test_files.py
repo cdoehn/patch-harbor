@@ -125,3 +125,26 @@ def test_staging_failure_is_a_file_preparation_error(
     assert raised.value.exit_code is ExitCode.FILE_PREPARATION_ERROR
     assert "cannot write FILE 'payload.txt': denied" == str(raised.value)
     assert target.read_text(encoding="utf-8") == "original"
+
+
+def test_failed_atomic_replace_removes_staged_file(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    target = tmp_path / "payload.txt"
+    target.write_text("original", encoding="utf-8")
+
+    def fail_replace(*args: object, **kwargs: object) -> None:
+        raise PermissionError("replace denied")
+
+    monkeypatch.setattr(payload_files.os, "replace", fail_replace)
+
+    with pytest.raises(PatchHarborError) as raised:
+        write_payload_files((("payload.txt", "replacement"),), cwd=tmp_path)
+
+    assert raised.value.exit_code is ExitCode.FILE_PREPARATION_ERROR
+    assert str(raised.value) == (
+        "cannot write FILE 'payload.txt': replace denied"
+    )
+    assert target.read_text(encoding="utf-8") == "original"
+    assert list(tmp_path.glob(".patchharbor-*.tmp")) == []

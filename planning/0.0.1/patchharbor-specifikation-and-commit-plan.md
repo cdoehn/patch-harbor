@@ -952,6 +952,14 @@ Alle für Version 1 vorgesehenen Eingabewege und optionalen Skriptnutzdaten funk
 
 ---
 
+## Review nach Meilenstein 2
+
+- Der gerichtete Ablauf bleibt `CLI → Input → Parser → Files → Execution → Output`; neue Rückabhängigkeiten sind nicht notwendig.
+- Das flache Paket genügt weiterhin. Ein zusätzlicher Application-Layer entsteht erst, wenn die Orchestrierung in Meilenstein 3 tatsächlich wächst.
+- Die vollständige Vereinheitlichung der Ressourcenbudgets für alle Quellen bleibt gezielt in Step 4.b; FILE- und ZIP-Grenzen sind bereits zentral definiert und getestet.
+
+---
+
 # Meilenstein 3 – Kontrollierte Execution und Ausgabe
 
 ## Ziel

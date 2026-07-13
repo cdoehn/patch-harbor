@@ -12,19 +12,11 @@ REQUIRED_MARKER = "# PATCHHARBOR"
 _NAME = r"[A-Za-z0-9.]+"
 _META_PREFIX = "# PATCHHARBOR META "
 _META_PATTERN = re.compile(rf"^# PATCHHARBOR META ({_NAME})=(.*)$")
-_MESSAGE_PREFIX = "# PATCHHARBOR MESSAGE "
-_MESSAGE_START_PATTERN = re.compile(
-    rf"^# PATCHHARBOR MESSAGE ({_NAME}) START$"
+_BLOCK_START_PATTERN = re.compile(
+    r"^# PATCHHARBOR (MESSAGE|FILE) (.+) START$"
 )
-_MESSAGE_END_PATTERN = re.compile(
-    r"^# PATCHHARBOR MESSAGE (.+) END$"
-)
-_FILE_PREFIX = "# PATCHHARBOR FILE "
-_FILE_START_PATTERN = re.compile(
-    r"^# PATCHHARBOR FILE (.+) START$"
-)
-_FILE_END_PATTERN = re.compile(
-    r"^# PATCHHARBOR FILE (.+) END$"
+_BLOCK_END_PATTERN = re.compile(
+    r"^# PATCHHARBOR (MESSAGE|FILE) (.+) END$"
 )
 
 
@@ -75,11 +67,19 @@ def validate_required_marker(script_text: str) -> None:
         )
 
 
-def _message_content(line: str) -> str | None:
+def _comment_content(line: str) -> str | None:
     if line == "#":
         return ""
     if line.startswith("# "):
         return line[2:]
+    return None
+
+
+def _invalid_block_start(line: str) -> str | None:
+    for kind in ("MESSAGE", "FILE"):
+        prefix = f"# PATCHHARBOR {kind} "
+        if line.startswith(prefix) and line.endswith(" START"):
+            return kind
     return None
 
 
@@ -96,67 +96,68 @@ def parse_script(script_text: str) -> ParsedScript:
     active_name: str | None = None
     active_content: list[str] = []
     active_content_is_valid = True
-    discarding_invalid_kind: str | None = None
+    discarding_kind: str | None = None
 
     def warn(text: str) -> None:
         if text not in seen_warnings:
             warnings.append(text)
             seen_warnings.add(text)
 
+    def reset_active_block() -> None:
+        nonlocal active_kind, active_name, active_content
+        nonlocal active_content_is_valid
+        active_kind = None
+        active_name = None
+        active_content = []
+        active_content_is_valid = True
+
     for line in script_text.splitlines():
-        if discarding_invalid_kind is not None:
-            end_pattern = (
-                _MESSAGE_END_PATTERN
-                if discarding_invalid_kind == "MESSAGE"
-                else _FILE_END_PATTERN
-            )
-            if end_pattern.fullmatch(line):
-                discarding_invalid_kind = None
+        end_match = _BLOCK_END_PATTERN.fullmatch(line)
+
+        if discarding_kind is not None:
+            if end_match and end_match.group(1) == discarding_kind:
+                discarding_kind = None
             continue
 
         if active_kind is not None and active_name is not None:
-            end_pattern = (
-                _MESSAGE_END_PATTERN
-                if active_kind == "MESSAGE"
-                else _FILE_END_PATTERN
-            )
-            if end_match := end_pattern.fullmatch(line):
-                end_name = end_match.group(1)
-                if end_name != active_name:
+            if end_match:
+                end_kind, end_name = end_match.groups()
+                if end_kind != active_kind or end_name != active_name:
                     warn(
-                        f"discarded {active_kind} {active_name!r}: END name "
-                        f"{end_name!r} does not match"
+                        f"discarded {active_kind} {active_name!r}: "
+                        f"END name {end_name!r} does not match"
                     )
                 elif not active_content_is_valid:
                     warn(
                         f"discarded {active_kind} {active_name!r}: "
                         "content is not fully commented"
                     )
+                elif active_kind == "MESSAGE":
+                    messages.append(
+                        Message(
+                            name=active_name,
+                            text="\n".join(active_content),
+                        )
+                    )
+                elif not is_safe_payload_name(active_name):
+                    warn(
+                        f"discarded FILE {active_name!r}: invalid file name"
+                    )
                 else:
-                    text = "\n".join(active_content)
-                    if active_kind == "MESSAGE":
-                        messages.append(Message(name=active_name, text=text))
-                    else:
-                        if not is_safe_payload_name(active_name):
-                            warn(
-                                f"discarded FILE {active_name!r}: "
-                                "invalid file name"
-                            )
-                        else:
-                            if size_warning := payload_size_warning(
-                                active_name, text
-                            ):
-                                warn(size_warning)
-                            payload_files.append(
-                                PayloadFile(name=active_name, text=text)
-                            )
-                active_kind = None
-                active_name = None
-                active_content = []
-                active_content_is_valid = True
+                    if size_warning := payload_size_warning(
+                        active_name, active_content
+                    ):
+                        warn(size_warning)
+                    payload_files.append(
+                        PayloadFile(
+                            name=active_name,
+                            text="\n".join(active_content),
+                        )
+                    )
+                reset_active_block()
                 continue
 
-            content_line = _message_content(line)
+            content_line = _comment_content(line)
             if content_line is None:
                 active_content_is_valid = False
             else:
@@ -176,28 +177,19 @@ def parse_script(script_text: str) -> ParsedScript:
             warn("ignored invalid META directive")
             continue
 
-        if start_match := _MESSAGE_START_PATTERN.fullmatch(line):
-            active_kind = "MESSAGE"
-            active_name = start_match.group(1)
-            active_content = []
-            active_content_is_valid = True
+        if start_match := _BLOCK_START_PATTERN.fullmatch(line):
+            kind, name = start_match.groups()
+            if kind == "MESSAGE" and re.fullmatch(_NAME, name) is None:
+                warn("discarded invalid MESSAGE block")
+                discarding_kind = kind
+            else:
+                active_kind = kind
+                active_name = name
             continue
 
-        if start_match := _FILE_START_PATTERN.fullmatch(line):
-            active_kind = "FILE"
-            active_name = start_match.group(1)
-            active_content = []
-            active_content_is_valid = True
-            continue
-
-        if line.startswith(_MESSAGE_PREFIX) and line.endswith(" START"):
-            warn("discarded invalid MESSAGE block")
-            discarding_invalid_kind = "MESSAGE"
-            continue
-
-        if line.startswith(_FILE_PREFIX) and line.endswith(" START"):
-            warn("discarded invalid FILE block")
-            discarding_invalid_kind = "FILE"
+        if invalid_kind := _invalid_block_start(line):
+            warn(f"discarded invalid {invalid_kind} block")
+            discarding_kind = invalid_kind
 
     if active_kind is not None and active_name is not None:
         warn(f"discarded {active_kind} {active_name!r}: missing END marker")
