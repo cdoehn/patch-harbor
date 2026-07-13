@@ -5,8 +5,8 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "patchharbor"
 version = "0.1.0"
-description = "Repository-agnostic development scripts and patch workflow tools."
-keywords = ["cli", "development-tools", "patch-workflow", "repository-automation"]
+description = "Controlled runner for generated Bash and PowerShell scripts."
+keywords = ["bash", "cli", "powershell", "script-runner"]
 readme = "README.md"
 requires-python = ">=3.12"
 license = { text = "MIT" }
@@ -18,11 +18,11 @@ classifiers = [
   "Environment :: Console",
   "Intended Audience :: Developers",
   "License :: OSI Approved :: MIT License",
+  "Operating System :: Microsoft :: Windows",
   "Operating System :: POSIX :: Linux",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.12",
-  "Topic :: Software Development :: Build Tools",
-  "Topic :: Software Development :: Quality Assurance",
+  "Topic :: System :: Shells",
 ]
 
 dependencies = []

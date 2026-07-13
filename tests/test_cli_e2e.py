@@ -72,6 +72,9 @@ def test_fs_run_help_is_limited_to_public_arguments(tmp_path: Path) -> None:
     assert "Run one Bash or PowerShell script file." in completed.stdout
     assert "--timeout SECONDS" in completed.stdout
     assert "default: 300" in completed.stdout
+    assert "--log" not in completed.stdout
+    assert "--plain" not in completed.stdout
+    assert "--no-color" not in completed.stdout
 
 
 def _script_path(tmp_path: Path, stem: str) -> Path:

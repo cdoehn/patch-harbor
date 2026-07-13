@@ -2,8 +2,15 @@
 
 PatchHarbor runs generated Bash and PowerShell scripts in a controlled workflow.
 
-Run the complete local test suite with:
+## Installation
 
 ```bash
-./scripts/test.sh
+pipx install patchharbor
+```
+
+The command-line reference is available through:
+
+```bash
+patchharbor --help
+patchharbor fs run --help
 ```
