@@ -12,7 +12,7 @@ import zipfile
 
 from patchharbor.errors import ExitCode, PatchHarborError
 from patchharbor.execution import execute_script_file
-from patchharbor.files import temporary_script_file
+from patchharbor.files import temporary_script_file, write_payload_files
 from patchharbor.parser import ParsedScript, ScriptFormatError, parse_script, validate_required_marker
 
 
@@ -76,6 +76,10 @@ def _execute_parsed_script(
     cwd: Path,
     timeout_seconds: float,
 ) -> int:
+    write_payload_files(
+        ((payload.name, payload.text) for payload in script.payload_files),
+        cwd=cwd,
+    )
     try:
         with temporary_script_file(script.text, suffix=suffix) as temporary_path:
             return execute_script_file(

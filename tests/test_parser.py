@@ -4,6 +4,7 @@ import pytest
 
 from patchharbor.parser import (
     Message,
+    PayloadFile,
     Metadata,
     ScriptFormatError,
     parse_script,
@@ -154,4 +155,27 @@ def test_duplicate_optional_data_warnings_are_reported_once() -> None:
     assert parsed.warnings == (
         "ignored invalid META directive",
         "discarded invalid MESSAGE block",
+    )
+
+
+def test_multiple_file_blocks_are_parsed_in_order() -> None:
+    parsed = parse_script(
+        "\n".join(
+            (
+                "# PATCHHARBOR",
+                "# PATCHHARBOR FILE first.txt START",
+                "# first line",
+                "#",
+                "# third line",
+                "# PATCHHARBOR FILE first.txt END",
+                "# PATCHHARBOR FILE payload.b64 START",
+                "# SGVsbG8=",
+                "# PATCHHARBOR FILE payload.b64 END",
+            )
+        )
+    )
+
+    assert parsed.payload_files == (
+        PayloadFile(name="first.txt", text="first line\n\nthird line"),
+        PayloadFile(name="payload.b64", text="SGVsbG8="),
     )
