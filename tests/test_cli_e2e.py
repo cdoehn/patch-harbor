@@ -256,7 +256,7 @@ def test_missing_source_is_reported_before_process_start(tmp_path: Path) -> None
 
     assert completed.returncode == 4
     assert completed.stdout == ""
-    assert "patchharbor: cannot read script file" in completed.stderr
+    assert "patchharbor: cannot read script source" in completed.stderr
 
 
 def test_temporary_script_is_removed_after_timeout(tmp_path: Path) -> None:

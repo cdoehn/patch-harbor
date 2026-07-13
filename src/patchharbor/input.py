@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import Enum
 import os
 from pathlib import Path
 from typing import TextIO
@@ -14,12 +13,6 @@ from patchharbor.files import temporary_script_file
 from patchharbor.parser import ScriptFormatError, validate_required_marker
 
 
-class SourceKind(Enum):
-    """Supported script source kinds."""
-
-    FILE = "file"
-    STDIN = "stdin"
-
 
 @dataclass(frozen=True)
 class ScriptSource:
@@ -27,7 +20,6 @@ class ScriptSource:
 
     text: str
     suffix: str
-    kind: SourceKind
 
 
 def read_script_file(script_path: Path) -> ScriptSource:
@@ -36,14 +28,13 @@ def read_script_file(script_path: Path) -> ScriptSource:
         script_text = script_path.read_text(encoding="utf-8")
     except (OSError, UnicodeError) as exc:
         raise PatchHarborError(
-            f"cannot read script file {script_path}: {exc}",
+            f"cannot read script source {script_path}: {exc}",
             ExitCode.SOURCE_ERROR,
         ) from exc
 
     return ScriptSource(
         text=script_text,
         suffix=script_path.suffix,
-        kind=SourceKind.FILE,
     )
 
 
@@ -53,7 +44,7 @@ def read_script_stdin(stream: TextIO) -> ScriptSource:
         script_text = stream.read()
     except (OSError, UnicodeError) as exc:
         raise PatchHarborError(
-            f"cannot read script from standard input: {exc}",
+            f"cannot read script source standard input: {exc}",
             ExitCode.SOURCE_ERROR,
         ) from exc
 
@@ -66,7 +57,6 @@ def read_script_stdin(stream: TextIO) -> ScriptSource:
     return ScriptSource(
         text=script_text,
         suffix=".ps1" if os.name == "nt" else ".sh",
-        kind=SourceKind.STDIN,
     )
 
 

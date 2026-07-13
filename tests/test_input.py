@@ -3,11 +3,7 @@ from __future__ import annotations
 from io import StringIO
 from pathlib import Path
 
-from patchharbor.input import (
-    SourceKind,
-    read_script_file,
-    read_script_stdin,
-)
+from patchharbor.input import read_script_file, read_script_stdin
 
 
 def test_file_and_stdin_produce_the_same_neutral_shape(tmp_path: Path) -> None:
@@ -19,5 +15,4 @@ def test_file_and_stdin_produce_the_same_neutral_shape(tmp_path: Path) -> None:
 
     assert file_source.text == stdin_source.text
     assert file_source.suffix == ".sh"
-    assert file_source.kind is SourceKind.FILE
-    assert stdin_source.kind is SourceKind.STDIN
+    assert stdin_source.suffix in {".sh", ".ps1"}
