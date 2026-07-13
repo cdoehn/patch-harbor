@@ -40,27 +40,13 @@ class Message:
 
 
 @dataclass(frozen=True)
-class ParseWarning:
-    """One non-fatal problem in optional script information."""
-
-    text: str
-
-
-@dataclass(frozen=True)
 class ParsedScript:
     """Structured script data passed to later processing layers."""
 
     text: str
     metadata: tuple[Metadata, ...]
     messages: tuple[Message, ...]
-    warnings: tuple[ParseWarning, ...]
-
-
-@dataclass(frozen=True)
-class _MessageBlockResult:
-    message: Message | None
-    next_index: int
-    warning: ParseWarning | None
+    warnings: tuple[str, ...]
 
 
 def validate_required_marker(script_text: str) -> None:
@@ -79,80 +65,62 @@ def _message_content(line: str) -> str | None:
     return None
 
 
-def _parse_message_block(
-    lines: list[str],
-    *,
-    start_index: int,
-    name: str,
-) -> _MessageBlockResult:
-    content: list[str] = []
-    invalid_content_line: int | None = None
-    index = start_index + 1
-
-    while index < len(lines):
-        line = lines[index]
-        if end_match := _MESSAGE_END_PATTERN.fullmatch(line):
-            end_name = end_match.group(1)
-            if end_name != name:
-                return _MessageBlockResult(
-                    message=None,
-                    next_index=index + 1,
-                    warning=ParseWarning(
-                        f"discarded MESSAGE {name!r}: END name "
-                        f"{end_name!r} does not match"
-                    ),
-                )
-            if invalid_content_line is not None:
-                return _MessageBlockResult(
-                    message=None,
-                    next_index=index + 1,
-                    warning=ParseWarning(
-                        f"discarded MESSAGE {name!r}: line "
-                        f"{invalid_content_line} is not commented"
-                    ),
-                )
-            return _MessageBlockResult(
-                message=Message(name=name, text="\n".join(content)),
-                next_index=index + 1,
-                warning=None,
-            )
-
-        content_line = _message_content(line)
-        if content_line is None:
-            invalid_content_line = invalid_content_line or index + 1
-        else:
-            content.append(content_line)
-        index += 1
-
-    return _MessageBlockResult(
-        message=None,
-        next_index=index,
-        warning=ParseWarning(
-            f"discarded MESSAGE {name!r}: missing END marker"
-        ),
-    )
-
-
-def _skip_invalid_message_block(lines: list[str], start_index: int) -> int:
-    index = start_index + 1
-    while index < len(lines):
-        if _MESSAGE_END_PATTERN.fullmatch(lines[index]):
-            return index + 1
-        index += 1
-    return index
-
-
 def parse_script(script_text: str) -> ParsedScript:
-    """Parse required syntax and collect non-fatal optional-data warnings."""
+    """Parse required syntax and retain only valid optional information."""
     validate_required_marker(script_text)
-    lines = script_text.splitlines()
     metadata: list[Metadata] = []
     messages: list[Message] = []
-    warnings: list[ParseWarning] = []
-    index = 0
+    warnings: list[str] = []
+    seen_warnings: set[str] = set()
 
-    while index < len(lines):
-        line = lines[index]
+    active_name: str | None = None
+    active_content: list[str] = []
+    active_content_is_valid = True
+    discarding_invalid_message = False
+
+    def warn(text: str) -> None:
+        if text not in seen_warnings:
+            warnings.append(text)
+            seen_warnings.add(text)
+
+    for line in script_text.splitlines():
+        if discarding_invalid_message:
+            if _MESSAGE_END_PATTERN.fullmatch(line):
+                discarding_invalid_message = False
+            continue
+
+        if active_name is not None:
+            if end_match := _MESSAGE_END_PATTERN.fullmatch(line):
+                end_name = end_match.group(1)
+                if end_name != active_name:
+                    warn(
+                        f"discarded MESSAGE {active_name!r}: END name "
+                        f"{end_name!r} does not match"
+                    )
+                elif not active_content_is_valid:
+                    warn(
+                        f"discarded MESSAGE {active_name!r}: "
+                        "content is not fully commented"
+                    )
+                else:
+                    messages.append(
+                        Message(
+                            name=active_name,
+                            text="\n".join(active_content),
+                        )
+                    )
+                active_name = None
+                active_content = []
+                active_content_is_valid = True
+                continue
+
+            content_line = _message_content(line)
+            if content_line is None:
+                active_content_is_valid = False
+            else:
+                active_content.append(content_line)
+            continue
+
         if metadata_match := _META_PATTERN.fullmatch(line):
             metadata.append(
                 Metadata(
@@ -160,39 +128,24 @@ def parse_script(script_text: str) -> ParsedScript:
                     value=metadata_match.group(2),
                 )
             )
-            index += 1
             continue
 
         if line.startswith(_META_PREFIX):
-            warnings.append(
-                ParseWarning(f"ignored invalid META line {index + 1}")
-            )
-            index += 1
+            warn("ignored invalid META directive")
             continue
 
         if start_match := _MESSAGE_START_PATTERN.fullmatch(line):
-            result = _parse_message_block(
-                lines,
-                start_index=index,
-                name=start_match.group(1),
-            )
-            if result.message is not None:
-                messages.append(result.message)
-            if result.warning is not None:
-                warnings.append(result.warning)
-            index = result.next_index
+            active_name = start_match.group(1)
+            active_content = []
+            active_content_is_valid = True
             continue
 
         if line.startswith(_MESSAGE_PREFIX) and line.endswith(" START"):
-            warnings.append(
-                ParseWarning(
-                    f"discarded invalid MESSAGE block at line {index + 1}"
-                )
-            )
-            index = _skip_invalid_message_block(lines, index)
-            continue
+            warn("discarded invalid MESSAGE block")
+            discarding_invalid_message = True
 
-        index += 1
+    if active_name is not None:
+        warn(f"discarded MESSAGE {active_name!r}: missing END marker")
 
     return ParsedScript(
         text=script_text,

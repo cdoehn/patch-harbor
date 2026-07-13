@@ -89,10 +89,10 @@ def test_damaged_optional_information_is_discarded_with_warnings() -> None:
 
     assert parsed.metadata == ()
     assert parsed.messages == ()
-    assert tuple(warning.text for warning in parsed.warnings) == (
-        "ignored invalid META line 2",
+    assert parsed.warnings == (
+        "ignored invalid META directive",
         "discarded MESSAGE 'First': END name 'Other' does not match",
-        "discarded MESSAGE 'Second': line 7 is not commented",
+        "discarded MESSAGE 'Second': content is not fully commented",
         "discarded MESSAGE 'Third': missing END marker",
     )
 
@@ -131,6 +131,27 @@ def test_invalid_message_name_discards_the_whole_block() -> None:
     )
 
     assert parsed.messages == (Message(name="Good", text="retained"),)
-    assert tuple(warning.text for warning in parsed.warnings) == (
-        "discarded invalid MESSAGE block at line 2",
+    assert parsed.warnings == ("discarded invalid MESSAGE block",)
+
+
+def test_duplicate_optional_data_warnings_are_reported_once() -> None:
+    parsed = parse_script(
+        "\n".join(
+            (
+                "# PATCHHARBOR",
+                "# PATCHHARBOR META bad-name=first",
+                "# PATCHHARBOR META other-name=second",
+                "# PATCHHARBOR MESSAGE bad-name START",
+                "# ignored",
+                "# PATCHHARBOR MESSAGE bad-name END",
+                "# PATCHHARBOR MESSAGE other-name START",
+                "# ignored",
+                "# PATCHHARBOR MESSAGE other-name END",
+            )
+        )
+    )
+
+    assert parsed.warnings == (
+        "ignored invalid META directive",
+        "discarded invalid MESSAGE block",
     )
