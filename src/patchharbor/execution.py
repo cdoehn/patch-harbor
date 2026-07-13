@@ -6,9 +6,7 @@ import os
 from pathlib import Path
 import subprocess
 
-
-class ScriptExecutionTimeout(Exception):
-    """The script exceeded its configured execution timeout."""
+from patchharbor.errors import InterpreterError, ScriptTimeoutError
 
 
 def execute_script_file(
@@ -39,8 +37,12 @@ def execute_script_file(
             timeout=timeout_seconds,
         )
     except subprocess.TimeoutExpired as exc:
-        raise ScriptExecutionTimeout(
+        raise ScriptTimeoutError(
             f"script timed out after {timeout_seconds:g} seconds"
+        ) from exc
+    except OSError as exc:
+        raise InterpreterError(
+            f"cannot start script interpreter: {exc}"
         ) from exc
 
     return completed.returncode

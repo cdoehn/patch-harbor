@@ -7,11 +7,8 @@ from collections.abc import Sequence
 from pathlib import Path
 import sys
 
-from patchharbor.input import (
-    ScriptInputError,
-    ScriptTimeoutError,
-    run_script_file,
-)
+from patchharbor.errors import PatchHarborError
+from patchharbor.input import run_script_file
 
 
 DEFAULT_TIMEOUT_SECONDS = 300.0
@@ -58,12 +55,9 @@ def main(argv: Sequence[str] | None = None) -> int:
                 cwd=Path.cwd(),
                 timeout_seconds=args.timeout,
             )
-        except ScriptTimeoutError as exc:
+        except PatchHarborError as exc:
             print(f"patchharbor: {exc}", file=sys.stderr)
-            return 124
-        except ScriptInputError as exc:
-            print(f"patchharbor: {exc}", file=sys.stderr)
-            return 2
+            return int(exc.exit_code)
 
     parser.error("unsupported command")
 

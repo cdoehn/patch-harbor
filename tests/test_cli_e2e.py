@@ -79,7 +79,7 @@ def test_fs_run_rejects_script_without_required_marker(tmp_path: Path) -> None:
 
     completed = _run_patchharbor(script_path, tmp_path)
 
-    assert completed.returncode == 2
+    assert completed.returncode == 3
     assert completed.stdout == ""
     assert completed.stderr == (
         "patchharbor: missing required marker line: # PATCHHARBOR\n"
@@ -93,7 +93,7 @@ def test_message_line_does_not_replace_required_marker(tmp_path: Path) -> None:
 
     completed = _run_patchharbor(script_path, tmp_path)
 
-    assert completed.returncode == 2
+    assert completed.returncode == 3
     assert "missing required marker line" in completed.stderr
 
 
@@ -188,4 +188,44 @@ def test_temporary_script_is_removed_after_execution(tmp_path: Path) -> None:
     temporary_path = Path(completed.stdout.strip())
     assert completed.returncode == 0
     assert temporary_path.parent == Path(tempfile.gettempdir())
+    assert not temporary_path.exists()
+
+
+def test_missing_source_is_reported_before_process_start(tmp_path: Path) -> None:
+    script_path = _script_path(tmp_path, "missing")
+
+    completed = _run_patchharbor(script_path, tmp_path)
+
+    assert completed.returncode == 4
+    assert completed.stdout == ""
+    assert "patchharbor: cannot read script file" in completed.stderr
+
+
+def test_temporary_script_is_removed_after_timeout(tmp_path: Path) -> None:
+    observed_path = tmp_path / "temporary-path.txt"
+    script_path = _script_path(tmp_path, "timeout-cleanup")
+    if os.name == "nt":
+        script_body = (
+            f'Set-Content -Path "{observed_path}" -Value $PSCommandPath\n'
+            "while ($true) {}\n"
+        )
+    else:
+        script_body = (
+            f'printf "%s\\n" "$0" > "{observed_path}"\n'
+            "while :; do :; done\n"
+        )
+    script_path.write_text(
+        f"{REQUIRED_MARKER}\n{script_body}",
+        encoding="utf-8",
+    )
+
+    completed = _run_patchharbor(
+        script_path,
+        tmp_path,
+        "--timeout",
+        "0.05",
+    )
+
+    temporary_path = Path(observed_path.read_text(encoding="utf-8").strip())
+    assert completed.returncode == 124
     assert not temporary_path.exists()

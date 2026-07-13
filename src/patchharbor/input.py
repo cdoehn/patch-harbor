@@ -4,17 +4,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from patchharbor.execution import ScriptExecutionTimeout, execute_script_file
+from patchharbor.errors import (
+    ExecutionPreparationError,
+    NoValidScriptError,
+    SourceError,
+)
+from patchharbor.execution import execute_script_file
 from patchharbor.files import temporary_script_file
 from patchharbor.parser import ScriptFormatError, validate_required_marker
-
-
-class ScriptInputError(Exception):
-    """The requested script source could not be loaded or validated."""
-
-
-class ScriptTimeoutError(ScriptInputError):
-    """The validated script exceeded its configured timeout."""
 
 
 def run_script_file(
@@ -27,14 +24,14 @@ def run_script_file(
     try:
         script_text = script_path.read_text(encoding="utf-8")
     except (OSError, UnicodeError) as exc:
-        raise ScriptInputError(
+        raise SourceError(
             f"cannot read script file {script_path}: {exc}"
         ) from exc
 
     try:
         validate_required_marker(script_text)
     except ScriptFormatError as exc:
-        raise ScriptInputError(str(exc)) from exc
+        raise NoValidScriptError(str(exc)) from exc
 
     try:
         with temporary_script_file(
@@ -46,7 +43,7 @@ def run_script_file(
                 cwd=cwd,
                 timeout_seconds=timeout_seconds,
             )
-    except ScriptExecutionTimeout as exc:
-        raise ScriptTimeoutError(str(exc)) from exc
     except OSError as exc:
-        raise ScriptInputError(f"cannot prepare temporary script: {exc}") from exc
+        raise ExecutionPreparationError(
+            f"cannot prepare temporary script: {exc}"
+        ) from exc
