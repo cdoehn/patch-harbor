@@ -7,7 +7,7 @@ from collections.abc import Sequence
 from pathlib import Path
 import sys
 
-from patchharbor.input import ScriptFileError, run_script_file
+from patchharbor.input import ScriptInputError, run_script_file
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -31,7 +31,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.command == "fs" and args.fs_command == "run":
         try:
             return run_script_file(args.path)
-        except ScriptFileError as exc:
+        except ScriptInputError as exc:
             print(f"patchharbor: {exc}", file=sys.stderr)
             return 2
 
