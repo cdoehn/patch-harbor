@@ -51,6 +51,7 @@ def _run_patchharbor(
     cwd: Path,
     *run_arguments: str,
     environment_overrides: Mapping[str, str] | None = None,
+    input_text: str | None = None,
 ) -> subprocess.CompletedProcess[str]:
     return _run_cli(
         cwd,
@@ -59,6 +60,7 @@ def _run_patchharbor(
         *run_arguments,
         str(script_path),
         environment_overrides=environment_overrides,
+        input_text=input_text,
     )
 
 
@@ -94,7 +96,7 @@ def test_fs_run_help_is_limited_to_public_arguments(tmp_path: Path) -> None:
     completed = _run_cli(tmp_path, "fs", "run", "--help")
 
     assert completed.returncode == 0
-    assert "Run one Bash or PowerShell script from PATH or standard input." in completed.stdout
+    assert "Run one Bash or PowerShell script from a file, directory, or standard input." in completed.stdout
     assert "--timeout SECONDS" in completed.stdout
     assert "default: 300" in completed.stdout
     assert "--log" not in completed.stdout
@@ -307,3 +309,100 @@ def test_missing_interpreter_is_reported_as_tool_error(tmp_path: Path) -> None:
     assert completed.stderr.startswith(
         "patchharbor: cannot start script interpreter:"
     )
+
+
+def _write_named_script(path: Path, output: str, *, exit_code: int = 0) -> None:
+    if os.name == "nt":
+        body = f'Write-Output "{output}"\nexit {exit_code}\n'
+    else:
+        body = f'printf "%s\\n" "{output}"\nexit {exit_code}\n'
+    path.write_text(f"{REQUIRED_MARKER}\n{body}", encoding="utf-8")
+
+
+def test_directory_candidates_are_sorted_and_selected_by_index(tmp_path: Path) -> None:
+    inbox = tmp_path / "inbox"
+    inbox.mkdir()
+    newest = _script_path(inbox, "newest")
+    alpha = _script_path(inbox, "alpha")
+    beta = _script_path(inbox, "beta")
+    _write_named_script(newest, "newest")
+    _write_named_script(alpha, "alpha")
+    _write_named_script(beta, "beta")
+    os.utime(newest, ns=(300, 300))
+    os.utime(alpha, ns=(200, 200))
+    os.utime(beta, ns=(200, 200))
+
+    completed = _run_patchharbor(inbox, tmp_path, input_text="2\n")
+
+    assert completed.returncode == 0
+    assert completed.stderr == ""
+    assert completed.stdout.index(f"1. {newest.name}") < completed.stdout.index(
+        f"2. {alpha.name}"
+    )
+    assert completed.stdout.index(f"2. {alpha.name}") < completed.stdout.index(
+        f"3. {beta.name}"
+    )
+    assert completed.stdout.endswith("alpha\n")
+
+
+def test_directory_with_one_candidate_runs_without_prompt(tmp_path: Path) -> None:
+    inbox = tmp_path / "inbox"
+    inbox.mkdir()
+    _write_named_script(_script_path(inbox, "only"), "automatic")
+
+    completed = _run_patchharbor(inbox, tmp_path)
+
+    assert completed.returncode == 0
+    assert completed.stdout == "automatic\n"
+    assert completed.stderr == ""
+
+
+def test_empty_directory_selection_aborts(tmp_path: Path) -> None:
+    inbox = tmp_path / "inbox"
+    inbox.mkdir()
+    _write_named_script(_script_path(inbox, "first"), "first")
+    _write_named_script(_script_path(inbox, "second"), "second")
+
+    completed = _run_patchharbor(inbox, tmp_path, input_text="\n")
+
+    assert completed.returncode == 2
+    assert "Available PatchHarbor scripts:" in completed.stdout
+    assert completed.stderr == "patchharbor: no script selected\n"
+
+
+def test_directory_without_candidates_is_rejected(tmp_path: Path) -> None:
+    inbox = tmp_path / "inbox"
+    inbox.mkdir()
+    (inbox / "plain.txt").write_text("not a script\n", encoding="utf-8")
+    (inbox / "nested").mkdir()
+
+    completed = _run_patchharbor(inbox, tmp_path)
+
+    assert completed.returncode == 3
+    assert completed.stdout == ""
+    assert completed.stderr == (
+        f"patchharbor: no PatchHarbor scripts found in directory {inbox}\n"
+    )
+
+
+def test_invalid_directory_selection_is_retried(tmp_path: Path) -> None:
+    inbox = tmp_path / "inbox"
+    inbox.mkdir()
+    first = _script_path(inbox, "first")
+    second = _script_path(inbox, "second")
+    _write_named_script(first, "first")
+    _write_named_script(second, "second")
+    os.utime(first, ns=(200, 200))
+    os.utime(second, ns=(100, 100))
+
+    completed = _run_patchharbor(
+        inbox,
+        tmp_path,
+        input_text="wrong\n２\n2\n",
+    )
+
+    assert completed.returncode == 0
+    assert completed.stdout.count("Invalid selection.") == 2
+    assert completed.stdout.endswith("second\n")
+    assert completed.stderr == ""
+

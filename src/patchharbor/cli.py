@@ -11,8 +11,8 @@ from typing import TextIO
 from patchharbor.errors import PatchHarborError
 from patchharbor.execution import DEFAULT_TIMEOUT_SECONDS
 from patchharbor.input import (
-    read_script_file,
     read_script_stdin,
+    run_script_path,
     run_script_source,
 )
 
@@ -50,8 +50,8 @@ def _build_parser() -> argparse.ArgumentParser:
 
     run_parser = fs_commands.add_parser(
         "run",
-        help="run one script file",
-        description="Run one Bash or PowerShell script from PATH or standard input.",
+        help="run a script file or choose one from a directory",
+        description="Run one Bash or PowerShell script from a file, directory, or standard input.",
     )
     run_parser.add_argument(
         "--timeout",
@@ -68,7 +68,7 @@ def _build_parser() -> argparse.ArgumentParser:
         type=Path,
         nargs="?",
         metavar="PATH",
-        help="script file to run; omit to read standard input",
+        help="script file or directory; omit to read standard input",
     )
 
     return parser
@@ -85,13 +85,17 @@ def _run_command(
         parser.error("PATH is required when standard input is a terminal")
 
     try:
-        source = (
-            read_script_file(path)
-            if path is not None
-            else read_script_stdin(stdin)
-        )
+        if path is not None:
+            return run_script_path(
+                path,
+                cwd=Path.cwd(),
+                timeout_seconds=timeout_seconds,
+                selection_input=stdin,
+                selection_output=sys.stdout,
+            )
+
         return run_script_source(
-            source,
+            read_script_stdin(stdin),
             cwd=Path.cwd(),
             timeout_seconds=timeout_seconds,
         )
