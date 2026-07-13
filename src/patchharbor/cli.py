@@ -6,10 +6,11 @@ import argparse
 from collections.abc import Sequence
 from pathlib import Path
 import sys
+from typing import TextIO
 
 from patchharbor.errors import PatchHarborError
 from patchharbor.execution import DEFAULT_TIMEOUT_SECONDS
-from patchharbor.input import run_script_file
+from patchharbor.input import run_script_file, run_script_stdin
 
 
 def _positive_seconds(value: str) -> float:
@@ -46,7 +47,7 @@ def _build_parser() -> argparse.ArgumentParser:
     run_parser = fs_commands.add_parser(
         "run",
         help="run one script file",
-        description="Run one Bash or PowerShell script file.",
+        description="Run one Bash or PowerShell script from PATH or standard input.",
     )
     run_parser.add_argument(
         "--timeout",
@@ -61,17 +62,33 @@ def _build_parser() -> argparse.ArgumentParser:
     run_parser.add_argument(
         "path",
         type=Path,
+        nargs="?",
         metavar="PATH",
-        help="script file to run",
+        help="script file to run; omit to read standard input",
     )
 
     return parser
 
 
-def _run_file_command(path: Path, timeout_seconds: float) -> int:
+def _run_command(
+    path: Path | None,
+    timeout_seconds: float,
+    *,
+    parser: argparse.ArgumentParser,
+    stdin: TextIO,
+) -> int:
+    if path is None and stdin.isatty():
+        parser.error("PATH is required when standard input is a terminal")
+
     try:
-        return run_script_file(
-            path,
+        if path is not None:
+            return run_script_file(
+                path,
+                cwd=Path.cwd(),
+                timeout_seconds=timeout_seconds,
+            )
+        return run_script_stdin(
+            stdin,
             cwd=Path.cwd(),
             timeout_seconds=timeout_seconds,
         )
@@ -80,13 +97,22 @@ def _run_file_command(path: Path, timeout_seconds: float) -> int:
         return int(exc.exit_code)
 
 
-def main(argv: Sequence[str] | None = None) -> int:
+def main(
+    argv: Sequence[str] | None = None,
+    *,
+    stdin: TextIO | None = None,
+) -> int:
     """Run the PatchHarbor CLI."""
     parser = _build_parser()
     args = parser.parse_args(argv)
 
     if args.command == "fs" and args.fs_command == "run":
-        return _run_file_command(args.path, args.timeout)
+        return _run_command(
+            args.path,
+            args.timeout,
+            parser=parser,
+            stdin=sys.stdin if stdin is None else stdin,
+        )
 
     parser.error("unsupported command")
 

@@ -8,6 +8,7 @@ from enum import IntEnum
 class ExitCode(IntEnum):
     """Exit codes owned by PatchHarbor rather than the executed script."""
 
+    USAGE_ERROR = 2
     NO_VALID_SCRIPT = 3
     SOURCE_ERROR = 4
     INTERPRETER_ERROR = 5

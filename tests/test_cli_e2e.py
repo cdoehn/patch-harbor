@@ -16,6 +16,7 @@ def _run_cli(
     cwd: Path,
     *arguments: str,
     environment_overrides: Mapping[str, str] | None = None,
+    input_text: str | None = None,
 ) -> subprocess.CompletedProcess[str]:
     environment = os.environ.copy()
     source_path = str(PROJECT_ROOT / "src")
@@ -28,6 +29,11 @@ def _run_cli(
     if environment_overrides:
         environment.update(environment_overrides)
 
+    standard_input = (
+        {"stdin": subprocess.DEVNULL}
+        if input_text is None
+        else {"input": input_text}
+    )
     return subprocess.run(
         [sys.executable, "-m", "patchharbor.cli", *arguments],
         cwd=cwd,
@@ -35,8 +41,8 @@ def _run_cli(
         check=False,
         capture_output=True,
         text=True,
-        stdin=subprocess.DEVNULL,
         timeout=15,
+        **standard_input,
     )
 
 
@@ -56,20 +62,39 @@ def _run_patchharbor(
     )
 
 
-def test_fs_run_without_path_is_a_usage_error(tmp_path: Path) -> None:
+def test_fs_run_rejects_empty_standard_input(tmp_path: Path) -> None:
     completed = _run_cli(tmp_path, "fs", "run")
 
     assert completed.returncode == 2
     assert completed.stdout == ""
-    assert completed.stderr.startswith("usage: patchharbor fs run")
-    assert "PATH" in completed.stderr
+    assert completed.stderr == "patchharbor: no script input received\n"
+
+
+def test_fs_run_reads_script_from_standard_input(tmp_path: Path) -> None:
+    script_text = (
+        f"{REQUIRED_MARKER}\n"
+        'printf "%s\\n" "stdin-e2e"\n'
+        if os.name != "nt"
+        else f'{REQUIRED_MARKER}\nWrite-Output "stdin-e2e"\n'
+    )
+
+    completed = _run_cli(
+        tmp_path,
+        "fs",
+        "run",
+        input_text=script_text,
+    )
+
+    assert completed.returncode == 0
+    assert completed.stdout == "stdin-e2e\n"
+    assert completed.stderr == ""
 
 
 def test_fs_run_help_is_limited_to_public_arguments(tmp_path: Path) -> None:
     completed = _run_cli(tmp_path, "fs", "run", "--help")
 
     assert completed.returncode == 0
-    assert "Run one Bash or PowerShell script file." in completed.stdout
+    assert "Run one Bash or PowerShell script from PATH or standard input." in completed.stdout
     assert "--timeout SECONDS" in completed.stdout
     assert "default: 300" in completed.stdout
     assert "--log" not in completed.stdout
