@@ -32,8 +32,12 @@ patchharbor = "patchharbor.cli:main"
 
 [project.optional-dependencies]
 dev = [
+  "build>=1.2",
+  "pipx>=1.7",
   "pytest>=7.4",
-  "pytest-timeout>=2.4"
+  "pytest-timeout>=2.4",
+  "setuptools>=68",
+  "wheel>=0.43"
 ]
 
 [tool.setuptools.packages.find]
