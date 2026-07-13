@@ -98,7 +98,7 @@ def test_zip_resource_budgets_fail_before_execution(
         _run_path(archive_path, tmp_path)
 
     assert raised.value.exit_code is ExitCode.SOURCE_ERROR
-    assert "ZIP archive exceeds resource limit" in str(raised.value)
+    assert "resource limit exceeded" in str(raised.value)
 
 
 def test_each_zip_script_receives_its_own_timeout(
@@ -124,7 +124,7 @@ def test_each_zip_script_receives_its_own_timeout(
         observed.append((source, timeout_seconds))
         return 0
 
-    monkeypatch.setattr(script_input, "run_script_source", fake_run_script_source)
+    monkeypatch.setattr(script_input, "_execute_script_source", fake_run_script_source)
 
     result = _run_path(archive_path, tmp_path, timeout_seconds=7.5)
 

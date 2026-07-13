@@ -69,6 +69,26 @@ def read_script_stdin(stream: TextIO) -> ScriptSource:
     )
 
 
+def _execute_script_source(
+    source: ScriptSource,
+    *,
+    cwd: Path,
+    timeout_seconds: float,
+) -> int:
+    try:
+        with temporary_script_file(source.text, suffix=source.suffix) as temporary_path:
+            return execute_script_file(
+                temporary_path,
+                cwd=cwd,
+                timeout_seconds=timeout_seconds,
+            )
+    except OSError as exc:
+        raise PatchHarborError(
+            f"cannot prepare temporary script: {exc}",
+            ExitCode.EXECUTION_ERROR,
+        ) from exc
+
+
 def run_script_source(
     source: ScriptSource,
     *,
@@ -84,18 +104,11 @@ def run_script_source(
             ExitCode.NO_VALID_SCRIPT,
         ) from exc
 
-    try:
-        with temporary_script_file(source.text, suffix=source.suffix) as temporary_path:
-            return execute_script_file(
-                temporary_path,
-                cwd=cwd,
-                timeout_seconds=timeout_seconds,
-            )
-    except OSError as exc:
-        raise PatchHarborError(
-            f"cannot prepare temporary script: {exc}",
-            ExitCode.EXECUTION_ERROR,
-        ) from exc
+    return _execute_script_source(
+        source,
+        cwd=cwd,
+        timeout_seconds=timeout_seconds,
+    )
 
 
 @dataclass(frozen=True)
@@ -110,11 +123,15 @@ class DirectoryCandidate:
         return self.path.name
 
 
-def _zip_limit_error(path: Path, detail: str) -> PatchHarborError:
+def _zip_source_error(path: Path, detail: object) -> PatchHarborError:
     return PatchHarborError(
-        f"ZIP archive exceeds resource limit ({detail}): {path}",
+        f"cannot read ZIP archive {path}: {detail}",
         ExitCode.SOURCE_ERROR,
     )
+
+
+def _zip_limit_error(path: Path, detail: str) -> PatchHarborError:
+    return _zip_source_error(path, f"resource limit exceeded ({detail})")
 
 
 def _validate_zip_budgets(
@@ -321,13 +338,6 @@ def _looks_like_zip(path: Path) -> bool:
         return False
 
 
-def _invalid_zip_error(path: Path, exc: BaseException) -> PatchHarborError:
-    return PatchHarborError(
-        f"cannot read ZIP archive {path}: {exc}",
-        ExitCode.SOURCE_ERROR,
-    )
-
-
 def _run_zip_file(
     path: Path,
     *,
@@ -349,7 +359,7 @@ def _run_zip_file(
                 f"file is neither a UTF-8 PatchHarbor script nor a ZIP archive: {path}",
                 ExitCode.NO_VALID_SCRIPT,
             ) from exc
-        raise _invalid_zip_error(path, exc) from exc
+        raise _zip_source_error(path, exc) from exc
 
     executed = False
     last_exit_code = 0
@@ -357,7 +367,7 @@ def _run_zip_file(
         with archive:
             for source in _iter_zip_script_sources(archive, path=path):
                 executed = True
-                last_exit_code = run_script_source(
+                last_exit_code = _execute_script_source(
                     source,
                     cwd=cwd,
                     timeout_seconds=timeout_seconds,
@@ -367,7 +377,7 @@ def _run_zip_file(
     except PatchHarborError:
         raise
     except (OSError, RuntimeError, zipfile.BadZipFile) as exc:
-        raise _invalid_zip_error(path, exc) from exc
+        raise _zip_source_error(path, exc) from exc
 
     if not executed:
         raise _no_valid_zip_script(path)
