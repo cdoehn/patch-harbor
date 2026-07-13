@@ -1,4 +1,4 @@
-"""Command-line interface for the first PatchHarbor vertical slice."""
+"""PatchHarbor command-line interface."""
 
 from __future__ import annotations
 
@@ -23,22 +23,61 @@ def _positive_seconds(value: str) -> float:
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="patchharbor")
-    commands = parser.add_subparsers(dest="command", required=True)
+    parser = argparse.ArgumentParser(
+        prog="patchharbor",
+        description="Run generated scripts in a controlled workflow.",
+    )
+    commands = parser.add_subparsers(
+        dest="command",
+        required=True,
+        metavar="COMMAND",
+    )
 
-    fs_parser = commands.add_parser("fs")
-    fs_commands = fs_parser.add_subparsers(dest="fs_command", required=True)
+    fs_parser = commands.add_parser(
+        "fs",
+        help="read scripts from the file system",
+    )
+    fs_commands = fs_parser.add_subparsers(
+        dest="fs_command",
+        required=True,
+        metavar="COMMAND",
+    )
 
-    run_parser = fs_commands.add_parser("run")
+    run_parser = fs_commands.add_parser(
+        "run",
+        help="run one script file",
+        description="Run one Bash or PowerShell script file.",
+    )
     run_parser.add_argument(
         "--timeout",
         type=_positive_seconds,
         default=DEFAULT_TIMEOUT_SECONDS,
         metavar="SECONDS",
+        help=(
+            "stop the script after this many seconds "
+            f"(default: {DEFAULT_TIMEOUT_SECONDS:g})"
+        ),
     )
-    run_parser.add_argument("path", type=Path)
+    run_parser.add_argument(
+        "path",
+        type=Path,
+        metavar="PATH",
+        help="script file to run",
+    )
 
     return parser
+
+
+def _run_file_command(path: Path, timeout_seconds: float) -> int:
+    try:
+        return run_script_file(
+            path,
+            cwd=Path.cwd(),
+            timeout_seconds=timeout_seconds,
+        )
+    except PatchHarborError as exc:
+        print(f"patchharbor: {exc}", file=sys.stderr)
+        return int(exc.exit_code)
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -47,15 +86,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     if args.command == "fs" and args.fs_command == "run":
-        try:
-            return run_script_file(
-                args.path,
-                cwd=Path.cwd(),
-                timeout_seconds=args.timeout,
-            )
-        except PatchHarborError as exc:
-            print(f"patchharbor: {exc}", file=sys.stderr)
-            return int(exc.exit_code)
+        return _run_file_command(args.path, args.timeout)
 
     parser.error("unsupported command")
 

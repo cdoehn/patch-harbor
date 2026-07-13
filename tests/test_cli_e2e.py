@@ -12,10 +12,9 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 REQUIRED_MARKER = "# PATCHHARBOR"
 
 
-def _run_patchharbor(
-    script_path: Path,
+def _run_cli(
     cwd: Path,
-    *run_arguments: str,
+    *arguments: str,
     environment_overrides: Mapping[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
     environment = os.environ.copy()
@@ -30,22 +29,49 @@ def _run_patchharbor(
         environment.update(environment_overrides)
 
     return subprocess.run(
-        [
-            sys.executable,
-            "-m",
-            "patchharbor.cli",
-            "fs",
-            "run",
-            *run_arguments,
-            str(script_path),
-        ],
+        [sys.executable, "-m", "patchharbor.cli", *arguments],
         cwd=cwd,
         env=environment,
         check=False,
         capture_output=True,
         text=True,
+        stdin=subprocess.DEVNULL,
         timeout=15,
     )
+
+
+def _run_patchharbor(
+    script_path: Path,
+    cwd: Path,
+    *run_arguments: str,
+    environment_overrides: Mapping[str, str] | None = None,
+) -> subprocess.CompletedProcess[str]:
+    return _run_cli(
+        cwd,
+        "fs",
+        "run",
+        *run_arguments,
+        str(script_path),
+        environment_overrides=environment_overrides,
+    )
+
+
+def test_fs_run_without_path_is_a_usage_error(tmp_path: Path) -> None:
+    completed = _run_cli(tmp_path, "fs", "run")
+
+    assert completed.returncode == 2
+    assert completed.stdout == ""
+    assert completed.stderr.startswith("usage: patchharbor fs run")
+    assert "PATH" in completed.stderr
+
+
+def test_fs_run_help_is_limited_to_public_arguments(tmp_path: Path) -> None:
+    completed = _run_cli(tmp_path, "fs", "run", "--help")
+
+    assert completed.returncode == 0
+    assert "Run one Bash or PowerShell script file." in completed.stdout
+    assert "--timeout SECONDS" in completed.stdout
+    assert "default: 300" in completed.stdout
 
 
 def _script_path(tmp_path: Path, stem: str) -> Path:
