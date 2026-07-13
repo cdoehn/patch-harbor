@@ -517,3 +517,57 @@ def test_metadata_and_multiple_messages_do_not_change_execution(tmp_path: Path) 
     assert completed.returncode == 0
     assert completed.stdout == "ran\n"
     assert completed.stderr == ""
+
+
+def test_damaged_message_does_not_prevent_script_execution(
+    tmp_path: Path,
+) -> None:
+    script_path = _script_path(tmp_path, "damaged-message")
+    if os.name == "nt":
+        script_body = 'Write-Output "still-runs"\n'
+    else:
+        script_body = 'printf "%s\\n" "still-runs"\n'
+    script_path.write_text(
+        "\n".join(
+            (
+                REQUIRED_MARKER,
+                "# PATCHHARBOR MESSAGE Note START",
+                "# ignored",
+                "# PATCHHARBOR MESSAGE Wrong END",
+                script_body.rstrip("\n"),
+                "",
+            )
+        ),
+        encoding="utf-8",
+    )
+
+    completed = _run_patchharbor(script_path, tmp_path)
+
+    assert completed.returncode == 0
+    assert completed.stdout == "still-runs\n"
+
+
+def test_metadata_cannot_change_execution_controls(tmp_path: Path) -> None:
+    script_path = _script_path(tmp_path, "informational-meta")
+    if os.name == "nt":
+        script_body = 'Start-Sleep -Milliseconds 20\nWrite-Output "unchanged"\n'
+    else:
+        script_body = 'sleep 0.02\nprintf "%s\\n" "unchanged"\n'
+    script_path.write_text(
+        "\n".join(
+            (
+                REQUIRED_MARKER,
+                "# PATCHHARBOR META timeout=0.001",
+                "# PATCHHARBOR META interpreter=missing-command",
+                "# PATCHHARBOR META environment.TEST=injected",
+                script_body.rstrip("\n"),
+                "",
+            )
+        ),
+        encoding="utf-8",
+    )
+
+    completed = _run_patchharbor(script_path, tmp_path)
+
+    assert completed.returncode == 0
+    assert completed.stdout == "unchanged\n"

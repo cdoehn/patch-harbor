@@ -67,3 +67,70 @@ def test_metadata_and_multiple_named_messages_are_parsed_in_order() -> None:
         Message(name="Intro.1", text="First line\n\nThird line"),
         Message(name="result2", text="Finished"),
     )
+
+
+def test_damaged_optional_information_is_discarded_with_warnings() -> None:
+    parsed = parse_script(
+        "\n".join(
+            (
+                "# PATCHHARBOR",
+                "# PATCHHARBOR META bad-name=value",
+                "# PATCHHARBOR MESSAGE First START",
+                "# ignored",
+                "# PATCHHARBOR MESSAGE Other END",
+                "# PATCHHARBOR MESSAGE Second START",
+                "not commented",
+                "# PATCHHARBOR MESSAGE Second END",
+                "# PATCHHARBOR MESSAGE Third START",
+                "# unfinished",
+            )
+        )
+    )
+
+    assert parsed.metadata == ()
+    assert parsed.messages == ()
+    assert tuple(warning.text for warning in parsed.warnings) == (
+        "ignored invalid META line 2",
+        "discarded MESSAGE 'First': END name 'Other' does not match",
+        "discarded MESSAGE 'Second': line 7 is not commented",
+        "discarded MESSAGE 'Third': missing END marker",
+    )
+
+
+def test_valid_message_after_damaged_block_is_still_parsed() -> None:
+    parsed = parse_script(
+        "\n".join(
+            (
+                "# PATCHHARBOR",
+                "# PATCHHARBOR MESSAGE Broken START",
+                "# PATCHHARBOR MESSAGE Wrong END",
+                "# PATCHHARBOR MESSAGE Good START",
+                "# retained",
+                "# PATCHHARBOR MESSAGE Good END",
+            )
+        )
+    )
+
+    assert parsed.messages == (Message(name="Good", text="retained"),)
+    assert len(parsed.warnings) == 1
+
+
+def test_invalid_message_name_discards_the_whole_block() -> None:
+    parsed = parse_script(
+        "\n".join(
+            (
+                "# PATCHHARBOR",
+                "# PATCHHARBOR MESSAGE bad-name START",
+                "# ignored",
+                "# PATCHHARBOR MESSAGE bad-name END",
+                "# PATCHHARBOR MESSAGE Good START",
+                "# retained",
+                "# PATCHHARBOR MESSAGE Good END",
+            )
+        )
+    )
+
+    assert parsed.messages == (Message(name="Good", text="retained"),)
+    assert tuple(warning.text for warning in parsed.warnings) == (
+        "discarded invalid MESSAGE block at line 2",
+    )
