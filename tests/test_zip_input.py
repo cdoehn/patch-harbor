@@ -8,7 +8,8 @@ import pytest
 
 from patchharbor.errors import ExitCode, PatchHarborError
 import patchharbor.input as script_input
-from patchharbor.input import ScriptSource, discover_directory_candidates, run_script_path
+from patchharbor.input import discover_directory_candidates, run_script_path
+from patchharbor.parser import ParsedScript
 
 
 REQUIRED_MARKER = "# PATCHHARBOR"
@@ -113,21 +114,22 @@ def test_each_zip_script_receives_its_own_timeout(
             ("second.sh", f"{REQUIRED_MARKER}\n"),
         ],
     )
-    observed: list[tuple[ScriptSource, float]] = []
+    observed: list[tuple[ParsedScript, str, float]] = []
 
-    def fake_run_script_source(
-        source: ScriptSource,
+    def fake_execute_parsed_script(
+        script: ParsedScript,
         *,
+        suffix: str,
         cwd: Path,
         timeout_seconds: float,
     ) -> int:
-        observed.append((source, timeout_seconds))
+        observed.append((script, suffix, timeout_seconds))
         return 0
 
-    monkeypatch.setattr(script_input, "_execute_script_source", fake_run_script_source)
+    monkeypatch.setattr(script_input, "_execute_parsed_script", fake_execute_parsed_script)
 
     result = _run_path(archive_path, tmp_path, timeout_seconds=7.5)
 
     assert result == 0
     assert len(observed) == 2
-    assert [timeout for _, timeout in observed] == [7.5, 7.5]
+    assert [timeout for _, _, timeout in observed] == [7.5, 7.5]

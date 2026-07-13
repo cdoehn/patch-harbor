@@ -485,3 +485,35 @@ def test_corrupt_zip_is_distinct_from_missing_marker(tmp_path: Path) -> None:
     assert completed.stderr.startswith(
         f"patchharbor: cannot read ZIP archive {archive_path}:"
     )
+
+
+def test_metadata_and_multiple_messages_do_not_change_execution(tmp_path: Path) -> None:
+    script_path = _script_path(tmp_path, "informational-data")
+    if os.name == "nt":
+        command = 'Write-Output "ran"\n'
+    else:
+        command = 'printf "%s\\n" "ran"\n'
+    script_path.write_text(
+        "\n".join(
+            (
+                REQUIRED_MARKER,
+                "# PATCHHARBOR META author=Christian",
+                "# PATCHHARBOR META build.V1=ready",
+                "# PATCHHARBOR MESSAGE First.1 START",
+                "# One",
+                "# PATCHHARBOR MESSAGE First.1 END",
+                "# PATCHHARBOR MESSAGE second2 START",
+                "# Two",
+                "# PATCHHARBOR MESSAGE second2 END",
+                command.rstrip("\n"),
+                "",
+            )
+        ),
+        encoding="utf-8",
+    )
+
+    completed = _run_patchharbor(script_path, tmp_path)
+
+    assert completed.returncode == 0
+    assert completed.stdout == "ran\n"
+    assert completed.stderr == ""

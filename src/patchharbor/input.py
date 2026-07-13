@@ -13,7 +13,7 @@ import zipfile
 from patchharbor.errors import ExitCode, PatchHarborError
 from patchharbor.execution import execute_script_file
 from patchharbor.files import temporary_script_file
-from patchharbor.parser import ScriptFormatError, validate_required_marker
+from patchharbor.parser import ParsedScript, ScriptFormatError, parse_script, validate_required_marker
 
 
 MAX_ZIP_ENTRIES = 1_000
@@ -69,14 +69,15 @@ def read_script_stdin(stream: TextIO) -> ScriptSource:
     )
 
 
-def _execute_script_source(
-    source: ScriptSource,
+def _execute_parsed_script(
+    script: ParsedScript,
     *,
+    suffix: str,
     cwd: Path,
     timeout_seconds: float,
 ) -> int:
     try:
-        with temporary_script_file(source.text, suffix=source.suffix) as temporary_path:
+        with temporary_script_file(script.text, suffix=suffix) as temporary_path:
             return execute_script_file(
                 temporary_path,
                 cwd=cwd,
@@ -97,15 +98,16 @@ def run_script_source(
 ) -> int:
     """Validate and run one neutral script source."""
     try:
-        validate_required_marker(source.text)
+        script = parse_script(source.text)
     except ScriptFormatError as exc:
         raise PatchHarborError(
             str(exc),
             ExitCode.NO_VALID_SCRIPT,
         ) from exc
 
-    return _execute_script_source(
-        source,
+    return _execute_parsed_script(
+        script,
+        suffix=source.suffix,
         cwd=cwd,
         timeout_seconds=timeout_seconds,
     )
@@ -196,11 +198,11 @@ def _read_zip_entry(
     return b"".join(chunks), total_bytes_read
 
 
-def _iter_zip_script_sources(
+def _iter_zip_scripts(
     archive: zipfile.ZipFile,
     *,
     path: Path,
-) -> Iterator[ScriptSource]:
+) -> Iterator[tuple[ParsedScript, str]]:
     entries = archive.infolist()
     _validate_zip_budgets(path, entries)
     total_bytes_read = 0
@@ -219,21 +221,17 @@ def _iter_zip_script_sources(
             continue
 
         try:
-            script_text = raw_content.decode("utf-8")
-            validate_required_marker(script_text)
+            script = parse_script(raw_content.decode("utf-8"))
         except (UnicodeError, ScriptFormatError):
             continue
 
-        yield ScriptSource(
-            text=script_text,
-            suffix=PurePosixPath(entry.filename).suffix,
-        )
+        yield script, PurePosixPath(entry.filename).suffix
 
 
 def _zip_contains_valid_script(path: Path) -> bool:
     try:
         with zipfile.ZipFile(path) as archive:
-            return next(_iter_zip_script_sources(archive, path=path), None) is not None
+            return next(_iter_zip_scripts(archive, path=path), None) is not None
     except (OSError, RuntimeError, zipfile.BadZipFile, PatchHarborError):
         return False
 
@@ -365,10 +363,11 @@ def _run_zip_file(
     last_exit_code = 0
     try:
         with archive:
-            for source in _iter_zip_script_sources(archive, path=path):
+            for script, suffix in _iter_zip_scripts(archive, path=path):
                 executed = True
-                last_exit_code = _execute_script_source(
-                    source,
+                last_exit_code = _execute_parsed_script(
+                    script,
+                    suffix=suffix,
                     cwd=cwd,
                     timeout_seconds=timeout_seconds,
                 )
