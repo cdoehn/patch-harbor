@@ -6,6 +6,7 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import zipfile
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -405,4 +406,69 @@ def test_invalid_directory_selection_is_retried(tmp_path: Path) -> None:
     assert completed.stdout.count("Enter 1-2.") == 2
     assert completed.stdout.endswith("second\n")
     assert completed.stderr == ""
+
+
+def _zip_script_text(output: str, *, exit_code: int = 0) -> str:
+    if os.name == "nt":
+        body = f'Write-Output "{output}"\nexit {exit_code}\n'
+    else:
+        body = f'printf "%s\\n" "{output}"\nexit {exit_code}\n'
+    return f"{REQUIRED_MARKER}\n{body}"
+
+
+def test_zip_scripts_run_in_stored_archive_order(tmp_path: Path) -> None:
+    archive_path = tmp_path / "scripts.zip"
+    with zipfile.ZipFile(archive_path, "w") as archive:
+        archive.writestr("z-first.sh", _zip_script_text("first"))
+        archive.writestr("a-second.sh", _zip_script_text("second"))
+
+    completed = _run_patchharbor(archive_path, tmp_path)
+
+    assert completed.returncode == 0
+    assert completed.stdout == "first\nsecond\n"
+    assert completed.stderr == ""
+
+
+def test_zip_execution_stops_after_first_failed_script(tmp_path: Path) -> None:
+    archive_path = tmp_path / "scripts.zip"
+    with zipfile.ZipFile(archive_path, "w") as archive:
+        archive.writestr(
+            "first.sh",
+            _zip_script_text("first", exit_code=17),
+        )
+        archive.writestr("second.sh", _zip_script_text("second"))
+
+    completed = _run_patchharbor(archive_path, tmp_path)
+
+    assert completed.returncode == 17
+    assert completed.stdout == "first\n"
+    assert completed.stderr == ""
+
+
+def test_zip_ignores_entries_without_required_marker(tmp_path: Path) -> None:
+    archive_path = tmp_path / "scripts.zip"
+    with zipfile.ZipFile(archive_path, "w") as archive:
+        archive.writestr("notes.txt", "not a script\n")
+        archive.writestr("run.sh", _zip_script_text("ran"))
+
+    completed = _run_patchharbor(archive_path, tmp_path)
+
+    assert completed.returncode == 0
+    assert completed.stdout == "ran\n"
+    assert completed.stderr == ""
+
+
+def test_empty_zip_has_a_clear_tool_error(tmp_path: Path) -> None:
+    archive_path = tmp_path / "empty.zip"
+    with zipfile.ZipFile(archive_path, "w"):
+        pass
+
+    completed = _run_patchharbor(archive_path, tmp_path)
+
+    assert completed.returncode == 3
+    assert completed.stdout == ""
+    assert completed.stderr == (
+        f"patchharbor: no valid PatchHarbor scripts found in ZIP archive "
+        f"{archive_path}\n"
+    )
 

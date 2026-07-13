@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import TextIO
+import zipfile
 
 from patchharbor.errors import ExitCode, PatchHarborError
 from patchharbor.execution import execute_script_file
@@ -185,6 +186,94 @@ def _read_selected_candidate(candidate: DirectoryCandidate) -> ScriptSource:
         ) from exc
 
 
+
+def _no_valid_zip_script(path: Path) -> PatchHarborError:
+    return PatchHarborError(
+        f"no valid PatchHarbor scripts found in ZIP archive {path}",
+        ExitCode.NO_VALID_SCRIPT,
+    )
+
+
+def _run_zip_file(
+    path: Path,
+    *,
+    cwd: Path,
+    timeout_seconds: float,
+    direct_error: PatchHarborError,
+) -> int:
+    try:
+        archive = zipfile.ZipFile(path)
+    except OSError:
+        raise direct_error
+    except zipfile.BadZipFile as exc:
+        if isinstance(direct_error.__cause__, ScriptFormatError):
+            raise direct_error
+        raise PatchHarborError(
+            f"file is neither a UTF-8 PatchHarbor script nor a ZIP archive: {path}",
+            ExitCode.NO_VALID_SCRIPT,
+        ) from exc
+
+    executed = False
+    last_exit_code = 0
+    try:
+        with archive:
+            for entry in archive.infolist():
+                if entry.is_dir():
+                    continue
+                try:
+                    script_text = archive.read(entry).decode("utf-8")
+                    validate_required_marker(script_text)
+                except (OSError, RuntimeError, UnicodeError, ScriptFormatError):
+                    continue
+
+                executed = True
+                last_exit_code = run_script_source(
+                    ScriptSource(
+                        text=script_text,
+                        suffix=PurePosixPath(entry.filename).suffix,
+                    ),
+                    cwd=cwd,
+                    timeout_seconds=timeout_seconds,
+                )
+                if last_exit_code != 0:
+                    return last_exit_code
+    except zipfile.BadZipFile as exc:
+        raise PatchHarborError(
+            f"cannot read ZIP archive {path}: {exc}",
+            ExitCode.SOURCE_ERROR,
+        ) from exc
+
+    if not executed:
+        raise _no_valid_zip_script(path)
+    return last_exit_code
+
+
+def _run_script_file_or_zip(
+    path: Path,
+    *,
+    cwd: Path,
+    timeout_seconds: float,
+) -> int:
+    try:
+        source = read_script_file(path)
+        return run_script_source(
+            source,
+            cwd=cwd,
+            timeout_seconds=timeout_seconds,
+        )
+    except PatchHarborError as exc:
+        if exc.exit_code not in {
+            ExitCode.NO_VALID_SCRIPT,
+            ExitCode.SOURCE_ERROR,
+        }:
+            raise
+        return _run_zip_file(
+            path,
+            cwd=cwd,
+            timeout_seconds=timeout_seconds,
+            direct_error=exc,
+        )
+
 def run_script_path(
     path: Path,
     *,
@@ -194,24 +283,26 @@ def run_script_path(
     selection_output: TextIO,
 ) -> int:
     """Run a script file or select one direct script from a directory."""
-    if path.is_dir():
-        candidates = discover_directory_candidates(path)
-        if not candidates:
-            raise PatchHarborError(
-                f"no PatchHarbor scripts found in directory {path}",
-                ExitCode.NO_VALID_SCRIPT,
-            )
-        selected = select_directory_candidate(
-            candidates,
-            input_stream=selection_input,
-            output_stream=selection_output,
+    if not path.is_dir():
+        return _run_script_file_or_zip(
+            path,
+            cwd=cwd,
+            timeout_seconds=timeout_seconds,
         )
-        source = _read_selected_candidate(selected)
-    else:
-        source = read_script_file(path)
 
+    candidates = discover_directory_candidates(path)
+    if not candidates:
+        raise PatchHarborError(
+            f"no PatchHarbor scripts found in directory {path}",
+            ExitCode.NO_VALID_SCRIPT,
+        )
+    selected = select_directory_candidate(
+        candidates,
+        input_stream=selection_input,
+        output_stream=selection_output,
+    )
     return run_script_source(
-        source,
+        _read_selected_candidate(selected),
         cwd=cwd,
         timeout_seconds=timeout_seconds,
     )
