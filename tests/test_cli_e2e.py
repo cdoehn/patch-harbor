@@ -472,3 +472,16 @@ def test_empty_zip_has_a_clear_tool_error(tmp_path: Path) -> None:
         f"{archive_path}\n"
     )
 
+
+
+def test_corrupt_zip_is_distinct_from_missing_marker(tmp_path: Path) -> None:
+    archive_path = tmp_path / "broken.zip"
+    archive_path.write_bytes(b"PK\x03\x04broken")
+
+    completed = _run_patchharbor(archive_path, tmp_path)
+
+    assert completed.returncode == 4
+    assert completed.stdout == ""
+    assert completed.stderr.startswith(
+        f"patchharbor: cannot read ZIP archive {archive_path}:"
+    )
