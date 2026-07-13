@@ -10,7 +10,11 @@ from typing import TextIO
 
 from patchharbor.errors import PatchHarborError
 from patchharbor.execution import DEFAULT_TIMEOUT_SECONDS
-from patchharbor.input import run_script_file, run_script_stdin
+from patchharbor.input import (
+    read_script_file,
+    read_script_stdin,
+    run_script_source,
+)
 
 
 def _positive_seconds(value: str) -> float:
@@ -81,14 +85,13 @@ def _run_command(
         parser.error("PATH is required when standard input is a terminal")
 
     try:
-        if path is not None:
-            return run_script_file(
-                path,
-                cwd=Path.cwd(),
-                timeout_seconds=timeout_seconds,
-            )
-        return run_script_stdin(
-            stdin,
+        source = (
+            read_script_file(path)
+            if path is not None
+            else read_script_stdin(stdin)
+        )
+        return run_script_source(
+            source,
             cwd=Path.cwd(),
             timeout_seconds=timeout_seconds,
         )

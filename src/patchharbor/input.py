@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+from enum import Enum
 import os
 from pathlib import Path
 from typing import TextIO
@@ -12,42 +14,24 @@ from patchharbor.files import temporary_script_file
 from patchharbor.parser import ScriptFormatError, validate_required_marker
 
 
-def _run_script_text(
-    script_text: str,
-    *,
-    suffix: str,
-    cwd: Path,
-    timeout_seconds: float,
-) -> int:
-    try:
-        validate_required_marker(script_text)
-    except ScriptFormatError as exc:
-        raise PatchHarborError(
-            str(exc),
-            ExitCode.NO_VALID_SCRIPT,
-        ) from exc
+class SourceKind(Enum):
+    """Supported script source kinds."""
 
-    try:
-        with temporary_script_file(script_text, suffix=suffix) as temporary_path:
-            return execute_script_file(
-                temporary_path,
-                cwd=cwd,
-                timeout_seconds=timeout_seconds,
-            )
-    except OSError as exc:
-        raise PatchHarborError(
-            f"cannot prepare temporary script: {exc}",
-            ExitCode.EXECUTION_ERROR,
-        ) from exc
+    FILE = "file"
+    STDIN = "stdin"
 
 
-def run_script_file(
-    script_path: Path,
-    *,
-    cwd: Path,
-    timeout_seconds: float,
-) -> int:
-    """Read and run one UTF-8 script file."""
+@dataclass(frozen=True)
+class ScriptSource:
+    """Neutral script input handed to the parsing and execution pipeline."""
+
+    text: str
+    suffix: str
+    kind: SourceKind
+
+
+def read_script_file(script_path: Path) -> ScriptSource:
+    """Read one UTF-8 script file into a neutral source value."""
     try:
         script_text = script_path.read_text(encoding="utf-8")
     except (OSError, UnicodeError) as exc:
@@ -56,21 +40,15 @@ def run_script_file(
             ExitCode.SOURCE_ERROR,
         ) from exc
 
-    return _run_script_text(
-        script_text,
+    return ScriptSource(
+        text=script_text,
         suffix=script_path.suffix,
-        cwd=cwd,
-        timeout_seconds=timeout_seconds,
+        kind=SourceKind.FILE,
     )
 
 
-def run_script_stdin(
-    stream: TextIO,
-    *,
-    cwd: Path,
-    timeout_seconds: float,
-) -> int:
-    """Read standard input once and run it as one script."""
+def read_script_stdin(stream: TextIO) -> ScriptSource:
+    """Read standard input once into a neutral source value."""
     try:
         script_text = stream.read()
     except (OSError, UnicodeError) as exc:
@@ -85,9 +63,37 @@ def run_script_stdin(
             ExitCode.USAGE_ERROR,
         )
 
-    return _run_script_text(
-        script_text,
+    return ScriptSource(
+        text=script_text,
         suffix=".ps1" if os.name == "nt" else ".sh",
-        cwd=cwd,
-        timeout_seconds=timeout_seconds,
+        kind=SourceKind.STDIN,
     )
+
+
+def run_script_source(
+    source: ScriptSource,
+    *,
+    cwd: Path,
+    timeout_seconds: float,
+) -> int:
+    """Validate and run one neutral script source."""
+    try:
+        validate_required_marker(source.text)
+    except ScriptFormatError as exc:
+        raise PatchHarborError(
+            str(exc),
+            ExitCode.NO_VALID_SCRIPT,
+        ) from exc
+
+    try:
+        with temporary_script_file(source.text, suffix=source.suffix) as temporary_path:
+            return execute_script_file(
+                temporary_path,
+                cwd=cwd,
+                timeout_seconds=timeout_seconds,
+            )
+    except OSError as exc:
+        raise PatchHarborError(
+            f"cannot prepare temporary script: {exc}",
+            ExitCode.EXECUTION_ERROR,
+        ) from exc
