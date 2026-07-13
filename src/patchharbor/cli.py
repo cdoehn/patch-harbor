@@ -3,30 +3,11 @@
 from __future__ import annotations
 
 import argparse
-import os
 from collections.abc import Sequence
 from pathlib import Path
-import subprocess
+import sys
 
-
-def _run_file(script_path: Path) -> int:
-    """Read one UTF-8 script and run it with the platform default shell."""
-    script_path.read_text(encoding="utf-8")
-
-    if os.name == "nt":
-        command = [
-            "powershell.exe",
-            "-NoLogo",
-            "-NoProfile",
-            "-NonInteractive",
-            "-File",
-            str(script_path),
-        ]
-    else:
-        command = ["bash", str(script_path)]
-
-    completed = subprocess.run(command, check=False)
-    return completed.returncode
+from patchharbor.input import run_file
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -48,7 +29,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     if args.command == "fs" and args.fs_command == "run":
-        return _run_file(args.path)
+        result = run_file(args.path)
+        if result.error is not None:
+            print(f"patchharbor: {result.error.message}", file=sys.stderr)
+            return 2
+        if result.execution is None:
+            raise RuntimeError("file run finished without a result")
+        return result.execution.exit_code
 
     parser.error("unsupported command")
 
