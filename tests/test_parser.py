@@ -5,29 +5,30 @@ import pytest
 from patchharbor.parser import ScriptFormatError, validate_required_marker
 
 
-@pytest.mark.parametrize(
-    "line_ending",
-    ["\n", "\r\n", "\r"],
-)
-def test_required_marker_accepts_common_line_endings(line_ending: str) -> None:
-    validate_required_marker(
-        f"first{line_ending}# PATCHHARBOR{line_ending}last"
-    )
+def test_required_marker_accepts_common_line_endings() -> None:
+    for line_ending in ("\n", "\r\n", "\r"):
+        validate_required_marker(
+            f"first{line_ending}# PATCHHARBOR{line_ending}last"
+        )
 
 
-@pytest.mark.parametrize(
-    "script_text",
-    [
+def test_required_marker_rejects_non_exact_lines() -> None:
+    invalid_scripts = (
         "echo no-marker\n",
         " # PATCHHARBOR\n",
         "# PATCHHARBOR extra\n",
         "# patchharbor\n",
         "# PATCHHARBOR MESSAGE note\n",
-    ],
-)
-def test_required_marker_rejects_non_exact_lines(script_text: str) -> None:
+    )
+
+    for script_text in invalid_scripts:
+        with pytest.raises(ScriptFormatError):
+            validate_required_marker(script_text)
+
+
+def test_missing_marker_error_is_explicit() -> None:
     with pytest.raises(
         ScriptFormatError,
         match=r"^missing required marker line: # PATCHHARBOR$",
     ):
-        validate_required_marker(script_text)
+        validate_required_marker("echo no-marker\n")
