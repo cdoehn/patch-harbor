@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 import re
 
+from patchharbor.files import is_safe_payload_name, payload_size_warning
+
 
 REQUIRED_MARKER = "# PATCHHARBOR"
 _NAME = r"[A-Za-z0-9.]+"
@@ -19,7 +21,7 @@ _MESSAGE_END_PATTERN = re.compile(
 )
 _FILE_PREFIX = "# PATCHHARBOR FILE "
 _FILE_START_PATTERN = re.compile(
-    r"^# PATCHHARBOR FILE ([A-Za-z0-9._-]+) START$"
+    r"^# PATCHHARBOR FILE (.+) START$"
 )
 _FILE_END_PATTERN = re.compile(
     r"^# PATCHHARBOR FILE (.+) END$"
@@ -135,9 +137,19 @@ def parse_script(script_text: str) -> ParsedScript:
                     if active_kind == "MESSAGE":
                         messages.append(Message(name=active_name, text=text))
                     else:
-                        payload_files.append(
-                            PayloadFile(name=active_name, text=text)
-                        )
+                        if not is_safe_payload_name(active_name):
+                            warn(
+                                f"discarded FILE {active_name!r}: "
+                                "invalid file name"
+                            )
+                        else:
+                            if size_warning := payload_size_warning(
+                                active_name, text
+                            ):
+                                warn(size_warning)
+                            payload_files.append(
+                                PayloadFile(name=active_name, text=text)
+                            )
                 active_kind = None
                 active_name = None
                 active_content = []

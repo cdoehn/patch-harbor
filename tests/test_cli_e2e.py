@@ -679,3 +679,56 @@ def test_multiple_file_blocks_keep_base64_as_plain_text(tmp_path: Path) -> None:
     assert (tmp_path / "payload.b64").read_text(encoding="utf-8") == (
         "SGVsbG8gUGF0Y2hIYXJib3Ih"
     )
+
+
+def test_damaged_file_block_does_not_prevent_execution(tmp_path: Path) -> None:
+    script_path = _script_path(tmp_path, "damaged-file")
+    if os.name == "nt":
+        command = 'Write-Output "still-runs"\n'
+    else:
+        command = 'printf "%s\\n" "still-runs"\n'
+    script_path.write_text(
+        "\n".join(
+            (
+                REQUIRED_MARKER,
+                "# PATCHHARBOR FILE broken.txt START",
+                "# ignored",
+                "# PATCHHARBOR FILE wrong.txt END",
+                command.rstrip("\n"),
+                "",
+            )
+        ),
+        encoding="utf-8",
+    )
+
+    completed = _run_patchharbor(script_path, tmp_path)
+
+    assert completed.returncode == 0
+    assert completed.stdout == "still-runs\n"
+    assert not (tmp_path / "broken.txt").exists()
+
+
+def test_non_regular_file_target_prevents_execution(tmp_path: Path) -> None:
+    target = tmp_path / "blocked.txt"
+    target.mkdir()
+    sentinel = tmp_path / "must-not-exist"
+    script_path = _script_path(tmp_path, "blocked-file")
+    if os.name == "nt":
+        command = f'Set-Content -LiteralPath "{sentinel}" -Value executed\n'
+    else:
+        command = f'printf executed > "{sentinel}"\n'
+    script_path.write_text(
+        _file_payload_script(
+            files=[("blocked.txt", ["replacement"])],
+            command=command,
+        ),
+        encoding="utf-8",
+    )
+
+    completed = _run_patchharbor(script_path, tmp_path)
+
+    assert completed.returncode == 6
+    assert completed.stdout == ""
+    assert "target is not a regular file" in completed.stderr
+    assert not sentinel.exists()
+    assert target.is_dir()

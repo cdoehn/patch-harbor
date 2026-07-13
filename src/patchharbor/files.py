@@ -1,4 +1,4 @@
-"""Temporary file preparation for PatchHarbor scripts."""
+"""Temporary and transferred file preparation for PatchHarbor scripts."""
 
 from __future__ import annotations
 
@@ -6,9 +6,24 @@ from collections.abc import Iterable, Iterator
 from contextlib import contextmanager
 import os
 from pathlib import Path
+import re
+import stat
 import tempfile
 
 from patchharbor.errors import ExitCode, PatchHarborError
+
+
+PAYLOAD_WARNING_BYTES = 10 * 1024 * 1024
+MAX_PAYLOAD_BYTES = 256 * 1024 * 1024
+_FILENAME_PATTERN = re.compile(r"^[A-Za-z0-9._-]{1,128}$")
+_WINDOWS_RESERVED_NAMES = {
+    "CON",
+    "PRN",
+    "AUX",
+    "NUL",
+    *(f"COM{number}" for number in range(1, 10)),
+    *(f"LPT{number}" for number in range(1, 10)),
+}
 
 
 @contextmanager
@@ -29,18 +44,85 @@ def temporary_script_file(script_text: str, *, suffix: str) -> Iterator[Path]:
         script_path.unlink(missing_ok=True)
 
 
+def is_safe_payload_name(name: str) -> bool:
+    """Return whether a FILE name is a portable, path-free file name."""
+    if _FILENAME_PATTERN.fullmatch(name) is None:
+        return False
+    if name in {".", ".."} or name.endswith((".", " ")):
+        return False
+    stem = name.split(".", 1)[0].upper()
+    return stem not in _WINDOWS_RESERVED_NAMES
+
+
+def payload_size_warning(name: str, text: str) -> str | None:
+    """Enforce the hard FILE budget and return an optional size warning."""
+    size_bytes = len(text.encode("utf-8"))
+    if size_bytes > MAX_PAYLOAD_BYTES:
+        raise PatchHarborError(
+            f"FILE {name!r} exceeds the {MAX_PAYLOAD_BYTES} byte limit",
+            ExitCode.SOURCE_ERROR,
+        )
+    if size_bytes > PAYLOAD_WARNING_BYTES:
+        return f"FILE {name!r} is large ({size_bytes} bytes)"
+    return None
+
+
+def _reject_non_regular_target(target: Path, *, name: str) -> None:
+    try:
+        mode = target.lstat().st_mode
+    except FileNotFoundError:
+        return
+    except OSError as exc:
+        raise PatchHarborError(
+            f"cannot inspect FILE target {name!r}: {exc}",
+            ExitCode.FILE_PREPARATION_ERROR,
+        ) from exc
+
+    if stat.S_ISLNK(mode) or not stat.S_ISREG(mode):
+        raise PatchHarborError(
+            f"cannot write FILE {name!r}: target is not a regular file",
+            ExitCode.FILE_PREPARATION_ERROR,
+        )
+
+
+def _atomic_write_text(target: Path, text: str, *, name: str) -> None:
+    staged_path: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            newline="",
+            dir=target.parent,
+            prefix=".patchharbor-",
+            suffix=".tmp",
+            delete=False,
+        ) as handle:
+            staged_path = Path(handle.name)
+            handle.write(text)
+        os.replace(staged_path, target)
+        staged_path = None
+    except OSError as exc:
+        raise PatchHarborError(
+            f"cannot write FILE {name!r}: {exc}",
+            ExitCode.FILE_PREPARATION_ERROR,
+        ) from exc
+    finally:
+        if staged_path is not None:
+            staged_path.unlink(missing_ok=True)
+
+
 def write_payload_files(
     payloads: Iterable[tuple[str, str]],
     *,
     cwd: Path,
 ) -> None:
-    """Write valid FILE payloads into the script working directory."""
+    """Atomically write validated FILE payloads into the working directory."""
     for name, text in payloads:
-        target = cwd / name
-        try:
-            target.write_text(text, encoding="utf-8", newline="")
-        except OSError as exc:
+        if not is_safe_payload_name(name):
             raise PatchHarborError(
-                f"cannot write FILE {name!r}: {exc}",
+                f"cannot write FILE {name!r}: unsafe file name",
                 ExitCode.FILE_PREPARATION_ERROR,
-            ) from exc
+            )
+        target = cwd / name
+        _reject_non_regular_target(target, name=name)
+        _atomic_write_text(target, text, name=name)
