@@ -8,10 +8,8 @@ from pathlib import Path
 import sys
 
 from patchharbor.errors import PatchHarborError
+from patchharbor.execution import DEFAULT_TIMEOUT_SECONDS
 from patchharbor.input import run_script_file
-
-
-DEFAULT_TIMEOUT_SECONDS = 300.0
 
 
 def _positive_seconds(value: str) -> float:

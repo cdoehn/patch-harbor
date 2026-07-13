@@ -4,11 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from patchharbor.errors import (
-    ExecutionPreparationError,
-    NoValidScriptError,
-    SourceError,
-)
+from patchharbor.errors import ExitCode, PatchHarborError
 from patchharbor.execution import execute_script_file
 from patchharbor.files import temporary_script_file
 from patchharbor.parser import ScriptFormatError, validate_required_marker
@@ -24,14 +20,18 @@ def run_script_file(
     try:
         script_text = script_path.read_text(encoding="utf-8")
     except (OSError, UnicodeError) as exc:
-        raise SourceError(
-            f"cannot read script file {script_path}: {exc}"
+        raise PatchHarborError(
+            f"cannot read script file {script_path}: {exc}",
+            ExitCode.SOURCE_ERROR,
         ) from exc
 
     try:
         validate_required_marker(script_text)
     except ScriptFormatError as exc:
-        raise NoValidScriptError(str(exc)) from exc
+        raise PatchHarborError(
+            str(exc),
+            ExitCode.NO_VALID_SCRIPT,
+        ) from exc
 
     try:
         with temporary_script_file(
@@ -44,6 +44,7 @@ def run_script_file(
                 timeout_seconds=timeout_seconds,
             )
     except OSError as exc:
-        raise ExecutionPreparationError(
-            f"cannot prepare temporary script: {exc}"
+        raise PatchHarborError(
+            f"cannot prepare temporary script: {exc}",
+            ExitCode.EXECUTION_ERROR,
         ) from exc

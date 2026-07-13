@@ -6,7 +6,10 @@ import os
 from pathlib import Path
 import subprocess
 
-from patchharbor.errors import InterpreterError, ScriptTimeoutError
+from patchharbor.errors import ExitCode, PatchHarborError
+
+
+DEFAULT_TIMEOUT_SECONDS = 300.0
 
 
 def execute_script_file(
@@ -37,12 +40,14 @@ def execute_script_file(
             timeout=timeout_seconds,
         )
     except subprocess.TimeoutExpired as exc:
-        raise ScriptTimeoutError(
-            f"script timed out after {timeout_seconds:g} seconds"
+        raise PatchHarborError(
+            f"script timed out after {timeout_seconds:g} seconds",
+            ExitCode.TIMEOUT,
         ) from exc
     except OSError as exc:
-        raise InterpreterError(
-            f"cannot start script interpreter: {exc}"
+        raise PatchHarborError(
+            f"cannot start script interpreter: {exc}",
+            ExitCode.INTERPRETER_ERROR,
         ) from exc
 
     return completed.returncode

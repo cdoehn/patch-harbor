@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Mapping
 from pathlib import Path
 import subprocess
 import sys
@@ -15,6 +16,7 @@ def _run_patchharbor(
     script_path: Path,
     cwd: Path,
     *run_arguments: str,
+    environment_overrides: Mapping[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
     environment = os.environ.copy()
     source_path = str(PROJECT_ROOT / "src")
@@ -24,6 +26,8 @@ def _run_patchharbor(
         if not existing_pythonpath
         else os.pathsep.join((source_path, existing_pythonpath))
     )
+    if environment_overrides:
+        environment.update(environment_overrides)
 
     return subprocess.run(
         [
@@ -229,3 +233,23 @@ def test_temporary_script_is_removed_after_timeout(tmp_path: Path) -> None:
     temporary_path = Path(observed_path.read_text(encoding="utf-8").strip())
     assert completed.returncode == 124
     assert not temporary_path.exists()
+
+
+def test_missing_interpreter_is_reported_as_tool_error(tmp_path: Path) -> None:
+    script_path = _script_path(tmp_path, "missing-interpreter")
+    script_path.write_text(
+        f"{REQUIRED_MARKER}\n",
+        encoding="utf-8",
+    )
+
+    completed = _run_patchharbor(
+        script_path,
+        tmp_path,
+        environment_overrides={"PATH": "", "PATHEXT": ""},
+    )
+
+    assert completed.returncode == 5
+    assert completed.stdout == ""
+    assert completed.stderr.startswith(
+        "patchharbor: cannot start script interpreter:"
+    )
