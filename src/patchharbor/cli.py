@@ -7,7 +7,7 @@ from collections.abc import Sequence
 from pathlib import Path
 import sys
 
-from patchharbor.input import run_file
+from patchharbor.input import ScriptFileError, run_script_file
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -29,13 +29,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     if args.command == "fs" and args.fs_command == "run":
-        result = run_file(args.path)
-        if result.error is not None:
-            print(f"patchharbor: {result.error.message}", file=sys.stderr)
+        try:
+            return run_script_file(args.path)
+        except ScriptFileError as exc:
+            print(f"patchharbor: {exc}", file=sys.stderr)
             return 2
-        if result.execution is None:
-            raise RuntimeError("file run finished without a result")
-        return result.execution.exit_code
 
     parser.error("unsupported command")
 
