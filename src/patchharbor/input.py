@@ -88,7 +88,19 @@ def run_script_source(
             ExitCode.EXECUTION_ERROR,
         ) from exc
 
-def _directory_script_paths(directory: Path) -> list[Path]:
+@dataclass(frozen=True)
+class DirectoryCandidate:
+    """Stable display and sorting data for one directory candidate."""
+
+    path: Path
+    display_name: str
+    modified_ns: int
+
+
+def discover_directory_candidates(
+    directory: Path,
+) -> tuple[DirectoryCandidate, ...]:
+    """Scan a directory once and return sorted direct-script candidates."""
     try:
         entries = list(directory.iterdir())
     except OSError as exc:
@@ -97,34 +109,47 @@ def _directory_script_paths(directory: Path) -> list[Path]:
             ExitCode.SOURCE_ERROR,
         ) from exc
 
-    candidates: list[tuple[int, str, Path]] = []
+    candidates: list[DirectoryCandidate] = []
     for entry in entries:
         try:
             if entry.is_symlink() or not entry.is_file():
                 continue
             source = read_script_file(entry)
             validate_required_marker(source.text)
-            modified_ns = entry.stat().st_mtime_ns
+            candidates.append(
+                DirectoryCandidate(
+                    path=entry,
+                    display_name=entry.name,
+                    modified_ns=entry.stat().st_mtime_ns,
+                )
+            )
         except (PatchHarborError, ScriptFormatError, OSError):
             continue
-        candidates.append((modified_ns, entry.name, entry))
 
-    candidates.sort(key=lambda item: (-item[0], item[1]))
-    return [path for _, _, path in candidates]
+    return tuple(
+        sorted(
+            candidates,
+            key=lambda candidate: (
+                -candidate.modified_ns,
+                candidate.display_name,
+            ),
+        )
+    )
 
 
-def _select_directory_script(
-    candidates: list[Path],
+def select_directory_candidate(
+    candidates: tuple[DirectoryCandidate, ...],
     *,
     input_stream: TextIO,
     output_stream: TextIO,
-) -> Path:
+) -> DirectoryCandidate:
+    """Choose exactly one candidate without performing filesystem discovery."""
     if len(candidates) == 1:
         return candidates[0]
 
     print("Available PatchHarbor scripts:", file=output_stream)
     for index, candidate in enumerate(candidates, start=1):
-        print(f"  {index}. {candidate.name}", file=output_stream)
+        print(f"  {index}. {candidate.display_name}", file=output_stream)
 
     while True:
         print(
@@ -152,6 +177,16 @@ def _select_directory_script(
         )
 
 
+def _read_selected_candidate(candidate: DirectoryCandidate) -> ScriptSource:
+    try:
+        return read_script_file(candidate.path)
+    except PatchHarborError as exc:
+        raise PatchHarborError(
+            f"selected script is no longer available: {candidate.display_name}",
+            ExitCode.SOURCE_ERROR,
+        ) from exc
+
+
 def run_script_path(
     path: Path,
     *,
@@ -161,21 +196,22 @@ def run_script_path(
     selection_output: TextIO,
 ) -> int:
     """Run a script file or select one direct script from a directory."""
-    selected_path = path
     if path.is_dir():
-        candidates = _directory_script_paths(path)
+        candidates = discover_directory_candidates(path)
         if not candidates:
             raise PatchHarborError(
                 f"no PatchHarbor scripts found in directory {path}",
                 ExitCode.NO_VALID_SCRIPT,
             )
-        selected_path = _select_directory_script(
+        selected = select_directory_candidate(
             candidates,
             input_stream=selection_input,
             output_stream=selection_output,
         )
+        source = _read_selected_candidate(selected)
+    else:
+        source = read_script_file(path)
 
-    source = read_script_file(selected_path)
     return run_script_source(
         source,
         cwd=cwd,
