@@ -22,7 +22,6 @@ def file_input_artifact(path: Path) -> InputArtifact:
     return InputArtifact(
         path=path,
         display_name=str(path),
-        remove_after_use=False,
     )
 
 
@@ -45,7 +44,6 @@ def stdin_input_artifact(stream: TextIO) -> Iterator[InputArtifact]:
     """Copy standard input as bytes to one secure temporary artifact."""
     descriptor, raw_path = tempfile.mkstemp(
         prefix="patchharbor-input-",
-        suffix=".artifact",
     )
     artifact_path = Path(raw_path)
     byte_stream = getattr(stream, "buffer", stream)
@@ -78,7 +76,6 @@ def stdin_input_artifact(stream: TextIO) -> Iterator[InputArtifact]:
         yield InputArtifact(
             path=artifact_path,
             display_name="standard input",
-            remove_after_use=True,
         )
     finally:
         artifact_path.unlink(missing_ok=True)

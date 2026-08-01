@@ -8,31 +8,32 @@ from typing import TextIO
 from patchharbor.bundles import resolve_patch_bundle
 from patchharbor.errors import ExitCode, PatchHarborError
 from patchharbor.execution import execute_script_text
-from patchharbor.models import InputArtifact
-from patchharbor.parser import ParsedScript
+from patchharbor.models import BundleScript, InputArtifact
+from patchharbor.parser import parse_script
 from patchharbor.payload_files import prepare_payload_files, write_payload_files
 from patchharbor.sources import (
     DirectoryCandidate,
     file_input_artifact,
     list_directory_entries,
     select_directory_candidate,
+    stdin_input_artifact,
 )
 
 
-def _execute_parsed_script(
-    script: ParsedScript,
+def _execute_bundle_script(
+    bundle_script: BundleScript,
     *,
-    suffix: str,
     cwd: Path,
     timeout_seconds: float,
 ) -> int:
+    parsed_script = parse_script(bundle_script.text)
     prepared_payloads, _payload_warnings = prepare_payload_files(
-        (payload.name, payload.text) for payload in script.payload_files
+        (payload.name, payload.text) for payload in parsed_script.payload_files
     )
     write_payload_files(prepared_payloads, cwd=cwd)
     return execute_script_text(
-        script.text,
-        suffix=suffix,
+        parsed_script.text,
+        suffix=bundle_script.suffix,
         cwd=cwd,
         timeout_seconds=timeout_seconds,
     )
@@ -48,15 +49,29 @@ def run_input_artifact(
     bundle = resolve_patch_bundle(artifact)
     last_exit_code = 0
     for bundle_script in bundle.scripts:
-        last_exit_code = _execute_parsed_script(
-            bundle_script.script,
-            suffix=bundle_script.suffix,
+        last_exit_code = _execute_bundle_script(
+            bundle_script,
             cwd=cwd,
             timeout_seconds=timeout_seconds,
         )
         if last_exit_code != 0:
             return last_exit_code
     return last_exit_code
+
+
+def run_standard_input(
+    stream: TextIO,
+    *,
+    cwd: Path,
+    timeout_seconds: float,
+) -> int:
+    """Own the temporary stdin artifact for exactly one runner request."""
+    with stdin_input_artifact(stream) as artifact:
+        return run_input_artifact(
+            artifact,
+            cwd=cwd,
+            timeout_seconds=timeout_seconds,
+        )
 
 
 def _is_directory_candidate(path: Path) -> bool:

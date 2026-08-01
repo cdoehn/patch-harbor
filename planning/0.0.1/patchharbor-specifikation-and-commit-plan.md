@@ -152,7 +152,7 @@ Ist kein Pfad angegeben und die Standardeingabe ist ein normales Terminal, endet
 
 Clipboard und WebSocket werden als zukünftige Eingabequellen in der Architektur berücksichtigt, aber in Version 1 nicht implementiert und nicht im Help-Screen angezeigt.
 
-Jede Quelle liefert denselben kleinen Typ `InputArtifact`: einen sicher lesbaren lokalen Pfad, einen Anzeigenamen und die Information, ob PatchHarbor das Artefakt nach dem Auftrag entfernen muss. Die Quelle interpretiert den Inhalt nicht und entscheidet nicht, ob er ein direktes Skript oder ein ZIP-Bundle enthält.
+Jede Quelle liefert denselben kleinen Typ `InputArtifact`: einen sicher lesbaren lokalen Pfad und einen Anzeigenamen. Die Quelle besitzt den Lebenszyklus eines von ihr erzeugten temporären Artefakts und entfernt es über genau einen Cleanup-Pfad nach dem Auftrag. Die Quelle interpretiert den Inhalt nicht und entscheidet nicht, ob er ein direktes Skript oder ein ZIP-Bundle enthält.
 
 Eine spätere WebSocket-Quelle bildet eine vollständige Textnachricht auf ein direktes Skript-Artefakt ab. Eine vollständige Binärnachricht enthält die unveränderten Bytes eines ZIP-basierten PatchBundles mit mehreren Skripten und optionalen Binärdateien. Die Binärnachricht wird nicht als Text interpretiert, sondern bytegenau als temporäres Eingabeartefakt bereitgestellt.
 
@@ -328,10 +328,9 @@ Eine Quelle ist ausschließlich dafür verantwortlich, Daten zu empfangen und al
 Ein `InputArtifact` enthält nur:
 
 - einen sicher lesbaren lokalen Pfad,
-- einen Anzeigenamen für Status und Fehler,
-- eine Cleanup-Information für temporäre Artefakte.
+- einen Anzeigenamen für Status und Fehler.
 
-Eine vorhandene Datei kann direkt referenziert werden. Inhalte aus Pipe und später WebSocket werden als Bytes sicher in eine temporäre Datei geschrieben. Dadurch bleiben auch große oder binäre Eingaben möglich, ohne dass jede Quelle den gesamten Inhalt dauerhaft als Python-String halten muss.
+Eine vorhandene Datei kann direkt referenziert werden. Inhalte aus Pipe und später WebSocket werden als Bytes sicher in eine temporäre Datei geschrieben. Die erzeugende Quelle besitzt dieses temporäre Artefakt und entfernt es beim Verlassen ihres einen definierten Lebenszyklus; das neutrale Modell trägt dafür kein zusätzliches Zustandsfeld. Dadurch bleiben auch große oder binäre Eingaben möglich, ohne dass jede Quelle den gesamten Inhalt dauerhaft als Python-String halten muss.
 
 Die Quelle interpretiert den Inhalt nicht. Sie kennt weder Marker noch ZIP-Regeln, Bundle-Nutzdateien, Parser, FILE-Blöcke oder Execution.
 

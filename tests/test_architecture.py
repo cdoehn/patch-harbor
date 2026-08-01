@@ -25,30 +25,73 @@ def _local_imports(module_name: str) -> set[str]:
 
 def test_lower_layers_do_not_import_orchestration_or_unrelated_layers() -> None:
     forbidden = {
-        "sources": {"application", "bundles", "execution", "parser", "payload_files"},
-        "bundles": {"application", "execution", "payload_files", "sources"},
-        "parser": {"application", "bundles", "execution", "files", "payload_files", "sources"},
-        "payload_files": {"application", "bundles", "execution", "parser", "sources"},
-        "execution": {"application", "bundles", "parser", "payload_files", "sources"},
+        "models": {
+            "application",
+            "bundles",
+            "execution",
+            "parser",
+            "payload_files",
+            "sources",
+        },
+        "sources": {
+            "application",
+            "bundles",
+            "execution",
+            "parser",
+            "payload_files",
+        },
+        "bundles": {
+            "application",
+            "execution",
+            "payload_files",
+            "sources",
+        },
+        "parser": {
+            "application",
+            "bundles",
+            "execution",
+            "payload_files",
+            "sources",
+        },
+        "payload_files": {
+            "application",
+            "bundles",
+            "execution",
+            "parser",
+            "sources",
+        },
+        "execution": {
+            "application",
+            "bundles",
+            "parser",
+            "payload_files",
+            "sources",
+        },
     }
 
     for module_name, disallowed in forbidden.items():
         assert _local_imports(module_name).isdisjoint(disallowed), module_name
 
 
-def test_cli_uses_application_and_sources_instead_of_legacy_input_module() -> None:
+def test_cli_depends_on_application_not_source_or_legacy_modules() -> None:
     imports = _local_imports("cli")
 
     assert "application" in imports
-    assert "sources" in imports
+    assert "sources" not in imports
     assert "input" not in imports
+    assert "files" not in imports
+
+
+def test_legacy_facade_modules_are_removed() -> None:
+    assert not (PACKAGE_ROOT / "input.py").exists()
+    assert not (PACKAGE_ROOT / "files.py").exists()
 
 
 def test_runtime_module_dependencies_are_acyclic() -> None:
     modules = {
         path.stem
         for path in PACKAGE_ROOT.glob("*.py")
-        if path.stem not in {"__init__"}
+        if path.stem != "__init__"
     }
     graph = {
         module: _local_imports(module) & modules

@@ -10,7 +10,7 @@ import zipfile
 
 from patchharbor.errors import ExitCode, PatchHarborError
 from patchharbor.models import BundleScript, InputArtifact, PatchBundle
-from patchharbor.parser import ScriptFormatError, parse_script
+from patchharbor.parser import ScriptFormatError, validate_required_marker
 
 
 MAX_ZIP_ENTRIES = 1_000
@@ -25,8 +25,6 @@ def _default_script_suffix() -> str:
 
 
 def _direct_script_suffix(artifact: InputArtifact) -> str:
-    if artifact.remove_after_use:
-        return _default_script_suffix()
     return artifact.path.suffix or _default_script_suffix()
 
 
@@ -148,25 +146,16 @@ def _iter_zip_scripts(
             continue
 
         try:
-            parsed_script = parse_script(raw_content.decode("utf-8"))
+            script_text = raw_content.decode("utf-8")
+            validate_required_marker(script_text)
         except (UnicodeError, ScriptFormatError):
             continue
 
         yield BundleScript(
-            script=parsed_script,
-            suffix=PurePosixPath(entry.filename).suffix or _default_script_suffix(),
-            display_name=entry.filename,
+            text=script_text,
+            suffix=PurePosixPath(entry.filename).suffix
+            or _default_script_suffix(),
         )
-
-
-def _looks_like_zip(artifact: InputArtifact) -> bool:
-    if artifact.path.suffix.lower() == ".zip":
-        return True
-    try:
-        with artifact.path.open("rb") as handle:
-            return handle.read(4) in _ZIP_SIGNATURES
-    except OSError:
-        return False
 
 
 def _no_valid_zip_script(artifact: InputArtifact) -> PatchHarborError:
@@ -178,24 +167,16 @@ def _no_valid_zip_script(artifact: InputArtifact) -> PatchHarborError:
 
 
 def _try_direct_script(
+    raw_content: bytes,
     artifact: InputArtifact,
 ) -> tuple[BundleScript | None, PatchHarborError | None, bool]:
     try:
-        raw_content = artifact.path.read_bytes()
-    except OSError as exc:
-        raise _artifact_source_error(artifact, exc) from exc
-
-    try:
         script_text = raw_content.decode("utf-8")
     except UnicodeError as exc:
-        return (
-            None,
-            _artifact_source_error(artifact, exc),
-            False,
-        )
+        return None, _artifact_source_error(artifact, exc), False
 
     try:
-        parsed_script = parse_script(script_text)
+        validate_required_marker(script_text)
     except ScriptFormatError as exc:
         return (
             None,
@@ -205,9 +186,8 @@ def _try_direct_script(
 
     return (
         BundleScript(
-            script=parsed_script,
+            text=script_text,
             suffix=_direct_script_suffix(artifact),
-            display_name=artifact.display_name,
         ),
         None,
         True,
@@ -216,32 +196,39 @@ def _try_direct_script(
 
 def resolve_patch_bundle(artifact: InputArtifact) -> PatchBundle:
     """Resolve one source-neutral artifact to an ordered PatchBundle."""
-    direct_script, direct_error, direct_was_utf8 = _try_direct_script(artifact)
+    try:
+        raw_content = artifact.path.read_bytes()
+    except OSError as exc:
+        raise _artifact_source_error(artifact, exc) from exc
+
+    direct_script, direct_error, direct_was_utf8 = _try_direct_script(
+        raw_content,
+        artifact,
+    )
     if direct_script is not None:
         return PatchBundle(scripts=(direct_script,))
     assert direct_error is not None
 
+    zip_hint = (
+        artifact.path.suffix.lower() == ".zip"
+        or raw_content.startswith(_ZIP_SIGNATURES)
+    )
     try:
-        archive = zipfile.ZipFile(artifact.path)
-    except OSError:
-        raise direct_error
-    except zipfile.BadZipFile as exc:
-        if not _looks_like_zip(artifact):
-            if direct_was_utf8:
-                raise direct_error
-            raise PatchHarborError(
-                "file is neither a UTF-8 PatchHarbor script nor a ZIP archive: "
-                f"{artifact.display_name}",
-                ExitCode.NO_VALID_SCRIPT,
-            ) from exc
-        raise _zip_source_error(artifact, exc) from exc
-
-    try:
-        with archive:
+        with zipfile.ZipFile(artifact.path) as archive:
             scripts = tuple(_iter_zip_scripts(archive, artifact=artifact))
+    except zipfile.BadZipFile as exc:
+        if zip_hint:
+            raise _zip_source_error(artifact, exc) from exc
+        if direct_was_utf8:
+            raise direct_error
+        raise PatchHarborError(
+            "file is neither a UTF-8 PatchHarbor script nor a ZIP archive: "
+            f"{artifact.display_name}",
+            ExitCode.NO_VALID_SCRIPT,
+        ) from exc
     except PatchHarborError:
         raise
-    except (OSError, RuntimeError, zipfile.BadZipFile) as exc:
+    except (OSError, RuntimeError) as exc:
         raise _zip_source_error(artifact, exc) from exc
 
     if not scripts:

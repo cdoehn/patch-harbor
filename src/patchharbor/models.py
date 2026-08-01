@@ -4,10 +4,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from patchharbor.parser import ParsedScript
 
 
 @dataclass(frozen=True)
@@ -16,16 +12,14 @@ class InputArtifact:
 
     path: Path
     display_name: str
-    remove_after_use: bool
 
 
 @dataclass(frozen=True)
 class BundleScript:
-    """One parsed script in its bundle order."""
+    """One script in its bundle order."""
 
-    script: ParsedScript
+    text: str
     suffix: str
-    display_name: str
 
 
 @dataclass(frozen=True)

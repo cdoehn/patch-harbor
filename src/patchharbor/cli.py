@@ -10,8 +10,7 @@ from typing import TextIO
 
 from patchharbor.errors import PatchHarborError
 from patchharbor.execution import DEFAULT_TIMEOUT_SECONDS
-from patchharbor.application import run_input_artifact, run_script_path
-from patchharbor.sources import stdin_input_artifact
+from patchharbor.application import run_script_path, run_standard_input
 
 
 def _positive_seconds(value: str) -> float:
@@ -91,12 +90,11 @@ def _run_command(
                 selection_output=sys.stdout,
             )
 
-        with stdin_input_artifact(stdin) as artifact:
-            return run_input_artifact(
-                artifact,
-                cwd=Path.cwd(),
-                timeout_seconds=timeout_seconds,
-            )
+        return run_standard_input(
+            stdin,
+            cwd=Path.cwd(),
+            timeout_seconds=timeout_seconds,
+        )
     except PatchHarborError as exc:
         print(f"patchharbor: {exc}", file=sys.stderr)
         return int(exc.exit_code)

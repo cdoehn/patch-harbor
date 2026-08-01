@@ -10,7 +10,6 @@ from patchharbor.errors import ExitCode, PatchHarborError
 import patchharbor.application as script_application
 from patchharbor.application import discover_directory_candidates, run_script_path
 import patchharbor.bundles as script_bundles
-from patchharbor.parser import ParsedScript
 
 
 REQUIRED_MARKER = "# PATCHHARBOR"
@@ -115,20 +114,20 @@ def test_each_zip_script_receives_its_own_timeout(
             ("second.sh", f"{REQUIRED_MARKER}\n"),
         ],
     )
-    observed: list[tuple[ParsedScript, str, float]] = []
+    observed: list[tuple[str, str, float]] = []
 
-    def fake_execute_parsed_script(
-        script: ParsedScript,
+    def fake_execute_script_text(
+        script_text: str,
         *,
         suffix: str,
         cwd: Path,
         timeout_seconds: float,
     ) -> int:
-        observed.append((script, suffix, timeout_seconds))
+        observed.append((script_text, suffix, timeout_seconds))
         return 0
 
     monkeypatch.setattr(
-        script_application, "_execute_parsed_script", fake_execute_parsed_script
+        script_application, "execute_script_text", fake_execute_script_text
     )
 
     result = _run_path(archive_path, tmp_path, timeout_seconds=7.5)
