@@ -2,7 +2,7 @@
 
 **Empfohlener Dokumentname:** PatchHarbor – Spezifikation und Commit-Plan  
 **Empfohlener Dateiname:** `patchharbor-spezifikation-und-commit-plan.md`  
-**Status:** verbindliche Planungsbasis für Version 1  
+**Status:** verbindliche Planungsbasis für Version 1 und architektonische Vorbereitung von Meilenstein 5
 **Projektname, Kommando und Marker:** `PatchHarbor`, `patchharbor`, `# PATCHHARBOR`
 
 Der Name **Commit-Plan** allein wäre zu eng, weil dieses Dokument zuerst die Produktspezifikation und danach den Umsetzungsplan enthält. Der Titel **Spezifikation und Commit-Plan** beschreibt den Inhalt eindeutig.
@@ -16,9 +16,10 @@ Dieses Dokument ist die gemeinsame Arbeitsgrundlage für Architektur, Implementi
 1. die bereinigte Spezifikation von PatchHarbor,
 2. die verbindlichen Architekturgrenzen,
 3. die Teststrategie,
-4. vier nummerierte Meilensteine mit Definition of Done,
-5. alle Steps innerhalb der Meilensteine,
-6. für jeden Step genau drei Commits in den Phasen **work**, **right** und **clean**.
+4. vier nummerierte Release-Meilensteine für Version 1 mit Definition of Done,
+5. einen nachgelagerten Meilenstein 5 für den späteren WebSocket-Transport,
+6. alle Steps des verbindlichen Version-1-Plans,
+7. für jeden ausgeplanten Step genau drei Commits in den Phasen **work**, **right** und **clean**.
 
 Nach jedem Meilenstein wird der verbleibende Plan geprüft. Notwendige Anpassungen werden klein und gezielt vorgenommen. Der Plan wird nicht vollständig neu geschrieben.
 
@@ -28,7 +29,7 @@ Nach jedem Meilenstein wird der verbleibende Plan geprüft. Notwendige Anpassung
 
 ### 2.1 Hierarchie
 
-- Meilensteine werden mit normalen Zahlen nummeriert: `1`, `2`, `3`, `4`.
+- Meilensteine werden mit normalen Zahlen nummeriert. `1` bis `4` bilden Version 1; `5` ist der nachgelagerte WebSocket-Meilenstein.
 - Steps werden innerhalb des Meilensteins mit kleinen Buchstaben nummeriert: `a`, `b`, `c` und so weiter.
 - Commits bilden die unterste Ebene und erhalten den Phasenbuchstaben `W`, `R` oder `C`.
 
@@ -69,13 +70,16 @@ Beispiele:
 
 PatchHarbor ist ausschließlich ein kontrollierter Runner für von einer KI erzeugte Skripte.
 
-PatchHarbor übernimmt ein Skript, erkennt das PatchHarbor-Format, liest optionale Informationen und übertragene Dateien, bereitet diese vor und führt das Skript aus.
+PatchHarbor übernimmt ein Eingabeartefakt aus genau einer Quelle, löst daraus ein geordnetes Bundle mit einem oder mehreren PatchHarbor-Skripten auf, liest optionale Informationen und übertragene Dateien, bereitet diese vor und führt die Skripte kontrolliert aus.
+
+Ein einzelnes Skript ist fachlich ein Bundle mit genau einem Eintrag. Ein ZIP-Archiv kann ein Bundle mit mehreren geordneten Skripten transportieren.
 
 PatchHarbor ist kein Testwerkzeug, kein Git-Werkzeug und kein Build-System.
 
 ### 3.1 PatchHarbor macht
 
-- Skripte aus unterstützten Quellen übernehmen,
+- Eingabeartefakte aus unterstützten Quellen übernehmen,
+- direkte Skripte und ZIP-Container zu geordneten Skript-Bundles auflösen,
 - den exakten PatchHarbor-Marker prüfen,
 - optionale Metadaten und Messages best effort erkennen,
 - optionale FILE-Blöcke sicher vorbereiten,
@@ -96,23 +100,26 @@ PatchHarbor ist kein Testwerkzeug, kein Git-Werkzeug und kein Build-System.
 - keinen Hintergrunddienst oder Daemon betreiben,
 - keine KI-Anleitung im Programm verwalten,
 - in Version 1 keinen Save-Modus anbieten,
-- in Version 1 keine Clipboard- oder WebSocket-Schnittstelle öffentlich anbieten.
+- in Version 1 keine Clipboard- oder WebSocket-Schnittstelle öffentlich anbieten,
+- kein allgemeines Plugin-System oder universelles Bundle-Manifest vorwegnehmen.
 
 ---
 
 ## 4. Lebenszyklus und Arbeitsverzeichnis
 
-Ein Aufruf verarbeitet genau eine Quelle und endet anschließend.
+Ein Runner-Auftrag verarbeitet genau ein Eingabeartefakt und endet anschließend. Der CLI-Aufruf bezieht dieses Artefakt aus genau einer Quelle.
 
 Der Ablauf lautet:
 
-**Start → Quelle übernehmen → Skriptformat prüfen → optionale Nutzdaten vorbereiten → ausführen → Ergebnis anzeigen → Prozess beenden**
+**Start → Quelle übernehmen → Eingabeartefakt bereitstellen → Bundle auflösen → Skriptformat prüfen → optionale Nutzdaten vorbereiten → ausführen → Ergebnis anzeigen → Auftrag beenden**
 
-Das Skript wird immer im aktuellen Arbeitsverzeichnis ausgeführt, in dem der Nutzer PatchHarbor gestartet hat. Der Speicherort der Eingabedatei, eines ZIP-Archivs oder einer temporären Skriptdatei ändert das Arbeitsverzeichnis nicht.
+Ein späterer äußerer Host, beispielsweise ein WebSocket-Host, darf mehrere Aufträge nacheinander an denselben Runner übergeben. Der Runner selbst bleibt pro Auftrag zustandslos und wird nicht zu einem dauerhaft beobachtenden Daemon.
+
+Jedes Skript wird immer im aktuellen Arbeitsverzeichnis ausgeführt, in dem der Auftrag gestartet wurde. Der Speicherort der Eingabedatei, eines ZIP-Archivs oder einer temporären Skriptdatei ändert das Arbeitsverzeichnis nicht.
 
 Relative Pfade im Skript beziehen sich deshalb immer auf dieses aktuelle Arbeitsverzeichnis.
 
-Skripte aus Pipe oder ZIP werden bei Bedarf sicher im System-Temp-Verzeichnis zwischengespeichert und anschließend gelöscht. Ein Skript darf sich nicht darauf verlassen, dass sein eigener Dateipfad im Projektverzeichnis liegt.
+Inhalte aus Pipe, ZIP oder später WebSocket werden bei Bedarf sicher im System-Temp-Verzeichnis zwischengespeichert und anschließend gelöscht. Ein Skript darf sich nicht darauf verlassen, dass sein eigener Dateipfad im Projektverzeichnis liegt.
 
 ---
 
@@ -138,9 +145,13 @@ Ist kein Pfad angegeben und die Standardeingabe ist ein normales Terminal, endet
 
 ### 5.2 Noch nicht öffentliche Quellen
 
-Clipboard und WebSocket werden als zukünftige Eingabequellen in der Architektur berücksichtigt, aber nicht implementiert und nicht im Help-Screen angezeigt.
+Clipboard und WebSocket werden als zukünftige Eingabequellen in der Architektur berücksichtigt, aber in Version 1 nicht implementiert und nicht im Help-Screen angezeigt.
 
-Die Vorbereitung besteht nur aus einer klaren internen Quellengrenze. Es gibt in Version 1 kein Plugin-System und keine dynamische Modulregistrierung.
+Jede Quelle liefert denselben kleinen Typ `InputArtifact`: einen sicher lesbaren lokalen Pfad, einen Anzeigenamen und die Information, ob PatchHarbor das Artefakt nach dem Auftrag entfernen muss. Die Quelle interpretiert den Inhalt nicht und entscheidet nicht, ob er ein direktes Skript oder ein ZIP-Bundle enthält.
+
+Eine spätere WebSocket-Quelle bildet eine vollständige Textnachricht auf ein direktes Skript-Artefakt und eine vollständige Binärnachricht auf ein ZIP-Artefakt ab. Ab dieser Übergabe verwendet sie exakt dieselbe Bundle-, Parser-, FILE- und Execution-Pipeline wie Datei und Pipe.
+
+Die Vorbereitung besteht nur aus dieser kleinen internen Quellengrenze. Es gibt in Version 1 kein Plugin-System, keine dynamische Modulregistrierung und keine WebSocket-Abhängigkeit.
 
 ### 5.3 Installation
 
@@ -259,7 +270,7 @@ Unbegrenzte Eingaben werden nicht unterstützt. Die Anfangswerte sind zentrale K
 Empfohlene Anfangswerte:
 
 - Warning ab 10 MiB für einen einzelnen Skript- oder FILE-Inhalt,
-- höchstens 256 MiB pro direkter Eingabe oder ZIP-Eintrag,
+- höchstens 256 MiB pro Eingabeartefakt oder ZIP-Eintrag,
 - höchstens 512 MiB unkomprimierte Gesamtdaten eines ZIP-Archivs,
 - höchstens 1.000 ZIP-Einträge.
 
@@ -267,19 +278,25 @@ Eine Überschreitung eines harten Budgets führt zu einem klaren Tool-Fehler vor
 
 ---
 
-## 8. Dateisystemquelle
+## 8. Quellen, Eingabeartefakte und Bundles
 
-### 8.1 Einzelne Datei
+### 8.1 Quellengrenze und Eingabeartefakt
 
-Eine einzelne Datei wird zuerst als direktes UTF-8-Skript geprüft.
+Eine Quelle ist ausschließlich dafür verantwortlich, Daten zu empfangen und als neutrales Eingabeartefakt bereitzustellen.
 
-Wird kein gültiger Pflichtmarker gefunden oder ist die Datei nicht als Text lesbar, versucht PatchHarbor die Datei als ZIP-Archiv zu öffnen.
+Ein `InputArtifact` enthält nur:
 
-Ist die Datei weder ein gültiges PatchHarbor-Skript noch ein verarbeitbares ZIP mit gültigen Skripten, endet der Aufruf mit einem klaren Fehler.
+- einen sicher lesbaren lokalen Pfad,
+- einen Anzeigenamen für Status und Fehler,
+- eine Cleanup-Information für temporäre Artefakte.
 
-Der Dateiname und die Dateiendung sind für die Skripterkennung unerheblich.
+Eine vorhandene Datei kann direkt referenziert werden. Inhalte aus Pipe und später WebSocket werden sicher in eine temporäre Datei geschrieben. Dadurch bleiben auch große oder binäre Eingaben möglich, ohne dass jede Quelle den gesamten Inhalt dauerhaft als Python-String halten muss.
 
-### 8.2 Ordner
+Die Quelle interpretiert den Inhalt nicht. Sie kennt weder Marker noch ZIP-Regeln, Parser, FILE-Blöcke oder Execution.
+
+### 8.2 Datei und Ordner
+
+Eine einzelne reguläre Datei wird als Eingabeartefakt übernommen. Dateiname und Dateiendung sind für die Skripterkennung unerheblich.
 
 Ein Ordner wird genau einmal gescannt. Er wird nicht überwacht.
 
@@ -288,6 +305,7 @@ Regeln:
 - nicht rekursiv,
 - nur reguläre Dateien,
 - symbolische Links werden ignoriert,
+- ein Kandidat ist eine Datei, deren Bundle-Auflösung mindestens ein gültiges PatchHarbor-Skript liefert,
 - Kandidaten werden nach Änderungszeit sortiert, neueste zuerst,
 - bei identischer Änderungszeit dient der Dateiname als stabiler zweiter Sortierschlüssel,
 - die Auswahl erfolgt mit einer ab eins gezählten Zahl aus ASCII-Ziffern,
@@ -296,18 +314,28 @@ Regeln:
 - leere Eingabe bricht ohne automatische Auswahl ab,
 - ungültige Eingabe wird erneut abgefragt, solange die Eingabe interaktiv möglich ist.
 
-Nach Einführung des ZIP-Fallbacks gelten sowohl direkte PatchHarbor-Skripte als auch ZIP-Dateien mit mindestens einem gültigen PatchHarbor-Skript als Kandidaten.
+### 8.3 Bundle-Auflösung
 
-### 8.3 ZIP-Datei
+Jedes Eingabeartefakt wird genau einmal zu einem `ScriptBundle` aufgelöst. Ein Bundle ist eine geordnete Folge von einem oder mehreren PatchHarbor-Skripten.
 
-ZIP ist ein Transportformat, kein eigener Ausführungsmodus.
+Regeln:
+
+- Ein direkt lesbares UTF-8-Skript mit exaktem Pflichtmarker ergibt ein Bundle mit genau einem Eintrag.
+- Ist das Artefakt kein gültiges direktes Skript, wird es als ZIP-Container geprüft.
+- Ist es weder ein gültiges Skript noch ein ZIP mit mindestens einem gültigen Skript, endet der Auftrag mit einem klaren Tool-Fehler.
+- Die Bundle-Auflösung ist unabhängig davon, ob das Artefakt aus Datei, Pipe oder später WebSocket stammt.
+- Quelle und Dateiendung bestimmen nicht den Skripttyp.
+
+### 8.4 ZIP-Container
+
+ZIP ist eine Bundle-Codierung und kein eigener Ausführungsmodus.
 
 Regeln:
 
 - Verzeichniseinträge, Links und andere nicht reguläre Einträge werden ignoriert.
 - Verschachtelte ZIP-Archive werden in Version 1 nicht geöffnet.
 - Alle regulären Dateieinträge werden in der im Archiv gespeicherten Reihenfolge geprüft.
-- Nur Einträge mit dem exakten Pflichtmarker werden ausgeführt.
+- Nur Einträge mit dem exakten Pflichtmarker werden in das Bundle aufgenommen.
 - Die Aussage alle Dateien probieren bedeutet alle Dateien prüfen, nicht markerlose Dateien blind ausführen.
 - Mehrere gültige Skripte werden sequenziell in Archiv-Reihenfolge ausgeführt.
 - Jedes Skript erhält sein eigenes Timeout.
@@ -316,13 +344,25 @@ Regeln:
 - Enthält das Archiv kein gültiges Skript, endet PatchHarbor mit einem Tool-Fehler.
 - Das Archiv wird möglichst streamend verarbeitet und nicht vollständig in das Projektverzeichnis entpackt.
 
-### 8.4 Pipe und STDIN
+### 8.5 Pipe und STDIN
 
-Ist kein Pfad angegeben und STDIN ist eine Pipe, liest PatchHarbor den vollständigen Input einmalig ein.
+Ist kein Pfad angegeben und STDIN ist eine Pipe, wird der vollständige Input einmalig in ein sicheres temporäres Eingabeartefakt geschrieben.
 
-Es gibt keinen Streaming-Befehlsdialog und kein interaktives Protokoll. Nach dem Einlesen durchläuft der Inhalt dieselbe Pipeline wie ein direktes Skript.
+Es gibt keinen Streaming-Befehlsdialog und kein interaktives Protokoll. Nach der Übergabe durchläuft das Artefakt dieselbe Bundle-, Parser-, FILE- und Execution-Pipeline wie eine vorhandene Datei.
 
 Die Standardeingabe des ausgeführten Kindprozesses bleibt geschlossen. Version 1 unterstützt ausschließlich nicht interaktive Skripte.
+
+### 8.6 Spätere WebSocket-Quelle
+
+WebSocket gehört nicht zu Version 1. Für den späteren Meilenstein 5 gilt bereits die fachliche Grenze:
+
+- eine vollständige Textnachricht entspricht einem direkten Skript-Artefakt,
+- eine vollständige Binärnachricht entspricht einem ZIP-Artefakt,
+- eine vollständige Nachricht entspricht genau einem Runner-Auftrag,
+- ein langlebiger WebSocket-Host darf mehrere Aufträge nacheinander empfangen,
+- der Runner verarbeitet weiterhin jeweils genau ein Artefakt und bleibt zustandslos,
+- im selben Arbeitsverzeichnis werden Aufträge nicht parallel ausgeführt,
+- Authentifizierung, Transportverschlüsselung, Größen- und Ratenlimits werden erst in Meilenstein 5 implementiert.
 
 ---
 
@@ -359,7 +399,7 @@ Version 1 unterstützt bewusst nur Bash und PowerShell.
 - Strg+C beendet das Skript und seine Kindprozesse und liefert Exit-Code 130.
 - Timeout liefert Exit-Code 124.
 
-### 9.4 Ausführungsreihenfolge je Skript
+### 9.4 Ausführungsreihenfolge je Skript im Bundle
 
 1. Pflichtmarker prüfen.
 2. optionale META-, MESSAGE- und FILE-Blöcke vollständig analysieren.
@@ -483,37 +523,42 @@ Da ein Skript theoretisch dieselben numerischen Werte zurückgeben kann, muss di
 
 Der fachliche Datenfluss lautet:
 
-**Quelle → Skriptformat → FILE-Vorbereitung → Execution → Darstellung**
+**Quelle → InputArtifact → Bundle-Auflösung → Skriptformat → FILE-Vorbereitung → Execution → Darstellung**
 
-Die Importabhängigkeiten werden jedoch über einen kleinen Orchestrator gesteuert. Execution darf nicht die TUI kennen und der Parser darf nicht die Prozesssteuerung kennen.
+Die Importabhängigkeiten werden über einen kleinen Anwendungsorchestrator gesteuert. Execution darf nicht die TUI kennen, der Parser darf nicht die Prozesssteuerung kennen und eine Quelle darf weder ZIP noch Skriptformat interpretieren.
 
 ### 12.2 Empfohlene Modulgrenzen
 
-Zu Beginn bleibt das Python-Paket flach. Unterordner entstehen erst bei echter Größe oder plattformspezifischer Notwendigkeit.
+Das Python-Paket bleibt zunächst flach. Unterordner entstehen erst bei echter Größe oder plattformspezifischer Notwendigkeit.
 
 Empfohlene Module:
 
 - `cli.py` – argparse und Umwandlung der CLI-Eingabe in einen Anwendungsaufruf,
-- `application.py` – einziger Orchestrator des vollständigen Ablaufs,
-- `sources.py` – Datei, Ordner, ZIP und STDIN übernehmen,
+- `application.py` – einziger Orchestrator eines Runner-Auftrags,
+- `sources.py` – Datei, Ordner und STDIN als `InputArtifact` bereitstellen; spätere Quellen werden hier als Adapter ergänzt,
+- `bundles.py` – direkte Skripte und ZIP-Container zu einem geordneten `ScriptBundle` auflösen,
 - `script_format.py` – Marker, META, MESSAGE und FILE-Blöcke analysieren,
 - `payload_files.py` – Dateinamen prüfen und Dateien atomar schreiben,
 - `execution.py` – Interpreter, Prozessstart, Timeout und Ergebnis,
 - `presentation.py` – Plain-Ausgabe, TUI, Farben und Rolling-Buffer-Darstellung,
-- `models.py` – kleine unveränderliche Datenträger,
+- `models.py` – kleine unveränderliche Datenträger wie `InputArtifact` und `ScriptBundle`,
 - `errors.py` – eindeutige Tool-Fehler und Exit-Codes,
 - `platform/` – nur die tatsächlich notwendige Linux- und Windows-Prozesssteuerung.
 
 ### 12.3 Abhängigkeitsregel
 
 - `cli` kennt `application`.
-- `application` orchestriert die fachlichen Module.
-- Fachmodule kennen sich nicht gegenseitig, sofern eine Übergabe über Modelle genügt.
+- `application` orchestriert Quellen, Bundle-Auflösung, Parser, FILE-Verarbeitung, Execution und Darstellung.
+- `sources` kennt nur Eingabezugriffe und neutrale Modelle; es kennt weder ZIP-Regeln noch Parser oder Execution.
+- `bundles` kennt Eingabeartefakte und darf zur Markerprüfung `script_format` verwenden; `script_format` kennt `bundles` nicht.
+- `script_format` liefert reine Beschreibungen optionaler FILE-Blöcke und importiert keine Schreiblogik aus `payload_files`.
+- `payload_files` validiert und schreibt; es steuert keine Execution.
 - `models` und `errors` kennen keine höherliegenden Module.
-- `execution` kennt weder TUI noch argparse.
+- `execution` kennt weder Quellen, Bundles, TUI noch argparse.
 - `presentation` erhält Zustandsmodelle und steuert keine Ausführung.
 - Es gibt keine Pakete namens `utils`, `helpers` oder `common` als Sammelstellen.
-- Zukünftige Quellen liefern denselben neutralen Quellenausgang, ohne die Verarbeitungspipeline zu verändern.
+- Zukünftige Quellen liefern denselben `InputArtifact`, ohne die Bundle-, Parser-, FILE- oder Execution-Pipeline zu verändern.
+- Es gibt keine Plugin-Basisklasse, solange mindestens zwei reale externe Erweiterungen keinen gemeinsamen Vertrag erzwingen.
 
 ---
 
@@ -546,6 +591,8 @@ Für jeden Step gilt:
 - MESSAGE-Zeile ohne eigenständigen Marker ist kein gültiges Skript,
 - fehlender Marker,
 - STDIN und Pipe,
+- Datei und Pipe liefern dieselbe `InputArtifact`- und Bundle-Semantik,
+- ein direktes Skript ergibt ein Bundle mit genau einem Eintrag,
 - Ordnerscan und Auswahl,
 - ZIP mit mehreren Skripten in Archiv-Reihenfolge,
 - Abbruch beim ersten fehlerhaften ZIP-Skript,
@@ -565,7 +612,8 @@ Für jeden Step gilt:
 - Plain-Modus ohne Cursorsequenzen,
 - Logdatei im System-Temp-Verzeichnis,
 - korrektes ursprüngliches Arbeitsverzeichnis,
-- Ressourcenlimits und ZIP-Bomben-Schutz.
+- Ressourcenlimits und ZIP-Bomben-Schutz,
+- Quellen-, Bundle- und Execution-Grenzen ohne zirkuläre Abhängigkeiten.
 
 ### 13.4 Plattformen und CI
 
@@ -604,6 +652,14 @@ Folgende Funktionen gehören nicht zu Version 1:
 
 Diese Liste verhindert, dass die erste Version wieder zu groß wird.
 
+### 14.1 Nachgelagerter Meilenstein 5
+
+Nach der Freigabe von Version 1 folgt **Meilenstein 5 – WebSocket-Transport**. Er ergänzt nur einen äußeren Transportadapter und verändert den Runner-Kern nicht.
+
+Bereits festgelegt sind Textnachricht gleich direktes Skript, Binärnachricht gleich ZIP-Bundle und eine Nachricht gleich ein Runner-Auftrag. Vor der Implementierung werden im Review von Meilenstein 4 das Antwortformat, Authentifizierung, TLS, lokale Standardbindung, Warteschlange, Ratenlimits und Abbruchsemantik verbindlich entschieden.
+
+Der detaillierte W-R-C-Commit-Plan für Meilenstein 5 wird erst nach dem Release-Review erstellt. Dadurch wird die Zukunftsgrenze dokumentiert, ohne Version 1 mit spekulativem WebSocket-Code oder einem vorzeitig festgelegten Protokoll zu belasten.
+
 ---
 
 # Teil B – Meilenstein- und Commit-Plan
@@ -616,6 +672,9 @@ Diese Liste verhindert, dass die erste Version wieder zu groß wird.
 | 2 | Robuste Inputs und Nutzdaten | Datei, Ordner, ZIP, Pipe, Messages und FILE-Blöcke funktionieren. |
 | 3 | Kontrollierte Execution und Ausgabe | Prozessbaum, Output, Logging und feste TUI sind stabil. |
 | 4 | Plattform und Release-Qualität | Linux und Windows sind automatisiert getestet und pipx-fähig veröffentlicht. |
+| 5 | WebSocket-Transport, nach Version 1 | Textskripte und ZIP-Bundles können später über einen sicheren äußeren Host als normale Runner-Aufträge übernommen werden. |
+
+Die Meilensteine 1 bis 4 bilden den verbindlichen Version-1-Commit-Plan. Meilenstein 5 ist ein nachgelagertes Ziel und wird erst nach dem Review von Meilenstein 4 in konkrete Steps und W-R-C-Commits zerlegt.
 
 Am Ende jedes Meilensteins werden Architektur, Risiken und der verbleibende Commit-Plan geprüft. Notwendige Korrekturen werden im `C`-Commit des letzten Steps dieses Meilensteins dokumentiert, damit kein zusätzlicher künstlicher Planungscommit entsteht.
 
@@ -954,8 +1013,10 @@ Alle für Version 1 vorgesehenen Eingabewege und optionalen Skriptnutzdaten funk
 
 ## Review nach Meilenstein 2
 
-- Der gerichtete Ablauf bleibt `CLI → Input → Parser → Files → Execution → Output`; neue Rückabhängigkeiten sind nicht notwendig.
-- Das flache Paket genügt weiterhin. Ein zusätzlicher Application-Layer entsteht erst, wenn die Orchestrierung in Meilenstein 3 tatsächlich wächst.
+- Datei, Ordner, Pipe, ZIP, Messages und FILE-Blöcke funktionieren fachlich; ein Neustart ist nicht erforderlich.
+- Die bisherige Eingabelogik bündelt jedoch Quellenzugriff, ZIP-Erkennung, Parsing, FILE-Vorbereitung und Ausführungsreihenfolge zu stark in einem Pfad.
+- Vor der weiteren Execution-Arbeit wird deshalb ein neuer Step 3.a eingeschoben: Quelle, neutrales `InputArtifact`, Bundle-Auflösung und Anwendungsorchestrierung werden klar getrennt.
+- Diese Korrektur bereitet WebSocket und weitere Quellen vor, ohne WebSocket-Code, Plugin-System oder asynchrone Kernarchitektur in Version 1 einzuführen.
 - Die vollständige Vereinheitlichung der Ressourcenbudgets für alle Quellen bleibt gezielt in Step 4.b; FILE- und ZIP-Grenzen sind bereits zentral definiert und getestet.
 
 ---
@@ -968,6 +1029,9 @@ Prozesse werden auf Linux und Windows zuverlässig gesteuert. Output, Logging un
 
 ## Scope
 
+- transportneutrale Quellengrenze mit `InputArtifact`,
+- direkte Skripte und ZIP-Container als geordnete `ScriptBundle`s,
+- kleiner Application-Orchestrator ohne Plugin-System,
 - unterstützte Interpreter,
 - PowerShell-Startregeln,
 - Prozessbaum und Signale,
@@ -980,6 +1044,9 @@ Prozesse werden auf Linux und Windows zuverlässig gesteuert. Output, Logging un
 
 ## Definition of Done
 
+- Datei und STDIN durchlaufen denselben Artefakt-zu-Bundle-Pfad.
+- Ein direktes Skript und ein ZIP-Bundle werden quellenunabhängig aufgelöst.
+- Quellen, Bundle-Auflösung, Parser, FILE-Verarbeitung und Execution haben eine gerichtete, zyklusfreie Abhängigkeitsrichtung.
 - Bash und PowerShell werden deterministisch gewählt.
 - Unbekannte Interpreter werden klar abgelehnt.
 - Timeout und Strg+C beenden auch Kindprozesse.
@@ -991,11 +1058,45 @@ Prozesse werden auf Linux und Windows zuverlässig gesteuert. Output, Logging un
 
 ---
 
-## Step 3.a – Interpreterauswahl und PowerShell-Vertrag härten
+## Step 3.a – Transportneutrale Artefakt- und Bundle-Grenze einführen
+
+**Ergebnis:** Datei und Pipe liefern denselben neutralen Eingang; direkte Skripte und ZIPs werden unabhängig von ihrer Quelle zu einem geordneten Bundle aufgelöst.
+
+### 3.a.W – Einheitlichen Artefakt-zu-Bundle-Durchlauf implementieren
+
+- kleine unveränderliche Modelle `InputArtifact` und `ScriptBundle` einführen,
+- vorhandene Datei direkt als Artefakt referenzieren,
+- STDIN sicher in ein temporäres Artefakt schreiben,
+- direktes Skript als Bundle mit einem Eintrag abbilden,
+- ZIP als geordnetes Bundle mit allen gültigen Skripten abbilden,
+- Datei-, Pipe- und ZIP-Verhalten über denselben Anwendungsweg ausführen,
+- E2E-Tests ergänzen, die gleiche Semantik und Archiv-Reihenfolge prüfen.
+
+### 3.a.R – Quellen, Bundle-Auflösung und Anwendung fachlich trennen
+
+- Quellenzugriff nach `sources.py` verschieben,
+- direkte Skript- und ZIP-Auflösung nach `bundles.py` verschieben,
+- sequenzielle Auftragssteuerung in einem kleinen `application.py` bündeln,
+- Parser reine Skript- und FILE-Beschreibungen liefern lassen,
+- Dateinamenprüfung und Schreiben ausschließlich in der FILE-Verarbeitung halten,
+- Execution von Quelle, ZIP und Parser entkoppeln,
+- Importtests oder Architekturtests für die gerichtete Abhängigkeit ergänzen.
+
+### 3.a.C – Übergabegrenze vereinfachen und Altpfade entfernen
+
+- alte quellenspezifische Ausführungszweige und doppelte ZIP-Behandlung entfernen,
+- temporäre Artefaktverwaltung auf genau einen Cleanup-Pfad reduzieren,
+- Modelle auf tatsächlich benötigte Felder begrenzen,
+- keine Plugin-Basisklasse, Registry, WebSocket-Bibliothek oder Async-Kernarchitektur hinzufügen,
+- vorhandene Verhaltenstests grün halten und fragile Implementierungsassertions entfernen.
+
+---
+
+## Step 3.b – Interpreterauswahl und PowerShell-Vertrag härten
 
 **Ergebnis:** Der Interpreter wird aus einer kleinen Whitelist deterministisch gewählt.
 
-### 3.a.W – Bash- und PowerShell-Auswahl implementieren
+### 3.b.W – Bash- und PowerShell-Auswahl implementieren
 
 - Linux ohne Shebang auf Bash abbilden,
 - Windows ohne Shebang auf Windows PowerShell abbilden,
@@ -1005,14 +1106,14 @@ Prozesse werden auf Linux und Windows zuverlässig gesteuert. Output, Logging un
 - PowerShell ohne Profil und nicht interaktiv starten,
 - E2E-Tests für Defaults, bekannte Shebangs und fehlenden Interpreter ergänzen.
 
-### 3.a.R – Interpreterresolver plattformneutral strukturieren
+### 3.b.R – Interpreterresolver plattformneutral strukturieren
 
 - Shebang-Auswertung, Verfügbarkeitsprüfung und Prozessargumente trennen,
 - freie Shebang-Kommandoausführung verhindern,
 - temporäre Dateiendung nur als technische Hilfe, nicht als Typentscheidung nutzen,
 - PowerShell Execution Policy nicht umgehen und Policy-Fehler verständlich abbilden.
 
-### 3.a.C – Interpreterlogik vereinfachen
+### 3.b.C – Interpreterlogik vereinfachen
 
 - Mapping auf tatsächlich unterstützte Varianten begrenzen,
 - doppelte OS-Abfragen entfernen,
@@ -1021,11 +1122,11 @@ Prozesse werden auf Linux und Windows zuverlässig gesteuert. Output, Logging un
 
 ---
 
-## Step 3.b – Prozessbaum, Timeout und Strg+C zuverlässig steuern
+## Step 3.c – Prozessbaum, Timeout und Strg+C zuverlässig steuern
 
 **Ergebnis:** PatchHarbor hinterlässt nach Ende, Timeout oder Abbruch keine Kindprozesse.
 
-### 3.b.W – Plattformgerechte Prozessgruppen implementieren
+### 3.c.W – Plattformgerechte Prozessgruppen implementieren
 
 - unter Linux eine eigene Prozesssitzung beziehungsweise Gruppe starten,
 - unter Windows den Prozess in einem Job Object verwalten,
@@ -1034,14 +1135,14 @@ Prozesse werden auf Linux und Windows zuverlässig gesteuert. Output, Logging un
 - Exit-Codes 124 und 130 liefern,
 - echte E2E-Tests mit einem Kindprozess auf beiden Plattformen ergänzen.
 
-### 3.b.R – Plattformcode hinter kleinem Lifecycle-Vertrag isolieren
+### 3.c.R – Plattformcode hinter kleinem Lifecycle-Vertrag isolieren
 
 - Linux- und Windows-Details in `platform/` trennen,
 - Execution nur eine kleine Start-, Stop- und Kill-Schnittstelle kennen lassen,
 - Race Conditions zwischen natürlichem Ende, Timeout und Strg+C behandeln,
 - Cleanup auch bei Exceptions garantieren.
 
-### 3.b.C – Prozesssteuerung vereinfachen und härten
+### 3.c.C – Prozesssteuerung vereinfachen und härten
 
 - redundante Signalpfade entfernen,
 - genau eine Zustandsmaschine für läuft, beendet, Timeout und Abbruch verwenden,
@@ -1050,11 +1151,11 @@ Prozesse werden auf Linux und Windows zuverlässig gesteuert. Output, Logging un
 
 ---
 
-## Step 3.c – Output fortlaufend erfassen und begrenzen
+## Step 3.d – Output fortlaufend erfassen und begrenzen
 
 **Ergebnis:** STDOUT und STDERR erscheinen gemeinsam, ohne Deadlock und ohne unbegrenzten RAM-Verbrauch.
 
-### 3.c.W – Zusammengeführten Output und Rolling Buffer implementieren
+### 3.d.W – Zusammengeführten Output und Rolling Buffer implementieren
 
 - STDOUT und STDERR in einen gemeinsamen Stream führen,
 - Output während des Laufs fortlaufend lesen,
@@ -1063,14 +1164,14 @@ Prozesse werden auf Linux und Windows zuverlässig gesteuert. Output, Logging un
 - lange Zeile und letzte Zeile ohne Zeilenumbruch unterstützen,
 - E2E-Tests für viel Output, gemischte Streams und schnellen Prozess ergänzen.
 
-### 3.c.R – Streaming und Decodierung robust strukturieren
+### 3.d.R – Streaming und Decodierung robust strukturieren
 
 - Byte-Lesen von Textdecodierung und Zeilenbildung trennen,
 - fehlerhafte Zeichen mit Ersatzdarstellung statt Crash behandeln,
 - Thread- oder Async-Lösung so kapseln, dass der Prozess nie wegen voller Pipe blockiert,
 - Zähler für verworfene ältere Zeilen bereitstellen.
 
-### 3.c.C – Buffer und Reader vereinfachen
+### 3.d.C – Buffer und Reader vereinfachen
 
 - geeignete begrenzte Datenstruktur verwenden,
 - unnötige vollständige Outputkopien entfernen,
@@ -1079,11 +1180,11 @@ Prozesse werden auf Linux und Windows zuverlässig gesteuert. Output, Logging un
 
 ---
 
-## Step 3.d – Plain-Ausgabe und vollständiges Temp-Log ergänzen
+## Step 3.e – Plain-Ausgabe und vollständiges Temp-Log ergänzen
 
 **Ergebnis:** Automation erhält saubere Textausgabe; Debugging kann den vollständigen Output sichern.
 
-### 3.d.W – Plain-Modus und `--log` implementieren
+### 3.e.W – Plain-Modus und `--log` implementieren
 
 - bei Nicht-TTY automatisch einfache fortlaufende Ausgabe verwenden,
 - `--plain` und `--no-color` ergänzen,
@@ -1092,14 +1193,14 @@ Prozesse werden auf Linux und Windows zuverlässig gesteuert. Output, Logging un
 - Logpfad am Ende anzeigen,
 - E2E-Tests für Plain-Ausgabe und Loginhalt ergänzen.
 
-### 3.d.R – Ausgabeziele und Log-Lebenszyklus trennen
+### 3.e.R – Ausgabeziele und Log-Lebenszyklus trennen
 
 - Terminaldarstellung, Plain-Sink und Log-Sink sauber koordinieren,
 - Logging vom Rolling Buffer unabhängig machen,
 - rohe Skriptausgabe im Log und bereinigte Ausgabe im UI unterscheiden,
 - sichere Tempdateierzeugung und korrektes Schließen auf allen Fehlerpfaden sicherstellen.
 
-### 3.d.C – Output-Pipeline entschlacken
+### 3.e.C – Output-Pipeline entschlacken
 
 - unnötiges allgemeines Logging-Framework vermeiden,
 - Ausgabeziele über kleine Funktionen oder einen schmalen Vertrag anbinden,
@@ -1108,11 +1209,11 @@ Prozesse werden auf Linux und Windows zuverlässig gesteuert. Output, Logging un
 
 ---
 
-## Step 3.e – Feste TUI mit Redraw alle 0,2 Sekunden bauen
+## Step 3.f – Feste TUI mit Redraw alle 0,2 Sekunden bauen
 
 **Ergebnis:** Im interaktiven Terminal bleibt eine kompakte feste Oberfläche ohne Scroll-Effekt sichtbar.
 
-### 3.e.W – Dashboard und periodischen Redraw implementieren
+### 3.f.W – Dashboard und periodischen Redraw implementieren
 
 - Bereiche Source, Messages, Files, Execution und Result darstellen,
 - maximale Breite 80 und tatsächliche Terminalbreite berücksichtigen,
@@ -1122,7 +1223,7 @@ Prozesse werden auf Linux und Windows zuverlässig gesteuert. Output, Logging un
 - feste Bereichshöhen und Überlaufhinweise implementieren,
 - Renderer-Tests und einen interaktiven Smoke-Test ergänzen.
 
-### 3.e.R – Terminalschutz und Fallbacks ergänzen
+### 3.f.R – Terminalschutz und Fallbacks ergänzen
 
 - ANSI-Steuersequenzen aus sichtbarem Skriptoutput entfernen,
 - Cursorzustand und Farben auch bei Exception oder Strg+C wiederherstellen,
@@ -1130,7 +1231,7 @@ Prozesse werden auf Linux und Windows zuverlässig gesteuert. Output, Logging un
 - horizontales Kürzen ohne unbeabsichtigte Zeilenumbrüche sicherstellen,
 - TUI-Zustandsmodell von Execution entkoppeln.
 
-### 3.e.C – TUI beruhigen und vereinfachen
+### 3.f.C – TUI beruhigen und vereinfachen
 
 - nur bei verändertem Zustand oder fälligem 0,2-Sekunden-Tick rendern,
 - Flackern und unnötige Vollausgaben reduzieren,
@@ -1274,7 +1375,7 @@ PatchHarbor ist auf den Zielplattformen reproduzierbar getestet, sicher paketier
 ### 4.d.R – Architektur- und Release-Audit durchführen
 
 - Importabhängigkeiten gegen die vereinbarte Richtung prüfen,
-- CLI, Source, Parser, FILE, Execution und Presentation auf klare Grenzen prüfen,
+- CLI, Sources, Bundle-Auflösung, Parser, FILE, Execution und Presentation auf klare Grenzen prüfen,
 - interne Exit-Codes, Warnings und Fehlermeldungen konsolidieren,
 - sicherstellen, dass Clipboard, WebSocket, SSH, Save, Tests und Git nicht öffentlich enthalten sind,
 - Lizenz, Paketinhalt und veröffentlichte Dateien prüfen.
@@ -1286,6 +1387,37 @@ PatchHarbor ist auf den Zielplattformen reproduzierbar getestet, sicher paketier
 - alle Tests auf beiden Release-Gates ausführen,
 - verbleibenden Commit-Plan und Risiken abschließend reviewen,
 - Version 1 nur freigeben, wenn die Definition of Done vollständig erfüllt ist.
+
+---
+
+# Meilenstein 5 – WebSocket-Transport, nach Version 1
+
+## Ziel
+
+Ein äußerer WebSocket-Host kann vollständige PatchHarbor-Skripte und ZIP-Bundles entgegennehmen und sie ohne Sonderpfad als normale Runner-Aufträge verarbeiten lassen.
+
+## Bereits festgelegte Grenze
+
+- Textnachricht ergibt ein direktes Skript-Artefakt.
+- Binärnachricht ergibt ein ZIP-Artefakt.
+- Eine vollständige Nachricht ergibt genau einen Runner-Auftrag.
+- Der Runner bleibt zustandslos und verarbeitet weiterhin genau ein Artefakt pro Auftrag.
+- Im selben Arbeitsverzeichnis werden Aufträge sequenziell ausgeführt.
+- WebSocket darf die Bundle-, Parser-, FILE-, Execution- und Presentation-Pipeline nicht umgehen.
+
+## Entscheidungstor nach Meilenstein 4
+
+Vor der Zerlegung in konkrete Steps und W-R-C-Commits werden verbindlich entschieden:
+
+- Antwortformat und Zuordnung von Auftrag zu Ergebnis,
+- lokale Standardbindung und Freigabe für Remote-Zugriff,
+- Authentifizierung und Autorisierung,
+- TLS beziehungsweise sicherer Transport,
+- Größen-, Verbindungs- und Ratenlimits,
+- Warteschlange, Backpressure und Abbruch bei Verbindungsverlust,
+- Linux- und Windows-Akzeptanztests.
+
+Meilenstein 5 gehört nicht zum Releaseumfang von Version 1. Sein detaillierter Commit-Plan entsteht erst nach dem Review von Meilenstein 4.
 
 ---
 
@@ -1337,18 +1469,20 @@ Ein Meilenstein ist erst abgeschlossen, wenn:
 
 # Teil D – Zusammenfassung
 
-Der Plan besteht aus:
+Der verbindliche Version-1-Plan besteht aus:
 
-- **4 Meilensteinen**,
-- **18 Steps**,
-- **54 geplanten Commits**,
+- **4 Release-Meilensteinen**,
+- **19 Steps**,
+- **57 geplanten Commits**,
 - pro Step genau einem `W`-, einem `R`- und einem `C`-Commit.
+
+Zusätzlich ist **Meilenstein 5 – WebSocket-Transport** als nachgelagertes Ziel dokumentiert. Seine Steps und Commits werden bewusst erst nach dem Review von Meilenstein 4 festgelegt.
 
 Die Reihenfolge ist bewusst vertikal:
 
 **Meilenstein → Step → work → right → clean**
 
-Der erste Step liefert den kleinsten ausführbaren Datei-Run ohne TUI. Danach werden Eingaben und Nutzdaten, kontrollierte Execution und Ausgabe sowie zuletzt Plattform- und Release-Qualität ergänzt.
+Der erste Step liefert den kleinsten ausführbaren Datei-Run ohne TUI. Danach folgen Eingaben und Nutzdaten. Vor der weiteren Execution-Arbeit trennt Step 3.a Quellen, Eingabeartefakte und Bundles, damit spätere Transporte denselben Kern verwenden. Anschließend werden kontrollierte Execution und Ausgabe sowie Plattform- und Release-Qualität ergänzt.
 
 Die Leitlinie bleibt über den gesamten Plan gleich:
 
