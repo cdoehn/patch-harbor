@@ -7,8 +7,9 @@ import zipfile
 import pytest
 
 from patchharbor.errors import ExitCode, PatchHarborError
-import patchharbor.input as script_input
-from patchharbor.input import discover_directory_candidates, run_script_path
+import patchharbor.application as script_application
+from patchharbor.application import discover_directory_candidates, run_script_path
+import patchharbor.bundles as script_bundles
 from patchharbor.parser import ParsedScript
 
 
@@ -93,7 +94,7 @@ def test_zip_resource_budgets_fail_before_execution(
 ) -> None:
     archive_path = tmp_path / "limited.zip"
     _write_zip(archive_path, entries)
-    monkeypatch.setattr(script_input, constant_name, limit)
+    monkeypatch.setattr(script_bundles, constant_name, limit)
 
     with pytest.raises(PatchHarborError) as raised:
         _run_path(archive_path, tmp_path)
@@ -126,7 +127,9 @@ def test_each_zip_script_receives_its_own_timeout(
         observed.append((script, suffix, timeout_seconds))
         return 0
 
-    monkeypatch.setattr(script_input, "_execute_parsed_script", fake_execute_parsed_script)
+    monkeypatch.setattr(
+        script_application, "_execute_parsed_script", fake_execute_parsed_script
+    )
 
     result = _run_path(archive_path, tmp_path, timeout_seconds=7.5)
 

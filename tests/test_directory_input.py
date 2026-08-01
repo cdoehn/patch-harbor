@@ -7,12 +7,8 @@ from pathlib import Path
 import pytest
 
 from patchharbor.errors import ExitCode, PatchHarborError
-from patchharbor.input import (
-    DirectoryCandidate,
-    discover_directory_candidates,
-    run_script_path,
-    select_directory_candidate,
-)
+from patchharbor.application import discover_directory_candidates, run_script_path
+from patchharbor.sources import DirectoryCandidate, select_directory_candidate
 
 
 REQUIRED_MARKER = "# PATCHHARBOR"

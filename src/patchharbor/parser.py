@@ -5,7 +5,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 import re
 
-from patchharbor.files import is_safe_payload_name, payload_size_warning
 
 
 REQUIRED_MARKER = "# PATCHHARBOR"
@@ -139,15 +138,7 @@ def parse_script(script_text: str) -> ParsedScript:
                             text="\n".join(active_content),
                         )
                     )
-                elif not is_safe_payload_name(active_name):
-                    warn(
-                        f"discarded FILE {active_name!r}: invalid file name"
-                    )
                 else:
-                    if size_warning := payload_size_warning(
-                        active_name, active_content
-                    ):
-                        warn(size_warning)
                     payload_files.append(
                         PayloadFile(
                             name=active_name,

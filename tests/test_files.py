@@ -6,8 +6,12 @@ from pathlib import Path
 import pytest
 
 from patchharbor.errors import ExitCode, PatchHarborError
-import patchharbor.files as payload_files
-from patchharbor.files import is_safe_payload_name, write_payload_files
+import patchharbor.payload_files as payload_files
+from patchharbor.payload_files import (
+    is_safe_payload_name,
+    prepare_payload_files,
+    write_payload_files,
+)
 
 
 @pytest.mark.parametrize(
@@ -148,3 +152,38 @@ def test_failed_atomic_replace_removes_staged_file(
     )
     assert target.read_text(encoding="utf-8") == "original"
     assert list(tmp_path.glob(".patchharbor-*.tmp")) == []
+
+
+def test_prepare_payload_files_discards_invalid_name_with_warning() -> None:
+    prepared, warnings = prepare_payload_files(
+        (("../outside.txt", "ignored"), ("good.txt", "retained"))
+    )
+
+    assert prepared == (("good.txt", "retained"),)
+    assert warnings == (
+        "discarded FILE '../outside.txt': invalid file name",
+    )
+
+
+def test_prepare_payload_files_reports_large_payload(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(payload_files, "PAYLOAD_WARNING_BYTES", 3)
+    monkeypatch.setattr(payload_files, "MAX_PAYLOAD_BYTES", 10)
+
+    prepared, warnings = prepare_payload_files((("large.txt", "1234"),))
+
+    assert prepared == (("large.txt", "1234"),)
+    assert warnings == ("FILE 'large.txt' is large (4 bytes)",)
+
+
+def test_prepare_payload_files_rejects_hard_budget(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(payload_files, "MAX_PAYLOAD_BYTES", 3)
+
+    with pytest.raises(PatchHarborError) as raised:
+        prepare_payload_files((("too-large.txt", "1234"),))
+
+    assert raised.value.exit_code is ExitCode.SOURCE_ERROR
+    assert str(raised.value) == "FILE 'too-large.txt' exceeds the 3 byte limit"

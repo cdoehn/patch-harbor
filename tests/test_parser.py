@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import pytest
 
-from patchharbor.errors import ExitCode, PatchHarborError
-import patchharbor.files as payload_files
 from patchharbor.parser import (
     Message,
     PayloadFile,
@@ -198,22 +196,22 @@ def test_multiple_file_blocks_are_parsed_in_order() -> None:
         "a" * 129,
     ),
 )
-def test_invalid_file_name_discards_block_with_warning(name: str) -> None:
+def test_file_name_is_described_without_filesystem_validation(name: str) -> None:
     parsed = parse_script(
         "\n".join(
             (
                 "# PATCHHARBOR",
                 f"# PATCHHARBOR FILE {name} START",
-                "# ignored",
+                "# retained for payload validation",
                 f"# PATCHHARBOR FILE {name} END",
             )
         )
     )
 
-    assert parsed.payload_files == ()
-    assert parsed.warnings == (
-        f"discarded FILE {name!r}: invalid file name",
+    assert parsed.payload_files == (
+        PayloadFile(name=name, text="retained for payload validation"),
     )
+    assert parsed.warnings == ()
 
 
 def test_damaged_file_blocks_are_discarded_without_losing_later_file() -> None:
@@ -244,47 +242,3 @@ def test_damaged_file_blocks_are_discarded_without_losing_later_file() -> None:
         "discarded FILE 'uncommented.txt': content is not fully commented",
         "discarded FILE 'unfinished.txt': missing END marker",
     )
-
-
-def test_large_file_payload_adds_warning(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setattr(payload_files, "PAYLOAD_WARNING_BYTES", 3)
-    monkeypatch.setattr(payload_files, "MAX_PAYLOAD_BYTES", 10)
-
-    parsed = parse_script(
-        "\n".join(
-            (
-                "# PATCHHARBOR",
-                "# PATCHHARBOR FILE large.txt START",
-                "# 1234",
-                "# PATCHHARBOR FILE large.txt END",
-            )
-        )
-    )
-
-    assert parsed.payload_files == (
-        PayloadFile(name="large.txt", text="1234"),
-    )
-    assert parsed.warnings == ("FILE 'large.txt' is large (4 bytes)",)
-
-
-def test_file_payload_over_hard_budget_is_fatal(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setattr(payload_files, "MAX_PAYLOAD_BYTES", 3)
-
-    with pytest.raises(PatchHarborError) as raised:
-        parse_script(
-            "\n".join(
-                (
-                    "# PATCHHARBOR",
-                    "# PATCHHARBOR FILE too-large.txt START",
-                    "# 1234",
-                    "# PATCHHARBOR FILE too-large.txt END",
-                )
-            )
-        )
-
-    assert raised.value.exit_code is ExitCode.SOURCE_ERROR
-    assert str(raised.value) == "FILE 'too-large.txt' exceeds the 3 byte limit"

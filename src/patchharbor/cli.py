@@ -10,11 +10,8 @@ from typing import TextIO
 
 from patchharbor.errors import PatchHarborError
 from patchharbor.execution import DEFAULT_TIMEOUT_SECONDS
-from patchharbor.input import (
-    run_input_artifact,
-    run_script_path,
-    stdin_input_artifact,
-)
+from patchharbor.application import run_input_artifact, run_script_path
+from patchharbor.sources import stdin_input_artifact
 
 
 def _positive_seconds(value: str) -> float:

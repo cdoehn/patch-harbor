@@ -758,6 +758,30 @@ def test_damaged_file_block_does_not_prevent_execution(tmp_path: Path) -> None:
     assert not (tmp_path / "broken.txt").exists()
 
 
+def test_unsafe_file_name_is_ignored_before_execution(tmp_path: Path) -> None:
+    outside = tmp_path.parent / f"outside-{tmp_path.name}.txt"
+    outside.unlink(missing_ok=True)
+    script_path = _script_path(tmp_path, "unsafe-file-name")
+    if os.name == "nt":
+        command = 'Write-Output "still-runs"\n'
+    else:
+        command = 'printf "%s\\n" "still-runs"\n'
+    unsafe_name = f"../{outside.name}"
+    script_path.write_text(
+        _file_payload_script(
+            files=[(unsafe_name, ["must not be written"])],
+            command=command,
+        ),
+        encoding="utf-8",
+    )
+
+    completed = _run_patchharbor(script_path, tmp_path)
+
+    assert completed.returncode == 0
+    assert completed.stdout == "still-runs\n"
+    assert not outside.exists()
+
+
 def test_non_regular_file_target_prevents_execution(tmp_path: Path) -> None:
     target = tmp_path / "blocked.txt"
     target.mkdir()

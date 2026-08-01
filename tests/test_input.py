@@ -3,11 +3,8 @@ from __future__ import annotations
 from io import StringIO
 from pathlib import Path
 
-from patchharbor.input import (
-    file_input_artifact,
-    resolve_patch_bundle,
-    stdin_input_artifact,
-)
+from patchharbor.bundles import resolve_patch_bundle
+from patchharbor.sources import file_input_artifact, stdin_input_artifact
 
 
 def test_file_and_stdin_resolve_through_the_same_artifact_bundle_shape(
