@@ -3,6 +3,7 @@
 **Empfohlener Dokumentname:** PatchHarbor – Spezifikation und Commit-Plan  
 **Empfohlener Dateiname:** `patchharbor-spezifikation-und-commit-plan.md`  
 **Status:** verbindliche Planungsbasis für Version 1 und architektonische Vorbereitung von Meilenstein 5
+
 **Projektname, Kommando und Marker:** `PatchHarbor`, `patchharbor`, `# PATCHHARBOR`
 
 Der Name **Commit-Plan** allein wäre zu eng, weil dieses Dokument zuerst die Produktspezifikation und danach den Umsetzungsplan enthält. Der Titel **Spezifikation und Commit-Plan** beschreibt den Inhalt eindeutig.
@@ -70,19 +71,21 @@ Beispiele:
 
 PatchHarbor ist ausschließlich ein kontrollierter Runner für von einer KI erzeugte Skripte.
 
-PatchHarbor übernimmt ein Eingabeartefakt aus genau einer Quelle, löst daraus ein geordnetes Bundle mit einem oder mehreren PatchHarbor-Skripten auf, liest optionale Informationen und übertragene Dateien, bereitet diese vor und führt die Skripte kontrolliert aus.
+PatchHarbor übernimmt ein Eingabeartefakt aus genau einer Quelle und löst daraus ein `PatchBundle` auf. Ein PatchBundle enthält mindestens ein PatchHarbor-Skript und kann zusätzlich null oder mehrere übertragene Nutzdateien enthalten.
 
-Ein einzelnes Skript ist fachlich ein Bundle mit genau einem Eintrag. Ein ZIP-Archiv kann ein Bundle mit mehreren geordneten Skripten transportieren.
+Ein einzelnes Skript ist fachlich ein PatchBundle mit genau einem Skript und ohne Bundle-Nutzdateien. Ein ZIP-Archiv kann mehrere geordnete PatchHarbor-Skripte sowie Text- und Binärdateien gemeinsam und bytegenau transportieren.
 
 PatchHarbor ist kein Testwerkzeug, kein Git-Werkzeug und kein Build-System.
 
 ### 3.1 PatchHarbor macht
 
 - Eingabeartefakte aus unterstützten Quellen übernehmen,
-- direkte Skripte und ZIP-Container zu geordneten Skript-Bundles auflösen,
+- direkte Skripte und ZIP-Container zu transportneutralen `PatchBundle`s auflösen,
+- reguläre ZIP-Einträge anhand des exakten PatchHarbor-Markers als Skript oder Nutzdatei klassifizieren,
+- Text- und Binärdateien aus einem ZIP-Bundle bytegenau und sicher vor der ersten Skriptausführung bereitstellen,
 - den exakten PatchHarbor-Marker prüfen,
 - optionale Metadaten und Messages best effort erkennen,
-- optionale FILE-Blöcke sicher vorbereiten,
+- optionale inline FILE-Blöcke sicher vorbereiten,
 - Skripte mit Timeout ausführen,
 - Prozess und Kindprozesse bei Timeout oder Abbruch beenden,
 - Status, Messages, Dateien und begrenzte Skriptausgabe anzeigen,
@@ -111,15 +114,17 @@ Ein Runner-Auftrag verarbeitet genau ein Eingabeartefakt und endet anschließend
 
 Der Ablauf lautet:
 
-**Start → Quelle übernehmen → Eingabeartefakt bereitstellen → Bundle auflösen → Skriptformat prüfen → optionale Nutzdaten vorbereiten → ausführen → Ergebnis anzeigen → Auftrag beenden**
+**Start → Quelle übernehmen → Eingabeartefakt bereitstellen → PatchBundle vollständig auflösen und validieren → Bundle-Nutzdateien bereitstellen → Skripte nacheinander vorbereiten und ausführen → Ergebnis anzeigen → Auftrag beenden**
 
 Ein späterer äußerer Host, beispielsweise ein WebSocket-Host, darf mehrere Aufträge nacheinander an denselben Runner übergeben. Der Runner selbst bleibt pro Auftrag zustandslos und wird nicht zu einem dauerhaft beobachtenden Daemon.
 
-Jedes Skript wird immer im aktuellen Arbeitsverzeichnis ausgeführt, in dem der Auftrag gestartet wurde. Der Speicherort der Eingabedatei, eines ZIP-Archivs oder einer temporären Skriptdatei ändert das Arbeitsverzeichnis nicht.
+Das vollständige PatchBundle wird validiert und seine Nutzdateien werden vorbereitet, bevor das erste Skript startet. Ist das Bundle beschädigt, enthält es einen unsicheren oder mehrdeutigen Eintrag oder kann eine Nutzdatei nicht geschrieben werden, startet kein Skript.
+
+Jedes Skript wird immer im aktuellen Arbeitsverzeichnis ausgeführt, in dem der Auftrag gestartet wurde. Alle erfolgreich bereitgestellten Bundle-Nutzdateien sind dort bereits vor dem ersten Skript verfügbar. Der Speicherort der Eingabedatei, eines ZIP-Archivs oder einer temporären Skriptdatei ändert das Arbeitsverzeichnis nicht.
 
 Relative Pfade im Skript beziehen sich deshalb immer auf dieses aktuelle Arbeitsverzeichnis.
 
-Inhalte aus Pipe, ZIP oder später WebSocket werden bei Bedarf sicher im System-Temp-Verzeichnis zwischengespeichert und anschließend gelöscht. Ein Skript darf sich nicht darauf verlassen, dass sein eigener Dateipfad im Projektverzeichnis liegt.
+Inhalte aus Pipe, ZIP oder später WebSocket werden bei Bedarf sicher im System-Temp-Verzeichnis zwischengespeichert und anschließend gelöscht. Skripteinträge eines ZIP-Bundles werden nicht als Nutzdateien in das Arbeitsverzeichnis kopiert. Ein Skript darf sich nicht darauf verlassen, dass sein eigener Dateipfad im Projektverzeichnis liegt.
 
 ---
 
@@ -139,7 +144,7 @@ Unterstützte Optionen:
 - `--no-color` für Ausgabe ohne Farben,
 - die üblichen argparse-Hilfen wie `--help`.
 
-Ist kein Pfad angegeben und die Standardeingabe enthält eine Pipe, wird das Skript vollständig aus der Standardeingabe gelesen.
+Ist kein Pfad angegeben und die Standardeingabe enthält eine Pipe, wird das Eingabeartefakt vollständig als Byte-Strom aus der Standardeingabe übernommen. Es kann ein direktes UTF-8-Skript oder ein ZIP-basiertes PatchBundle sein.
 
 Ist kein Pfad angegeben und die Standardeingabe ist ein normales Terminal, endet PatchHarbor mit einem klaren Fehler wegen fehlender Eingabe.
 
@@ -149,7 +154,9 @@ Clipboard und WebSocket werden als zukünftige Eingabequellen in der Architektur
 
 Jede Quelle liefert denselben kleinen Typ `InputArtifact`: einen sicher lesbaren lokalen Pfad, einen Anzeigenamen und die Information, ob PatchHarbor das Artefakt nach dem Auftrag entfernen muss. Die Quelle interpretiert den Inhalt nicht und entscheidet nicht, ob er ein direktes Skript oder ein ZIP-Bundle enthält.
 
-Eine spätere WebSocket-Quelle bildet eine vollständige Textnachricht auf ein direktes Skript-Artefakt und eine vollständige Binärnachricht auf ein ZIP-Artefakt ab. Ab dieser Übergabe verwendet sie exakt dieselbe Bundle-, Parser-, FILE- und Execution-Pipeline wie Datei und Pipe.
+Eine spätere WebSocket-Quelle bildet eine vollständige Textnachricht auf ein direktes Skript-Artefakt ab. Eine vollständige Binärnachricht enthält die unveränderten Bytes eines ZIP-basierten PatchBundles mit mehreren Skripten und optionalen Binärdateien. Die Binärnachricht wird nicht als Text interpretiert, sondern bytegenau als temporäres Eingabeartefakt bereitgestellt.
+
+Ab dieser Übergabe verwendet WebSocket exakt dieselbe PatchBundle-, Nutzdatei-, Parser-, FILE- und Execution-Pipeline wie Datei und Pipe. Es entsteht kein zweites WebSocket-spezifisches Bundleformat.
 
 Die Vorbereitung besteht nur aus dieser kleinen internen Quellengrenze. Es gibt in Version 1 kein Plugin-System, keine dynamische Modulregistrierung und keine WebSocket-Abhängigkeit.
 
@@ -219,19 +226,30 @@ Es dürfen mehrere benannte FILE-Blöcke enthalten sein.
 
 Anfang und Ende eines Blocks enthalten denselben Dateinamen. Der Inhalt besteht in Version 1 ausschließlich aus kommentiertem UTF-8-Text. PatchHarbor entfernt das definierte Kommentarpräfix und schreibt den verbleibenden Text als Datei.
 
-Binärdaten oder bytegenau zu übertragende Inhalte werden vorher außerhalb von PatchHarbor als Base64-Text codiert. PatchHarbor erkennt oder decodiert Base64 nicht automatisch.
+Binärdaten oder bytegenau zu übertragende Inhalte können in einem inline FILE-Block nur als vorher erzeugter Base64-Text transportiert werden. PatchHarbor erkennt oder decodiert Base64 nicht automatisch. Für echte Binärdateien ist das ZIP-basierte PatchBundle vorgesehen; dort bleiben die Bytes unverändert.
 
 Ein beschädigter FILE-Block wird vollständig verworfen und als Warning angezeigt. Das Skript darf weiterlaufen, sofern kein formal gültiger FILE-Block beim tatsächlichen Schreiben scheitert.
 
 Scheitert das Schreiben eines formal gültigen FILE-Blocks, wird das Skript nicht gestartet.
 
+### 6.5 Bundle-Nutzdateien
+
+Ein ZIP-basiertes PatchBundle kann neben den PatchHarbor-Skripten beliebige reguläre Text- und Binärdateien enthalten. Diese Dateien sind keine kommentierten FILE-Blöcke und werden nicht als UTF-8 interpretiert. Ihre Bytes werden unverändert übernommen.
+
+Die beiden Übertragungswege bleiben bewusst getrennt:
+
+- inline FILE-Blöcke sind für kleine kommentierte UTF-8-Texte mit einfachen Dateinamen bestimmt,
+- Bundle-Nutzdateien sind für mehrere Dateien, Verzeichnisstrukturen, große Inhalte und echte Binärdaten bestimmt.
+
+Bundle-Nutzdateien werden einmal vor dem ersten Skript bereitgestellt. Inline FILE-Blöcke werden anschließend wie bisher unmittelbar vor dem jeweiligen Skript geschrieben. Trifft ein späterer inline FILE-Block auf dieselbe Zieldatei, gilt die bereits festgelegte Überschreibungsregel.
+
 ---
 
 ## 7. Sichere Verarbeitung übertragener Dateien
 
-### 7.1 Erlaubte Dateinamen
+### 7.1 Erlaubte Dateinamen für inline FILE-Blöcke
 
-FILE-Blöcke dürfen nur einfache Dateinamen enthalten, keine Pfade.
+Inline FILE-Blöcke dürfen nur einfache Dateinamen enthalten, keine Pfade.
 
 Erlaubt sind ausschließlich:
 
@@ -251,34 +269,57 @@ Zusätzliche Regeln:
 - keine reservierten Windows-Gerätenamen wie CON, PRN, AUX, NUL, COM1 bis COM9 und LPT1 bis LPT9, auch nicht mit Dateiendung,
 - vorhandene symbolische Links und andere nicht reguläre Ziele werden nicht überschrieben.
 
-Ein unzulässiger Name macht den gesamten FILE-Block ungültig. Der Block wird verworfen und als Warning angezeigt.
+Ein unzulässiger Name macht den gesamten inline FILE-Block ungültig. Der Block wird verworfen und als Warning angezeigt.
 
-### 7.2 Schreiben und Überschreiben
+### 7.2 Sichere relative Pfade für Bundle-Nutzdateien
 
-- FILE-Blöcke werden vor der jeweiligen Skriptausführung geschrieben.
+Bundle-Nutzdateien dürfen sichere relative Unterordner innerhalb des aktuellen Arbeitsverzeichnisses verwenden. Der Zielpfad entspricht dem normalisierten ZIP-Eintragsnamen.
+
+Für jeden Pfad gelten folgende Regeln:
+
+- ausschließlich relative Pfade mit dem ZIP-Trennzeichen Schrägstrich,
+- keine absoluten Pfade, Laufwerksangaben, UNC-Pfade, Backslashes oder Wechsel in ein übergeordnetes Verzeichnis,
+- kein leeres Segment, Punktsegment oder Zwei-Punkte-Segment,
+- jedes Segment besteht nur aus Buchstaben, Ziffern, Punkt, Unterstrich und Bindestrich,
+- jedes Segment ist höchstens 128 Zeichen und der gesamte relative Pfad höchstens 512 Zeichen lang,
+- kein Segment ist ein reservierter Windows-Gerätename und kein Segment endet mit Punkt oder Leerzeichen,
+- symbolische Links, Hardlinks, Geräte, Pipes und andere besondere Archivtypen sind unzulässig,
+- vorhandene symbolische Links oder andere nicht reguläre Ziele und Elternpfade werden nicht überschrieben,
+- doppelte normalisierte Zielpfade und Groß-/Kleinschreibungs-Kollisionen werden plattformübergreifend als mehrdeutig abgelehnt.
+
+Verzeichniseinträge dürfen ausschließlich die sichere Zielstruktur beschreiben. Skripteinträge werden nicht in das Arbeitsverzeichnis geschrieben.
+
+Ein unsicherer, beschädigter oder mehrdeutiger Eintrag macht das gesamte ZIP-Bundle ungültig. Anders als bei einem optional beschädigten inline FILE-Block ist dies ein fataler Bundle-Fehler; kein Skript wird gestartet.
+
+### 7.3 Validieren, Staging und Überschreiben
+
+- Das gesamte PatchBundle wird einschließlich aller Eintragstypen, Zielpfade, Duplikate und Ressourcenbudgets validiert, bevor eine Zieldatei geschrieben wird.
+- Bundle-Nutzdateien werden bytegenau in einem sicheren temporären Staging-Bereich vorbereitet.
+- Erst nach erfolgreichem Staging werden alle Bundle-Nutzdateien vor dem ersten Skript in das aktuelle Arbeitsverzeichnis übernommen.
 - Vorhandene reguläre Dateien werden ohne Nachfrage überschrieben.
-- Jede Datei wird zunächst vollständig in eine sichere temporäre Datei im selben Verzeichnis geschrieben.
-- Erst danach wird die Zieldatei atomar ersetzt.
-- PatchHarbor legt keine Backups an.
-- Version 1 bietet keine vollständige Transaktion über mehrere FILE-Blöcke. Jeder einzelne Dateiaustausch ist atomar.
-- Scheitert ein tatsächlicher Schreibvorgang, startet das Skript nicht.
+- Jede Zieldatei wird zunächst vollständig in eine sichere temporäre Datei im selben Zielverzeichnis geschrieben und danach atomar ersetzt.
+- Benötigte sichere Unterordner werden angelegt.
+- PatchHarbor legt keine dauerhaften Backups an.
+- Version 1 bietet keine vollständige Transaktion über mehrere Bundle-Nutzdateien oder inline FILE-Blöcke. Jeder einzelne Dateiaustausch ist atomar.
+- Scheitert Staging oder ein tatsächlicher Schreibvorgang, startet kein Skript des Bundles.
+- Inline FILE-Blöcke werden nach den Bundle-Nutzdateien und unmittelbar vor dem jeweiligen Skript geschrieben.
 
-### 7.3 Größen- und Ressourcenbudget
+### 7.4 Größen- und Ressourcenbudget
 
 Unbegrenzte Eingaben werden nicht unterstützt. Die Anfangswerte sind zentrale Konstanten und können nach echten Nutzungserfahrungen angepasst werden.
 
 Empfohlene Anfangswerte:
 
-- Warning ab 10 MiB für einen einzelnen Skript- oder FILE-Inhalt,
+- Warning ab 10 MiB für einen einzelnen Skript-, inline FILE- oder Bundle-Nutzdateiinhalt,
 - höchstens 256 MiB pro Eingabeartefakt oder ZIP-Eintrag,
-- höchstens 512 MiB unkomprimierte Gesamtdaten eines ZIP-Archivs,
-- höchstens 1.000 ZIP-Einträge.
+- höchstens 512 MiB unkomprimierte Gesamtdaten eines ZIP-Archivs einschließlich Skripten und Nutzdateien,
+- höchstens 1.000 ZIP-Einträge einschließlich Verzeichnis-, Skript- und Nutzdateieinträgen.
 
 Eine Überschreitung eines harten Budgets führt zu einem klaren Tool-Fehler vor der Ausführung. Die Warning-Schwelle allein verhindert die Verarbeitung nicht.
 
 ---
 
-## 8. Quellen, Eingabeartefakte und Bundles
+## 8. Quellen, Eingabeartefakte und PatchBundles
 
 ### 8.1 Quellengrenze und Eingabeartefakt
 
@@ -290,13 +331,13 @@ Ein `InputArtifact` enthält nur:
 - einen Anzeigenamen für Status und Fehler,
 - eine Cleanup-Information für temporäre Artefakte.
 
-Eine vorhandene Datei kann direkt referenziert werden. Inhalte aus Pipe und später WebSocket werden sicher in eine temporäre Datei geschrieben. Dadurch bleiben auch große oder binäre Eingaben möglich, ohne dass jede Quelle den gesamten Inhalt dauerhaft als Python-String halten muss.
+Eine vorhandene Datei kann direkt referenziert werden. Inhalte aus Pipe und später WebSocket werden als Bytes sicher in eine temporäre Datei geschrieben. Dadurch bleiben auch große oder binäre Eingaben möglich, ohne dass jede Quelle den gesamten Inhalt dauerhaft als Python-String halten muss.
 
-Die Quelle interpretiert den Inhalt nicht. Sie kennt weder Marker noch ZIP-Regeln, Parser, FILE-Blöcke oder Execution.
+Die Quelle interpretiert den Inhalt nicht. Sie kennt weder Marker noch ZIP-Regeln, Bundle-Nutzdateien, Parser, FILE-Blöcke oder Execution.
 
 ### 8.2 Datei und Ordner
 
-Eine einzelne reguläre Datei wird als Eingabeartefakt übernommen. Dateiname und Dateiendung sind für die Skripterkennung unerheblich.
+Eine einzelne reguläre Datei wird als Eingabeartefakt übernommen. Dateiname und Dateiendung sind für die Skript- und Bundle-Erkennung unerheblich.
 
 Ein Ordner wird genau einmal gescannt. Er wird nicht überwacht.
 
@@ -305,7 +346,7 @@ Regeln:
 - nicht rekursiv,
 - nur reguläre Dateien,
 - symbolische Links werden ignoriert,
-- ein Kandidat ist eine Datei, deren Bundle-Auflösung mindestens ein gültiges PatchHarbor-Skript liefert,
+- ein Kandidat ist eine Datei, deren PatchBundle-Auflösung mindestens ein gültiges PatchHarbor-Skript liefert,
 - Kandidaten werden nach Änderungszeit sortiert, neueste zuerst,
 - bei identischer Änderungszeit dient der Dateiname als stabiler zweiter Sortierschlüssel,
 - die Auswahl erfolgt mit einer ab eins gezählten Zahl aus ASCII-Ziffern,
@@ -314,41 +355,48 @@ Regeln:
 - leere Eingabe bricht ohne automatische Auswahl ab,
 - ungültige Eingabe wird erneut abgefragt, solange die Eingabe interaktiv möglich ist.
 
-### 8.3 Bundle-Auflösung
+### 8.3 PatchBundle-Auflösung
 
-Jedes Eingabeartefakt wird genau einmal zu einem `ScriptBundle` aufgelöst. Ein Bundle ist eine geordnete Folge von einem oder mehreren PatchHarbor-Skripten.
+Jedes Eingabeartefakt wird genau einmal zu einem `PatchBundle` aufgelöst. Ein PatchBundle enthält:
 
-Regeln:
-
-- Ein direkt lesbares UTF-8-Skript mit exaktem Pflichtmarker ergibt ein Bundle mit genau einem Eintrag.
-- Ist das Artefakt kein gültiges direktes Skript, wird es als ZIP-Container geprüft.
-- Ist es weder ein gültiges Skript noch ein ZIP mit mindestens einem gültigen Skript, endet der Auftrag mit einem klaren Tool-Fehler.
-- Die Bundle-Auflösung ist unabhängig davon, ob das Artefakt aus Datei, Pipe oder später WebSocket stammt.
-- Quelle und Dateiendung bestimmen nicht den Skripttyp.
-
-### 8.4 ZIP-Container
-
-ZIP ist eine Bundle-Codierung und kein eigener Ausführungsmodus.
+- mindestens ein PatchHarbor-Skript in einer definierten Reihenfolge,
+- null oder mehr geordnete Bundle-Nutzdateien mit relativem Zielpfad und bytegenauem Inhalt.
 
 Regeln:
 
-- Verzeichniseinträge, Links und andere nicht reguläre Einträge werden ignoriert.
-- Verschachtelte ZIP-Archive werden in Version 1 nicht geöffnet.
-- Alle regulären Dateieinträge werden in der im Archiv gespeicherten Reihenfolge geprüft.
-- Nur Einträge mit dem exakten Pflichtmarker werden in das Bundle aufgenommen.
-- Die Aussage alle Dateien probieren bedeutet alle Dateien prüfen, nicht markerlose Dateien blind ausführen.
-- Mehrere gültige Skripte werden sequenziell in Archiv-Reihenfolge ausgeführt.
+- Ein direkt lesbares UTF-8-Skript mit exaktem Pflichtmarker ergibt ein PatchBundle mit genau einem Skript und ohne Bundle-Nutzdateien.
+- Ist das Artefakt kein gültiges direktes Skript, wird es als ZIP-basiertes PatchBundle geprüft.
+- Ist es weder ein gültiges direktes Skript noch ein gültiges ZIP-Bundle mit mindestens einem PatchHarbor-Skript, endet der Auftrag mit einem klaren Tool-Fehler.
+- Die PatchBundle-Auflösung ist unabhängig davon, ob das Artefakt aus Datei, Pipe oder später WebSocket stammt.
+- Quelle, Dateiname und Dateiendung bestimmen weder Skripttyp noch Bundletyp.
+
+### 8.4 ZIP-basiertes PatchBundle
+
+ZIP ist die Bundle-Codierung für mehrere Skripte und zusätzliche Text- oder Binärdateien. Es ist kein eigener Ausführungsmodus.
+
+Regeln:
+
+- Das Archiv wird vor der ersten Dateischreibung vollständig auf Struktur, Eintragstypen, sichere Zielpfade, Duplikate, Lesbarkeit und Ressourcenbudgets geprüft.
+- Verzeichniseinträge beschreiben nur die sichere relative Zielstruktur.
+- Symbolische Links, Hardlinks und andere besondere oder mehrdeutige Einträge machen das gesamte Bundle ungültig.
+- Jeder reguläre Dateieintrag wird in Archiv-Reihenfolge klassifiziert.
+- Ist ein Eintrag vollständig als UTF-8 lesbar und enthält er den exakten Pflichtmarker, ist er ein ausführbares PatchHarbor-Skript.
+- Jeder andere sichere reguläre Eintrag ist eine Bundle-Nutzdatei und wird bytegenau übertragen. Das gilt auch für markerlose Shell- oder PowerShell-Dateien.
+- Binärdateien werden niemals als Text verändert und niemals ausgeführt.
+- Ein enthaltenes ZIP ohne PatchHarbor-Marker wird nicht rekursiv geöffnet, sondern wie jede andere Binärdatei als Nutzdatei übertragen.
+- Skripteinträge werden in der im Archiv gespeicherten Reihenfolge ausgeführt.
+- Bundle-Nutzdateien werden vollständig vorbereitet und vor dem ersten Skript bereitgestellt.
 - Jedes Skript erhält sein eigenes Timeout.
 - Beim ersten nicht erfolgreichen Skript wird abgebrochen.
 - Der Exit-Code des zuletzt ausgeführten Skripts wird zurückgegeben.
-- Enthält das Archiv kein gültiges Skript, endet PatchHarbor mit einem Tool-Fehler.
-- Das Archiv wird möglichst streamend verarbeitet und nicht vollständig in das Projektverzeichnis entpackt.
+- Enthält das Archiv kein gültiges PatchHarbor-Skript, endet PatchHarbor mit einem Tool-Fehler; reine Dateiübertragung ohne Skript ist kein Produktzweck.
+- Das Archiv wird möglichst streamend verarbeitet und nicht pauschal vollständig in das Projektverzeichnis entpackt.
 
 ### 8.5 Pipe und STDIN
 
-Ist kein Pfad angegeben und STDIN ist eine Pipe, wird der vollständige Input einmalig in ein sicheres temporäres Eingabeartefakt geschrieben.
+Ist kein Pfad angegeben und STDIN ist eine Pipe, wird der vollständige Byte-Strom einmalig in ein sicheres temporäres Eingabeartefakt geschrieben.
 
-Es gibt keinen Streaming-Befehlsdialog und kein interaktives Protokoll. Nach der Übergabe durchläuft das Artefakt dieselbe Bundle-, Parser-, FILE- und Execution-Pipeline wie eine vorhandene Datei.
+Dadurch kann STDIN sowohl ein direktes UTF-8-Skript als auch ein binäres ZIP-basiertes PatchBundle übertragen. Es gibt keinen Streaming-Befehlsdialog und kein interaktives Protokoll. Nach der Übergabe durchläuft das Artefakt dieselbe PatchBundle-, Nutzdatei-, Parser-, FILE- und Execution-Pipeline wie eine vorhandene Datei.
 
 Die Standardeingabe des ausgeführten Kindprozesses bleibt geschlossen. Version 1 unterstützt ausschließlich nicht interaktive Skripte.
 
@@ -356,12 +404,16 @@ Die Standardeingabe des ausgeführten Kindprozesses bleibt geschlossen. Version 
 
 WebSocket gehört nicht zu Version 1. Für den späteren Meilenstein 5 gilt bereits die fachliche Grenze:
 
-- eine vollständige Textnachricht entspricht einem direkten Skript-Artefakt,
-- eine vollständige Binärnachricht entspricht einem ZIP-Artefakt,
+- eine vollständige Textnachricht entspricht einem direkten UTF-8-Skript-Artefakt,
+- eine vollständige Binärnachricht entspricht bytegenau einem vollständigen ZIP-basierten PatchBundle,
+- dasselbe ZIP-Bundle kann damit unverändert aus Datei, Pipe oder WebSocket stammen,
+- ein WebSocket-Bundle kann mehrere geordnete PatchHarbor-Skripte und beliebige sichere Text- oder Binärdateien enthalten,
+- die WebSocket-Quelle interpretiert, entpackt oder verändert das Bundle nicht,
 - eine vollständige Nachricht entspricht genau einem Runner-Auftrag,
 - ein langlebiger WebSocket-Host darf mehrere Aufträge nacheinander empfangen,
-- der Runner verarbeitet weiterhin jeweils genau ein Artefakt und bleibt zustandslos,
+- der Runner verarbeitet weiterhin jeweils genau ein Eingabeartefakt und bleibt zustandslos,
 - im selben Arbeitsverzeichnis werden Aufträge nicht parallel ausgeführt,
+- WebSocket darf die PatchBundle-, Nutzdatei-, Parser-, FILE-, Execution- und Presentation-Pipeline nicht umgehen,
 - Authentifizierung, Transportverschlüsselung, Größen- und Ratenlimits werden erst in Meilenstein 5 implementiert.
 
 ---
@@ -399,16 +451,19 @@ Version 1 unterstützt bewusst nur Bash und PowerShell.
 - Strg+C beendet das Skript und seine Kindprozesse und liefert Exit-Code 130.
 - Timeout liefert Exit-Code 124.
 
-### 9.4 Ausführungsreihenfolge je Skript im Bundle
+### 9.4 Ausführungsreihenfolge eines PatchBundle-Auftrags
 
-1. Pflichtmarker prüfen.
-2. optionale META-, MESSAGE- und FILE-Blöcke vollständig analysieren.
-3. beschädigte optionale Blöcke als Warning verwerfen.
-4. gültige FILE-Blöcke sicher schreiben.
-5. Interpreter bestimmen.
-6. Kindprozess im ursprünglichen Arbeitsverzeichnis starten.
-7. Output erfassen und Status darstellen.
-8. Exit-Code zurückgeben oder beim ersten Fehler abbrechen.
+1. Eingabeartefakt vollständig zu einem PatchBundle auflösen.
+2. gesamtes Bundle einschließlich Eintragstypen, Zielpfaden, Duplikaten und Ressourcenbudgets validieren.
+3. alle Bundle-Nutzdateien bytegenau stagen und vor dem ersten Skript sicher in das Arbeitsverzeichnis schreiben.
+4. für das nächste Skript Pflichtmarker sowie optionale META-, MESSAGE- und inline FILE-Blöcke vollständig analysieren.
+5. beschädigte optionale Blöcke als Warning verwerfen.
+6. gültige inline FILE-Blöcke sicher schreiben.
+7. Interpreter bestimmen.
+8. Kindprozess im ursprünglichen Arbeitsverzeichnis starten.
+9. Output erfassen und Status darstellen.
+10. bei Erfolg mit dem nächsten Skript fortfahren oder beim ersten Fehler abbrechen.
+11. Exit-Code des zuletzt ausgeführten Skripts zurückgeben.
 
 ---
 
@@ -450,11 +505,11 @@ Vorgesehene Bereiche:
 - Execution,
 - Result.
 
-Der Source-Bereich zeigt dauerhaft die gewählte Eingabe und bei ZIP zusätzlich den aktuellen Skripteintrag.
+Der Source-Bereich zeigt dauerhaft die gewählte Eingabe und bei einem ZIP-basierten PatchBundle zusätzlich den aktuellen Skripteintrag sowie dessen Position im Bundle.
 
 Der Message-Bereich zeigt so viele Messages, wie in den festen Bereich passen. Weitere Messages werden gezählt, aber nicht vollständig dargestellt.
 
-Der Files-Bereich zeigt Dateiname, Größe und Status, aber niemals den Dateiinhalt.
+Der Files-Bereich zeigt Bundle-Nutzdateien und inline FILE-Dateien mit relativem Zielpfad beziehungsweise Dateiname, Größe und Status, aber niemals den Dateiinhalt. Wenn der feste Bereich voll ist, wird die Anzahl weiterer Dateien angezeigt.
 
 ### 10.3 Nicht interaktive Ausgabe
 
@@ -508,7 +563,7 @@ Empfohlene Tool-Exit-Codes:
 | `3` | kein gültiges PatchHarbor-Skript gefunden |
 | `4` | Quelle oder ZIP nicht lesbar beziehungsweise Ressourcenbudget überschritten |
 | `5` | Interpreter fehlt oder kann nicht gestartet werden |
-| `6` | Vorbereitung eines gültigen FILE-Blocks fehlgeschlagen |
+| `6` | Vorbereitung einer gültigen übertragenen Datei fehlgeschlagen, Bundle-Nutzdatei oder inline FILE-Block |
 | `7` | sonstiger interner Ausführungsfehler vor Prozessstart |
 | `124` | Timeout |
 | `130` | Abbruch durch Strg+C |
@@ -523,7 +578,7 @@ Da ein Skript theoretisch dieselben numerischen Werte zurückgeben kann, muss di
 
 Der fachliche Datenfluss lautet:
 
-**Quelle → InputArtifact → Bundle-Auflösung → Skriptformat → FILE-Vorbereitung → Execution → Darstellung**
+**Quelle → InputArtifact → PatchBundle-Auflösung → Bundle-Nutzdateien → Skriptformat → inline FILE-Vorbereitung → Execution → Darstellung**
 
 Die Importabhängigkeiten werden über einen kleinen Anwendungsorchestrator gesteuert. Execution darf nicht die TUI kennen, der Parser darf nicht die Prozesssteuerung kennen und eine Quelle darf weder ZIP noch Skriptformat interpretieren.
 
@@ -536,29 +591,30 @@ Empfohlene Module:
 - `cli.py` – argparse und Umwandlung der CLI-Eingabe in einen Anwendungsaufruf,
 - `application.py` – einziger Orchestrator eines Runner-Auftrags,
 - `sources.py` – Datei, Ordner und STDIN als `InputArtifact` bereitstellen; spätere Quellen werden hier als Adapter ergänzt,
-- `bundles.py` – direkte Skripte und ZIP-Container zu einem geordneten `ScriptBundle` auflösen,
-- `script_format.py` – Marker, META, MESSAGE und FILE-Blöcke analysieren,
-- `payload_files.py` – Dateinamen prüfen und Dateien atomar schreiben,
+- `bundles.py` – direkte Skripte und ZIP-Container zu einem `PatchBundle` mit geordneten Skripten und Bundle-Nutzdateien auflösen,
+- `script_format.py` – Marker, META, MESSAGE und inline FILE-Blöcke analysieren,
+- `payload_files.py` – einfache inline Dateinamen und sichere relative Bundle-Pfade prüfen, Inhalte stagen und Dateien atomar schreiben,
 - `execution.py` – Interpreter, Prozessstart, Timeout und Ergebnis,
 - `presentation.py` – Plain-Ausgabe, TUI, Farben und Rolling-Buffer-Darstellung,
-- `models.py` – kleine unveränderliche Datenträger wie `InputArtifact` und `ScriptBundle`,
+- `models.py` – kleine unveränderliche Datenträger wie `InputArtifact`, `PatchBundle`, `BundleScript` und `BundlePayload`,
 - `errors.py` – eindeutige Tool-Fehler und Exit-Codes,
 - `platform/` – nur die tatsächlich notwendige Linux- und Windows-Prozesssteuerung.
 
 ### 12.3 Abhängigkeitsregel
 
 - `cli` kennt `application`.
-- `application` orchestriert Quellen, Bundle-Auflösung, Parser, FILE-Verarbeitung, Execution und Darstellung.
-- `sources` kennt nur Eingabezugriffe und neutrale Modelle; es kennt weder ZIP-Regeln noch Parser oder Execution.
-- `bundles` kennt Eingabeartefakte und darf zur Markerprüfung `script_format` verwenden; `script_format` kennt `bundles` nicht.
-- `script_format` liefert reine Beschreibungen optionaler FILE-Blöcke und importiert keine Schreiblogik aus `payload_files`.
-- `payload_files` validiert und schreibt; es steuert keine Execution.
+- `application` orchestriert Quellen, PatchBundle-Auflösung, Bundle-Nutzdateien, Parser, inline FILE-Verarbeitung, Execution und Darstellung.
+- `sources` kennt nur Eingabezugriffe und neutrale Modelle; es kennt weder ZIP-Regeln noch Parser, Nutzdateiverarbeitung oder Execution.
+- `bundles` kennt Eingabeartefakte und darf zur Markerprüfung eine kleine reine Funktion aus `script_format` verwenden; `script_format` kennt `bundles` nicht.
+- `bundles` klassifiziert und beschreibt Inhalte, schreibt aber keine Nutzdateien in das Arbeitsverzeichnis.
+- `script_format` liefert reine Beschreibungen optionaler inline FILE-Blöcke und importiert keine Schreiblogik aus `payload_files`.
+- `payload_files` validiert, staged und schreibt Bundle-Nutzdateien und inline FILE-Inhalte; es steuert keine Execution.
 - `models` und `errors` kennen keine höherliegenden Module.
-- `execution` kennt weder Quellen, Bundles, TUI noch argparse.
+- `execution` kennt weder Quellen, PatchBundles, TUI noch argparse.
 - `presentation` erhält Zustandsmodelle und steuert keine Ausführung.
 - Es gibt keine Pakete namens `utils`, `helpers` oder `common` als Sammelstellen.
-- Zukünftige Quellen liefern denselben `InputArtifact`, ohne die Bundle-, Parser-, FILE- oder Execution-Pipeline zu verändern.
-- Es gibt keine Plugin-Basisklasse, solange mindestens zwei reale externe Erweiterungen keinen gemeinsamen Vertrag erzwingen.
+- Zukünftige Quellen liefern denselben `InputArtifact`, ohne die PatchBundle-, Nutzdatei-, Parser-, FILE- oder Execution-Pipeline zu verändern.
+- Es gibt keine Plugin-Basisklasse, Registry oder asynchrone Kernarchitektur in Version 1.
 
 ---
 
@@ -590,17 +646,24 @@ Für jeden Step gilt:
 - exakter Pflichtmarker,
 - MESSAGE-Zeile ohne eigenständigen Marker ist kein gültiges Skript,
 - fehlender Marker,
-- STDIN und Pipe,
-- Datei und Pipe liefern dieselbe `InputArtifact`- und Bundle-Semantik,
-- ein direktes Skript ergibt ein Bundle mit genau einem Eintrag,
+- STDIN und Pipe mit direktem Skript,
+- STDIN und Pipe mit binärem ZIP-basiertem PatchBundle,
 - Ordnerscan und Auswahl,
-- ZIP mit mehreren Skripten in Archiv-Reihenfolge,
+- ZIP-Bundle mit mehreren Skripten in Archiv-Reihenfolge,
+- ZIP-Bundle mit einem Skript und einer nicht als UTF-8 lesbaren Binärdatei einschließlich Nullbytes,
+- bytegenaue Erhaltung von Bundle-Nutzdateien,
+- alle Bundle-Nutzdateien sind bereits vor dem ersten Skript verfügbar,
+- markerlose Text-, Bash- oder PowerShell-Dateien werden übertragen, aber nicht ausgeführt,
+- verschachteltes ZIP ohne PatchHarbor-Marker wird als Binärdatei übertragen und nicht rekursiv geöffnet,
+- reines Datei-ZIP ohne gültiges PatchHarbor-Skript wird abgelehnt,
+- unsicherer, beschädigter, besonderer, doppelter oder auf Windows mehrdeutiger ZIP-Eintrag verwirft das gesamte Bundle und startet kein Skript,
+- tatsächlicher Schreibfehler einer Bundle-Nutzdatei verhindert jede Skriptausführung,
 - Abbruch beim ersten fehlerhaften ZIP-Skript,
 - Exit-Code des letzten ausgeführten Skripts,
 - gültige und beschädigte Message-Blöcke,
-- gültige und beschädigte FILE-Blöcke,
-- tatsächlicher FILE-Schreibfehler verhindert Execution,
-- sichere Dateinamen, Windows-Reservierungen und symbolische Links,
+- gültige und beschädigte inline FILE-Blöcke,
+- tatsächlicher inline FILE-Schreibfehler verhindert die jeweilige Execution,
+- sichere inline Dateinamen, sichere relative Bundle-Pfade, Windows-Reservierungen und symbolische Links,
 - atomisches Überschreiben,
 - Timeout pro Skript,
 - Strg+C und vollständiger Prozessbaum,
@@ -612,8 +675,8 @@ Für jeden Step gilt:
 - Plain-Modus ohne Cursorsequenzen,
 - Logdatei im System-Temp-Verzeichnis,
 - korrektes ursprüngliches Arbeitsverzeichnis,
-- Ressourcenlimits und ZIP-Bomben-Schutz,
-- Quellen-, Bundle- und Execution-Grenzen ohne zirkuläre Abhängigkeiten.
+- Ressourcenlimits und ZIP-Bomben-Schutz über Skripte und Bundle-Nutzdateien,
+- Quellen-, PatchBundle-, Nutzdatei- und Execution-Grenzen ohne zirkuläre Abhängigkeiten.
 
 ### 13.4 Plattformen und CI
 
@@ -646,8 +709,8 @@ Folgende Funktionen gehören nicht zu Version 1:
 - interaktive Kindskripte,
 - automatische Base64-Decodierung,
 - rekursive Ordnersuche,
-- verschachtelte ZIP-Archive,
-- vollständige Transaktion über mehrere FILE-Blöcke,
+- rekursive Auflösung verschachtelter ZIP-Archive,
+- vollständige Transaktion über mehrere Bundle-Nutzdateien und inline FILE-Blöcke,
 - dauerhafte Logverwaltung oder Logrotation.
 
 Diese Liste verhindert, dass die erste Version wieder zu groß wird.
@@ -656,7 +719,7 @@ Diese Liste verhindert, dass die erste Version wieder zu groß wird.
 
 Nach der Freigabe von Version 1 folgt **Meilenstein 5 – WebSocket-Transport**. Er ergänzt nur einen äußeren Transportadapter und verändert den Runner-Kern nicht.
 
-Bereits festgelegt sind Textnachricht gleich direktes Skript, Binärnachricht gleich ZIP-Bundle und eine Nachricht gleich ein Runner-Auftrag. Vor der Implementierung werden im Review von Meilenstein 4 das Antwortformat, Authentifizierung, TLS, lokale Standardbindung, Warteschlange, Ratenlimits und Abbruchsemantik verbindlich entschieden.
+Bereits festgelegt sind Textnachricht gleich direktes Skript, Binärnachricht gleich unverändertes ZIP-basiertes PatchBundle und eine Nachricht gleich ein Runner-Auftrag. Das WebSocket-Bundle kann mehrere geordnete Skripte und echte Binärdateien enthalten und wird durch denselben Resolver wie Datei und Pipe verarbeitet. Vor der Implementierung werden im Review von Meilenstein 4 das Antwortformat, Authentifizierung, TLS, lokale Standardbindung, Warteschlange, Ratenlimits und Abbruchsemantik verbindlich entschieden.
 
 Der detaillierte W-R-C-Commit-Plan für Meilenstein 5 wird erst nach dem Release-Review erstellt. Dadurch wird die Zukunftsgrenze dokumentiert, ohne Version 1 mit spekulativem WebSocket-Code oder einem vorzeitig festgelegten Protokoll zu belasten.
 
@@ -670,9 +733,9 @@ Der detaillierte W-R-C-Commit-Plan für Meilenstein 5 wird erst nach dem Release
 |---:|---|---|
 | 1 | Minimal lauffähig | Eine direkte Datei kann ohne TUI kontrolliert ausgeführt werden. |
 | 2 | Robuste Inputs und Nutzdaten | Datei, Ordner, ZIP, Pipe, Messages und FILE-Blöcke funktionieren. |
-| 3 | Kontrollierte Execution und Ausgabe | Prozessbaum, Output, Logging und feste TUI sind stabil. |
+| 3 | PatchBundle, Execution und Ausgabe | Bundle-Nutzdateien, Prozessbaum, Output, Logging und feste TUI sind stabil. |
 | 4 | Plattform und Release-Qualität | Linux und Windows sind automatisiert getestet und pipx-fähig veröffentlicht. |
-| 5 | WebSocket-Transport, nach Version 1 | Textskripte und ZIP-Bundles können später über einen sicheren äußeren Host als normale Runner-Aufträge übernommen werden. |
+| 5 | WebSocket-Transport, nach Version 1 | Direkte Textskripte und unveränderte ZIP-PatchBundles mit mehreren Skripten und Binärdateien können über einen sicheren äußeren Host übernommen werden. |
 
 Die Meilensteine 1 bis 4 bilden den verbindlichen Version-1-Commit-Plan. Meilenstein 5 ist ein nachgelagertes Ziel und wird erst nach dem Review von Meilenstein 4 in konkrete Steps und W-R-C-Commits zerlegt.
 
@@ -1013,24 +1076,27 @@ Alle für Version 1 vorgesehenen Eingabewege und optionalen Skriptnutzdaten funk
 
 ## Review nach Meilenstein 2
 
-- Datei, Ordner, Pipe, ZIP, Messages und FILE-Blöcke funktionieren fachlich; ein Neustart ist nicht erforderlich.
+- Datei, Ordner, Pipe, ZIP-Skriptfolgen, Messages und inline FILE-Blöcke funktionieren fachlich; ein Neustart ist nicht erforderlich.
 - Die bisherige Eingabelogik bündelt jedoch Quellenzugriff, ZIP-Erkennung, Parsing, FILE-Vorbereitung und Ausführungsreihenfolge zu stark in einem Pfad.
-- Vor der weiteren Execution-Arbeit wird deshalb ein neuer Step 3.a eingeschoben: Quelle, neutrales `InputArtifact`, Bundle-Auflösung und Anwendungsorchestrierung werden klar getrennt.
-- Diese Korrektur bereitet WebSocket und weitere Quellen vor, ohne WebSocket-Code, Plugin-System oder asynchrone Kernarchitektur in Version 1 einzuführen.
-- Die vollständige Vereinheitlichung der Ressourcenbudgets für alle Quellen bleibt gezielt in Step 4.b; FILE- und ZIP-Grenzen sind bereits zentral definiert und getestet.
+- Vor der weiteren Execution-Arbeit trennt Step 3.a deshalb Quelle, neutrales `InputArtifact`, PatchBundle-Auflösung und Anwendungsorchestrierung.
+- Die nachträgliche Produktentscheidung, ZIP-PatchBundles zusätzlich für bytegenaue Text- und Binärdateien zu verwenden, wird anschließend als eigener vertikaler Step 3.b umgesetzt.
+- Diese Korrekturen bereiten WebSocket und weitere Quellen vor, ohne WebSocket-Code, Plugin-System oder asynchrone Kernarchitektur in Version 1 einzuführen.
+- Die vollständige Vereinheitlichung der Ressourcenbudgets für alle Quellen, Skripte und Bundle-Nutzdateien bleibt gezielt in Step 4.b.
 
 ---
 
-# Meilenstein 3 – Kontrollierte Execution und Ausgabe
+# Meilenstein 3 – PatchBundle, Execution und Ausgabe
 
 ## Ziel
 
-Prozesse werden auf Linux und Windows zuverlässig gesteuert. Output, Logging und die feste Terminaloberfläche funktionieren ohne Scroll-Effekt oder Prozesslecks.
+Der transportneutrale PatchBundle-Kern unterstützt mehrere Skripte und bytegenaue Text- oder Binärdateien. Prozesse werden anschließend auf Linux und Windows zuverlässig gesteuert; Output, Logging und die feste Terminaloberfläche funktionieren ohne Scroll-Effekt oder Prozesslecks.
 
 ## Scope
 
 - transportneutrale Quellengrenze mit `InputArtifact`,
-- direkte Skripte und ZIP-Container als geordnete `ScriptBundle`s,
+- direkte Skripte und ZIP-Container als `PatchBundle`s,
+- mehrere geordnete Skripte und bytegenaue Bundle-Nutzdateien,
+- sichere relative Nutzdateipfade, Staging und atomisches Schreiben vor dem ersten Skript,
 - kleiner Application-Orchestrator ohne Plugin-System,
 - unterstützte Interpreter,
 - PowerShell-Startregeln,
@@ -1044,9 +1110,12 @@ Prozesse werden auf Linux und Windows zuverlässig gesteuert. Output, Logging un
 
 ## Definition of Done
 
-- Datei und STDIN durchlaufen denselben Artefakt-zu-Bundle-Pfad.
-- Ein direktes Skript und ein ZIP-Bundle werden quellenunabhängig aufgelöst.
-- Quellen, Bundle-Auflösung, Parser, FILE-Verarbeitung und Execution haben eine gerichtete, zyklusfreie Abhängigkeitsrichtung.
+- Datei und STDIN durchlaufen denselben Artefakt-zu-PatchBundle-Pfad.
+- Ein direktes Skript und ein ZIP-basiertes PatchBundle werden quellenunabhängig aufgelöst.
+- Ein ZIP-PatchBundle kann mehrere Skripte und echte Binärdateien bytegenau übertragen.
+- Alle Bundle-Nutzdateien werden vor dem ersten Skript sicher bereitgestellt.
+- Ein ungültiger oder nicht vollständig vorbereitbarer Bundle-Inhalt verhindert jede Skriptausführung.
+- Quellen, PatchBundle-Auflösung, Nutzdateiverarbeitung, Parser, inline FILE-Verarbeitung und Execution haben eine gerichtete, zyklusfreie Abhängigkeitsrichtung.
 - Bash und PowerShell werden deterministisch gewählt.
 - Unbekannte Interpreter werden klar abgelehnt.
 - Timeout und Strg+C beenden auch Kindprozesse.
@@ -1058,27 +1127,27 @@ Prozesse werden auf Linux und Windows zuverlässig gesteuert. Output, Logging un
 
 ---
 
-## Step 3.a – Transportneutrale Artefakt- und Bundle-Grenze einführen
+## Step 3.a – Transportneutrale Artefakt- und PatchBundle-Grenze einführen
 
-**Ergebnis:** Datei und Pipe liefern denselben neutralen Eingang; direkte Skripte und ZIPs werden unabhängig von ihrer Quelle zu einem geordneten Bundle aufgelöst.
+**Ergebnis:** Datei und Pipe liefern denselben neutralen Eingang; direkte Skripte und ZIPs werden unabhängig von ihrer Quelle zu einem `PatchBundle` aufgelöst.
 
-### 3.a.W – Einheitlichen Artefakt-zu-Bundle-Durchlauf implementieren
+### 3.a.W – Einheitlichen Artefakt-zu-PatchBundle-Durchlauf implementieren
 
-- kleine unveränderliche Modelle `InputArtifact` und `ScriptBundle` einführen,
+- kleine unveränderliche Modelle `InputArtifact` und `PatchBundle` einführen,
 - vorhandene Datei direkt als Artefakt referenzieren,
-- STDIN sicher in ein temporäres Artefakt schreiben,
-- direktes Skript als Bundle mit einem Eintrag abbilden,
-- ZIP als geordnetes Bundle mit allen gültigen Skripten abbilden,
+- STDIN als Byte-Strom sicher in ein temporäres Artefakt schreiben,
+- direktes Skript als PatchBundle mit einem Skript abbilden,
+- ZIP als PatchBundle mit geordneten Skripten auflösen,
 - Datei-, Pipe- und ZIP-Verhalten über denselben Anwendungsweg ausführen,
 - E2E-Tests ergänzen, die gleiche Semantik und Archiv-Reihenfolge prüfen.
 
-### 3.a.R – Quellen, Bundle-Auflösung und Anwendung fachlich trennen
+### 3.a.R – Quellen, PatchBundle-Auflösung und Anwendung fachlich trennen
 
 - Quellenzugriff nach `sources.py` verschieben,
 - direkte Skript- und ZIP-Auflösung nach `bundles.py` verschieben,
 - sequenzielle Auftragssteuerung in einem kleinen `application.py` bündeln,
-- Parser reine Skript- und FILE-Beschreibungen liefern lassen,
-- Dateinamenprüfung und Schreiben ausschließlich in der FILE-Verarbeitung halten,
+- Parser reine Skript- und inline FILE-Beschreibungen liefern lassen,
+- Dateinamenprüfung und Schreiben ausschließlich in der Nutzdateiverarbeitung halten,
 - Execution von Quelle, ZIP und Parser entkoppeln,
 - Importtests oder Architekturtests für die gerichtete Abhängigkeit ergänzen.
 
@@ -1092,11 +1161,47 @@ Prozesse werden auf Linux und Windows zuverlässig gesteuert. Output, Logging un
 
 ---
 
-## Step 3.b – Interpreterauswahl und PowerShell-Vertrag härten
+## Step 3.b – Binäre Bundle-Nutzdateien sicher bereitstellen
+
+**Ergebnis:** Ein ZIP-basiertes PatchBundle kann mehrere Skripte und beliebige Text- oder Binärdateien übertragen; alle Nutzdateien stehen bytegenau vor dem ersten Skript bereit.
+
+### 3.b.W – Bundle-Nutzdateien vertikal implementieren
+
+- `PatchBundle` um geordnete `BundlePayload`-Beschreibungen erweitern,
+- reguläre ZIP-Einträge mit Pflichtmarker als Skripte und alle anderen regulären Einträge als Nutzdateien klassifizieren,
+- Binärdaten ohne UTF-8-Konvertierung bytegenau lesen und schreiben,
+- sichere relative Unterordner aus dem ZIP übernehmen,
+- alle Bundle-Nutzdateien vor dem ersten Skript bereitstellen,
+- Skripte weiterhin in Archiv-Reihenfolge ausführen,
+- E2E-Test mit mehreren Skripten und einer Binärdatei einschließlich Nullbytes ergänzen,
+- im Test nachweisen, dass die Binärdatei bereits für das erste Skript verfügbar und bytegenau ist.
+
+### 3.b.R – Bundle vollständig validieren und fatal absichern
+
+- gesamte Archivstruktur vor dem ersten Zielschreibvorgang validieren,
+- absolute Pfade, Zwei-Punkte-Segmente, Backslashes, reservierte Windows-Namen und überlange Pfade ablehnen,
+- Links, besondere Eintragstypen, doppelte normalisierte Ziele und Groß-/Kleinschreibungs-Kollisionen ablehnen,
+- Bundle-Nutzdateien zunächst in einem sicheren temporären Bereich stagen,
+- tatsächliche Schreibfehler fatal behandeln und jede Skriptausführung verhindern,
+- ZIP ohne gültiges PatchHarbor-Skript weiterhin ablehnen,
+- markerlose Skriptdateien nur übertragen und niemals ausführen,
+- Tests für beschädigte, unsichere, doppelte und reine Datei-Bundles ergänzen.
+
+### 3.b.C – Bundle-Payload-Pipeline vereinfachen
+
+- gemeinsame atomare Schreibprimitive für Bundle-Nutzdateien und inline FILE-Inhalte nutzen, ohne ihre unterschiedlichen Namensregeln zu vermischen,
+- vollständiges Entpacken in das Projektverzeichnis und unnötige Bytekopien vermeiden,
+- Skripteinträge, Nutzdateien und Verzeichniseinträge mit wenigen klaren Modellen darstellen,
+- Fehlertexte auf ungültiges Bundle, Ressourcenfehler und tatsächlichen Schreibfehler begrenzen,
+- Tests auf sichtbares Verhalten und Bytegleichheit statt interne ZIP-Objekte ausrichten.
+
+---
+
+## Step 3.c – Interpreterauswahl und PowerShell-Vertrag härten
 
 **Ergebnis:** Der Interpreter wird aus einer kleinen Whitelist deterministisch gewählt.
 
-### 3.b.W – Bash- und PowerShell-Auswahl implementieren
+### 3.c.W – Bash- und PowerShell-Auswahl implementieren
 
 - Linux ohne Shebang auf Bash abbilden,
 - Windows ohne Shebang auf Windows PowerShell abbilden,
@@ -1106,14 +1211,14 @@ Prozesse werden auf Linux und Windows zuverlässig gesteuert. Output, Logging un
 - PowerShell ohne Profil und nicht interaktiv starten,
 - E2E-Tests für Defaults, bekannte Shebangs und fehlenden Interpreter ergänzen.
 
-### 3.b.R – Interpreterresolver plattformneutral strukturieren
+### 3.c.R – Interpreterresolver plattformneutral strukturieren
 
 - Shebang-Auswertung, Verfügbarkeitsprüfung und Prozessargumente trennen,
 - freie Shebang-Kommandoausführung verhindern,
 - temporäre Dateiendung nur als technische Hilfe, nicht als Typentscheidung nutzen,
 - PowerShell Execution Policy nicht umgehen und Policy-Fehler verständlich abbilden.
 
-### 3.b.C – Interpreterlogik vereinfachen
+### 3.c.C – Interpreterlogik vereinfachen
 
 - Mapping auf tatsächlich unterstützte Varianten begrenzen,
 - doppelte OS-Abfragen entfernen,
@@ -1122,11 +1227,11 @@ Prozesse werden auf Linux und Windows zuverlässig gesteuert. Output, Logging un
 
 ---
 
-## Step 3.c – Prozessbaum, Timeout und Strg+C zuverlässig steuern
+## Step 3.d – Prozessbaum, Timeout und Strg+C zuverlässig steuern
 
 **Ergebnis:** PatchHarbor hinterlässt nach Ende, Timeout oder Abbruch keine Kindprozesse.
 
-### 3.c.W – Plattformgerechte Prozessgruppen implementieren
+### 3.d.W – Plattformgerechte Prozessgruppen implementieren
 
 - unter Linux eine eigene Prozesssitzung beziehungsweise Gruppe starten,
 - unter Windows den Prozess in einem Job Object verwalten,
@@ -1135,14 +1240,14 @@ Prozesse werden auf Linux und Windows zuverlässig gesteuert. Output, Logging un
 - Exit-Codes 124 und 130 liefern,
 - echte E2E-Tests mit einem Kindprozess auf beiden Plattformen ergänzen.
 
-### 3.c.R – Plattformcode hinter kleinem Lifecycle-Vertrag isolieren
+### 3.d.R – Plattformcode hinter kleinem Lifecycle-Vertrag isolieren
 
 - Linux- und Windows-Details in `platform/` trennen,
 - Execution nur eine kleine Start-, Stop- und Kill-Schnittstelle kennen lassen,
 - Race Conditions zwischen natürlichem Ende, Timeout und Strg+C behandeln,
 - Cleanup auch bei Exceptions garantieren.
 
-### 3.c.C – Prozesssteuerung vereinfachen und härten
+### 3.d.C – Prozesssteuerung vereinfachen und härten
 
 - redundante Signalpfade entfernen,
 - genau eine Zustandsmaschine für läuft, beendet, Timeout und Abbruch verwenden,
@@ -1151,11 +1256,11 @@ Prozesse werden auf Linux und Windows zuverlässig gesteuert. Output, Logging un
 
 ---
 
-## Step 3.d – Output fortlaufend erfassen und begrenzen
+## Step 3.e – Output fortlaufend erfassen und begrenzen
 
 **Ergebnis:** STDOUT und STDERR erscheinen gemeinsam, ohne Deadlock und ohne unbegrenzten RAM-Verbrauch.
 
-### 3.d.W – Zusammengeführten Output und Rolling Buffer implementieren
+### 3.e.W – Zusammengeführten Output und Rolling Buffer implementieren
 
 - STDOUT und STDERR in einen gemeinsamen Stream führen,
 - Output während des Laufs fortlaufend lesen,
@@ -1164,14 +1269,14 @@ Prozesse werden auf Linux und Windows zuverlässig gesteuert. Output, Logging un
 - lange Zeile und letzte Zeile ohne Zeilenumbruch unterstützen,
 - E2E-Tests für viel Output, gemischte Streams und schnellen Prozess ergänzen.
 
-### 3.d.R – Streaming und Decodierung robust strukturieren
+### 3.e.R – Streaming und Decodierung robust strukturieren
 
 - Byte-Lesen von Textdecodierung und Zeilenbildung trennen,
 - fehlerhafte Zeichen mit Ersatzdarstellung statt Crash behandeln,
 - Thread- oder Async-Lösung so kapseln, dass der Prozess nie wegen voller Pipe blockiert,
 - Zähler für verworfene ältere Zeilen bereitstellen.
 
-### 3.d.C – Buffer und Reader vereinfachen
+### 3.e.C – Buffer und Reader vereinfachen
 
 - geeignete begrenzte Datenstruktur verwenden,
 - unnötige vollständige Outputkopien entfernen,
@@ -1180,11 +1285,11 @@ Prozesse werden auf Linux und Windows zuverlässig gesteuert. Output, Logging un
 
 ---
 
-## Step 3.e – Plain-Ausgabe und vollständiges Temp-Log ergänzen
+## Step 3.f – Plain-Ausgabe und vollständiges Temp-Log ergänzen
 
 **Ergebnis:** Automation erhält saubere Textausgabe; Debugging kann den vollständigen Output sichern.
 
-### 3.e.W – Plain-Modus und `--log` implementieren
+### 3.f.W – Plain-Modus und `--log` implementieren
 
 - bei Nicht-TTY automatisch einfache fortlaufende Ausgabe verwenden,
 - `--plain` und `--no-color` ergänzen,
@@ -1193,14 +1298,14 @@ Prozesse werden auf Linux und Windows zuverlässig gesteuert. Output, Logging un
 - Logpfad am Ende anzeigen,
 - E2E-Tests für Plain-Ausgabe und Loginhalt ergänzen.
 
-### 3.e.R – Ausgabeziele und Log-Lebenszyklus trennen
+### 3.f.R – Ausgabeziele und Log-Lebenszyklus trennen
 
 - Terminaldarstellung, Plain-Sink und Log-Sink sauber koordinieren,
 - Logging vom Rolling Buffer unabhängig machen,
 - rohe Skriptausgabe im Log und bereinigte Ausgabe im UI unterscheiden,
 - sichere Tempdateierzeugung und korrektes Schließen auf allen Fehlerpfaden sicherstellen.
 
-### 3.e.C – Output-Pipeline entschlacken
+### 3.f.C – Output-Pipeline entschlacken
 
 - unnötiges allgemeines Logging-Framework vermeiden,
 - Ausgabeziele über kleine Funktionen oder einen schmalen Vertrag anbinden,
@@ -1209,11 +1314,11 @@ Prozesse werden auf Linux und Windows zuverlässig gesteuert. Output, Logging un
 
 ---
 
-## Step 3.f – Feste TUI mit Redraw alle 0,2 Sekunden bauen
+## Step 3.g – Feste TUI mit Redraw alle 0,2 Sekunden bauen
 
 **Ergebnis:** Im interaktiven Terminal bleibt eine kompakte feste Oberfläche ohne Scroll-Effekt sichtbar.
 
-### 3.f.W – Dashboard und periodischen Redraw implementieren
+### 3.g.W – Dashboard und periodischen Redraw implementieren
 
 - Bereiche Source, Messages, Files, Execution und Result darstellen,
 - maximale Breite 80 und tatsächliche Terminalbreite berücksichtigen,
@@ -1223,7 +1328,7 @@ Prozesse werden auf Linux und Windows zuverlässig gesteuert. Output, Logging un
 - feste Bereichshöhen und Überlaufhinweise implementieren,
 - Renderer-Tests und einen interaktiven Smoke-Test ergänzen.
 
-### 3.f.R – Terminalschutz und Fallbacks ergänzen
+### 3.g.R – Terminalschutz und Fallbacks ergänzen
 
 - ANSI-Steuersequenzen aus sichtbarem Skriptoutput entfernen,
 - Cursorzustand und Farben auch bei Exception oder Strg+C wiederherstellen,
@@ -1231,7 +1336,7 @@ Prozesse werden auf Linux und Windows zuverlässig gesteuert. Output, Logging un
 - horizontales Kürzen ohne unbeabsichtigte Zeilenumbrüche sicherstellen,
 - TUI-Zustandsmodell von Execution entkoppeln.
 
-### 3.f.C – TUI beruhigen und vereinfachen
+### 3.g.C – TUI beruhigen und vereinfachen
 
 - nur bei verändertem Zustand oder fälligem 0,2-Sekunden-Tick rendern,
 - Flackern und unnötige Vollausgaben reduzieren,
@@ -1265,7 +1370,7 @@ PatchHarbor ist auf den Zielplattformen reproduzierbar getestet, sicher paketier
 - Ubuntu 24.04 und Windows sind Release-Gates,
 - Ubuntu 26.04 läuft mindestens als zusätzliche Lane,
 - Prozessbaumtests sind auf Linux und Windows grün,
-- ZIP- und FILE-Sicherheitsfälle sind grün,
+- ZIP-Bundle-, Binärdatei-, Pfad- und inline FILE-Sicherheitsfälle sind grün,
 - pipx-Installation aus dem gebauten Wheel ist grün,
 - Help-Screens beschreiben alle und nur die implementierten Funktionen,
 - keine offenen kritischen Architekturfragen bestehen,
@@ -1285,7 +1390,7 @@ PatchHarbor ist auf den Zielplattformen reproduzierbar getestet, sicher paketier
 - Tempverzeichnis und CWD auf beiden Systemen prüfen,
 - Windows PowerShell als Default und PowerShell 7 per Shebang testen,
 - Bash-Verhalten auf Ubuntu 24.04 und 26.04 prüfen,
-- Plattform-E2E-Tests für FILE, ZIP, Timeout und Logging hinzufügen.
+- Plattform-E2E-Tests für inline FILE, ZIP-PatchBundle mit Binärdatei, Timeout und Logging hinzufügen.
 
 ### 4.a.R – OS-spezifische Logik an klare Grenzen verschieben
 
@@ -1309,7 +1414,7 @@ PatchHarbor ist auf den Zielplattformen reproduzierbar getestet, sicher paketier
 
 ### 4.b.W – Harte Budgets und Angriffsfälle testen
 
-- Grenzen für direkte Eingabe, ZIP-Eintrag, ZIP-Gesamtdaten und Eintragszahl implementieren,
+- Grenzen für direkte Eingabe, Skript- und Nutzdateieintrag, ZIP-Gesamtdaten und Eintragszahl implementieren,
 - Warning-Schwelle für große Inhalte anzeigen,
 - ZIP-Bomben-ähnliche Fälle kontrolliert ablehnen,
 - ANSI- und Kontrollzeichenfälle testen,
@@ -1337,7 +1442,7 @@ PatchHarbor ist auf den Zielplattformen reproduzierbar getestet, sicher paketier
 
 ### 4.c.W – E2E-Akzeptanzsuite und CI-Matrix einführen
 
-- vollständige E2E-Szenarien für Datei, Ordner, ZIP, Pipe, Messages, FILE, Timeout, Logging und Exit-Codes bündeln,
+- vollständige E2E-Szenarien für Datei, Ordner, ZIP-PatchBundle mit mehreren Skripten und Binärdateien, Pipe, Messages, inline FILE, Timeout, Logging und Exit-Codes bündeln,
 - GitHub Actions für Ubuntu 24.04, Ubuntu 26.04 und Windows einrichten,
 - Windows PowerShell und PowerShell 7 abdecken,
 - Wheel bauen und mit pipx in sauberer Umgebung installieren,
@@ -1375,7 +1480,7 @@ PatchHarbor ist auf den Zielplattformen reproduzierbar getestet, sicher paketier
 ### 4.d.R – Architektur- und Release-Audit durchführen
 
 - Importabhängigkeiten gegen die vereinbarte Richtung prüfen,
-- CLI, Sources, Bundle-Auflösung, Parser, FILE, Execution und Presentation auf klare Grenzen prüfen,
+- CLI, Sources, PatchBundle-Auflösung, Bundle-Nutzdateien, Parser, inline FILE, Execution und Presentation auf klare Grenzen prüfen,
 - interne Exit-Codes, Warnings und Fehlermeldungen konsolidieren,
 - sicherstellen, dass Clipboard, WebSocket, SSH, Save, Tests und Git nicht öffentlich enthalten sind,
 - Lizenz, Paketinhalt und veröffentlichte Dateien prüfen.
@@ -1394,16 +1499,18 @@ PatchHarbor ist auf den Zielplattformen reproduzierbar getestet, sicher paketier
 
 ## Ziel
 
-Ein äußerer WebSocket-Host kann vollständige PatchHarbor-Skripte und ZIP-Bundles entgegennehmen und sie ohne Sonderpfad als normale Runner-Aufträge verarbeiten lassen.
+Ein äußerer WebSocket-Host kann vollständige PatchHarbor-Skripte und unveränderte ZIP-basierte PatchBundles mit mehreren Skripten und echten Binärdateien entgegennehmen und sie ohne Sonderpfad als normale Runner-Aufträge verarbeiten lassen.
 
 ## Bereits festgelegte Grenze
 
 - Textnachricht ergibt ein direktes Skript-Artefakt.
-- Binärnachricht ergibt ein ZIP-Artefakt.
+- Binärnachricht ergibt bytegenau ein vollständiges ZIP-basiertes PatchBundle.
+- Dasselbe Bundleformat wird aus Datei, Pipe und WebSocket verarbeitet.
+- Ein Bundle darf mehrere geordnete PatchHarbor-Skripte und beliebige sichere Text- oder Binärdateien enthalten.
 - Eine vollständige Nachricht ergibt genau einen Runner-Auftrag.
 - Der Runner bleibt zustandslos und verarbeitet weiterhin genau ein Artefakt pro Auftrag.
 - Im selben Arbeitsverzeichnis werden Aufträge sequenziell ausgeführt.
-- WebSocket darf die Bundle-, Parser-, FILE-, Execution- und Presentation-Pipeline nicht umgehen.
+- WebSocket darf die PatchBundle-, Nutzdatei-, Parser-, FILE-, Execution- und Presentation-Pipeline nicht umgehen.
 
 ## Entscheidungstor nach Meilenstein 4
 
@@ -1472,8 +1579,8 @@ Ein Meilenstein ist erst abgeschlossen, wenn:
 Der verbindliche Version-1-Plan besteht aus:
 
 - **4 Release-Meilensteinen**,
-- **19 Steps**,
-- **57 geplanten Commits**,
+- **20 Steps**,
+- **60 geplanten Commits**,
 - pro Step genau einem `W`-, einem `R`- und einem `C`-Commit.
 
 Zusätzlich ist **Meilenstein 5 – WebSocket-Transport** als nachgelagertes Ziel dokumentiert. Seine Steps und Commits werden bewusst erst nach dem Review von Meilenstein 4 festgelegt.
@@ -1482,7 +1589,7 @@ Die Reihenfolge ist bewusst vertikal:
 
 **Meilenstein → Step → work → right → clean**
 
-Der erste Step liefert den kleinsten ausführbaren Datei-Run ohne TUI. Danach folgen Eingaben und Nutzdaten. Vor der weiteren Execution-Arbeit trennt Step 3.a Quellen, Eingabeartefakte und Bundles, damit spätere Transporte denselben Kern verwenden. Anschließend werden kontrollierte Execution und Ausgabe sowie Plattform- und Release-Qualität ergänzt.
+Der erste Step liefert den kleinsten ausführbaren Datei-Run ohne TUI. Danach folgen Eingaben und inline Nutzdaten. Vor der weiteren Execution-Arbeit trennt Step 3.a Quellen, Eingabeartefakte und PatchBundles. Step 3.b ergänzt darauf mehrere Skripte und bytegenaue Binärdateien im ZIP-Bundle. Anschließend werden kontrollierte Execution und Ausgabe sowie Plattform- und Release-Qualität ergänzt.
 
 Die Leitlinie bleibt über den gesamten Plan gleich:
 
