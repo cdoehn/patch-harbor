@@ -23,7 +23,16 @@ class BundleScript:
 
 
 @dataclass(frozen=True)
+class BundlePayload:
+    """One byte-exact file carried by a ZIP PatchBundle."""
+
+    relative_path: str
+    content: bytes
+
+
+@dataclass(frozen=True)
 class PatchBundle:
-    """An ordered, non-empty collection of PatchHarbor scripts."""
+    """Ordered scripts plus files made available before execution."""
 
     scripts: tuple[BundleScript, ...]
+    payloads: tuple[BundlePayload, ...] = ()

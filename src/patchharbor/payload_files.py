@@ -10,6 +10,7 @@ import stat
 import tempfile
 
 from patchharbor.errors import ExitCode, PatchHarborError
+from patchharbor.models import BundlePayload
 
 
 PAYLOAD_WARNING_BYTES = 10 * 1024 * 1024
@@ -39,6 +40,22 @@ def is_safe_payload_name(name: str) -> bool:
     if name in {".", ".."} or name.endswith((".", " ")):
         return False
     return name.split(".", 1)[0].upper() not in _WINDOWS_RESERVED_NAMES
+
+
+def is_safe_bundle_path(relative_path: str) -> bool:
+    """Return whether a ZIP payload path stays below the working directory."""
+    if (
+        not relative_path
+        or len(relative_path) > 512
+        or relative_path.startswith("/")
+        or "\\" in relative_path
+    ):
+        return False
+
+    return all(
+        is_safe_payload_name(segment)
+        for segment in relative_path.split("/")
+    )
 
 
 def payload_size_warning(name: str, text: str) -> str | None:
@@ -105,6 +122,86 @@ def _replace_text(target: Path, text: str, *, name: str) -> None:
     finally:
         if staged_path is not None:
             staged_path.unlink(missing_ok=True)
+
+
+def _bundle_file_error(relative_path: str, detail: object) -> PatchHarborError:
+    return PatchHarborError(
+        f"cannot write bundle file {relative_path!r}: {detail}",
+        ExitCode.FILE_PREPARATION_ERROR,
+    )
+
+
+def _ensure_bundle_parent(cwd: Path, relative_path: str) -> Path:
+    target = cwd
+    segments = relative_path.split("/")
+
+    for segment in segments[:-1]:
+        target /= segment
+        try:
+            mode = target.lstat().st_mode
+        except FileNotFoundError:
+            try:
+                target.mkdir()
+            except OSError as exc:
+                raise _bundle_file_error(relative_path, exc) from exc
+            continue
+        except OSError as exc:
+            raise _bundle_file_error(relative_path, exc) from exc
+
+        if stat.S_ISLNK(mode) or not stat.S_ISDIR(mode):
+            raise _bundle_file_error(
+                relative_path,
+                "parent is not a directory",
+            )
+
+    return target / segments[-1]
+
+
+def _replace_bytes(
+    target: Path,
+    content: bytes,
+    *,
+    relative_path: str,
+) -> None:
+    staged_path: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="wb",
+            dir=target.parent,
+            prefix=".patchharbor-",
+            suffix=".tmp",
+            delete=False,
+        ) as handle:
+            staged_path = Path(handle.name)
+            handle.write(content)
+        os.replace(staged_path, target)
+        staged_path = None
+    except OSError as exc:
+        raise _bundle_file_error(relative_path, exc) from exc
+    finally:
+        if staged_path is not None:
+            staged_path.unlink(missing_ok=True)
+
+
+def write_bundle_payloads(
+    payloads: Iterable[BundlePayload],
+    *,
+    cwd: Path,
+) -> None:
+    """Write ZIP payload bytes before the first bundle script executes."""
+    for payload in payloads:
+        if not is_safe_bundle_path(payload.relative_path):
+            raise _bundle_file_error(
+                payload.relative_path,
+                "unsafe relative path",
+            )
+        target = _ensure_bundle_parent(cwd, payload.relative_path)
+        _validate_target(target, name=payload.relative_path)
+        _replace_bytes(
+            target,
+            payload.content,
+            relative_path=payload.relative_path,
+        )
 
 
 def write_payload_files(

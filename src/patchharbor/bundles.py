@@ -2,14 +2,18 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterator
 import os
 from pathlib import PurePosixPath
 import stat
 import zipfile
 
 from patchharbor.errors import ExitCode, PatchHarborError
-from patchharbor.models import BundleScript, InputArtifact, PatchBundle
+from patchharbor.models import (
+    BundlePayload,
+    BundleScript,
+    InputArtifact,
+    PatchBundle,
+)
 from patchharbor.parser import ScriptFormatError, validate_required_marker
 
 
@@ -123,14 +127,16 @@ def _read_zip_entry(
     return b"".join(chunks), total_bytes_read
 
 
-def _iter_zip_scripts(
+def _read_zip_members(
     archive: zipfile.ZipFile,
     *,
     artifact: InputArtifact,
-) -> Iterator[BundleScript]:
+) -> tuple[tuple[BundleScript, ...], tuple[BundlePayload, ...]]:
     entries = archive.infolist()
     _validate_zip_budgets(artifact, entries)
     total_bytes_read = 0
+    scripts: list[BundleScript] = []
+    payloads: list[BundlePayload] = []
 
     for entry in entries:
         if not _is_regular_zip_entry(entry):
@@ -142,20 +148,28 @@ def _iter_zip_scripts(
             artifact=artifact,
             total_bytes_read=total_bytes_read,
         )
-        if raw_content.startswith(_ZIP_SIGNATURES):
-            continue
 
         try:
             script_text = raw_content.decode("utf-8")
             validate_required_marker(script_text)
         except (UnicodeError, ScriptFormatError):
+            payloads.append(
+                BundlePayload(
+                    relative_path=entry.filename,
+                    content=raw_content,
+                )
+            )
             continue
 
-        yield BundleScript(
-            text=script_text,
-            suffix=PurePosixPath(entry.filename).suffix
-            or _default_script_suffix(),
+        scripts.append(
+            BundleScript(
+                text=script_text,
+                suffix=PurePosixPath(entry.filename).suffix
+                or _default_script_suffix(),
+            )
         )
+
+    return tuple(scripts), tuple(payloads)
 
 
 def _no_valid_zip_script(artifact: InputArtifact) -> PatchHarborError:
@@ -215,7 +229,7 @@ def resolve_patch_bundle(artifact: InputArtifact) -> PatchBundle:
     )
     try:
         with zipfile.ZipFile(artifact.path) as archive:
-            scripts = tuple(_iter_zip_scripts(archive, artifact=artifact))
+            scripts, payloads = _read_zip_members(archive, artifact=artifact)
     except zipfile.BadZipFile as exc:
         if zip_hint:
             raise _zip_source_error(artifact, exc) from exc
@@ -233,4 +247,4 @@ def resolve_patch_bundle(artifact: InputArtifact) -> PatchBundle:
 
     if not scripts:
         raise _no_valid_zip_script(artifact)
-    return PatchBundle(scripts=scripts)
+    return PatchBundle(scripts=scripts, payloads=payloads)

@@ -6,10 +6,13 @@ from pathlib import Path
 import pytest
 
 from patchharbor.errors import ExitCode, PatchHarborError
+from patchharbor.models import BundlePayload
 import patchharbor.payload_files as payload_files
 from patchharbor.payload_files import (
+    is_safe_bundle_path,
     is_safe_payload_name,
     prepare_payload_files,
+    write_bundle_payloads,
     write_payload_files,
 )
 
@@ -187,3 +190,17 @@ def test_prepare_payload_files_rejects_hard_budget(
 
     assert raised.value.exit_code is ExitCode.SOURCE_ERROR
     assert str(raised.value) == "FILE 'too-large.txt' exceeds the 3 byte limit"
+
+
+def test_bundle_payload_is_written_byte_exactly_in_relative_directory(
+    tmp_path: Path,
+) -> None:
+    content = bytes((0, 1, 2, 255)) + b"PATCH"
+
+    assert is_safe_bundle_path("assets/blob.bin")
+    write_bundle_payloads(
+        (BundlePayload("assets/blob.bin", content),),
+        cwd=tmp_path,
+    )
+
+    assert (tmp_path / "assets" / "blob.bin").read_bytes() == content

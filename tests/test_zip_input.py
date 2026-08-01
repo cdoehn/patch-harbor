@@ -43,7 +43,9 @@ def test_directory_discovery_includes_zip_with_valid_script(tmp_path: Path) -> N
     assert [candidate.path for candidate in candidates] == [archive_path]
 
 
-def test_zip_ignores_directories_links_and_nested_archives(tmp_path: Path) -> None:
+def test_zip_without_scripts_is_rejected_even_with_binary_payloads(
+    tmp_path: Path,
+) -> None:
     nested_path = tmp_path / "nested.zip"
     _write_zip(nested_path, [("nested.sh", f"{REQUIRED_MARKER}\n")])
     nested_bytes = nested_path.read_bytes()

@@ -479,6 +479,57 @@ def test_fs_run_reads_zip_patchbundle_from_standard_input_in_archive_order(
     assert completed.stderr == b""
 
 
+def test_zip_bundle_writes_binary_payload_before_scripts_in_order(
+    tmp_path: Path,
+) -> None:
+    archive_path = tmp_path / "bundle.zip"
+    binary_payload = bytes((0, 1, 2, 255)) + b"PATCH"
+
+    if os.name == "nt":
+        first_script = (
+            f"{REQUIRED_MARKER}\n"
+            '$actual = [Convert]::ToBase64String('
+            '[IO.File]::ReadAllBytes("assets/blob.bin"))\n'
+            'if ($actual -ne "AAEC/1BBVENI") { exit 41 }\n'
+            'Add-Content -LiteralPath "order.txt" -Value "first"\n'
+        )
+        second_script = (
+            f"{REQUIRED_MARKER}\n"
+            'Add-Content -LiteralPath "order.txt" -Value "second"\n'
+        )
+        first_name = "z-first.ps1"
+        second_name = "a-second.ps1"
+    else:
+        first_script = (
+            f"{REQUIRED_MARKER}\n"
+            'actual="$(base64 < assets/blob.bin | tr -d "\\n")"\n'
+            '[ "$actual" = "AAEC/1BBVENI" ] || exit 41\n'
+            'printf "%s\\n" first >> order.txt\n'
+        )
+        second_script = (
+            f"{REQUIRED_MARKER}\n"
+            'printf "%s\\n" second >> order.txt\n'
+        )
+        first_name = "z-first.sh"
+        second_name = "a-second.sh"
+
+    with zipfile.ZipFile(archive_path, "w") as archive:
+        archive.writestr(first_name, first_script)
+        archive.writestr("assets/blob.bin", binary_payload)
+        archive.writestr(second_name, second_script)
+
+    completed = _run_patchharbor(archive_path, tmp_path)
+
+    assert completed.returncode == 0
+    assert completed.stdout == ""
+    assert completed.stderr == ""
+    assert (tmp_path / "assets" / "blob.bin").read_bytes() == binary_payload
+    assert (tmp_path / "order.txt").read_text(encoding="utf-8").splitlines() == [
+        "first",
+        "second",
+    ]
+
+
 def test_zip_execution_stops_after_first_failed_script(tmp_path: Path) -> None:
     archive_path = tmp_path / "scripts.zip"
     with zipfile.ZipFile(archive_path, "w") as archive:
@@ -495,7 +546,7 @@ def test_zip_execution_stops_after_first_failed_script(tmp_path: Path) -> None:
     assert completed.stderr == ""
 
 
-def test_zip_ignores_entries_without_required_marker(tmp_path: Path) -> None:
+def test_zip_transfers_entries_without_required_marker(tmp_path: Path) -> None:
     archive_path = tmp_path / "scripts.zip"
     with zipfile.ZipFile(archive_path, "w") as archive:
         archive.writestr("notes.txt", "not a script\n")
@@ -506,6 +557,9 @@ def test_zip_ignores_entries_without_required_marker(tmp_path: Path) -> None:
     assert completed.returncode == 0
     assert completed.stdout == "ran\n"
     assert completed.stderr == ""
+    assert (tmp_path / "notes.txt").read_text(encoding="utf-8") == (
+        "not a script\n"
+    )
 
 
 def test_empty_zip_has_a_clear_tool_error(tmp_path: Path) -> None:

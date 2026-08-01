@@ -10,7 +10,11 @@ from patchharbor.errors import ExitCode, PatchHarborError
 from patchharbor.execution import execute_script_text
 from patchharbor.models import BundleScript, InputArtifact
 from patchharbor.parser import parse_script
-from patchharbor.payload_files import prepare_payload_files, write_payload_files
+from patchharbor.payload_files import (
+    prepare_payload_files,
+    write_bundle_payloads,
+    write_payload_files,
+)
 from patchharbor.sources import (
     DirectoryCandidate,
     file_input_artifact,
@@ -47,6 +51,7 @@ def run_input_artifact(
 ) -> int:
     """Resolve and execute every script in one input artifact."""
     bundle = resolve_patch_bundle(artifact)
+    write_bundle_payloads(bundle.payloads, cwd=cwd)
     last_exit_code = 0
     for bundle_script in bundle.scripts:
         last_exit_code = _execute_bundle_script(
