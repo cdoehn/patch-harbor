@@ -204,3 +204,164 @@ def test_bundle_payload_is_written_byte_exactly_in_relative_directory(
     )
 
     assert (tmp_path / "assets" / "blob.bin").read_bytes() == content
+
+
+def test_bundle_validates_every_target_before_replacing_any_file(
+    tmp_path: Path,
+) -> None:
+    first_target = tmp_path / "first.bin"
+    first_target.write_bytes(b"old")
+    blocked_parent = tmp_path / "blocked"
+    blocked_parent.write_bytes(b"not a directory")
+
+    with pytest.raises(PatchHarborError) as raised:
+        write_bundle_payloads(
+            (
+                BundlePayload("first.bin", b"new"),
+                BundlePayload("blocked/second.bin", b"second"),
+            ),
+            cwd=tmp_path,
+        )
+
+    assert raised.value.exit_code is ExitCode.FILE_PREPARATION_ERROR
+    assert first_target.read_bytes() == b"old"
+    assert blocked_parent.read_bytes() == b"not a directory"
+
+
+def test_bundle_stages_every_payload_before_first_target_replace(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    payloads = (
+        BundlePayload("one.bin", b"one"),
+        BundlePayload("nested/two.bin", b"two"),
+    )
+    real_replace = payload_files._replace_staged_bytes
+    calls = 0
+
+    def verify_complete_stage(
+        target: Path,
+        staged_source: Path,
+        *,
+        relative_path: str,
+    ) -> None:
+        nonlocal calls
+        calls += 1
+        if relative_path == "one.bin":
+            stage_root = staged_source.parent
+            assert (stage_root / "nested" / "two.bin").read_bytes() == b"two"
+        real_replace(
+            target,
+            staged_source,
+            relative_path=relative_path,
+        )
+
+    monkeypatch.setattr(
+        payload_files,
+        "_replace_staged_bytes",
+        verify_complete_stage,
+    )
+
+    write_bundle_payloads(payloads, cwd=tmp_path)
+
+    assert calls == 2
+    assert (tmp_path / "one.bin").read_bytes() == b"one"
+    assert (tmp_path / "nested" / "two.bin").read_bytes() == b"two"
+
+
+def test_bundle_rejects_duplicate_payload_targets_before_writing(
+    tmp_path: Path,
+) -> None:
+    with pytest.raises(PatchHarborError) as raised:
+        write_bundle_payloads(
+            (
+                BundlePayload("Payload.bin", b"one"),
+                BundlePayload("payload.bin", b"two"),
+            ),
+            cwd=tmp_path,
+        )
+
+    assert raised.value.exit_code is ExitCode.FILE_PREPARATION_ERROR
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_bundle_does_not_follow_symbolic_link_parent(tmp_path: Path) -> None:
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    linked_parent = tmp_path / "assets"
+    try:
+        linked_parent.symlink_to(outside, target_is_directory=True)
+    except (OSError, NotImplementedError) as exc:
+        pytest.skip(f"symbolic links unavailable: {exc}")
+
+    with pytest.raises(PatchHarborError) as raised:
+        write_bundle_payloads(
+            (BundlePayload("assets/blob.bin", b"payload"),),
+            cwd=tmp_path,
+        )
+
+    assert raised.value.exit_code is ExitCode.FILE_PREPARATION_ERROR
+    assert not (outside / "blob.bin").exists()
+
+
+def test_bundle_staging_failure_happens_before_any_target_replace(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    target = tmp_path / "first.bin"
+    target.write_bytes(b"old")
+    real_stage = payload_files._stage_bundle_payload
+    calls = 0
+
+    def fail_second_stage(
+        stage_root: Path,
+        payload: BundlePayload,
+    ) -> Path:
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise PatchHarborError(
+                "cannot write bundle file 'second.bin': denied",
+                ExitCode.FILE_PREPARATION_ERROR,
+            )
+        return real_stage(stage_root, payload)
+
+    monkeypatch.setattr(
+        payload_files,
+        "_stage_bundle_payload",
+        fail_second_stage,
+    )
+
+    with pytest.raises(PatchHarborError) as raised:
+        write_bundle_payloads(
+            (
+                BundlePayload("first.bin", b"new"),
+                BundlePayload("second.bin", b"second"),
+            ),
+            cwd=tmp_path,
+        )
+
+    assert raised.value.exit_code is ExitCode.FILE_PREPARATION_ERROR
+    assert target.read_bytes() == b"old"
+    assert not (tmp_path / "second.bin").exists()
+
+
+def test_bundle_atomic_replace_failure_is_fatal_and_cleans_local_stage(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fail_replace(*args: object, **kwargs: object) -> None:
+        raise PermissionError("replace denied")
+
+    monkeypatch.setattr(payload_files.os, "replace", fail_replace)
+
+    with pytest.raises(PatchHarborError) as raised:
+        write_bundle_payloads(
+            (BundlePayload("payload.bin", b"payload"),),
+            cwd=tmp_path,
+        )
+
+    assert raised.value.exit_code is ExitCode.FILE_PREPARATION_ERROR
+    assert "replace denied" in str(raised.value)
+    assert not (tmp_path / "payload.bin").exists()
+    assert list(tmp_path.glob(".patchharbor-*.tmp")) == []

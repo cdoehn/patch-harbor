@@ -1,29 +1,27 @@
-"""Validation and atomic writing of inline PatchHarbor FILE payloads."""
+"""Validation, staging, and atomic writing of PatchHarbor payload files."""
 
 from __future__ import annotations
 
 from collections.abc import Iterable
 import os
 from pathlib import Path
-import re
+import shutil
 import stat
 import tempfile
 
+from patchharbor.bundle_paths import (
+    BundlePathError,
+    is_safe_bundle_path,
+    is_safe_path_segment,
+    validate_bundle_member_paths,
+)
 from patchharbor.errors import ExitCode, PatchHarborError
 from patchharbor.models import BundlePayload
 
 
 PAYLOAD_WARNING_BYTES = 10 * 1024 * 1024
 MAX_PAYLOAD_BYTES = 256 * 1024 * 1024
-_FILENAME_PATTERN = re.compile(r"^[A-Za-z0-9._-]{1,128}$")
-_WINDOWS_RESERVED_NAMES = {
-    "CON",
-    "PRN",
-    "AUX",
-    "NUL",
-    *(f"COM{number}" for number in range(1, 10)),
-    *(f"LPT{number}" for number in range(1, 10)),
-}
+_COPY_CHUNK_BYTES = 64 * 1024
 
 
 def _file_error(name: str, detail: object) -> PatchHarborError:
@@ -35,27 +33,7 @@ def _file_error(name: str, detail: object) -> PatchHarborError:
 
 def is_safe_payload_name(name: str) -> bool:
     """Return whether a FILE name is a portable, path-free file name."""
-    if _FILENAME_PATTERN.fullmatch(name) is None:
-        return False
-    if name in {".", ".."} or name.endswith((".", " ")):
-        return False
-    return name.split(".", 1)[0].upper() not in _WINDOWS_RESERVED_NAMES
-
-
-def is_safe_bundle_path(relative_path: str) -> bool:
-    """Return whether a ZIP payload path stays below the working directory."""
-    if (
-        not relative_path
-        or len(relative_path) > 512
-        or relative_path.startswith("/")
-        or "\\" in relative_path
-    ):
-        return False
-
-    return all(
-        is_safe_payload_name(segment)
-        for segment in relative_path.split("/")
-    )
+    return is_safe_path_segment(name)
 
 
 def payload_size_warning(name: str, text: str) -> str | None:
@@ -131,6 +109,49 @@ def _bundle_file_error(relative_path: str, detail: object) -> PatchHarborError:
     )
 
 
+def _validate_bundle_target(cwd: Path, relative_path: str) -> Path:
+    target = cwd
+    segments = relative_path.split("/")
+
+    for segment in segments[:-1]:
+        target /= segment
+        try:
+            mode = target.lstat().st_mode
+        except FileNotFoundError:
+            return cwd.joinpath(*segments)
+        except OSError as exc:
+            raise _bundle_file_error(relative_path, exc) from exc
+
+        if stat.S_ISLNK(mode) or not stat.S_ISDIR(mode):
+            raise _bundle_file_error(
+                relative_path,
+                "parent is not a directory",
+            )
+
+    final_target = target / segments[-1]
+    _validate_bundle_file_target(final_target, relative_path=relative_path)
+    return final_target
+
+
+def _validate_bundle_file_target(
+    target: Path,
+    *,
+    relative_path: str,
+) -> None:
+    try:
+        mode = target.lstat().st_mode
+    except FileNotFoundError:
+        return
+    except OSError as exc:
+        raise _bundle_file_error(relative_path, exc) from exc
+
+    if stat.S_ISLNK(mode) or not stat.S_ISREG(mode):
+        raise _bundle_file_error(
+            relative_path,
+            "target is not a regular file",
+        )
+
+
 def _ensure_bundle_parent(cwd: Path, relative_path: str) -> Path:
     target = cwd
     segments = relative_path.split("/")
@@ -157,30 +178,44 @@ def _ensure_bundle_parent(cwd: Path, relative_path: str) -> Path:
     return target / segments[-1]
 
 
-def _replace_bytes(
+def _stage_bundle_payload(
+    stage_root: Path,
+    payload: BundlePayload,
+) -> Path:
+    target = stage_root.joinpath(*payload.relative_path.split("/"))
+    try:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        with target.open("xb") as handle:
+            handle.write(payload.content)
+    except OSError as exc:
+        raise _bundle_file_error(payload.relative_path, exc) from exc
+    return target
+
+
+def _replace_staged_bytes(
     target: Path,
-    content: bytes,
+    staged_source: Path,
     *,
     relative_path: str,
 ) -> None:
-    staged_path: Path | None = None
+    local_stage: Path | None = None
     try:
-        with tempfile.NamedTemporaryFile(
+        with staged_source.open("rb") as source, tempfile.NamedTemporaryFile(
             mode="wb",
             dir=target.parent,
             prefix=".patchharbor-",
             suffix=".tmp",
             delete=False,
         ) as handle:
-            staged_path = Path(handle.name)
-            handle.write(content)
-        os.replace(staged_path, target)
-        staged_path = None
+            local_stage = Path(handle.name)
+            shutil.copyfileobj(source, handle, length=_COPY_CHUNK_BYTES)
+        os.replace(local_stage, target)
+        local_stage = None
     except OSError as exc:
         raise _bundle_file_error(relative_path, exc) from exc
     finally:
-        if staged_path is not None:
-            staged_path.unlink(missing_ok=True)
+        if local_stage is not None:
+            local_stage.unlink(missing_ok=True)
 
 
 def write_bundle_payloads(
@@ -188,20 +223,49 @@ def write_bundle_payloads(
     *,
     cwd: Path,
 ) -> None:
-    """Write ZIP payload bytes before the first bundle script executes."""
-    for payload in payloads:
-        if not is_safe_bundle_path(payload.relative_path):
-            raise _bundle_file_error(
-                payload.relative_path,
-                "unsafe relative path",
-            )
-        target = _ensure_bundle_parent(cwd, payload.relative_path)
-        _validate_target(target, name=payload.relative_path)
-        _replace_bytes(
-            target,
-            payload.content,
-            relative_path=payload.relative_path,
+    """Stage every ZIP payload before writing any target or running a script."""
+    payload_items = tuple(payloads)
+    if not payload_items:
+        return
+
+    try:
+        validate_bundle_member_paths(
+            (payload.relative_path, False) for payload in payload_items
         )
+    except BundlePathError as exc:
+        raise _bundle_file_error("<bundle>", exc) from exc
+
+    for payload in payload_items:
+        _validate_bundle_target(cwd, payload.relative_path)
+
+    try:
+        staging_directory = tempfile.TemporaryDirectory(
+            prefix="patchharbor-bundle-stage-"
+        )
+    except OSError as exc:
+        raise _bundle_file_error("<bundle>", exc) from exc
+
+    with staging_directory as raw_stage_root:
+        stage_root = Path(raw_stage_root)
+        staged_payloads = tuple(
+            (
+                payload,
+                _stage_bundle_payload(stage_root, payload),
+            )
+            for payload in payload_items
+        )
+
+        for payload, staged_source in staged_payloads:
+            target = _ensure_bundle_parent(cwd, payload.relative_path)
+            _validate_bundle_file_target(
+                target,
+                relative_path=payload.relative_path,
+            )
+            _replace_staged_bytes(
+                target,
+                staged_source,
+                relative_path=payload.relative_path,
+            )
 
 
 def write_payload_files(

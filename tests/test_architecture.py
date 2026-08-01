@@ -33,6 +33,14 @@ def test_lower_layers_do_not_import_orchestration_or_unrelated_layers() -> None:
             "payload_files",
             "sources",
         },
+        "bundle_paths": {
+            "application",
+            "bundles",
+            "execution",
+            "parser",
+            "payload_files",
+            "sources",
+        },
         "sources": {
             "application",
             "bundles",

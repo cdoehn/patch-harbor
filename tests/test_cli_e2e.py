@@ -562,6 +562,34 @@ def test_zip_transfers_entries_without_required_marker(tmp_path: Path) -> None:
     )
 
 
+def test_markerless_script_file_is_transferred_but_never_executed(
+    tmp_path: Path,
+) -> None:
+    archive_path = tmp_path / "markerless-script.zip"
+    if os.name == "nt":
+        payload_name = "helper.ps1"
+        payload_content = 'Set-Content -LiteralPath "unexpected.txt" -Value "ran"\n'
+        valid_name = "run.ps1"
+        valid_script = f"{REQUIRED_MARKER}\nexit 0\n"
+    else:
+        payload_name = "helper.sh"
+        payload_content = 'printf "%s\n" ran > unexpected.txt\n'
+        valid_name = "run.sh"
+        valid_script = f"{REQUIRED_MARKER}\nexit 0\n"
+
+    with zipfile.ZipFile(archive_path, "w") as archive:
+        archive.writestr(payload_name, payload_content)
+        archive.writestr(valid_name, valid_script)
+
+    completed = _run_patchharbor(archive_path, tmp_path)
+
+    assert completed.returncode == 0
+    assert completed.stdout == ""
+    assert completed.stderr == ""
+    assert (tmp_path / payload_name).read_text(encoding="utf-8") == payload_content
+    assert not (tmp_path / "unexpected.txt").exists()
+
+
 def test_empty_zip_has_a_clear_tool_error(tmp_path: Path) -> None:
     archive_path = tmp_path / "empty.zip"
     with zipfile.ZipFile(archive_path, "w"):

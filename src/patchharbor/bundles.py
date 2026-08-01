@@ -2,11 +2,16 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 import os
 from pathlib import PurePosixPath
 import stat
 import zipfile
 
+from patchharbor.bundle_paths import (
+    BundlePathError,
+    validate_bundle_member_paths,
+)
 from patchharbor.errors import ExitCode, PatchHarborError
 from patchharbor.models import (
     BundlePayload,
@@ -22,6 +27,13 @@ MAX_ZIP_ENTRY_BYTES = 256 * 1024 * 1024
 MAX_ZIP_TOTAL_BYTES = 512 * 1024 * 1024
 _ZIP_READ_CHUNK_BYTES = 64 * 1024
 _ZIP_SIGNATURES = (b"PK\x03\x04", b"PK\x05\x06", b"PK\x07\x08")
+
+
+@dataclass(frozen=True)
+class _ValidatedZipMember:
+    entry: zipfile.ZipInfo
+    relative_path: str
+    is_directory: bool
 
 
 def _default_script_suffix() -> str:
@@ -50,6 +62,13 @@ def _zip_source_error(
         f"cannot read ZIP archive {artifact.display_name}: {detail}",
         ExitCode.SOURCE_ERROR,
     )
+
+
+def _invalid_zip_bundle(
+    artifact: InputArtifact,
+    detail: object,
+) -> PatchHarborError:
+    return _zip_source_error(artifact, f"invalid PatchBundle ({detail})")
 
 
 def _zip_limit_error(
@@ -87,20 +106,68 @@ def _validate_zip_budgets(
             )
 
 
-def _is_regular_zip_entry(entry: zipfile.ZipInfo) -> bool:
-    if entry.is_dir():
-        return False
-
+def _zip_member_is_directory(
+    entry: zipfile.ZipInfo,
+    *,
+    artifact: InputArtifact,
+) -> bool:
     if entry.create_system != 3:
-        return True
+        return entry.is_dir()
 
     file_type = stat.S_IFMT(entry.external_attr >> 16)
-    return file_type in (0, stat.S_IFREG)
+    if entry.is_dir():
+        if file_type not in (0, stat.S_IFDIR):
+            raise _invalid_zip_bundle(
+                artifact,
+                f"unsupported entry type for {entry.filename!r}",
+            )
+        return True
+
+    if file_type not in (0, stat.S_IFREG):
+        raise _invalid_zip_bundle(
+            artifact,
+            f"unsupported entry type for {entry.filename!r}",
+        )
+    return False
+
+
+def _validate_zip_members(
+    entries: list[zipfile.ZipInfo],
+    *,
+    artifact: InputArtifact,
+) -> tuple[_ValidatedZipMember, ...]:
+    member_kinds = tuple(
+        (
+            entry,
+            _zip_member_is_directory(entry, artifact=artifact),
+        )
+        for entry in entries
+    )
+    try:
+        normalized_paths = validate_bundle_member_paths(
+            (entry.filename, is_directory)
+            for entry, is_directory in member_kinds
+        )
+    except BundlePathError as exc:
+        raise _invalid_zip_bundle(artifact, exc) from exc
+
+    return tuple(
+        _ValidatedZipMember(
+            entry=entry,
+            relative_path=relative_path,
+            is_directory=is_directory,
+        )
+        for (entry, is_directory), relative_path in zip(
+            member_kinds,
+            normalized_paths,
+            strict=True,
+        )
+    )
 
 
 def _read_zip_entry(
     archive: zipfile.ZipFile,
-    entry: zipfile.ZipInfo,
+    member: _ValidatedZipMember,
     *,
     artifact: InputArtifact,
     total_bytes_read: int,
@@ -108,14 +175,15 @@ def _read_zip_entry(
     chunks: list[bytes] = []
     entry_bytes_read = 0
 
-    with archive.open(entry, "r") as stream:
+    with archive.open(member.entry, "r") as stream:
         while chunk := stream.read(_ZIP_READ_CHUNK_BYTES):
             entry_bytes_read += len(chunk)
             total_bytes_read += len(chunk)
             if entry_bytes_read > MAX_ZIP_ENTRY_BYTES:
                 raise _zip_limit_error(
                     artifact,
-                    f"entry {entry.filename!r} exceeds {MAX_ZIP_ENTRY_BYTES} bytes",
+                    f"entry {member.relative_path!r} exceeds "
+                    f"{MAX_ZIP_ENTRY_BYTES} bytes",
                 )
             if total_bytes_read > MAX_ZIP_TOTAL_BYTES:
                 raise _zip_limit_error(
@@ -134,17 +202,18 @@ def _read_zip_members(
 ) -> tuple[tuple[BundleScript, ...], tuple[BundlePayload, ...]]:
     entries = archive.infolist()
     _validate_zip_budgets(artifact, entries)
+    members = _validate_zip_members(entries, artifact=artifact)
     total_bytes_read = 0
     scripts: list[BundleScript] = []
     payloads: list[BundlePayload] = []
 
-    for entry in entries:
-        if not _is_regular_zip_entry(entry):
+    for member in members:
+        if member.is_directory:
             continue
 
         raw_content, total_bytes_read = _read_zip_entry(
             archive,
-            entry,
+            member,
             artifact=artifact,
             total_bytes_read=total_bytes_read,
         )
@@ -155,7 +224,7 @@ def _read_zip_members(
         except (UnicodeError, ScriptFormatError):
             payloads.append(
                 BundlePayload(
-                    relative_path=entry.filename,
+                    relative_path=member.relative_path,
                     content=raw_content,
                 )
             )
@@ -164,7 +233,7 @@ def _read_zip_members(
         scripts.append(
             BundleScript(
                 text=script_text,
-                suffix=PurePosixPath(entry.filename).suffix
+                suffix=PurePosixPath(member.relative_path).suffix
                 or _default_script_suffix(),
             )
         )

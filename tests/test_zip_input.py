@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from io import StringIO
 from pathlib import Path
+import stat
 import zipfile
 
 import pytest
@@ -48,22 +49,153 @@ def test_zip_without_scripts_is_rejected_even_with_binary_payloads(
 ) -> None:
     nested_path = tmp_path / "nested.zip"
     _write_zip(nested_path, [("nested.sh", f"{REQUIRED_MARKER}\n")])
-    nested_bytes = nested_path.read_bytes()
 
-    archive_path = tmp_path / "scripts.zip"
+    archive_path = tmp_path / "payloads.zip"
     with zipfile.ZipFile(archive_path, "w") as archive:
-        archive.writestr("folder/", "")
-        link = zipfile.ZipInfo("linked.sh")
-        link.create_system = 3
-        link.external_attr = (0o120777 << 16)
-        archive.writestr(link, f"{REQUIRED_MARKER}\n")
-        archive.writestr("nested.zip", nested_bytes)
+        archive.writestr("folder/", b"")
+        archive.writestr("notes.txt", "not executable\n")
+        archive.writestr("nested.zip", nested_path.read_bytes())
 
     with pytest.raises(PatchHarborError) as raised:
         _run_path(archive_path, tmp_path)
 
     assert raised.value.exit_code is ExitCode.NO_VALID_SCRIPT
     assert str(raised.value).startswith("no valid PatchHarbor scripts found")
+
+
+@pytest.mark.parametrize("entry_type", (stat.S_IFLNK, stat.S_IFIFO))
+def test_zip_rejects_links_and_special_entries_before_any_script_runs(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    entry_type: int,
+) -> None:
+    archive_path = tmp_path / "linked.zip"
+    with zipfile.ZipFile(archive_path, "w") as archive:
+        archive.writestr("run.sh", f"{REQUIRED_MARKER}\n")
+        special = zipfile.ZipInfo("special.bin")
+        special.create_system = 3
+        special.external_attr = (entry_type | 0o777) << 16
+        archive.writestr(special, b"target")
+
+    executed: list[str] = []
+    monkeypatch.setattr(
+        script_application,
+        "execute_script_text",
+        lambda script_text, **kwargs: executed.append(script_text) or 0,
+    )
+
+    with pytest.raises(PatchHarborError) as raised:
+        _run_path(archive_path, tmp_path)
+
+    assert raised.value.exit_code is ExitCode.SOURCE_ERROR
+    assert "unsupported entry type" in str(raised.value)
+    assert executed == []
+
+
+@pytest.mark.parametrize(
+    "member_name",
+    (
+        "../escape.bin",
+        "/absolute.bin",
+        "folder\\payload.bin",
+        "CON/data.bin",
+        "folder/./payload.bin",
+        f"{'a' * 129}/payload.bin",
+    ),
+)
+def test_zip_rejects_unsafe_member_paths_before_execution(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    member_name: str,
+) -> None:
+    archive_path = tmp_path / "unsafe.zip"
+    with zipfile.ZipFile(archive_path, "w") as archive:
+        archive.writestr("run.sh", f"{REQUIRED_MARKER}\n")
+        archive.writestr("safe.bin", b"must-not-be-written")
+        archive.writestr(member_name, b"payload")
+
+    executed: list[str] = []
+    monkeypatch.setattr(
+        script_application,
+        "execute_script_text",
+        lambda script_text, **kwargs: executed.append(script_text) or 0,
+    )
+
+    with pytest.raises(PatchHarborError) as raised:
+        _run_path(archive_path, tmp_path)
+
+    assert raised.value.exit_code is ExitCode.SOURCE_ERROR
+    assert "invalid PatchBundle" in str(raised.value)
+    assert executed == []
+    assert not (tmp_path / "safe.bin").exists()
+
+
+@pytest.mark.parametrize(
+    "member_names",
+    (
+        ("payload.bin", "payload.bin"),
+        ("Payload.bin", "payload.bin"),
+        ("Assets/one.bin", "assets/two.bin"),
+        ("assets", "assets/two.bin"),
+    ),
+)
+def test_zip_rejects_duplicate_and_ambiguous_member_trees(
+    tmp_path: Path,
+    member_names: tuple[str, str],
+) -> None:
+    archive_path = tmp_path / "ambiguous.zip"
+    with zipfile.ZipFile(archive_path, "w") as archive:
+        archive.writestr("run.sh", f"{REQUIRED_MARKER}\n")
+        archive.writestr(member_names[0], b"one")
+        if member_names[0] == member_names[1]:
+            with pytest.warns(UserWarning):
+                archive.writestr(member_names[1], b"two")
+        else:
+            archive.writestr(member_names[1], b"two")
+
+    with pytest.raises(PatchHarborError) as raised:
+        _run_path(archive_path, tmp_path)
+
+    assert raised.value.exit_code is ExitCode.SOURCE_ERROR
+    assert "invalid PatchBundle" in str(raised.value)
+
+
+def test_bundle_write_failure_prevents_every_script_execution(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    archive_path = tmp_path / "write-failure.zip"
+    _write_zip(
+        archive_path,
+        [
+            ("run.sh", f"{REQUIRED_MARKER}\n"),
+            ("payload.txt", "payload"),
+        ],
+    )
+    executed: list[str] = []
+
+    def fail_payload_write(*args: object, **kwargs: object) -> None:
+        raise PatchHarborError(
+            "cannot write bundle file 'payload.txt': denied",
+            ExitCode.FILE_PREPARATION_ERROR,
+        )
+
+    monkeypatch.setattr(
+        script_application,
+        "write_bundle_payloads",
+        fail_payload_write,
+    )
+    monkeypatch.setattr(
+        script_application,
+        "execute_script_text",
+        lambda script_text, **kwargs: executed.append(script_text) or 0,
+    )
+
+    with pytest.raises(PatchHarborError) as raised:
+        _run_path(archive_path, tmp_path)
+
+    assert raised.value.exit_code is ExitCode.FILE_PREPARATION_ERROR
+    assert executed == []
 
 
 @pytest.mark.parametrize(
