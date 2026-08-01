@@ -11,9 +11,9 @@ from typing import TextIO
 from patchharbor.errors import PatchHarborError
 from patchharbor.execution import DEFAULT_TIMEOUT_SECONDS
 from patchharbor.input import (
-    read_script_stdin,
+    run_input_artifact,
     run_script_path,
-    run_script_source,
+    stdin_input_artifact,
 )
 
 
@@ -94,11 +94,12 @@ def _run_command(
                 selection_output=sys.stdout,
             )
 
-        return run_script_source(
-            read_script_stdin(stdin),
-            cwd=Path.cwd(),
-            timeout_seconds=timeout_seconds,
-        )
+        with stdin_input_artifact(stdin) as artifact:
+            return run_input_artifact(
+                artifact,
+                cwd=Path.cwd(),
+                timeout_seconds=timeout_seconds,
+            )
     except PatchHarborError as exc:
         print(f"patchharbor: {exc}", file=sys.stderr)
         return int(exc.exit_code)

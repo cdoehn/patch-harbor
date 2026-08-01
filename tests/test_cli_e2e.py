@@ -47,6 +47,32 @@ def _run_cli(
     )
 
 
+
+
+def _run_cli_bytes(
+    cwd: Path,
+    *arguments: str,
+    input_bytes: bytes,
+) -> subprocess.CompletedProcess[bytes]:
+    environment = os.environ.copy()
+    source_path = str(PROJECT_ROOT / "src")
+    existing_pythonpath = environment.get("PYTHONPATH")
+    environment["PYTHONPATH"] = (
+        source_path
+        if not existing_pythonpath
+        else os.pathsep.join((source_path, existing_pythonpath))
+    )
+    return subprocess.run(
+        [sys.executable, "-m", "patchharbor.cli", *arguments],
+        cwd=cwd,
+        env=environment,
+        check=False,
+        capture_output=True,
+        input=input_bytes,
+        timeout=15,
+    )
+
+
 def _run_patchharbor(
     script_path: Path,
     cwd: Path,
@@ -427,6 +453,30 @@ def test_zip_scripts_run_in_stored_archive_order(tmp_path: Path) -> None:
     assert completed.returncode == 0
     assert completed.stdout == "first\nsecond\n"
     assert completed.stderr == ""
+
+
+
+
+def test_fs_run_reads_zip_patchbundle_from_standard_input_in_archive_order(
+    tmp_path: Path,
+) -> None:
+    from io import BytesIO
+
+    archive_bytes = BytesIO()
+    with zipfile.ZipFile(archive_bytes, "w") as archive:
+        archive.writestr("z-first.sh", _zip_script_text("first"))
+        archive.writestr("a-second.sh", _zip_script_text("second"))
+
+    completed = _run_cli_bytes(
+        tmp_path,
+        "fs",
+        "run",
+        input_bytes=archive_bytes.getvalue(),
+    )
+
+    assert completed.returncode == 0
+    assert completed.stdout.decode().splitlines() == ["first", "second"]
+    assert completed.stderr == b""
 
 
 def test_zip_execution_stops_after_first_failed_script(tmp_path: Path) -> None:
