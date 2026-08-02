@@ -2,20 +2,19 @@
 
 from __future__ import annotations
 
-import codecs
 from collections import deque
+from io import TextIOWrapper
 from threading import Lock, Thread
 from typing import BinaryIO
 
 
 RETAINED_OUTPUT_LINES = 10
 VISIBLE_OUTPUT_LINES = 5
-OUTPUT_CHUNK_BYTES = 64 * 1024
 OUTPUT_READER_JOIN_SECONDS = 2.0
 
 
-class RollingLineBuffer:
-    """Keep only the newest script-output lines and count evictions."""
+class _RollingLineBuffer:
+    """Keep only the newest output lines and count older discarded lines."""
 
     def __init__(self) -> None:
         self._lines: deque[str] = deque(maxlen=RETAINED_OUTPUT_LINES)
@@ -31,93 +30,27 @@ class RollingLineBuffer:
 
     @property
     def retained_lines(self) -> tuple[str, ...]:
-        """Return the at most ten lines retained in memory."""
         with self._lock:
             return tuple(self._lines)
 
     @property
     def visible_lines(self) -> tuple[str, ...]:
-        """Return the last five lines for the current simple output."""
         with self._lock:
             return tuple(self._lines)[-VISIBLE_OUTPUT_LINES:]
 
     @property
     def discarded_line_count(self) -> int:
-        """Return how many older lines were evicted from the buffer."""
         with self._lock:
             return self._discarded_line_count
 
 
-class _Utf8Decoder:
-    """Decode arbitrary byte chunks incrementally and replace invalid input."""
-
-    def __init__(self) -> None:
-        decoder_type = codecs.getincrementaldecoder("utf-8")
-        self._decoder = decoder_type(errors="replace")
-
-    def feed(self, chunk: bytes) -> str:
-        return self._decoder.decode(chunk, final=False)
-
-    def finish(self) -> str:
-        return self._decoder.decode(b"", final=True)
-
-
-class _LineBuilder:
-    """Turn decoded text chunks into normalized output lines."""
-
-    def __init__(self) -> None:
-        self._pending = ""
-
-    def feed(self, text: str) -> tuple[str, ...]:
-        self._pending += text
-        return self._extract_lines(final=False)
-
-    def finish(self, text: str = "") -> tuple[str, ...]:
-        self._pending += text
-        return self._extract_lines(final=True)
-
-    def _extract_lines(self, *, final: bool) -> tuple[str, ...]:
-        data = self._pending
-        lines: list[str] = []
-        start = 0
-        index = 0
-
-        while index < len(data):
-            character = data[index]
-            if character == "\n":
-                lines.append(data[start:index] + "\n")
-                start = index + 1
-            elif character == "\r":
-                if index + 1 == len(data) and not final:
-                    break
-                lines.append(data[start:index] + "\n")
-                if index + 1 < len(data) and data[index + 1] == "\n":
-                    index += 1
-                start = index + 1
-            index += 1
-
-        self._pending = data[start:]
-        if final and self._pending:
-            lines.append(self._pending)
-            self._pending = ""
-        return tuple(lines)
-
-
 class ProcessOutputCapture:
-    """Drain one binary process pipe on a dedicated reader thread."""
+    """Drain and decode one merged binary process pipe on a reader thread."""
 
-    def __init__(
-        self,
-        stream: BinaryIO,
-        *,
-        chunk_size: int = OUTPUT_CHUNK_BYTES,
-    ) -> None:
-        if chunk_size <= 0:
-            raise ValueError("output chunk size must be positive")
-        self.buffer = RollingLineBuffer()
+    def __init__(self, stream: BinaryIO) -> None:
+        self._buffer = _RollingLineBuffer()
         self._stream = stream
-        self._chunk_size = chunk_size
-        self._errors: list[Exception] = []
+        self._error: Exception | None = None
         self._thread = Thread(
             target=self._drain,
             name="patchharbor-output-reader",
@@ -133,6 +66,21 @@ class ProcessOutputCapture:
     @property
     def finished(self) -> bool:
         return self._finished
+
+    @property
+    def retained_lines(self) -> tuple[str, ...]:
+        """Return the at most ten lines retained in memory."""
+        return self._buffer.retained_lines
+
+    @property
+    def visible_lines(self) -> tuple[str, ...]:
+        """Return the last five lines for the current simple output."""
+        return self._buffer.visible_lines
+
+    @property
+    def discarded_line_count(self) -> int:
+        """Return how many older lines were evicted from the buffer."""
+        return self._buffer.discarded_line_count
 
     def start(self) -> None:
         """Start draining before the child can fill its output pipe."""
@@ -154,28 +102,28 @@ class ProcessOutputCapture:
             if self._thread.is_alive():
                 raise OSError("script output reader did not finish")
             self._finished = True
-        if self._errors:
-            raise OSError(f"cannot read script output: {self._errors[0]}")
+        if self._error is not None:
+            raise OSError(f"cannot read script output: {self._error}")
 
     def _drain(self) -> None:
-        decoder = _Utf8Decoder()
-        line_builder = _LineBuilder()
+        text_stream: TextIOWrapper | None = None
         try:
-            while True:
-                chunk = self._stream.read(self._chunk_size)
-                if not chunk:
-                    break
-                if not isinstance(chunk, bytes):
-                    raise TypeError("script output stream did not return bytes")
-                for line in line_builder.feed(decoder.feed(chunk)):
-                    self.buffer.append(line)
-
-            for line in line_builder.finish(decoder.finish()):
-                self.buffer.append(line)
+            text_stream = TextIOWrapper(
+                self._stream,
+                encoding="utf-8",
+                errors="replace",
+                newline=None,
+            )
+            for line in text_stream:
+                self._buffer.append(line)
         except Exception as exc:  # reported by finish() on the controlling thread
-            self._errors.append(exc)
+            self._error = exc
         finally:
             try:
-                self._stream.close()
+                if text_stream is None:
+                    self._stream.close()
+                else:
+                    text_stream.close()
             except OSError as exc:
-                self._errors.append(exc)
+                if self._error is None:
+                    self._error = exc

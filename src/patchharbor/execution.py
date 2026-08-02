@@ -17,7 +17,7 @@ from patchharbor.interpreters import (
     resolve_interpreter,
     select_interpreter,
 )
-from patchharbor.output import ProcessOutputCapture, RollingLineBuffer
+from patchharbor.output import ProcessOutputCapture
 from patchharbor.platform import ProcessState, create_process_tree
 
 
@@ -43,11 +43,11 @@ def _temporary_script_file(script_text: str, *, suffix: str) -> Iterator[Path]:
 
 
 def _write_visible_output(
-    buffer: RollingLineBuffer,
+    lines: tuple[str, ...],
     *,
     destination: TextIO,
 ) -> None:
-    for line in buffer.visible_lines:
+    for line in lines:
         destination.write(line)
     destination.flush()
 
@@ -127,7 +127,7 @@ def execute_script_file(
             result = process_tree.run(timeout_seconds=timeout_seconds)
             capture.finish()
             _write_visible_output(
-                capture.buffer,
+                capture.visible_lines,
                 destination=(
                     sys.stdout if output_stream is None else output_stream
                 ),

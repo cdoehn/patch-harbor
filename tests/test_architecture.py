@@ -205,11 +205,11 @@ def test_execution_delegates_binary_output_capture_to_output_module() -> None:
     )
     output_source = (PACKAGE_ROOT / "output.py").read_text(encoding="utf-8")
 
-    assert "ProcessOutputCapture" in execution_source
+    assert "from patchharbor.output import ProcessOutputCapture" in execution_source
+    assert "RollingLineBuffer" not in execution_source
     assert "threading" not in execution_source
     assert "codecs" not in execution_source
     assert "Thread(" in output_source
-    assert "getincrementaldecoder" in output_source
 
     for platform_module in ("posix.py", "windows.py"):
         source = (PACKAGE_ROOT / "platform" / platform_module).read_text(
