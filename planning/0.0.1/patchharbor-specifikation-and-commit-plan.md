@@ -425,10 +425,13 @@ Version 1 unterstützt bewusst nur Bash und PowerShell.
 
 - Linux ohne Shebang: Bash.
 - Windows ohne Shebang: Windows PowerShell.
-- Ein bekannter, unterstützter Shebang hat Vorrang.
-- Unbekannte oder beliebige Shebang-Kommandos werden nicht ausgeführt.
-- Ein angeforderter Interpreter muss vorhanden sein, sonst endet PatchHarbor mit einem klaren Fehler.
-- PowerShell 7 kann durch einen ausdrücklich unterstützten Shebang gewählt werden, wenn `pwsh` installiert ist.
+- Ein bekannter, unterstützter Shebang in der ersten Skriptzeile hat Vorrang.
+- Bash wird durch `#!/bin/bash`, `#!/usr/bin/bash` oder `#!/usr/bin/env bash` gewählt.
+- Windows PowerShell wird durch `#!powershell`, `#!powershell.exe`, `#!/usr/bin/env powershell` oder `#!/usr/bin/env powershell.exe` gewählt.
+- PowerShell 7 wird durch `#!pwsh`, `#!pwsh.exe`, `#!/usr/bin/pwsh`, `#!/usr/bin/env pwsh` oder `#!/usr/bin/env pwsh.exe` gewählt.
+- Unbekannte, erweiterte oder beliebige Shebang-Kommandos werden nicht ausgeführt.
+- Ein angeforderter Interpreter wird vor dem Prozessstart über den Systempfad gesucht. Fehlt er, endet PatchHarbor mit einem klaren Fehler.
+- Die Dateiendung entscheidet nicht über den Interpreter. Für die temporäre Skriptdatei wird lediglich eine zum ausgewählten Interpreter passende technische Endung verwendet.
 - Weitere Interpreter können später über eine kleine geprüfte Zuordnung ergänzt werden, nicht über freie Kommandoausführung.
 
 ### 9.2 PowerShell auf Windows

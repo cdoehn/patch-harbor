@@ -3,10 +3,13 @@ from __future__ import annotations
 import os
 from collections.abc import Mapping
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import tempfile
 import zipfile
+
+import pytest
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -133,6 +136,71 @@ def test_fs_run_help_is_limited_to_public_arguments(tmp_path: Path) -> None:
 
 def _script_path(tmp_path: Path, stem: str) -> Path:
     return tmp_path / (f"{stem}.ps1" if os.name == "nt" else f"{stem}.sh")
+
+
+def test_fs_run_honors_a_supported_platform_shebang(
+    tmp_path: Path,
+) -> None:
+    script_path = tmp_path / "explicit-interpreter.txt"
+    if os.name == "nt":
+        shebang = "#!powershell.exe"
+        script_body = 'Write-Output "explicit-interpreter"\n'
+    else:
+        shebang = "#!/usr/bin/env bash"
+        script_body = 'printf "%s\\n" "explicit-interpreter"\n'
+    script_path.write_text(
+        f"{shebang}\n{REQUIRED_MARKER}\n{script_body}",
+        encoding="utf-8",
+    )
+
+    completed = _run_patchharbor(script_path, tmp_path)
+
+    assert completed.returncode == 0
+    assert completed.stdout == "explicit-interpreter\n"
+    assert completed.stderr == ""
+
+
+def test_fs_run_rejects_unknown_shebang_before_execution(
+    tmp_path: Path,
+) -> None:
+    sentinel_path = tmp_path / "must-not-exist"
+    script_path = tmp_path / "unknown-interpreter.txt"
+    script_path.write_text(
+        "#!/usr/bin/env python3\n"
+        f"{REQUIRED_MARKER}\n"
+        f'open({str(sentinel_path)!r}, "w").write("executed")\n',
+        encoding="utf-8",
+    )
+
+    completed = _run_patchharbor(script_path, tmp_path)
+
+    assert completed.returncode == 5
+    assert completed.stdout == ""
+    assert completed.stderr == (
+        "patchharbor: unsupported script interpreter in shebang: "
+        "/usr/bin/env python3\n"
+    )
+    assert not sentinel_path.exists()
+
+
+@pytest.mark.skipif(
+    shutil.which("pwsh") is None,
+    reason="PowerShell 7 is not installed",
+)
+def test_fs_run_honors_powershell_7_shebang(tmp_path: Path) -> None:
+    script_path = tmp_path / "powershell-seven.txt"
+    script_path.write_text(
+        "#!/usr/bin/env pwsh\n"
+        f"{REQUIRED_MARKER}\n"
+        'Write-Output "powershell-seven"\n',
+        encoding="utf-8",
+    )
+
+    completed = _run_patchharbor(script_path, tmp_path)
+
+    assert completed.returncode == 0
+    assert completed.stdout == "powershell-seven\n"
+    assert completed.stderr == ""
 
 
 def test_fs_run_executes_a_real_script_file_with_required_marker(
@@ -331,10 +399,11 @@ def test_missing_interpreter_is_reported_as_tool_error(tmp_path: Path) -> None:
         environment_overrides={"PATH": "", "PATHEXT": ""},
     )
 
+    executable = "powershell.exe" if os.name == "nt" else "bash"
     assert completed.returncode == 5
     assert completed.stdout == ""
-    assert completed.stderr.startswith(
-        "patchharbor: cannot start script interpreter:"
+    assert completed.stderr == (
+        f"patchharbor: script interpreter not found: {executable}\n"
     )
 
 
