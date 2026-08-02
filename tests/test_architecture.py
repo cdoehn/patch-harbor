@@ -32,6 +32,7 @@ def test_lower_layers_do_not_import_orchestration_or_unrelated_layers() -> None:
             "interpreters",
             "parser",
             "payload_files",
+            "platform",
             "sources",
         },
         "bundle_paths": {
@@ -41,6 +42,7 @@ def test_lower_layers_do_not_import_orchestration_or_unrelated_layers() -> None:
             "interpreters",
             "parser",
             "payload_files",
+            "platform",
             "sources",
         },
         "sources": {
@@ -50,12 +52,14 @@ def test_lower_layers_do_not_import_orchestration_or_unrelated_layers() -> None:
             "interpreters",
             "parser",
             "payload_files",
+            "platform",
         },
         "bundles": {
             "application",
             "execution",
             "interpreters",
             "payload_files",
+            "platform",
             "sources",
         },
         "parser": {
@@ -64,6 +68,7 @@ def test_lower_layers_do_not_import_orchestration_or_unrelated_layers() -> None:
             "execution",
             "interpreters",
             "payload_files",
+            "platform",
             "sources",
         },
         "payload_files": {
@@ -72,6 +77,7 @@ def test_lower_layers_do_not_import_orchestration_or_unrelated_layers() -> None:
             "execution",
             "interpreters",
             "parser",
+            "platform",
             "sources",
         },
         "interpreters": {
@@ -80,6 +86,7 @@ def test_lower_layers_do_not_import_orchestration_or_unrelated_layers() -> None:
             "execution",
             "parser",
             "payload_files",
+            "platform",
             "sources",
         },
         "execution": {
@@ -135,3 +142,45 @@ def test_runtime_module_dependencies_are_acyclic() -> None:
 
     for module in sorted(modules):
         visit(module)
+
+
+def test_execution_uses_only_the_platform_lifecycle_boundary() -> None:
+    imports = _local_imports("execution")
+    source = (PACKAGE_ROOT / "execution.py").read_text(encoding="utf-8")
+
+    assert "platform" in imports
+    assert "patchharbor.platform.posix" not in source
+    assert "patchharbor.platform.windows" not in source
+    assert "ctypes" not in source
+    assert "killpg" not in source
+    assert "CTRL_BREAK_EVENT" not in source
+    assert "start_new_session" not in source
+
+
+def test_platform_package_does_not_import_application_layers() -> None:
+    disallowed = {
+        "application",
+        "bundles",
+        "cli",
+        "execution",
+        "interpreters",
+        "parser",
+        "payload_files",
+        "sources",
+    }
+    imports: set[str] = set()
+
+    for module_path in (PACKAGE_ROOT / "platform").glob("*.py"):
+        tree = ast.parse(module_path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom) and node.module:
+                if node.module.startswith("patchharbor."):
+                    imports.add(node.module.split(".", 1)[1].split(".", 1)[0])
+            elif isinstance(node, ast.Import):
+                for alias in node.names:
+                    if alias.name.startswith("patchharbor."):
+                        imports.add(
+                            alias.name.split(".", 1)[1].split(".", 1)[0]
+                        )
+
+    assert imports.isdisjoint(disallowed)

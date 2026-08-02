@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-import subprocess
 
 import pytest
 
@@ -9,33 +8,50 @@ from patchharbor.errors import ExitCode, PatchHarborError
 import patchharbor.execution as execution
 from patchharbor.execution import execute_script_text
 import patchharbor.interpreters as interpreters
+from patchharbor.platform import ProcessTreeTimeout
 
 
-class _CompletedProcess:
-    def __init__(self, returncode: int) -> None:
-        self.pid = 123456
-        self.returncode: int | None = None
-        self._result = returncode
+class _FakeProcessTree:
+    def __init__(
+        self,
+        *,
+        returncode: int = 0,
+        wait_error: BaseException | None = None,
+        stop_error: OSError | None = None,
+    ) -> None:
+        self.returncode = returncode
+        self.wait_error = wait_error
+        self.stop_error = stop_error
+        self.wait_timeouts: list[float] = []
+        self.stop_calls: list[bool] = []
+        self.entered = 0
+        self.closed = 0
+        self.exit_exception: type[BaseException] | None = None
 
-    def wait(self, timeout: float | None = None) -> int:
-        self.returncode = self._result
-        return self._result
+    def __enter__(self) -> _FakeProcessTree:
+        self.entered += 1
+        return self
 
-    def poll(self) -> int | None:
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: object,
+    ) -> bool:
+        self.exit_exception = exc_type
+        self.closed += 1
+        return False
+
+    def wait(self, *, timeout_seconds: float) -> int:
+        self.wait_timeouts.append(timeout_seconds)
+        if self.wait_error is not None:
+            raise self.wait_error
         return self.returncode
 
-    def kill(self) -> None:
-        self.returncode = -9
-
-
-class _TimedOutProcess(_CompletedProcess):
-    def wait(self, timeout: float | None = None) -> int:
-        raise subprocess.TimeoutExpired(["interpreter"], timeout)
-
-
-class _InterruptedProcess(_CompletedProcess):
-    def wait(self, timeout: float | None = None) -> int:
-        raise KeyboardInterrupt
+    def stop(self, *, graceful: bool) -> None:
+        self.stop_calls.append(graceful)
+        if self.stop_error is not None:
+            raise self.stop_error
 
 
 def _patch_resolved_interpreter(
@@ -53,26 +69,26 @@ def test_execution_stages_with_selected_technical_suffix(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     observed: list[tuple[list[str], Path]] = []
+    process_tree = _FakeProcessTree(returncode=0)
     _patch_resolved_interpreter(monkeypatch)
 
-    def fake_start_process(
+    def fake_create_process_tree(
         command: list[str],
         *,
         cwd: Path,
-    ) -> tuple[_CompletedProcess, None]:
+    ) -> _FakeProcessTree:
         script_path = Path(command[-1])
         assert script_path.suffix == ".sh"
         assert script_path.read_text(encoding="utf-8").startswith(
             "#!/usr/bin/env bash"
         )
         observed.append((command, cwd))
-        return _CompletedProcess(0), None
+        return process_tree
 
-    monkeypatch.setattr(execution, "_start_process", fake_start_process)
     monkeypatch.setattr(
         execution,
-        "_stop_process_tree",
-        lambda *args, **kwargs: None,
+        "create_process_tree",
+        fake_create_process_tree,
     )
 
     result = execute_script_text(
@@ -87,6 +103,10 @@ def test_execution_stages_with_selected_technical_suffix(
     assert command[0] == "/interpreters/bash"
     assert Path(command[-1]).suffix == ".sh"
     assert observed_cwd == tmp_path
+    assert process_tree.wait_timeouts == [7]
+    assert process_tree.stop_calls == [False]
+    assert process_tree.entered == 1
+    assert process_tree.closed == 1
 
 
 def test_interpreter_selection_error_happens_before_process_start(
@@ -100,7 +120,7 @@ def test_interpreter_selection_error_happens_before_process_start(
         process_started = True
         raise AssertionError("process must not start")
 
-    monkeypatch.setattr(execution, "_start_process", fail_if_started)
+    monkeypatch.setattr(execution, "create_process_tree", fail_if_started)
 
     with pytest.raises(PatchHarborError) as raised:
         execute_script_text(
@@ -125,7 +145,7 @@ def test_missing_selected_interpreter_happens_before_process_start(
         process_started = True
         raise AssertionError("process must not start")
 
-    monkeypatch.setattr(execution, "_start_process", fail_if_started)
+    monkeypatch.setattr(execution, "create_process_tree", fail_if_started)
 
     with pytest.raises(PatchHarborError) as raised:
         execute_script_text(
@@ -139,26 +159,48 @@ def test_missing_selected_interpreter_happens_before_process_start(
     assert not process_started
 
 
+def test_process_start_error_is_reported_as_interpreter_error(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _patch_resolved_interpreter(monkeypatch)
+    monkeypatch.setattr(
+        execution,
+        "create_process_tree",
+        lambda command, cwd: (_ for _ in ()).throw(OSError("start failed")),
+    )
+
+    with pytest.raises(PatchHarborError) as raised:
+        execute_script_text(
+            "#!/usr/bin/env bash\n# PATCHHARBOR\n",
+            cwd=tmp_path,
+            timeout_seconds=7,
+        )
+
+    assert raised.value.exit_code is ExitCode.INTERPRETER_ERROR
+    assert str(raised.value) == "cannot start script interpreter: start failed"
+
+
 def test_nonzero_powershell_result_is_returned_without_policy_bypass(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     observed_command: list[str] = []
+    process_tree = _FakeProcessTree(returncode=1)
     _patch_resolved_interpreter(monkeypatch)
 
-    def fake_start_process(
+    def fake_create_process_tree(
         command: list[str],
         *,
         cwd: Path,
-    ) -> tuple[_CompletedProcess, None]:
+    ) -> _FakeProcessTree:
         observed_command.extend(command)
-        return _CompletedProcess(1), None
+        return process_tree
 
-    monkeypatch.setattr(execution, "_start_process", fake_start_process)
     monkeypatch.setattr(
         execution,
-        "_stop_process_tree",
-        lambda *args, **kwargs: None,
+        "create_process_tree",
+        fake_create_process_tree,
     )
 
     result = execute_script_text(
@@ -171,6 +213,8 @@ def test_nonzero_powershell_result_is_returned_without_policy_bypass(
     lowered = {argument.casefold() for argument in observed_command}
     assert "-executionpolicy" not in lowered
     assert "bypass" not in lowered
+    assert process_tree.stop_calls == [False]
+    assert process_tree.closed == 1
 
 
 def test_timeout_stops_the_process_tree_and_returns_124(
@@ -178,18 +222,11 @@ def test_timeout_stops_the_process_tree_and_returns_124(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _patch_resolved_interpreter(monkeypatch)
-    process = _TimedOutProcess(0)
-    stop_calls: list[bool] = []
-
+    process_tree = _FakeProcessTree(wait_error=ProcessTreeTimeout())
     monkeypatch.setattr(
         execution,
-        "_start_process",
-        lambda command, cwd: (process, None),
-    )
-    monkeypatch.setattr(
-        execution,
-        "_stop_process_tree",
-        lambda process, job_handle, *, graceful: stop_calls.append(graceful),
+        "create_process_tree",
+        lambda command, cwd: process_tree,
     )
 
     with pytest.raises(PatchHarborError) as raised:
@@ -200,7 +237,9 @@ def test_timeout_stops_the_process_tree_and_returns_124(
         )
 
     assert raised.value.exit_code is ExitCode.TIMEOUT
-    assert stop_calls == [True]
+    assert process_tree.stop_calls == [True]
+    assert process_tree.closed == 1
+    assert process_tree.exit_exception is PatchHarborError
 
 
 def test_keyboard_interrupt_stops_the_process_tree_and_returns_130(
@@ -208,18 +247,11 @@ def test_keyboard_interrupt_stops_the_process_tree_and_returns_130(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _patch_resolved_interpreter(monkeypatch)
-    process = _InterruptedProcess(0)
-    stop_calls: list[bool] = []
-
+    process_tree = _FakeProcessTree(wait_error=KeyboardInterrupt())
     monkeypatch.setattr(
         execution,
-        "_start_process",
-        lambda command, cwd: (process, None),
-    )
-    monkeypatch.setattr(
-        execution,
-        "_stop_process_tree",
-        lambda process, job_handle, *, graceful: stop_calls.append(graceful),
+        "create_process_tree",
+        lambda command, cwd: process_tree,
     )
 
     with pytest.raises(PatchHarborError) as raised:
@@ -231,45 +263,62 @@ def test_keyboard_interrupt_stops_the_process_tree_and_returns_130(
 
     assert raised.value.exit_code is ExitCode.INTERRUPTED
     assert str(raised.value) == "script aborted by user"
-    assert stop_calls == [True]
+    assert process_tree.stop_calls == [True]
+    assert process_tree.closed == 1
+    assert process_tree.exit_exception is PatchHarborError
 
 
-def test_force_kill_follows_the_two_second_grace_period(
+def test_process_tree_is_closed_when_waiting_raises_an_os_error(
+    tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    process = _CompletedProcess(0)
-    events: list[str] = []
-
+    _patch_resolved_interpreter(monkeypatch)
+    process_tree = _FakeProcessTree(wait_error=OSError("wait failed"))
     monkeypatch.setattr(
         execution,
-        "_request_process_tree_stop",
-        lambda process, job_handle: events.append("request"),
-    )
-    def fake_wait_for_tree(
-        process: _CompletedProcess,
-        job_handle: object | None,
-        *,
-        timeout_seconds: float,
-    ) -> bool:
-        events.append(f"wait:{timeout_seconds:g}")
-        return timeout_seconds == 1.0
-
-    monkeypatch.setattr(
-        execution,
-        "_wait_for_process_tree_exit",
-        fake_wait_for_tree,
-    )
-    monkeypatch.setattr(
-        execution,
-        "_force_process_tree_stop",
-        lambda process, job_handle: events.append("force"),
-    )
-    monkeypatch.setattr(
-        execution,
-        "_reap_root_process",
-        lambda process: events.append("reap"),
+        "create_process_tree",
+        lambda command, cwd: process_tree,
     )
 
-    execution._stop_process_tree(process, None, graceful=True)
+    with pytest.raises(PatchHarborError) as raised:
+        execute_script_text(
+            "#!/usr/bin/env bash\n# PATCHHARBOR\n",
+            cwd=tmp_path,
+            timeout_seconds=7,
+        )
 
-    assert events == ["request", "wait:2", "force", "wait:1", "reap"]
+    assert raised.value.exit_code is ExitCode.EXECUTION_ERROR
+    assert str(raised.value) == "cannot control script process tree: wait failed"
+    assert process_tree.closed == 1
+    assert process_tree.exit_exception is OSError
+
+
+def test_process_tree_is_closed_when_final_descendant_cleanup_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _patch_resolved_interpreter(monkeypatch)
+    process_tree = _FakeProcessTree(
+        returncode=0,
+        stop_error=OSError("cleanup failed"),
+    )
+    monkeypatch.setattr(
+        execution,
+        "create_process_tree",
+        lambda command, cwd: process_tree,
+    )
+
+    with pytest.raises(PatchHarborError) as raised:
+        execute_script_text(
+            "#!/usr/bin/env bash\n# PATCHHARBOR\n",
+            cwd=tmp_path,
+            timeout_seconds=7,
+        )
+
+    assert raised.value.exit_code is ExitCode.EXECUTION_ERROR
+    assert str(raised.value) == (
+        "cannot control script process tree: cleanup failed"
+    )
+    assert process_tree.stop_calls == [False]
+    assert process_tree.closed == 1
+    assert process_tree.exit_exception is OSError
