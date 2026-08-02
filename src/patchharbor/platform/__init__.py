@@ -5,10 +5,19 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from patchharbor.platform.lifecycle import ProcessTree, ProcessTreeTimeout
+from patchharbor.platform.lifecycle import (
+    ProcessResult,
+    ProcessState,
+    ProcessTree,
+)
 
 
-__all__ = ["ProcessTree", "ProcessTreeTimeout", "create_process_tree"]
+__all__ = [
+    "ProcessResult",
+    "ProcessState",
+    "ProcessTree",
+    "create_process_tree",
+]
 
 
 def create_process_tree(command: list[str], *, cwd: Path) -> ProcessTree:

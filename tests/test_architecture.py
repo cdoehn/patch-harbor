@@ -155,6 +155,9 @@ def test_execution_uses_only_the_platform_lifecycle_boundary() -> None:
     assert "killpg" not in source
     assert "CTRL_BREAK_EVENT" not in source
     assert "start_new_session" not in source
+    assert "process_tree.wait(" not in source
+    assert "process_tree.stop(" not in source
+    assert "process_tree.run(" in source
 
 
 def test_platform_package_does_not_import_application_layers() -> None:

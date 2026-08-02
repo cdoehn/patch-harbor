@@ -4,7 +4,8 @@ import subprocess
 
 import pytest
 
-from patchharbor.platform import ProcessTreeTimeout
+from patchharbor.platform import ProcessState
+from patchharbor.platform import lifecycle
 from patchharbor.platform.lifecycle import ProcessTree
 
 
@@ -19,12 +20,12 @@ class _FakeRootProcess:
         self.returncode = returncode
         self.wait_error = wait_error
         self.kill_calls = 0
-        self.wait_calls: list[float | None] = []
 
     def wait(self, timeout: float | None = None) -> int:
-        self.wait_calls.append(timeout)
         if self.wait_error is not None:
-            raise self.wait_error
+            error = self.wait_error
+            self.wait_error = None
+            raise error
         if self.returncode is None:
             self.returncode = 0
         return self.returncode
@@ -42,83 +43,103 @@ class _TestProcessTree(ProcessTree):
         self,
         process: _FakeRootProcess,
         *,
-        tree_states: list[bool] | None = None,
-        wait_results: list[bool] | None = None,
+        tree_alive: bool = True,
+        graceful_stop_works: bool = True,
     ) -> None:
         super().__init__(process)  # type: ignore[arg-type]
-        self.tree_states = list(tree_states or [False])
-        self.wait_results = list(wait_results or [])
-        self.events: list[str] = []
+        self.tree_alive = tree_alive
+        self.graceful_stop_works = graceful_stop_works
+        self.resources_closed = 0
 
     def _tree_has_processes(self) -> bool:
-        self.events.append("has")
-        if len(self.tree_states) > 1:
-            return self.tree_states.pop(0)
-        return self.tree_states[0]
+        return self.tree_alive
 
     def _request_stop(self) -> None:
-        self.events.append("request")
+        if self.graceful_stop_works:
+            self.tree_alive = False
+            if self._process.returncode is None:
+                self._process.returncode = -15
 
     def _force_stop(self) -> None:
-        self.events.append("force")
-
-    def _wait_for_tree_exit(self, *, timeout_seconds: float) -> bool:
-        self.events.append(f"wait:{timeout_seconds:g}")
-        if self.wait_results:
-            return self.wait_results.pop(0)
-        return True
+        self.tree_alive = False
+        if self._process.returncode is None:
+            self._process.returncode = -9
 
     def _close_platform_resources(self) -> None:
-        self.events.append("close")
+        self.resources_closed += 1
 
 
-def test_wait_translates_subprocess_timeout_to_lifecycle_timeout() -> None:
+def test_completed_run_returns_exit_code_and_removes_descendants() -> None:
+    process = _FakeRootProcess(returncode=7)
+    tree = _TestProcessTree(process, tree_alive=True)
+
+    with tree:
+        result = tree.run(timeout_seconds=1.5)
+
+    assert result.state is ProcessState.EXITED
+    assert result.return_code == 7
+    assert not tree.tree_alive
+    assert tree.resources_closed == 1
+
+
+def test_timeout_returns_one_terminal_state_and_stops_tree(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(lifecycle, "GRACEFUL_STOP_SECONDS", 0.0)
     process = _FakeRootProcess(
         wait_error=subprocess.TimeoutExpired(["interpreter"], 1.5)
     )
-    tree = _TestProcessTree(process)
-
-    with pytest.raises(ProcessTreeTimeout):
-        tree.wait(timeout_seconds=1.5)
-
-    assert process.wait_calls == [1.5]
-
-
-def test_graceful_stop_uses_force_after_two_second_grace_period() -> None:
-    process = _FakeRootProcess(returncode=0)
     tree = _TestProcessTree(
         process,
-        wait_results=[False, True],
+        tree_alive=True,
+        graceful_stop_works=False,
     )
 
-    tree.stop(graceful=True)
+    with tree:
+        result = tree.run(timeout_seconds=1.5)
 
-    assert tree.events == ["request", "wait:2", "force", "wait:1"]
+    assert result.state is ProcessState.TIMED_OUT
+    assert result.return_code is None
+    assert not tree.tree_alive
+    assert tree.resources_closed == 1
 
 
-def test_natural_exit_race_does_not_force_an_already_empty_tree() -> None:
+def test_keyboard_interrupt_returns_one_terminal_state_and_stops_tree() -> None:
+    process = _FakeRootProcess(wait_error=KeyboardInterrupt())
+    tree = _TestProcessTree(process, tree_alive=True)
+
+    with tree:
+        result = tree.run(timeout_seconds=10)
+
+    assert result.state is ProcessState.INTERRUPTED
+    assert result.return_code is None
+    assert not tree.tree_alive
+    assert tree.resources_closed == 1
+
+
+def test_process_tree_can_only_be_run_once() -> None:
     process = _FakeRootProcess(returncode=0)
-    tree = _TestProcessTree(
-        process,
-        wait_results=[True],
-    )
+    tree = _TestProcessTree(process, tree_alive=False)
 
-    tree.stop(graceful=True)
+    with tree:
+        result = tree.run(timeout_seconds=1)
+        with pytest.raises(RuntimeError, match="already been run"):
+            tree.run(timeout_seconds=1)
 
-    assert tree.events == ["request", "wait:2"]
+    assert result.state is ProcessState.EXITED
+    assert tree.resources_closed == 1
 
 
-def test_context_cleanup_runs_once_when_body_raises() -> None:
-    process = _FakeRootProcess(returncode=0)
-    tree = _TestProcessTree(process)
+def test_context_cleanup_stops_tree_when_waiting_raises() -> None:
+    process = _FakeRootProcess(wait_error=OSError("wait failed"))
+    tree = _TestProcessTree(process, tree_alive=True)
 
-    with pytest.raises(RuntimeError, match="body failed"):
+    with pytest.raises(OSError, match="wait failed"):
         with tree:
-            raise RuntimeError("body failed")
+            tree.run(timeout_seconds=1)
 
-    assert tree.events == ["has", "close"]
-    tree.close()
-    assert tree.events == ["has", "close"]
+    assert not tree.tree_alive
+    assert tree.resources_closed == 1
 
 
 def test_cleanup_error_does_not_hide_existing_body_error() -> None:
@@ -128,25 +149,8 @@ def test_cleanup_error_does_not_hide_existing_body_error() -> None:
         def _close_platform_resources(self) -> None:
             raise OSError("close failed")
 
-    tree = _FailingCloseTree(process)
+    tree = _FailingCloseTree(process, tree_alive=True)
 
     with pytest.raises(RuntimeError, match="body failed"):
         with tree:
             raise RuntimeError("body failed")
-
-
-def test_close_releases_platform_resources_when_stop_check_fails() -> None:
-    process = _FakeRootProcess(returncode=0)
-
-    class _FailingStopTree(_TestProcessTree):
-        def _tree_has_processes(self) -> bool:
-            raise OSError("tree query failed")
-
-    tree = _FailingStopTree(process)
-
-    with pytest.raises(OSError, match="tree query failed"):
-        tree.close()
-
-    assert tree.events == ["close"]
-    tree.close()
-    assert tree.events == ["close"]

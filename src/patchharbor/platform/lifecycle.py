@@ -3,19 +3,34 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from enum import Enum, auto
 import subprocess
 import time
 from types import TracebackType
 from typing import Self
 
 
-FORCE_KILL_GRACE_SECONDS = 2.0
-_FORCE_KILL_WAIT_SECONDS = 1.0
-_PROCESS_TREE_POLL_SECONDS = 0.05
+GRACEFUL_STOP_SECONDS = 2.0
+FORCE_STOP_SECONDS = 1.0
+PROCESS_TREE_POLL_SECONDS = 0.05
 
 
-class ProcessTreeTimeout(TimeoutError):
-    """The root process exceeded its configured execution timeout."""
+class ProcessState(Enum):
+    """Terminal-independent states of one process-tree run."""
+
+    RUNNING = auto()
+    EXITED = auto()
+    TIMED_OUT = auto()
+    INTERRUPTED = auto()
+
+
+@dataclass(frozen=True, slots=True)
+class ProcessResult:
+    """Result of waiting for and cleaning up one owned process tree."""
+
+    state: ProcessState
+    return_code: int | None = None
 
 
 class ProcessTree(ABC):
@@ -23,6 +38,8 @@ class ProcessTree(ABC):
 
     def __init__(self, process: subprocess.Popen[bytes]) -> None:
         self._process = process
+        self._state = ProcessState.RUNNING
+        self._tree_stopped = False
         self._closed = False
 
     def __enter__(self) -> Self:
@@ -41,35 +58,29 @@ class ProcessTree(ABC):
                 raise
         return False
 
-    def wait(self, *, timeout_seconds: float) -> int:
-        """Wait for the root process while preserving platform interrupt behavior."""
-        try:
-            return self._wait_root(timeout_seconds=timeout_seconds)
-        except subprocess.TimeoutExpired as exc:
-            raise ProcessTreeTimeout from exc
-
-    def stop(self, *, graceful: bool) -> None:
-        """Stop all remaining processes and reap the root process."""
+    def run(self, *, timeout_seconds: float) -> ProcessResult:
+        """Wait once, classify the result, and stop all remaining processes."""
         if self._closed:
-            return
+            raise RuntimeError("process tree is closed")
+        if self._state is not ProcessState.RUNNING:
+            raise RuntimeError("process tree has already been run")
 
-        if graceful:
-            self._request_stop()
-            stopped = self._wait_for_tree_exit(
-                timeout_seconds=FORCE_KILL_GRACE_SECONDS
-            )
-        else:
-            stopped = not self._tree_has_processes()
+        return_code: int | None = None
+        try:
+            return_code = self._wait_root(timeout_seconds=timeout_seconds)
+            self._state = ProcessState.EXITED
+        except subprocess.TimeoutExpired:
+            self._state = ProcessState.TIMED_OUT
+        except KeyboardInterrupt:
+            self._state = ProcessState.INTERRUPTED
 
-        if not stopped:
-            self._force_stop()
-            stopped = self._wait_for_tree_exit(
-                timeout_seconds=_FORCE_KILL_WAIT_SECONDS
-            )
-        if not stopped:
-            raise OSError("script process tree did not terminate")
-
-        self._reap_root()
+        self._stop_remaining_processes(
+            graceful=self._state in {
+                ProcessState.TIMED_OUT,
+                ProcessState.INTERRUPTED,
+            }
+        )
+        return ProcessResult(self._state, return_code)
 
     def close(self) -> None:
         """Guarantee process-tree cleanup and release platform resources once."""
@@ -78,7 +89,7 @@ class ProcessTree(ABC):
 
         cleanup_error: OSError | None = None
         try:
-            self.stop(graceful=False)
+            self._stop_remaining_processes(graceful=False)
         except OSError as exc:
             cleanup_error = exc
         try:
@@ -91,19 +102,42 @@ class ProcessTree(ABC):
         if cleanup_error is not None:
             raise cleanup_error
 
+    def _stop_remaining_processes(self, *, graceful: bool) -> None:
+        if self._tree_stopped:
+            return
+
+        if graceful:
+            self._request_stop()
+            stopped = self._wait_for_tree_exit(
+                timeout_seconds=GRACEFUL_STOP_SECONDS
+            )
+        else:
+            stopped = not self._tree_has_processes()
+
+        if not stopped:
+            self._force_stop()
+            stopped = self._wait_for_tree_exit(
+                timeout_seconds=FORCE_STOP_SECONDS
+            )
+        if not stopped:
+            raise OSError("script process tree did not terminate")
+
+        self._reap_root()
+        self._tree_stopped = True
+
     def _wait_for_tree_exit(self, *, timeout_seconds: float) -> bool:
         deadline = time.monotonic() + timeout_seconds
         while self._tree_has_processes():
             if time.monotonic() >= deadline:
                 return False
-            time.sleep(_PROCESS_TREE_POLL_SECONDS)
+            time.sleep(PROCESS_TREE_POLL_SECONDS)
         return True
 
     def _reap_root(self) -> None:
         if self._process.poll() is not None:
             return
         try:
-            self._process.wait(timeout=_FORCE_KILL_WAIT_SECONDS)
+            self._process.wait(timeout=FORCE_STOP_SECONDS)
         except subprocess.TimeoutExpired:
             self._process.kill()
             self._process.wait()

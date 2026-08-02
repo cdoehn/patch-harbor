@@ -15,7 +15,7 @@ from patchharbor.interpreters import (
     resolve_interpreter,
     select_interpreter,
 )
-from patchharbor.platform import ProcessTreeTimeout, create_process_tree
+from patchharbor.platform import ProcessState, create_process_tree
 
 
 DEFAULT_TIMEOUT_SECONDS = 300.0
@@ -93,27 +93,22 @@ def execute_script_file(
 
     try:
         with process_tree:
-            try:
-                return_code = process_tree.wait(
-                    timeout_seconds=timeout_seconds
-                )
-            except ProcessTreeTimeout as exc:
-                process_tree.stop(graceful=True)
+            result = process_tree.run(timeout_seconds=timeout_seconds)
+            if result.state is ProcessState.TIMED_OUT:
                 raise PatchHarborError(
                     f"script timed out after {timeout_seconds:g} seconds",
                     ExitCode.TIMEOUT,
-                ) from exc
-            except KeyboardInterrupt as exc:
-                process_tree.stop(graceful=True)
+                )
+            if result.state is ProcessState.INTERRUPTED:
                 raise PatchHarborError(
                     "script aborted by user",
                     ExitCode.INTERRUPTED,
-                ) from exc
-
-            # The root may exit while descendants remain. The lifecycle owns
-            # those processes and removes them before the result is returned.
-            process_tree.stop(graceful=False)
-            return return_code
+                )
+            if result.state is not ProcessState.EXITED:
+                raise OSError("script process tree returned no terminal result")
+            if result.return_code is None:
+                raise OSError("script process tree returned no exit code")
+            return result.return_code
     except PatchHarborError:
         raise
     except OSError as exc:
