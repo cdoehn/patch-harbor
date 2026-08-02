@@ -8,7 +8,6 @@ import os
 from pathlib import Path
 import sys
 import tempfile
-import threading
 from typing import TextIO
 
 from patchharbor.errors import ExitCode, PatchHarborError
@@ -18,12 +17,11 @@ from patchharbor.interpreters import (
     resolve_interpreter,
     select_interpreter,
 )
-from patchharbor.output import RollingLineBuffer
-from patchharbor.platform import ProcessState, ProcessTree, create_process_tree
+from patchharbor.output import ProcessOutputCapture, RollingLineBuffer
+from patchharbor.platform import ProcessState, create_process_tree
 
 
 DEFAULT_TIMEOUT_SECONDS = 300.0
-OUTPUT_READER_JOIN_SECONDS = 2.0
 
 
 @contextmanager
@@ -42,24 +40,6 @@ def _temporary_script_file(script_text: str, *, suffix: str) -> Iterator[Path]:
         yield script_path
     finally:
         script_path.unlink(missing_ok=True)
-
-
-def _read_process_output(
-    stream: TextIO,
-    buffer: RollingLineBuffer,
-    errors: list[Exception],
-) -> None:
-    """Drain merged process output while the process tree is running."""
-    try:
-        for line in stream:
-            buffer.append(line)
-    except Exception as exc:  # reported by the controlling thread
-        errors.append(exc)
-    finally:
-        try:
-            stream.close()
-        except OSError as exc:
-            errors.append(exc)
 
 
 def _write_visible_output(
@@ -105,6 +85,16 @@ def execute_script_text(
         ) from exc
 
 
+def _finish_capture_after_process_error(capture: ProcessOutputCapture) -> None:
+    """Drain the now-closed process pipe without hiding the primary failure."""
+    if not capture.started or capture.finished:
+        return
+    try:
+        capture.finish()
+    except OSError:
+        pass
+
+
 def execute_script_file(
     script_path: Path,
     *,
@@ -129,29 +119,15 @@ def execute_script_file(
             ExitCode.INTERPRETER_ERROR,
         ) from exc
 
-    buffer = RollingLineBuffer()
-    reader_errors: list[Exception] = []
-    reader: threading.Thread | None = None
+    capture = ProcessOutputCapture(process_tree.output_stream)
 
     try:
         with process_tree:
-            reader = threading.Thread(
-                target=_read_process_output,
-                args=(process_tree.output_stream, buffer, reader_errors),
-                name="patchharbor-output-reader",
-                daemon=True,
-            )
-            reader.start()
+            capture.start()
             result = process_tree.run(timeout_seconds=timeout_seconds)
-
-            reader.join(timeout=OUTPUT_READER_JOIN_SECONDS)
-            if reader.is_alive():
-                raise OSError("script output reader did not finish")
-            if reader_errors:
-                raise OSError(f"cannot read script output: {reader_errors[0]}")
-
+            capture.finish()
             _write_visible_output(
-                buffer,
+                capture.buffer,
                 destination=(
                     sys.stdout if output_stream is None else output_stream
                 ),
@@ -173,12 +149,11 @@ def execute_script_file(
                 raise OSError("script process tree returned no exit code")
             return result.return_code
     except PatchHarborError:
+        _finish_capture_after_process_error(capture)
         raise
     except OSError as exc:
+        _finish_capture_after_process_error(capture)
         raise PatchHarborError(
             f"cannot control script process tree: {exc}",
             ExitCode.EXECUTION_ERROR,
         ) from exc
-    finally:
-        if reader is not None and reader.is_alive():
-            reader.join(timeout=OUTPUT_READER_JOIN_SECONDS)

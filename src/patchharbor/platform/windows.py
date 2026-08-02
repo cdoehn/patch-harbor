@@ -148,7 +148,7 @@ class WindowsProcessTree(ProcessTree):
 
     def __init__(
         self,
-        process: subprocess.Popen[str],
+        process: subprocess.Popen[bytes],
         job_handle: object,
     ) -> None:
         super().__init__(process)
@@ -162,10 +162,7 @@ class WindowsProcessTree(ProcessTree):
             stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            bufsize=1,
+            bufsize=0,
             creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
         )
         job_handle: object | None = None

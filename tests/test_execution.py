@@ -19,7 +19,7 @@ class _FakeProcessTree:
         result: ProcessResult | None = None,
         run_error: BaseException | None = None,
         close_error: OSError | None = None,
-        output_text: str = "",
+        output_bytes: bytes = b"",
     ) -> None:
         self.result = result or ProcessResult(ProcessState.EXITED, 0)
         self.run_error = run_error
@@ -28,7 +28,7 @@ class _FakeProcessTree:
         self.entered = 0
         self.closed = 0
         self.exit_exception: type[BaseException] | None = None
-        self.output_stream = io.StringIO(output_text)
+        self.output_stream = io.BytesIO(output_bytes)
 
     def __enter__(self) -> _FakeProcessTree:
         self.entered += 1
@@ -323,7 +323,9 @@ def test_execution_shows_only_last_five_merged_lines(
 ) -> None:
     _patch_resolved_interpreter(monkeypatch)
     process_tree = _FakeProcessTree(
-        output_text="".join(f"line-{number}\n" for number in range(1, 13))
+        output_bytes="".join(
+            f"line-{number}\n" for number in range(1, 13)
+        ).encode()
     )
     monkeypatch.setattr(
         execution,
@@ -344,3 +346,27 @@ def test_execution_shows_only_last_five_merged_lines(
         f"line-{number}\n" for number in range(8, 13)
     )
     assert process_tree.output_stream.closed
+
+
+def test_execution_replaces_invalid_utf8_output(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _patch_resolved_interpreter(monkeypatch)
+    process_tree = _FakeProcessTree(output_bytes=b"bad-\xff-output\n")
+    monkeypatch.setattr(
+        execution,
+        "create_process_tree",
+        lambda command, cwd: process_tree,
+    )
+    destination = io.StringIO()
+
+    result = execute_script_text(
+        "#!/usr/bin/env bash\n# PATCHHARBOR\n",
+        cwd=tmp_path,
+        timeout_seconds=7,
+        output_stream=destination,
+    )
+
+    assert result == 0
+    assert destination.getvalue() == "bad-�-output\n"

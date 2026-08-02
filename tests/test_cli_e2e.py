@@ -1209,13 +1209,13 @@ def test_fs_run_keeps_only_last_five_lines_from_large_output(
     script_path = _script_path(tmp_path, "large-output")
     if os.name == "nt":
         script_body = (
-            "1..2000 | ForEach-Object { "
+            "1..20000 | ForEach-Object { "
             '[Console]::Out.WriteLine(("line-{0:D4}" -f $_)) }\n'
         )
     else:
         script_body = (
             'number=1\n'
-            'while [ "$number" -le 2000 ]; do\n'
+            'while [ "$number" -le 20000 ]; do\n'
             '    printf "line-%04d\\n" "$number"\n'
             '    number=$((number + 1))\n'
             'done\n'
@@ -1229,11 +1229,11 @@ def test_fs_run_keeps_only_last_five_lines_from_large_output(
 
     assert completed.returncode == 0
     assert completed.stdout.splitlines() == [
-        "line-1996",
-        "line-1997",
-        "line-1998",
-        "line-1999",
-        "line-2000",
+        "line-19996",
+        "line-19997",
+        "line-19998",
+        "line-19999",
+        "line-20000",
     ]
     assert completed.stderr == ""
 
@@ -1299,4 +1299,27 @@ def test_fs_run_handles_long_and_unterminated_output_from_fast_script(
 
     assert completed.returncode == 0
     assert completed.stdout == f"{long_line}\nfinal-without-newline"
+    assert completed.stderr == ""
+
+
+def test_fs_run_replaces_invalid_utf8_from_script_output(tmp_path: Path) -> None:
+    script_path = _script_path(tmp_path, "invalid-utf8-output")
+    if os.name == "nt":
+        script_body = (
+            "$bytes = [byte[]](0x62,0x61,0x64,0x2D,0xFF,0x0A)\n"
+            "$stream = [Console]::OpenStandardOutput()\n"
+            "$stream.Write($bytes, 0, $bytes.Length)\n"
+            "$stream.Flush()\n"
+        )
+    else:
+        script_body = "printf 'bad-\\377\\n'\n"
+    script_path.write_text(
+        f"{REQUIRED_MARKER}\n{script_body}",
+        encoding="utf-8",
+    )
+
+    completed = _run_patchharbor(script_path, tmp_path)
+
+    assert completed.returncode == 0
+    assert completed.stdout == "bad-�\n"
     assert completed.stderr == ""

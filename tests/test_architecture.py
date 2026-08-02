@@ -197,3 +197,26 @@ def test_platform_package_does_not_import_application_layers() -> None:
                         )
 
     assert imports.isdisjoint(disallowed)
+
+
+def test_execution_delegates_binary_output_capture_to_output_module() -> None:
+    execution_source = (PACKAGE_ROOT / "execution.py").read_text(
+        encoding="utf-8"
+    )
+    output_source = (PACKAGE_ROOT / "output.py").read_text(encoding="utf-8")
+
+    assert "ProcessOutputCapture" in execution_source
+    assert "threading" not in execution_source
+    assert "codecs" not in execution_source
+    assert "Thread(" in output_source
+    assert "getincrementaldecoder" in output_source
+
+    for platform_module in ("posix.py", "windows.py"):
+        source = (PACKAGE_ROOT / "platform" / platform_module).read_text(
+            encoding="utf-8"
+        )
+        assert "stdout=subprocess.PIPE" in source
+        assert "stderr=subprocess.STDOUT" in source
+        assert "text=True" not in source
+        assert "encoding=" not in source
+        assert "errors=" not in source
