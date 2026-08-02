@@ -14,37 +14,27 @@ from patchharbor.errors import ExitCode, PatchHarborError
 class InterpreterSpec:
     """One supported interpreter before executable lookup."""
 
-    name: str
     executable: str
     script_suffix: str
     arguments: tuple[str, ...]
 
 
-@dataclass(frozen=True)
-class ResolvedInterpreter:
-    """One supported interpreter with an executable found on PATH."""
-
-    spec: InterpreterSpec
-    executable_path: str
-
+_POWERSHELL_ARGUMENTS = ("-NoLogo", "-NoProfile", "-NonInteractive", "-File")
 
 _BASH = InterpreterSpec(
-    name="bash",
     executable="bash",
     script_suffix=".sh",
     arguments=(),
 )
 _WINDOWS_POWERSHELL = InterpreterSpec(
-    name="windows-powershell",
     executable="powershell.exe",
     script_suffix=".ps1",
-    arguments=("-NoLogo", "-NoProfile", "-NonInteractive", "-File"),
+    arguments=_POWERSHELL_ARGUMENTS,
 )
 _POWERSHELL_7 = InterpreterSpec(
-    name="powershell-7",
     executable="pwsh",
     script_suffix=".ps1",
-    arguments=("-NoLogo", "-NoProfile", "-NonInteractive", "-File"),
+    arguments=_POWERSHELL_ARGUMENTS,
 )
 
 _SUPPORTED_SHEBANGS = {
@@ -84,7 +74,7 @@ def select_interpreter(
     return interpreter
 
 
-def resolve_interpreter(spec: InterpreterSpec) -> ResolvedInterpreter:
+def resolve_interpreter(spec: InterpreterSpec) -> str:
     """Resolve a selected interpreter executable through the system PATH."""
     executable_path = shutil.which(spec.executable)
     if executable_path is None:
@@ -92,19 +82,13 @@ def resolve_interpreter(spec: InterpreterSpec) -> ResolvedInterpreter:
             f"script interpreter not found: {spec.executable}",
             ExitCode.INTERPRETER_ERROR,
         )
-    return ResolvedInterpreter(
-        spec=spec,
-        executable_path=executable_path,
-    )
+    return executable_path
 
 
 def build_interpreter_command(
-    interpreter: ResolvedInterpreter,
+    spec: InterpreterSpec,
+    executable_path: str,
     script_path: Path,
 ) -> list[str]:
     """Build fixed process arguments without interpreting arbitrary shebang text."""
-    return [
-        interpreter.executable_path,
-        *interpreter.spec.arguments,
-        str(script_path),
-    ]
+    return [executable_path, *spec.arguments, str(script_path)]

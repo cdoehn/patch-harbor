@@ -11,7 +11,7 @@ import tempfile
 
 from patchharbor.errors import ExitCode, PatchHarborError
 from patchharbor.interpreters import (
-    ResolvedInterpreter,
+    InterpreterSpec,
     build_interpreter_command,
     resolve_interpreter,
     select_interpreter,
@@ -42,14 +42,12 @@ def _temporary_script_file(script_text: str, *, suffix: str) -> Iterator[Path]:
 def execute_script_text(
     script_text: str,
     *,
-    suffix: str,
     cwd: Path,
     timeout_seconds: float,
 ) -> int:
     """Stage and execute script text with a supported interpreter."""
-    del suffix  # A source filename suffix never selects the interpreter.
     selected = select_interpreter(script_text)
-    interpreter = resolve_interpreter(selected)
+    executable_path = resolve_interpreter(selected)
 
     try:
         with _temporary_script_file(
@@ -58,7 +56,8 @@ def execute_script_text(
         ) as script_path:
             return execute_script_file(
                 script_path,
-                interpreter=interpreter,
+                interpreter=selected,
+                executable_path=executable_path,
                 cwd=cwd,
                 timeout_seconds=timeout_seconds,
             )
@@ -72,12 +71,17 @@ def execute_script_text(
 def execute_script_file(
     script_path: Path,
     *,
-    interpreter: ResolvedInterpreter,
+    interpreter: InterpreterSpec,
+    executable_path: str,
     cwd: Path,
     timeout_seconds: float,
 ) -> int:
     """Run one staged script with an already resolved interpreter."""
-    command = build_interpreter_command(interpreter, script_path)
+    command = build_interpreter_command(
+        interpreter,
+        executable_path,
+        script_path,
+    )
 
     try:
         completed = subprocess.run(

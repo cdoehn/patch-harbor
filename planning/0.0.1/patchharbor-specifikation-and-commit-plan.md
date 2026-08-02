@@ -1227,10 +1227,12 @@ Der transportneutrale PatchBundle-Kern unterstützt mehrere Skripte und bytegena
 
 ### 3.c.C – Interpreterlogik vereinfachen
 
-- Mapping auf tatsächlich unterstützte Varianten begrenzen,
-- doppelte OS-Abfragen entfernen,
-- Fehlermeldungen auf Interpretername und Ursache reduzieren,
-- nicht benötigte Python- oder Shell-Autodetektion entfernen.
+- `BundleScript` und Execution nicht mehr mit bedeutungslosen Quelldateiendungen belasten,
+- die technische temporäre Dateiendung ausschließlich aus dem gewählten Interpreter ableiten,
+- Interpretermodelle auf die tatsächlich zur Ausführung benötigten Felder reduzieren,
+- gemeinsame feste PowerShell-Argumente nur einmal definieren,
+- die exakte Whitelist und die knappen Interpreterfehler unverändert beibehalten,
+- Tests auf öffentlich sichtbares Auswahl- und Ausführungsverhalten statt auf Quelldateiendungen ausrichten.
 
 ---
 

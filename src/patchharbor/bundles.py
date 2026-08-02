@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-import os
-from pathlib import PurePosixPath
 import stat
 import zipfile
 
@@ -34,14 +32,6 @@ class _ValidatedZipMember:
     entry: zipfile.ZipInfo
     relative_path: str
     is_directory: bool
-
-
-def _default_script_suffix() -> str:
-    return ".ps1" if os.name == "nt" else ".sh"
-
-
-def _direct_script_suffix(artifact: InputArtifact) -> str:
-    return artifact.path.suffix or _default_script_suffix()
 
 
 def _artifact_source_error(
@@ -230,13 +220,7 @@ def _read_zip_members(
             )
             continue
 
-        scripts.append(
-            BundleScript(
-                text=script_text,
-                suffix=PurePosixPath(member.relative_path).suffix
-                or _default_script_suffix(),
-            )
-        )
+        scripts.append(BundleScript(text=script_text))
 
     return tuple(scripts), tuple(payloads)
 
@@ -267,14 +251,7 @@ def _try_direct_script(
             True,
         )
 
-    return (
-        BundleScript(
-            text=script_text,
-            suffix=_direct_script_suffix(artifact),
-        ),
-        None,
-        True,
-    )
+    return BundleScript(text=script_text), None, True
 
 
 def _resolve_zip_bundle(artifact: InputArtifact) -> PatchBundle:

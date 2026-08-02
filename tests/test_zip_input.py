@@ -248,16 +248,15 @@ def test_each_zip_script_receives_its_own_timeout(
             ("second.sh", f"{REQUIRED_MARKER}\n"),
         ],
     )
-    observed: list[tuple[str, str, float]] = []
+    observed: list[tuple[str, float]] = []
 
     def fake_execute_script_text(
         script_text: str,
         *,
-        suffix: str,
         cwd: Path,
         timeout_seconds: float,
     ) -> int:
-        observed.append((script_text, suffix, timeout_seconds))
+        observed.append((script_text, timeout_seconds))
         return 0
 
     monkeypatch.setattr(
@@ -268,4 +267,4 @@ def test_each_zip_script_receives_its_own_timeout(
 
     assert result == 0
     assert len(observed) == 2
-    assert [timeout for _, _, timeout in observed] == [7.5, 7.5]
+    assert [timeout for _, timeout in observed] == [7.5, 7.5]

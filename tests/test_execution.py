@@ -11,7 +11,7 @@ from patchharbor.execution import execute_script_text
 import patchharbor.interpreters as interpreters
 
 
-def test_execution_stages_with_selected_technical_suffix_and_ignores_source_suffix(
+def test_execution_stages_with_selected_technical_suffix(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -39,7 +39,6 @@ def test_execution_stages_with_selected_technical_suffix_and_ignores_source_suff
 
     result = execute_script_text(
         "#!/usr/bin/env bash\n# PATCHHARBOR\n",
-        suffix=".ps1",
         cwd=tmp_path,
         timeout_seconds=7,
     )
@@ -68,7 +67,6 @@ def test_interpreter_selection_error_happens_before_process_start(
     with pytest.raises(PatchHarborError) as raised:
         execute_script_text(
             "#!/usr/bin/env python3\n# PATCHHARBOR\n",
-            suffix=".py",
             cwd=tmp_path,
             timeout_seconds=7,
         )
@@ -94,7 +92,6 @@ def test_missing_selected_interpreter_happens_before_process_start(
     with pytest.raises(PatchHarborError) as raised:
         execute_script_text(
             "#!/usr/bin/env bash\n# PATCHHARBOR\n",
-            suffix=".sh",
             cwd=tmp_path,
             timeout_seconds=7,
         )
@@ -128,7 +125,6 @@ def test_nonzero_powershell_result_is_returned_without_policy_bypass(
 
     result = execute_script_text(
         "#!powershell.exe\n# PATCHHARBOR\n",
-        suffix=".txt",
         cwd=tmp_path,
         timeout_seconds=7,
     )

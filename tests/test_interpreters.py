@@ -7,7 +7,6 @@ import pytest
 from patchharbor.errors import ExitCode, PatchHarborError
 import patchharbor.interpreters as interpreters
 from patchharbor.interpreters import (
-    ResolvedInterpreter,
     build_interpreter_command,
     resolve_interpreter,
     select_interpreter,
@@ -15,55 +14,39 @@ from patchharbor.interpreters import (
 
 
 @pytest.mark.parametrize(
-    ("shebang", "name", "executable", "suffix"),
+    ("shebang", "executable", "suffix"),
     (
-        ("#!/bin/bash", "bash", "bash", ".sh"),
-        ("#!/usr/bin/bash", "bash", "bash", ".sh"),
-        ("#!/usr/bin/env bash", "bash", "bash", ".sh"),
-        ("#!powershell", "windows-powershell", "powershell.exe", ".ps1"),
-        ("#!powershell.exe", "windows-powershell", "powershell.exe", ".ps1"),
-        (
-            "#!/usr/bin/env powershell",
-            "windows-powershell",
-            "powershell.exe",
-            ".ps1",
-        ),
-        (
-            "#!/usr/bin/env powershell.exe",
-            "windows-powershell",
-            "powershell.exe",
-            ".ps1",
-        ),
-        ("#!pwsh", "powershell-7", "pwsh", ".ps1"),
-        ("#!pwsh.exe", "powershell-7", "pwsh", ".ps1"),
-        ("#!/usr/bin/pwsh", "powershell-7", "pwsh", ".ps1"),
-        ("#!/usr/bin/env pwsh", "powershell-7", "pwsh", ".ps1"),
-        ("#!/usr/bin/env pwsh.exe", "powershell-7", "pwsh", ".ps1"),
+        ("#!/bin/bash", "bash", ".sh"),
+        ("#!/usr/bin/bash", "bash", ".sh"),
+        ("#!/usr/bin/env bash", "bash", ".sh"),
+        ("#!powershell", "powershell.exe", ".ps1"),
+        ("#!powershell.exe", "powershell.exe", ".ps1"),
+        ("#!/usr/bin/env powershell", "powershell.exe", ".ps1"),
+        ("#!/usr/bin/env powershell.exe", "powershell.exe", ".ps1"),
+        ("#!pwsh", "pwsh", ".ps1"),
+        ("#!pwsh.exe", "pwsh", ".ps1"),
+        ("#!/usr/bin/pwsh", "pwsh", ".ps1"),
+        ("#!/usr/bin/env pwsh", "pwsh", ".ps1"),
+        ("#!/usr/bin/env pwsh.exe", "pwsh", ".ps1"),
     ),
 )
 def test_supported_shebang_selects_whitelisted_interpreter(
     shebang: str,
-    name: str,
     executable: str,
     suffix: str,
 ) -> None:
     selected = select_interpreter(f"{shebang}\n# PATCHHARBOR\n")
 
-    assert selected.name == name
     assert selected.executable == executable
     assert selected.script_suffix == suffix
 
 
 @pytest.mark.parametrize(
-    ("os_name", "expected_name", "expected_executable"),
-    (
-        ("posix", "bash", "bash"),
-        ("nt", "windows-powershell", "powershell.exe"),
-    ),
+    ("os_name", "expected_executable"),
+    (("posix", "bash"), ("nt", "powershell.exe")),
 )
 def test_missing_shebang_uses_platform_default(
     os_name: str,
-    expected_name: str,
     expected_executable: str,
 ) -> None:
     selected = select_interpreter(
@@ -71,7 +54,6 @@ def test_missing_shebang_uses_platform_default(
         os_name=os_name,
     )
 
-    assert selected.name == expected_name
     assert selected.executable == expected_executable
 
 
@@ -110,9 +92,11 @@ def test_missing_interpreter_is_reported_during_resolution(
 
 def test_bash_command_contains_only_executable_and_script() -> None:
     selected = select_interpreter("#!/usr/bin/env bash\n# PATCHHARBOR\n")
-    resolved = ResolvedInterpreter(selected, "/resolved/bash")
-
-    command = build_interpreter_command(resolved, Path("/tmp/script.sh"))
+    command = build_interpreter_command(
+        selected,
+        "/resolved/bash",
+        Path("/tmp/script.sh"),
+    )
 
     assert command == ["/resolved/bash", "/tmp/script.sh"]
 
@@ -122,9 +106,11 @@ def test_powershell_command_has_fixed_noninteractive_arguments_without_bypass(
     shebang: str,
 ) -> None:
     selected = select_interpreter(f"{shebang}\n# PATCHHARBOR\n")
-    resolved = ResolvedInterpreter(selected, f"/resolved/{selected.executable}")
-
-    command = build_interpreter_command(resolved, Path("/tmp/script.ps1"))
+    command = build_interpreter_command(
+        selected,
+        f"/resolved/{selected.executable}",
+        Path("/tmp/script.ps1"),
+    )
 
     assert command == [
         f"/resolved/{selected.executable}",

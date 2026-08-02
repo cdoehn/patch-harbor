@@ -19,7 +19,6 @@ class BundleScript:
     """One script in its bundle order."""
 
     text: str
-    suffix: str
 
 
 @dataclass(frozen=True)

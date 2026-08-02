@@ -37,7 +37,6 @@ def _execute_bundle_script(
     write_payload_files(prepared_payloads, cwd=cwd)
     return execute_script_text(
         parsed_script.text,
-        suffix=bundle_script.suffix,
         cwd=cwd,
         timeout_seconds=timeout_seconds,
     )
