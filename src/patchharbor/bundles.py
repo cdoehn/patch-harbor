@@ -277,8 +277,27 @@ def _try_direct_script(
     )
 
 
+def _resolve_zip_bundle(artifact: InputArtifact) -> PatchBundle:
+    try:
+        with zipfile.ZipFile(artifact.path) as archive:
+            scripts, payloads = _read_zip_members(archive, artifact=artifact)
+    except zipfile.BadZipFile as exc:
+        raise _zip_source_error(artifact, exc) from exc
+    except PatchHarborError:
+        raise
+    except (OSError, RuntimeError) as exc:
+        raise _zip_source_error(artifact, exc) from exc
+
+    if not scripts:
+        raise _no_valid_zip_script(artifact)
+    return PatchBundle(scripts=scripts, payloads=payloads)
+
+
 def resolve_patch_bundle(artifact: InputArtifact) -> PatchBundle:
     """Resolve one source-neutral artifact to an ordered PatchBundle."""
+    if zipfile.is_zipfile(artifact.path):
+        return _resolve_zip_bundle(artifact)
+
     try:
         raw_content = artifact.path.read_bytes()
     except OSError as exc:
@@ -296,24 +315,12 @@ def resolve_patch_bundle(artifact: InputArtifact) -> PatchBundle:
         artifact.path.suffix.lower() == ".zip"
         or raw_content.startswith(_ZIP_SIGNATURES)
     )
-    try:
-        with zipfile.ZipFile(artifact.path) as archive:
-            scripts, payloads = _read_zip_members(archive, artifact=artifact)
-    except zipfile.BadZipFile as exc:
-        if zip_hint:
-            raise _zip_source_error(artifact, exc) from exc
-        if direct_was_utf8:
-            raise direct_error
-        raise PatchHarborError(
-            "file is neither a UTF-8 PatchHarbor script nor a ZIP archive: "
-            f"{artifact.display_name}",
-            ExitCode.NO_VALID_SCRIPT,
-        ) from exc
-    except PatchHarborError:
-        raise
-    except (OSError, RuntimeError) as exc:
-        raise _zip_source_error(artifact, exc) from exc
-
-    if not scripts:
-        raise _no_valid_zip_script(artifact)
-    return PatchBundle(scripts=scripts, payloads=payloads)
+    if zip_hint:
+        return _resolve_zip_bundle(artifact)
+    if direct_was_utf8:
+        raise direct_error
+    raise PatchHarborError(
+        "file is neither a UTF-8 PatchHarbor script nor a ZIP archive: "
+        f"{artifact.display_name}",
+        ExitCode.NO_VALID_SCRIPT,
+    )

@@ -294,14 +294,14 @@ Ein unsicherer, beschädigter oder mehrdeutiger Eintrag macht das gesamte ZIP-Bu
 ### 7.3 Validieren, Staging und Überschreiben
 
 - Das gesamte PatchBundle wird einschließlich aller Eintragstypen, Zielpfade, Duplikate und Ressourcenbudgets validiert, bevor eine Zieldatei geschrieben wird.
-- Bundle-Nutzdateien werden bytegenau in einem sicheren temporären Staging-Bereich vorbereitet.
-- Erst nach erfolgreichem Staging werden alle Bundle-Nutzdateien vor dem ersten Skript in das aktuelle Arbeitsverzeichnis übernommen.
+- Bundle-Nutzdateien werden als Teil des vollständig aufgelösten PatchBundles bytegenau vorbereitet.
+- Erst wenn alle Bundle-Inhalte vollständig gelesen und validiert sind, werden die Nutzdateien vor dem ersten Skript in das aktuelle Arbeitsverzeichnis übernommen.
 - Vorhandene reguläre Dateien werden ohne Nachfrage überschrieben.
 - Jede Zieldatei wird zunächst vollständig in eine sichere temporäre Datei im selben Zielverzeichnis geschrieben und danach atomar ersetzt.
 - Benötigte sichere Unterordner werden angelegt.
 - PatchHarbor legt keine dauerhaften Backups an.
 - Version 1 bietet keine vollständige Transaktion über mehrere Bundle-Nutzdateien oder inline FILE-Blöcke. Jeder einzelne Dateiaustausch ist atomar.
-- Scheitert Staging oder ein tatsächlicher Schreibvorgang, startet kein Skript des Bundles.
+- Scheitert die vollständige Vorbereitung oder ein tatsächlicher Schreibvorgang, startet kein Skript des Bundles.
 - Inline FILE-Blöcke werden nach den Bundle-Nutzdateien und unmittelbar vor dem jeweiligen Skript geschrieben.
 
 ### 7.4 Größen- und Ressourcenbudget
@@ -454,7 +454,7 @@ Version 1 unterstützt bewusst nur Bash und PowerShell.
 
 1. Eingabeartefakt vollständig zu einem PatchBundle auflösen.
 2. gesamtes Bundle einschließlich Eintragstypen, Zielpfaden, Duplikaten und Ressourcenbudgets validieren.
-3. alle Bundle-Nutzdateien bytegenau stagen und vor dem ersten Skript sicher in das Arbeitsverzeichnis schreiben.
+3. alle Bundle-Nutzdateien bytegenau vollständig vorbereiten und vor dem ersten Skript sicher in das Arbeitsverzeichnis schreiben.
 4. für das nächste Skript Pflichtmarker sowie optionale META-, MESSAGE- und inline FILE-Blöcke vollständig analysieren.
 5. beschädigte optionale Blöcke als Warning verwerfen.
 6. gültige inline FILE-Blöcke sicher schreiben.
@@ -592,7 +592,7 @@ Empfohlene Module:
 - `sources.py` – Datei, Ordner und STDIN als `InputArtifact` bereitstellen; spätere Quellen werden hier als Adapter ergänzt,
 - `bundles.py` – direkte Skripte und ZIP-Container zu einem `PatchBundle` mit geordneten Skripten und Bundle-Nutzdateien auflösen,
 - `script_format.py` – Marker, META, MESSAGE und inline FILE-Blöcke analysieren,
-- `payload_files.py` – einfache inline Dateinamen und sichere relative Bundle-Pfade prüfen, Inhalte stagen und Dateien atomar schreiben,
+- `payload_files.py` – einfache inline Dateinamen und sichere relative Bundle-Pfade prüfen und Inhalte über ein gemeinsames atomares Schreibprimitiv schreiben,
 - `execution.py` – Interpreter, Prozessstart, Timeout und Ergebnis,
 - `presentation.py` – Plain-Ausgabe, TUI, Farben und Rolling-Buffer-Darstellung,
 - `models.py` – kleine unveränderliche Datenträger wie `InputArtifact`, `PatchBundle`, `BundleScript` und `BundlePayload`,
@@ -1095,7 +1095,7 @@ Der transportneutrale PatchBundle-Kern unterstützt mehrere Skripte und bytegena
 - transportneutrale Quellengrenze mit `InputArtifact`,
 - direkte Skripte und ZIP-Container als `PatchBundle`s,
 - mehrere geordnete Skripte und bytegenaue Bundle-Nutzdateien,
-- sichere relative Nutzdateipfade, Staging und atomisches Schreiben vor dem ersten Skript,
+- sichere relative Nutzdateipfade, vollständige Vorbereitung und atomisches Schreiben vor dem ersten Skript,
 - kleiner Application-Orchestrator ohne Plugin-System,
 - unterstützte Interpreter,
 - PowerShell-Startregeln,
@@ -1180,7 +1180,7 @@ Der transportneutrale PatchBundle-Kern unterstützt mehrere Skripte und bytegena
 - gesamte Archivstruktur vor dem ersten Zielschreibvorgang validieren,
 - absolute Pfade, Zwei-Punkte-Segmente, Backslashes, reservierte Windows-Namen und überlange Pfade ablehnen,
 - Links, besondere Eintragstypen, doppelte normalisierte Ziele und Groß-/Kleinschreibungs-Kollisionen ablehnen,
-- Bundle-Nutzdateien zunächst in einem sicheren temporären Bereich stagen,
+- Bundle-Nutzdateien vollständig im aufgelösten PatchBundle vorbereiten,
 - tatsächliche Schreibfehler fatal behandeln und jede Skriptausführung verhindern,
 - ZIP ohne gültiges PatchHarbor-Skript weiterhin ablehnen,
 - markerlose Skriptdateien nur übertragen und niemals ausführen,
