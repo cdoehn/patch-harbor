@@ -8,7 +8,7 @@ from enum import Enum, auto
 import subprocess
 import time
 from types import TracebackType
-from typing import Self
+from typing import Self, TextIO
 
 
 GRACEFUL_STOP_SECONDS = 2.0
@@ -36,11 +36,19 @@ class ProcessResult:
 class ProcessTree(ABC):
     """Own one root process and every descendant started below it."""
 
-    def __init__(self, process: subprocess.Popen[bytes]) -> None:
+    def __init__(self, process: subprocess.Popen[str]) -> None:
         self._process = process
         self._state = ProcessState.RUNNING
         self._tree_stopped = False
         self._closed = False
+
+    @property
+    def output_stream(self) -> TextIO:
+        """Return the merged text stream captured from the root process."""
+        stream = self._process.stdout
+        if stream is None:
+            raise RuntimeError("script process output is not captured")
+        return stream
 
     def __enter__(self) -> Self:
         return self

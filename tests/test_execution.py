@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import io
 from pathlib import Path
 
 import pytest
@@ -18,6 +19,7 @@ class _FakeProcessTree:
         result: ProcessResult | None = None,
         run_error: BaseException | None = None,
         close_error: OSError | None = None,
+        output_text: str = "",
     ) -> None:
         self.result = result or ProcessResult(ProcessState.EXITED, 0)
         self.run_error = run_error
@@ -26,6 +28,7 @@ class _FakeProcessTree:
         self.entered = 0
         self.closed = 0
         self.exit_exception: type[BaseException] | None = None
+        self.output_stream = io.StringIO(output_text)
 
     def __enter__(self) -> _FakeProcessTree:
         self.entered += 1
@@ -312,3 +315,32 @@ def test_process_tree_is_closed_when_final_descendant_cleanup_fails(
     )
     assert process_tree.closed == 1
     assert process_tree.exit_exception is None
+
+
+def test_execution_shows_only_last_five_merged_lines(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _patch_resolved_interpreter(monkeypatch)
+    process_tree = _FakeProcessTree(
+        output_text="".join(f"line-{number}\n" for number in range(1, 13))
+    )
+    monkeypatch.setattr(
+        execution,
+        "create_process_tree",
+        lambda command, cwd: process_tree,
+    )
+    destination = io.StringIO()
+
+    result = execute_script_text(
+        "#!/usr/bin/env bash\n# PATCHHARBOR\n",
+        cwd=tmp_path,
+        timeout_seconds=7,
+        output_stream=destination,
+    )
+
+    assert result == 0
+    assert destination.getvalue() == "".join(
+        f"line-{number}\n" for number in range(8, 13)
+    )
+    assert process_tree.output_stream.closed

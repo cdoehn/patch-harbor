@@ -19,6 +19,12 @@ class PosixProcessTree(ProcessTree):
             command,
             cwd=cwd,
             stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            bufsize=1,
             start_new_session=True,
         )
         return cls(process)

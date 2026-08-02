@@ -1201,3 +1201,102 @@ raise SystemExit(result)
     assert completed.returncode == 130
     assert completed.stderr == "patchharbor: script aborted by user\n"
     _assert_child_process_stopped(child_pid)
+
+
+def test_fs_run_keeps_only_last_five_lines_from_large_output(
+    tmp_path: Path,
+) -> None:
+    script_path = _script_path(tmp_path, "large-output")
+    if os.name == "nt":
+        script_body = (
+            "1..2000 | ForEach-Object { "
+            '[Console]::Out.WriteLine(("line-{0:D4}" -f $_)) }\n'
+        )
+    else:
+        script_body = (
+            'number=1\n'
+            'while [ "$number" -le 2000 ]; do\n'
+            '    printf "line-%04d\\n" "$number"\n'
+            '    number=$((number + 1))\n'
+            'done\n'
+        )
+    script_path.write_text(
+        f"{REQUIRED_MARKER}\n{script_body}",
+        encoding="utf-8",
+    )
+
+    completed = _run_patchharbor(script_path, tmp_path)
+
+    assert completed.returncode == 0
+    assert completed.stdout.splitlines() == [
+        "line-1996",
+        "line-1997",
+        "line-1998",
+        "line-1999",
+        "line-2000",
+    ]
+    assert completed.stderr == ""
+
+
+def test_fs_run_merges_stdout_and_stderr_in_write_order(tmp_path: Path) -> None:
+    script_path = _script_path(tmp_path, "merged-output")
+    if os.name == "nt":
+        script_body = (
+            '[Console]::Out.WriteLine("stdout-1")\n'
+            '[Console]::Out.Flush()\n'
+            '[Console]::Error.WriteLine("stderr-1")\n'
+            '[Console]::Error.Flush()\n'
+            '[Console]::Out.WriteLine("stdout-2")\n'
+            '[Console]::Out.Flush()\n'
+            '[Console]::Error.WriteLine("stderr-2")\n'
+            '[Console]::Error.Flush()\n'
+        )
+    else:
+        script_body = (
+            'printf "%s\\n" "stdout-1"\n'
+            'printf "%s\\n" "stderr-1" >&2\n'
+            'printf "%s\\n" "stdout-2"\n'
+            'printf "%s\\n" "stderr-2" >&2\n'
+        )
+    script_path.write_text(
+        f"{REQUIRED_MARKER}\n{script_body}",
+        encoding="utf-8",
+    )
+
+    completed = _run_patchharbor(script_path, tmp_path)
+
+    assert completed.returncode == 0
+    assert completed.stdout.splitlines() == [
+        "stdout-1",
+        "stderr-1",
+        "stdout-2",
+        "stderr-2",
+    ]
+    assert completed.stderr == ""
+
+
+def test_fs_run_handles_long_and_unterminated_output_from_fast_script(
+    tmp_path: Path,
+) -> None:
+    script_path = _script_path(tmp_path, "fast-output")
+    long_line = "x" * 20_000
+    if os.name == "nt":
+        script_body = (
+            f'[Console]::Out.WriteLine("{long_line}")\n'
+            '[Console]::Out.Write("final-without-newline")\n'
+        )
+    else:
+        script_body = (
+            f"printf '%s\\n' '{long_line}'\n"
+            "printf '%s' 'final-without-newline'\n"
+        )
+    script_path.write_text(
+        f"{REQUIRED_MARKER}\n{script_body}",
+        encoding="utf-8",
+    )
+
+    completed = _run_patchharbor(script_path, tmp_path)
+
+    assert completed.returncode == 0
+    assert completed.stdout == f"{long_line}\nfinal-without-newline"
+    assert completed.stderr == ""

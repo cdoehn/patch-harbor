@@ -89,6 +89,16 @@ def test_lower_layers_do_not_import_orchestration_or_unrelated_layers() -> None:
             "platform",
             "sources",
         },
+        "output": {
+            "application",
+            "bundles",
+            "execution",
+            "interpreters",
+            "parser",
+            "payload_files",
+            "platform",
+            "sources",
+        },
         "execution": {
             "application",
             "bundles",
