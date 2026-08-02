@@ -15,6 +15,7 @@ class ExitCode(IntEnum):
     FILE_PREPARATION_ERROR = 6
     EXECUTION_ERROR = 7
     TIMEOUT = 124
+    INTERRUPTED = 130
 
 
 class PatchHarborError(Exception):

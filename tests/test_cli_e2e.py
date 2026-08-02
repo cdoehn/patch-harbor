@@ -7,6 +7,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import zipfile
 
 import pytest
@@ -92,6 +93,134 @@ def _run_patchharbor(
         environment_overrides=environment_overrides,
         input_text=input_text,
     )
+
+
+
+
+def _child_process_script(ready_path: Path, *, exit_parent: bool = False) -> str:
+    if os.name == "nt":
+        encoded_command = (
+            "UwB0AGEAcgB0AC0AUwBsAGUAZQBwACAALQBTAGUAYwBvAG4AZABzACAANgAwAA=="
+        )
+        parent_tail = "exit 0" if exit_parent else "Wait-Process -Id $child.Id"
+        escaped_ready = str(ready_path).replace("'", "''")
+        return (
+            f"{REQUIRED_MARKER}\n"
+            "$child = Start-Process "
+            "-FilePath (Join-Path $PSHOME 'powershell.exe') "
+            "-ArgumentList '-NoLogo','-NoProfile','-NonInteractive',"
+            f"'-EncodedCommand','{encoded_command}' -PassThru\n"
+            f"Set-Content -LiteralPath '{escaped_ready}' "
+            "-Value $child.Id -NoNewline\n"
+            f"{parent_tail}\n"
+        )
+
+    parent_tail = "exit 0" if exit_parent else 'wait "$child_pid"'
+    return (
+        f"{REQUIRED_MARKER}\n"
+        "sleep 60 &\n"
+        "child_pid=$!\n"
+        f"printf '%s' \"$child_pid\" > \"{ready_path}\"\n"
+        f"{parent_tail}\n"
+    )
+
+
+def _wait_for_child_pid(ready_path: Path, *, timeout: float = 5.0) -> int:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if ready_path.exists():
+            value = ready_path.read_text(encoding="utf-8").strip()
+            if value:
+                return int(value)
+        time.sleep(0.02)
+    raise AssertionError(f"child PID was not written to {ready_path}")
+
+
+def _pid_is_running(pid: int) -> bool:
+    if os.name != "nt":
+        stat_path = Path(f"/proc/{pid}/stat")
+        try:
+            fields = stat_path.read_text(encoding="utf-8").split()
+        except FileNotFoundError:
+            return False
+        if len(fields) > 2 and fields[2] == "Z":
+            return False
+        try:
+            os.kill(pid, 0)
+        except ProcessLookupError:
+            return False
+        except PermissionError:
+            return True
+        return True
+
+    import ctypes
+    from ctypes import wintypes
+
+    process_query_limited_information = 0x1000
+    still_active = 259
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.OpenProcess.argtypes = (wintypes.DWORD, wintypes.BOOL, wintypes.DWORD)
+    kernel32.OpenProcess.restype = wintypes.HANDLE
+    kernel32.GetExitCodeProcess.argtypes = (wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD))
+    kernel32.GetExitCodeProcess.restype = wintypes.BOOL
+    kernel32.CloseHandle.argtypes = (wintypes.HANDLE,)
+    kernel32.CloseHandle.restype = wintypes.BOOL
+
+    handle = kernel32.OpenProcess(process_query_limited_information, False, pid)
+    if not handle:
+        return False
+    try:
+        exit_code = wintypes.DWORD()
+        if not kernel32.GetExitCodeProcess(handle, ctypes.byref(exit_code)):
+            return False
+        return exit_code.value == still_active
+    finally:
+        kernel32.CloseHandle(handle)
+
+
+def _kill_test_pid(pid: int) -> None:
+    if not _pid_is_running(pid):
+        return
+    if os.name != "nt":
+        try:
+            os.kill(pid, 9)
+        except ProcessLookupError:
+            pass
+        return
+
+    import ctypes
+    from ctypes import wintypes
+
+    process_terminate = 0x0001
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    handle = kernel32.OpenProcess(process_terminate, False, pid)
+    if handle:
+        try:
+            kernel32.TerminateProcess(handle, 1)
+        finally:
+            kernel32.CloseHandle(handle)
+
+
+def _assert_child_process_stopped(pid: int, *, timeout: float = 5.0) -> None:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if not _pid_is_running(pid):
+            return
+        time.sleep(0.05)
+    _kill_test_pid(pid)
+    raise AssertionError(f"child process {pid} survived PatchHarbor")
+
+
+def _subprocess_environment() -> dict[str, str]:
+    environment = os.environ.copy()
+    source_path = str(PROJECT_ROOT / "src")
+    existing_pythonpath = environment.get("PYTHONPATH")
+    environment["PYTHONPATH"] = (
+        source_path
+        if not existing_pythonpath
+        else os.pathsep.join((source_path, existing_pythonpath))
+    )
+    return environment
 
 
 def test_fs_run_rejects_empty_standard_input(tmp_path: Path) -> None:
@@ -957,3 +1086,118 @@ def test_non_regular_file_target_prevents_execution(tmp_path: Path) -> None:
     assert "target is not a regular file" in completed.stderr
     assert not sentinel.exists()
     assert target.is_dir()
+
+
+def test_normal_script_exit_does_not_leave_a_child_process(
+    tmp_path: Path,
+) -> None:
+    ready_path = tmp_path / "normal-child.pid"
+    script_path = _script_path(tmp_path, "normal-child-tree")
+    script_path.write_text(
+        _child_process_script(ready_path, exit_parent=True),
+        encoding="utf-8",
+    )
+
+    completed = _run_patchharbor(script_path, tmp_path)
+    child_pid = _wait_for_child_pid(ready_path)
+
+    assert completed.returncode == 0
+    _assert_child_process_stopped(child_pid)
+
+
+def test_timeout_stops_the_complete_child_process_tree(
+    tmp_path: Path,
+) -> None:
+    ready_path = tmp_path / "timeout-child.pid"
+    script_path = _script_path(tmp_path, "timeout-child-tree")
+    script_path.write_text(
+        _child_process_script(ready_path),
+        encoding="utf-8",
+    )
+
+    completed = _run_patchharbor(
+        script_path,
+        tmp_path,
+        "--timeout",
+        "1.5",
+    )
+    child_pid = _wait_for_child_pid(ready_path)
+
+    assert completed.returncode == 124
+    assert completed.stderr == "patchharbor: script timed out after 1.5 seconds\n"
+    _assert_child_process_stopped(child_pid)
+
+
+def test_keyboard_interrupt_stops_the_complete_child_process_tree(
+    tmp_path: Path,
+) -> None:
+    ready_path = tmp_path / "interrupt-child.pid"
+    script_path = _script_path(tmp_path, "interrupt-child-tree")
+    script_path.write_text(
+        _child_process_script(ready_path),
+        encoding="utf-8",
+    )
+    runner_path = tmp_path / "interrupt-runner.py"
+    runner_path.write_text(
+        """\
+from __future__ import annotations
+import _thread
+from pathlib import Path
+import sys
+import threading
+import time
+
+from patchharbor.errors import PatchHarborError
+from patchharbor.execution import execute_script_text
+
+script_path = Path(sys.argv[1])
+ready_path = Path(sys.argv[2])
+cwd = Path(sys.argv[3])
+
+
+def interrupt_when_child_is_ready() -> None:
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline:
+        if ready_path.exists() and ready_path.read_text(encoding="utf-8").strip():
+            _thread.interrupt_main()
+            return
+        time.sleep(0.02)
+    _thread.interrupt_main()
+
+
+threading.Thread(target=interrupt_when_child_is_ready, daemon=True).start()
+try:
+    result = execute_script_text(
+        script_path.read_text(encoding="utf-8"),
+        cwd=cwd,
+        timeout_seconds=30,
+    )
+except PatchHarborError as exc:
+    print(f"patchharbor: {exc}", file=sys.stderr)
+    raise SystemExit(int(exc.exit_code))
+raise SystemExit(result)
+""",
+        encoding="utf-8",
+    )
+
+    completed = subprocess.run(
+        [
+            sys.executable,
+            str(runner_path),
+            str(script_path),
+            str(ready_path),
+            str(tmp_path),
+        ],
+        cwd=tmp_path,
+        env=_subprocess_environment(),
+        stdin=subprocess.DEVNULL,
+        capture_output=True,
+        text=True,
+        timeout=15,
+        check=False,
+    )
+    child_pid = _wait_for_child_pid(ready_path)
+
+    assert completed.returncode == 130
+    assert completed.stderr == "patchharbor: script aborted by user\n"
+    _assert_child_process_stopped(child_pid)
