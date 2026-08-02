@@ -437,8 +437,9 @@ Version 1 unterstützt bewusst nur Bash und PowerShell.
 ### 9.2 PowerShell auf Windows
 
 - PowerShell wird ohne Benutzerprofil und nicht interaktiv gestartet.
-- PatchHarbor umgeht die Execution Policy standardmäßig nicht.
-- Verhindert die lokale oder zentrale Richtlinie die Ausführung, zeigt PatchHarbor einen klaren Fehler.
+- Die festen Prozessargumente enthalten weder `-ExecutionPolicy` noch `Bypass`.
+- PatchHarbor umgeht und verändert die lokale oder zentrale Execution Policy nicht.
+- Verhindert die Richtlinie die Ausführung, bleibt die native PowerShell-Fehlermeldung sichtbar und der PowerShell-Exit-Code wird unverändert zurückgegeben.
 - Ein späterer expliziter Bypass-Schalter ist möglich, gehört aber nicht zu Version 1.
 
 ### 9.3 Timeout und Prozessende
@@ -596,7 +597,8 @@ Empfohlene Module:
 - `bundles.py` – direkte Skripte und ZIP-Container zu einem `PatchBundle` mit geordneten Skripten und Bundle-Nutzdateien auflösen,
 - `script_format.py` – Marker, META, MESSAGE und inline FILE-Blöcke analysieren,
 - `payload_files.py` – einfache inline Dateinamen und sichere relative Bundle-Pfade prüfen und Inhalte über ein gemeinsames atomares Schreibprimitiv schreiben,
-- `execution.py` – Interpreter, Prozessstart, Timeout und Ergebnis,
+- `interpreters.py` – Whitelist, Shebang-Auswertung, Plattformdefault, Verfügbarkeitsprüfung und feste Prozessargumente,
+- `execution.py` – temporäre Skriptdatei, Prozessstart, Timeout und Ergebnis,
 - `presentation.py` – Plain-Ausgabe, TUI, Farben und Rolling-Buffer-Darstellung,
 - `models.py` – kleine unveränderliche Datenträger wie `InputArtifact`, `PatchBundle`, `BundleScript` und `BundlePayload`,
 - `errors.py` – eindeutige Tool-Fehler und Exit-Codes,
@@ -611,8 +613,9 @@ Empfohlene Module:
 - `bundles` klassifiziert und beschreibt Inhalte, schreibt aber keine Nutzdateien in das Arbeitsverzeichnis.
 - `script_format` liefert reine Beschreibungen optionaler inline FILE-Blöcke und importiert keine Schreiblogik aus `payload_files`.
 - `payload_files` validiert, staged und schreibt Bundle-Nutzdateien und inline FILE-Inhalte; es steuert keine Execution.
+- `interpreters` kennt nur den kleinen Interpretervertrag und Tool-Fehler; es kennt weder Quellen, PatchBundles, Parser noch Execution.
 - `models` und `errors` kennen keine höherliegenden Module.
-- `execution` kennt weder Quellen, PatchBundles, TUI noch argparse.
+- `execution` darf `interpreters` verwenden, kennt aber weder Quellen, PatchBundles, TUI noch argparse.
 - `presentation` erhält Zustandsmodelle und steuert keine Ausführung.
 - Es gibt keine Pakete namens `utils`, `helpers` oder `common` als Sammelstellen.
 - Zukünftige Quellen liefern denselben `InputArtifact`, ohne die PatchBundle-, Nutzdatei-, Parser-, FILE- oder Execution-Pipeline zu verändern.
@@ -1215,10 +1218,12 @@ Der transportneutrale PatchBundle-Kern unterstützt mehrere Skripte und bytegena
 
 ### 3.c.R – Interpreterresolver plattformneutral strukturieren
 
-- Shebang-Auswertung, Verfügbarkeitsprüfung und Prozessargumente trennen,
-- freie Shebang-Kommandoausführung verhindern,
-- temporäre Dateiendung nur als technische Hilfe, nicht als Typentscheidung nutzen,
-- PowerShell Execution Policy nicht umgehen und Policy-Fehler verständlich abbilden.
+- Shebang-Auswertung, Plattformdefault, Verfügbarkeitsprüfung und Prozessargumente in `interpreters.py` trennen,
+- freie oder um Argumente erweiterte Shebang-Kommandos vor jeder Interpretersuche ablehnen,
+- temporäre Dateiendung nur aus dem bereits gewählten Interpreter ableiten und nie als Typentscheidung verwenden,
+- PowerShell ohne `-ExecutionPolicy` oder `Bypass` starten,
+- native PowerShell-Policyfehler sichtbar lassen und den Prozess-Exit-Code unverändert zurückgeben,
+- Unit- und Architekturtests auf die neue gerichtete Grenze ausrichten.
 
 ### 3.c.C – Interpreterlogik vereinfachen
 

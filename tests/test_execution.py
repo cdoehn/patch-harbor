@@ -8,86 +8,62 @@ import pytest
 from patchharbor.errors import ExitCode, PatchHarborError
 import patchharbor.execution as execution
 from patchharbor.execution import execute_script_text
+import patchharbor.interpreters as interpreters
 
 
-@pytest.mark.parametrize(
-    ("shebang", "expected_executable", "expected_suffix", "power_shell"),
-    (
-        ("#!/bin/bash", "bash", ".sh", False),
-        ("#!/usr/bin/bash", "bash", ".sh", False),
-        ("#!/usr/bin/env bash", "bash", ".sh", False),
-        ("#!powershell", "powershell.exe", ".ps1", True),
-        ("#!powershell.exe", "powershell.exe", ".ps1", True),
-        ("#!/usr/bin/env powershell", "powershell.exe", ".ps1", True),
-        ("#!/usr/bin/env powershell.exe", "powershell.exe", ".ps1", True),
-        ("#!pwsh", "pwsh", ".ps1", True),
-        ("#!pwsh.exe", "pwsh", ".ps1", True),
-        ("#!/usr/bin/pwsh", "pwsh", ".ps1", True),
-        ("#!/usr/bin/env pwsh", "pwsh", ".ps1", True),
-        ("#!/usr/bin/env pwsh.exe", "pwsh", ".ps1", True),
-    ),
-)
-def test_supported_shebang_selects_expected_interpreter_command(
+def test_execution_stages_with_selected_technical_suffix_and_ignores_source_suffix(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
-    shebang: str,
-    expected_executable: str,
-    expected_suffix: str,
-    power_shell: bool,
 ) -> None:
     observed: list[tuple[list[str], Path]] = []
 
-    def fake_which(executable: str) -> str:
-        assert executable == expected_executable
-        return f"/interpreters/{executable}"
+    monkeypatch.setattr(
+        interpreters.shutil,
+        "which",
+        lambda executable: f"/interpreters/{executable}",
+    )
 
     def fake_run(
         command: list[str],
         **kwargs: object,
     ) -> subprocess.CompletedProcess[str]:
         script_path = Path(command[-1])
-        assert script_path.suffix == expected_suffix
-        assert script_path.read_text(encoding="utf-8").startswith(shebang)
+        assert script_path.suffix == ".sh"
+        assert script_path.read_text(encoding="utf-8").startswith(
+            "#!/usr/bin/env bash"
+        )
         observed.append((command, Path(kwargs["cwd"])))
         return subprocess.CompletedProcess(command, 0)
 
-    monkeypatch.setattr(execution.shutil, "which", fake_which)
     monkeypatch.setattr(execution.subprocess, "run", fake_run)
 
     result = execute_script_text(
-        f"{shebang}\n# PATCHHARBOR\n",
-        suffix=".irrelevant",
+        "#!/usr/bin/env bash\n# PATCHHARBOR\n",
+        suffix=".ps1",
         cwd=tmp_path,
         timeout_seconds=7,
     )
 
     assert result == 0
+    assert len(observed) == 1
     command, observed_cwd = observed[0]
-    assert command[0] == f"/interpreters/{expected_executable}"
+    assert command[0] == "/interpreters/bash"
+    assert Path(command[-1]).suffix == ".sh"
     assert observed_cwd == tmp_path
-    if power_shell:
-        assert command[1:-1] == [
-            "-NoLogo",
-            "-NoProfile",
-            "-NonInteractive",
-            "-File",
-        ]
-    else:
-        assert len(command) == 2
 
 
-def test_unknown_shebang_is_rejected_before_interpreter_lookup(
+def test_interpreter_selection_error_happens_before_process_start(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    lookup_called = False
+    process_started = False
 
-    def fake_which(executable: str) -> str | None:
-        nonlocal lookup_called
-        lookup_called = True
-        return None
+    def fail_if_started(*args: object, **kwargs: object) -> None:
+        nonlocal process_started
+        process_started = True
+        raise AssertionError("process must not start")
 
-    monkeypatch.setattr(execution.shutil, "which", fake_which)
+    monkeypatch.setattr(execution.subprocess, "run", fail_if_started)
 
     with pytest.raises(PatchHarborError) as raised:
         execute_script_text(
@@ -98,19 +74,15 @@ def test_unknown_shebang_is_rejected_before_interpreter_lookup(
         )
 
     assert raised.value.exit_code is ExitCode.INTERPRETER_ERROR
-    assert str(raised.value) == (
-        "unsupported script interpreter in shebang: /usr/bin/env python3"
-    )
-    assert not lookup_called
+    assert not process_started
 
 
-def test_missing_selected_interpreter_is_reported_before_process_start(
+def test_missing_selected_interpreter_happens_before_process_start(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     process_started = False
-
-    monkeypatch.setattr(execution.shutil, "which", lambda executable: None)
+    monkeypatch.setattr(interpreters.shutil, "which", lambda executable: None)
 
     def fail_if_started(*args: object, **kwargs: object) -> None:
         nonlocal process_started
@@ -130,3 +102,38 @@ def test_missing_selected_interpreter_is_reported_before_process_start(
     assert raised.value.exit_code is ExitCode.INTERPRETER_ERROR
     assert str(raised.value) == "script interpreter not found: bash"
     assert not process_started
+
+
+def test_nonzero_powershell_result_is_returned_without_policy_bypass(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    observed_command: list[str] = []
+    monkeypatch.setattr(
+        interpreters.shutil,
+        "which",
+        lambda executable: f"/interpreters/{executable}",
+    )
+
+    def fake_run(
+        command: list[str],
+        **kwargs: object,
+    ) -> subprocess.CompletedProcess[str]:
+        assert "stdout" not in kwargs
+        assert "stderr" not in kwargs
+        observed_command.extend(command)
+        return subprocess.CompletedProcess(command, 1)
+
+    monkeypatch.setattr(execution.subprocess, "run", fake_run)
+
+    result = execute_script_text(
+        "#!powershell.exe\n# PATCHHARBOR\n",
+        suffix=".txt",
+        cwd=tmp_path,
+        timeout_seconds=7,
+    )
+
+    assert result == 1
+    lowered = {argument.casefold() for argument in observed_command}
+    assert "-executionpolicy" not in lowered
+    assert "bypass" not in lowered
