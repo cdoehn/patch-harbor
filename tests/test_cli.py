@@ -123,6 +123,15 @@ def test_interactive_terminal_uses_fixed_dashboard_and_periodic_redraw(
     assert "RESULT" in rendered
     assert "running-two" in rendered
     assert "status: success" in rendered
+    for color_sequence in (
+        "\x1b[1;36m",
+        "\x1b[1;34m",
+        "\x1b[1;32m",
+        "\x1b[1;33m",
+        "\x1b[1;31m",
+        "\x1b[2m",
+    ):
+        assert color_sequence not in rendered
     assert rendered.endswith("\x1b[0m\x1b[?25h")
     assert stderr.getvalue() == ""
 

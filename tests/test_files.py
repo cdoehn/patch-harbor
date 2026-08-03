@@ -313,3 +313,52 @@ def test_bundle_atomic_replace_failure_is_fatal_and_cleans_local_stage(
     assert "replace denied" in str(raised.value)
     assert not (tmp_path / "payload.bin").exists()
     assert list(tmp_path.glob(".patchharbor-*.tmp")) == []
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX special files are unavailable")
+def test_posix_fifo_inline_target_is_not_replaced(tmp_path: Path) -> None:
+    target = tmp_path / "payload.txt"
+    os.mkfifo(target)
+
+    with pytest.raises(PatchHarborError) as raised:
+        write_payload_files((("payload.txt", "replacement"),), cwd=tmp_path)
+
+    assert raised.value.exit_code is ExitCode.FILE_PREPARATION_ERROR
+    assert "target is not a regular file" in str(raised.value)
+    assert target.exists()
+
+
+def test_bundle_does_not_replace_symbolic_link_target(tmp_path: Path) -> None:
+    real_target = tmp_path / "real.bin"
+    real_target.write_bytes(b"original")
+    link = tmp_path / "payload.bin"
+    try:
+        link.symlink_to(real_target)
+    except (OSError, NotImplementedError) as exc:
+        pytest.skip(f"symbolic links unavailable: {exc}")
+
+    with pytest.raises(PatchHarborError) as raised:
+        write_bundle_payloads(
+            (BundlePayload("payload.bin", b"replacement"),),
+            cwd=tmp_path,
+        )
+
+    assert raised.value.exit_code is ExitCode.FILE_PREPARATION_ERROR
+    assert real_target.read_bytes() == b"original"
+    assert link.is_symlink()
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX special files are unavailable")
+def test_posix_fifo_bundle_target_is_not_replaced(tmp_path: Path) -> None:
+    target = tmp_path / "payload.bin"
+    os.mkfifo(target)
+
+    with pytest.raises(PatchHarborError) as raised:
+        write_bundle_payloads(
+            (BundlePayload("payload.bin", b"replacement"),),
+            cwd=tmp_path,
+        )
+
+    assert raised.value.exit_code is ExitCode.FILE_PREPARATION_ERROR
+    assert "target is not a regular file" in str(raised.value)
+    assert target.exists()

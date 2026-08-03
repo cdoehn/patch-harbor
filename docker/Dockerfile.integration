@@ -26,7 +26,8 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 RUN python3 -m venv "${VIRTUAL_ENV}" \
-    && python -m pip install --upgrade pip setuptools wheel build pytest
+    && python -m pip install --upgrade pip setuptools wheel build pytest pytest-timeout pipx \
+    && python -m pip show pytest-timeout pipx >/dev/null
 
 WORKDIR /workspace
 COPY . .

@@ -1,0 +1,10 @@
+.git
+.venv
+.pytest_cache
+**/__pycache__
+*.py[cod]
+build
+dist
+*.egg-info
+*.log
+patchharbor_*_result_*.zip
