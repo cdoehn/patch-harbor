@@ -7,6 +7,7 @@ import pytest
 
 import patchharbor.cli as cli
 from patchharbor.cli import main
+from patchharbor.output import OutputTargets
 
 
 class _TerminalInput(StringIO):
@@ -35,16 +36,16 @@ def test_plain_flag_streams_to_an_interactive_terminal(
 ) -> None:
     stdout = _TerminalOutput()
     stderr = StringIO()
-    observed_plain_stream: StringIO | None = None
+    observed_output: OutputTargets | None = None
 
     def fake_run_script_path(
         path: Path,
         **options: object,
     ) -> int:
-        nonlocal observed_plain_stream
-        observed_plain_stream = options["plain_output_stream"]  # type: ignore[assignment]
-        assert observed_plain_stream is stdout
-        observed_plain_stream.write("plain-output\n")
+        nonlocal observed_output
+        observed_output = options["output"]
+        assert observed_output.plain_text_stream is stdout
+        observed_output.plain_text_stream.write("plain-output\n")
         return 0
 
     monkeypatch.setattr(cli, "run_script_path", fake_run_script_path)

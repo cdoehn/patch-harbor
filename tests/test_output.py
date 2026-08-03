@@ -1,12 +1,10 @@
 from __future__ import annotations
 
 import io
-from pathlib import Path
-import tempfile
 
 import pytest
 
-from patchharbor.output import ProcessOutputCapture, temporary_run_log
+from patchharbor.output import OutputTargets, ProcessOutputCapture
 
 
 def _capture(raw_output: bytes) -> ProcessOutputCapture:
@@ -77,32 +75,49 @@ def test_output_capture_reports_binary_stream_read_errors() -> None:
     assert capture.finished
 
 
-def test_output_capture_streams_every_line_to_each_live_destination() -> None:
-    first = io.StringIO()
-    second = io.StringIO()
+def test_output_capture_streams_decoded_lines_to_plain_destination() -> None:
+    destination = io.StringIO()
     capture = ProcessOutputCapture(
         io.BytesIO(b"one\ntwo\nthree"),
-        live_text_streams=(first, second),
+        live_text_streams=(destination,),
     )
 
     capture.start()
     capture.finish()
 
-    assert first.getvalue() == "one\ntwo\nthree"
-    assert second.getvalue() == "one\ntwo\nthree"
+    assert destination.getvalue() == "one\ntwo\nthree"
     assert capture.retained_lines == ("one\n", "two\n", "three")
 
 
-def test_temporary_run_logs_are_unique_and_use_the_system_temp_directory() -> None:
-    with temporary_run_log() as first:
-        first.path.write_text("first", encoding="utf-8")
-    with temporary_run_log() as second:
-        second.path.write_text("second", encoding="utf-8")
+def test_output_capture_keeps_raw_log_bytes_separate_from_ui_text() -> None:
+    raw_output = b"first\r\nbad-\xff\rfinal"
+    plain_destination = io.StringIO()
+    raw_destination = io.BytesIO()
+    capture = ProcessOutputCapture(
+        io.BytesIO(raw_output),
+        live_text_streams=(plain_destination,),
+        raw_byte_streams=(raw_destination,),
+    )
 
-    try:
-        assert first.path != second.path
-        assert first.path.parent == Path(tempfile.gettempdir())
-        assert second.path.parent == Path(tempfile.gettempdir())
-    finally:
-        first.path.unlink(missing_ok=True)
-        second.path.unlink(missing_ok=True)
+    capture.start()
+    capture.finish()
+
+    assert raw_destination.getvalue() == raw_output
+    assert plain_destination.getvalue() == "first\nbad-�\nfinal"
+    assert capture.retained_lines == ("first\n", "bad-�\n", "final")
+
+
+def test_output_targets_choose_plain_or_bounded_output() -> None:
+    bounded = io.StringIO()
+    plain = io.StringIO()
+    bounded_targets = OutputTargets(bounded_text_stream=bounded)
+    plain_targets = OutputTargets(
+        bounded_text_stream=bounded,
+        plain_text_stream=plain,
+    )
+
+    bounded_targets.write_visible_lines(("bounded\n",))
+    plain_targets.write_visible_lines(("must-not-be-replayed\n",))
+
+    assert bounded.getvalue() == "bounded\n"
+    assert plain.getvalue() == ""

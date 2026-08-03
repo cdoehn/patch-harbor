@@ -5,8 +5,6 @@ from __future__ import annotations
 import argparse
 from collections.abc import Sequence
 from contextlib import nullcontext
-from datetime import datetime, timezone
-import json
 from pathlib import Path
 import sys
 from typing import TextIO
@@ -14,7 +12,8 @@ from typing import TextIO
 from patchharbor.application import run_script_path, run_standard_input
 from patchharbor.errors import ExitCode, PatchHarborError
 from patchharbor.execution import DEFAULT_TIMEOUT_SECONDS
-from patchharbor.output import TemporaryRunLog, temporary_run_log
+from patchharbor.output import OutputTargets
+from patchharbor.run_log import temporary_run_log
 
 
 def _positive_seconds(value: str) -> float:
@@ -96,48 +95,41 @@ def _is_terminal(stream: TextIO) -> bool:
         return False
 
 
-def _write_log_header(
-    run_log: TemporaryRunLog,
+def _execute_request(
+    path: Path | None,
     *,
-    source_name: str,
     cwd: Path,
     timeout_seconds: float,
-    plain_output: bool,
-    color_enabled: bool,
-) -> None:
-    stream = run_log.stream
-    stream.write("PatchHarbor run log\n")
-    stream.write(
-        f"started_utc: {datetime.now(timezone.utc).isoformat()}\n"
-    )
-    stream.write(f"source: {json.dumps(source_name, ensure_ascii=False)}\n")
-    stream.write(
-        f"working_directory: {json.dumps(str(cwd), ensure_ascii=False)}\n"
-    )
-    stream.write(f"timeout_seconds: {timeout_seconds:g}\n")
-    stream.write(f"plain_output: {str(plain_output).lower()}\n")
-    stream.write(f"color_enabled: {str(color_enabled).lower()}\n")
-    stream.write("--- merged script output ---\n")
-    stream.flush()
-
-
-def _write_log_result(
-    run_log: TemporaryRunLog,
-    *,
-    exit_code: int,
-    tool_error: str | None,
-) -> None:
-    stream = run_log.stream
-    stream.write("\n--- run result ---\n")
-    stream.write(f"exit_code: {exit_code}\n")
-    if tool_error is not None:
-        stream.write(
-            f"tool_error: {json.dumps(tool_error, ensure_ascii=False)}\n"
+    stdin: TextIO,
+    stdout: TextIO,
+    stderr: TextIO,
+    output: OutputTargets,
+) -> tuple[int, str | None]:
+    try:
+        if path is not None:
+            return (
+                run_script_path(
+                    path,
+                    cwd=cwd,
+                    timeout_seconds=timeout_seconds,
+                    selection_input=stdin,
+                    selection_output=stdout,
+                    output=output,
+                ),
+                None,
+            )
+        return (
+            run_standard_input(
+                stdin,
+                cwd=cwd,
+                timeout_seconds=timeout_seconds,
+                output=output,
+            ),
+            None,
         )
-    stream.write(
-        f"finished_utc: {datetime.now(timezone.utc).isoformat()}\n"
-    )
-    stream.flush()
+    except PatchHarborError as exc:
+        print(f"patchharbor: {exc}", file=stderr)
+        return int(exc.exit_code), str(exc)
 
 
 def _run_command(
@@ -161,14 +153,12 @@ def _run_command(
     log_context = temporary_run_log() if log_enabled else nullcontext(None)
     log_path: Path | None = None
     exit_code = 0
-    tool_error: str | None = None
 
     try:
         with log_context as run_log:
             if run_log is not None:
                 log_path = run_log.path
-                _write_log_header(
-                    run_log,
+                run_log.write_header(
                     source_name="standard input" if path is None else str(path),
                     cwd=cwd,
                     timeout_seconds=timeout_seconds,
@@ -176,41 +166,31 @@ def _run_command(
                     color_enabled=color_enabled,
                 )
 
-            try:
-                if path is not None:
-                    exit_code = run_script_path(
-                        path,
-                        cwd=cwd,
-                        timeout_seconds=timeout_seconds,
-                        selection_input=stdin,
-                        selection_output=stdout,
-                        output_stream=stdout,
-                        plain_output_stream=(stdout if plain_output else None),
-                        log_stream=(None if run_log is None else run_log.stream),
-                    )
-                else:
-                    exit_code = run_standard_input(
-                        stdin,
-                        cwd=cwd,
-                        timeout_seconds=timeout_seconds,
-                        output_stream=stdout,
-                        plain_output_stream=(stdout if plain_output else None),
-                        log_stream=(None if run_log is None else run_log.stream),
-                    )
-            except PatchHarborError as exc:
-                tool_error = str(exc)
-                print(f"patchharbor: {exc}", file=stderr)
-                exit_code = int(exc.exit_code)
+            output = OutputTargets(
+                bounded_text_stream=stdout,
+                plain_text_stream=(stdout if plain_output else None),
+                raw_output_stream=(
+                    None if run_log is None else run_log.raw_output_stream
+                ),
+            )
+            exit_code, tool_error = _execute_request(
+                path,
+                cwd=cwd,
+                timeout_seconds=timeout_seconds,
+                stdin=stdin,
+                stdout=stdout,
+                stderr=stderr,
+                output=output,
+            )
 
             if run_log is not None:
-                _write_log_result(
-                    run_log,
+                run_log.write_result(
                     exit_code=exit_code,
                     tool_error=tool_error,
                 )
     except OSError as exc:
         print(f"patchharbor: cannot write run log: {exc}", file=stderr)
-        return int(ExitCode.EXECUTION_ERROR)
+        exit_code = int(ExitCode.EXECUTION_ERROR)
 
     if log_path is not None:
         print(f"patchharbor: log: {log_path}", file=stderr)

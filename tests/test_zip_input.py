@@ -255,7 +255,9 @@ def test_each_zip_script_receives_its_own_timeout(
         *,
         cwd: Path,
         timeout_seconds: float,
+        output: object | None = None,
     ) -> int:
+        assert output is None
         observed.append((script_text, timeout_seconds))
         return 0
 

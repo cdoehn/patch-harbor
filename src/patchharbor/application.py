@@ -9,6 +9,7 @@ from patchharbor.bundles import resolve_patch_bundle
 from patchharbor.errors import ExitCode, PatchHarborError
 from patchharbor.execution import execute_script_text
 from patchharbor.models import BundleScript, InputArtifact
+from patchharbor.output import OutputTargets
 from patchharbor.parser import parse_script
 from patchharbor.payload_files import (
     prepare_payload_files,
@@ -29,29 +30,18 @@ def _execute_bundle_script(
     *,
     cwd: Path,
     timeout_seconds: float,
-    output_stream: TextIO | None = None,
-    plain_output_stream: TextIO | None = None,
-    log_stream: TextIO | None = None,
+    output: OutputTargets | None = None,
 ) -> int:
     parsed_script = parse_script(bundle_script.text)
     prepared_payloads, _payload_warnings = prepare_payload_files(
         (payload.name, payload.text) for payload in parsed_script.payload_files
     )
     write_payload_files(prepared_payloads, cwd=cwd)
-
-    output_options: dict[str, TextIO] = {}
-    if output_stream is not None:
-        output_options["output_stream"] = output_stream
-    if plain_output_stream is not None:
-        output_options["plain_output_stream"] = plain_output_stream
-    if log_stream is not None:
-        output_options["log_stream"] = log_stream
-
     return execute_script_text(
         parsed_script.text,
         cwd=cwd,
         timeout_seconds=timeout_seconds,
-        **output_options,
+        output=output,
     )
 
 
@@ -60,9 +50,7 @@ def run_input_artifact(
     *,
     cwd: Path,
     timeout_seconds: float,
-    output_stream: TextIO | None = None,
-    plain_output_stream: TextIO | None = None,
-    log_stream: TextIO | None = None,
+    output: OutputTargets | None = None,
 ) -> int:
     """Resolve and execute every script in one input artifact."""
     bundle = resolve_patch_bundle(artifact)
@@ -73,9 +61,7 @@ def run_input_artifact(
             bundle_script,
             cwd=cwd,
             timeout_seconds=timeout_seconds,
-            output_stream=output_stream,
-            plain_output_stream=plain_output_stream,
-            log_stream=log_stream,
+            output=output,
         )
         if last_exit_code != 0:
             return last_exit_code
@@ -87,9 +73,7 @@ def run_standard_input(
     *,
     cwd: Path,
     timeout_seconds: float,
-    output_stream: TextIO | None = None,
-    plain_output_stream: TextIO | None = None,
-    log_stream: TextIO | None = None,
+    output: OutputTargets | None = None,
 ) -> int:
     """Own the temporary stdin artifact for exactly one runner request."""
     with stdin_input_artifact(stream) as artifact:
@@ -97,9 +81,7 @@ def run_standard_input(
             artifact,
             cwd=cwd,
             timeout_seconds=timeout_seconds,
-            output_stream=output_stream,
-            plain_output_stream=plain_output_stream,
-            log_stream=log_stream,
+            output=output,
         )
 
 
@@ -127,9 +109,7 @@ def _run_selected_candidate(
     *,
     cwd: Path,
     timeout_seconds: float,
-    output_stream: TextIO | None = None,
-    plain_output_stream: TextIO | None = None,
-    log_stream: TextIO | None = None,
+    output: OutputTargets | None = None,
 ) -> int:
     if candidate.path.is_symlink() or not candidate.path.is_file():
         raise PatchHarborError(
@@ -141,9 +121,7 @@ def _run_selected_candidate(
         file_input_artifact(candidate.path),
         cwd=cwd,
         timeout_seconds=timeout_seconds,
-        output_stream=output_stream,
-        plain_output_stream=plain_output_stream,
-        log_stream=log_stream,
+        output=output,
     )
 
 
@@ -154,9 +132,7 @@ def run_script_path(
     timeout_seconds: float,
     selection_input: TextIO,
     selection_output: TextIO,
-    output_stream: TextIO | None = None,
-    plain_output_stream: TextIO | None = None,
-    log_stream: TextIO | None = None,
+    output: OutputTargets | None = None,
 ) -> int:
     """Run a script/ZIP file or select one from a directory."""
     if not path.is_dir():
@@ -164,9 +140,7 @@ def run_script_path(
             file_input_artifact(path),
             cwd=cwd,
             timeout_seconds=timeout_seconds,
-            output_stream=output_stream,
-            plain_output_stream=plain_output_stream,
-            log_stream=log_stream,
+            output=output,
         )
 
     candidates = discover_directory_candidates(path)
@@ -184,7 +158,5 @@ def run_script_path(
         selected,
         cwd=cwd,
         timeout_seconds=timeout_seconds,
-        output_stream=output_stream,
-        plain_output_stream=plain_output_stream,
-        log_stream=log_stream,
+        output=output,
     )

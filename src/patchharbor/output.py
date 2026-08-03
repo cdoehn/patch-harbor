@@ -1,17 +1,12 @@
-"""Bounded capture, plain streaming, and temporary run logs."""
+"""Bounded output capture and explicit output target routing."""
 
 from __future__ import annotations
 
 from collections import deque
-from collections.abc import Iterator
-from contextlib import contextmanager
 from dataclasses import dataclass
-from io import TextIOWrapper
-import os
-from pathlib import Path
+from io import BufferedReader, RawIOBase, TextIOWrapper
 from threading import Lock, Thread
-import tempfile
-from typing import BinaryIO, TextIO
+from typing import BinaryIO, Callable, TextIO
 
 
 RETAINED_OUTPUT_LINES = 10
@@ -20,42 +15,34 @@ OUTPUT_READER_JOIN_SECONDS = 2.0
 
 
 @dataclass(frozen=True)
-class TemporaryRunLog:
-    """One securely created persistent log in the system temp directory."""
+class OutputTargets:
+    """Destinations for bounded, plain, and byte-exact process output."""
 
-    path: Path
-    stream: TextIO
+    bounded_text_stream: TextIO
+    plain_text_stream: TextIO | None = None
+    raw_output_stream: BinaryIO | None = None
 
+    @property
+    def live_text_streams(self) -> tuple[TextIO, ...]:
+        """Return destinations that receive every decoded line."""
+        if self.plain_text_stream is None:
+            return ()
+        return (self.plain_text_stream,)
 
-@contextmanager
-def temporary_run_log() -> Iterator[TemporaryRunLog]:
-    """Create a unique UTF-8 run log that remains after the command ends."""
-    descriptor, raw_path = tempfile.mkstemp(
-        prefix="patchharbor-",
-        suffix=".log",
-        text=True,
-    )
-    path = Path(raw_path)
-    stream: TextIO | None = None
-    try:
-        stream = os.fdopen(
-            descriptor,
-            "w",
-            encoding="utf-8",
-            newline="",
-        )
-        yield TemporaryRunLog(path=path, stream=stream)
-    except BaseException:
-        if stream is None:
-            try:
-                os.close(descriptor)
-            except OSError:
-                pass
-            path.unlink(missing_ok=True)
-        raise
-    finally:
-        if stream is not None:
-            stream.close()
+    @property
+    def raw_byte_streams(self) -> tuple[BinaryIO, ...]:
+        """Return destinations that receive the original process bytes."""
+        if self.raw_output_stream is None:
+            return ()
+        return (self.raw_output_stream,)
+
+    def write_visible_lines(self, lines: tuple[str, ...]) -> None:
+        """Write the bounded view unless plain streaming is active."""
+        if self.plain_text_stream is not None:
+            return
+        for line in lines:
+            self.bounded_text_stream.write(line)
+        self.bounded_text_stream.flush()
 
 
 class _RollingLineBuffer:
@@ -89,18 +76,70 @@ class _RollingLineBuffer:
             return self._discarded_line_count
 
 
+class _RawOutputTee(RawIOBase):
+    """Copy source bytes to raw sinks before text decoding."""
+
+    def __init__(
+        self,
+        source: BinaryIO,
+        destinations: tuple[BinaryIO, ...],
+        remember_error: Callable[[str, Exception], None],
+    ) -> None:
+        super().__init__()
+        self._source = source
+        self._destinations = list(dict.fromkeys(destinations))
+        self._remember_error = remember_error
+
+    def readable(self) -> bool:
+        return True
+
+    def readinto(self, buffer: bytearray | memoryview) -> int | None:
+        reader = getattr(self._source, "read1", self._source.read)
+        chunk = reader(len(buffer))
+        if chunk is None:
+            return None
+        if not chunk:
+            return 0
+
+        view = memoryview(buffer)
+        view[: len(chunk)] = chunk
+        active_destinations: list[BinaryIO] = []
+        for destination in self._destinations:
+            try:
+                written = destination.write(chunk)
+                if written is not None and written != len(chunk):
+                    raise OSError("short write")
+                destination.flush()
+            except Exception as exc:
+                self._remember_error("cannot write raw script output", exc)
+            else:
+                active_destinations.append(destination)
+        self._destinations = active_destinations
+        return len(chunk)
+
+    def close(self) -> None:
+        if self.closed:
+            return
+        try:
+            self._source.close()
+        finally:
+            super().close()
+
+
 class ProcessOutputCapture:
-    """Drain, decode, stream, and retain one merged binary process pipe."""
+    """Drain one merged binary process pipe without blocking the child."""
 
     def __init__(
         self,
         stream: BinaryIO,
         *,
         live_text_streams: tuple[TextIO, ...] = (),
+        raw_byte_streams: tuple[BinaryIO, ...] = (),
     ) -> None:
         self._buffer = _RollingLineBuffer()
         self._stream = stream
         self._live_text_streams = list(dict.fromkeys(live_text_streams))
+        self._raw_byte_streams = tuple(dict.fromkeys(raw_byte_streams))
         self._error: tuple[str, Exception] | None = None
         self._thread = Thread(
             target=self._drain,
@@ -161,7 +200,7 @@ class ProcessOutputCapture:
         if self._error is None:
             self._error = (context, error)
 
-    def _publish(self, line: str) -> None:
+    def _publish_text(self, line: str) -> None:
         active_streams: list[TextIO] = []
         for destination in self._live_text_streams:
             try:
@@ -176,15 +215,20 @@ class ProcessOutputCapture:
     def _drain(self) -> None:
         text_stream: TextIOWrapper | None = None
         try:
-            text_stream = TextIOWrapper(
+            raw_tee = _RawOutputTee(
                 self._stream,
+                self._raw_byte_streams,
+                self._remember_error,
+            )
+            text_stream = TextIOWrapper(
+                BufferedReader(raw_tee),
                 encoding="utf-8",
                 errors="replace",
                 newline=None,
             )
             for line in text_stream:
                 self._buffer.append(line)
-                self._publish(line)
+                self._publish_text(line)
         except Exception as exc:  # reported by finish() on the controlling thread
             self._remember_error("cannot read script output", exc)
         finally:

@@ -99,6 +99,17 @@ def test_lower_layers_do_not_import_orchestration_or_unrelated_layers() -> None:
             "platform",
             "sources",
         },
+        "run_log": {
+            "application",
+            "bundles",
+            "execution",
+            "interpreters",
+            "output",
+            "parser",
+            "payload_files",
+            "platform",
+            "sources",
+        },
         "execution": {
             "application",
             "bundles",
@@ -205,7 +216,7 @@ def test_execution_delegates_binary_output_capture_to_output_module() -> None:
     )
     output_source = (PACKAGE_ROOT / "output.py").read_text(encoding="utf-8")
 
-    assert "from patchharbor.output import ProcessOutputCapture" in execution_source
+    assert "from patchharbor.output import OutputTargets, ProcessOutputCapture" in execution_source
     assert "RollingLineBuffer" not in execution_source
     assert "threading" not in execution_source
     assert "codecs" not in execution_source
@@ -220,3 +231,20 @@ def test_execution_delegates_binary_output_capture_to_output_module() -> None:
         assert "text=True" not in source
         assert "encoding=" not in source
         assert "errors=" not in source
+
+
+def test_execution_output_contract_does_not_import_run_log() -> None:
+    execution_imports = _local_imports("execution")
+    output_imports = _local_imports("output")
+
+    assert "output" in execution_imports
+    assert "run_log" not in execution_imports
+    assert "run_log" not in output_imports
+
+
+def test_cli_coordinates_output_and_run_log_boundaries() -> None:
+    imports = _local_imports("cli")
+
+    assert "application" in imports
+    assert "output" in imports
+    assert "run_log" in imports

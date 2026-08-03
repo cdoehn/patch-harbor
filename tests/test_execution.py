@@ -9,6 +9,7 @@ from patchharbor.errors import ExitCode, PatchHarborError
 import patchharbor.execution as execution
 from patchharbor.execution import execute_script_text
 import patchharbor.interpreters as interpreters
+from patchharbor.output import OutputTargets
 from patchharbor.platform import ProcessResult, ProcessState
 
 
@@ -338,7 +339,7 @@ def test_execution_shows_only_last_five_merged_lines(
         "#!/usr/bin/env bash\n# PATCHHARBOR\n",
         cwd=tmp_path,
         timeout_seconds=7,
-        output_stream=destination,
+        output=OutputTargets(bounded_text_stream=destination),
     )
 
     assert result == 0
@@ -365,7 +366,7 @@ def test_execution_replaces_invalid_utf8_output(
         "#!/usr/bin/env bash\n# PATCHHARBOR\n",
         cwd=tmp_path,
         timeout_seconds=7,
-        output_stream=destination,
+        output=OutputTargets(bounded_text_stream=destination),
     )
 
     assert result == 0
@@ -394,8 +395,10 @@ def test_execution_plain_mode_streams_all_lines_without_bounded_replay(
         "#!/usr/bin/env bash\n# PATCHHARBOR\n",
         cwd=tmp_path,
         timeout_seconds=7,
-        output_stream=bounded_destination,
-        plain_output_stream=plain_destination,
+        output=OutputTargets(
+            bounded_text_stream=bounded_destination,
+            plain_text_stream=plain_destination,
+        ),
     )
 
     assert result == 0

@@ -96,6 +96,11 @@ def _run_patchharbor(
     )
 
 
+def _log_path_from_stderr(stderr: str) -> Path:
+    prefix = "patchharbor: log: "
+    matching = [line for line in stderr.splitlines() if line.startswith(prefix)]
+    assert matching, stderr
+    return Path(matching[-1].removeprefix(prefix))
 
 
 def _child_process_script(ready_path: Path, *, exit_parent: bool = False) -> str:
@@ -1373,5 +1378,58 @@ def test_fs_run_log_contains_complete_output_and_run_metadata(
         assert "logged-12\n" in log_text
         assert "--- run result ---\n" in log_text
         assert "exit_code: 0\n" in log_text
+    finally:
+        log_path.unlink(missing_ok=True)
+
+
+def test_fs_run_log_preserves_raw_invalid_utf8_while_plain_output_is_safe(
+    tmp_path: Path,
+) -> None:
+    script_path = _script_path(tmp_path, "raw-invalid-log")
+    if os.name == "nt":
+        script_body = (
+            "$bytes = [byte[]](0x72,0x61,0x77,0x2D,0xFF,0x0A)\n"
+            "$stream = [Console]::OpenStandardOutput()\n"
+            "$stream.Write($bytes, 0, $bytes.Length)\n"
+            "$stream.Flush()\n"
+        )
+    else:
+        script_body = "printf 'raw-\\377\\n'\n"
+    script_path.write_text(
+        f"{REQUIRED_MARKER}\n{script_body}",
+        encoding="utf-8",
+    )
+
+    completed = _run_patchharbor(script_path, tmp_path, "--log")
+
+    assert completed.returncode == 0
+    assert completed.stdout == "raw-�\n"
+    log_path = _log_path_from_stderr(completed.stderr)
+    try:
+        log_bytes = log_path.read_bytes()
+        assert b"raw-\xff\n" in log_bytes
+        assert "raw-�\n".encode() not in log_bytes
+        assert b"exit_code: 0\n" in log_bytes
+    finally:
+        log_path.unlink(missing_ok=True)
+
+
+def test_fs_run_log_is_closed_and_complete_after_tool_error(
+    tmp_path: Path,
+) -> None:
+    script_path = _script_path(tmp_path, "logged-tool-error")
+    script_path.write_text("echo missing marker\n", encoding="utf-8")
+
+    completed = _run_patchharbor(script_path, tmp_path, "--log")
+
+    assert completed.returncode == 3
+    assert "missing required marker line" in completed.stderr
+    log_path = _log_path_from_stderr(completed.stderr)
+    try:
+        log_text = log_path.read_text(encoding="utf-8")
+        assert "PatchHarbor run log\n" in log_text
+        assert "--- run result ---\n" in log_text
+        assert "exit_code: 3\n" in log_text
+        assert 'tool_error: "missing required marker line: # PATCHHARBOR"\n' in log_text
     finally:
         log_path.unlink(missing_ok=True)

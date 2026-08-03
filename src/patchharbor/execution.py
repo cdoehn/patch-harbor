@@ -8,7 +8,6 @@ import os
 from pathlib import Path
 import sys
 import tempfile
-from typing import TextIO
 
 from patchharbor.errors import ExitCode, PatchHarborError
 from patchharbor.interpreters import (
@@ -17,7 +16,7 @@ from patchharbor.interpreters import (
     resolve_interpreter,
     select_interpreter,
 )
-from patchharbor.output import ProcessOutputCapture
+from patchharbor.output import OutputTargets, ProcessOutputCapture
 from patchharbor.platform import ProcessState, create_process_tree
 
 
@@ -42,24 +41,12 @@ def _temporary_script_file(script_text: str, *, suffix: str) -> Iterator[Path]:
         script_path.unlink(missing_ok=True)
 
 
-def _write_visible_output(
-    lines: tuple[str, ...],
-    *,
-    destination: TextIO,
-) -> None:
-    for line in lines:
-        destination.write(line)
-    destination.flush()
-
-
 def execute_script_text(
     script_text: str,
     *,
     cwd: Path,
     timeout_seconds: float,
-    output_stream: TextIO | None = None,
-    plain_output_stream: TextIO | None = None,
-    log_stream: TextIO | None = None,
+    output: OutputTargets | None = None,
 ) -> int:
     """Stage and execute script text with a supported interpreter."""
     selected = select_interpreter(script_text)
@@ -76,9 +63,7 @@ def execute_script_text(
                 executable_path=executable_path,
                 cwd=cwd,
                 timeout_seconds=timeout_seconds,
-                output_stream=output_stream,
-                plain_output_stream=plain_output_stream,
-                log_stream=log_stream,
+                output=output,
             )
     except PatchHarborError:
         raise
@@ -106,11 +91,9 @@ def execute_script_file(
     executable_path: str,
     cwd: Path,
     timeout_seconds: float,
-    output_stream: TextIO | None = None,
-    plain_output_stream: TextIO | None = None,
-    log_stream: TextIO | None = None,
+    output: OutputTargets | None = None,
 ) -> int:
-    """Run one staged script with bounded, plain, and optional log output."""
+    """Run one staged script through the configured output targets."""
     command = build_interpreter_command(
         interpreter,
         executable_path,
@@ -125,14 +108,11 @@ def execute_script_file(
             ExitCode.INTERPRETER_ERROR,
         ) from exc
 
-    live_streams = tuple(
-        stream
-        for stream in (plain_output_stream, log_stream)
-        if stream is not None
-    )
+    targets = output or OutputTargets(bounded_text_stream=sys.stdout)
     capture = ProcessOutputCapture(
         process_tree.output_stream,
-        live_text_streams=live_streams,
+        live_text_streams=targets.live_text_streams,
+        raw_byte_streams=targets.raw_byte_streams,
     )
 
     try:
@@ -140,14 +120,7 @@ def execute_script_file(
             capture.start()
             result = process_tree.run(timeout_seconds=timeout_seconds)
             capture.finish()
-
-            if plain_output_stream is None:
-                _write_visible_output(
-                    capture.visible_lines,
-                    destination=(
-                        sys.stdout if output_stream is None else output_stream
-                    ),
-                )
+            targets.write_visible_lines(capture.visible_lines)
 
             if result.state is ProcessState.TIMED_OUT:
                 raise PatchHarborError(
