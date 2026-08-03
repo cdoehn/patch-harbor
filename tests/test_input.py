@@ -8,12 +8,12 @@ import stat
 import pytest
 
 import patchharbor.application as script_application
-import patchharbor.bundles as script_bundles
 import patchharbor.sources as script_sources
 from patchharbor.application import run_script_path
 from patchharbor.bundles import resolve_patch_bundle
 from patchharbor.errors import ExitCode, PatchHarborError
 from patchharbor.output import OutputTargets
+from patchharbor.resource_policy import ResourcePolicy
 from patchharbor.sources import file_input_artifact, stdin_input_artifact
 
 
@@ -46,10 +46,15 @@ def test_file_input_artifact_rejects_hard_budget(
 ) -> None:
     source = tmp_path / "oversized-input"
     source.write_bytes(b"1234")
-    monkeypatch.setattr(script_sources, "MAX_INPUT_ARTIFACT_BYTES", 3)
+    policy = ResourcePolicy(
+        warning_bytes=1,
+        max_input_artifact_bytes=3,
+        max_content_bytes=10,
+        max_zip_total_bytes=20,
+    )
 
     with pytest.raises(PatchHarborError) as raised:
-        file_input_artifact(source)
+        file_input_artifact(source, policy=policy)
 
     assert raised.value.exit_code is ExitCode.SOURCE_ERROR
     assert "resource limit exceeded" in str(raised.value)
@@ -69,10 +74,15 @@ def test_stdin_budget_failure_removes_secure_temporary_artifact(
         return descriptor, raw_path
 
     monkeypatch.setattr(script_sources.tempfile, "mkstemp", recording_mkstemp)
-    monkeypatch.setattr(script_sources, "MAX_INPUT_ARTIFACT_BYTES", 3)
+    policy = ResourcePolicy(
+        warning_bytes=1,
+        max_input_artifact_bytes=3,
+        max_content_bytes=10,
+        max_zip_total_bytes=20,
+    )
 
     with pytest.raises(PatchHarborError) as raised:
-        with stdin_input_artifact(BytesIO(b"1234")):
+        with stdin_input_artifact(BytesIO(b"1234"), policy=policy):
             raise AssertionError("oversized input must not be yielded")
 
     assert raised.value.exit_code is ExitCode.SOURCE_ERROR
@@ -114,10 +124,15 @@ def test_direct_reader_rechecks_budget_after_artifact_creation(
     source.write_bytes(b"123")
     artifact = file_input_artifact(source)
     source.write_bytes(b"123456")
-    monkeypatch.setattr(script_bundles, "MAX_INPUT_ARTIFACT_BYTES", 5)
+    policy = ResourcePolicy(
+        warning_bytes=1,
+        max_input_artifact_bytes=5,
+        max_content_bytes=10,
+        max_zip_total_bytes=20,
+    )
 
     with pytest.raises(PatchHarborError) as raised:
-        resolve_patch_bundle(artifact)
+        resolve_patch_bundle(artifact, policy=policy)
 
     assert raised.value.exit_code is ExitCode.SOURCE_ERROR
     assert "resource limit exceeded" in str(raised.value)
@@ -130,8 +145,12 @@ def test_large_source_warning_reaches_plain_output(
     source = tmp_path / "large-script"
     source.write_text("# PATCHHARBOR\n", encoding="utf-8")
     warning_output = StringIO()
-    monkeypatch.setattr(script_sources, "INPUT_WARNING_BYTES", 3)
-    monkeypatch.setattr(script_sources, "MAX_INPUT_ARTIFACT_BYTES", 100)
+    policy = ResourcePolicy(
+        warning_bytes=3,
+        max_input_artifact_bytes=100,
+        max_content_bytes=100,
+        max_zip_total_bytes=200,
+    )
     monkeypatch.setattr(
         script_application,
         "execute_script_text",
@@ -148,6 +167,7 @@ def test_large_source_warning_reaches_plain_output(
             visible_text_stream=StringIO(),
             warning_text_stream=warning_output,
         ),
+        resource_policy=policy,
     )
 
     assert result == 0

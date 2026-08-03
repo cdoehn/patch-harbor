@@ -37,6 +37,17 @@ def test_lower_layers_do_not_import_orchestration_or_unrelated_layers() -> None:
             "presentation",
             "sources",
         },
+        "resource_policy": {
+            "application",
+            "bundles",
+            "execution",
+            "interpreters",
+            "parser",
+            "payload_files",
+            "platform",
+            "presentation",
+            "sources",
+        },
         "bundle_paths": {
             "application",
             "bundles",
@@ -331,3 +342,28 @@ def test_runtime_package_imports_only_itself_and_the_standard_library() -> None:
 
     allowed = set(sys.stdlib_module_names) | {"__future__", "patchharbor"}
     assert imported_roots <= allowed
+
+
+def test_resource_budgets_have_one_low_level_policy_boundary() -> None:
+    policy_source = (PACKAGE_ROOT / "resource_policy.py").read_text(
+        encoding="utf-8"
+    )
+    assert "class ResourcePolicy" in policy_source
+    assert "DEFAULT_RESOURCE_POLICY" in policy_source
+
+    for module_name in ("sources", "bundles", "payload_files", "application"):
+        source = (PACKAGE_ROOT / f"{module_name}.py").read_text(
+            encoding="utf-8"
+        )
+        assert "patchharbor.resource_policy" in source
+
+    for module_name in ("sources", "bundles", "payload_files"):
+        source = (PACKAGE_ROOT / f"{module_name}.py").read_text(
+            encoding="utf-8"
+        )
+        assert "10 * 1024 * 1024" not in source
+        assert "256 * 1024 * 1024" not in source
+        assert "512 * 1024 * 1024" not in source
+        assert "MAX_ZIP_ENTRIES" not in source
+        assert "MAX_INPUT_ARTIFACT_BYTES" not in source
+        assert "MAX_PAYLOAD_BYTES" not in source

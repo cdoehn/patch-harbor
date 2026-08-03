@@ -8,7 +8,7 @@ import pytest
 from patchharbor.bundle_paths import is_safe_bundle_path
 from patchharbor.errors import ExitCode, PatchHarborError
 from patchharbor.models import BundlePayload
-import patchharbor.payload_files as payload_files
+from patchharbor.resource_policy import ResourcePolicy
 import patchharbor.platform.filesystem as platform_filesystem
 from patchharbor.payload_files import (
     is_safe_payload_name,
@@ -181,25 +181,34 @@ def test_prepare_payload_files_discards_invalid_name_with_warning() -> None:
     )
 
 
-def test_prepare_payload_files_reports_large_payload(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setattr(payload_files, "PAYLOAD_WARNING_BYTES", 3)
-    monkeypatch.setattr(payload_files, "MAX_PAYLOAD_BYTES", 10)
+def test_prepare_payload_files_reports_large_payload() -> None:
+    policy = ResourcePolicy(
+        warning_bytes=3,
+        max_content_bytes=10,
+        max_zip_total_bytes=20,
+    )
 
-    prepared, warnings = prepare_payload_files((("large.txt", "1234"),))
+    prepared, warnings = prepare_payload_files(
+        (("large.txt", "1234"),),
+        policy=policy,
+    )
 
     assert prepared == (("large.txt", "1234"),)
     assert warnings == ("FILE 'large.txt' is large (4 bytes)",)
 
 
-def test_prepare_payload_files_rejects_hard_budget(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setattr(payload_files, "MAX_PAYLOAD_BYTES", 3)
+def test_prepare_payload_files_rejects_hard_budget() -> None:
+    policy = ResourcePolicy(
+        warning_bytes=1,
+        max_content_bytes=3,
+        max_zip_total_bytes=6,
+    )
 
     with pytest.raises(PatchHarborError) as raised:
-        prepare_payload_files((("too-large.txt", "1234"),))
+        prepare_payload_files(
+            (("too-large.txt", "1234"),),
+            policy=policy,
+        )
 
     assert raised.value.exit_code is ExitCode.SOURCE_ERROR
     assert str(raised.value) == "FILE 'too-large.txt' exceeds the 3 byte limit"
@@ -373,3 +382,49 @@ def test_posix_fifo_bundle_target_is_not_replaced(tmp_path: Path) -> None:
     assert raised.value.exit_code is ExitCode.FILE_PREPARATION_ERROR
     assert "target is not a regular file" in str(raised.value)
     assert target.exists()
+
+
+def test_runner_applies_shared_policy_to_inline_file_before_execution(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from io import StringIO
+
+    import patchharbor.application as script_application
+    from patchharbor.application import run_script_path
+
+    script_path = tmp_path / "oversized-inline.sh"
+    script_path.write_text(
+        "# PATCHHARBOR\n"
+        "# PATCHHARBOR FILE payload.txt START\n"
+        "# 1234\n"
+        "# PATCHHARBOR FILE payload.txt END\n",
+        encoding="utf-8",
+    )
+    policy = ResourcePolicy(
+        warning_bytes=1,
+        max_input_artifact_bytes=1024,
+        max_content_bytes=3,
+        max_zip_total_bytes=6,
+    )
+    executed: list[str] = []
+    monkeypatch.setattr(
+        script_application,
+        "execute_script_text",
+        lambda script_text, **kwargs: executed.append(script_text) or 0,
+    )
+
+    with pytest.raises(PatchHarborError) as raised:
+        run_script_path(
+            script_path,
+            cwd=tmp_path,
+            timeout_seconds=1,
+            selection_input=StringIO(),
+            selection_output=StringIO(),
+            resource_policy=policy,
+        )
+
+    assert raised.value.exit_code is ExitCode.SOURCE_ERROR
+    assert "exceeds the 3 byte limit" in str(raised.value)
+    assert executed == []
+    assert not (tmp_path / "payload.txt").exists()

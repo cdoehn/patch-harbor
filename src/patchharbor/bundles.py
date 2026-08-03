@@ -19,14 +19,9 @@ from patchharbor.models import (
 )
 from patchharbor.parser import ScriptFormatError, validate_required_marker
 from patchharbor.platform.errors import describe_os_error
+from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY, ResourcePolicy
 
 
-CONTENT_WARNING_BYTES = 10 * 1024 * 1024
-MAX_INPUT_ARTIFACT_BYTES = 256 * 1024 * 1024
-MAX_ZIP_ENTRIES = 1_000
-MAX_ZIP_ENTRY_BYTES = 256 * 1024 * 1024
-MAX_ZIP_TOTAL_BYTES = 512 * 1024 * 1024
-_ZIP_READ_CHUNK_BYTES = 64 * 1024
 _ZIP_SIGNATURES = (b"PK\x03\x04", b"PK\x05\x06", b"PK\x07\x08")
 
 
@@ -35,6 +30,66 @@ class _ValidatedZipMember:
     entry: zipfile.ZipInfo
     relative_path: str
     is_directory: bool
+
+
+@dataclass(slots=True)
+class _ZipReadBudget:
+    """Coordinate declared and observed ZIP limits for one resolution."""
+
+    artifact: InputArtifact
+    policy: ResourcePolicy
+    total_bytes_read: int = 0
+
+    def validate_declared_entries(self, entries: list[zipfile.ZipInfo]) -> None:
+        if len(entries) > self.policy.max_zip_entries:
+            raise _zip_limit_error(
+                self.artifact,
+                f"more than {self.policy.max_zip_entries} entries",
+            )
+
+        declared_total = 0
+        for entry in entries:
+            if entry.file_size > self.policy.max_content_bytes:
+                raise _zip_limit_error(
+                    self.artifact,
+                    f"entry {entry.filename!r} exceeds "
+                    f"{self.policy.max_content_bytes} bytes",
+                )
+            declared_total += entry.file_size
+            if declared_total > self.policy.max_zip_total_bytes:
+                raise _zip_limit_error(
+                    self.artifact,
+                    "uncompressed data exceeds "
+                    f"{self.policy.max_zip_total_bytes} bytes",
+                )
+
+    def read_member(
+        self,
+        archive: zipfile.ZipFile,
+        member: _ValidatedZipMember,
+    ) -> bytes:
+        chunks: list[bytes] = []
+        entry_bytes_read = 0
+
+        with archive.open(member.entry, "r") as stream:
+            while chunk := stream.read(self.policy.read_chunk_bytes):
+                entry_bytes_read += len(chunk)
+                self.total_bytes_read += len(chunk)
+                if entry_bytes_read > self.policy.max_content_bytes:
+                    raise _zip_limit_error(
+                        self.artifact,
+                        f"entry {member.relative_path!r} exceeds "
+                        f"{self.policy.max_content_bytes} bytes",
+                    )
+                if self.total_bytes_read > self.policy.max_zip_total_bytes:
+                    raise _zip_limit_error(
+                        self.artifact,
+                        "uncompressed data exceeds "
+                        f"{self.policy.max_zip_total_bytes} bytes",
+                    )
+                chunks.append(chunk)
+
+        return b"".join(chunks)
 
 
 def _artifact_source_error(
@@ -74,65 +129,43 @@ def _zip_limit_error(
     )
 
 
-def _artifact_limit_error(artifact: InputArtifact) -> PatchHarborError:
+def _artifact_limit_error(
+    artifact: InputArtifact,
+    policy: ResourcePolicy,
+) -> PatchHarborError:
     return _artifact_source_error(
         artifact,
         "resource limit exceeded "
-        f"(input artifact exceeds {MAX_INPUT_ARTIFACT_BYTES} bytes)",
+        f"(input artifact exceeds {policy.max_input_artifact_bytes} bytes)",
     )
 
 
-def _large_content_warning(label: str, size_bytes: int) -> str | None:
-    if size_bytes > CONTENT_WARNING_BYTES:
-        return f"{label} is large ({size_bytes} bytes)"
-    return None
-
-
-def _validate_artifact_budget(artifact: InputArtifact) -> None:
-    if artifact.size_bytes > MAX_INPUT_ARTIFACT_BYTES:
-        raise _artifact_limit_error(artifact)
+def _validate_artifact_budget(
+    artifact: InputArtifact,
+    policy: ResourcePolicy,
+) -> None:
+    if artifact.size_bytes > policy.max_input_artifact_bytes:
+        raise _artifact_limit_error(artifact, policy)
     try:
         current_size = artifact.path.stat().st_size
     except OSError as exc:
         raise _artifact_source_error(artifact, describe_os_error(exc)) from exc
-    if current_size > MAX_INPUT_ARTIFACT_BYTES:
-        raise _artifact_limit_error(artifact)
+    if current_size > policy.max_input_artifact_bytes:
+        raise _artifact_limit_error(artifact, policy)
 
 
-def _read_direct_artifact(artifact: InputArtifact) -> bytes:
+def _read_direct_artifact(
+    artifact: InputArtifact,
+    policy: ResourcePolicy,
+) -> bytes:
     try:
         with artifact.path.open("rb") as stream:
-            raw_content = stream.read(MAX_INPUT_ARTIFACT_BYTES + 1)
+            raw_content = stream.read(policy.max_input_artifact_bytes + 1)
     except OSError as exc:
         raise _artifact_source_error(artifact, describe_os_error(exc)) from exc
-    if len(raw_content) > MAX_INPUT_ARTIFACT_BYTES:
-        raise _artifact_limit_error(artifact)
+    if len(raw_content) > policy.max_input_artifact_bytes:
+        raise _artifact_limit_error(artifact, policy)
     return raw_content
-
-
-def _validate_zip_budgets(
-    artifact: InputArtifact,
-    entries: list[zipfile.ZipInfo],
-) -> None:
-    if len(entries) > MAX_ZIP_ENTRIES:
-        raise _zip_limit_error(
-            artifact,
-            f"more than {MAX_ZIP_ENTRIES} entries",
-        )
-
-    total_bytes = 0
-    for entry in entries:
-        if entry.file_size > MAX_ZIP_ENTRY_BYTES:
-            raise _zip_limit_error(
-                artifact,
-                f"entry {entry.filename!r} exceeds {MAX_ZIP_ENTRY_BYTES} bytes",
-            )
-        total_bytes += entry.file_size
-        if total_bytes > MAX_ZIP_TOTAL_BYTES:
-            raise _zip_limit_error(
-                artifact,
-                f"uncompressed data exceeds {MAX_ZIP_TOTAL_BYTES} bytes",
-            )
 
 
 def _zip_member_is_directory(
@@ -194,49 +227,20 @@ def _validate_zip_members(
     )
 
 
-def _read_zip_entry(
-    archive: zipfile.ZipFile,
-    member: _ValidatedZipMember,
-    *,
-    artifact: InputArtifact,
-    total_bytes_read: int,
-) -> tuple[bytes, int]:
-    chunks: list[bytes] = []
-    entry_bytes_read = 0
-
-    with archive.open(member.entry, "r") as stream:
-        while chunk := stream.read(_ZIP_READ_CHUNK_BYTES):
-            entry_bytes_read += len(chunk)
-            total_bytes_read += len(chunk)
-            if entry_bytes_read > MAX_ZIP_ENTRY_BYTES:
-                raise _zip_limit_error(
-                    artifact,
-                    f"entry {member.relative_path!r} exceeds "
-                    f"{MAX_ZIP_ENTRY_BYTES} bytes",
-                )
-            if total_bytes_read > MAX_ZIP_TOTAL_BYTES:
-                raise _zip_limit_error(
-                    artifact,
-                    f"uncompressed data exceeds {MAX_ZIP_TOTAL_BYTES} bytes",
-                )
-            chunks.append(chunk)
-
-    return b"".join(chunks), total_bytes_read
-
-
 def _read_zip_members(
     archive: zipfile.ZipFile,
     *,
     artifact: InputArtifact,
+    policy: ResourcePolicy,
 ) -> tuple[
     tuple[BundleScript, ...],
     tuple[BundlePayload, ...],
     tuple[str, ...],
 ]:
     entries = archive.infolist()
-    _validate_zip_budgets(artifact, entries)
+    budget = _ZipReadBudget(artifact=artifact, policy=policy)
+    budget.validate_declared_entries(entries)
     members = _validate_zip_members(entries, artifact=artifact)
-    total_bytes_read = 0
     scripts: list[BundleScript] = []
     payloads: list[BundlePayload] = []
     warnings: list[str] = []
@@ -245,13 +249,8 @@ def _read_zip_members(
         if member.is_directory:
             continue
 
-        raw_content, total_bytes_read = _read_zip_entry(
-            archive,
-            member,
-            artifact=artifact,
-            total_bytes_read=total_bytes_read,
-        )
-        if warning := _large_content_warning(
+        raw_content = budget.read_member(archive, member)
+        if warning := policy.large_content_warning(
             f"ZIP entry {member.relative_path!r}",
             len(raw_content),
         ):
@@ -315,12 +314,16 @@ def _try_direct_script(
     )
 
 
-def _resolve_zip_bundle(artifact: InputArtifact) -> PatchBundle:
+def _resolve_zip_bundle(
+    artifact: InputArtifact,
+    policy: ResourcePolicy,
+) -> PatchBundle:
     try:
         with zipfile.ZipFile(artifact.path) as archive:
             scripts, payloads, entry_warnings = _read_zip_members(
                 archive,
                 artifact=artifact,
+                policy=policy,
             )
     except zipfile.BadZipFile as exc:
         raise _zip_source_error(artifact, exc) from exc
@@ -340,13 +343,17 @@ def _resolve_zip_bundle(artifact: InputArtifact) -> PatchBundle:
     )
 
 
-def resolve_patch_bundle(artifact: InputArtifact) -> PatchBundle:
+def resolve_patch_bundle(
+    artifact: InputArtifact,
+    *,
+    policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY,
+) -> PatchBundle:
     """Resolve one source-neutral artifact to an ordered PatchBundle."""
-    _validate_artifact_budget(artifact)
+    _validate_artifact_budget(artifact, policy)
     if zipfile.is_zipfile(artifact.path):
-        return _resolve_zip_bundle(artifact)
+        return _resolve_zip_bundle(artifact, policy)
 
-    raw_content = _read_direct_artifact(artifact)
+    raw_content = _read_direct_artifact(artifact, policy)
     direct_script, direct_error, direct_was_utf8 = _try_direct_script(
         raw_content,
         artifact,
@@ -363,7 +370,7 @@ def resolve_patch_bundle(artifact: InputArtifact) -> PatchBundle:
         or raw_content.startswith(_ZIP_SIGNATURES)
     )
     if zip_hint:
-        return _resolve_zip_bundle(artifact)
+        return _resolve_zip_bundle(artifact, policy)
     if direct_was_utf8:
         raise direct_error
     raise PatchHarborError(

@@ -13,29 +13,34 @@ from typing import TextIO
 from patchharbor.errors import ExitCode, PatchHarborError
 from patchharbor.models import InputArtifact
 from patchharbor.platform.errors import describe_os_error
+from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY, ResourcePolicy
 
 
-INPUT_WARNING_BYTES = 10 * 1024 * 1024
-MAX_INPUT_ARTIFACT_BYTES = 256 * 1024 * 1024
-_ARTIFACT_COPY_CHUNK_BYTES = 64 * 1024
-
-
-def _input_limit_error(display_name: str) -> PatchHarborError:
+def _input_limit_error(
+    display_name: str,
+    policy: ResourcePolicy,
+) -> PatchHarborError:
     return PatchHarborError(
         "resource limit exceeded "
         f"(input artifact {display_name!r} exceeds "
-        f"{MAX_INPUT_ARTIFACT_BYTES} bytes)",
+        f"{policy.max_input_artifact_bytes} bytes)",
         ExitCode.SOURCE_ERROR,
     )
 
 
-def _input_warnings(size_bytes: int) -> tuple[str, ...]:
-    if size_bytes > INPUT_WARNING_BYTES:
-        return (f"input artifact is large ({size_bytes} bytes)",)
-    return ()
+def _input_warnings(
+    size_bytes: int,
+    policy: ResourcePolicy,
+) -> tuple[str, ...]:
+    warning = policy.large_content_warning("input artifact", size_bytes)
+    return () if warning is None else (warning,)
 
 
-def file_input_artifact(path: Path) -> InputArtifact:
+def file_input_artifact(
+    path: Path,
+    *,
+    policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY,
+) -> InputArtifact:
     """Reference one existing filesystem input after checking its byte budget."""
     display_name = str(path)
     try:
@@ -46,14 +51,14 @@ def file_input_artifact(path: Path) -> InputArtifact:
             ExitCode.SOURCE_ERROR,
         ) from exc
 
-    if size_bytes > MAX_INPUT_ARTIFACT_BYTES:
-        raise _input_limit_error(display_name)
+    if size_bytes > policy.max_input_artifact_bytes:
+        raise _input_limit_error(display_name, policy)
 
     return InputArtifact(
         path=path,
         display_name=display_name,
         size_bytes=size_bytes,
-        warnings=_input_warnings(size_bytes),
+        warnings=_input_warnings(size_bytes, policy),
     )
 
 
@@ -72,7 +77,11 @@ def _read_stream_chunk(stream: object, size: int) -> bytes | None:
 
 
 @contextmanager
-def stdin_input_artifact(stream: TextIO) -> Iterator[InputArtifact]:
+def stdin_input_artifact(
+    stream: TextIO,
+    *,
+    policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY,
+) -> Iterator[InputArtifact]:
     """Copy standard input as bounded bytes to one secure temporary artifact."""
     descriptor, raw_path = tempfile.mkstemp(
         prefix="patchharbor-input-",
@@ -87,12 +96,15 @@ def stdin_input_artifact(stream: TextIO) -> Iterator[InputArtifact]:
                 while True:
                     chunk = _read_stream_chunk(
                         byte_stream,
-                        _ARTIFACT_COPY_CHUNK_BYTES,
+                        policy.read_chunk_bytes,
                     )
                     if chunk is None:
                         break
-                    if bytes_written + len(chunk) > MAX_INPUT_ARTIFACT_BYTES:
-                        raise _input_limit_error("standard input")
+                    if (
+                        bytes_written + len(chunk)
+                        > policy.max_input_artifact_bytes
+                    ):
+                        raise _input_limit_error("standard input", policy)
                     handle.write(chunk)
                     bytes_written += len(chunk)
         except (OSError, TypeError, UnicodeError) as exc:
@@ -112,7 +124,7 @@ def stdin_input_artifact(stream: TextIO) -> Iterator[InputArtifact]:
             path=artifact_path,
             display_name="standard input",
             size_bytes=bytes_written,
-            warnings=_input_warnings(bytes_written),
+            warnings=_input_warnings(bytes_written, policy),
         )
     finally:
         artifact_path.unlink(missing_ok=True)

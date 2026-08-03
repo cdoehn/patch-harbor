@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from io import StringIO
+from io import BytesIO, StringIO
 from pathlib import Path
 import stat
 import zipfile
@@ -11,6 +11,7 @@ from patchharbor.errors import ExitCode, PatchHarborError
 import patchharbor.application as script_application
 from patchharbor.application import discover_directory_candidates, run_script_path
 import patchharbor.bundles as script_bundles
+from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY, ResourcePolicy
 from patchharbor.sources import file_input_artifact
 
 
@@ -23,13 +24,20 @@ def _write_zip(path: Path, entries: list[tuple[str, str]]) -> None:
             archive.writestr(name, content)
 
 
-def _run_path(path: Path, cwd: Path, *, timeout_seconds: float = 1) -> int:
+def _run_path(
+    path: Path,
+    cwd: Path,
+    *,
+    timeout_seconds: float = 1,
+    resource_policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY,
+) -> int:
     return run_script_path(
         path,
         cwd=cwd,
         timeout_seconds=timeout_seconds,
         selection_input=StringIO(),
         selection_output=StringIO(),
+        resource_policy=resource_policy,
     )
 
 
@@ -201,41 +209,127 @@ def test_bundle_write_failure_prevents_every_script_execution(
 
 
 @pytest.mark.parametrize(
-    ("constant_name", "limit", "entries"),
+    ("policy", "entries"),
     [
         (
-            "MAX_ZIP_ENTRIES",
-            1,
+            ResourcePolicy(
+                warning_bytes=1,
+                max_content_bytes=20,
+                max_zip_total_bytes=40,
+                max_zip_entries=1,
+            ),
             [("one.txt", "1"), ("two.txt", "2")],
         ),
         (
-            "MAX_ZIP_ENTRY_BYTES",
-            4,
+            ResourcePolicy(
+                warning_bytes=1,
+                max_content_bytes=4,
+                max_zip_total_bytes=8,
+            ),
             [("large.txt", "12345")],
         ),
         (
-            "MAX_ZIP_TOTAL_BYTES",
-            8,
+            ResourcePolicy(
+                warning_bytes=1,
+                max_content_bytes=8,
+                max_zip_total_bytes=8,
+            ),
             [("one.txt", "12345"), ("two.txt", "67890")],
         ),
     ],
 )
 def test_zip_resource_budgets_fail_before_execution(
     tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    constant_name: str,
-    limit: int,
+    policy: ResourcePolicy,
     entries: list[tuple[str, str]],
 ) -> None:
     archive_path = tmp_path / "limited.zip"
     _write_zip(archive_path, entries)
-    monkeypatch.setattr(script_bundles, constant_name, limit)
 
     with pytest.raises(PatchHarborError) as raised:
-        _run_path(archive_path, tmp_path)
+        _run_path(archive_path, tmp_path, resource_policy=policy)
 
     assert raised.value.exit_code is ExitCode.SOURCE_ERROR
     assert "resource limit exceeded" in str(raised.value)
+
+
+@pytest.mark.parametrize(
+    ("policy", "observed_payload", "error_fragment"),
+    [
+        (
+            ResourcePolicy(
+                warning_bytes=1,
+                max_content_bytes=20,
+                max_zip_total_bytes=100,
+            ),
+            b"x" * 21,
+            "entry 'payload.bin' exceeds 20 bytes",
+        ),
+        (
+            ResourcePolicy(
+                warning_bytes=1,
+                max_content_bytes=100,
+                max_zip_total_bytes=20,
+            ),
+            b"x" * 10,
+            "uncompressed data exceeds 20 bytes",
+        ),
+    ],
+)
+def test_zip_live_bytes_use_the_same_policy_as_preflight(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    policy: ResourcePolicy,
+    observed_payload: bytes,
+    error_fragment: str,
+) -> None:
+    archive_path = tmp_path / "misreported.zip"
+    with zipfile.ZipFile(archive_path, "w") as archive:
+        archive.writestr("run.sh", f"{REQUIRED_MARKER}\n")
+        archive.writestr("payload.bin", b"x")
+
+    original_open = script_bundles.zipfile.ZipFile.open
+
+    def open_with_misreported_payload(
+        archive: zipfile.ZipFile,
+        member: str | zipfile.ZipInfo,
+        mode: str = "r",
+        pwd: bytes | None = None,
+        *,
+        force_zip64: bool = False,
+    ) -> object:
+        member_name = (
+            member.filename if isinstance(member, zipfile.ZipInfo) else member
+        )
+        if member_name == "payload.bin":
+            return BytesIO(observed_payload)
+        return original_open(
+            archive,
+            member,
+            mode,
+            pwd,
+            force_zip64=force_zip64,
+        )
+
+    monkeypatch.setattr(
+        script_bundles.zipfile.ZipFile,
+        "open",
+        open_with_misreported_payload,
+    )
+    executed: list[str] = []
+    monkeypatch.setattr(
+        script_application,
+        "execute_script_text",
+        lambda script_text, **kwargs: executed.append(script_text) or 0,
+    )
+
+    with pytest.raises(PatchHarborError) as raised:
+        _run_path(archive_path, tmp_path, resource_policy=policy)
+
+    assert raised.value.exit_code is ExitCode.SOURCE_ERROR
+    assert error_fragment in str(raised.value)
+    assert executed == []
+    assert not (tmp_path / "payload.bin").exists()
 
 
 def test_zip_large_entry_warning_is_preserved_on_bundle(
@@ -246,13 +340,19 @@ def test_zip_large_entry_warning_is_preserved_on_bundle(
     with zipfile.ZipFile(archive_path, "w") as archive:
         archive.writestr("run.sh", f"{REQUIRED_MARKER}\n")
         archive.writestr("payload.bin", b"x" * 21)
-    monkeypatch.setattr(script_bundles, "CONTENT_WARNING_BYTES", 20)
+    policy = ResourcePolicy(
+        warning_bytes=20,
+        max_content_bytes=1024,
+        max_zip_total_bytes=2048,
+    )
 
     bundle = script_bundles.resolve_patch_bundle(
-        file_input_artifact(archive_path)
+        file_input_artifact(archive_path, policy=policy),
+        policy=policy,
     )
 
     assert bundle.warnings == (
+        "input artifact is large (243 bytes)",
         "ZIP entry 'payload.bin' is large (21 bytes)",
     )
 
@@ -272,8 +372,11 @@ def test_compressed_zip_bomb_like_payload_is_rejected_before_execution(
         archive.writestr("payload.bin", expanded)
 
     assert archive_path.stat().st_size < len(expanded)
-    monkeypatch.setattr(script_bundles, "MAX_ZIP_ENTRY_BYTES", 8192)
-    monkeypatch.setattr(script_bundles, "MAX_ZIP_TOTAL_BYTES", 1024)
+    policy = ResourcePolicy(
+        warning_bytes=1,
+        max_content_bytes=8192,
+        max_zip_total_bytes=1024,
+    )
     executed: list[str] = []
     monkeypatch.setattr(
         script_application,
@@ -282,7 +385,11 @@ def test_compressed_zip_bomb_like_payload_is_rejected_before_execution(
     )
 
     with pytest.raises(PatchHarborError) as raised:
-        _run_path(archive_path, tmp_path)
+        _run_path(
+            archive_path,
+            tmp_path,
+            resource_policy=policy,
+        )
 
     assert raised.value.exit_code is ExitCode.SOURCE_ERROR
     assert "resource limit exceeded" in str(raised.value)

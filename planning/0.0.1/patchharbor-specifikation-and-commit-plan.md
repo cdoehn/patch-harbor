@@ -306,7 +306,9 @@ Ein unsicherer, beschädigter oder mehrdeutiger Eintrag macht das gesamte ZIP-Bu
 
 ### 7.4 Größen- und Ressourcenbudget
 
-Unbegrenzte Eingaben werden nicht unterstützt. Die Anfangswerte sind zentrale Konstanten und können nach echten Nutzungserfahrungen angepasst werden.
+Unbegrenzte Eingaben werden nicht unterstützt. Ein Runner-Auftrag verwendet genau eine kleine unveränderliche `ResourcePolicy`. Dadurch gelten für Datei, Pipe, direkte Skripte, ZIP-Einträge und inline FILE-Inhalte dieselben nachvollziehbaren Grenzwerte. Die Anfangswerte können nach echten Nutzungserfahrungen angepasst werden.
+
+Die ZIP-Auflösung prüft deklarierte Größen und Eintragszahlen vorab. Während des tatsächlichen Lesens werden die gelesenen Bytes erneut gegen dieselbe Policy geprüft. Laufende Zähler existieren nur innerhalb der aktuellen ZIP-Auflösung und werden nicht als allgemeiner Anwendungszustand gespeichert.
 
 Empfohlene Anfangswerte:
 
@@ -597,6 +599,7 @@ Empfohlene Module:
 - `bundles.py` – direkte Skripte und ZIP-Container zu einem `PatchBundle` mit geordneten Skripten und Bundle-Nutzdateien auflösen,
 - `script_format.py` – Marker, META, MESSAGE und inline FILE-Blöcke analysieren,
 - `payload_files.py` – einfache inline Dateinamen und sichere relative Bundle-Pfade prüfen und Inhalte über ein gemeinsames atomares Schreibprimitiv schreiben,
+- `resource_policy.py` – wenige unveränderliche Ressourcenbudgets und die gemeinsame Warning-Schwelle,
 - `interpreters.py` – Whitelist, Shebang-Auswertung, Plattformdefault, Verfügbarkeitsprüfung und feste Prozessargumente,
 - `execution.py` – temporäre Skriptdatei, Prozessstart, Timeout und Ergebnis,
 - `presentation.py` – Plain-Ausgabe, TUI, Farben und Rolling-Buffer-Darstellung,
@@ -614,8 +617,9 @@ Empfohlene Module:
 - `script_format` liefert reine Beschreibungen optionaler inline FILE-Blöcke und importiert keine Schreiblogik aus `payload_files`.
 - `payload_files` validiert, staged und schreibt Bundle-Nutzdateien und inline FILE-Inhalte; es steuert keine Execution.
 - `interpreters` kennt nur den kleinen Interpretervertrag und Tool-Fehler; es kennt weder Quellen, PatchBundles, Parser noch Execution.
-- `models` und `errors` kennen keine höherliegenden Module.
-- `execution` darf `interpreters` verwenden, kennt aber weder Quellen, PatchBundles, TUI noch argparse.
+- `models`, `errors` und `resource_policy` kennen keine höherliegenden Module.
+- Quellen, PatchBundle-Auflösung und inline FILE-Verarbeitung erhalten dieselbe `ResourcePolicy` vom Anwendungsorchestrator.
+- `execution` darf `interpreters` verwenden, kennt aber weder Quellen, PatchBundles, Ressourcenpolicy, TUI noch argparse.
 - `presentation` erhält Zustandsmodelle und steuert keine Ausführung.
 - Es gibt keine Pakete namens `utils`, `helpers` oder `common` als Sammelstellen.
 - Zukünftige Quellen liefern denselben `InputArtifact`, ohne die PatchBundle-, Nutzdatei-, Parser-, FILE- oder Execution-Pipeline zu verändern.

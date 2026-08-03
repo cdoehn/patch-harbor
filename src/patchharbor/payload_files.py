@@ -12,6 +12,7 @@ from patchharbor.bundle_paths import (
 )
 from patchharbor.errors import ExitCode, PatchHarborError
 from patchharbor.models import BundlePayload
+from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY, ResourcePolicy
 from patchharbor.platform.filesystem import (
     FileSystemOperationError,
     PathKind,
@@ -19,10 +20,6 @@ from patchharbor.platform.filesystem import (
     create_directory,
     path_kind,
 )
-
-
-PAYLOAD_WARNING_BYTES = 10 * 1024 * 1024
-MAX_PAYLOAD_BYTES = 256 * 1024 * 1024
 
 
 def _write_error(label: str, detail: object) -> PatchHarborError:
@@ -45,21 +42,27 @@ def is_safe_payload_name(name: str) -> bool:
     return is_safe_path_segment(name)
 
 
-def payload_size_warning(name: str, text: str) -> str | None:
-    """Enforce the hard FILE budget and return an optional soft warning."""
+def payload_size_warning(
+    name: str,
+    text: str,
+    *,
+    policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY,
+) -> str | None:
+    """Enforce the shared hard budget and return an optional soft warning."""
     size_bytes = len(text.encode("utf-8"))
-    if size_bytes > MAX_PAYLOAD_BYTES:
+    if size_bytes > policy.max_content_bytes:
         raise PatchHarborError(
-            f"FILE {name!r} exceeds the {MAX_PAYLOAD_BYTES} byte limit",
+            f"FILE {name!r} exceeds the "
+            f"{policy.max_content_bytes} byte limit",
             ExitCode.SOURCE_ERROR,
         )
-    if size_bytes > PAYLOAD_WARNING_BYTES:
-        return f"FILE {name!r} is large ({size_bytes} bytes)"
-    return None
+    return policy.large_content_warning(f"FILE {name!r}", size_bytes)
 
 
 def prepare_payload_files(
     payloads: Iterable[tuple[str, str]],
+    *,
+    policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY,
 ) -> tuple[tuple[tuple[str, str], ...], tuple[str, ...]]:
     """Filter optional FILE descriptions without touching the filesystem."""
     prepared: list[tuple[str, str]] = []
@@ -69,7 +72,7 @@ def prepare_payload_files(
         if not is_safe_payload_name(name):
             warnings.append(f"discarded FILE {name!r}: invalid file name")
             continue
-        if warning := payload_size_warning(name, text):
+        if warning := payload_size_warning(name, text, policy=policy):
             warnings.append(warning)
         prepared.append((name, text))
 

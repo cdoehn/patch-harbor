@@ -17,6 +17,7 @@ from patchharbor.payload_files import (
     write_payload_files,
 )
 from patchharbor.presentation import DashboardPresentation, PresentedFile
+from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY, ResourcePolicy
 from patchharbor.sources import (
     DirectoryCandidate,
     file_input_artifact,
@@ -35,10 +36,16 @@ def _execute_bundle_script(
     timeout_seconds: float,
     output: OutputTargets | None = None,
     presentation: DashboardPresentation | None = None,
+    resource_policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY,
 ) -> int:
     parsed_script = parse_script(bundle_script.text)
+    payload_descriptions = (
+        (payload.name, payload.text)
+        for payload in parsed_script.payload_files
+    )
     prepared_payloads, payload_warnings = prepare_payload_files(
-        (payload.name, payload.text) for payload in parsed_script.payload_files
+        payload_descriptions,
+        policy=resource_policy,
     )
     script_warnings = parsed_script.warnings + payload_warnings
     if presentation is not None:
@@ -78,9 +85,10 @@ def run_input_artifact(
     timeout_seconds: float,
     output: OutputTargets | None = None,
     presentation: DashboardPresentation | None = None,
+    resource_policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY,
 ) -> int:
     """Resolve and execute every script in one input artifact."""
-    bundle = resolve_patch_bundle(artifact)
+    bundle = resolve_patch_bundle(artifact, policy=resource_policy)
     if presentation is not None:
         presentation.begin_request(
             source_name=artifact.display_name,
@@ -109,6 +117,7 @@ def run_input_artifact(
             timeout_seconds=timeout_seconds,
             output=output,
             presentation=presentation,
+            resource_policy=resource_policy,
         )
         if last_exit_code != 0:
             return last_exit_code
@@ -122,21 +131,29 @@ def run_standard_input(
     timeout_seconds: float,
     output: OutputTargets | None = None,
     presentation: DashboardPresentation | None = None,
+    resource_policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY,
 ) -> int:
     """Own the temporary stdin artifact for exactly one runner request."""
-    with stdin_input_artifact(stream) as artifact:
+    with stdin_input_artifact(stream, policy=resource_policy) as artifact:
         return run_input_artifact(
             artifact,
             cwd=cwd,
             timeout_seconds=timeout_seconds,
             output=output,
             presentation=presentation,
+            resource_policy=resource_policy,
         )
 
 
-def _is_directory_candidate(path: Path) -> bool:
+def _is_directory_candidate(
+    path: Path,
+    resource_policy: ResourcePolicy,
+) -> bool:
     try:
-        resolve_patch_bundle(file_input_artifact(path))
+        resolve_patch_bundle(
+            file_input_artifact(path, policy=resource_policy),
+            policy=resource_policy,
+        )
         return True
     except PatchHarborError:
         return False
@@ -144,12 +161,14 @@ def _is_directory_candidate(path: Path) -> bool:
 
 def discover_directory_candidates(
     directory: Path,
+    *,
+    resource_policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY,
 ) -> tuple[DirectoryCandidate, ...]:
     """Return sorted regular files that resolve to a PatchBundle."""
     return tuple(
         candidate
         for candidate in list_directory_entries(directory)
-        if _is_directory_candidate(candidate.path)
+        if _is_directory_candidate(candidate.path, resource_policy)
     )
 
 
@@ -160,6 +179,7 @@ def _run_selected_candidate(
     timeout_seconds: float,
     output: OutputTargets | None = None,
     presentation: DashboardPresentation | None = None,
+    resource_policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY,
 ) -> int:
     if candidate.path.is_symlink() or not candidate.path.is_file():
         raise PatchHarborError(
@@ -168,11 +188,12 @@ def _run_selected_candidate(
         )
 
     return run_input_artifact(
-        file_input_artifact(candidate.path),
+        file_input_artifact(candidate.path, policy=resource_policy),
         cwd=cwd,
         timeout_seconds=timeout_seconds,
         output=output,
         presentation=presentation,
+        resource_policy=resource_policy,
     )
 
 
@@ -185,18 +206,23 @@ def run_script_path(
     selection_output: TextIO,
     output: OutputTargets | None = None,
     presentation: DashboardPresentation | None = None,
+    resource_policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY,
 ) -> int:
     """Run a script/ZIP file or select one from a directory."""
     if not path.is_dir():
         return run_input_artifact(
-            file_input_artifact(path),
+            file_input_artifact(path, policy=resource_policy),
             cwd=cwd,
             timeout_seconds=timeout_seconds,
             output=output,
             presentation=presentation,
+            resource_policy=resource_policy,
         )
 
-    candidates = discover_directory_candidates(path)
+    candidates = discover_directory_candidates(
+        path,
+        resource_policy=resource_policy,
+    )
     if not candidates:
         raise PatchHarborError(
             f"no PatchHarbor scripts found in directory {path}",
@@ -213,4 +239,5 @@ def run_script_path(
         timeout_seconds=timeout_seconds,
         output=output,
         presentation=presentation,
+        resource_policy=resource_policy,
     )
