@@ -149,7 +149,6 @@ def _run_command(
 
     cwd = Path.cwd()
     plain_output = force_plain or not _is_terminal(stdout)
-    color_enabled = not no_color and not plain_output
     log_context = temporary_run_log() if log_enabled else nullcontext(None)
     log_path: Path | None = None
     exit_code = 0
@@ -162,13 +161,11 @@ def _run_command(
                     source_name="standard input" if path is None else str(path),
                     cwd=cwd,
                     timeout_seconds=timeout_seconds,
-                    plain_output=plain_output,
-                    color_enabled=color_enabled,
                 )
 
             output = OutputTargets(
-                bounded_text_stream=stdout,
-                plain_text_stream=(stdout if plain_output else None),
+                visible_text_stream=stdout,
+                live_text_stream=(stdout if plain_output else None),
                 raw_output_stream=(
                     None if run_log is None else run_log.raw_output_stream
                 ),

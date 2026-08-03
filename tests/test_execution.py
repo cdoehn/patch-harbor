@@ -339,7 +339,7 @@ def test_execution_shows_only_last_five_merged_lines(
         "#!/usr/bin/env bash\n# PATCHHARBOR\n",
         cwd=tmp_path,
         timeout_seconds=7,
-        output=OutputTargets(bounded_text_stream=destination),
+        output=OutputTargets(visible_text_stream=destination),
     )
 
     assert result == 0
@@ -366,7 +366,7 @@ def test_execution_replaces_invalid_utf8_output(
         "#!/usr/bin/env bash\n# PATCHHARBOR\n",
         cwd=tmp_path,
         timeout_seconds=7,
-        output=OutputTargets(bounded_text_stream=destination),
+        output=OutputTargets(visible_text_stream=destination),
     )
 
     assert result == 0
@@ -396,8 +396,8 @@ def test_execution_plain_mode_streams_all_lines_without_bounded_replay(
         cwd=tmp_path,
         timeout_seconds=7,
         output=OutputTargets(
-            bounded_text_stream=bounded_destination,
-            plain_text_stream=plain_destination,
+            visible_text_stream=bounded_destination,
+            live_text_stream=plain_destination,
         ),
     )
 

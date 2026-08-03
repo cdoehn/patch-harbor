@@ -108,11 +108,11 @@ def execute_script_file(
             ExitCode.INTERPRETER_ERROR,
         ) from exc
 
-    targets = output or OutputTargets(bounded_text_stream=sys.stdout)
+    targets = output or OutputTargets(visible_text_stream=sys.stdout)
     capture = ProcessOutputCapture(
         process_tree.output_stream,
-        live_text_streams=targets.live_text_streams,
-        raw_byte_streams=targets.raw_byte_streams,
+        live_text_stream=targets.live_text_stream,
+        raw_output_stream=targets.raw_output_stream,
     )
 
     try:

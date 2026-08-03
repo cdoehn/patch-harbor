@@ -44,8 +44,8 @@ def test_plain_flag_streams_to_an_interactive_terminal(
     ) -> int:
         nonlocal observed_output
         observed_output = options["output"]
-        assert observed_output.plain_text_stream is stdout
-        observed_output.plain_text_stream.write("plain-output\n")
+        assert observed_output.live_text_stream is stdout
+        observed_output.live_text_stream.write("plain-output\n")
         return 0
 
     monkeypatch.setattr(cli, "run_script_path", fake_run_script_path)

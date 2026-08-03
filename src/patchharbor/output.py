@@ -1,4 +1,4 @@
-"""Bounded output capture and explicit output target routing."""
+"""Bounded output capture with three explicit output destinations."""
 
 from __future__ import annotations
 
@@ -16,33 +16,19 @@ OUTPUT_READER_JOIN_SECONDS = 2.0
 
 @dataclass(frozen=True)
 class OutputTargets:
-    """Destinations for bounded, plain, and byte-exact process output."""
+    """The visible, live, and byte-exact destinations for one script."""
 
-    bounded_text_stream: TextIO
-    plain_text_stream: TextIO | None = None
+    visible_text_stream: TextIO
+    live_text_stream: TextIO | None = None
     raw_output_stream: BinaryIO | None = None
 
-    @property
-    def live_text_streams(self) -> tuple[TextIO, ...]:
-        """Return destinations that receive every decoded line."""
-        if self.plain_text_stream is None:
-            return ()
-        return (self.plain_text_stream,)
-
-    @property
-    def raw_byte_streams(self) -> tuple[BinaryIO, ...]:
-        """Return destinations that receive the original process bytes."""
-        if self.raw_output_stream is None:
-            return ()
-        return (self.raw_output_stream,)
-
     def write_visible_lines(self, lines: tuple[str, ...]) -> None:
-        """Write the bounded view unless plain streaming is active."""
-        if self.plain_text_stream is not None:
+        """Write the bounded final view unless live streaming is active."""
+        if self.live_text_stream is not None:
             return
         for line in lines:
-            self.bounded_text_stream.write(line)
-        self.bounded_text_stream.flush()
+            self.visible_text_stream.write(line)
+        self.visible_text_stream.flush()
 
 
 class _RollingLineBuffer:
@@ -77,17 +63,17 @@ class _RollingLineBuffer:
 
 
 class _RawOutputTee(RawIOBase):
-    """Copy source bytes to raw sinks before text decoding."""
+    """Copy source bytes to one optional raw destination before decoding."""
 
     def __init__(
         self,
         source: BinaryIO,
-        destinations: tuple[BinaryIO, ...],
+        destination: BinaryIO | None,
         remember_error: Callable[[str, Exception], None],
     ) -> None:
         super().__init__()
         self._source = source
-        self._destinations = list(dict.fromkeys(destinations))
+        self._destination = destination
         self._remember_error = remember_error
 
     def readable(self) -> bool:
@@ -103,8 +89,8 @@ class _RawOutputTee(RawIOBase):
 
         view = memoryview(buffer)
         view[: len(chunk)] = chunk
-        active_destinations: list[BinaryIO] = []
-        for destination in self._destinations:
+        destination = self._destination
+        if destination is not None:
             try:
                 written = destination.write(chunk)
                 if written is not None and written != len(chunk):
@@ -112,9 +98,7 @@ class _RawOutputTee(RawIOBase):
                 destination.flush()
             except Exception as exc:
                 self._remember_error("cannot write raw script output", exc)
-            else:
-                active_destinations.append(destination)
-        self._destinations = active_destinations
+                self._destination = None
         return len(chunk)
 
     def close(self) -> None:
@@ -133,13 +117,13 @@ class ProcessOutputCapture:
         self,
         stream: BinaryIO,
         *,
-        live_text_streams: tuple[TextIO, ...] = (),
-        raw_byte_streams: tuple[BinaryIO, ...] = (),
+        live_text_stream: TextIO | None = None,
+        raw_output_stream: BinaryIO | None = None,
     ) -> None:
         self._buffer = _RollingLineBuffer()
         self._stream = stream
-        self._live_text_streams = list(dict.fromkeys(live_text_streams))
-        self._raw_byte_streams = tuple(dict.fromkeys(raw_byte_streams))
+        self._live_text_stream = live_text_stream
+        self._raw_output_stream = raw_output_stream
         self._error: tuple[str, Exception] | None = None
         self._thread = Thread(
             target=self._drain,
@@ -201,23 +185,22 @@ class ProcessOutputCapture:
             self._error = (context, error)
 
     def _publish_text(self, line: str) -> None:
-        active_streams: list[TextIO] = []
-        for destination in self._live_text_streams:
-            try:
-                destination.write(line)
-                destination.flush()
-            except Exception as exc:
-                self._remember_error("cannot write script output", exc)
-            else:
-                active_streams.append(destination)
-        self._live_text_streams = active_streams
+        destination = self._live_text_stream
+        if destination is None:
+            return
+        try:
+            destination.write(line)
+            destination.flush()
+        except Exception as exc:
+            self._remember_error("cannot write script output", exc)
+            self._live_text_stream = None
 
     def _drain(self) -> None:
         text_stream: TextIOWrapper | None = None
         try:
             raw_tee = _RawOutputTee(
                 self._stream,
-                self._raw_byte_streams,
+                self._raw_output_stream,
                 self._remember_error,
             )
             text_stream = TextIOWrapper(

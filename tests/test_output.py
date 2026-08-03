@@ -79,7 +79,7 @@ def test_output_capture_streams_decoded_lines_to_plain_destination() -> None:
     destination = io.StringIO()
     capture = ProcessOutputCapture(
         io.BytesIO(b"one\ntwo\nthree"),
-        live_text_streams=(destination,),
+        live_text_stream=destination,
     )
 
     capture.start()
@@ -95,8 +95,8 @@ def test_output_capture_keeps_raw_log_bytes_separate_from_ui_text() -> None:
     raw_destination = io.BytesIO()
     capture = ProcessOutputCapture(
         io.BytesIO(raw_output),
-        live_text_streams=(plain_destination,),
-        raw_byte_streams=(raw_destination,),
+        live_text_stream=plain_destination,
+        raw_output_stream=raw_destination,
     )
 
     capture.start()
@@ -110,10 +110,10 @@ def test_output_capture_keeps_raw_log_bytes_separate_from_ui_text() -> None:
 def test_output_targets_choose_plain_or_bounded_output() -> None:
     bounded = io.StringIO()
     plain = io.StringIO()
-    bounded_targets = OutputTargets(bounded_text_stream=bounded)
+    bounded_targets = OutputTargets(visible_text_stream=bounded)
     plain_targets = OutputTargets(
-        bounded_text_stream=bounded,
-        plain_text_stream=plain,
+        visible_text_stream=bounded,
+        live_text_stream=plain,
     )
 
     bounded_targets.write_visible_lines(("bounded\n",))

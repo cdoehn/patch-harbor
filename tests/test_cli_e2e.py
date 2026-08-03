@@ -1371,12 +1371,12 @@ def test_fs_run_log_contains_complete_output_and_run_metadata(
         expected_cwd = json.dumps(str(tmp_path), ensure_ascii=False)
         assert f"working_directory: {expected_cwd}\n" in log_text
         assert "timeout_seconds: 300\n" in log_text
-        assert "plain_output: true\n" in log_text
-        assert "color_enabled: false\n" in log_text
-        assert "--- merged script output ---\n" in log_text
+        assert "plain_output:" not in log_text
+        assert "color_enabled:" not in log_text
+        assert "--- output ---\n" in log_text
         assert "logged-01\n" in log_text
         assert "logged-12\n" in log_text
-        assert "--- run result ---\n" in log_text
+        assert "--- result ---\n" in log_text
         assert "exit_code: 0\n" in log_text
     finally:
         log_path.unlink(missing_ok=True)
@@ -1428,7 +1428,7 @@ def test_fs_run_log_is_closed_and_complete_after_tool_error(
     try:
         log_text = log_path.read_text(encoding="utf-8")
         assert "PatchHarbor run log\n" in log_text
-        assert "--- run result ---\n" in log_text
+        assert "--- result ---\n" in log_text
         assert "exit_code: 3\n" in log_text
         assert 'tool_error: "missing required marker line: # PATCHHARBOR"\n' in log_text
     finally:
