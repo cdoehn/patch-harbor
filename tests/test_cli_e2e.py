@@ -19,6 +19,9 @@ from tests.platform_support import (
 )
 
 
+pytestmark = pytest.mark.e2e
+
+
 def _run_cli(
     cwd: Path,
     *arguments: str,

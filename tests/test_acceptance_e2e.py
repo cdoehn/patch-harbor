@@ -21,6 +21,9 @@ from tests.platform_support import (
 )
 
 
+pytestmark = pytest.mark.acceptance
+
+
 def _run_cli(
     cwd: Path,
     *arguments: str,

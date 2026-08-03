@@ -40,6 +40,15 @@ dev = [
   "wheel>=0.43"
 ]
 
+[tool.pytest.ini_options]
+addopts = "--strict-markers"
+markers = [
+  "acceptance: public cross-platform acceptance workflow",
+  "e2e: end-to-end CLI behavior",
+  "platform: platform-specific integration behavior",
+  "packaging: wheel and pipx packaging behavior"
+]
+
 [tool.setuptools.packages.find]
 where = ["src"]
 include = ["patchharbor*"]

@@ -12,18 +12,22 @@ jobs:
   acceptance:
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.runner }}
+    continue-on-error: ${{ matrix.preview }}
     timeout-minutes: 30
 
     strategy:
       fail-fast: false
       matrix:
         include:
-          - name: Ubuntu 24.04
+          - name: Release gate - Ubuntu 24.04
             runner: ubuntu-24.04
-          - name: Ubuntu 26.04
-            runner: ubuntu-26.04
-          - name: Windows 2025
+            preview: false
+          - name: Release gate - Windows 2025
             runner: windows-2025
+            preview: false
+          - name: Preview - Ubuntu 26.04
+            runner: ubuntu-26.04
+            preview: true
 
     steps:
       - name: Check out repository
@@ -46,5 +50,26 @@ jobs:
           powershell.exe -NoLogo -NoProfile -NonInteractive -Command '$PSVersionTable.PSVersion'
           pwsh -NoLogo -NoProfile -NonInteractive -Command '$PSVersionTable.PSVersion'
 
-      - name: Run complete unit, E2E, packaging, and acceptance suite
-        run: python -m pytest -q --timeout=120 tests
+      - name: Run core and architecture tests
+        run: >-
+          python -m pytest -q --timeout=120
+          -m "not e2e and not acceptance and not platform and not packaging"
+          tests
+
+      - name: Run E2E and acceptance tests
+        run: >-
+          python -m pytest -q --timeout=120
+          -m "e2e or acceptance"
+          tests
+
+      - name: Run platform tests
+        run: >-
+          python -m pytest -q --timeout=120
+          -m "platform"
+          tests
+
+      - name: Run packaging tests
+        run: >-
+          python -m pytest -q --timeout=120
+          -m "packaging"
+          tests

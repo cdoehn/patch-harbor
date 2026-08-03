@@ -6,8 +6,12 @@ import subprocess
 import sys
 import tomllib
 
+import pytest
+
 from tests.platform_support import PROJECT_ROOT, native_script, native_value
 
+
+pytestmark = pytest.mark.packaging
 
 MAX_WHEEL_BYTES = 256 * 1024
 

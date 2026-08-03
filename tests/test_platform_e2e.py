@@ -17,6 +17,9 @@ from tests.platform_support import (
 )
 
 
+pytestmark = pytest.mark.platform
+
+
 def test_platform_default_interpreter_ignores_filename_extension(
     tmp_path: Path,
 ) -> None:
