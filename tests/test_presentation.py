@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from io import StringIO
 from pathlib import Path
+import time
 import unicodedata
 
 from patchharbor.application import run_script_path
@@ -62,6 +63,25 @@ class _EncodedTerminal(StringIO):
         return True
 
 
+class _CountingTerminal(_EncodedTerminal):
+    def __init__(self, *, encoding: str = "utf-8") -> None:
+        super().__init__(encoding=encoding)
+        self.flush_count = 0
+
+    def flush(self) -> None:
+        self.flush_count += 1
+        super().flush()
+
+
+def _wait_until(predicate, *, timeout_seconds: float = 1.0) -> None:
+    deadline = time.monotonic() + timeout_seconds
+    while time.monotonic() < deadline:
+        if predicate():
+            return
+        time.sleep(0.005)
+    raise AssertionError("timed out waiting for dashboard update")
+
+
 def _cell_width(text: str) -> int:
     width = 0
     for character in text:
@@ -105,6 +125,7 @@ def test_dashboard_renderer_has_fixed_sections_width_and_overflow_hints() -> Non
         assert section in frame
     assert "weitere Messages" in frame
     assert "weitere Dateien" in frame
+    assert "weitere Zeilen" in frame
     assert "line-5" in frame
     assert "status: running" in frame
 
@@ -199,6 +220,69 @@ def test_dashboard_restores_cursor_and_color_after_final_frame() -> None:
     assert rendered.startswith("\x1b[?25l\x1b[0m\x1b[2J\x1b[H")
     assert rendered.endswith("\x1b[0m\x1b[?25h")
     assert rendered.count("\x1b[?25h") == 1
+
+
+def test_dashboard_does_not_rewrite_unchanged_frames() -> None:
+    stream = _CountingTerminal()
+    dashboard = TerminalDashboard(
+        stream,
+        color_enabled=False,
+        refresh_seconds=0.01,
+        width_supplier=lambda: 60,
+    )
+
+    try:
+        dashboard.begin_request(
+            source_name="script.sh",
+            bundle_files=(),
+            script_total=1,
+        )
+        initial_flush_count = stream.flush_count
+        time.sleep(0.05)
+
+        assert stream.flush_count == initial_flush_count
+
+        dashboard.begin_script(
+            script_name="script.sh",
+            script_index=1,
+            script_total=1,
+            messages=(),
+            inline_files=(),
+            warnings=(),
+        )
+        _wait_until(lambda: stream.flush_count > initial_flush_count)
+        changed_flush_count = stream.flush_count
+        time.sleep(0.05)
+
+        assert stream.flush_count == changed_flush_count
+    finally:
+        dashboard.close()
+
+
+def test_dashboard_redraws_when_terminal_width_changes() -> None:
+    stream = _CountingTerminal()
+    width = [60]
+    dashboard = TerminalDashboard(
+        stream,
+        color_enabled=False,
+        refresh_seconds=0.01,
+        width_supplier=lambda: width[0],
+    )
+
+    try:
+        dashboard.begin_request(
+            source_name="script.sh",
+            bundle_files=(),
+            script_total=1,
+        )
+        initial_flush_count = stream.flush_count
+        width[0] = 50
+        _wait_until(lambda: stream.flush_count > initial_flush_count)
+
+        frames = stream.getvalue()
+        assert "┌" + "─" * 48 + "┐" in frames
+    finally:
+        dashboard.close()
 
 
 def test_application_supplies_messages_and_inline_files_to_presentation(

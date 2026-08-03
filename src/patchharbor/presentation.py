@@ -398,7 +398,7 @@ def render_dashboard(
     rows.extend(_content(row, width) for row in _file_rows(snapshot.files, FILE_ROWS))
     execution_title = "EXECUTION"
     if snapshot.discarded_output_lines:
-        execution_title += f" · +{snapshot.discarded_output_lines} older"
+        execution_title += f" · +{snapshot.discarded_output_lines} weitere Zeilen"
     rows.append(_section(execution_title, width))
     rows.extend(_content(row, width) for row in _execution_rows(snapshot))
     rows.append(_section("RESULT", width))
@@ -482,7 +482,7 @@ class TerminalDashboard:
         )
         self._started = False
         self._thread_started = False
-        self._first_frame = True
+        self._last_frame: str | None = None
         self._cursor_hidden = False
         self._closed = False
         self._render_error: Exception | None = None
@@ -578,7 +578,7 @@ class TerminalDashboard:
                 log_path=None if log_path is None else str(log_path),
             )
         self._stop_loop()
-        self._render_now()
+        self._render_now(force=True)
         render_error = self._render_error
         self.close()
         if render_error is not None:
@@ -619,7 +619,7 @@ class TerminalDashboard:
             if self._render_error is not None:
                 self._stop.set()
 
-    def _render_now(self) -> None:
+    def _render_now(self, *, force: bool = False) -> None:
         if self._render_error is not None or self._closed:
             return
         snapshot = self._snapshot()
@@ -630,16 +630,18 @@ class TerminalDashboard:
                 width=width,
                 color_enabled=self._color_enabled,
             )
+            if not force and frame == self._last_frame:
+                return
+
+            first_frame = self._last_frame is None
+            if first_frame:
+                self._cursor_hidden = True
+                prefix = _HIDE_CURSOR + _RESET + _CLEAR_SCREEN + _CURSOR_HOME
+            else:
+                prefix = _RESET + _CURSOR_HOME
             with self._write_lock:
-                if self._first_frame:
-                    self._cursor_hidden = True
-                    prefix = _HIDE_CURSOR + _RESET + _CLEAR_SCREEN + _CURSOR_HOME
-                else:
-                    prefix = _RESET + _CURSOR_HOME
-                self._stream.write(prefix)
-                self._stream.write(frame)
-                self._stream.write(_RESET + _CLEAR_TO_END)
+                self._stream.write(prefix + frame + _RESET + _CLEAR_TO_END)
                 self._stream.flush()
-                self._first_frame = False
+            self._last_frame = frame
         except Exception as exc:
             self._render_error = exc

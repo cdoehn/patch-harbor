@@ -1347,11 +1347,24 @@ Der transportneutrale PatchBundle-Kern unterstützt mehrere Skripte und bytegena
 
 ### 3.g.C – TUI beruhigen und vereinfachen
 
-- nur bei verändertem Zustand oder fälligem 0,2-Sekunden-Tick rendern,
-- Flackern und unnötige Vollausgaben reduzieren,
-- Darstellung auf die vereinbarten Informationen begrenzen,
+- Zustandsänderungen sammeln und höchstens beim nächsten 0,2-Sekunden-Tick darstellen,
+- identische Frames nicht erneut in das Terminal schreiben,
+- bei geänderter Terminalbreite neu rendern und den finalen Zustand sofort ausgeben,
+- Darstellung auf Source, Messages, Files, Execution und Result begrenzen,
 - keine Scroll-, Auswahl- oder Framework-Funktionen hinzufügen,
 - Meilenstein 3 reviewen und den verbleibenden Plan gezielt aktualisieren.
+
+---
+
+## Review nach Meilenstein 3
+
+- Der transportneutrale Pfad von Quelle über `InputArtifact` und `PatchBundle` bis zur Execution ist umgesetzt; ein Neustart ist nicht erforderlich.
+- ZIP-PatchBundles tragen mehrere geordnete Skripte sowie bytegenaue Text- und Binärdateien. WebSocket kann später denselben Artefakt- und Bundlepfad verwenden, ohne den Runner-Kern zu verändern.
+- Interpreterwahl, Prozessbaum-Lifecycle, Timeout, Strg+C, Output-Capture, Plain-Modus, Temp-Log und feste TUI sind fachlich getrennt und durch Verhaltens- sowie Architekturtests abgesichert.
+- Das Dashboard schreibt identische Frames nicht erneut, bleibt auf die vereinbarten fünf Bereiche begrenzt und verwendet weiterhin nur ANSI-Cursorsteuerung ohne TUI-Framework.
+- Der plattformübergreifende Release-Nachweis, insbesondere auf echtem Windows, bleibt bewusst Aufgabe von Meilenstein 4 und wird nicht durch weitere Architekturarbeit in Meilenstein 3 vorweggenommen.
+- Der Restplan bleibt bei den vier Steps 4.a bis 4.d: Plattformfälle, Ressourcenbudgets, CI-Akzeptanzsuite und Release-Audit. Es ist kein zusätzlicher Version-1-Step nötig.
+- WebSocket bleibt vollständig außerhalb von Version 1 und wird erst nach dem Review von Meilenstein 4 in eigene W-R-C-Commits zerlegt.
 
 ---
 
@@ -1399,6 +1412,7 @@ PatchHarbor ist auf den Zielplattformen reproduzierbar getestet, sicher paketier
 - Tempverzeichnis und CWD auf beiden Systemen prüfen,
 - Windows PowerShell als Default und PowerShell 7 per Shebang testen,
 - Bash-Verhalten auf Ubuntu 24.04 und 26.04 prüfen,
+- Terminal-Fallback, Cursor-Wiederherstellung und `--no-color` auf Linux und Windows prüfen,
 - Plattform-E2E-Tests für inline FILE, ZIP-PatchBundle mit Binärdatei, Timeout und Logging hinzufügen.
 
 ### 4.a.R – OS-spezifische Logik an klare Grenzen verschieben
