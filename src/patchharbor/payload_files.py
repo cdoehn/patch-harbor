@@ -3,10 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
-import os
 from pathlib import Path
-import stat
-import tempfile
 
 from patchharbor.bundle_paths import (
     BundlePathError,
@@ -15,6 +12,13 @@ from patchharbor.bundle_paths import (
 )
 from patchharbor.errors import ExitCode, PatchHarborError
 from patchharbor.models import BundlePayload
+from patchharbor.platform.filesystem import (
+    FileSystemOperationError,
+    PathKind,
+    atomic_replace_bytes,
+    create_directory,
+    path_kind,
+)
 
 
 PAYLOAD_WARNING_BYTES = 10 * 1024 * 1024
@@ -72,42 +76,25 @@ def prepare_payload_files(
     return tuple(prepared), tuple(warnings)
 
 
+def _kind_or_error(target: Path, *, label: str) -> PathKind:
+    try:
+        return path_kind(target)
+    except FileSystemOperationError as exc:
+        raise _write_error(label, exc.operation) from exc
+
+
 def _validate_regular_target(target: Path, *, label: str) -> None:
-    try:
-        mode = target.lstat().st_mode
-    except FileNotFoundError:
+    kind = _kind_or_error(target, label=label)
+    if kind in {PathKind.MISSING, PathKind.REGULAR_FILE}:
         return
-    except OSError as exc:
-        raise _write_error(label, exc) from exc
-
-    if stat.S_ISLNK(mode) or not stat.S_ISREG(mode):
-        raise _write_error(label, "target is not a regular file")
+    raise _write_error(label, "target is not a regular file")
 
 
-def _atomic_replace_bytes(
-    target: Path,
-    content: bytes,
-    *,
-    label: str,
-) -> None:
-    staged_path: Path | None = None
+def _replace_bytes(target: Path, content: bytes, *, label: str) -> None:
     try:
-        with tempfile.NamedTemporaryFile(
-            mode="wb",
-            dir=target.parent,
-            prefix=".patchharbor-",
-            suffix=".tmp",
-            delete=False,
-        ) as handle:
-            staged_path = Path(handle.name)
-            handle.write(content)
-        os.replace(staged_path, target)
-        staged_path = None
-    except OSError as exc:
-        raise _write_error(label, exc) from exc
-    finally:
-        if staged_path is not None:
-            staged_path.unlink(missing_ok=True)
+        atomic_replace_bytes(target, content)
+    except FileSystemOperationError as exc:
+        raise _write_error(label, exc.operation) from exc
 
 
 def _bundle_target(
@@ -122,21 +109,18 @@ def _bundle_target(
 
     for segment in segments[:-1]:
         target /= segment
-        try:
-            mode = target.lstat().st_mode
-        except FileNotFoundError:
+        kind = _kind_or_error(target, label=label)
+        if kind is PathKind.MISSING:
             if not create_parents:
                 return cwd.joinpath(*segments)
             try:
-                target.mkdir()
-            except OSError as exc:
-                raise _write_error(label, exc) from exc
+                create_directory(target)
+            except FileSystemOperationError as exc:
+                raise _write_error(label, exc.operation) from exc
             continue
-        except OSError as exc:
-            raise _write_error(label, exc) from exc
-
-        if stat.S_ISLNK(mode) or not stat.S_ISDIR(mode):
-            raise _write_error(label, "parent is not a directory")
+        if kind is PathKind.DIRECTORY:
+            continue
+        raise _write_error(label, "parent is not a directory")
 
     final_target = target / segments[-1]
     _validate_regular_target(final_target, label=label)
@@ -173,7 +157,7 @@ def write_bundle_payloads(
             payload.relative_path,
             create_parents=True,
         )
-        _atomic_replace_bytes(
+        _replace_bytes(
             target,
             payload.content,
             label=f"bundle file {payload.relative_path!r}",
@@ -192,7 +176,7 @@ def write_payload_files(
         target = cwd / name
         label = f"FILE {name!r}"
         _validate_regular_target(target, label=label)
-        _atomic_replace_bytes(
+        _replace_bytes(
             target,
             text.encode("utf-8"),
             label=label,

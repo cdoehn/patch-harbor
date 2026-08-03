@@ -81,7 +81,7 @@ def test_missing_interpreter_is_reported_during_resolution(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     selected = select_interpreter("#!/usr/bin/env bash\n# PATCHHARBOR\n")
-    monkeypatch.setattr(interpreters.shutil, "which", lambda executable: None)
+    monkeypatch.setattr(interpreters, "find_executable", lambda executable: None)
 
     with pytest.raises(PatchHarborError) as raised:
         resolve_interpreter(selected)

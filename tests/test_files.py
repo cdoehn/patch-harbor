@@ -9,12 +9,19 @@ from patchharbor.bundle_paths import is_safe_bundle_path
 from patchharbor.errors import ExitCode, PatchHarborError
 from patchharbor.models import BundlePayload
 import patchharbor.payload_files as payload_files
+import patchharbor.platform.filesystem as platform_filesystem
 from patchharbor.payload_files import (
     is_safe_payload_name,
     prepare_payload_files,
     write_bundle_payloads,
     write_payload_files,
 )
+
+from tests.platform_support import (
+    REQUIRES_POSIX_SPECIAL_FILES,
+    create_symlink_or_skip,
+)
+
 
 
 @pytest.mark.parametrize(
@@ -68,11 +75,14 @@ def test_payload_is_staged_in_target_directory_and_atomically_replaced(
     observed: list[tuple[Path, Path]] = []
     real_replace = os.replace
 
-    def recording_replace(source: str | os.PathLike[str], destination: str | os.PathLike[str]) -> None:
+    def recording_replace(
+        source: str | os.PathLike[str],
+        destination: str | os.PathLike[str],
+    ) -> None:
         observed.append((Path(source), Path(destination)))
         real_replace(source, destination)
 
-    monkeypatch.setattr(payload_files.os, "replace", recording_replace)
+    monkeypatch.setattr(platform_filesystem.os, "replace", recording_replace)
 
     write_payload_files((("payload.txt", "new"),), cwd=tmp_path)
 
@@ -100,10 +110,7 @@ def test_symbolic_link_payload_target_is_not_replaced(tmp_path: Path) -> None:
     real_target = tmp_path / "real.txt"
     real_target.write_text("original", encoding="utf-8")
     link = tmp_path / "payload.txt"
-    try:
-        link.symlink_to(real_target)
-    except (OSError, NotImplementedError) as exc:
-        pytest.skip(f"symbolic links unavailable: {exc}")
+    create_symlink_or_skip(link, real_target)
 
     with pytest.raises(PatchHarborError) as raised:
         write_payload_files((("payload.txt", "replacement"),), cwd=tmp_path)
@@ -124,13 +131,19 @@ def test_staging_failure_is_a_file_preparation_error(
     def fail_staging(*args: object, **kwargs: object) -> object:
         raise PermissionError("denied")
 
-    monkeypatch.setattr(payload_files.tempfile, "NamedTemporaryFile", fail_staging)
+    monkeypatch.setattr(
+        platform_filesystem.tempfile,
+        "NamedTemporaryFile",
+        fail_staging,
+    )
 
     with pytest.raises(PatchHarborError) as raised:
         write_payload_files((("payload.txt", "replacement"),), cwd=tmp_path)
 
     assert raised.value.exit_code is ExitCode.FILE_PREPARATION_ERROR
-    assert "cannot write FILE 'payload.txt': denied" == str(raised.value)
+    assert str(raised.value) == (
+        "cannot write FILE 'payload.txt': cannot stage replacement"
+    )
     assert target.read_text(encoding="utf-8") == "original"
 
 
@@ -144,14 +157,14 @@ def test_failed_atomic_replace_removes_staged_file(
     def fail_replace(*args: object, **kwargs: object) -> None:
         raise PermissionError("replace denied")
 
-    monkeypatch.setattr(payload_files.os, "replace", fail_replace)
+    monkeypatch.setattr(platform_filesystem.os, "replace", fail_replace)
 
     with pytest.raises(PatchHarborError) as raised:
         write_payload_files((("payload.txt", "replacement"),), cwd=tmp_path)
 
     assert raised.value.exit_code is ExitCode.FILE_PREPARATION_ERROR
     assert str(raised.value) == (
-        "cannot write FILE 'payload.txt': replace denied"
+        "cannot write FILE 'payload.txt': cannot replace target"
     )
     assert target.read_text(encoding="utf-8") == "original"
     assert list(tmp_path.glob(".patchharbor-*.tmp")) == []
@@ -222,7 +235,7 @@ def test_bundle_payload_atomically_replaces_existing_file(
         observed.append((Path(source), Path(destination)))
         real_replace(source, destination)
 
-    monkeypatch.setattr(payload_files.os, "replace", recording_replace)
+    monkeypatch.setattr(platform_filesystem.os, "replace", recording_replace)
 
     write_bundle_payloads(
         (BundlePayload("payload.bin", bytes((0, 255)) + b"new"),),
@@ -279,10 +292,11 @@ def test_bundle_does_not_follow_symbolic_link_parent(tmp_path: Path) -> None:
     outside = tmp_path / "outside"
     outside.mkdir()
     linked_parent = tmp_path / "assets"
-    try:
-        linked_parent.symlink_to(outside, target_is_directory=True)
-    except (OSError, NotImplementedError) as exc:
-        pytest.skip(f"symbolic links unavailable: {exc}")
+    create_symlink_or_skip(
+        linked_parent,
+        outside,
+        target_is_directory=True,
+    )
 
     with pytest.raises(PatchHarborError) as raised:
         write_bundle_payloads(
@@ -301,7 +315,7 @@ def test_bundle_atomic_replace_failure_is_fatal_and_cleans_local_stage(
     def fail_replace(*args: object, **kwargs: object) -> None:
         raise PermissionError("replace denied")
 
-    monkeypatch.setattr(payload_files.os, "replace", fail_replace)
+    monkeypatch.setattr(platform_filesystem.os, "replace", fail_replace)
 
     with pytest.raises(PatchHarborError) as raised:
         write_bundle_payloads(
@@ -310,12 +324,12 @@ def test_bundle_atomic_replace_failure_is_fatal_and_cleans_local_stage(
         )
 
     assert raised.value.exit_code is ExitCode.FILE_PREPARATION_ERROR
-    assert "replace denied" in str(raised.value)
+    assert "cannot replace target" in str(raised.value)
     assert not (tmp_path / "payload.bin").exists()
     assert list(tmp_path.glob(".patchharbor-*.tmp")) == []
 
 
-@pytest.mark.skipif(os.name == "nt", reason="POSIX special files are unavailable")
+@REQUIRES_POSIX_SPECIAL_FILES
 def test_posix_fifo_inline_target_is_not_replaced(tmp_path: Path) -> None:
     target = tmp_path / "payload.txt"
     os.mkfifo(target)
@@ -332,10 +346,7 @@ def test_bundle_does_not_replace_symbolic_link_target(tmp_path: Path) -> None:
     real_target = tmp_path / "real.bin"
     real_target.write_bytes(b"original")
     link = tmp_path / "payload.bin"
-    try:
-        link.symlink_to(real_target)
-    except (OSError, NotImplementedError) as exc:
-        pytest.skip(f"symbolic links unavailable: {exc}")
+    create_symlink_or_skip(link, real_target)
 
     with pytest.raises(PatchHarborError) as raised:
         write_bundle_payloads(
@@ -348,7 +359,7 @@ def test_bundle_does_not_replace_symbolic_link_target(tmp_path: Path) -> None:
     assert link.is_symlink()
 
 
-@pytest.mark.skipif(os.name == "nt", reason="POSIX special files are unavailable")
+@REQUIRES_POSIX_SPECIAL_FILES
 def test_posix_fifo_bundle_target_is_not_replaced(tmp_path: Path) -> None:
     target = tmp_path / "payload.bin"
     os.mkfifo(target)

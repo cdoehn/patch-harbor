@@ -4,7 +4,6 @@ import json
 import os
 from collections.abc import Mapping
 from pathlib import Path
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -12,6 +11,8 @@ import time
 import zipfile
 
 import pytest
+
+from tests.platform_support import REQUIRES_POWERSHELL_7
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -318,10 +319,7 @@ def test_fs_run_rejects_unknown_shebang_before_execution(
     assert not sentinel_path.exists()
 
 
-@pytest.mark.skipif(
-    shutil.which("pwsh") is None,
-    reason="PowerShell 7 is not installed",
-)
+@REQUIRES_POWERSHELL_7
 def test_fs_run_honors_powershell_7_shebang(tmp_path: Path) -> None:
     script_path = tmp_path / "powershell-seven.txt"
     script_path.write_text(

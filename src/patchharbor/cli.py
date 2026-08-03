@@ -13,6 +13,7 @@ from patchharbor.application import run_script_path, run_standard_input
 from patchharbor.errors import ExitCode, PatchHarborError
 from patchharbor.execution import DEFAULT_TIMEOUT_SECONDS
 from patchharbor.output import OutputTargets
+from patchharbor.platform.errors import describe_os_error
 from patchharbor.presentation import (
     TerminalDashboard,
     terminal_supports_dashboard,
@@ -204,7 +205,10 @@ def _run_command(
             exit_code = int(ExitCode.INTERRUPTED)
             tool_error = "request aborted by user"
         except OSError as exc:
-            tool_error = f"cannot write PatchHarbor output: {exc}"
+            tool_error = (
+                "cannot write PatchHarbor output: "
+                f"{describe_os_error(exc)}"
+            )
             exit_code = int(ExitCode.EXECUTION_ERROR)
 
         dashboard_active = dashboard is not None and dashboard.started
@@ -216,7 +220,11 @@ def _run_command(
                     log_path=log_path,
                 )
             except OSError as exc:
-                print(f"patchharbor: {exc}", file=stderr)
+                print(
+                    "patchharbor: cannot restore terminal: "
+                    f"{describe_os_error(exc)}",
+                    file=stderr,
+                )
                 exit_code = int(ExitCode.EXECUTION_ERROR)
         else:
             if tool_error is not None:

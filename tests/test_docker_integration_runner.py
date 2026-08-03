@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-import os
 from pathlib import Path
 import subprocess
 
-import pytest
+from tests.platform_support import REQUIRES_BASH_DOCKER_RUNNER
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -12,7 +11,7 @@ RUNNER = PROJECT_ROOT / "scripts" / "run_docker_integration_tests.sh"
 DOCKERFILE = PROJECT_ROOT / "docker" / "Dockerfile.integration"
 
 
-@pytest.mark.skipif(os.name == "nt", reason="Docker integration runner is Linux-only")
+@REQUIRES_BASH_DOCKER_RUNNER
 def test_docker_integration_runner_accepts_only_supported_ubuntu_versions() -> None:
     completed = subprocess.run(
         ["bash", str(RUNNER), "25.10"],

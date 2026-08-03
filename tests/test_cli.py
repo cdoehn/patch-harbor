@@ -239,3 +239,30 @@ def test_unexpected_exception_still_restores_terminal(
         )
 
     assert stdout.getvalue().endswith("\x1b[0m\x1b[?25h")
+
+
+def test_output_os_error_uses_platform_neutral_text(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    stderr = StringIO()
+
+    def fake_run_script_path(
+        path: Path,
+        **options: object,
+    ) -> int:
+        raise PermissionError("native platform wording")
+
+    monkeypatch.setattr(cli, "run_script_path", fake_run_script_path)
+
+    result = main(
+        ["fs", "run", "--plain", str(tmp_path / "script.sh")],
+        stdin=StringIO(),
+        stdout=StringIO(),
+        stderr=stderr,
+    )
+
+    assert result == 7
+    assert stderr.getvalue() == (
+        "patchharbor: cannot write PatchHarbor output: permission denied\n"
+    )

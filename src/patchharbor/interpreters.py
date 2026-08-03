@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-import os
 from pathlib import Path
-import shutil
 
 from patchharbor.errors import ExitCode, PatchHarborError
+from patchharbor.platform.runtime import (
+    PlatformFamily,
+    find_executable,
+    platform_family,
+)
 
 
 @dataclass(frozen=True)
@@ -61,8 +64,8 @@ def select_interpreter(
     """Select one whitelisted interpreter from the first line or OS default."""
     first_line = script_text.splitlines()[0] if script_text else ""
     if not first_line.startswith("#!"):
-        platform_name = os.name if os_name is None else os_name
-        return _WINDOWS_POWERSHELL if platform_name == "nt" else _BASH
+        family = platform_family(os_name=os_name)
+        return _WINDOWS_POWERSHELL if family is PlatformFamily.WINDOWS else _BASH
 
     interpreter = _SUPPORTED_SHEBANGS.get(first_line)
     if interpreter is None:
@@ -76,7 +79,7 @@ def select_interpreter(
 
 def resolve_interpreter(spec: InterpreterSpec) -> str:
     """Resolve a selected interpreter executable through the system PATH."""
-    executable_path = shutil.which(spec.executable)
+    executable_path = find_executable(spec.executable)
     if executable_path is None:
         raise PatchHarborError(
             f"script interpreter not found: {spec.executable}",

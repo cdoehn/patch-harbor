@@ -58,8 +58,8 @@ def _patch_resolved_interpreter(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
-        interpreters.shutil,
-        "which",
+        interpreters,
+        "find_executable",
         lambda executable: f"/interpreters/{executable}",
     )
 
@@ -137,7 +137,7 @@ def test_missing_selected_interpreter_happens_before_process_start(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     process_started = False
-    monkeypatch.setattr(interpreters.shutil, "which", lambda executable: None)
+    monkeypatch.setattr(interpreters, "find_executable", lambda executable: None)
 
     def fail_if_started(*args: object, **kwargs: object) -> None:
         nonlocal process_started
@@ -177,7 +177,9 @@ def test_process_start_error_is_reported_as_interpreter_error(
         )
 
     assert raised.value.exit_code is ExitCode.INTERPRETER_ERROR
-    assert str(raised.value) == "cannot start script interpreter: start failed"
+    assert str(raised.value) == (
+        "cannot start script interpreter: operating-system operation failed"
+    )
 
 
 def test_nonzero_powershell_result_is_returned_without_policy_bypass(
@@ -284,7 +286,9 @@ def test_process_tree_is_closed_when_waiting_raises_an_os_error(
         )
 
     assert raised.value.exit_code is ExitCode.EXECUTION_ERROR
-    assert str(raised.value) == "cannot control script process tree: wait failed"
+    assert str(raised.value) == (
+        "cannot control script process tree: operating-system operation failed"
+    )
     assert process_tree.closed == 1
     assert process_tree.exit_exception is OSError
 
@@ -312,7 +316,7 @@ def test_process_tree_is_closed_when_final_descendant_cleanup_fails(
 
     assert raised.value.exit_code is ExitCode.EXECUTION_ERROR
     assert str(raised.value) == (
-        "cannot control script process tree: cleanup failed"
+        "cannot control script process tree: operating-system operation failed"
     )
     assert process_tree.closed == 1
     assert process_tree.exit_exception is None

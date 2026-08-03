@@ -18,6 +18,7 @@ from patchharbor.models import (
     PatchBundle,
 )
 from patchharbor.parser import ScriptFormatError, validate_required_marker
+from patchharbor.platform.errors import describe_os_error
 
 
 MAX_ZIP_ENTRIES = 1_000
@@ -274,7 +275,9 @@ def _resolve_zip_bundle(artifact: InputArtifact) -> PatchBundle:
         raise _zip_source_error(artifact, exc) from exc
     except PatchHarborError:
         raise
-    except (OSError, RuntimeError) as exc:
+    except OSError as exc:
+        raise _zip_source_error(artifact, describe_os_error(exc)) from exc
+    except RuntimeError as exc:
         raise _zip_source_error(artifact, exc) from exc
 
     if not scripts:
@@ -290,7 +293,7 @@ def resolve_patch_bundle(artifact: InputArtifact) -> PatchBundle:
     try:
         raw_content = artifact.path.read_bytes()
     except OSError as exc:
-        raise _artifact_source_error(artifact, exc) from exc
+        raise _artifact_source_error(artifact, describe_os_error(exc)) from exc
 
     direct_script, direct_error, direct_was_utf8 = _try_direct_script(
         raw_content,

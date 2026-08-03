@@ -3,12 +3,13 @@ from __future__ import annotations
 from collections.abc import Mapping
 import os
 from pathlib import Path
-import shutil
 import subprocess
 import sys
 import zipfile
 
 import pytest
+
+from tests.platform_support import REQUIRES_POWERSHELL_7
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -274,10 +275,7 @@ def test_platform_log_uses_configured_system_temp_and_contains_output(
         log_path.unlink(missing_ok=True)
 
 
-@pytest.mark.skipif(
-    shutil.which("pwsh") is None,
-    reason="PowerShell 7 is not installed",
-)
+@REQUIRES_POWERSHELL_7
 def test_platform_powershell_7_shebang_executes_when_available(
     tmp_path: Path,
 ) -> None:

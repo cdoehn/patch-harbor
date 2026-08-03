@@ -18,6 +18,7 @@ from patchharbor.interpreters import (
 )
 from patchharbor.output import OutputTargets, ProcessOutputCapture
 from patchharbor.platform import ProcessState, create_process_tree
+from patchharbor.platform.errors import describe_os_error
 
 
 DEFAULT_TIMEOUT_SECONDS = 300.0
@@ -69,7 +70,7 @@ def execute_script_text(
         raise
     except OSError as exc:
         raise PatchHarborError(
-            f"cannot prepare temporary script: {exc}",
+            f"cannot prepare temporary script: {describe_os_error(exc)}",
             ExitCode.EXECUTION_ERROR,
         ) from exc
 
@@ -104,7 +105,7 @@ def execute_script_file(
         process_tree = create_process_tree(command, cwd=cwd)
     except OSError as exc:
         raise PatchHarborError(
-            f"cannot start script interpreter: {exc}",
+            f"cannot start script interpreter: {describe_os_error(exc)}",
             ExitCode.INTERPRETER_ERROR,
         ) from exc
 
@@ -144,6 +145,6 @@ def execute_script_file(
     except OSError as exc:
         _finish_capture_after_process_error(capture)
         raise PatchHarborError(
-            f"cannot control script process tree: {exc}",
+            f"cannot control script process tree: {describe_os_error(exc)}",
             ExitCode.EXECUTION_ERROR,
         ) from exc

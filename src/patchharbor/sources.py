@@ -12,6 +12,7 @@ from typing import TextIO
 
 from patchharbor.errors import ExitCode, PatchHarborError
 from patchharbor.models import InputArtifact
+from patchharbor.platform.errors import describe_os_error
 
 
 _ARTIFACT_COPY_CHUNK_BYTES = 64 * 1024
@@ -63,7 +64,8 @@ def stdin_input_artifact(stream: TextIO) -> Iterator[InputArtifact]:
                     bytes_written += len(chunk)
         except (OSError, TypeError, UnicodeError) as exc:
             raise PatchHarborError(
-                f"cannot read script source standard input: {exc}",
+                "cannot read script source standard input: "
+                f"{describe_os_error(exc) if isinstance(exc, OSError) else exc}",
                 ExitCode.SOURCE_ERROR,
             ) from exc
 
@@ -99,7 +101,8 @@ def list_directory_entries(directory: Path) -> tuple[DirectoryCandidate, ...]:
         entries = list(directory.iterdir())
     except OSError as exc:
         raise PatchHarborError(
-            f"cannot read script source directory {directory}: {exc}",
+            f"cannot read script source directory {directory}: "
+            f"{describe_os_error(exc)}",
             ExitCode.SOURCE_ERROR,
         ) from exc
 

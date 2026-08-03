@@ -54,7 +54,6 @@ def test_lower_layers_do_not_import_orchestration_or_unrelated_layers() -> None:
             "interpreters",
             "parser",
             "payload_files",
-            "platform",
             "presentation",
         },
         "bundles": {
@@ -62,7 +61,6 @@ def test_lower_layers_do_not_import_orchestration_or_unrelated_layers() -> None:
             "execution",
             "interpreters",
             "payload_files",
-            "platform",
             "presentation",
             "sources",
         },
@@ -82,7 +80,6 @@ def test_lower_layers_do_not_import_orchestration_or_unrelated_layers() -> None:
             "execution",
             "interpreters",
             "parser",
-            "platform",
             "presentation",
             "sources",
         },
@@ -92,7 +89,6 @@ def test_lower_layers_do_not_import_orchestration_or_unrelated_layers() -> None:
             "execution",
             "parser",
             "payload_files",
-            "platform",
             "presentation",
             "sources",
         },
@@ -231,13 +227,25 @@ def test_platform_package_does_not_import_application_layers() -> None:
     assert imports.isdisjoint(disallowed)
 
 
+def test_platform_package_uses_the_shared_runtime_family_boundary() -> None:
+    source = (PACKAGE_ROOT / "platform" / "__init__.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert "platform_family()" in source
+    assert "import os" not in source
+
+
 def test_execution_delegates_binary_output_capture_to_output_module() -> None:
     execution_source = (PACKAGE_ROOT / "execution.py").read_text(
         encoding="utf-8"
     )
     output_source = (PACKAGE_ROOT / "output.py").read_text(encoding="utf-8")
 
-    assert "from patchharbor.output import OutputTargets, ProcessOutputCapture" in execution_source
+    assert (
+        "from patchharbor.output import OutputTargets, ProcessOutputCapture"
+        in execution_source
+    )
     assert "RollingLineBuffer" not in execution_source
     assert "threading" not in execution_source
     assert "codecs" not in execution_source
@@ -286,3 +294,23 @@ def test_dashboard_state_remains_inside_presentation_boundary() -> None:
 
     assert "presentation" not in _local_imports("execution")
     assert "presentation" not in _local_imports("output")
+
+
+def test_platform_sensitive_modules_use_only_the_platform_boundary() -> None:
+    interpreters_source = (PACKAGE_ROOT / "interpreters.py").read_text(encoding="utf-8")
+    payload_source = (PACKAGE_ROOT / "payload_files.py").read_text(encoding="utf-8")
+
+    assert "from patchharbor.platform.runtime import" in interpreters_source
+    assert "import os" not in interpreters_source
+    assert "import shutil" not in interpreters_source
+
+    assert "from patchharbor.platform.filesystem import" in payload_source
+    assert "import os" not in payload_source
+    assert "import stat" not in payload_source
+    assert "import tempfile" not in payload_source
+
+
+def test_platform_error_text_is_normalized_outside_platform_modules() -> None:
+    for module_name in ("bundles", "execution", "sources"):
+        source = (PACKAGE_ROOT / f"{module_name}.py").read_text(encoding="utf-8")
+        assert "describe_os_error" in source
