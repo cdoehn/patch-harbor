@@ -178,6 +178,10 @@ def _run_command(
                     raw_output_stream=(
                         None if run_log is None else run_log.raw_output_stream
                     ),
+                    warning_text_stream=(stderr if plain_output else None),
+                    warning_observer=(
+                        None if run_log is None else run_log.write_warning
+                    ),
                     line_observer=(
                         None if dashboard is None else dashboard.update_output
                     ),

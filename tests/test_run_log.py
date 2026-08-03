@@ -44,12 +44,14 @@ def test_run_log_preserves_raw_bytes_between_utf8_metadata(
             cwd=tmp_path,
             timeout_seconds=12,
         )
+        run_log.write_warning("large input")
         run_log.raw_output_stream.write(b"bad-\xff-output\n")
         run_log.write_result(exit_code=7, tool_error="output failed")
 
     try:
         data = log_path.read_bytes()
         assert b"PatchHarbor run log\n" in data
+        assert b'patchharbor_warning: "large input"\n' in data
         assert b"bad-\xff-output\n" in data
         assert b"--- result ---\n" in data
         assert b"exit_code: 7\n" in data

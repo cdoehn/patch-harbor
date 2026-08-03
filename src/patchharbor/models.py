@@ -12,6 +12,8 @@ class InputArtifact:
 
     path: Path
     display_name: str
+    size_bytes: int
+    warnings: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -36,3 +38,4 @@ class PatchBundle:
 
     scripts: tuple[BundleScript, ...]
     payloads: tuple[BundlePayload, ...] = ()
+    warnings: tuple[str, ...] = ()

@@ -21,7 +21,23 @@ class OutputTargets:
     visible_text_stream: TextIO
     live_text_stream: TextIO | None = None
     raw_output_stream: BinaryIO | None = None
+    warning_text_stream: TextIO | None = None
+    warning_observer: Callable[[str], None] | None = None
     line_observer: Callable[[tuple[str, ...], int], None] | None = None
+
+    def write_warnings(self, warnings: tuple[str, ...]) -> None:
+        """Write user-visible warnings without mixing them into script output."""
+        destination = self.warning_text_stream
+        observer = self.warning_observer
+        if destination is None and observer is None:
+            return
+        for warning in warnings:
+            if destination is not None:
+                destination.write(f"patchharbor: warning: {warning}\n")
+            if observer is not None:
+                observer(warning)
+        if destination is not None:
+            destination.flush()
 
     def write_visible_lines(self, lines: tuple[str, ...]) -> None:
         """Write the bounded final view unless live streaming is active."""

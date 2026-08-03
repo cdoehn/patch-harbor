@@ -15,14 +15,45 @@ from patchharbor.models import InputArtifact
 from patchharbor.platform.errors import describe_os_error
 
 
+INPUT_WARNING_BYTES = 10 * 1024 * 1024
+MAX_INPUT_ARTIFACT_BYTES = 256 * 1024 * 1024
 _ARTIFACT_COPY_CHUNK_BYTES = 64 * 1024
 
 
+def _input_limit_error(display_name: str) -> PatchHarborError:
+    return PatchHarborError(
+        "resource limit exceeded "
+        f"(input artifact {display_name!r} exceeds "
+        f"{MAX_INPUT_ARTIFACT_BYTES} bytes)",
+        ExitCode.SOURCE_ERROR,
+    )
+
+
+def _input_warnings(size_bytes: int) -> tuple[str, ...]:
+    if size_bytes > INPUT_WARNING_BYTES:
+        return (f"input artifact is large ({size_bytes} bytes)",)
+    return ()
+
+
 def file_input_artifact(path: Path) -> InputArtifact:
-    """Reference one existing filesystem input without copying it."""
+    """Reference one existing filesystem input after checking its byte budget."""
+    display_name = str(path)
+    try:
+        size_bytes = path.stat().st_size
+    except OSError as exc:
+        raise PatchHarborError(
+            f"cannot read script source {display_name}: {describe_os_error(exc)}",
+            ExitCode.SOURCE_ERROR,
+        ) from exc
+
+    if size_bytes > MAX_INPUT_ARTIFACT_BYTES:
+        raise _input_limit_error(display_name)
+
     return InputArtifact(
         path=path,
-        display_name=str(path),
+        display_name=display_name,
+        size_bytes=size_bytes,
+        warnings=_input_warnings(size_bytes),
     )
 
 
@@ -42,7 +73,7 @@ def _read_stream_chunk(stream: object, size: int) -> bytes | None:
 
 @contextmanager
 def stdin_input_artifact(stream: TextIO) -> Iterator[InputArtifact]:
-    """Copy standard input as bytes to one secure temporary artifact."""
+    """Copy standard input as bounded bytes to one secure temporary artifact."""
     descriptor, raw_path = tempfile.mkstemp(
         prefix="patchharbor-input-",
     )
@@ -60,6 +91,8 @@ def stdin_input_artifact(stream: TextIO) -> Iterator[InputArtifact]:
                     )
                     if chunk is None:
                         break
+                    if bytes_written + len(chunk) > MAX_INPUT_ARTIFACT_BYTES:
+                        raise _input_limit_error("standard input")
                     handle.write(chunk)
                     bytes_written += len(chunk)
         except (OSError, TypeError, UnicodeError) as exc:
@@ -78,6 +111,8 @@ def stdin_input_artifact(stream: TextIO) -> Iterator[InputArtifact]:
         yield InputArtifact(
             path=artifact_path,
             display_name="standard input",
+            size_bytes=bytes_written,
+            warnings=_input_warnings(bytes_written),
         )
     finally:
         artifact_path.unlink(missing_ok=True)

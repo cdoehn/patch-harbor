@@ -21,6 +21,8 @@ from patchharbor.parser import ScriptFormatError, validate_required_marker
 from patchharbor.platform.errors import describe_os_error
 
 
+CONTENT_WARNING_BYTES = 10 * 1024 * 1024
+MAX_INPUT_ARTIFACT_BYTES = 256 * 1024 * 1024
 MAX_ZIP_ENTRIES = 1_000
 MAX_ZIP_ENTRY_BYTES = 256 * 1024 * 1024
 MAX_ZIP_TOTAL_BYTES = 512 * 1024 * 1024
@@ -70,6 +72,42 @@ def _zip_limit_error(
         artifact,
         f"resource limit exceeded ({detail})",
     )
+
+
+def _artifact_limit_error(artifact: InputArtifact) -> PatchHarborError:
+    return _artifact_source_error(
+        artifact,
+        "resource limit exceeded "
+        f"(input artifact exceeds {MAX_INPUT_ARTIFACT_BYTES} bytes)",
+    )
+
+
+def _large_content_warning(label: str, size_bytes: int) -> str | None:
+    if size_bytes > CONTENT_WARNING_BYTES:
+        return f"{label} is large ({size_bytes} bytes)"
+    return None
+
+
+def _validate_artifact_budget(artifact: InputArtifact) -> None:
+    if artifact.size_bytes > MAX_INPUT_ARTIFACT_BYTES:
+        raise _artifact_limit_error(artifact)
+    try:
+        current_size = artifact.path.stat().st_size
+    except OSError as exc:
+        raise _artifact_source_error(artifact, describe_os_error(exc)) from exc
+    if current_size > MAX_INPUT_ARTIFACT_BYTES:
+        raise _artifact_limit_error(artifact)
+
+
+def _read_direct_artifact(artifact: InputArtifact) -> bytes:
+    try:
+        with artifact.path.open("rb") as stream:
+            raw_content = stream.read(MAX_INPUT_ARTIFACT_BYTES + 1)
+    except OSError as exc:
+        raise _artifact_source_error(artifact, describe_os_error(exc)) from exc
+    if len(raw_content) > MAX_INPUT_ARTIFACT_BYTES:
+        raise _artifact_limit_error(artifact)
+    return raw_content
 
 
 def _validate_zip_budgets(
@@ -190,13 +228,18 @@ def _read_zip_members(
     archive: zipfile.ZipFile,
     *,
     artifact: InputArtifact,
-) -> tuple[tuple[BundleScript, ...], tuple[BundlePayload, ...]]:
+) -> tuple[
+    tuple[BundleScript, ...],
+    tuple[BundlePayload, ...],
+    tuple[str, ...],
+]:
     entries = archive.infolist()
     _validate_zip_budgets(artifact, entries)
     members = _validate_zip_members(entries, artifact=artifact)
     total_bytes_read = 0
     scripts: list[BundleScript] = []
     payloads: list[BundlePayload] = []
+    warnings: list[str] = []
 
     for member in members:
         if member.is_directory:
@@ -208,6 +251,11 @@ def _read_zip_members(
             artifact=artifact,
             total_bytes_read=total_bytes_read,
         )
+        if warning := _large_content_warning(
+            f"ZIP entry {member.relative_path!r}",
+            len(raw_content),
+        ):
+            warnings.append(warning)
 
         try:
             script_text = raw_content.decode("utf-8")
@@ -228,7 +276,7 @@ def _read_zip_members(
             )
         )
 
-    return tuple(scripts), tuple(payloads)
+    return tuple(scripts), tuple(payloads), tuple(warnings)
 
 
 def _no_valid_zip_script(artifact: InputArtifact) -> PatchHarborError:
@@ -270,7 +318,10 @@ def _try_direct_script(
 def _resolve_zip_bundle(artifact: InputArtifact) -> PatchBundle:
     try:
         with zipfile.ZipFile(artifact.path) as archive:
-            scripts, payloads = _read_zip_members(archive, artifact=artifact)
+            scripts, payloads, entry_warnings = _read_zip_members(
+                archive,
+                artifact=artifact,
+            )
     except zipfile.BadZipFile as exc:
         raise _zip_source_error(artifact, exc) from exc
     except PatchHarborError:
@@ -282,25 +333,29 @@ def _resolve_zip_bundle(artifact: InputArtifact) -> PatchBundle:
 
     if not scripts:
         raise _no_valid_zip_script(artifact)
-    return PatchBundle(scripts=scripts, payloads=payloads)
+    return PatchBundle(
+        scripts=scripts,
+        payloads=payloads,
+        warnings=artifact.warnings + entry_warnings,
+    )
 
 
 def resolve_patch_bundle(artifact: InputArtifact) -> PatchBundle:
     """Resolve one source-neutral artifact to an ordered PatchBundle."""
+    _validate_artifact_budget(artifact)
     if zipfile.is_zipfile(artifact.path):
         return _resolve_zip_bundle(artifact)
 
-    try:
-        raw_content = artifact.path.read_bytes()
-    except OSError as exc:
-        raise _artifact_source_error(artifact, describe_os_error(exc)) from exc
-
+    raw_content = _read_direct_artifact(artifact)
     direct_script, direct_error, direct_was_utf8 = _try_direct_script(
         raw_content,
         artifact,
     )
     if direct_script is not None:
-        return PatchBundle(scripts=(direct_script,))
+        return PatchBundle(
+            scripts=(direct_script,),
+            warnings=artifact.warnings,
+        )
     assert direct_error is not None
 
     zip_hint = (

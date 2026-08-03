@@ -142,3 +142,21 @@ def test_output_capture_notifies_dashboard_with_bounded_snapshots() -> None:
         tuple(f"line-{number}\n" for number in range(8, 13)),
         2,
     )
+
+
+def test_output_targets_write_and_observe_warnings() -> None:
+    warnings = io.StringIO()
+    observed: list[str] = []
+    targets = OutputTargets(
+        visible_text_stream=io.StringIO(),
+        warning_text_stream=warnings,
+        warning_observer=observed.append,
+    )
+
+    targets.write_warnings(("first", "second"))
+
+    assert warnings.getvalue() == (
+        "patchharbor: warning: first\n"
+        "patchharbor: warning: second\n"
+    )
+    assert observed == ["first", "second"]

@@ -76,6 +76,7 @@ class DashboardPresentation(Protocol):
         source_name: str,
         bundle_files: tuple[PresentedFile, ...],
         script_total: int,
+        warnings: tuple[str, ...] = (),
     ) -> None:
         """Start the fixed dashboard for one validated request."""
 
@@ -324,11 +325,17 @@ def _execution_rows(snapshot: DashboardSnapshot) -> tuple[str, ...]:
     return rows + ("",) * max(0, EXECUTION_ROWS - len(rows))
 
 
+def _warning_summary(warnings: tuple[str, ...]) -> str:
+    if not warnings:
+        return ""
+    first = _sanitize_line(warnings[0])
+    suffix = f" · +{len(warnings) - 1}" if len(warnings) > 1 else ""
+    return f"warning: {first}{suffix}"
+
+
 def _result_rows(snapshot: DashboardSnapshot) -> tuple[str, str]:
     if snapshot.status == "running":
-        first = "status: running"
-        second = f"warnings: {len(snapshot.warnings)}" if snapshot.warnings else ""
-        return first, second
+        return "status: running", _warning_summary(snapshot.warnings)
     if snapshot.status == "preparing":
         return "status: preparing", ""
 
@@ -342,6 +349,8 @@ def _result_rows(snapshot: DashboardSnapshot) -> tuple[str, str]:
         first = f"status: failed · exit code: {snapshot.exit_code}"
         second = ""
 
+    if not second:
+        second = _warning_summary(snapshot.warnings)
     if snapshot.log_path is not None:
         log_text = f"log: {snapshot.log_path}"
         second = f"{second} · {log_text}" if second else log_text
@@ -358,6 +367,8 @@ def _line_color(line: str, snapshot: DashboardSnapshot) -> str:
             return _GREEN
         if snapshot.status in {"error", "failed"}:
             return _RED
+        return _YELLOW
+    if "warning:" in line:
         return _YELLOW
     if "weitere" in line or "gekürzt" in line:
         return _DIM
@@ -472,6 +483,7 @@ class TerminalDashboard:
         self._width_supplier = width_supplier or (lambda: _terminal_width(stream))
         self._state = DashboardSnapshot()
         self._bundle_files: tuple[PresentedFile, ...] = ()
+        self._request_warnings: tuple[str, ...] = ()
         self._state_lock = Lock()
         self._write_lock = Lock()
         self._stop = Event()
@@ -497,14 +509,17 @@ class TerminalDashboard:
         source_name: str,
         bundle_files: tuple[PresentedFile, ...],
         script_total: int,
+        warnings: tuple[str, ...] = (),
     ) -> None:
         with self._state_lock:
             self._bundle_files = bundle_files
+            self._request_warnings = warnings
             self._state = replace(
                 self._state,
                 source_name=source_name,
                 script_total=script_total,
                 files=bundle_files,
+                warnings=warnings,
                 status="preparing",
             )
             should_start = not self._started
@@ -539,7 +554,7 @@ class TerminalDashboard:
                 files=self._bundle_files + inline_files,
                 output_lines=(),
                 discarded_output_lines=0,
-                warnings=warnings,
+                warnings=self._request_warnings + warnings,
                 status="running",
                 exit_code=None,
                 tool_error=None,

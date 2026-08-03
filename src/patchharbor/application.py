@@ -40,6 +40,7 @@ def _execute_bundle_script(
     prepared_payloads, payload_warnings = prepare_payload_files(
         (payload.name, payload.text) for payload in parsed_script.payload_files
     )
+    script_warnings = parsed_script.warnings + payload_warnings
     if presentation is not None:
         presentation.begin_script(
             script_name=bundle_script.display_name,
@@ -57,8 +58,10 @@ def _execute_bundle_script(
                 )
                 for name, text in prepared_payloads
             ),
-            warnings=parsed_script.warnings + payload_warnings,
+            warnings=script_warnings,
         )
+    if output is not None:
+        output.write_warnings(script_warnings)
     write_payload_files(prepared_payloads, cwd=cwd)
     return execute_script_text(
         parsed_script.text,
@@ -90,7 +93,10 @@ def run_input_artifact(
                 for payload in bundle.payloads
             ),
             script_total=len(bundle.scripts),
+            warnings=bundle.warnings,
         )
+    if output is not None:
+        output.write_warnings(bundle.warnings)
     write_bundle_payloads(bundle.payloads, cwd=cwd)
     last_exit_code = 0
     script_total = len(bundle.scripts)

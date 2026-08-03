@@ -101,6 +101,7 @@ def test_zip_rejects_links_and_special_entries_before_any_script_runs(
         "folder\\payload.bin",
         "CON/data.bin",
         "folder/./payload.bin",
+        "folder/\x1b-control.bin",
         f"{'a' * 129}/payload.bin",
     ),
 )
@@ -235,6 +236,59 @@ def test_zip_resource_budgets_fail_before_execution(
 
     assert raised.value.exit_code is ExitCode.SOURCE_ERROR
     assert "resource limit exceeded" in str(raised.value)
+
+
+def test_zip_large_entry_warning_is_preserved_on_bundle(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    archive_path = tmp_path / "large-entry.zip"
+    with zipfile.ZipFile(archive_path, "w") as archive:
+        archive.writestr("run.sh", f"{REQUIRED_MARKER}\n")
+        archive.writestr("payload.bin", b"x" * 21)
+    monkeypatch.setattr(script_bundles, "CONTENT_WARNING_BYTES", 20)
+
+    bundle = script_bundles.resolve_patch_bundle(
+        file_input_artifact(archive_path)
+    )
+
+    assert bundle.warnings == (
+        "ZIP entry 'payload.bin' is large (21 bytes)",
+    )
+
+
+def test_compressed_zip_bomb_like_payload_is_rejected_before_execution(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    archive_path = tmp_path / "compressed-bomb.zip"
+    expanded = b"A" * 4096
+    with zipfile.ZipFile(
+        archive_path,
+        "w",
+        compression=zipfile.ZIP_DEFLATED,
+    ) as archive:
+        archive.writestr("run.sh", f"{REQUIRED_MARKER}\n")
+        archive.writestr("payload.bin", expanded)
+
+    assert archive_path.stat().st_size < len(expanded)
+    monkeypatch.setattr(script_bundles, "MAX_ZIP_ENTRY_BYTES", 8192)
+    monkeypatch.setattr(script_bundles, "MAX_ZIP_TOTAL_BYTES", 1024)
+    executed: list[str] = []
+    monkeypatch.setattr(
+        script_application,
+        "execute_script_text",
+        lambda script_text, **kwargs: executed.append(script_text) or 0,
+    )
+
+    with pytest.raises(PatchHarborError) as raised:
+        _run_path(archive_path, tmp_path)
+
+    assert raised.value.exit_code is ExitCode.SOURCE_ERROR
+    assert "resource limit exceeded" in str(raised.value)
+    assert "uncompressed data" in str(raised.value)
+    assert executed == []
+    assert not (tmp_path / "payload.bin").exists()
 
 
 def test_each_zip_script_receives_its_own_timeout(

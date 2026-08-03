@@ -42,6 +42,13 @@ class _RunLog:
             "--- output ---\n"
         )
 
+    def write_warning(self, warning: str) -> None:
+        """Append one PatchHarbor warning without changing process bytes."""
+        self._write_text(
+            "patchharbor_warning: "
+            f"{json.dumps(warning, ensure_ascii=False)}\n"
+        )
+
     def write_result(
         self,
         *,

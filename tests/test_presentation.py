@@ -181,6 +181,24 @@ def test_dashboard_clips_wide_unicode_by_terminal_cells_without_wrapping() -> No
     assert "…" in frame
 
 
+def test_dashboard_shows_first_warning_and_counts_the_rest_safely() -> None:
+    snapshot = DashboardSnapshot(
+        source_name="source",
+        warnings=(
+            "large input\x1b[2J",
+            "second warning",
+            "third warning",
+        ),
+        status="success",
+        exit_code=0,
+    )
+
+    frame = render_dashboard(snapshot, width=60)
+
+    assert "warning: large input · +2" in frame
+    assert "\x1b" not in frame
+
+
 def test_terminal_capability_rejects_narrow_or_non_unicode_terminals(
     monkeypatch,
 ) -> None:
@@ -316,6 +334,7 @@ def test_application_supplies_messages_and_inline_files_to_presentation(
         "source_name": str(script_path),
         "bundle_files": (),
         "script_total": 1,
+        "warnings": (),
     }
     assert presentation.script is not None
     assert presentation.script["script_name"] == str(script_path)

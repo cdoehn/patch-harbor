@@ -47,6 +47,7 @@ def test_plain_flag_streams_to_an_interactive_terminal(
         nonlocal observed_output
         observed_output = options["output"]
         assert observed_output.live_text_stream is stdout
+        assert observed_output.warning_text_stream is stderr
         observed_output.live_text_stream.write("plain-output\n")
         return 0
 
@@ -78,6 +79,7 @@ def test_interactive_terminal_uses_fixed_dashboard_and_periodic_redraw(
         presentation = options["presentation"]
         output = options["output"]
         assert presentation is not None
+        assert output.warning_text_stream is None
         presentation.begin_request(
             source_name=str(path),
             bundle_files=(
