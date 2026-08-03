@@ -58,6 +58,8 @@ def execute_script_text(
     cwd: Path,
     timeout_seconds: float,
     output_stream: TextIO | None = None,
+    plain_output_stream: TextIO | None = None,
+    log_stream: TextIO | None = None,
 ) -> int:
     """Stage and execute script text with a supported interpreter."""
     selected = select_interpreter(script_text)
@@ -75,6 +77,8 @@ def execute_script_text(
                 cwd=cwd,
                 timeout_seconds=timeout_seconds,
                 output_stream=output_stream,
+                plain_output_stream=plain_output_stream,
+                log_stream=log_stream,
             )
     except PatchHarborError:
         raise
@@ -103,8 +107,10 @@ def execute_script_file(
     cwd: Path,
     timeout_seconds: float,
     output_stream: TextIO | None = None,
+    plain_output_stream: TextIO | None = None,
+    log_stream: TextIO | None = None,
 ) -> int:
-    """Run one staged script and show its last five merged output lines."""
+    """Run one staged script with bounded, plain, and optional log output."""
     command = build_interpreter_command(
         interpreter,
         executable_path,
@@ -119,19 +125,29 @@ def execute_script_file(
             ExitCode.INTERPRETER_ERROR,
         ) from exc
 
-    capture = ProcessOutputCapture(process_tree.output_stream)
+    live_streams = tuple(
+        stream
+        for stream in (plain_output_stream, log_stream)
+        if stream is not None
+    )
+    capture = ProcessOutputCapture(
+        process_tree.output_stream,
+        live_text_streams=live_streams,
+    )
 
     try:
         with process_tree:
             capture.start()
             result = process_tree.run(timeout_seconds=timeout_seconds)
             capture.finish()
-            _write_visible_output(
-                capture.visible_lines,
-                destination=(
-                    sys.stdout if output_stream is None else output_stream
-                ),
-            )
+
+            if plain_output_stream is None:
+                _write_visible_output(
+                    capture.visible_lines,
+                    destination=(
+                        sys.stdout if output_stream is None else output_stream
+                    ),
+                )
 
             if result.state is ProcessState.TIMED_OUT:
                 raise PatchHarborError(

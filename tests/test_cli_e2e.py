@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 from collections.abc import Mapping
 from pathlib import Path
@@ -258,9 +259,9 @@ def test_fs_run_help_is_limited_to_public_arguments(tmp_path: Path) -> None:
     assert "Run one Bash or PowerShell script from a file, directory, or standard input." in completed.stdout
     assert "--timeout SECONDS" in completed.stdout
     assert "default: 300" in completed.stdout
-    assert "--log" not in completed.stdout
-    assert "--plain" not in completed.stdout
-    assert "--no-color" not in completed.stdout
+    assert "--plain" in completed.stdout
+    assert "--no-color" in completed.stdout
+    assert "--log" in completed.stdout
 
 
 def _script_path(tmp_path: Path, stem: str) -> Path:
@@ -1203,7 +1204,7 @@ raise SystemExit(result)
     _assert_child_process_stopped(child_pid)
 
 
-def test_fs_run_keeps_only_last_five_lines_from_large_output(
+def test_fs_run_non_tty_streams_complete_large_output(
     tmp_path: Path,
 ) -> None:
     script_path = _script_path(tmp_path, "large-output")
@@ -1228,13 +1229,10 @@ def test_fs_run_keeps_only_last_five_lines_from_large_output(
     completed = _run_patchharbor(script_path, tmp_path)
 
     assert completed.returncode == 0
-    assert completed.stdout.splitlines() == [
-        "line-19996",
-        "line-19997",
-        "line-19998",
-        "line-19999",
-        "line-20000",
-    ]
+    output_lines = completed.stdout.splitlines()
+    assert len(output_lines) == 20_000
+    assert output_lines[:3] == ["line-0001", "line-0002", "line-0003"]
+    assert output_lines[-3:] == ["line-19998", "line-19999", "line-20000"]
     assert completed.stderr == ""
 
 
@@ -1323,3 +1321,57 @@ def test_fs_run_replaces_invalid_utf8_from_script_output(tmp_path: Path) -> None
     assert completed.returncode == 0
     assert completed.stdout == "bad-�\n"
     assert completed.stderr == ""
+
+
+def test_fs_run_log_contains_complete_output_and_run_metadata(
+    tmp_path: Path,
+) -> None:
+    script_path = _script_path(tmp_path, "logged-output")
+    if os.name == "nt":
+        script_body = (
+            '1..12 | ForEach-Object { '
+            '[Console]::Out.WriteLine(("logged-{0:D2}" -f $_)) }\n'
+        )
+    else:
+        script_body = (
+            'number=1\n'
+            'while [ "$number" -le 12 ]; do\n'
+            '    printf "logged-%02d\\n" "$number"\n'
+            '    number=$((number + 1))\n'
+            'done\n'
+        )
+    script_path.write_text(
+        f"{REQUIRED_MARKER}\n{script_body}",
+        encoding="utf-8",
+    )
+
+    completed = _run_patchharbor(
+        script_path,
+        tmp_path,
+        "--log",
+        "--no-color",
+    )
+
+    assert completed.returncode == 0
+    assert completed.stdout.splitlines() == [
+        f"logged-{number:02d}" for number in range(1, 13)
+    ]
+    prefix = "patchharbor: log: "
+    assert completed.stderr.startswith(prefix)
+    log_path = Path(completed.stderr.removeprefix(prefix).strip())
+    try:
+        assert log_path.parent == Path(tempfile.gettempdir())
+        log_text = log_path.read_text(encoding="utf-8")
+        assert "PatchHarbor run log\n" in log_text
+        expected_cwd = json.dumps(str(tmp_path), ensure_ascii=False)
+        assert f"working_directory: {expected_cwd}\n" in log_text
+        assert "timeout_seconds: 300\n" in log_text
+        assert "plain_output: true\n" in log_text
+        assert "color_enabled: false\n" in log_text
+        assert "--- merged script output ---\n" in log_text
+        assert "logged-01\n" in log_text
+        assert "logged-12\n" in log_text
+        assert "--- run result ---\n" in log_text
+        assert "exit_code: 0\n" in log_text
+    finally:
+        log_path.unlink(missing_ok=True)

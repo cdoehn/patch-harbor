@@ -370,3 +370,36 @@ def test_execution_replaces_invalid_utf8_output(
 
     assert result == 0
     assert destination.getvalue() == "bad-�-output\n"
+
+
+def test_execution_plain_mode_streams_all_lines_without_bounded_replay(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _patch_resolved_interpreter(monkeypatch)
+    process_tree = _FakeProcessTree(
+        output_bytes="".join(
+            f"plain-{number}\n" for number in range(1, 13)
+        ).encode()
+    )
+    monkeypatch.setattr(
+        execution,
+        "create_process_tree",
+        lambda command, cwd: process_tree,
+    )
+    plain_destination = io.StringIO()
+    bounded_destination = io.StringIO()
+
+    result = execute_script_text(
+        "#!/usr/bin/env bash\n# PATCHHARBOR\n",
+        cwd=tmp_path,
+        timeout_seconds=7,
+        output_stream=bounded_destination,
+        plain_output_stream=plain_destination,
+    )
+
+    assert result == 0
+    assert plain_destination.getvalue() == "".join(
+        f"plain-{number}\n" for number in range(1, 13)
+    )
+    assert bounded_destination.getvalue() == ""

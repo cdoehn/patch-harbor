@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import io
+from pathlib import Path
+import tempfile
 
 import pytest
 
-from patchharbor.output import ProcessOutputCapture
+from patchharbor.output import ProcessOutputCapture, temporary_run_log
 
 
 def _capture(raw_output: bytes) -> ProcessOutputCapture:
@@ -73,3 +75,34 @@ def test_output_capture_reports_binary_stream_read_errors() -> None:
         capture.finish()
 
     assert capture.finished
+
+
+def test_output_capture_streams_every_line_to_each_live_destination() -> None:
+    first = io.StringIO()
+    second = io.StringIO()
+    capture = ProcessOutputCapture(
+        io.BytesIO(b"one\ntwo\nthree"),
+        live_text_streams=(first, second),
+    )
+
+    capture.start()
+    capture.finish()
+
+    assert first.getvalue() == "one\ntwo\nthree"
+    assert second.getvalue() == "one\ntwo\nthree"
+    assert capture.retained_lines == ("one\n", "two\n", "three")
+
+
+def test_temporary_run_logs_are_unique_and_use_the_system_temp_directory() -> None:
+    with temporary_run_log() as first:
+        first.path.write_text("first", encoding="utf-8")
+    with temporary_run_log() as second:
+        second.path.write_text("second", encoding="utf-8")
+
+    try:
+        assert first.path != second.path
+        assert first.path.parent == Path(tempfile.gettempdir())
+        assert second.path.parent == Path(tempfile.gettempdir())
+    finally:
+        first.path.unlink(missing_ok=True)
+        second.path.unlink(missing_ok=True)
