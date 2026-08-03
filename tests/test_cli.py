@@ -114,7 +114,7 @@ def test_interactive_terminal_uses_fixed_dashboard_and_periodic_redraw(
 
     rendered = stdout.getvalue()
     assert result == 0
-    assert rendered.startswith("\x1b[2J\x1b[H")
+    assert rendered.startswith("\x1b[?25l\x1b[0m\x1b[2J\x1b[H")
     assert rendered.count("\x1b[H") >= 3
     assert "SOURCE" in rendered
     assert "MESSAGES" in rendered
@@ -123,4 +123,110 @@ def test_interactive_terminal_uses_fixed_dashboard_and_periodic_redraw(
     assert "RESULT" in rendered
     assert "running-two" in rendered
     assert "status: success" in rendered
+    assert rendered.endswith("\x1b[0m\x1b[?25h")
     assert stderr.getvalue() == ""
+
+
+
+def test_too_narrow_terminal_falls_back_to_plain_output(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    stdout = _TerminalOutput()
+    stderr = StringIO()
+
+    def fake_run_script_path(
+        path: Path,
+        **options: object,
+    ) -> int:
+        assert options["presentation"] is None
+        output = options["output"]
+        assert isinstance(output, OutputTargets)
+        assert output.live_text_stream is stdout
+        output.live_text_stream.write("narrow-fallback\n")
+        return 0
+
+    monkeypatch.setattr(cli, "terminal_supports_dashboard", lambda stream: False)
+    monkeypatch.setattr(cli, "run_script_path", fake_run_script_path)
+
+    result = main(
+        ["fs", "run", str(tmp_path / "script.sh")],
+        stdin=StringIO(),
+        stdout=stdout,
+        stderr=stderr,
+    )
+
+    assert result == 0
+    assert stdout.getvalue() == "narrow-fallback\n"
+    assert stderr.getvalue() == ""
+
+
+def test_keyboard_interrupt_restores_terminal_and_returns_130(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    stdout = _TerminalOutput()
+    stderr = StringIO()
+
+    def fake_run_script_path(
+        path: Path,
+        **options: object,
+    ) -> int:
+        presentation = options["presentation"]
+        assert presentation is not None
+        presentation.begin_request(
+            source_name=str(path),
+            bundle_files=(),
+            script_total=1,
+        )
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(cli, "terminal_supports_dashboard", lambda stream: True)
+    monkeypatch.setattr(cli, "run_script_path", fake_run_script_path)
+
+    result = main(
+        ["fs", "run", "--no-color", str(tmp_path / "script.sh")],
+        stdin=StringIO(),
+        stdout=stdout,
+        stderr=stderr,
+    )
+
+    rendered = stdout.getvalue()
+    assert result == 130
+    assert "status: error · exit code: 130" in rendered
+    assert "request aborted by user" in rendered
+    assert rendered.endswith("\x1b[0m\x1b[?25h")
+    assert stderr.getvalue() == ""
+
+
+def test_unexpected_exception_still_restores_terminal(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    stdout = _TerminalOutput()
+
+    def fake_run_script_path(
+        path: Path,
+        **options: object,
+    ) -> int:
+        presentation = options["presentation"]
+        assert presentation is not None
+        presentation.begin_request(
+            source_name=str(path),
+            bundle_files=(),
+            script_total=1,
+        )
+        raise RuntimeError("unexpected")
+
+    monkeypatch.setattr(cli, "terminal_supports_dashboard", lambda stream: True)
+    monkeypatch.setattr(cli, "run_script_path", fake_run_script_path)
+
+    with pytest.raises(RuntimeError, match="unexpected"):
+        main(
+            ["fs", "run", "--no-color", str(tmp_path / "script.sh")],
+            stdin=StringIO(),
+            stdout=stdout,
+            stderr=StringIO(),
+        )
+
+    assert stdout.getvalue().endswith("\x1b[0m\x1b[?25h")

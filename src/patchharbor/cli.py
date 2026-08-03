@@ -13,7 +13,10 @@ from patchharbor.application import run_script_path, run_standard_input
 from patchharbor.errors import ExitCode, PatchHarborError
 from patchharbor.execution import DEFAULT_TIMEOUT_SECONDS
 from patchharbor.output import OutputTargets
-from patchharbor.presentation import TerminalDashboard
+from patchharbor.presentation import (
+    TerminalDashboard,
+    terminal_supports_dashboard,
+)
 from patchharbor.run_log import temporary_run_log
 
 
@@ -89,12 +92,6 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _is_terminal(stream: TextIO) -> bool:
-    try:
-        return stream.isatty()
-    except (AttributeError, OSError):
-        return False
-
 
 def _execute_request(
     path: Path | None,
@@ -150,7 +147,7 @@ def _run_command(
         parser.error("PATH is required when standard input is a terminal")
 
     cwd = Path.cwd()
-    plain_output = force_plain or not _is_terminal(stdout)
+    plain_output = force_plain or not terminal_supports_dashboard(stdout)
     dashboard = (
         None
         if plain_output
@@ -162,62 +159,75 @@ def _run_command(
     tool_error: str | None = None
 
     try:
-        with log_context as run_log:
-            if run_log is not None:
-                log_path = run_log.path
-                run_log.write_header(
-                    source_name="standard input" if path is None else str(path),
-                    cwd=cwd,
-                    timeout_seconds=timeout_seconds,
+        try:
+            with log_context as run_log:
+                if run_log is not None:
+                    log_path = run_log.path
+                    run_log.write_header(
+                        source_name=(
+                            "standard input" if path is None else str(path)
+                        ),
+                        cwd=cwd,
+                        timeout_seconds=timeout_seconds,
+                    )
+
+                output = OutputTargets(
+                    visible_text_stream=stdout,
+                    live_text_stream=(stdout if plain_output else None),
+                    raw_output_stream=(
+                        None if run_log is None else run_log.raw_output_stream
+                    ),
+                    line_observer=(
+                        None if dashboard is None else dashboard.update_output
+                    ),
                 )
+                try:
+                    exit_code, tool_error = _execute_request(
+                        path,
+                        cwd=cwd,
+                        timeout_seconds=timeout_seconds,
+                        stdin=stdin,
+                        stdout=stdout,
+                        output=output,
+                        dashboard=dashboard,
+                    )
+                except KeyboardInterrupt:
+                    exit_code = int(ExitCode.INTERRUPTED)
+                    tool_error = "request aborted by user"
 
-            output = OutputTargets(
-                visible_text_stream=stdout,
-                live_text_stream=(stdout if plain_output else None),
-                raw_output_stream=(
-                    None if run_log is None else run_log.raw_output_stream
-                ),
-                line_observer=(
-                    None if dashboard is None else dashboard.update_output
-                ),
-            )
-            exit_code, tool_error = _execute_request(
-                path,
-                cwd=cwd,
-                timeout_seconds=timeout_seconds,
-                stdin=stdin,
-                stdout=stdout,
-                output=output,
-                dashboard=dashboard,
-            )
+                if run_log is not None:
+                    run_log.write_result(
+                        exit_code=exit_code,
+                        tool_error=tool_error,
+                    )
+        except KeyboardInterrupt:
+            exit_code = int(ExitCode.INTERRUPTED)
+            tool_error = "request aborted by user"
+        except OSError as exc:
+            tool_error = f"cannot write PatchHarbor output: {exc}"
+            exit_code = int(ExitCode.EXECUTION_ERROR)
 
-            if run_log is not None:
-                run_log.write_result(
+        dashboard_active = dashboard is not None and dashboard.started
+        if dashboard_active:
+            try:
+                dashboard.finish(
                     exit_code=exit_code,
                     tool_error=tool_error,
+                    log_path=log_path,
                 )
-    except OSError as exc:
-        tool_error = f"cannot write run log: {exc}"
-        exit_code = int(ExitCode.EXECUTION_ERROR)
+            except OSError as exc:
+                print(f"patchharbor: {exc}", file=stderr)
+                exit_code = int(ExitCode.EXECUTION_ERROR)
+        else:
+            if tool_error is not None:
+                print(f"patchharbor: {tool_error}", file=stderr)
+            if log_path is not None:
+                print(f"patchharbor: log: {log_path}", file=stderr)
 
-    dashboard_active = dashboard is not None and dashboard.started
-    if dashboard_active:
-        try:
-            dashboard.finish(
-                exit_code=exit_code,
-                tool_error=tool_error,
-                log_path=log_path,
-            )
-        except OSError as exc:
-            print(f"patchharbor: {exc}", file=stderr)
-            exit_code = int(ExitCode.EXECUTION_ERROR)
-    else:
-        if tool_error is not None:
-            print(f"patchharbor: {tool_error}", file=stderr)
-        if log_path is not None:
-            print(f"patchharbor: log: {log_path}", file=stderr)
-
-    return exit_code
+        return exit_code
+    finally:
+        if dashboard is not None:
+            dashboard.close()
 
 
 def main(

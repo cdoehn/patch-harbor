@@ -276,3 +276,13 @@ def test_execution_does_not_import_terminal_presentation() -> None:
     assert "presentation" not in _local_imports("execution")
     assert "presentation" not in _local_imports("output")
     assert "presentation" in _local_imports("application")
+
+
+def test_dashboard_state_remains_inside_presentation_boundary() -> None:
+    for module_name in ("application", "execution", "output"):
+        source = (PACKAGE_ROOT / f"{module_name}.py").read_text(encoding="utf-8")
+        assert "DashboardSnapshot" not in source
+        assert "TerminalDashboard" not in source
+
+    assert "presentation" not in _local_imports("execution")
+    assert "presentation" not in _local_imports("output")

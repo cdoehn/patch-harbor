@@ -1,4 +1,4 @@
-"""Fixed terminal dashboard for one interactive PatchHarbor request."""
+"""Protected fixed terminal dashboard for one interactive PatchHarbor request."""
 
 from __future__ import annotations
 
@@ -6,11 +6,13 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 import os
 import shutil
-from threading import Event, Lock, Thread
+from threading import Event, Lock, Thread, current_thread
 from typing import Callable, Protocol, TextIO
+import unicodedata
 
 
 DASHBOARD_MAX_WIDTH = 80
+DASHBOARD_MIN_WIDTH = 40
 DASHBOARD_REFRESH_SECONDS = 0.2
 SOURCE_ROWS = 2
 MESSAGE_ROWS = 4
@@ -21,6 +23,8 @@ RESULT_ROWS = 2
 _CLEAR_SCREEN = "\x1b[2J"
 _CURSOR_HOME = "\x1b[H"
 _CLEAR_TO_END = "\x1b[J"
+_HIDE_CURSOR = "\x1b[?25l"
+_SHOW_CURSOR = "\x1b[?25h"
 _RESET = "\x1b[0m"
 _CYAN = "\x1b[1;36m"
 _BLUE = "\x1b[1;34m"
@@ -28,6 +32,7 @@ _GREEN = "\x1b[1;32m"
 _YELLOW = "\x1b[1;33m"
 _RED = "\x1b[1;31m"
 _DIM = "\x1b[2m"
+_DASHBOARD_GLYPHS = "┌─┐│├┤└┘…"
 
 
 @dataclass(frozen=True, slots=True)
@@ -41,7 +46,7 @@ class PresentedFile:
 
 @dataclass(frozen=True, slots=True)
 class DashboardSnapshot:
-    """Immutable information required to render one dashboard frame."""
+    """Immutable presentation-only information for one dashboard frame."""
 
     source_name: str = "—"
     script_name: str = "—"
@@ -100,22 +105,126 @@ class DashboardPresentation(Protocol):
         tool_error: str | None,
         log_path: Path | None,
     ) -> None:
-        """Stop periodic redraw and render the final state immediately."""
+        """Stop periodic redraw, render the final state, and restore the terminal."""
+
+    def close(self) -> None:
+        """Restore terminal state without masking an active application error."""
+
+
+def _skip_control_string(text: str, index: int) -> int:
+    """Skip an OSC/DCS-like control string ending in BEL or ST."""
+    while index < len(text):
+        if text[index] == "\x07":
+            return index + 1
+        if (
+            text[index] == "\x1b"
+            and index + 1 < len(text)
+            and text[index + 1] == "\\"
+        ):
+            return index + 2
+        index += 1
+    return index
+
+
+def _strip_terminal_sequences(text: str) -> str:
+    """Remove ANSI/ECMA-48 escape sequences from untrusted visible text."""
+    result: list[str] = []
+    index = 0
+    while index < len(text):
+        character = text[index]
+        if character != "\x1b":
+            result.append(character)
+            index += 1
+            continue
+
+        index += 1
+        if index >= len(text):
+            break
+        introducer = text[index]
+        index += 1
+
+        if introducer == "[":
+            while index < len(text):
+                value = ord(text[index])
+                index += 1
+                if 0x40 <= value <= 0x7E:
+                    break
+            continue
+        if introducer in "]PX^_":
+            index = _skip_control_string(text, index)
+            continue
+        # A two-character escape sequence is fully consumed here.
+    return "".join(result)
+
+
+def _sanitize_line(text: str) -> str:
+    """Return one harmless terminal line without embedded control effects."""
+    stripped = _strip_terminal_sequences(text)
+    result: list[str] = []
+    for character in stripped:
+        if character == "\t":
+            result.append("    ")
+            continue
+        if character in "\r\n":
+            result.append(" ")
+            continue
+        category = unicodedata.category(character)
+        if category in {"Cc", "Cf", "Cs"}:
+            continue
+        result.append(character)
+    return "".join(result)
+
+
+def _sanitize_lines(text: str) -> tuple[str, ...]:
+    """Preserve intentional message line boundaries while removing controls."""
+    stripped = _strip_terminal_sequences(text)
+    normalized = stripped.replace("\r\n", "\n").replace("\r", "\n")
+    return tuple(_sanitize_line(line) for line in normalized.split("\n"))
+
+
+def _character_width(character: str) -> int:
+    if unicodedata.combining(character):
+        return 0
+    if unicodedata.category(character) in {"Mn", "Me", "Cf"}:
+        return 0
+    return 2 if unicodedata.east_asian_width(character) in {"W", "F"} else 1
+
+
+def _display_width(text: str) -> int:
+    return sum(_character_width(character) for character in text)
 
 
 def _clip(text: str, width: int) -> str:
     if width <= 0:
         return ""
-    text = text.replace("\t", "    ")
-    if len(text) <= width:
-        return text
+    safe_text = _sanitize_line(text)
+    if _display_width(safe_text) <= width:
+        return safe_text
     if width == 1:
         return "…"
-    return text[: width - 1] + "…"
+
+    target_width = width - 1
+    current_width = 0
+    result: list[str] = []
+    for character in safe_text:
+        character_width = _character_width(character)
+        if character_width and current_width + character_width > target_width:
+            break
+        result.append(character)
+        current_width += character_width
+    return "".join(result) + "…"
 
 
 def _fit(text: str, width: int) -> str:
-    return _clip(text, width).ljust(max(0, width))
+    clipped = _clip(text, width)
+    return clipped + " " * max(0, width - _display_width(clipped))
+
+
+def _center(text: str, width: int) -> str:
+    clipped = _clip(text, width)
+    remaining = max(0, width - _display_width(clipped))
+    left = remaining // 2
+    return " " * left + clipped + " " * (remaining - left)
 
 
 def _border(left: str, middle: str, right: str, width: int) -> str:
@@ -130,13 +239,18 @@ def _content(text: str, width: int) -> str:
     return "│" + _fit(" " + text, width - 2) + "│"
 
 
+def _centered_content(text: str, width: int) -> str:
+    if width <= 1:
+        return "│"[:width]
+    return "│" + _center(text, width - 2) + "│"
+
+
 def _section(title: str, width: int) -> str:
     if width <= 1:
         return "├"[:width]
     inner_width = width - 2
-    label = f"─ {title} "
-    label = _clip(label, inner_width)
-    return "├" + label + "─" * max(0, inner_width - len(label)) + "┤"
+    label = _clip(f"─ {title} ", inner_width)
+    return "├" + label + "─" * max(0, inner_width - _display_width(label)) + "┤"
 
 
 def _message_rows(
@@ -148,14 +262,12 @@ def _message_rows(
 
     rows: list[str] = []
     for message_index, (name, text) in enumerate(messages):
-        content_lines = text.splitlines() or [""]
-        block = [f"{name}: {content_lines[0]}"]
+        content_lines = _sanitize_lines(text) or ("",)
+        block = [f"{_sanitize_line(name)}: {content_lines[0]}"]
         block.extend(f"  {line}" for line in content_lines[1:])
         remaining = height - len(rows)
         if remaining <= 0:
-            rows[-1] = (
-                f"… +{len(messages) - message_index} weitere Messages"
-            )
+            rows[-1] = f"… +{len(messages) - message_index} weitere Messages"
             break
         if len(block) <= remaining:
             rows.extend(block)
@@ -204,7 +316,7 @@ def _file_rows(
 
 
 def _execution_rows(snapshot: DashboardSnapshot) -> tuple[str, ...]:
-    lines = tuple(line.rstrip("\r\n") for line in snapshot.output_lines)
+    lines = tuple(_sanitize_line(line.rstrip("\r\n")) for line in snapshot.output_lines)
     if not lines:
         first = "waiting for script output…" if snapshot.status == "running" else "—"
         return (first,) + ("",) * (EXECUTION_ROWS - 1)
@@ -215,11 +327,7 @@ def _execution_rows(snapshot: DashboardSnapshot) -> tuple[str, ...]:
 def _result_rows(snapshot: DashboardSnapshot) -> tuple[str, str]:
     if snapshot.status == "running":
         first = "status: running"
-        second = (
-            f"warnings: {len(snapshot.warnings)}"
-            if snapshot.warnings
-            else ""
-        )
+        second = f"warnings: {len(snapshot.warnings)}" if snapshot.warnings else ""
         return first, second
     if snapshot.status == "preparing":
         return "status: preparing", ""
@@ -279,7 +387,7 @@ def render_dashboard(
 
     rows: list[str] = [
         _border("┌", "─", "┐", width),
-        _content("PATCHHARBOR".center(max(0, width - 3)), width),
+        _centered_content("PATCHHARBOR", width),
         _section("SOURCE", width),
         _content(f"source: {snapshot.source_name}", width),
         _content(f"script: {script_text}", width),
@@ -305,19 +413,46 @@ def render_dashboard(
     return "\n".join(rows) + "\n"
 
 
-def _terminal_width(stream: TextIO) -> int:
-    columns = shutil.get_terminal_size(
-        fallback=(DASHBOARD_MAX_WIDTH, 24)
-    ).columns
+def _stream_is_terminal(stream: TextIO) -> bool:
+    try:
+        return stream.isatty()
+    except (AttributeError, OSError):
+        return False
+
+
+def _terminal_columns(stream: TextIO) -> int:
+    columns = shutil.get_terminal_size(fallback=(DASHBOARD_MAX_WIDTH, 24)).columns
     try:
         terminal_size = os.get_terminal_size(stream.fileno())
         if terminal_size.columns > 0:
             columns = terminal_size.columns
     except (AttributeError, OSError):
         pass
-    if columns <= 0:
-        columns = DASHBOARD_MAX_WIDTH
-    return max(4, min(DASHBOARD_MAX_WIDTH, columns))
+    return columns
+
+
+def _stream_supports_dashboard_glyphs(stream: TextIO) -> bool:
+    encoding = getattr(stream, "encoding", None)
+    if not encoding:
+        return True
+    try:
+        _DASHBOARD_GLYPHS.encode(encoding)
+    except (LookupError, UnicodeEncodeError):
+        return False
+    return True
+
+
+def terminal_supports_dashboard(stream: TextIO) -> bool:
+    """Return whether a fixed Unicode dashboard is safe for this stream."""
+    return (
+        _stream_is_terminal(stream)
+        and _terminal_columns(stream) >= DASHBOARD_MIN_WIDTH
+        and _stream_supports_dashboard_glyphs(stream)
+    )
+
+
+def _terminal_width(stream: TextIO) -> int:
+    return max(4, min(DASHBOARD_MAX_WIDTH, _terminal_columns(stream)))
 
 
 class TerminalDashboard:
@@ -346,7 +481,10 @@ class TerminalDashboard:
             daemon=True,
         )
         self._started = False
+        self._thread_started = False
         self._first_frame = True
+        self._cursor_hidden = False
+        self._closed = False
         self._render_error: Exception | None = None
 
     @property
@@ -374,7 +512,12 @@ class TerminalDashboard:
                 self._started = True
         if should_start:
             self._render_now()
+            if self._render_error is not None:
+                error = self._render_error
+                self.close()
+                raise OSError(f"cannot render dashboard: {error}")
             self._thread.start()
+            self._thread_started = True
 
     def begin_script(
         self,
@@ -421,7 +564,7 @@ class TerminalDashboard:
         tool_error: str | None,
         log_path: Path | None,
     ) -> None:
-        if not self._started:
+        if not self._started or self._closed:
             return
         status = "error" if tool_error is not None else (
             "success" if exit_code == 0 else "failed"
@@ -434,11 +577,37 @@ class TerminalDashboard:
                 tool_error=tool_error,
                 log_path=None if log_path is None else str(log_path),
             )
-        self._stop.set()
-        self._thread.join(timeout=max(1.0, self._refresh_seconds * 4))
+        self._stop_loop()
         self._render_now()
-        if self._render_error is not None:
-            raise OSError(f"cannot render dashboard: {self._render_error}")
+        render_error = self._render_error
+        self.close()
+        if render_error is not None:
+            raise OSError(f"cannot render dashboard: {render_error}")
+
+    def close(self) -> None:
+        """Stop redraw and restore terminal controls; safe to call repeatedly."""
+        if self._closed:
+            return
+        self._stop_loop()
+        if self._cursor_hidden:
+            try:
+                with self._write_lock:
+                    self._stream.write(_RESET + _SHOW_CURSOR)
+                    self._stream.flush()
+            except Exception as exc:
+                if self._render_error is None:
+                    self._render_error = exc
+            self._cursor_hidden = False
+        self._closed = True
+
+    def _stop_loop(self) -> None:
+        self._stop.set()
+        if (
+            self._thread_started
+            and self._thread.is_alive()
+            and current_thread() is not self._thread
+        ):
+            self._thread.join(timeout=max(1.0, self._refresh_seconds * 4))
 
     def _snapshot(self) -> DashboardSnapshot:
         with self._state_lock:
@@ -451,7 +620,7 @@ class TerminalDashboard:
                 self._stop.set()
 
     def _render_now(self) -> None:
-        if self._render_error is not None:
+        if self._render_error is not None or self._closed:
             return
         snapshot = self._snapshot()
         try:
@@ -462,10 +631,14 @@ class TerminalDashboard:
                 color_enabled=self._color_enabled,
             )
             with self._write_lock:
-                prefix = _CLEAR_SCREEN + _CURSOR_HOME if self._first_frame else _CURSOR_HOME
+                if self._first_frame:
+                    self._cursor_hidden = True
+                    prefix = _HIDE_CURSOR + _RESET + _CLEAR_SCREEN + _CURSOR_HOME
+                else:
+                    prefix = _RESET + _CURSOR_HOME
                 self._stream.write(prefix)
                 self._stream.write(frame)
-                self._stream.write(_CLEAR_TO_END)
+                self._stream.write(_RESET + _CLEAR_TO_END)
                 self._stream.flush()
                 self._first_frame = False
         except Exception as exc:
