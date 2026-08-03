@@ -4,6 +4,8 @@
 **Empfohlener Dateiname:** `patchharbor-spezifikation-und-commit-plan.md`  
 **Status:** verbindliche Planungsbasis für Version 1 und architektonische Vorbereitung von Meilenstein 5
 
+**Release-Version:** `1.0.0`
+
 **Projektname, Kommando und Marker:** `PatchHarbor`, `patchharbor`, `# PATCHHARBOR`
 
 Der Name **Commit-Plan** allein wäre zu eng, weil dieses Dokument zuerst die Produktspezifikation und danach den Umsetzungsplan enthält. Der Titel **Spezifikation und Commit-Plan** beschreibt den Inhalt eindeutig.
@@ -162,11 +164,11 @@ Die Vorbereitung besteht nur aus dieser kleinen internen Quellengrenze. Es gibt 
 
 ### 5.3 Installation
 
-Ziel ist die globale Installation über pipx, ohne dass der Nutzer eine virtuelle Umgebung selbst verwalten muss.
+Ziel ist die globale Installation über pipx, ohne dass der Nutzer eine virtuelle Umgebung selbst verwalten muss. Version 1.0.0 benötigt Python 3.12 oder neuer.
 
-Nach Veröffentlichung des Pakets lautet der Zielbefehl `pipx install patchharbor`.
+Nach Veröffentlichung des Pakets lautet der Zielbefehl `pipx install patchharbor`. Wheel und Source-Distribution werden aus derselben Version und denselben Release-Metadaten gebaut.
 
-Der Konsolenbefehl ist anschließend überall als `patchharbor` verfügbar.
+Der Konsolenbefehl ist anschließend überall als `patchharbor` verfügbar. `patchharbor --version` zeigt die installierte Release-Version.
 
 ### 5.4 Dokumentation
 

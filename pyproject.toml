@@ -1,23 +1,23 @@
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "patchharbor"
-version = "0.1.0"
-description = "Controlled runner for generated Bash and PowerShell scripts."
-keywords = ["bash", "cli", "powershell", "script-runner"]
+dynamic = ["version"]
+description = "Controlled cross-platform runner for generated Bash and PowerShell scripts and ZIP PatchBundles."
+keywords = ["bash", "cli", "patch-bundle", "powershell", "script-runner", "zip"]
 readme = "README.md"
 requires-python = ">=3.12"
-license = { text = "MIT" }
+license = "MIT"
+license-files = ["LICENSE"]
 authors = [
-  { name = "PatchHarbor contributors" }
+  { name = "Christian Döhn" }
 ]
 classifiers = [
-  "Development Status :: 3 - Alpha",
+  "Development Status :: 5 - Production/Stable",
   "Environment :: Console",
   "Intended Audience :: Developers",
-  "License :: OSI Approved :: MIT License",
   "Operating System :: Microsoft :: Windows",
   "Operating System :: POSIX :: Linux",
   "Programming Language :: Python :: 3",
@@ -36,7 +36,7 @@ dev = [
   "pipx>=1.7",
   "pytest>=7.4",
   "pytest-timeout>=2.4",
-  "setuptools>=68",
+  "setuptools>=77",
   "wheel>=0.43"
 ]
 
@@ -48,6 +48,9 @@ markers = [
   "platform: platform-specific integration behavior",
   "packaging: wheel and pipx packaging behavior"
 ]
+
+[tool.setuptools.dynamic]
+version = { attr = "patchharbor.__version__" }
 
 [tool.setuptools.packages.find]
 where = ["src"]

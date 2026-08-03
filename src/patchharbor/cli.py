@@ -9,6 +9,7 @@ from pathlib import Path
 import sys
 from typing import TextIO
 
+from patchharbor import __version__
 from patchharbor.application import run_script_path, run_standard_input
 from patchharbor.errors import ExitCode, PatchHarborError
 from patchharbor.execution import DEFAULT_TIMEOUT_SECONDS
@@ -34,7 +35,20 @@ def _positive_seconds(value: str) -> float:
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="patchharbor",
-        description="Run generated scripts in a controlled workflow.",
+        description=(
+            "Run generated Bash and PowerShell scripts and ZIP "
+            "PatchBundles in a controlled workflow."
+        ),
+        epilog=(
+            "Use 'patchharbor fs run --help' for input formats, "
+            "execution rules, and run options."
+        ),
+    )
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"%(prog)s {__version__}",
+        help="show the installed PatchHarbor version and exit",
     )
     commands = parser.add_subparsers(
         dest="command",
@@ -62,8 +76,23 @@ def _build_parser() -> argparse.ArgumentParser:
             "Run Bash or PowerShell scripts from a file, ZIP PatchBundle, "
             "directory, or standard input."
         ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
-            "Oversized inputs and unsafe ZIP PatchBundles are rejected "
+            "Script contract:\n"
+            "  A script must contain a line exactly equal to "
+            "'# PATCHHARBOR'.\n"
+            "\n"
+            "Input behavior:\n"
+            "  PATH may name one script, a ZIP PatchBundle, or a "
+            "directory.\n"
+            "  Omit PATH to read one script or ZIP PatchBundle from "
+            "standard input.\n"
+            "  ZIP PatchBundles may contain ordered scripts and binary "
+            "payload files.\n"
+            "\n"
+            "Execution behavior:\n"
+            "  Scripts run in the current working directory.\n"
+            "  Oversized inputs and unsafe ZIP PatchBundles are rejected "
             "before any script starts."
         ),
     )

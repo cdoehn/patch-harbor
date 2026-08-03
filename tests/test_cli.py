@@ -21,6 +21,38 @@ class _TerminalOutput(StringIO):
         return True
 
 
+def test_version_flag_reports_release_version(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    with pytest.raises(SystemExit) as raised:
+        main(["--version"])
+
+    assert raised.value.code == 0
+    assert capsys.readouterr().out == "patchharbor 1.0.0\n"
+
+
+def test_run_help_is_the_complete_public_command_reference(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    with pytest.raises(SystemExit) as raised:
+        main(["fs", "run", "--help"])
+
+    assert raised.value.code == 0
+    help_text = capsys.readouterr().out
+    for expected in (
+        "# PATCHHARBOR",
+        "ZIP PatchBundles may contain ordered scripts and binary payload files.",
+        "Scripts run in the current working directory.",
+        "--timeout SECONDS",
+        "--plain",
+        "--no-color",
+        "--log",
+    ):
+        assert expected in help_text
+    for deferred in ("websocket", "clipboard", "ssh", "save mode"):
+        assert deferred not in help_text.lower()
+
+
 def test_fs_run_without_path_on_terminal_is_a_usage_error(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
