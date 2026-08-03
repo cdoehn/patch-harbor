@@ -151,7 +151,7 @@ def _is_directory_candidate(
 ) -> bool:
     try:
         resolve_patch_bundle(
-            file_input_artifact(path, policy=resource_policy),
+            file_input_artifact(path),
             policy=resource_policy,
         )
         return True
@@ -188,7 +188,7 @@ def _run_selected_candidate(
         )
 
     return run_input_artifact(
-        file_input_artifact(candidate.path, policy=resource_policy),
+        file_input_artifact(candidate.path),
         cwd=cwd,
         timeout_seconds=timeout_seconds,
         output=output,
@@ -211,7 +211,7 @@ def run_script_path(
     """Run a script/ZIP file or select one from a directory."""
     if not path.is_dir():
         return run_input_artifact(
-            file_input_artifact(path, policy=resource_policy),
+            file_input_artifact(path),
             cwd=cwd,
             timeout_seconds=timeout_seconds,
             output=output,

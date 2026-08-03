@@ -308,7 +308,9 @@ Ein unsicherer, beschädigter oder mehrdeutiger Eintrag macht das gesamte ZIP-Bu
 
 Unbegrenzte Eingaben werden nicht unterstützt. Ein Runner-Auftrag verwendet genau eine kleine unveränderliche `ResourcePolicy`. Dadurch gelten für Datei, Pipe, direkte Skripte, ZIP-Einträge und inline FILE-Inhalte dieselben nachvollziehbaren Grenzwerte. Die Anfangswerte können nach echten Nutzungserfahrungen angepasst werden.
 
-Die ZIP-Auflösung prüft deklarierte Größen und Eintragszahlen vorab. Während des tatsächlichen Lesens werden die gelesenen Bytes erneut gegen dieselbe Policy geprüft. Laufende Zähler existieren nur innerhalb der aktuellen ZIP-Auflösung und werden nicht als allgemeiner Anwendungszustand gespeichert.
+Das neutrale `InputArtifact` speichert weder eine zweite Größenangabe noch vorberechnete Warnings. Der Resolver prüft die aktuelle Größe einer vorhandenen Datei einmal vor der Inhaltsauswertung und liest direkte Skripte zusätzlich begrenzt. Eine Pipe muss das harte Eingabebudget bereits während des Empfangs durchsetzen, damit die temporäre Datei nicht unbegrenzt wächst.
+
+Die ZIP-Auflösung prüft deklarierte Größen und Eintragszahlen vorab. Während des tatsächlichen Lesens werden die gelesenen Bytes erneut gegen dieselbe Policy geprüft. Diese beiden Prüfungen sind bewusst keine Dublette: Die Vorabprüfung stoppt offensichtlich zu große Archive früh, die laufende Prüfung schützt vor falschen oder manipulierten Größenangaben. Laufende Zähler existieren nur innerhalb der aktuellen ZIP-Auflösung und werden nicht als allgemeiner Anwendungszustand gespeichert. Die verwendete Lese-Chunkgröße ist ein internes I/O-Detail und kein Bestandteil der Ressourcenpolicy.
 
 Empfohlene Anfangswerte:
 
@@ -618,7 +620,7 @@ Empfohlene Module:
 - `payload_files` validiert, staged und schreibt Bundle-Nutzdateien und inline FILE-Inhalte; es steuert keine Execution.
 - `interpreters` kennt nur den kleinen Interpretervertrag und Tool-Fehler; es kennt weder Quellen, PatchBundles, Parser noch Execution.
 - `models`, `errors` und `resource_policy` kennen keine höherliegenden Module.
-- Quellen, PatchBundle-Auflösung und inline FILE-Verarbeitung erhalten dieselbe `ResourcePolicy` vom Anwendungsorchestrator.
+- Der Anwendungsorchestrator übergibt dieselbe `ResourcePolicy` an den STDIN-Empfang, die PatchBundle-Auflösung und die inline FILE-Verarbeitung; vorhandene Dateiquellen bleiben reine Referenzen.
 - `execution` darf `interpreters` verwenden, kennt aber weder Quellen, PatchBundles, Ressourcenpolicy, TUI noch argparse.
 - `presentation` erhält Zustandsmodelle und steuert keine Ausführung.
 - Es gibt keine Pakete namens `utils`, `helpers` oder `common` als Sammelstellen.
@@ -1464,10 +1466,21 @@ PatchHarbor ist auf den Zielplattformen reproduzierbar getestet, sicher paketier
 
 ### 4.b.C – Schutzlogik auf gutes Kosten-Nutzen-Verhältnis reduzieren
 
-- doppelte Größenprüfungen entfernen,
-- keine allgemeine Quota- oder Policy-Engine bauen,
-- Grenzwerte und Fehlermeldungen im Help nur soweit nötig erklären,
-- Tests auf echte Grenzen und nicht auf interne Zähler ausrichten.
+- duplizierte Größen- und Warning-Zustände aus `InputArtifact` und Dateiquellen entfernen,
+- vorhandene Dateien zentral im Resolver prüfen und STDIN nur während des Empfangs begrenzen,
+- die Lese-Chunkgröße als I/O-Detail aus der `ResourcePolicy` entfernen,
+- keine allgemeine Quota-, Registry- oder konfigurierbare Policy-Engine bauen,
+- im Help nur erklären, dass übergroße oder unsichere Eingaben vor dem ersten Skript abgelehnt werden,
+- Tests auf exakt akzeptierte und überschrittene Grenzen statt private Zähler oder Hilfsmethoden ausrichten.
+
+## Review nach Step 4.b
+
+- Die Version-1-Budgets bleiben zentral, unveränderlich und für alle Eingabewege konsistent.
+- Vorhandene Dateien tragen keinen duplizierten Größen- oder Warning-Zustand mehr; der Resolver besitzt die fachliche Prüfung.
+- STDIN bleibt während des Empfangs begrenzt, und ZIPs behalten bewusst sowohl die deklarierte Vorabprüfung als auch die Prüfung der tatsächlich gelesenen Bytes.
+- Es gibt keine allgemeine Quota-Engine, keine öffentliche Policy-Konfiguration und keine neue Laufzeitabhängigkeit.
+- Verhaltenstests decken die exakt erlaubte Grenze, die erste Überschreitung, ZIP-Gesamtbudgets und die Ausführungssperre vor dem ersten Skript ab.
+- Der verbleibende Plan kann ohne zusätzlichen Step mit der plattformübergreifenden Akzeptanzsuite in 4.c fortgesetzt werden.
 
 ---
 

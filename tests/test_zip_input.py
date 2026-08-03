@@ -253,6 +253,42 @@ def test_zip_resource_budgets_fail_before_execution(
     assert "resource limit exceeded" in str(raised.value)
 
 
+def test_zip_accepts_exact_entry_and_total_byte_boundaries(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    archive_path = tmp_path / "boundary.zip"
+    script_text = f"{REQUIRED_MARKER}\n"
+    payload = b"data"
+    with zipfile.ZipFile(archive_path, "w") as archive:
+        archive.writestr("run.sh", script_text)
+        archive.writestr("payload.bin", payload)
+
+    script_size = len(script_text.encode("utf-8"))
+    policy = ResourcePolicy(
+        warning_bytes=script_size,
+        max_content_bytes=script_size,
+        max_zip_total_bytes=script_size + len(payload),
+        max_zip_entries=2,
+    )
+    executed: list[str] = []
+    monkeypatch.setattr(
+        script_application,
+        "execute_script_text",
+        lambda script_text, **kwargs: executed.append(script_text) or 0,
+    )
+
+    result = _run_path(
+        archive_path,
+        tmp_path,
+        resource_policy=policy,
+    )
+
+    assert result == 0
+    assert executed == [script_text]
+    assert (tmp_path / "payload.bin").read_bytes() == payload
+
+
 @pytest.mark.parametrize(
     ("policy", "observed_payload", "error_fragment"),
     [
@@ -347,7 +383,7 @@ def test_zip_large_entry_warning_is_preserved_on_bundle(
     )
 
     bundle = script_bundles.resolve_patch_bundle(
-        file_input_artifact(archive_path, policy=policy),
+        file_input_artifact(archive_path),
         policy=policy,
     )
 

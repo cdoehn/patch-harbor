@@ -262,7 +262,15 @@ def test_fs_run_help_is_limited_to_public_arguments(tmp_path: Path) -> None:
     completed = _run_cli(tmp_path, "fs", "run", "--help")
 
     assert completed.returncode == 0
-    assert "Run one Bash or PowerShell script from a file, directory, or standard input." in completed.stdout
+    help_text = " ".join(completed.stdout.split())
+    assert (
+        "Run Bash or PowerShell scripts from a file, ZIP PatchBundle, "
+        "directory, or standard input."
+    ) in help_text
+    assert (
+        "Oversized inputs and unsafe ZIP PatchBundles are rejected "
+        "before any script starts."
+    ) in help_text
     assert "--timeout SECONDS" in completed.stdout
     assert "default: 300" in completed.stdout
     assert "--plain" in completed.stdout

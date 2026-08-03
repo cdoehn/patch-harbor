@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
+from io import DEFAULT_BUFFER_SIZE
 import os
 from pathlib import Path
 import tempfile
@@ -28,38 +29,9 @@ def _input_limit_error(
     )
 
 
-def _input_warnings(
-    size_bytes: int,
-    policy: ResourcePolicy,
-) -> tuple[str, ...]:
-    warning = policy.large_content_warning("input artifact", size_bytes)
-    return () if warning is None else (warning,)
-
-
-def file_input_artifact(
-    path: Path,
-    *,
-    policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY,
-) -> InputArtifact:
-    """Reference one existing filesystem input after checking its byte budget."""
-    display_name = str(path)
-    try:
-        size_bytes = path.stat().st_size
-    except OSError as exc:
-        raise PatchHarborError(
-            f"cannot read script source {display_name}: {describe_os_error(exc)}",
-            ExitCode.SOURCE_ERROR,
-        ) from exc
-
-    if size_bytes > policy.max_input_artifact_bytes:
-        raise _input_limit_error(display_name, policy)
-
-    return InputArtifact(
-        path=path,
-        display_name=display_name,
-        size_bytes=size_bytes,
-        warnings=_input_warnings(size_bytes, policy),
-    )
+def file_input_artifact(path: Path) -> InputArtifact:
+    """Reference one filesystem input without interpreting its content."""
+    return InputArtifact(path=path, display_name=str(path))
 
 
 def _read_stream_chunk(stream: object, size: int) -> bytes | None:
@@ -96,7 +68,7 @@ def stdin_input_artifact(
                 while True:
                     chunk = _read_stream_chunk(
                         byte_stream,
-                        policy.read_chunk_bytes,
+                        DEFAULT_BUFFER_SIZE,
                     )
                     if chunk is None:
                         break
@@ -123,8 +95,6 @@ def stdin_input_artifact(
         yield InputArtifact(
             path=artifact_path,
             display_name="standard input",
-            size_bytes=bytes_written,
-            warnings=_input_warnings(bytes_written, policy),
         )
     finally:
         artifact_path.unlink(missing_ok=True)

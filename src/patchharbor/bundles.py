@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from io import DEFAULT_BUFFER_SIZE
 import stat
 import zipfile
 
@@ -72,7 +73,7 @@ class _ZipReadBudget:
         entry_bytes_read = 0
 
         with archive.open(member.entry, "r") as stream:
-            while chunk := stream.read(self.policy.read_chunk_bytes):
+            while chunk := stream.read(DEFAULT_BUFFER_SIZE):
                 entry_bytes_read += len(chunk)
                 self.total_bytes_read += len(chunk)
                 if entry_bytes_read > self.policy.max_content_bytes:
@@ -140,18 +141,19 @@ def _artifact_limit_error(
     )
 
 
-def _validate_artifact_budget(
+def _artifact_warnings(
     artifact: InputArtifact,
     policy: ResourcePolicy,
-) -> None:
-    if artifact.size_bytes > policy.max_input_artifact_bytes:
-        raise _artifact_limit_error(artifact, policy)
+) -> tuple[str, ...]:
+    """Validate the current artifact size and return its optional warning."""
     try:
         current_size = artifact.path.stat().st_size
     except OSError as exc:
         raise _artifact_source_error(artifact, describe_os_error(exc)) from exc
     if current_size > policy.max_input_artifact_bytes:
         raise _artifact_limit_error(artifact, policy)
+    warning = policy.large_content_warning("input artifact", current_size)
+    return () if warning is None else (warning,)
 
 
 def _read_direct_artifact(
@@ -317,6 +319,7 @@ def _try_direct_script(
 def _resolve_zip_bundle(
     artifact: InputArtifact,
     policy: ResourcePolicy,
+    artifact_warnings: tuple[str, ...],
 ) -> PatchBundle:
     try:
         with zipfile.ZipFile(artifact.path) as archive:
@@ -339,7 +342,7 @@ def _resolve_zip_bundle(
     return PatchBundle(
         scripts=scripts,
         payloads=payloads,
-        warnings=artifact.warnings + entry_warnings,
+        warnings=artifact_warnings + entry_warnings,
     )
 
 
@@ -349,9 +352,9 @@ def resolve_patch_bundle(
     policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY,
 ) -> PatchBundle:
     """Resolve one source-neutral artifact to an ordered PatchBundle."""
-    _validate_artifact_budget(artifact, policy)
+    artifact_warnings = _artifact_warnings(artifact, policy)
     if zipfile.is_zipfile(artifact.path):
-        return _resolve_zip_bundle(artifact, policy)
+        return _resolve_zip_bundle(artifact, policy, artifact_warnings)
 
     raw_content = _read_direct_artifact(artifact, policy)
     direct_script, direct_error, direct_was_utf8 = _try_direct_script(
@@ -361,7 +364,7 @@ def resolve_patch_bundle(
     if direct_script is not None:
         return PatchBundle(
             scripts=(direct_script,),
-            warnings=artifact.warnings,
+            warnings=artifact_warnings,
         )
     assert direct_error is not None
 
@@ -370,7 +373,7 @@ def resolve_patch_bundle(
         or raw_content.startswith(_ZIP_SIGNATURES)
     )
     if zip_hint:
-        return _resolve_zip_bundle(artifact, policy)
+        return _resolve_zip_bundle(artifact, policy, artifact_warnings)
     if direct_was_utf8:
         raise direct_error
     raise PatchHarborError(

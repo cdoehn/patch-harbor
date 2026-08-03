@@ -17,7 +17,6 @@ class ResourcePolicy:
     max_content_bytes: int = 256 * _MIB
     max_zip_total_bytes: int = 512 * _MIB
     max_zip_entries: int = 1_000
-    read_chunk_bytes: int = 64 * 1024
 
     def __post_init__(self) -> None:
         values = {
@@ -26,7 +25,6 @@ class ResourcePolicy:
             "max_content_bytes": self.max_content_bytes,
             "max_zip_total_bytes": self.max_zip_total_bytes,
             "max_zip_entries": self.max_zip_entries,
-            "read_chunk_bytes": self.read_chunk_bytes,
         }
         for name, value in values.items():
             if isinstance(value, bool) or not isinstance(value, int) or value <= 0:

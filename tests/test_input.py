@@ -40,9 +40,8 @@ def test_file_and_stdin_resolve_through_the_same_bundle_semantics(
     assert stdin_bundle.scripts[0].display_name == "standard input"
 
 
-def test_file_input_artifact_rejects_hard_budget(
+def test_direct_file_resolution_rejects_hard_budget(
     tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     source = tmp_path / "oversized-input"
     source.write_bytes(b"1234")
@@ -54,11 +53,42 @@ def test_file_input_artifact_rejects_hard_budget(
     )
 
     with pytest.raises(PatchHarborError) as raised:
-        file_input_artifact(source, policy=policy)
+        resolve_patch_bundle(file_input_artifact(source), policy=policy)
 
     assert raised.value.exit_code is ExitCode.SOURCE_ERROR
     assert "resource limit exceeded" in str(raised.value)
     assert "exceeds 3 bytes" in str(raised.value)
+
+
+def test_direct_file_at_hard_budget_is_accepted(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source = tmp_path / "boundary-script"
+    source.write_text("# PATCHHARBOR\n", encoding="utf-8")
+    size_bytes = source.stat().st_size
+    policy = ResourcePolicy(
+        warning_bytes=size_bytes,
+        max_input_artifact_bytes=size_bytes,
+        max_content_bytes=size_bytes,
+        max_zip_total_bytes=size_bytes * 2,
+    )
+    monkeypatch.setattr(
+        script_application,
+        "execute_script_text",
+        lambda script_text, **options: 0,
+    )
+
+    result = run_script_path(
+        source,
+        cwd=tmp_path,
+        timeout_seconds=2,
+        selection_input=StringIO(),
+        selection_output=StringIO(),
+        resource_policy=policy,
+    )
+
+    assert result == 0
 
 
 def test_stdin_budget_failure_removes_secure_temporary_artifact(
@@ -118,7 +148,6 @@ def test_stdin_artifact_uses_unique_user_only_temporary_files(
 
 def test_direct_reader_rechecks_budget_after_artifact_creation(
     tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     source = tmp_path / "growing-input"
     source.write_bytes(b"123")

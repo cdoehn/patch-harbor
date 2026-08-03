@@ -54,8 +54,18 @@ def _build_parser() -> argparse.ArgumentParser:
 
     run_parser = fs_commands.add_parser(
         "run",
-        help="run a script file or choose one from a directory",
-        description="Run one Bash or PowerShell script from a file, directory, or standard input.",
+        help=(
+            "run scripts from a file, ZIP PatchBundle, directory, "
+            "or standard input"
+        ),
+        description=(
+            "Run Bash or PowerShell scripts from a file, ZIP PatchBundle, "
+            "directory, or standard input."
+        ),
+        epilog=(
+            "Oversized inputs and unsafe ZIP PatchBundles are rejected "
+            "before any script starts."
+        ),
     )
     run_parser.add_argument(
         "--timeout",
@@ -87,11 +97,13 @@ def _build_parser() -> argparse.ArgumentParser:
         type=Path,
         nargs="?",
         metavar="PATH",
-        help="script file or directory; omit to read standard input",
+        help=(
+            "script or ZIP PatchBundle file, or directory; "
+            "omit to read standard input"
+        ),
     )
 
     return parser
-
 
 
 def _execute_request(
