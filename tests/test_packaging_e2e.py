@@ -4,10 +4,12 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+import tomllib
+
+from tests.platform_support import PROJECT_ROOT, native_script, native_value
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-REQUIRED_MARKER = "# PATCHHARBOR"
+MAX_WHEEL_BYTES = 256 * 1024
 
 
 def _run(
@@ -28,6 +30,14 @@ def _run(
     )
 
 
+def test_runtime_package_declares_no_third_party_dependencies() -> None:
+    project = tomllib.loads(
+        (PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    )["project"]
+
+    assert project.get("dependencies", []) == []
+
+
 def test_local_wheel_runs_after_pipx_installation(tmp_path: Path) -> None:
     distribution_dir = tmp_path / "dist"
     build = _run(
@@ -46,6 +56,7 @@ def test_local_wheel_runs_after_pipx_installation(tmp_path: Path) -> None:
     assert build.returncode == 0, build.stdout + build.stderr
     wheels = list(distribution_dir.glob("patchharbor-*.whl"))
     assert len(wheels) == 1
+    assert wheels[0].stat().st_size <= MAX_WHEEL_BYTES
 
     pipx_home = tmp_path / "pipx-home"
     pipx_bin = tmp_path / "pipx-bin"
@@ -75,7 +86,7 @@ def test_local_wheel_runs_after_pipx_installation(tmp_path: Path) -> None:
 
     assert install.returncode == 0, install.stdout + install.stderr
 
-    executable_name = "patchharbor.exe" if os.name == "nt" else "patchharbor"
+    executable_name = native_value("patchharbor", "patchharbor.exe")
     executable = pipx_bin / executable_name
     help_result = _run(
         [str(executable), "--help"],
@@ -88,14 +99,13 @@ def test_local_wheel_runs_after_pipx_installation(tmp_path: Path) -> None:
 
     workdir = tmp_path / "work"
     workdir.mkdir()
-    script_suffix = ".ps1" if os.name == "nt" else ".sh"
+    script_suffix = native_value(".sh", ".ps1")
     script_path = workdir / f"hello{script_suffix}"
-    if os.name == "nt":
-        script_body = 'Write-Output "pipx-e2e"\n'
-    else:
-        script_body = 'printf "%s\\n" "pipx-e2e"\n'
     script_path.write_text(
-        f"{REQUIRED_MARKER}\n{script_body}",
+        native_script(
+            'printf "%s\\n" "pipx-e2e"',
+            'Write-Output "pipx-e2e"',
+        ),
         encoding="utf-8",
     )
 

@@ -1424,10 +1424,18 @@ PatchHarbor ist auf den Zielplattformen reproduzierbar getestet, sicher paketier
 
 ### 4.a.C – Plattformcode und Fixtures vereinfachen
 
-- doppelte Linux- und Windows-Testdaten zusammenführen,
-- nur echte Unterschiede separat halten,
-- unnötige OS-Heuristiken entfernen,
-- Abhängigkeiten und Paketgröße prüfen und möglichst bei Standardbibliothek bleiben.
+- den Plattformvertrag auf eine einfache Windows-Erkennung statt einer zusätzlichen Familien-Enumeration reduzieren,
+- gemeinsame Linux- und Windows-Testwerte zentral auswählen und nur echte Skriptunterschiede getrennt halten,
+- ungenutzten Dateisystem-Fehlerzustand entfernen,
+- Docker-Testwerkzeuge nur einmal aus den Projekt-Testabhängigkeiten installieren,
+- mit Packaging- und Architekturtests absichern, dass PatchHarbor zur Laufzeit bei der Python-Standardbibliothek bleibt und das Wheel kompakt bleibt.
+
+## Review nach Step 4.a
+
+- Linux-Verhalten ist lokal sowie in Docker auf Ubuntu 24.04 und Ubuntu 26.04 grün.
+- Die Plattformgrenzen für Runtime, Dateisystem und Prozessbaum sind klein und gerichtet.
+- PatchHarbor besitzt weiterhin keine Laufzeitabhängigkeiten außerhalb der Python-Standardbibliothek.
+- Die echte Windows-Release-Lane bleibt bewusst Bestandteil von Step 4.c; ein Neustart oder weiterer Plattform-Abstraktionslayer ist nicht erforderlich.
 
 ---
 

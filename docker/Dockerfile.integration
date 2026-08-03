@@ -26,41 +26,14 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 RUN python3 -m venv "${VIRTUAL_ENV}" \
-    && python -m pip install --upgrade pip setuptools wheel build pytest pytest-timeout pipx \
-    && python -m pip show pytest-timeout pipx >/dev/null
+    && python -m pip install --upgrade pip setuptools wheel
 
 WORKDIR /workspace
 COPY . .
 
-RUN python - <<'PY_TEST_REQUIREMENTS'
-from pathlib import Path
-import tomllib
-
-project = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))
-requirements: list[str] = []
-
-optional = project.get("project", {}).get("optional-dependencies", {})
-for group_name in ("test", "tests", "dev"):
-    group = optional.get(group_name, [])
-    if isinstance(group, list):
-        requirements.extend(item for item in group if isinstance(item, str))
-
-dependency_groups = project.get("dependency-groups", {})
-for group_name in ("test", "tests", "dev"):
-    group = dependency_groups.get(group_name, [])
-    if isinstance(group, list):
-        requirements.extend(item for item in group if isinstance(item, str))
-
-unique_requirements = list(dict.fromkeys(requirements))
-Path("/tmp/patchharbor-test-requirements.txt").write_text(
-    "".join(f"{item}\n" for item in unique_requirements),
-    encoding="utf-8",
-)
-PY_TEST_REQUIREMENTS
-
-RUN if [ -s /tmp/patchharbor-test-requirements.txt ]; then \
-        python -m pip install --requirement /tmp/patchharbor-test-requirements.txt; \
-    fi
+RUN python -c 'from pathlib import Path; import tomllib; project = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8")); requirements = project["project"]["optional-dependencies"]["dev"]; Path("/tmp/patchharbor-test-requirements.txt").write_text("".join(f"{item}\n" for item in requirements), encoding="utf-8")' \
+    && python -m pip install --requirement /tmp/patchharbor-test-requirements.txt \
+    && python -m pip show pytest-timeout pipx >/dev/null
 
 RUN rm -rf /tmp/patchharbor-dist \
     && python -m build --wheel --outdir /tmp/patchharbor-dist \

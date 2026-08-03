@@ -1,12 +1,8 @@
 from __future__ import annotations
 
-from pathlib import Path
 import subprocess
 
-from tests.platform_support import REQUIRES_BASH_DOCKER_RUNNER
-
-
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
+from tests.platform_support import PROJECT_ROOT, REQUIRES_BASH_DOCKER_RUNNER
 RUNNER = PROJECT_ROOT / "scripts" / "run_docker_integration_tests.sh"
 DOCKERFILE = PROJECT_ROOT / "docker" / "Dockerfile.integration"
 
@@ -34,6 +30,12 @@ def test_docker_integration_image_installs_required_test_tools_and_init() -> Non
 
     assert "pytest-timeout" in dockerfile
     assert "pipx" in dockerfile
+    assert "pip install --upgrade pip setuptools wheel" in dockerfile
+    assert "pip install --upgrade pip setuptools wheel build pytest" not in dockerfile
+    assert "PY_TEST_REQUIREMENTS" not in dockerfile
+    assert "python -c" in dockerfile
+    assert '["project"]["optional-dependencies"]["dev"]' in dockerfile
+    assert dockerfile.count("pip install --requirement") == 1
     assert "pip show pytest-timeout pipx" in dockerfile
     assert "docker run --rm --init" in runner
     assert '--timeout="$test_timeout_seconds"' in runner

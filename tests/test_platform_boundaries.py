@@ -11,18 +11,23 @@ from patchharbor.platform.filesystem import (
     PathKind,
     path_kind,
 )
-from patchharbor.platform.runtime import PlatformFamily, platform_family
+from patchharbor.platform.runtime import is_windows
 
 
 @pytest.mark.parametrize(
     ("os_name", "expected"),
-    (("posix", PlatformFamily.POSIX), ("nt", PlatformFamily.WINDOWS)),
+    (("posix", False), ("nt", True)),
 )
-def test_runtime_family_is_resolved_at_the_platform_boundary(
+def test_windows_detection_is_resolved_at_the_platform_boundary(
     os_name: str,
-    expected: PlatformFamily,
+    expected: bool,
 ) -> None:
-    assert platform_family(os_name=os_name) is expected
+    assert is_windows(os_name=os_name) is expected
+
+
+def test_unknown_python_os_family_is_rejected() -> None:
+    with pytest.raises(RuntimeError, match="unsupported operating system family"):
+        is_windows(os_name="unknown")
 
 
 @pytest.mark.parametrize(
@@ -61,11 +66,7 @@ def test_path_kind_does_not_follow_symbolic_links(tmp_path: Path) -> None:
 
 def test_filesystem_operation_error_exposes_stable_operation() -> None:
     cause = PermissionError("native platform wording")
-    error = FileSystemOperationError(
-        "cannot replace target",
-        Path("target"),
-        cause,
-    )
+    error = FileSystemOperationError("cannot replace target", cause)
 
     assert str(error) == "cannot replace target"
     assert error.cause is cause

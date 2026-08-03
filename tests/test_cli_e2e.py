@@ -12,11 +12,11 @@ import zipfile
 
 import pytest
 
-from tests.platform_support import REQUIRES_POWERSHELL_7
-
-
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-REQUIRED_MARKER = "# PATCHHARBOR"
+from tests.platform_support import (
+    PROJECT_ROOT,
+    REQUIRED_MARKER,
+    REQUIRES_POWERSHELL_7,
+)
 
 
 def _run_cli(

@@ -1,100 +1,38 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
-import os
 from pathlib import Path
-import subprocess
-import sys
 import zipfile
 
 import pytest
 
-from tests.platform_support import REQUIRES_POWERSHELL_7
-
-
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-REQUIRED_MARKER = "# PATCHHARBOR"
-
-
-def _environment(
-    overrides: Mapping[str, str] | None = None,
-) -> dict[str, str]:
-    environment = os.environ.copy()
-    source_path = str(PROJECT_ROOT / "src")
-    existing_pythonpath = environment.get("PYTHONPATH")
-    environment["PYTHONPATH"] = (
-        source_path
-        if not existing_pythonpath
-        else os.pathsep.join((source_path, existing_pythonpath))
-    )
-    if overrides:
-        environment.update(overrides)
-    return environment
-
-
-def _run_patchharbor(
-    source_path: Path,
-    *,
-    cwd: Path,
-    environment_overrides: Mapping[str, str] | None = None,
-    arguments: tuple[str, ...] = (),
-    timeout_seconds: float = 20,
-) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        [
-            sys.executable,
-            "-m",
-            "patchharbor.cli",
-            "fs",
-            "run",
-            *arguments,
-            str(source_path),
-        ],
-        cwd=cwd,
-        env=_environment(environment_overrides),
-        stdin=subprocess.DEVNULL,
-        capture_output=True,
-        text=True,
-        timeout=timeout_seconds,
-        check=False,
-    )
-
-
-def _platform_body(bash_body: str, powershell_body: str) -> str:
-    return powershell_body if os.name == "nt" else bash_body
-
-
-def _platform_script(bash_body: str, powershell_body: str) -> str:
-    return f"{REQUIRED_MARKER}\n{_platform_body(bash_body, powershell_body)}\n"
-
-
-def _normalized_path(path: str | Path) -> str:
-    return os.path.normcase(os.path.abspath(os.fspath(path)))
-
-
-def _log_path(stderr: str) -> Path:
-    prefix = "patchharbor: log: "
-    matching = [line for line in stderr.splitlines() if line.startswith(prefix)]
-    assert matching, stderr
-    return Path(matching[-1].removeprefix(prefix))
+from tests.platform_support import (
+    IS_WINDOWS,
+    REQUIRED_MARKER,
+    REQUIRES_POWERSHELL_7,
+    log_path_from_stderr,
+    native_script,
+    native_value,
+    normalized_path,
+    run_patchharbor,
+)
 
 
 def test_platform_default_interpreter_ignores_filename_extension(
     tmp_path: Path,
 ) -> None:
-    source_path = tmp_path / ("default.sh" if os.name == "nt" else "default.ps1")
+    source_path = tmp_path / native_value("default.ps1", "default.sh")
     source_path.write_text(
-        _platform_script(
+        native_script(
             'printf "%s\\n" "bash-default"',
             '[Console]::Out.WriteLine("powershell-default")',
         ),
         encoding="utf-8",
     )
 
-    completed = _run_patchharbor(source_path, cwd=tmp_path)
+    completed = run_patchharbor(source_path, cwd=tmp_path)
 
     assert completed.returncode == 0
-    expected = "powershell-default\n" if os.name == "nt" else "bash-default\n"
+    expected = native_value("bash-default\n", "powershell-default\n")
     assert completed.stdout == expected
     assert completed.stderr == ""
 
@@ -108,7 +46,7 @@ def test_platform_uses_system_temp_for_staging_and_requested_cwd(
     system_temp.mkdir()
     source_path = tmp_path / "downloaded-script.data"
     source_path.write_text(
-        _platform_script(
+        native_script(
             "pwd -P > observed-cwd.txt\nprintf '%s' \"$0\" > observed-script.txt",
             (
                 '[IO.File]::WriteAllText("observed-cwd.txt", '
@@ -124,7 +62,7 @@ def test_platform_uses_system_temp_for_staging_and_requested_cwd(
         "TMP": str(system_temp),
     }
 
-    completed = _run_patchharbor(
+    completed = run_patchharbor(
         source_path,
         cwd=working_directory,
         environment_overrides=temp_environment,
@@ -139,8 +77,8 @@ def test_platform_uses_system_temp_for_staging_and_requested_cwd(
     observed_script = (working_directory / "observed-script.txt").read_text(
         encoding="utf-8"
     ).strip()
-    assert _normalized_path(observed_cwd) == _normalized_path(working_directory)
-    assert _normalized_path(Path(observed_script).parent) == _normalized_path(
+    assert normalized_path(observed_cwd) == normalized_path(working_directory)
+    assert normalized_path(Path(observed_script).parent) == normalized_path(
         system_temp
     )
     assert not Path(observed_script).exists()
@@ -150,7 +88,7 @@ def test_platform_inline_file_is_available_before_script_execution(
     tmp_path: Path,
 ) -> None:
     source_path = tmp_path / "inline-payload.txt"
-    body = _platform_body(
+    body = native_value(
         (
             '[ "$(cat platform.txt)" = "platform-data" ] || exit 41\n'
             'printf "%s\\n" "inline-ok"'
@@ -170,7 +108,7 @@ def test_platform_inline_file_is_available_before_script_execution(
         encoding="utf-8",
     )
 
-    completed = _run_patchharbor(source_path, cwd=tmp_path)
+    completed = run_patchharbor(source_path, cwd=tmp_path)
 
     assert completed.returncode == 0
     assert completed.stdout == "inline-ok\n"
@@ -185,7 +123,7 @@ def test_platform_zip_patchbundle_preserves_binary_payload(
 ) -> None:
     archive_path = tmp_path / "platform-bundle.zip"
     binary_payload = bytes((0, 1, 2, 127, 128, 255)) + b"PATCHHARBOR"
-    if os.name == "nt":
+    if IS_WINDOWS:
         script_name = "apply.ps1"
         script = (
             f"{REQUIRED_MARKER}\n"
@@ -206,7 +144,7 @@ def test_platform_zip_patchbundle_preserves_binary_payload(
         archive.writestr(script_name, script)
         archive.writestr("assets/blob.bin", binary_payload)
 
-    completed = _run_patchharbor(archive_path, cwd=tmp_path)
+    completed = run_patchharbor(archive_path, cwd=tmp_path)
 
     assert completed.returncode == 0
     assert completed.stdout == "bundle-ok\n"
@@ -217,14 +155,14 @@ def test_platform_zip_patchbundle_preserves_binary_payload(
 def test_platform_timeout_returns_124(tmp_path: Path) -> None:
     source_path = tmp_path / "timeout-script.data"
     source_path.write_text(
-        _platform_script(
+        native_script(
             "sleep 30",
             "Start-Sleep -Seconds 30",
         ),
         encoding="utf-8",
     )
 
-    completed = _run_patchharbor(
+    completed = run_patchharbor(
         source_path,
         cwd=tmp_path,
         arguments=("--timeout", "0.2"),
@@ -244,7 +182,7 @@ def test_platform_log_uses_configured_system_temp_and_contains_output(
     system_temp.mkdir()
     source_path = tmp_path / "logged-script.data"
     source_path.write_text(
-        _platform_script(
+        native_script(
             'printf "%s\\n" "platform-log"',
             '[Console]::Out.WriteLine("platform-log")',
         ),
@@ -256,7 +194,7 @@ def test_platform_log_uses_configured_system_temp_and_contains_output(
         "TMP": str(system_temp),
     }
 
-    completed = _run_patchharbor(
+    completed = run_patchharbor(
         source_path,
         cwd=tmp_path,
         environment_overrides=temp_environment,
@@ -265,9 +203,9 @@ def test_platform_log_uses_configured_system_temp_and_contains_output(
 
     assert completed.returncode == 0
     assert completed.stdout == "platform-log\n"
-    log_path = _log_path(completed.stderr)
+    log_path = log_path_from_stderr(completed.stderr)
     try:
-        assert _normalized_path(log_path.parent) == _normalized_path(system_temp)
+        assert normalized_path(log_path.parent) == normalized_path(system_temp)
         log_bytes = log_path.read_bytes()
         assert b"platform-log\n" in log_bytes
         assert b"exit_code: 0\n" in log_bytes
@@ -287,7 +225,7 @@ def test_platform_powershell_7_shebang_executes_when_available(
         encoding="utf-8",
     )
 
-    completed = _run_patchharbor(source_path, cwd=tmp_path)
+    completed = run_patchharbor(source_path, cwd=tmp_path)
 
     assert completed.returncode == 0
     assert completed.stdout == "pwsh-seven\n"

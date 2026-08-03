@@ -6,11 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from patchharbor.errors import ExitCode, PatchHarborError
-from patchharbor.platform.runtime import (
-    PlatformFamily,
-    find_executable,
-    platform_family,
-)
+from patchharbor.platform.runtime import find_executable, is_windows
 
 
 @dataclass(frozen=True)
@@ -64,8 +60,7 @@ def select_interpreter(
     """Select one whitelisted interpreter from the first line or OS default."""
     first_line = script_text.splitlines()[0] if script_text else ""
     if not first_line.startswith("#!"):
-        family = platform_family(os_name=os_name)
-        return _WINDOWS_POWERSHELL if family is PlatformFamily.WINDOWS else _BASH
+        return _WINDOWS_POWERSHELL if is_windows(os_name=os_name) else _BASH
 
     interpreter = _SUPPORTED_SHEBANGS.get(first_line)
     if interpreter is None:

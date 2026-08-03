@@ -9,7 +9,7 @@ from patchharbor.platform.lifecycle import (
     ProcessState,
     ProcessTree,
 )
-from patchharbor.platform.runtime import PlatformFamily, platform_family
+from patchharbor.platform.runtime import is_windows
 
 
 __all__ = [
@@ -22,7 +22,7 @@ __all__ = [
 
 def create_process_tree(command: list[str], *, cwd: Path) -> ProcessTree:
     """Start the process-tree implementation for the current operating system."""
-    if platform_family() is PlatformFamily.WINDOWS:  # pragma: no cover
+    if is_windows():  # pragma: no cover - exercised on Windows CI
         from patchharbor.platform.windows import WindowsProcessTree
 
         return WindowsProcessTree.start(command, cwd=cwd)

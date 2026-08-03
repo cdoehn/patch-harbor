@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ast
 from pathlib import Path
+import sys
 
 
 PACKAGE_ROOT = Path(__file__).parents[1] / "src" / "patchharbor"
@@ -227,12 +228,12 @@ def test_platform_package_does_not_import_application_layers() -> None:
     assert imports.isdisjoint(disallowed)
 
 
-def test_platform_package_uses_the_shared_runtime_family_boundary() -> None:
+def test_platform_package_uses_the_shared_windows_boundary() -> None:
     source = (PACKAGE_ROOT / "platform" / "__init__.py").read_text(
         encoding="utf-8"
     )
 
-    assert "platform_family()" in source
+    assert "is_windows()" in source
     assert "import os" not in source
 
 
@@ -314,3 +315,19 @@ def test_platform_error_text_is_normalized_outside_platform_modules() -> None:
     for module_name in ("bundles", "execution", "sources"):
         source = (PACKAGE_ROOT / f"{module_name}.py").read_text(encoding="utf-8")
         assert "describe_os_error" in source
+
+
+def test_runtime_package_imports_only_itself_and_the_standard_library() -> None:
+    imported_roots: set[str] = set()
+    for module_path in PACKAGE_ROOT.rglob("*.py"):
+        tree = ast.parse(module_path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                imported_roots.update(
+                    alias.name.split(".", 1)[0] for alias in node.names
+                )
+            elif isinstance(node, ast.ImportFrom) and node.module:
+                imported_roots.add(node.module.split(".", 1)[0])
+
+    allowed = set(sys.stdlib_module_names) | {"__future__", "patchharbor"}
+    assert imported_roots <= allowed

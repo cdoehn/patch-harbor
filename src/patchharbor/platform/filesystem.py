@@ -22,10 +22,9 @@ class PathKind(Enum):
 class FileSystemOperationError(OSError):
     """One filesystem operation failed below the platform-neutral policy."""
 
-    def __init__(self, operation: str, path: Path, cause: OSError) -> None:
+    def __init__(self, operation: str, cause: OSError) -> None:
         super().__init__(operation)
         self.operation = operation
-        self.path = path
         self.cause = cause
 
 
@@ -36,7 +35,7 @@ def path_kind(path: Path) -> PathKind:
     except FileNotFoundError:
         return PathKind.MISSING
     except OSError as exc:
-        raise FileSystemOperationError("cannot inspect target", path, exc) from exc
+        raise FileSystemOperationError("cannot inspect target", exc) from exc
 
     if stat.S_ISLNK(mode):
         return PathKind.SYMBOLIC_LINK
@@ -54,7 +53,6 @@ def create_directory(path: Path) -> None:
     except OSError as exc:
         raise FileSystemOperationError(
             "cannot create parent directory",
-            path,
             exc,
         ) from exc
 
@@ -76,7 +74,6 @@ def atomic_replace_bytes(target: Path, content: bytes) -> None:
         except OSError as exc:
             raise FileSystemOperationError(
                 "cannot stage replacement",
-                target,
                 exc,
             ) from exc
 
@@ -85,7 +82,6 @@ def atomic_replace_bytes(target: Path, content: bytes) -> None:
         except OSError as exc:
             raise FileSystemOperationError(
                 "cannot replace target",
-                target,
                 exc,
             ) from exc
         staged_path = None

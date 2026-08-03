@@ -2,22 +2,19 @@
 
 from __future__ import annotations
 
-from enum import Enum
 import os
 import shutil
 
 
-class PlatformFamily(Enum):
-    """Operating-system families supported by PatchHarbor."""
-
-    POSIX = "posix"
-    WINDOWS = "windows"
+_SUPPORTED_OS_NAMES = frozenset({"nt", "posix"})
 
 
-def platform_family(*, os_name: str | None = None) -> PlatformFamily:
-    """Return the supported family for the current or supplied Python OS name."""
+def is_windows(*, os_name: str | None = None) -> bool:
+    """Return whether the current or supplied supported Python OS is Windows."""
     selected = os.name if os_name is None else os_name
-    return PlatformFamily.WINDOWS if selected == "nt" else PlatformFamily.POSIX
+    if selected not in _SUPPORTED_OS_NAMES:
+        raise RuntimeError(f"unsupported operating system family: {selected}")
+    return selected == "nt"
 
 
 def find_executable(executable: str) -> str | None:
