@@ -13,73 +13,15 @@ import zipfile
 import pytest
 
 from tests.platform_support import (
-    PROJECT_ROOT,
     REQUIRED_MARKER,
-    REQUIRES_POWERSHELL_7,
+    log_path_from_stderr as _log_path_from_stderr,
+    project_environment,
+    run_cli as _run_cli,
+    run_cli_bytes as _run_cli_bytes,
 )
 
 
 pytestmark = pytest.mark.e2e
-
-
-def _run_cli(
-    cwd: Path,
-    *arguments: str,
-    environment_overrides: Mapping[str, str] | None = None,
-    input_text: str | None = None,
-) -> subprocess.CompletedProcess[str]:
-    environment = os.environ.copy()
-    source_path = str(PROJECT_ROOT / "src")
-    existing_pythonpath = environment.get("PYTHONPATH")
-    environment["PYTHONPATH"] = (
-        source_path
-        if not existing_pythonpath
-        else os.pathsep.join((source_path, existing_pythonpath))
-    )
-    if environment_overrides:
-        environment.update(environment_overrides)
-
-    standard_input = (
-        {"stdin": subprocess.DEVNULL}
-        if input_text is None
-        else {"input": input_text}
-    )
-    return subprocess.run(
-        [sys.executable, "-m", "patchharbor.cli", *arguments],
-        cwd=cwd,
-        env=environment,
-        check=False,
-        capture_output=True,
-        text=True,
-        timeout=15,
-        **standard_input,
-    )
-
-
-
-
-def _run_cli_bytes(
-    cwd: Path,
-    *arguments: str,
-    input_bytes: bytes,
-) -> subprocess.CompletedProcess[bytes]:
-    environment = os.environ.copy()
-    source_path = str(PROJECT_ROOT / "src")
-    existing_pythonpath = environment.get("PYTHONPATH")
-    environment["PYTHONPATH"] = (
-        source_path
-        if not existing_pythonpath
-        else os.pathsep.join((source_path, existing_pythonpath))
-    )
-    return subprocess.run(
-        [sys.executable, "-m", "patchharbor.cli", *arguments],
-        cwd=cwd,
-        env=environment,
-        check=False,
-        capture_output=True,
-        input=input_bytes,
-        timeout=15,
-    )
 
 
 def _run_patchharbor(
@@ -98,13 +40,6 @@ def _run_patchharbor(
         environment_overrides=environment_overrides,
         input_text=input_text,
     )
-
-
-def _log_path_from_stderr(stderr: str) -> Path:
-    prefix = "patchharbor: log: "
-    matching = [line for line in stderr.splitlines() if line.startswith(prefix)]
-    assert matching, stderr
-    return Path(matching[-1].removeprefix(prefix))
 
 
 def _child_process_script(ready_path: Path, *, exit_parent: bool = False) -> str:
@@ -221,44 +156,12 @@ def _assert_child_process_stopped(pid: int, *, timeout: float = 5.0) -> None:
     raise AssertionError(f"child process {pid} survived PatchHarbor")
 
 
-def _subprocess_environment() -> dict[str, str]:
-    environment = os.environ.copy()
-    source_path = str(PROJECT_ROOT / "src")
-    existing_pythonpath = environment.get("PYTHONPATH")
-    environment["PYTHONPATH"] = (
-        source_path
-        if not existing_pythonpath
-        else os.pathsep.join((source_path, existing_pythonpath))
-    )
-    return environment
-
-
 def test_fs_run_rejects_empty_standard_input(tmp_path: Path) -> None:
     completed = _run_cli(tmp_path, "fs", "run")
 
     assert completed.returncode == 2
     assert completed.stdout == ""
     assert completed.stderr == "patchharbor: no script input received\n"
-
-
-def test_fs_run_reads_script_from_standard_input(tmp_path: Path) -> None:
-    script_text = (
-        f"{REQUIRED_MARKER}\n"
-        'printf "%s\\n" "stdin-e2e"\n'
-        if os.name != "nt"
-        else f'{REQUIRED_MARKER}\nWrite-Output "stdin-e2e"\n'
-    )
-
-    completed = _run_cli(
-        tmp_path,
-        "fs",
-        "run",
-        input_text=script_text,
-    )
-
-    assert completed.returncode == 0
-    assert completed.stdout == "stdin-e2e\n"
-    assert completed.stderr == ""
 
 
 def test_fs_run_help_is_limited_to_public_arguments(tmp_path: Path) -> None:
@@ -330,23 +233,6 @@ def test_fs_run_rejects_unknown_shebang_before_execution(
     assert not sentinel_path.exists()
 
 
-@REQUIRES_POWERSHELL_7
-def test_fs_run_honors_powershell_7_shebang(tmp_path: Path) -> None:
-    script_path = tmp_path / "powershell-seven.txt"
-    script_path.write_text(
-        "#!/usr/bin/env pwsh\n"
-        f"{REQUIRED_MARKER}\n"
-        'Write-Output "powershell-seven"\n',
-        encoding="utf-8",
-    )
-
-    completed = _run_patchharbor(script_path, tmp_path)
-
-    assert completed.returncode == 0
-    assert completed.stdout == "powershell-seven\n"
-    assert completed.stderr == ""
-
-
 def test_fs_run_executes_a_real_script_file_with_required_marker(
     tmp_path: Path,
 ) -> None:
@@ -411,40 +297,6 @@ def test_script_runs_in_the_original_working_directory(tmp_path: Path) -> None:
 
     assert completed.returncode == 0
     assert Path(completed.stdout.strip()).resolve() == tmp_path.resolve()
-
-
-def test_script_exit_code_is_returned(tmp_path: Path) -> None:
-    script_path = _script_path(tmp_path, "exit-code")
-    script_path.write_text(
-        f"{REQUIRED_MARKER}\nexit 23\n",
-        encoding="utf-8",
-    )
-
-    completed = _run_patchharbor(script_path, tmp_path)
-
-    assert completed.returncode == 23
-
-
-def test_timeout_returns_124(tmp_path: Path) -> None:
-    script_path = _script_path(tmp_path, "timeout")
-    if os.name == "nt":
-        script_body = "while ($true) {}\n"
-    else:
-        script_body = "while :; do :; done\n"
-    script_path.write_text(
-        f"{REQUIRED_MARKER}\n{script_body}",
-        encoding="utf-8",
-    )
-
-    completed = _run_patchharbor(
-        script_path,
-        tmp_path,
-        "--timeout",
-        "0.05",
-    )
-
-    assert completed.returncode == 124
-    assert completed.stderr == "patchharbor: script timed out after 0.05 seconds\n"
 
 
 def test_child_stdin_is_closed(tmp_path: Path) -> None:
@@ -559,32 +411,6 @@ def _write_named_script(path: Path, output: str, *, exit_code: int = 0) -> None:
     path.write_text(f"{REQUIRED_MARKER}\n{body}", encoding="utf-8")
 
 
-def test_directory_candidates_are_sorted_and_selected_by_index(tmp_path: Path) -> None:
-    inbox = tmp_path / "inbox"
-    inbox.mkdir()
-    newest = _script_path(inbox, "newest")
-    alpha = _script_path(inbox, "alpha")
-    beta = _script_path(inbox, "beta")
-    _write_named_script(newest, "newest")
-    _write_named_script(alpha, "alpha")
-    _write_named_script(beta, "beta")
-    os.utime(newest, ns=(300, 300))
-    os.utime(alpha, ns=(200, 200))
-    os.utime(beta, ns=(200, 200))
-
-    completed = _run_patchharbor(inbox, tmp_path, input_text="2\n")
-
-    assert completed.returncode == 0
-    assert completed.stderr == ""
-    assert completed.stdout.index(f"1 {newest.name}") < completed.stdout.index(
-        f"2 {alpha.name}"
-    )
-    assert completed.stdout.index(f"2 {alpha.name}") < completed.stdout.index(
-        f"3 {beta.name}"
-    )
-    assert completed.stdout.endswith("alpha\n")
-
-
 def test_directory_with_one_candidate_runs_without_prompt(tmp_path: Path) -> None:
     inbox = tmp_path / "inbox"
     inbox.mkdir()
@@ -668,8 +494,6 @@ def test_zip_scripts_run_in_stored_archive_order(tmp_path: Path) -> None:
     assert completed.stderr == ""
 
 
-
-
 def test_fs_run_reads_zip_patchbundle_from_standard_input_in_archive_order(
     tmp_path: Path,
 ) -> None:
@@ -690,57 +514,6 @@ def test_fs_run_reads_zip_patchbundle_from_standard_input_in_archive_order(
     assert completed.returncode == 0
     assert completed.stdout.decode().splitlines() == ["first", "second"]
     assert completed.stderr == b""
-
-
-def test_zip_bundle_writes_binary_payload_before_scripts_in_order(
-    tmp_path: Path,
-) -> None:
-    archive_path = tmp_path / "bundle.zip"
-    binary_payload = bytes((0, 1, 2, 255)) + b"PATCH"
-
-    if os.name == "nt":
-        first_script = (
-            f"{REQUIRED_MARKER}\n"
-            '$actual = [Convert]::ToBase64String('
-            '[IO.File]::ReadAllBytes("assets/blob.bin"))\n'
-            'if ($actual -ne "AAEC/1BBVENI") { exit 41 }\n'
-            'Add-Content -LiteralPath "order.txt" -Value "first"\n'
-        )
-        second_script = (
-            f"{REQUIRED_MARKER}\n"
-            'Add-Content -LiteralPath "order.txt" -Value "second"\n'
-        )
-        first_name = "z-first.ps1"
-        second_name = "a-second.ps1"
-    else:
-        first_script = (
-            f"{REQUIRED_MARKER}\n"
-            'actual="$(base64 < assets/blob.bin | tr -d "\\n")"\n'
-            '[ "$actual" = "AAEC/1BBVENI" ] || exit 41\n'
-            'printf "%s\\n" first >> order.txt\n'
-        )
-        second_script = (
-            f"{REQUIRED_MARKER}\n"
-            'printf "%s\\n" second >> order.txt\n'
-        )
-        first_name = "z-first.sh"
-        second_name = "a-second.sh"
-
-    with zipfile.ZipFile(archive_path, "w") as archive:
-        archive.writestr(first_name, first_script)
-        archive.writestr("assets/blob.bin", binary_payload)
-        archive.writestr(second_name, second_script)
-
-    completed = _run_patchharbor(archive_path, tmp_path)
-
-    assert completed.returncode == 0
-    assert completed.stdout == ""
-    assert completed.stderr == ""
-    assert (tmp_path / "assets" / "blob.bin").read_bytes() == binary_payload
-    assert (tmp_path / "order.txt").read_text(encoding="utf-8").splitlines() == [
-        "first",
-        "second",
-    ]
 
 
 def test_zip_execution_stops_after_first_failed_script(tmp_path: Path) -> None:
@@ -816,7 +589,6 @@ def test_empty_zip_has_a_clear_tool_error(tmp_path: Path) -> None:
         f"patchharbor: no valid PatchHarbor scripts found in ZIP archive "
         f"{archive_path}\n"
     )
-
 
 
 def test_corrupt_zip_is_distinct_from_missing_marker(tmp_path: Path) -> None:
@@ -1204,7 +976,7 @@ raise SystemExit(result)
             str(tmp_path),
         ],
         cwd=tmp_path,
-        env=_subprocess_environment(),
+        env=project_environment(),
         stdin=subprocess.DEVNULL,
         capture_output=True,
         text=True,

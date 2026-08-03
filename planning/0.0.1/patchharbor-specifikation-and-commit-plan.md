@@ -1505,10 +1505,20 @@ PatchHarbor ist auf den Zielplattformen reproduzierbar getestet, sicher paketier
 
 ### 4.c.C – Testbestand pragmatisch bereinigen
 
-- doppelte E2E-Fälle entfernen,
-- fragile pixelgenaue TUI-Assertions durch Zustands- und Renderer-Tests ersetzen,
-- Mocks auf unvermeidbare OS-Grenzen beschränken,
-- Testlaufzeit und Diagnoseausgaben optimieren, ohne Testaussage zu schwächen.
+- die Akzeptanzsuite als eindeutigen Besitzer der öffentlichen Happy Paths für Pipe, Timeout, Exit-Code, Ordnerwahl, ZIP-Bundle und Windows-Interpreter festlegen und identische ältere E2E-Fälle entfernen,
+- gemeinsame echte CLI-Subprozesshelfer in `tests/platform_support.py` bündeln, statt sie in mehreren Testdateien zu duplizieren,
+- TUI-Tests auf Abschnittsreihenfolge, Breitenbegrenzung, Zustandswechsel, Redraw und Terminal-Wiederherstellung ausrichten statt vollständige Frame-Bytes oder feste Zeilenzahlen zu vergleichen,
+- Test-Doubles nur an der CLI-zu-Anwendung-Grenze und an unvermeidbaren Betriebssystemgrenzen verwenden,
+- lokale und CI-Testläufe um eine kurze Liste der langsamsten Tests ergänzen, ohne Retries oder zusätzliche Laufzeitabhängigkeiten einzuführen.
+
+## Review nach Step 4.c
+
+- Die Akzeptanzsuite enthält je öffentlichen Hauptworkflow genau einen plattformübergreifenden Nachweis; granulare E2E-Tests bleiben für Fehler- und Sonderfälle zuständig.
+- Doppelte Happy-Path-Subprozesse wurden entfernt, ohne die Aussagen zu Pipe, Timeout, Exit-Code, Ordnerwahl, ZIP-PatchBundle oder PowerShell zu verlieren.
+- TUI-Verhalten wird über Rendererzustand, Begrenzung, Redraw und Terminal-Cleanup geprüft; private Bytefolgen und feste Framehöhen sind kein Testvertrag.
+- Ubuntu 24.04 und Windows bleiben blockierende Release-Gates, Ubuntu 26.04 bleibt die nicht blockierende Preview-Lane.
+- Diagnoseausgaben zeigen die langsamsten Tests; pauschale Retries, zusätzliche Mock-Schichten oder ein zweites Testframework wurden nicht eingeführt.
+- Der verbleibende Version-1-Plan kann ohne neuen Step mit Packaging, Release-Audit und finaler Bereinigung in Step 4.d fortgesetzt werden.
 
 ---
 

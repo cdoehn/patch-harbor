@@ -66,6 +66,50 @@ def project_environment(
     return environment
 
 
+def run_cli(
+    cwd: Path,
+    *arguments: str,
+    environment_overrides: Mapping[str, str] | None = None,
+    input_text: str | None = None,
+    timeout_seconds: float = 20,
+) -> subprocess.CompletedProcess[str]:
+    """Run the real CLI in text mode with stable test defaults."""
+    standard_input = (
+        {"stdin": subprocess.DEVNULL}
+        if input_text is None
+        else {"input": input_text}
+    )
+    return subprocess.run(
+        [sys.executable, "-m", "patchharbor.cli", *arguments],
+        cwd=cwd,
+        env=project_environment(environment_overrides),
+        capture_output=True,
+        text=True,
+        timeout=timeout_seconds,
+        check=False,
+        **standard_input,
+    )
+
+
+def run_cli_bytes(
+    cwd: Path,
+    *arguments: str,
+    input_bytes: bytes,
+    environment_overrides: Mapping[str, str] | None = None,
+    timeout_seconds: float = 20,
+) -> subprocess.CompletedProcess[bytes]:
+    """Run the real CLI with byte input for binary transport tests."""
+    return subprocess.run(
+        [sys.executable, "-m", "patchharbor.cli", *arguments],
+        cwd=cwd,
+        env=project_environment(environment_overrides),
+        capture_output=True,
+        input=input_bytes,
+        timeout=timeout_seconds,
+        check=False,
+    )
+
+
 def run_patchharbor(
     source_path: Path,
     *,
@@ -74,24 +118,15 @@ def run_patchharbor(
     arguments: tuple[str, ...] = (),
     timeout_seconds: float = 20,
 ) -> subprocess.CompletedProcess[str]:
-    """Run the real CLI against one source path."""
-    return subprocess.run(
-        [
-            sys.executable,
-            "-m",
-            "patchharbor.cli",
-            "fs",
-            "run",
-            *arguments,
-            str(source_path),
-        ],
-        cwd=cwd,
-        env=project_environment(environment_overrides),
-        stdin=subprocess.DEVNULL,
-        capture_output=True,
-        text=True,
-        timeout=timeout_seconds,
-        check=False,
+    """Run the public file-system command against one source path."""
+    return run_cli(
+        cwd,
+        "fs",
+        "run",
+        *arguments,
+        str(source_path),
+        environment_overrides=environment_overrides,
+        timeout_seconds=timeout_seconds,
     )
 
 

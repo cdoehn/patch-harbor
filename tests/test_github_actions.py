@@ -7,6 +7,7 @@ from tests.platform_support import PROJECT_ROOT
 
 WORKFLOW_PATH = PROJECT_ROOT / ".github" / "workflows" / "acceptance-tests.yml"
 PYPROJECT_PATH = PROJECT_ROOT / "pyproject.toml"
+TEST_SCRIPT_PATH = PROJECT_ROOT / "scripts" / "test.sh"
 
 
 def _workflow_text() -> str:
@@ -44,6 +45,7 @@ def test_acceptance_workflow_uses_current_python_actions_and_grouped_suites() ->
     assert '-m "platform"' in text
     assert "Run packaging tests" in text
     assert '-m "packaging"' in text
+    assert text.count("--durations=10") == 4
 
 
 def test_acceptance_workflow_requires_both_windows_powershell_variants() -> None:
@@ -84,3 +86,10 @@ def test_pytest_groups_are_registered_and_assigned_to_public_suites() -> None:
     for filename, marker in expected.items():
         text = (PROJECT_ROOT / "tests" / filename).read_text(encoding="utf-8")
         assert f"pytestmark = pytest.mark.{marker}" in text
+
+
+def test_local_test_runner_reports_slowest_tests_with_configurable_count() -> None:
+    text = TEST_SCRIPT_PATH.read_text(encoding="utf-8")
+
+    assert 'test_durations="${PATCHHARBOR_TEST_DURATIONS:-10}"' in text
+    assert '--durations="$test_durations"' in text

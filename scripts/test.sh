@@ -15,6 +15,10 @@ python -m pip install --disable-pip-version-check -e '.[dev]'
 
 test_timeout_seconds="${PATCHHARBOR_TEST_TIMEOUT_SECONDS:-120}"
 suite_timeout_seconds="${PATCHHARBOR_TEST_SUITE_TIMEOUT_SECONDS:-600}"
+test_durations="${PATCHHARBOR_TEST_DURATIONS:-10}"
 
 timeout "${suite_timeout_seconds}s" \
-    python -m pytest -q --timeout="$test_timeout_seconds" tests
+    python -m pytest -q \
+        --timeout="$test_timeout_seconds" \
+        --durations="$test_durations" \
+        tests

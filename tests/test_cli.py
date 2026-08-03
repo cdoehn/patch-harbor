@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from io import StringIO
 from pathlib import Path
-import time
 
 import pytest
 
@@ -65,7 +64,7 @@ def test_plain_flag_streams_to_an_interactive_terminal(
     assert stderr.getvalue() == ""
 
 
-def test_interactive_terminal_uses_fixed_dashboard_and_periodic_redraw(
+def test_interactive_terminal_wires_dashboard_and_restores_terminal(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -100,8 +99,6 @@ def test_interactive_terminal_uses_fixed_dashboard_and_periodic_redraw(
             warnings=(),
         )
         assert output.line_observer is not None
-        output.line_observer(("running-one\n",), 0)
-        time.sleep(0.45)
         output.line_observer(("running-one\n", "running-two\n"), 0)
         return 0
 
@@ -116,15 +113,14 @@ def test_interactive_terminal_uses_fixed_dashboard_and_periodic_redraw(
 
     rendered = stdout.getvalue()
     assert result == 0
-    assert rendered.startswith("\x1b[?25l\x1b[0m\x1b[2J\x1b[H")
-    assert rendered.count("\x1b[H") >= 3
-    assert "SOURCE" in rendered
-    assert "MESSAGES" in rendered
-    assert "FILES" in rendered
-    assert "EXECUTION" in rendered
-    assert "RESULT" in rendered
+    assert rendered.count("\x1b[?25l") == 1
+    assert rendered.count("\x1b[?25h") == 1
+    assert "\x1b[2J\x1b[H" in rendered
+    assert rendered.index("\x1b[?25l") < rendered.index("SOURCE")
+    assert rendered.rindex("status: success") < rendered.rindex("\x1b[?25h")
+    for section in ("SOURCE", "MESSAGES", "FILES", "EXECUTION", "RESULT"):
+        assert section in rendered
     assert "running-two" in rendered
-    assert "status: success" in rendered
     for color_sequence in (
         "\x1b[1;36m",
         "\x1b[1;34m",
@@ -134,7 +130,6 @@ def test_interactive_terminal_uses_fixed_dashboard_and_periodic_redraw(
         "\x1b[2m",
     ):
         assert color_sequence not in rendered
-    assert rendered.endswith("\x1b[0m\x1b[?25h")
     assert stderr.getvalue() == ""
 
 

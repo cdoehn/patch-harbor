@@ -52,24 +52,24 @@ jobs:
 
       - name: Run core and architecture tests
         run: >-
-          python -m pytest -q --timeout=120
+          python -m pytest -q --timeout=120 --durations=10
           -m "not e2e and not acceptance and not platform and not packaging"
           tests
 
       - name: Run E2E and acceptance tests
         run: >-
-          python -m pytest -q --timeout=120
+          python -m pytest -q --timeout=120 --durations=10
           -m "e2e or acceptance"
           tests
 
       - name: Run platform tests
         run: >-
-          python -m pytest -q --timeout=120
+          python -m pytest -q --timeout=120 --durations=10
           -m "platform"
           tests
 
       - name: Run packaging tests
         run: >-
-          python -m pytest -q --timeout=120
+          python -m pytest -q --timeout=120 --durations=10
           -m "packaging"
           tests

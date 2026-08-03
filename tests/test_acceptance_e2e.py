@@ -4,49 +4,21 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-import subprocess
-import sys
+import zipfile
 
 import pytest
-import zipfile
 
 from tests.platform_support import (
     IS_WINDOWS,
-    PROJECT_ROOT,
     REQUIRED_MARKER,
     log_path_from_stderr,
     native_script,
     native_value,
-    project_environment,
+    run_cli,
 )
 
 
 pytestmark = pytest.mark.acceptance
-
-
-def _run_cli(
-    cwd: Path,
-    *arguments: str,
-    input_text: str | None = None,
-    timeout_seconds: float = 20,
-) -> subprocess.CompletedProcess[str]:
-    environment = project_environment()
-    command = [sys.executable, "-m", "patchharbor.cli", *arguments]
-    standard_input = (
-        {"stdin": subprocess.DEVNULL}
-        if input_text is None
-        else {"input": input_text}
-    )
-    return subprocess.run(
-        command,
-        cwd=cwd,
-        env=environment,
-        capture_output=True,
-        text=True,
-        timeout=timeout_seconds,
-        check=False,
-        **standard_input,
-    )
 
 
 def _script_path(directory: Path, stem: str) -> Path:
@@ -86,7 +58,7 @@ def test_acceptance_file_messages_inline_file_and_log(tmp_path: Path) -> None:
         encoding="utf-8",
     )
 
-    completed = _run_cli(
+    completed = run_cli(
         tmp_path,
         "fs",
         "run",
@@ -123,7 +95,7 @@ def test_acceptance_directory_selection_uses_displayed_index(tmp_path: Path) -> 
     os.utime(newest, ns=(200, 200))
     os.utime(older, ns=(100, 100))
 
-    completed = _run_cli(
+    completed = run_cli(
         tmp_path,
         "fs",
         "run",
@@ -165,7 +137,7 @@ def test_acceptance_zip_bundle_transfers_binary_and_runs_scripts_in_order(
         archive.writestr("assets/blob.bin", binary_payload)
         archive.writestr(second_name, second_script)
 
-    completed = _run_cli(tmp_path, "fs", "run", str(archive_path))
+    completed = run_cli(tmp_path, "fs", "run", str(archive_path))
 
     assert isinstance(completed.stdout, str)
     assert isinstance(completed.stderr, str)
@@ -180,7 +152,7 @@ def test_acceptance_zip_bundle_transfers_binary_and_runs_scripts_in_order(
 
 
 def test_acceptance_pipe_runs_direct_script(tmp_path: Path) -> None:
-    completed = _run_cli(
+    completed = run_cli(
         tmp_path,
         "fs",
         "run",
@@ -204,7 +176,7 @@ def test_acceptance_timeout_returns_124(tmp_path: Path) -> None:
         encoding="utf-8",
     )
 
-    completed = _run_cli(
+    completed = run_cli(
         tmp_path,
         "fs",
         "run",
@@ -222,7 +194,7 @@ def test_acceptance_script_exit_code_is_forwarded(tmp_path: Path) -> None:
     script_path = _script_path(tmp_path, "exit-code")
     script_path.write_text(_output_script("failed", exit_code=23), encoding="utf-8")
 
-    completed = _run_cli(tmp_path, "fs", "run", str(script_path))
+    completed = run_cli(tmp_path, "fs", "run", str(script_path))
 
     assert isinstance(completed.stdout, str)
     assert isinstance(completed.stderr, str)
@@ -239,7 +211,7 @@ def test_acceptance_windows_runner_uses_windows_powershell(tmp_path: Path) -> No
         encoding="utf-8",
     )
 
-    completed = _run_cli(tmp_path, "fs", "run", str(script_path))
+    completed = run_cli(tmp_path, "fs", "run", str(script_path))
 
     assert completed.returncode == 0
     assert completed.stdout == "windows-powershell\n"
@@ -255,7 +227,7 @@ def test_acceptance_windows_runner_uses_powershell_7(tmp_path: Path) -> None:
         encoding="utf-8",
     )
 
-    completed = _run_cli(tmp_path, "fs", "run", str(script_path))
+    completed = run_cli(tmp_path, "fs", "run", str(script_path))
 
     assert completed.returncode == 0
     assert completed.stdout == "powershell-seven\n"

@@ -93,7 +93,20 @@ def _cell_width(text: str) -> int:
     return width
 
 
-def test_dashboard_renderer_has_fixed_sections_width_and_overflow_hints() -> None:
+def _assert_frame_fits(frame: str, width: int) -> None:
+    lines = frame.splitlines()
+    assert lines
+    assert max(_cell_width(line) for line in lines) <= width
+    assert _cell_width(lines[0]) == width
+    assert _cell_width(lines[-1]) == width
+
+
+def _latest_dashboard_frame(rendered: str) -> str:
+    frame = rendered.rsplit("\x1b[H", 1)[-1]
+    return frame.split("\x1b[0m\x1b[J", 1)[0]
+
+
+def test_dashboard_renderer_exposes_sections_and_overflow_without_wrapping() -> None:
     snapshot = DashboardSnapshot(
         source_name="downloads/patch-bundle.zip",
         script_name="scripts/apply-fix.sh",
@@ -117,12 +130,10 @@ def test_dashboard_renderer_has_fixed_sections_width_and_overflow_hints() -> Non
     )
 
     frame = render_dashboard(snapshot, width=60)
-    lines = frame.splitlines()
-
-    assert len(lines) == 24
-    assert all(_cell_width(line) == 60 for line in lines)
-    for section in ("SOURCE", "MESSAGES", "FILES", "EXECUTION", "RESULT"):
-        assert section in frame
+    _assert_frame_fits(frame, 60)
+    sections = ("SOURCE", "MESSAGES", "FILES", "EXECUTION", "RESULT")
+    positions = [frame.index(section) for section in sections]
+    assert positions == sorted(positions)
     assert "weitere Messages" in frame
     assert "weitere Dateien" in frame
     assert "weitere Zeilen" in frame
@@ -130,13 +141,13 @@ def test_dashboard_renderer_has_fixed_sections_width_and_overflow_hints() -> Non
     assert "status: running" in frame
 
 
-def test_dashboard_renderer_uses_actual_width_below_eighty() -> None:
+def test_dashboard_renderer_respects_requested_width() -> None:
     frame = render_dashboard(
         DashboardSnapshot(source_name="source", status="success", exit_code=0),
         width=47,
     )
 
-    assert all(_cell_width(line) == 47 for line in frame.splitlines())
+    _assert_frame_fits(frame, 47)
     assert "status: success" in frame
 
 
@@ -177,7 +188,7 @@ def test_dashboard_clips_wide_unicode_by_terminal_cells_without_wrapping() -> No
 
     frame = render_dashboard(snapshot, width=41)
 
-    assert all(_cell_width(line) == 41 for line in frame.splitlines())
+    _assert_frame_fits(frame, 41)
     assert "…" in frame
 
 
@@ -235,9 +246,11 @@ def test_dashboard_restores_cursor_and_color_after_final_frame() -> None:
     dashboard.close()
 
     rendered = stream.getvalue()
-    assert rendered.startswith("\x1b[?25l\x1b[0m\x1b[2J\x1b[H")
-    assert rendered.endswith("\x1b[0m\x1b[?25h")
+    assert rendered.count("\x1b[?25l") == 1
     assert rendered.count("\x1b[?25h") == 1
+    assert "\x1b[2J\x1b[H" in rendered
+    assert rendered.index("\x1b[?25l") < rendered.index("PATCHHARBOR")
+    assert rendered.rindex("status: success") < rendered.rindex("\x1b[?25h")
 
 
 def test_dashboard_does_not_rewrite_unchanged_frames() -> None:
@@ -297,8 +310,9 @@ def test_dashboard_redraws_when_terminal_width_changes() -> None:
         width[0] = 50
         _wait_until(lambda: stream.flush_count > initial_flush_count)
 
-        frames = stream.getvalue()
-        assert "┌" + "─" * 48 + "┐" in frames
+        latest_frame = _latest_dashboard_frame(stream.getvalue())
+        _assert_frame_fits(latest_frame, 50)
+        assert "source: script.sh" in latest_frame
     finally:
         dashboard.close()
 
