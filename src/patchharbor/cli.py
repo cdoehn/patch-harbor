@@ -11,7 +11,11 @@ from typing import TextIO
 
 from patchharbor import __version__
 from patchharbor.application import run_script_path, run_standard_input
-from patchharbor.errors import ExitCode, PatchHarborError
+from patchharbor.errors import (
+    ExitCode,
+    PatchHarborError,
+    format_tool_message,
+)
 from patchharbor.execution import DEFAULT_TIMEOUT_SECONDS
 from patchharbor.output import OutputTargets
 from patchharbor.platform.errors import describe_os_error
@@ -266,16 +270,18 @@ def _run_command(
                 )
             except OSError as exc:
                 print(
-                    "patchharbor: cannot restore terminal: "
-                    f"{describe_os_error(exc)}",
+                    format_tool_message(
+                        "cannot restore terminal: "
+                        f"{describe_os_error(exc)}"
+                    ),
                     file=stderr,
                 )
                 exit_code = int(ExitCode.EXECUTION_ERROR)
         else:
             if tool_error is not None:
-                print(f"patchharbor: {tool_error}", file=stderr)
+                print(format_tool_message(tool_error), file=stderr)
             if log_path is not None:
-                print(f"patchharbor: log: {log_path}", file=stderr)
+                print(format_tool_message(f"log: {log_path}"), file=stderr)
 
         return exit_code
     finally:

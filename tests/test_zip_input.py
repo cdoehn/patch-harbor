@@ -187,7 +187,7 @@ def test_bundle_write_failure_prevents_every_script_execution(
     def fail_payload_write(*args: object, **kwargs: object) -> None:
         raise PatchHarborError(
             "cannot write bundle file 'payload.txt': denied",
-            ExitCode.FILE_PREPARATION_ERROR,
+            ExitCode.PAYLOAD_PREPARATION_ERROR,
         )
 
     monkeypatch.setattr(
@@ -204,7 +204,7 @@ def test_bundle_write_failure_prevents_every_script_execution(
     with pytest.raises(PatchHarborError) as raised:
         _run_path(archive_path, tmp_path)
 
-    assert raised.value.exit_code is ExitCode.FILE_PREPARATION_ERROR
+    assert raised.value.exit_code is ExitCode.PAYLOAD_PREPARATION_ERROR
     assert executed == []
 
 

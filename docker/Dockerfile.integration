@@ -36,7 +36,7 @@ RUN python -c 'from pathlib import Path; import tomllib; project = tomllib.loads
     && python -m pip show pytest-timeout pipx >/dev/null
 
 RUN rm -rf /tmp/patchharbor-dist \
-    && python -m build --wheel --outdir /tmp/patchharbor-dist \
+    && python scripts/build_release.py --outdir /tmp/patchharbor-dist \
     && python -m pip install --force-reinstall /tmp/patchharbor-dist/*.whl \
     && python -m pip check
 

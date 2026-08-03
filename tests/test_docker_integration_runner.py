@@ -37,5 +37,7 @@ def test_docker_integration_image_installs_required_test_tools_and_init() -> Non
     assert '["project"]["optional-dependencies"]["dev"]' in dockerfile
     assert dockerfile.count("pip install --requirement") == 1
     assert "pip show pytest-timeout pipx" in dockerfile
+    assert "python scripts/build_release.py --outdir /tmp/patchharbor-dist" in dockerfile
+    assert "python -m build --wheel --outdir /tmp/patchharbor-dist" not in dockerfile
     assert "docker run --rm --init" in runner
     assert '--timeout="$test_timeout_seconds"' in runner

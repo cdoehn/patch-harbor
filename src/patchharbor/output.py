@@ -8,6 +8,8 @@ from io import BufferedReader, RawIOBase, TextIOWrapper
 from threading import Lock, Thread
 from typing import BinaryIO, Callable, TextIO
 
+from patchharbor.errors import format_tool_warning
+
 
 RETAINED_OUTPUT_LINES = 10
 VISIBLE_OUTPUT_LINES = 5
@@ -33,7 +35,7 @@ class OutputTargets:
             return
         for warning in warnings:
             if destination is not None:
-                destination.write(f"patchharbor: warning: {warning}\n")
+                destination.write(f"{format_tool_warning(warning)}\n")
             if observer is not None:
                 observer(warning)
         if destination is not None:

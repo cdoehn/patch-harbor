@@ -25,7 +25,7 @@ from patchharbor.platform.filesystem import (
 def _write_error(label: str, detail: object) -> PatchHarborError:
     return PatchHarborError(
         f"cannot write {label}: {detail}",
-        ExitCode.FILE_PREPARATION_ERROR,
+        ExitCode.PAYLOAD_PREPARATION_ERROR,
     )
 
 

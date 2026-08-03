@@ -283,13 +283,18 @@ def test_execution_output_contract_does_not_import_run_log() -> None:
     assert "run_log" not in output_imports
 
 
-def test_cli_coordinates_output_and_run_log_boundaries() -> None:
+def test_cli_coordinates_only_public_composition_boundaries() -> None:
     imports = _local_imports("cli")
 
-    assert "application" in imports
-    assert "output" in imports
-    assert "presentation" in imports
-    assert "run_log" in imports
+    assert imports == {
+        "application",
+        "errors",
+        "execution",
+        "output",
+        "platform",
+        "presentation",
+        "run_log",
+    }
 
 
 def test_execution_does_not_import_terminal_presentation() -> None:
@@ -367,3 +372,59 @@ def test_resource_budgets_have_one_low_level_policy_boundary() -> None:
         assert "MAX_ZIP_ENTRIES" not in source
         assert "MAX_INPUT_ARTIFACT_BYTES" not in source
         assert "MAX_PAYLOAD_BYTES" not in source
+
+
+
+def _qualified_module_name(path: Path) -> str | None:
+    relative = path.relative_to(PACKAGE_ROOT)
+    if relative.name == "__init__.py":
+        if relative.parent == Path("."):
+            return None
+        return ".".join(relative.parent.parts)
+    return ".".join(relative.with_suffix("").parts)
+
+
+def _qualified_local_imports(path: Path) -> set[str]:
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    imports: set[str] = set()
+    for node in ast.walk(tree):
+        names: tuple[str, ...] = ()
+        if isinstance(node, ast.ImportFrom) and node.module:
+            names = (node.module,)
+        elif isinstance(node, ast.Import):
+            names = tuple(alias.name for alias in node.names)
+        for imported_name in names:
+            if imported_name.startswith("patchharbor."):
+                imports.add(imported_name.removeprefix("patchharbor."))
+    return imports
+
+
+def test_complete_runtime_dependency_graph_is_acyclic() -> None:
+    modules_by_path = {
+        path: module_name
+        for path in PACKAGE_ROOT.rglob("*.py")
+        if (module_name := _qualified_module_name(path)) is not None
+    }
+    module_names = set(modules_by_path.values())
+    graph = {
+        module_name: _qualified_local_imports(path) & module_names
+        for path, module_name in modules_by_path.items()
+    }
+    visiting: set[str] = set()
+    visited: set[str] = set()
+
+    def visit(module_name: str) -> None:
+        if module_name in visiting:
+            raise AssertionError(
+                f"cyclic PatchHarbor import at {module_name}"
+            )
+        if module_name in visited:
+            return
+        visiting.add(module_name)
+        for dependency in graph[module_name]:
+            visit(dependency)
+        visiting.remove(module_name)
+        visited.add(module_name)
+
+    for module_name in sorted(graph):
+        visit(module_name)

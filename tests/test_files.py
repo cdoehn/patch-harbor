@@ -101,7 +101,7 @@ def test_non_regular_payload_target_is_not_replaced(tmp_path: Path) -> None:
     with pytest.raises(PatchHarborError) as raised:
         write_payload_files((("payload.txt", "content"),), cwd=tmp_path)
 
-    assert raised.value.exit_code is ExitCode.FILE_PREPARATION_ERROR
+    assert raised.value.exit_code is ExitCode.PAYLOAD_PREPARATION_ERROR
     assert "target is not a regular file" in str(raised.value)
     assert target.is_dir()
 
@@ -115,13 +115,13 @@ def test_symbolic_link_payload_target_is_not_replaced(tmp_path: Path) -> None:
     with pytest.raises(PatchHarborError) as raised:
         write_payload_files((("payload.txt", "replacement"),), cwd=tmp_path)
 
-    assert raised.value.exit_code is ExitCode.FILE_PREPARATION_ERROR
+    assert raised.value.exit_code is ExitCode.PAYLOAD_PREPARATION_ERROR
     assert "target is not a regular file" in str(raised.value)
     assert real_target.read_text(encoding="utf-8") == "original"
     assert link.is_symlink()
 
 
-def test_staging_failure_is_a_file_preparation_error(
+def test_staging_failure_is_a_payload_preparation_error(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -140,7 +140,7 @@ def test_staging_failure_is_a_file_preparation_error(
     with pytest.raises(PatchHarborError) as raised:
         write_payload_files((("payload.txt", "replacement"),), cwd=tmp_path)
 
-    assert raised.value.exit_code is ExitCode.FILE_PREPARATION_ERROR
+    assert raised.value.exit_code is ExitCode.PAYLOAD_PREPARATION_ERROR
     assert str(raised.value) == (
         "cannot write FILE 'payload.txt': cannot stage replacement"
     )
@@ -162,7 +162,7 @@ def test_failed_atomic_replace_removes_staged_file(
     with pytest.raises(PatchHarborError) as raised:
         write_payload_files((("payload.txt", "replacement"),), cwd=tmp_path)
 
-    assert raised.value.exit_code is ExitCode.FILE_PREPARATION_ERROR
+    assert raised.value.exit_code is ExitCode.PAYLOAD_PREPARATION_ERROR
     assert str(raised.value) == (
         "cannot write FILE 'payload.txt': cannot replace target"
     )
@@ -276,7 +276,7 @@ def test_bundle_validates_every_target_before_replacing_any_file(
             cwd=tmp_path,
         )
 
-    assert raised.value.exit_code is ExitCode.FILE_PREPARATION_ERROR
+    assert raised.value.exit_code is ExitCode.PAYLOAD_PREPARATION_ERROR
     assert first_target.read_bytes() == b"old"
     assert blocked_parent.read_bytes() == b"not a directory"
 
@@ -293,7 +293,7 @@ def test_bundle_rejects_duplicate_payload_targets_before_writing(
             cwd=tmp_path,
         )
 
-    assert raised.value.exit_code is ExitCode.FILE_PREPARATION_ERROR
+    assert raised.value.exit_code is ExitCode.PAYLOAD_PREPARATION_ERROR
     assert list(tmp_path.iterdir()) == []
 
 
@@ -313,7 +313,7 @@ def test_bundle_does_not_follow_symbolic_link_parent(tmp_path: Path) -> None:
             cwd=tmp_path,
         )
 
-    assert raised.value.exit_code is ExitCode.FILE_PREPARATION_ERROR
+    assert raised.value.exit_code is ExitCode.PAYLOAD_PREPARATION_ERROR
     assert not (outside / "blob.bin").exists()
 
 
@@ -332,7 +332,7 @@ def test_bundle_atomic_replace_failure_is_fatal_and_cleans_local_stage(
             cwd=tmp_path,
         )
 
-    assert raised.value.exit_code is ExitCode.FILE_PREPARATION_ERROR
+    assert raised.value.exit_code is ExitCode.PAYLOAD_PREPARATION_ERROR
     assert "cannot replace target" in str(raised.value)
     assert not (tmp_path / "payload.bin").exists()
     assert list(tmp_path.glob(".patchharbor-*.tmp")) == []
@@ -346,7 +346,7 @@ def test_posix_fifo_inline_target_is_not_replaced(tmp_path: Path) -> None:
     with pytest.raises(PatchHarborError) as raised:
         write_payload_files((("payload.txt", "replacement"),), cwd=tmp_path)
 
-    assert raised.value.exit_code is ExitCode.FILE_PREPARATION_ERROR
+    assert raised.value.exit_code is ExitCode.PAYLOAD_PREPARATION_ERROR
     assert "target is not a regular file" in str(raised.value)
     assert target.exists()
 
@@ -363,7 +363,7 @@ def test_bundle_does_not_replace_symbolic_link_target(tmp_path: Path) -> None:
             cwd=tmp_path,
         )
 
-    assert raised.value.exit_code is ExitCode.FILE_PREPARATION_ERROR
+    assert raised.value.exit_code is ExitCode.PAYLOAD_PREPARATION_ERROR
     assert real_target.read_bytes() == b"original"
     assert link.is_symlink()
 
@@ -379,7 +379,7 @@ def test_posix_fifo_bundle_target_is_not_replaced(tmp_path: Path) -> None:
             cwd=tmp_path,
         )
 
-    assert raised.value.exit_code is ExitCode.FILE_PREPARATION_ERROR
+    assert raised.value.exit_code is ExitCode.PAYLOAD_PREPARATION_ERROR
     assert "target is not a regular file" in str(raised.value)
     assert target.exists()
 

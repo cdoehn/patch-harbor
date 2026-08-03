@@ -601,7 +601,7 @@ Empfohlene Module:
 - `application.py` – einziger Orchestrator eines Runner-Auftrags,
 - `sources.py` – Datei, Ordner und STDIN als `InputArtifact` bereitstellen; spätere Quellen werden hier als Adapter ergänzt,
 - `bundles.py` – direkte Skripte und ZIP-Container zu einem `PatchBundle` mit geordneten Skripten und Bundle-Nutzdateien auflösen,
-- `script_format.py` – Marker, META, MESSAGE und inline FILE-Blöcke analysieren,
+- `parser.py` – Marker, META, MESSAGE und inline FILE-Blöcke analysieren,
 - `payload_files.py` – einfache inline Dateinamen und sichere relative Bundle-Pfade prüfen und Inhalte über ein gemeinsames atomares Schreibprimitiv schreiben,
 - `resource_policy.py` – wenige unveränderliche Ressourcenbudgets und die gemeinsame Warning-Schwelle,
 - `interpreters.py` – Whitelist, Shebang-Auswertung, Plattformdefault, Verfügbarkeitsprüfung und feste Prozessargumente,
@@ -613,12 +613,12 @@ Empfohlene Module:
 
 ### 12.3 Abhängigkeitsregel
 
-- `cli` kennt `application`.
+- `cli` kennt `application` und komponiert ausschließlich die öffentlichen Ausgabe-, Dashboard- und Run-Log-Grenzen; Quellen, Parser, PatchBundles und Nutzdateiverarbeitung werden nicht umgangen.
 - `application` orchestriert Quellen, PatchBundle-Auflösung, Bundle-Nutzdateien, Parser, inline FILE-Verarbeitung, Execution und Darstellung.
 - `sources` kennt nur Eingabezugriffe und neutrale Modelle; es kennt weder ZIP-Regeln noch Parser, Nutzdateiverarbeitung oder Execution.
-- `bundles` kennt Eingabeartefakte und darf zur Markerprüfung eine kleine reine Funktion aus `script_format` verwenden; `script_format` kennt `bundles` nicht.
+- `bundles` kennt Eingabeartefakte und darf zur Markerprüfung eine kleine reine Funktion aus `parser` verwenden; `parser` kennt `bundles` nicht.
 - `bundles` klassifiziert und beschreibt Inhalte, schreibt aber keine Nutzdateien in das Arbeitsverzeichnis.
-- `script_format` liefert reine Beschreibungen optionaler inline FILE-Blöcke und importiert keine Schreiblogik aus `payload_files`.
+- `parser` liefert reine Beschreibungen optionaler inline FILE-Blöcke und importiert keine Schreiblogik aus `payload_files`.
 - `payload_files` validiert, staged und schreibt Bundle-Nutzdateien und inline FILE-Inhalte; es steuert keine Execution.
 - `interpreters` kennt nur den kleinen Interpretervertrag und Tool-Fehler; es kennt weder Quellen, PatchBundles, Parser noch Execution.
 - `models`, `errors` und `resource_policy` kennen keine höherliegenden Module.
@@ -1539,11 +1539,15 @@ PatchHarbor ist auf den Zielplattformen reproduzierbar getestet, sicher paketier
 
 ### 4.d.R – Architektur- und Release-Audit durchführen
 
-- Importabhängigkeiten gegen die vereinbarte Richtung prüfen,
+- Importabhängigkeiten einschließlich des vollständigen `platform/`-Teilgraphen gegen die vereinbarte Richtung und auf Zyklen prüfen,
 - CLI, Sources, PatchBundle-Auflösung, Bundle-Nutzdateien, Parser, inline FILE, Execution und Presentation auf klare Grenzen prüfen,
-- interne Exit-Codes, Warnings und Fehlermeldungen konsolidieren,
-- sicherstellen, dass Clipboard, WebSocket, SSH, Save, Tests und Git nicht öffentlich enthalten sind,
-- Lizenz, Paketinhalt und veröffentlichte Dateien prüfen.
+- internen Exit-Code 6 als allgemeinen Payload-Vorbereitungsfehler benennen und sichtbare Tool- sowie Warning-Präfixe zentralisieren,
+- sicherstellen, dass Clipboard, WebSocket, SSH, Save, Tests und Git weder als öffentliche Befehle noch als Laufzeitmodule enthalten sind,
+- Release-Artefakte aus einem sauberen, explizit gestagten Quellbaum bauen, damit gelöschte Altmodule nicht aus veralteten Build-Verzeichnissen in das Wheel gelangen,
+- den exakten Laufzeitmodulbestand, den einzigen Konsolen-Entry-Point, fehlende Laufzeitabhängigkeiten, Lizenz und Source-Distribution prüfen,
+- denselben sauberen Release-Build in Packaging-Test und Docker-Integration verwenden.
+
+**Auditentscheidung:** Der Runner-Kern und die gerichtete Architektur bleiben erhalten. Das Audit darf keine neue Produktfunktion einführen; es schließt ausschließlich Release-, Namens- und Grenzfehler vor dem finalen Clean-Commit.
 
 ### 4.d.C – Finalen Ballast entfernen und Plan abschließen
 

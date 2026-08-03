@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import tarfile
@@ -18,6 +19,31 @@ pytestmark = pytest.mark.packaging
 
 MAX_WHEEL_BYTES = 256 * 1024
 RELEASE_VERSION = "1.0.0"
+EXPECTED_RUNTIME_FILES = {
+    "patchharbor/__init__.py",
+    "patchharbor/application.py",
+    "patchharbor/bundle_paths.py",
+    "patchharbor/bundles.py",
+    "patchharbor/cli.py",
+    "patchharbor/errors.py",
+    "patchharbor/execution.py",
+    "patchharbor/interpreters.py",
+    "patchharbor/models.py",
+    "patchharbor/output.py",
+    "patchharbor/parser.py",
+    "patchharbor/payload_files.py",
+    "patchharbor/presentation.py",
+    "patchharbor/resource_policy.py",
+    "patchharbor/run_log.py",
+    "patchharbor/sources.py",
+    "patchharbor/platform/__init__.py",
+    "patchharbor/platform/errors.py",
+    "patchharbor/platform/filesystem.py",
+    "patchharbor/platform/lifecycle.py",
+    "patchharbor/platform/posix.py",
+    "patchharbor/platform/runtime.py",
+    "patchharbor/platform/windows.py",
+}
 
 
 def _run(
@@ -44,6 +70,38 @@ def _project_metadata() -> dict[str, object]:
     )["project"]
 
 
+def _copy_project_for_release(tmp_path: Path) -> Path:
+    source_tree = tmp_path / "release-source"
+    shutil.copytree(
+        PROJECT_ROOT,
+        source_tree,
+        ignore=shutil.ignore_patterns(
+            ".git",
+            ".venv",
+            "build",
+            "dist",
+            "*.egg-info",
+            "__pycache__",
+            "*.pyc",
+            "*.pyo",
+            "*.log",
+            "patchharbor_*_result_*.zip",
+        ),
+    )
+
+    stale_package = source_tree / "build" / "lib" / "patchharbor"
+    stale_package.mkdir(parents=True)
+    (stale_package / "input.py").write_text(
+        "raise RuntimeError('stale legacy module')\n",
+        encoding="utf-8",
+    )
+    (stale_package / "files.py").write_text(
+        "raise RuntimeError('stale legacy module')\n",
+        encoding="utf-8",
+    )
+    return source_tree
+
+
 def test_release_metadata_is_complete_and_runtime_has_no_dependencies() -> None:
     project = _project_metadata()
 
@@ -54,24 +112,22 @@ def test_release_metadata_is_complete_and_runtime_has_no_dependencies() -> None:
     assert project["license"] == "MIT"
     assert project["license-files"] == ["LICENSE"]
     assert project["dependencies"] == []
+    assert project["scripts"] == {"patchharbor": "patchharbor.cli:main"}
     assert "Development Status :: 5 - Production/Stable" in project["classifiers"]
     assert (PROJECT_ROOT / "LICENSE").is_file()
 
 
 def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> None:
+    release_source = _copy_project_for_release(tmp_path)
     distribution_dir = tmp_path / "dist"
     build = _run(
         [
             sys.executable,
-            "-m",
-            "build",
-            "--wheel",
-            "--sdist",
-            "--no-isolation",
+            str(release_source / "scripts" / "build_release.py"),
             "--outdir",
             str(distribution_dir),
         ],
-        cwd=PROJECT_ROOT,
+        cwd=release_source,
     )
 
     assert build.returncode == 0, build.stdout + build.stderr
@@ -87,25 +143,59 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
 
     with zipfile.ZipFile(wheels[0]) as wheel:
         names = set(wheel.namelist())
+        runtime_files = {
+            name for name in names if name.startswith("patchharbor/")
+        }
+        assert runtime_files == EXPECTED_RUNTIME_FILES
+        assert "patchharbor/input.py" not in names
+        assert "patchharbor/files.py" not in names
+
         metadata_name = next(
             name for name in names if name.endswith(".dist-info/METADATA")
         )
         metadata = wheel.read(metadata_name).decode("utf-8")
         assert f"Version: {RELEASE_VERSION}\n" in metadata
         assert "License-Expression: MIT\n" in metadata
+        runtime_requirements = [
+            line
+            for line in metadata.splitlines()
+            if line.startswith("Requires-Dist:") and 'extra == "dev"' not in line
+        ]
+        assert runtime_requirements == []
         assert any(name.endswith(".dist-info/licenses/LICENSE") for name in names)
-        assert "patchharbor/cli.py" in names
+
+        entry_points_name = next(
+            name for name in names if name.endswith(".dist-info/entry_points.txt")
+        )
+        assert wheel.read(entry_points_name).decode("utf-8") == (
+            "[console_scripts]\n"
+            "patchharbor = patchharbor.cli:main\n"
+        )
 
     with tarfile.open(source_distributions[0], "r:gz") as source_distribution:
         names = set(source_distribution.getnames())
         root = f"patchharbor-{RELEASE_VERSION}"
         for required in (
             f"{root}/LICENSE",
+            f"{root}/MANIFEST.in",
             f"{root}/README.md",
             f"{root}/pyproject.toml",
+            f"{root}/scripts/build_release.py",
             f"{root}/src/patchharbor/cli.py",
+            f"{root}/tests/test_release_audit.py",
         ):
             assert required in names
+        for forbidden in (
+            f"{root}/planning/",
+            f"{root}/.github/",
+            f"{root}/docker/",
+            f"{root}/build/",
+            f"{root}/dist/",
+        ):
+            assert not any(name.startswith(forbidden) for name in names)
+        assert not any(name.endswith(".log") for name in names)
+        assert f"{root}/src/patchharbor/input.py" not in names
+        assert f"{root}/src/patchharbor/files.py" not in names
 
     pipx_home = tmp_path / "pipx-home"
     pipx_bin = tmp_path / "pipx-bin"
