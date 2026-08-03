@@ -16,6 +16,7 @@ from patchharbor.payload_files import (
     write_bundle_payloads,
     write_payload_files,
 )
+from patchharbor.presentation import DashboardPresentation, PresentedFile
 from patchharbor.sources import (
     DirectoryCandidate,
     file_input_artifact,
@@ -28,14 +29,36 @@ from patchharbor.sources import (
 def _execute_bundle_script(
     bundle_script: BundleScript,
     *,
+    script_index: int,
+    script_total: int,
     cwd: Path,
     timeout_seconds: float,
     output: OutputTargets | None = None,
+    presentation: DashboardPresentation | None = None,
 ) -> int:
     parsed_script = parse_script(bundle_script.text)
-    prepared_payloads, _payload_warnings = prepare_payload_files(
+    prepared_payloads, payload_warnings = prepare_payload_files(
         (payload.name, payload.text) for payload in parsed_script.payload_files
     )
+    if presentation is not None:
+        presentation.begin_script(
+            script_name=bundle_script.display_name,
+            script_index=script_index,
+            script_total=script_total,
+            messages=tuple(
+                (message.name, message.text)
+                for message in parsed_script.messages
+            ),
+            inline_files=tuple(
+                PresentedFile(
+                    name=name,
+                    size_bytes=len(text.encode("utf-8")),
+                    kind="FILE",
+                )
+                for name, text in prepared_payloads
+            ),
+            warnings=parsed_script.warnings + payload_warnings,
+        )
     write_payload_files(prepared_payloads, cwd=cwd)
     return execute_script_text(
         parsed_script.text,
@@ -51,17 +74,35 @@ def run_input_artifact(
     cwd: Path,
     timeout_seconds: float,
     output: OutputTargets | None = None,
+    presentation: DashboardPresentation | None = None,
 ) -> int:
     """Resolve and execute every script in one input artifact."""
     bundle = resolve_patch_bundle(artifact)
+    if presentation is not None:
+        presentation.begin_request(
+            source_name=artifact.display_name,
+            bundle_files=tuple(
+                PresentedFile(
+                    name=payload.relative_path,
+                    size_bytes=len(payload.content),
+                    kind="bundle",
+                )
+                for payload in bundle.payloads
+            ),
+            script_total=len(bundle.scripts),
+        )
     write_bundle_payloads(bundle.payloads, cwd=cwd)
     last_exit_code = 0
-    for bundle_script in bundle.scripts:
+    script_total = len(bundle.scripts)
+    for script_index, bundle_script in enumerate(bundle.scripts, start=1):
         last_exit_code = _execute_bundle_script(
             bundle_script,
+            script_index=script_index,
+            script_total=script_total,
             cwd=cwd,
             timeout_seconds=timeout_seconds,
             output=output,
+            presentation=presentation,
         )
         if last_exit_code != 0:
             return last_exit_code
@@ -74,6 +115,7 @@ def run_standard_input(
     cwd: Path,
     timeout_seconds: float,
     output: OutputTargets | None = None,
+    presentation: DashboardPresentation | None = None,
 ) -> int:
     """Own the temporary stdin artifact for exactly one runner request."""
     with stdin_input_artifact(stream) as artifact:
@@ -82,6 +124,7 @@ def run_standard_input(
             cwd=cwd,
             timeout_seconds=timeout_seconds,
             output=output,
+            presentation=presentation,
         )
 
 
@@ -110,6 +153,7 @@ def _run_selected_candidate(
     cwd: Path,
     timeout_seconds: float,
     output: OutputTargets | None = None,
+    presentation: DashboardPresentation | None = None,
 ) -> int:
     if candidate.path.is_symlink() or not candidate.path.is_file():
         raise PatchHarborError(
@@ -122,6 +166,7 @@ def _run_selected_candidate(
         cwd=cwd,
         timeout_seconds=timeout_seconds,
         output=output,
+        presentation=presentation,
     )
 
 
@@ -133,6 +178,7 @@ def run_script_path(
     selection_input: TextIO,
     selection_output: TextIO,
     output: OutputTargets | None = None,
+    presentation: DashboardPresentation | None = None,
 ) -> int:
     """Run a script/ZIP file or select one from a directory."""
     if not path.is_dir():
@@ -141,6 +187,7 @@ def run_script_path(
             cwd=cwd,
             timeout_seconds=timeout_seconds,
             output=output,
+            presentation=presentation,
         )
 
     candidates = discover_directory_candidates(path)
@@ -159,4 +206,5 @@ def run_script_path(
         cwd=cwd,
         timeout_seconds=timeout_seconds,
         output=output,
+        presentation=presentation,
     )

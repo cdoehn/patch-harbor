@@ -220,7 +220,12 @@ def _read_zip_members(
             )
             continue
 
-        scripts.append(BundleScript(text=script_text))
+        scripts.append(
+            BundleScript(
+                text=script_text,
+                display_name=member.relative_path,
+            )
+        )
 
     return tuple(scripts), tuple(payloads)
 
@@ -251,7 +256,14 @@ def _try_direct_script(
             True,
         )
 
-    return BundleScript(text=script_text), None, True
+    return (
+        BundleScript(
+            text=script_text,
+            display_name=artifact.display_name,
+        ),
+        None,
+        True,
+    )
 
 
 def _resolve_zip_bundle(artifact: InputArtifact) -> PatchBundle:

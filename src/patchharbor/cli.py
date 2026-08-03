@@ -13,6 +13,7 @@ from patchharbor.application import run_script_path, run_standard_input
 from patchharbor.errors import ExitCode, PatchHarborError
 from patchharbor.execution import DEFAULT_TIMEOUT_SECONDS
 from patchharbor.output import OutputTargets
+from patchharbor.presentation import TerminalDashboard
 from patchharbor.run_log import temporary_run_log
 
 
@@ -102,8 +103,8 @@ def _execute_request(
     timeout_seconds: float,
     stdin: TextIO,
     stdout: TextIO,
-    stderr: TextIO,
     output: OutputTargets,
+    dashboard: TerminalDashboard | None,
 ) -> tuple[int, str | None]:
     try:
         if path is not None:
@@ -115,6 +116,7 @@ def _execute_request(
                     selection_input=stdin,
                     selection_output=stdout,
                     output=output,
+                    presentation=dashboard,
                 ),
                 None,
             )
@@ -124,11 +126,11 @@ def _execute_request(
                 cwd=cwd,
                 timeout_seconds=timeout_seconds,
                 output=output,
+                presentation=dashboard,
             ),
             None,
         )
     except PatchHarborError as exc:
-        print(f"patchharbor: {exc}", file=stderr)
         return int(exc.exit_code), str(exc)
 
 
@@ -149,9 +151,15 @@ def _run_command(
 
     cwd = Path.cwd()
     plain_output = force_plain or not _is_terminal(stdout)
+    dashboard = (
+        None
+        if plain_output
+        else TerminalDashboard(stdout, color_enabled=not no_color)
+    )
     log_context = temporary_run_log() if log_enabled else nullcontext(None)
     log_path: Path | None = None
     exit_code = 0
+    tool_error: str | None = None
 
     try:
         with log_context as run_log:
@@ -169,6 +177,9 @@ def _run_command(
                 raw_output_stream=(
                     None if run_log is None else run_log.raw_output_stream
                 ),
+                line_observer=(
+                    None if dashboard is None else dashboard.update_output
+                ),
             )
             exit_code, tool_error = _execute_request(
                 path,
@@ -176,8 +187,8 @@ def _run_command(
                 timeout_seconds=timeout_seconds,
                 stdin=stdin,
                 stdout=stdout,
-                stderr=stderr,
                 output=output,
+                dashboard=dashboard,
             )
 
             if run_log is not None:
@@ -186,11 +197,26 @@ def _run_command(
                     tool_error=tool_error,
                 )
     except OSError as exc:
-        print(f"patchharbor: cannot write run log: {exc}", file=stderr)
+        tool_error = f"cannot write run log: {exc}"
         exit_code = int(ExitCode.EXECUTION_ERROR)
 
-    if log_path is not None:
-        print(f"patchharbor: log: {log_path}", file=stderr)
+    dashboard_active = dashboard is not None and dashboard.started
+    if dashboard_active:
+        try:
+            dashboard.finish(
+                exit_code=exit_code,
+                tool_error=tool_error,
+                log_path=log_path,
+            )
+        except OSError as exc:
+            print(f"patchharbor: {exc}", file=stderr)
+            exit_code = int(ExitCode.EXECUTION_ERROR)
+    else:
+        if tool_error is not None:
+            print(f"patchharbor: {tool_error}", file=stderr)
+        if log_path is not None:
+            print(f"patchharbor: log: {log_path}", file=stderr)
+
     return exit_code
 
 

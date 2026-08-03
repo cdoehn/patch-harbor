@@ -16,9 +16,10 @@ class InputArtifact:
 
 @dataclass(frozen=True)
 class BundleScript:
-    """One script in its bundle order."""
+    """One named script in its bundle order."""
 
     text: str
+    display_name: str
 
 
 @dataclass(frozen=True)

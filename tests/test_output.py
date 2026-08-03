@@ -121,3 +121,24 @@ def test_output_targets_choose_plain_or_bounded_output() -> None:
 
     assert bounded.getvalue() == "bounded\n"
     assert plain.getvalue() == ""
+
+
+def test_output_capture_notifies_dashboard_with_bounded_snapshots() -> None:
+    observed: list[tuple[tuple[str, ...], int]] = []
+    capture = ProcessOutputCapture(
+        io.BytesIO(
+            "".join(f"line-{number}\n" for number in range(1, 13)).encode()
+        ),
+        line_observer=lambda lines, discarded: observed.append(
+            (lines, discarded)
+        ),
+    )
+
+    capture.start()
+    capture.finish()
+
+    assert observed
+    assert observed[-1] == (
+        tuple(f"line-{number}\n" for number in range(8, 13)),
+        2,
+    )

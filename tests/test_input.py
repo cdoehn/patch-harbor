@@ -24,5 +24,7 @@ def test_file_and_stdin_resolve_through_the_same_bundle_semantics(
     assert not temporary_path.exists()
     assert len(file_bundle.scripts) == 1
     assert len(stdin_bundle.scripts) == 1
-    assert file_bundle.scripts == stdin_bundle.scripts
     assert file_bundle.scripts[0].text == script_text
+    assert stdin_bundle.scripts[0].text == script_text
+    assert file_bundle.scripts[0].display_name == str(script_path)
+    assert stdin_bundle.scripts[0].display_name == "standard input"

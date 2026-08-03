@@ -21,10 +21,11 @@ class OutputTargets:
     visible_text_stream: TextIO
     live_text_stream: TextIO | None = None
     raw_output_stream: BinaryIO | None = None
+    line_observer: Callable[[tuple[str, ...], int], None] | None = None
 
     def write_visible_lines(self, lines: tuple[str, ...]) -> None:
         """Write the bounded final view unless live streaming is active."""
-        if self.live_text_stream is not None:
+        if self.live_text_stream is not None or self.line_observer is not None:
             return
         for line in lines:
             self.visible_text_stream.write(line)
@@ -119,11 +120,13 @@ class ProcessOutputCapture:
         *,
         live_text_stream: TextIO | None = None,
         raw_output_stream: BinaryIO | None = None,
+        line_observer: Callable[[tuple[str, ...], int], None] | None = None,
     ) -> None:
         self._buffer = _RollingLineBuffer()
         self._stream = stream
         self._live_text_stream = live_text_stream
         self._raw_output_stream = raw_output_stream
+        self._line_observer = line_observer
         self._error: tuple[str, Exception] | None = None
         self._thread = Thread(
             target=self._drain,
@@ -184,6 +187,19 @@ class ProcessOutputCapture:
         if self._error is None:
             self._error = (context, error)
 
+    def _publish_snapshot(self) -> None:
+        observer = self._line_observer
+        if observer is None:
+            return
+        try:
+            observer(
+                self._buffer.visible_lines,
+                self._buffer.discarded_line_count,
+            )
+        except Exception as exc:
+            self._remember_error("cannot update script output view", exc)
+            self._line_observer = None
+
     def _publish_text(self, line: str) -> None:
         destination = self._live_text_stream
         if destination is None:
@@ -212,6 +228,7 @@ class ProcessOutputCapture:
             for line in text_stream:
                 self._buffer.append(line)
                 self._publish_text(line)
+                self._publish_snapshot()
         except Exception as exc:  # reported by finish() on the controlling thread
             self._remember_error("cannot read script output", exc)
         finally:

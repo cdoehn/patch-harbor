@@ -11,6 +11,7 @@ from patchharbor.errors import ExitCode, PatchHarborError
 import patchharbor.application as script_application
 from patchharbor.application import discover_directory_candidates, run_script_path
 import patchharbor.bundles as script_bundles
+from patchharbor.sources import file_input_artifact
 
 
 REQUIRED_MARKER = "# PATCHHARBOR"
@@ -270,3 +271,25 @@ def test_each_zip_script_receives_its_own_timeout(
     assert result == 0
     assert len(observed) == 2
     assert [timeout for _, timeout in observed] == [7.5, 7.5]
+
+
+def test_zip_bundle_preserves_script_entry_names_for_presentation(
+    tmp_path: Path,
+) -> None:
+    archive_path = tmp_path / "named-scripts.zip"
+    _write_zip(
+        archive_path,
+        [
+            ("scripts/first.sh", f"{REQUIRED_MARKER}\n"),
+            ("scripts/second.ps1", f"{REQUIRED_MARKER}\n"),
+        ],
+    )
+
+    bundle = script_bundles.resolve_patch_bundle(
+        file_input_artifact(archive_path)
+    )
+
+    assert [script.display_name for script in bundle.scripts] == [
+        "scripts/first.sh",
+        "scripts/second.ps1",
+    ]

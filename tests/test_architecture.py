@@ -33,6 +33,7 @@ def test_lower_layers_do_not_import_orchestration_or_unrelated_layers() -> None:
             "parser",
             "payload_files",
             "platform",
+            "presentation",
             "sources",
         },
         "bundle_paths": {
@@ -43,6 +44,7 @@ def test_lower_layers_do_not_import_orchestration_or_unrelated_layers() -> None:
             "parser",
             "payload_files",
             "platform",
+            "presentation",
             "sources",
         },
         "sources": {
@@ -53,6 +55,7 @@ def test_lower_layers_do_not_import_orchestration_or_unrelated_layers() -> None:
             "parser",
             "payload_files",
             "platform",
+            "presentation",
         },
         "bundles": {
             "application",
@@ -60,6 +63,7 @@ def test_lower_layers_do_not_import_orchestration_or_unrelated_layers() -> None:
             "interpreters",
             "payload_files",
             "platform",
+            "presentation",
             "sources",
         },
         "parser": {
@@ -69,6 +73,7 @@ def test_lower_layers_do_not_import_orchestration_or_unrelated_layers() -> None:
             "interpreters",
             "payload_files",
             "platform",
+            "presentation",
             "sources",
         },
         "payload_files": {
@@ -78,6 +83,7 @@ def test_lower_layers_do_not_import_orchestration_or_unrelated_layers() -> None:
             "interpreters",
             "parser",
             "platform",
+            "presentation",
             "sources",
         },
         "interpreters": {
@@ -87,6 +93,7 @@ def test_lower_layers_do_not_import_orchestration_or_unrelated_layers() -> None:
             "parser",
             "payload_files",
             "platform",
+            "presentation",
             "sources",
         },
         "output": {
@@ -97,6 +104,7 @@ def test_lower_layers_do_not_import_orchestration_or_unrelated_layers() -> None:
             "parser",
             "payload_files",
             "platform",
+            "presentation",
             "sources",
         },
         "run_log": {
@@ -108,6 +116,7 @@ def test_lower_layers_do_not_import_orchestration_or_unrelated_layers() -> None:
             "parser",
             "payload_files",
             "platform",
+            "presentation",
             "sources",
         },
         "execution": {
@@ -115,6 +124,17 @@ def test_lower_layers_do_not_import_orchestration_or_unrelated_layers() -> None:
             "bundles",
             "parser",
             "payload_files",
+            "presentation",
+            "sources",
+        },
+        "presentation": {
+            "application",
+            "bundles",
+            "execution",
+            "interpreters",
+            "parser",
+            "payload_files",
+            "platform",
             "sources",
         },
     }
@@ -190,6 +210,7 @@ def test_platform_package_does_not_import_application_layers() -> None:
         "interpreters",
         "parser",
         "payload_files",
+        "presentation",
         "sources",
     }
     imports: set[str] = set()
@@ -247,4 +268,11 @@ def test_cli_coordinates_output_and_run_log_boundaries() -> None:
 
     assert "application" in imports
     assert "output" in imports
+    assert "presentation" in imports
     assert "run_log" in imports
+
+
+def test_execution_does_not_import_terminal_presentation() -> None:
+    assert "presentation" not in _local_imports("execution")
+    assert "presentation" not in _local_imports("output")
+    assert "presentation" in _local_imports("application")

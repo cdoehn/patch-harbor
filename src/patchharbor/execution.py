@@ -113,6 +113,7 @@ def execute_script_file(
         process_tree.output_stream,
         live_text_stream=targets.live_text_stream,
         raw_output_stream=targets.raw_output_stream,
+        line_observer=targets.line_observer,
     )
 
     try:
