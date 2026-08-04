@@ -16,6 +16,23 @@ FORCE_STOP_SECONDS = 1.0
 PROCESS_TREE_POLL_SECONDS = 0.05
 
 
+def poll_process_until_exit(
+    process: subprocess.Popen[bytes],
+    *,
+    timeout_seconds: float,
+) -> int:
+    """Poll one root process so Python interrupts are observed on Windows."""
+    deadline = time.monotonic() + timeout_seconds
+    while True:
+        return_code = process.poll()
+        if return_code is not None:
+            return return_code
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise subprocess.TimeoutExpired(process.args, timeout_seconds)
+        time.sleep(min(PROCESS_TREE_POLL_SECONDS, remaining))
+
+
 class ProcessState(Enum):
     """Terminal-independent states of one process-tree run."""
 

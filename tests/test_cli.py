@@ -295,3 +295,37 @@ def test_output_os_error_uses_platform_neutral_text(
     assert stderr.getvalue() == (
         "patchharbor: cannot write PatchHarbor output: permission denied\n"
     )
+
+
+class _ReconfigurableStream(StringIO):
+    def __init__(self) -> None:
+        super().__init__()
+        self.reconfigure_calls: list[dict[str, str]] = []
+
+    def reconfigure(self, **options: str) -> None:
+        self.reconfigure_calls.append(options)
+
+
+def test_real_standard_streams_are_configured_for_utf8(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    stdin = _ReconfigurableStream()
+    stdout = _ReconfigurableStream()
+    stderr = _ReconfigurableStream()
+    monkeypatch.setattr(cli.sys, "stdin", stdin)
+    monkeypatch.setattr(cli.sys, "stdout", stdout)
+    monkeypatch.setattr(cli.sys, "stderr", stderr)
+
+    with pytest.raises(SystemExit) as raised:
+        main(["--version"])
+
+    assert raised.value.code == 0
+    assert stdin.reconfigure_calls == [
+        {"encoding": "utf-8", "errors": "strict"}
+    ]
+    assert stdout.reconfigure_calls == [
+        {"encoding": "utf-8", "errors": "replace"}
+    ]
+    assert stderr.reconfigure_calls == [
+        {"encoding": "utf-8", "errors": "replace"}
+    ]

@@ -46,7 +46,7 @@ def native_script(posix_body: str, windows_body: str) -> str:
 
 def normalized_path(path: str | Path) -> str:
     """Return the native comparison form of one absolute path."""
-    return os.path.normcase(os.path.abspath(os.fspath(path)))
+    return os.path.normcase(os.path.realpath(os.path.abspath(os.fspath(path))))
 
 
 def project_environment(
@@ -84,7 +84,8 @@ def run_cli(
         cwd=cwd,
         env=project_environment(environment_overrides),
         capture_output=True,
-        text=True,
+        encoding="utf-8",
+        errors="strict",
         timeout=timeout_seconds,
         check=False,
         **standard_input,

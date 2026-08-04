@@ -26,6 +26,18 @@ from patchharbor.presentation import (
 from patchharbor.run_log import temporary_run_log
 
 
+def _configure_utf8_standard_stream(stream: TextIO, *, errors: str) -> None:
+    """Use deterministic UTF-8 for real process standard streams when possible."""
+    reconfigure = getattr(stream, "reconfigure", None)
+    if not callable(reconfigure):
+        return
+    try:
+        reconfigure(encoding="utf-8", errors=errors)
+    except (OSError, ValueError):
+        # Embedded or already detached streams may not be reconfigurable.
+        pass
+
+
 def _positive_seconds(value: str) -> float:
     try:
         seconds = float(value)
@@ -300,6 +312,16 @@ def main(
     stderr: TextIO | None = None,
 ) -> int:
     """Run the PatchHarbor CLI."""
+    actual_stdin = sys.stdin if stdin is None else stdin
+    actual_stdout = sys.stdout if stdout is None else stdout
+    actual_stderr = sys.stderr if stderr is None else stderr
+    if stdin is None:
+        _configure_utf8_standard_stream(actual_stdin, errors="strict")
+    if stdout is None:
+        _configure_utf8_standard_stream(actual_stdout, errors="replace")
+    if stderr is None:
+        _configure_utf8_standard_stream(actual_stderr, errors="replace")
+
     parser = _build_parser()
     args = parser.parse_args(argv)
 
@@ -311,9 +333,9 @@ def main(
             no_color=args.no_color,
             log_enabled=args.log,
             parser=parser,
-            stdin=sys.stdin if stdin is None else stdin,
-            stdout=sys.stdout if stdout is None else stdout,
-            stderr=sys.stderr if stderr is None else stderr,
+            stdin=actual_stdin,
+            stdout=actual_stdout,
+            stderr=actual_stderr,
         )
 
     parser.error("unsupported command")

@@ -15,6 +15,7 @@ import pytest
 from tests.platform_support import (
     REQUIRED_MARKER,
     log_path_from_stderr as _log_path_from_stderr,
+    normalized_path,
     project_environment,
     run_cli as _run_cli,
     run_cli_bytes as _run_cli_bytes,
@@ -157,7 +158,7 @@ def _assert_child_process_stopped(pid: int, *, timeout: float = 5.0) -> None:
 
 
 def test_fs_run_rejects_empty_standard_input(tmp_path: Path) -> None:
-    completed = _run_cli(tmp_path, "fs", "run")
+    completed = _run_cli(tmp_path, "fs", "run", input_text="")
 
     assert completed.returncode == 2
     assert completed.stdout == ""
@@ -338,7 +339,9 @@ def test_temporary_script_is_removed_after_execution(tmp_path: Path) -> None:
 
     temporary_path = Path(completed.stdout.strip())
     assert completed.returncode == 0
-    assert temporary_path.parent == Path(tempfile.gettempdir())
+    assert normalized_path(temporary_path.parent) == normalized_path(
+        tempfile.gettempdir()
+    )
     assert not temporary_path.exists()
 
 
@@ -356,9 +359,11 @@ def test_temporary_script_is_removed_after_timeout(tmp_path: Path) -> None:
     observed_path = tmp_path / "temporary-path.txt"
     script_path = _script_path(tmp_path, "timeout-cleanup")
     if os.name == "nt":
+        escaped_observed_path = str(observed_path).replace("'", "''")
         script_body = (
-            f'Set-Content -Path "{observed_path}" -Value $PSCommandPath\n'
-            "while ($true) {}\n"
+            "[System.IO.File]::WriteAllText("
+            f"'{escaped_observed_path}', $PSCommandPath)\n"
+            "Start-Sleep -Seconds 60\n"
         )
     else:
         script_body = (
@@ -370,11 +375,12 @@ def test_temporary_script_is_removed_after_timeout(tmp_path: Path) -> None:
         encoding="utf-8",
     )
 
+    timeout_seconds = "5" if os.name == "nt" else "0.05"
     completed = _run_patchharbor(
         script_path,
         tmp_path,
         "--timeout",
-        "0.05",
+        timeout_seconds,
     )
 
     temporary_path = Path(observed_path.read_text(encoding="utf-8").strip())
@@ -1146,7 +1152,9 @@ def test_fs_run_log_contains_complete_output_and_run_metadata(
     assert completed.stderr.startswith(prefix)
     log_path = Path(completed.stderr.removeprefix(prefix).strip())
     try:
-        assert log_path.parent == Path(tempfile.gettempdir())
+        assert normalized_path(log_path.parent) == normalized_path(
+            tempfile.gettempdir()
+        )
         log_text = log_path.read_text(encoding="utf-8")
         assert "PatchHarbor run log\n" in log_text
         expected_cwd = json.dumps(str(tmp_path), ensure_ascii=False)
