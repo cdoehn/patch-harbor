@@ -58,7 +58,7 @@ def execute_script_text(
             script_text,
             suffix=selected.script_suffix,
         ) as script_path:
-            return execute_script_file(
+            return _execute_staged_script(
                 script_path,
                 interpreter=selected,
                 executable_path=executable_path,
@@ -85,7 +85,7 @@ def _finish_capture_after_process_error(capture: ProcessOutputCapture) -> None:
         pass
 
 
-def execute_script_file(
+def _execute_staged_script(
     script_path: Path,
     *,
     interpreter: InterpreterSpec,

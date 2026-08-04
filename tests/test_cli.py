@@ -41,7 +41,7 @@ def test_run_help_is_the_complete_public_command_reference(
     help_text = capsys.readouterr().out
     for expected in (
         "# PATCHHARBOR",
-        "ZIP PatchBundles may contain ordered scripts and binary payload files.",
+        "ZIP PatchBundles may contain ordered scripts and byte-exact payload files.",
         "Scripts run in the current working directory.",
         "--timeout SECONDS",
         "--plain",

@@ -170,8 +170,8 @@ def test_fs_run_help_is_limited_to_public_arguments(tmp_path: Path) -> None:
     assert completed.returncode == 0
     help_text = " ".join(completed.stdout.split())
     assert (
-        "Run Bash or PowerShell scripts from a file, ZIP PatchBundle, "
-        "directory, or standard input."
+        "Run generated Bash or PowerShell scripts from a file, "
+        "ZIP PatchBundle, directory, or standard input."
     ) in help_text
     assert (
         "Oversized inputs and unsafe ZIP PatchBundles are rejected "

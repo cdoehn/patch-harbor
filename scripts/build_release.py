@@ -14,14 +14,10 @@ import tempfile
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 _RELEASE_INPUT_FILES = (
     "LICENSE",
-    "MANIFEST.in",
     "README.md",
     "pyproject.toml",
 )
-_RELEASE_INPUT_TREES = (
-    "src",
-    "tests",
-)
+_RELEASE_INPUT_TREES = ("src",)
 
 
 def _copy_release_inputs(destination: Path) -> None:
@@ -45,10 +41,6 @@ def _copy_release_inputs(destination: Path) -> None:
                 "*.egg-info",
             ),
         )
-
-    scripts_directory = destination / "scripts"
-    scripts_directory.mkdir()
-    shutil.copy2(Path(__file__), scripts_directory / Path(__file__).name)
 
 
 def _remove_previous_project_artifacts(output_directory: Path) -> None:

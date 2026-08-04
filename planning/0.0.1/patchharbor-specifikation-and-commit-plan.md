@@ -2,7 +2,7 @@
 
 **Empfohlener Dokumentname:** PatchHarbor – Spezifikation und Commit-Plan  
 **Empfohlener Dateiname:** `patchharbor-spezifikation-und-commit-plan.md`  
-**Status:** verbindliche Planungsbasis für Version 1 und architektonische Vorbereitung von Meilenstein 5
+**Status:** Version-1-Implementierungsplan abgeschlossen; Release 1.0.0 wartet auf die grünen stabilen CI-Gates des finalen Commits
 
 **Release-Version:** `1.0.0`
 
@@ -1553,9 +1553,21 @@ PatchHarbor ist auf den Zielplattformen reproduzierbar getestet, sicher paketier
 
 - tote Module, ungenutzte Optionen und spekulative Abstraktionen löschen,
 - Namen und Help-Texte final vereinheitlichen,
-- alle Tests auf beiden Release-Gates ausführen,
+- alle lokal verfügbaren Prüfungen und beide Ubuntu-Docker-Läufe ausführen,
 - verbleibenden Commit-Plan und Risiken abschließend reviewen,
-- Version 1 nur freigeben, wenn die Definition of Done vollständig erfüllt ist.
+- Version 1 nur veröffentlichen, wenn die stabilen CI-Gates auf dem exakten finalen Commit grün sind.
+
+## Review nach Step 4.d und Meilenstein 4
+
+- Der Version-1-Implementierungsplan ist mit 20 Steps und 60 W-R-C-Commits vollständig umgesetzt; ein Neustart oder zusätzlicher Version-1-Step ist nicht erforderlich.
+- Wheel und Source-Distribution werden aus einem sauberen, expliziten Quellbestand gebaut. Das Wheel enthält nur die geprüften Laufzeitmodule; die Source-Distribution enthält keinen Testbestand und keine Release-Hilfsskripte.
+- PatchHarbor besitzt genau einen öffentlichen Konsolenbefehl, keine Laufzeitabhängigkeit außerhalb der Python-Standardbibliothek und keine halbfertige öffentliche Funktion.
+- Die lokale Testsuite sowie die Docker-Läufe auf Ubuntu 24.04 und Ubuntu 26.04 müssen im finalen Commit-Patch grün sein. Ubuntu 24.04 und Windows 2025 bleiben die stabilen Release-Gates; Ubuntu 26.04 bleibt eine nicht blockierende Preview-Lane.
+- Release-Tag und Veröffentlichung bleiben bis zu grünen stabilen CI-Gates auf dem exakten Commit `4.d.C` gesperrt. Ein lokaler Linux- oder Docker-Lauf ersetzt den echten Windows-Runner nicht.
+- Bekannte und akzeptierte Grenzen bleiben: keine Sandbox gegen das ausgeführte Skript, atomare Ersetzung je Datei statt Gesamttransaktion über ein Bundle, temporäre statt dauerhafte Logverwaltung und kein Umgehen der PowerShell Execution Policy.
+- WebSocket bleibt außerhalb von Version 1. Vor einem detaillierten Meilenstein-5-Plan sind Antwortformat, Bindung, Authentifizierung, TLS, Limits, Warteschlange und Abbruchsemantik verbindlich zu entscheiden.
+
+**Umsetzungsstand Version 1:** `60 / 60` geplante W-R-C-Commits abgeschlossen. Der Code ist ein Release Candidate; die Freigabe von `1.0.0` erfolgt erst nach den grünen stabilen CI-Gates.
 
 ---
 
@@ -1640,12 +1652,14 @@ Ein Meilenstein ist erst abgeschlossen, wenn:
 
 # Teil D – Zusammenfassung
 
-Der verbindliche Version-1-Plan besteht aus:
+Der abgeschlossene Version-1-Implementierungsplan besteht aus:
 
 - **4 Release-Meilensteinen**,
 - **20 Steps**,
 - **60 geplanten Commits**,
 - pro Step genau einem `W`-, einem `R`- und einem `C`-Commit.
+
+**Umsetzungsstand:** `60 / 60` geplante Commits sind abgeschlossen. Veröffentlichung und Release-Tag bleiben bis zum grünen Ubuntu-24.04- und Windows-Gate des finalen Commits gesperrt.
 
 Zusätzlich ist **Meilenstein 5 – WebSocket-Transport** als nachgelagertes Ziel dokumentiert. Seine Steps und Commits werden bewusst erst nach dem Review von Meilenstein 4 festgelegt.
 

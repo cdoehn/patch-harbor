@@ -66,24 +66,43 @@ def test_release_builder_uses_only_audited_source_inputs() -> None:
     source = (PROJECT_ROOT / "scripts" / "build_release.py").read_text(
         encoding="utf-8"
     )
-    manifest = (PROJECT_ROOT / "MANIFEST.in").read_text(encoding="utf-8")
-
     for required in (
         '"LICENSE"',
-        '"MANIFEST.in"',
         '"README.md"',
         '"pyproject.toml"',
         '"src"',
-        '"tests"',
         'TemporaryDirectory(prefix="patchharbor-release-")',
     ):
         assert required in source
-    for forbidden in ("planning", ".github", "docker"):
+    for forbidden in (
+        '"MANIFEST.in"',
+        '"tests"',
+        "scripts_directory",
+        "planning",
+        ".github",
+        "docker",
+    ):
         assert forbidden not in source
 
-    assert "include scripts/build_release.py" in manifest
-    assert "recursive-include tests *.py" in manifest
-    assert "global-exclude __pycache__ *.py[cod]" in manifest
+    assert not (PROJECT_ROOT / "MANIFEST.in").exists()
+
+
+def test_version_one_plan_is_closed_without_publishing_deferred_scope() -> None:
+    plan = (
+        PROJECT_ROOT
+        / "planning"
+        / "0.0.1"
+        / "patchharbor-specifikation-and-commit-plan.md"
+    ).read_text(encoding="utf-8")
+
+    for required in (
+        "## Review nach Step 4.d und Meilenstein 4",
+        "**Umsetzungsstand Version 1:** `60 / 60` geplante W-R-C-Commits",
+        "Release-Tag und Veröffentlichung bleiben bis zu grünen stabilen CI-Gates",
+        "WebSocket bleibt außerhalb von Version 1",
+    ):
+        assert required in plan
+    assert "## Step 5." not in plan
 
 
 def test_release_builder_stages_only_the_release_source_set(
@@ -104,12 +123,9 @@ def test_release_builder_stages_only_the_release_source_set(
 
     assert {path.name for path in stage.iterdir()} == {
         "LICENSE",
-        "MANIFEST.in",
         "README.md",
         "pyproject.toml",
-        "scripts",
         "src",
-        "tests",
     }
     assert not any(stage.rglob("*.log"))
     assert not (stage / "planning").exists()

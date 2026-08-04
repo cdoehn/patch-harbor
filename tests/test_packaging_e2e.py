@@ -177,15 +177,15 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
         root = f"patchharbor-{RELEASE_VERSION}"
         for required in (
             f"{root}/LICENSE",
-            f"{root}/MANIFEST.in",
             f"{root}/README.md",
             f"{root}/pyproject.toml",
-            f"{root}/scripts/build_release.py",
             f"{root}/src/patchharbor/cli.py",
-            f"{root}/tests/test_release_audit.py",
         ):
             assert required in names
         for forbidden in (
+            f"{root}/MANIFEST.in",
+            f"{root}/scripts/",
+            f"{root}/tests/",
             f"{root}/planning/",
             f"{root}/.github/",
             f"{root}/docker/",
@@ -260,7 +260,7 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
     assert run_help.returncode == 0
     for expected in (
         "# PATCHHARBOR",
-        "ZIP PatchBundles may contain ordered scripts and binary payload files.",
+        "ZIP PatchBundles may contain ordered scripts and byte-exact payload files.",
         "Scripts run in the current working directory.",
         "--timeout SECONDS",
         "--plain",

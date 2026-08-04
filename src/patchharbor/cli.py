@@ -40,8 +40,8 @@ def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="patchharbor",
         description=(
-            "Run generated Bash and PowerShell scripts and ZIP "
-            "PatchBundles in a controlled workflow."
+            "Run generated Bash and PowerShell scripts or ZIP "
+            "PatchBundles with controlled execution."
         ),
         epilog=(
             "Use 'patchharbor fs run --help' for input formats, "
@@ -62,7 +62,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
     fs_parser = commands.add_parser(
         "fs",
-        help="read scripts from the file system",
+        help="run from the file system or standard input",
     )
     fs_commands = fs_parser.add_subparsers(
         dest="fs_command",
@@ -77,8 +77,8 @@ def _build_parser() -> argparse.ArgumentParser:
             "or standard input"
         ),
         description=(
-            "Run Bash or PowerShell scripts from a file, ZIP PatchBundle, "
-            "directory, or standard input."
+            "Run generated Bash or PowerShell scripts from a file, "
+            "ZIP PatchBundle, directory, or standard input."
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
@@ -91,7 +91,7 @@ def _build_parser() -> argparse.ArgumentParser:
             "directory.\n"
             "  Omit PATH to read one script or ZIP PatchBundle from "
             "standard input.\n"
-            "  ZIP PatchBundles may contain ordered scripts and binary "
+            "  ZIP PatchBundles may contain ordered scripts and byte-exact "
             "payload files.\n"
             "\n"
             "Execution behavior:\n"
@@ -118,12 +118,15 @@ def _build_parser() -> argparse.ArgumentParser:
     run_parser.add_argument(
         "--no-color",
         action="store_true",
-        help="disable PatchHarbor colors",
+        help="disable colors in the terminal dashboard",
     )
     run_parser.add_argument(
         "--log",
         action="store_true",
-        help="write complete script output and run metadata to a temporary log",
+        help=(
+            "write complete merged script output and run metadata "
+            "to a temporary log"
+        ),
     )
     run_parser.add_argument(
         "path",
