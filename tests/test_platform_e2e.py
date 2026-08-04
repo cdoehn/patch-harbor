@@ -210,7 +210,11 @@ def test_platform_log_uses_configured_system_temp_and_contains_output(
     try:
         assert normalized_path(log_path.parent) == normalized_path(system_temp)
         log_bytes = log_path.read_bytes()
-        assert b"platform-log\n" in log_bytes
+        expected_output_bytes = native_value(
+            b"platform-log\n",
+            b"platform-log\r\n",
+        )
+        assert expected_output_bytes in log_bytes
         assert b"exit_code: 0\n" in log_bytes
     finally:
         log_path.unlink(missing_ok=True)
