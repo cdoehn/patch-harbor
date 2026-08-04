@@ -154,11 +154,12 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
             name for name in names if name.endswith(".dist-info/METADATA")
         )
         metadata = wheel.read(metadata_name).decode("utf-8")
-        assert f"Version: {RELEASE_VERSION}\n" in metadata
-        assert "License-Expression: MIT\n" in metadata
+        metadata_lines = metadata.splitlines()
+        assert f"Version: {RELEASE_VERSION}" in metadata_lines
+        assert "License-Expression: MIT" in metadata_lines
         runtime_requirements = [
             line
-            for line in metadata.splitlines()
+            for line in metadata_lines
             if line.startswith("Requires-Dist:") and 'extra == "dev"' not in line
         ]
         assert runtime_requirements == []
@@ -167,10 +168,10 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
         entry_points_name = next(
             name for name in names if name.endswith(".dist-info/entry_points.txt")
         )
-        assert wheel.read(entry_points_name).decode("utf-8") == (
-            "[console_scripts]\n"
-            "patchharbor = patchharbor.cli:main\n"
-        )
+        assert wheel.read(entry_points_name).decode("utf-8").splitlines() == [
+            "[console_scripts]",
+            "patchharbor = patchharbor.cli:main",
+        ]
 
     with tarfile.open(source_distributions[0], "r:gz") as source_distribution:
         names = set(source_distribution.getnames())
