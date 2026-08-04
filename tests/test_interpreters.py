@@ -92,13 +92,14 @@ def test_missing_interpreter_is_reported_during_resolution(
 
 def test_bash_command_contains_only_executable_and_script() -> None:
     selected = select_interpreter("#!/usr/bin/env bash\n# PATCHHARBOR\n")
+    script_path = Path("/tmp/script.sh")
     command = build_interpreter_command(
         selected,
         "/resolved/bash",
-        Path("/tmp/script.sh"),
+        script_path,
     )
 
-    assert command == ["/resolved/bash", "/tmp/script.sh"]
+    assert command == ["/resolved/bash", str(script_path)]
 
 
 @pytest.mark.parametrize("shebang", ("#!powershell.exe", "#!pwsh"))
@@ -106,10 +107,11 @@ def test_powershell_command_has_fixed_noninteractive_arguments_without_bypass(
     shebang: str,
 ) -> None:
     selected = select_interpreter(f"{shebang}\n# PATCHHARBOR\n")
+    script_path = Path("/tmp/script.ps1")
     command = build_interpreter_command(
         selected,
         f"/resolved/{selected.executable}",
-        Path("/tmp/script.ps1"),
+        script_path,
     )
 
     assert command == [
@@ -118,7 +120,7 @@ def test_powershell_command_has_fixed_noninteractive_arguments_without_bypass(
         "-NoProfile",
         "-NonInteractive",
         "-File",
-        "/tmp/script.ps1",
+        str(script_path),
     ]
     lowered = {argument.casefold() for argument in command}
     assert "-executionpolicy" not in lowered
