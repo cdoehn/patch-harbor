@@ -208,15 +208,15 @@ class WindowsProcessTree(ProcessTree):
         if not self._tree_has_processes() or self._process.poll() is not None:
             return
         try:
-            self._process.send_signal(signal.CTRL_BREAK_EVENT)
-        except (OSError, ValueError):
-            try:
-                self._process.terminate()
-            except OSError:
-                # The root may end between poll() and the signal. Remaining
-                # descendants are still owned by the Job Object and will be
-                # handled by the force-stop fallback after the grace period.
-                pass
+            # CTRL+BREAK opens the PowerShell debugger instead of stopping a
+            # script. Terminate only the root first; remaining descendants stay
+            # owned by the Job Object and are force-stopped after the grace
+            # period when necessary.
+            self._process.terminate()
+        except OSError:
+            # The root may end between poll() and terminate(). Remaining
+            # descendants are still owned by the Job Object.
+            pass
 
     def _force_stop(self) -> None:
         if not self._tree_has_processes():

@@ -176,7 +176,7 @@ class ProcessTree(ABC):
 
     @abstractmethod
     def _request_stop(self) -> None:
-        """Request a graceful stop of the owned process tree."""
+        """Request the platform's first-stage stop of the owned tree."""
 
     @abstractmethod
     def _force_stop(self) -> None:
