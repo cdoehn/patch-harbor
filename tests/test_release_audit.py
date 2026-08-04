@@ -87,22 +87,25 @@ def test_release_builder_uses_only_audited_source_inputs() -> None:
     assert not (PROJECT_ROOT / "MANIFEST.in").exists()
 
 
-def test_version_one_plan_is_closed_without_publishing_deferred_scope() -> None:
+def test_version_one_specification_and_plan_are_closed_without_publishing_deferred_scope() -> None:
+    specification = (
+        PROJECT_ROOT / "spec" / "SPECIFICATION.md"
+    ).read_text(encoding="utf-8")
     plan = (
-        PROJECT_ROOT
-        / "planning"
-        / "0.0.1"
-        / "patchharbor-specifikation-and-commit-plan.md"
+        PROJECT_ROOT / "planning" / "1.0.0" / "commit-plan.md"
     ).read_text(encoding="utf-8")
 
-    for required in (
-        "## Review nach Step 4.d und Meilenstein 4",
-        "**Umsetzungsstand Version 1:** `60 / 60` geplante W-R-C-Commits",
-        "Release-Tag und Veröffentlichung bleiben bis zu grünen stabilen CI-Gates",
-        "WebSocket bleibt außerhalb von Version 1",
-    ):
-        assert required in plan
-    assert "## Step 5." not in plan
+    assert "**Release-Version:** `1.0.0`" in specification
+
+    for document in (specification, plan):
+        for required in (
+            "## Review nach Step 4.d und Meilenstein 4",
+            "`60 / 60` geplante W-R-C-Commits",
+            "Release-Tag und Veröffentlichung bleiben bis zu grünen stabilen CI-Gates",
+            "WebSocket bleibt außerhalb von Version 1",
+        ):
+            assert required in document
+        assert "## Step 5." not in document
 
 
 def test_release_builder_stages_only_the_release_source_set(
