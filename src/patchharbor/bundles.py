@@ -209,7 +209,7 @@ def _validate_zip_members(
     )
     try:
         normalized_paths = validate_bundle_member_paths(
-            (entry.filename, is_directory)
+            (entry.orig_filename, is_directory)
             for entry, is_directory in member_kinds
         )
     except BundlePathError as exc:

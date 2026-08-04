@@ -24,6 +24,18 @@ def _write_zip(path: Path, entries: list[tuple[str, str]]) -> None:
             archive.writestr(name, content)
 
 
+def _write_raw_member_name(
+    archive: zipfile.ZipFile,
+    member_name: str,
+    content: bytes,
+) -> None:
+    """Write one exact archive member name without host-OS normalization."""
+    entry = zipfile.ZipInfo("placeholder")
+    entry.filename = member_name
+    entry.orig_filename = member_name
+    archive.writestr(entry, content)
+
+
 def _run_path(
     path: Path,
     cwd: Path,
@@ -122,7 +134,7 @@ def test_zip_rejects_unsafe_member_paths_before_execution(
     with zipfile.ZipFile(archive_path, "w") as archive:
         archive.writestr("run.sh", f"{REQUIRED_MARKER}\n")
         archive.writestr("safe.bin", b"must-not-be-written")
-        archive.writestr(member_name, b"payload")
+        _write_raw_member_name(archive, member_name, b"payload")
 
     executed: list[str] = []
     monkeypatch.setattr(
@@ -138,6 +150,32 @@ def test_zip_rejects_unsafe_member_paths_before_execution(
     assert "invalid PatchBundle" in str(raised.value)
     assert executed == []
     assert not (tmp_path / "safe.bin").exists()
+
+
+def test_zip_rejects_original_backslash_name_after_host_normalization(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    archive_path = tmp_path / "normalized-unsafe.zip"
+    with zipfile.ZipFile(archive_path, "w") as archive:
+        archive.writestr("run.sh", f"{REQUIRED_MARKER}\n")
+        _write_raw_member_name(archive, r"folder\payload.bin", b"payload")
+
+    real_infolist = zipfile.ZipFile.infolist
+
+    def normalized_infolist(archive: zipfile.ZipFile) -> list[zipfile.ZipInfo]:
+        entries = real_infolist(archive)
+        for entry in entries:
+            entry.filename = entry.filename.replace("\\", "/")
+        return entries
+
+    monkeypatch.setattr(zipfile.ZipFile, "infolist", normalized_infolist)
+
+    with pytest.raises(PatchHarborError) as raised:
+        _run_path(archive_path, tmp_path)
+
+    assert raised.value.exit_code is ExitCode.SOURCE_ERROR
+    assert "invalid PatchBundle" in str(raised.value)
 
 
 @pytest.mark.parametrize(

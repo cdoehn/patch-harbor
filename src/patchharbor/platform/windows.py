@@ -11,7 +11,7 @@ import signal
 import subprocess
 import threading
 
-from patchharbor.platform.lifecycle import ProcessTree
+from patchharbor.platform.lifecycle import ProcessTree, poll_process_until_exit
 
 
 _JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE = 0x00002000
@@ -183,7 +183,10 @@ class WindowsProcessTree(ProcessTree):
 
     def _wait_root(self, *, timeout_seconds: float) -> int:
         with _break_interrupt():
-            return self._process.wait(timeout=timeout_seconds)
+            return poll_process_until_exit(
+                self._process,
+                timeout_seconds=timeout_seconds,
+            )
 
     def _tree_has_processes(self) -> bool:
         self._process.poll()

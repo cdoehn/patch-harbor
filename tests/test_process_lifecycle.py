@@ -154,3 +154,49 @@ def test_cleanup_error_does_not_hide_existing_body_error() -> None:
     with pytest.raises(RuntimeError, match="body failed"):
         with tree:
             raise RuntimeError("body failed")
+
+
+class _PollingProcess:
+    def __init__(self, return_codes: list[int | None]) -> None:
+        self.args = ["interpreter"]
+        self._return_codes = iter(return_codes)
+        self.wait_calls = 0
+
+    def poll(self) -> int | None:
+        return next(self._return_codes)
+
+    def wait(self, timeout: float | None = None) -> int:
+        self.wait_calls += 1
+        raise AssertionError("polling helper must not block in wait()")
+
+
+def test_polling_wait_observes_process_exit_without_blocking_wait(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    process = _PollingProcess([None, None, 7])
+    monkeypatch.setattr(lifecycle.time, "sleep", lambda seconds: None)
+
+    result = lifecycle.poll_process_until_exit(
+        process,  # type: ignore[arg-type]
+        timeout_seconds=1,
+    )
+
+    assert result == 7
+    assert process.wait_calls == 0
+
+
+def test_polling_wait_raises_timeout_without_blocking_wait(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    process = _PollingProcess([None, None])
+    times = iter((0.0, 0.0, 1.1))
+    monkeypatch.setattr(lifecycle.time, "monotonic", lambda: next(times))
+    monkeypatch.setattr(lifecycle.time, "sleep", lambda seconds: None)
+
+    with pytest.raises(subprocess.TimeoutExpired):
+        lifecycle.poll_process_until_exit(
+            process,  # type: ignore[arg-type]
+            timeout_seconds=1,
+        )
+
+    assert process.wait_calls == 0

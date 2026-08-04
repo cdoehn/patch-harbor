@@ -22,7 +22,7 @@ def test_file_and_stdin_resolve_through_the_same_bundle_semantics(
 ) -> None:
     script_text = "# PATCHHARBOR\n"
     script_path = tmp_path / "example.sh"
-    script_path.write_text(script_text, encoding="utf-8")
+    script_path.write_bytes(script_text.encode("utf-8"))
 
     file_bundle = resolve_patch_bundle(file_input_artifact(script_path))
 
@@ -172,7 +172,8 @@ def test_large_source_warning_reaches_plain_output(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     source = tmp_path / "large-script"
-    source.write_text("# PATCHHARBOR\n", encoding="utf-8")
+    source.write_bytes(b"# PATCHHARBOR\n")
+    source_size = source.stat().st_size
     warning_output = StringIO()
     policy = ResourcePolicy(
         warning_bytes=3,
@@ -201,5 +202,6 @@ def test_large_source_warning_reaches_plain_output(
 
     assert result == 0
     assert warning_output.getvalue() == (
-        "patchharbor: warning: input artifact is large (14 bytes)\n"
+        "patchharbor: warning: input artifact is large "
+        f"({source_size} bytes)\n"
     )
