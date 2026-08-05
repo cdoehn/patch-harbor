@@ -13,6 +13,7 @@ from patchharbor.output import OutputTargets
 from patchharbor.parser import parse_script
 from patchharbor.payload_files import write_bundle_payloads
 from patchharbor.presentation import DashboardPresentation, PresentedFile
+from patchharbor.registry import register_local_repository
 from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY, ResourcePolicy
 from patchharbor.sources import (
     DirectoryCandidate,
@@ -21,6 +22,11 @@ from patchharbor.sources import (
     select_directory_candidate,
     stdin_input_artifact,
 )
+
+
+def register_repository(path: Path) -> tuple[str, Path]:
+    """Register one local Git repository instance."""
+    return register_local_repository(path)
 
 
 def _execute_bundle_script(

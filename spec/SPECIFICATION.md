@@ -9,7 +9,7 @@
 **Skriptmarker:** `# PATCHHARBOR`<br>
 **Patch-Paketmarker:** `patch-harbor`
 
-Der Umsetzungs- und Commit-Plan ist von dieser Produktspezifikation getrennt und liegt unter `planning/1.1.0/commit-plan-cleanup.md`. Änderungen am Produktziel werden in `spec/SPECIFICATION_CHANGELOG.md` dokumentiert.
+Der aktuelle Umsetzungs- und Commit-Plan ist von dieser Produktspezifikation getrennt und liegt unter `planning/1.1.0/commit-plan.md`. Der abgeschlossene Cleanup-Plan bleibt unter `planning/1.1.0/commit-plan-cleanup.md` erhalten. Änderungen am Produktziel werden in `spec/SPECIFICATION_CHANGELOG.md` dokumentiert.
 
 ---
 
@@ -2331,6 +2331,7 @@ spec/SPECIFICATION.md
 spec/SPECIFICATION_CHANGELOG.md
 planning/1.0.0/commit-plan.md
 planning/1.1.0/commit-plan-cleanup.md
+planning/1.1.0/commit-plan.md
 ```
 
 Der erste 1.1.0-Dokumentationscommit aktualisiert den Audit-Test auf diese Struktur, ohne Produktionscode zu verändern.

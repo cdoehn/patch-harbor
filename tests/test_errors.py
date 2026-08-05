@@ -15,6 +15,7 @@ def test_public_tool_exit_codes_are_complete_and_stable() -> None:
         "INTERPRETER_ERROR": 5,
         "PAYLOAD_PREPARATION_ERROR": 6,
         "EXECUTION_ERROR": 7,
+        "REPOSITORY_ERROR": 8,
         "TIMEOUT": 124,
         "INTERRUPTED": 130,
     }

@@ -10,7 +10,11 @@ import sys
 from typing import TextIO
 
 from patchharbor import __version__
-from patchharbor.application import run_script_path, run_standard_input
+from patchharbor.application import (
+    register_repository,
+    run_script_path,
+    run_standard_input,
+)
 from patchharbor.errors import (
     ExitCode,
     PatchHarborError,
@@ -70,6 +74,18 @@ def _build_parser() -> argparse.ArgumentParser:
         dest="command",
         required=True,
         metavar="COMMAND",
+    )
+
+    register_parser = commands.add_parser(
+        "register",
+        help="register one local Git repository instance",
+    )
+    register_parser.add_argument(
+        "repository",
+        type=Path,
+        nargs="?",
+        metavar="REPOSITORY",
+        help="Git repository; defaults to the current directory",
     )
 
     fs_parser = commands.add_parser(
@@ -152,6 +168,23 @@ def _build_parser() -> argparse.ArgumentParser:
     )
 
     return parser
+
+
+def _register_command(
+    path: Path | None,
+    *,
+    stdout: TextIO,
+    stderr: TextIO,
+) -> int:
+    try:
+        repo_id, repository_path = register_repository(path or Path.cwd())
+    except PatchHarborError as exc:
+        print(format_tool_message(str(exc)), file=stderr)
+        return int(exc.exit_code)
+
+    print(f"repo_id: {repo_id}", file=stdout)
+    print(f"repository_path: {repository_path}", file=stdout)
+    return 0
 
 
 def _execute_request(
@@ -324,6 +357,13 @@ def main(
 
     parser = _build_parser()
     args = parser.parse_args(argv)
+
+    if args.command == "register":
+        return _register_command(
+            args.repository,
+            stdout=actual_stdout,
+            stderr=actual_stderr,
+        )
 
     if args.command == "fs" and args.fs_command == "run":
         return _run_command(

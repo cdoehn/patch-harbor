@@ -22,6 +22,7 @@ EXPECTED_RUNTIME_FILES = {
     "parser.py",
     "payload_files.py",
     "presentation.py",
+    "registry.py",
     "resource_policy.py",
     "run_log.py",
     "sources.py",
@@ -78,30 +79,32 @@ def test_release_builder_uses_only_audited_source_inputs() -> None:
     assert not (PROJECT_ROOT / "MANIFEST.in").exists()
 
 
-def test_current_specification_changelog_and_cleanup_plan_are_published() -> None:
+def test_current_specification_changelog_and_plans_are_published() -> None:
     specification_path = PROJECT_ROOT / "spec" / "SPECIFICATION.md"
     changelog_path = PROJECT_ROOT / "spec" / "SPECIFICATION_CHANGELOG.md"
-    current_plan_path = (
+    cleanup_plan_path = (
         PROJECT_ROOT / "planning" / "1.1.0" / "commit-plan-cleanup.md"
+    )
+    implementation_plan_path = (
+        PROJECT_ROOT / "planning" / "1.1.0" / "commit-plan.md"
     )
     historical_plan_path = PROJECT_ROOT / "planning" / "1.0.0" / "commit-plan.md"
 
     specification = specification_path.read_text(encoding="utf-8")
-    current_plan = current_plan_path.read_text(encoding="utf-8")
+    cleanup_plan = cleanup_plan_path.read_text(encoding="utf-8")
+    implementation_plan = implementation_plan_path.read_text(encoding="utf-8")
 
     assert "**Produktversion:** `1.1.0`" in specification
     assert "`spec/SPECIFICATION_CHANGELOG.md`" in specification
     assert "`planning/1.1.0/commit-plan-cleanup.md`" in specification
+    assert "`planning/1.1.0/commit-plan.md`" in specification
     assert changelog_path.is_file()
-    assert current_plan.strip()
-    assert "# PatchHarbor 1.1.0 – Cleanup- und Rückbau-Commit-Plan" in current_plan
-    assert (
-        "**Dateiname:** `planning/1.1.0/commit-plan-cleanup.md`"
-        in current_plan
+    assert cleanup_plan.startswith(
+        "# PatchHarbor 1.1.0 – Cleanup- und Rückbau-Commit-Plan"
     )
-    assert not (
-        PROJECT_ROOT / "planning" / "1.1.0" / "commit-plan.md"
-    ).exists()
+    assert implementation_plan.startswith(
+        "# PatchHarbor 1.1.0 – W-R-C-Commit-Plan"
+    )
     assert historical_plan_path.is_file()
 
 

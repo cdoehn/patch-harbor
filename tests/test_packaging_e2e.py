@@ -33,6 +33,7 @@ EXPECTED_RUNTIME_FILES = {
     "patchharbor/parser.py",
     "patchharbor/payload_files.py",
     "patchharbor/presentation.py",
+    "patchharbor/registry.py",
     "patchharbor/resource_policy.py",
     "patchharbor/run_log.py",
     "patchharbor/sources.py",

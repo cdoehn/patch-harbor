@@ -167,6 +167,7 @@ spec/SPECIFICATION.md
 spec/SPECIFICATION_CHANGELOG.md
 planning/1.0.0/commit-plan.md
 planning/1.1.0/commit-plan-cleanup.md
+planning/1.1.0/commit-plan.md
 ```
 
 Das allererste anschließende Code-Cleanup ist:
