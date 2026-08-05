@@ -1,6 +1,6 @@
 # PatchHarbor 1.1.0 – Cleanup- und Rückbau-Commit-Plan
 
-**Dateiname:** `planning/1.1.0/commit-plan.md`<br>
+**Dateiname:** `planning/1.1.0/commit-plan-cleanup.md`<br>
 **Zielversion:** `1.1.0`<br>
 **Planphase:** Rückbau und Bereinigung vor der Implementierung neuer 1.1.0-Funktionen<br>
 **Stand:** 2026-08-04<br>
@@ -112,7 +112,7 @@ Daher gilt:
 Der aktuelle Snapshot enthält außerdem:
 
 - einen Release-Audit-Test, der weiterhin `1.0.0` in der aktuellen Spezifikation erwartet,
-- einen leeren `planning/1.1.0/commit-plan.md`,
+- einen damals leeren Plan am früheren Pfad `planning/1.1.0/commit-plan.md`,
 - Ubuntu 26.04 im Acceptance-Workflow noch als nicht blockierende Preview-Lane,
 - einen statischen Workflow-Test, der genau diese veraltete Preview-Regel erzwingt.
 
@@ -243,7 +243,7 @@ Die neue Spezifikation, der Changelog und dieser Commit-Plan bilden den verbindl
 
 - `spec/SPECIFICATION.md` als aktuelle 1.1.0-Spezifikation führen,
 - `spec/SPECIFICATION_CHANGELOG.md` als aktuellen Spezifikations-Changelog führen,
-- diesen Plan unter `planning/1.1.0/commit-plan.md` einchecken,
+- diesen Plan unter `planning/1.1.0/commit-plan-cleanup.md` einchecken,
 - `planning/1.0.0/commit-plan.md` unverändert als Historie behalten.
 
 #### Release-Audit
@@ -252,7 +252,7 @@ Die neue Spezifikation, der Changelog und dieser Commit-Plan bilden den verbindl
 
 - die aktuelle Produktversion `1.1.0` in `spec/SPECIFICATION.md` erwartet,
 - `spec/SPECIFICATION_CHANGELOG.md` erwartet,
-- den nicht leeren Plan `planning/1.1.0/commit-plan.md` erwartet,
+- den nicht leeren Plan `planning/1.1.0/commit-plan-cleanup.md` erwartet,
 - den historischen 1.0.0-Plan nur noch auf Vorhandensein prüft,
 - keine alten `60 / 60`-, Step-5- oder nachgelagerten Transportaussagen mehr aus der aktuellen Spezifikation verlangt,
 - die exakte Runtime-Modulinventur weiterhin prüft,
