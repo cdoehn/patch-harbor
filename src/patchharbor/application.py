@@ -11,11 +11,7 @@ from patchharbor.execution import execute_script_text
 from patchharbor.models import BundleScript, InputArtifact
 from patchharbor.output import OutputTargets
 from patchharbor.parser import parse_script
-from patchharbor.payload_files import (
-    prepare_payload_files,
-    write_bundle_payloads,
-    write_payload_files,
-)
+from patchharbor.payload_files import write_bundle_payloads
 from patchharbor.presentation import DashboardPresentation, PresentedFile
 from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY, ResourcePolicy
 from patchharbor.sources import (
@@ -36,18 +32,9 @@ def _execute_bundle_script(
     timeout_seconds: float,
     output: OutputTargets | None = None,
     presentation: DashboardPresentation | None = None,
-    resource_policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY,
 ) -> int:
     parsed_script = parse_script(bundle_script.text)
-    payload_descriptions = (
-        (payload.name, payload.text)
-        for payload in parsed_script.payload_files
-    )
-    prepared_payloads, payload_warnings = prepare_payload_files(
-        payload_descriptions,
-        policy=resource_policy,
-    )
-    script_warnings = parsed_script.warnings + payload_warnings
+    script_warnings = parsed_script.warnings
     if presentation is not None:
         presentation.begin_script(
             script_name=bundle_script.display_name,
@@ -57,19 +44,10 @@ def _execute_bundle_script(
                 (message.name, message.text)
                 for message in parsed_script.messages
             ),
-            inline_files=tuple(
-                PresentedFile(
-                    name=name,
-                    size_bytes=len(text.encode("utf-8")),
-                    kind="FILE",
-                )
-                for name, text in prepared_payloads
-            ),
             warnings=script_warnings,
         )
     if output is not None:
         output.write_warnings(script_warnings)
-    write_payload_files(prepared_payloads, cwd=cwd)
     return execute_script_text(
         parsed_script.text,
         cwd=cwd,
@@ -117,7 +95,6 @@ def run_input_artifact(
             timeout_seconds=timeout_seconds,
             output=output,
             presentation=presentation,
-            resource_policy=resource_policy,
         )
         if last_exit_code != 0:
             return last_exit_code

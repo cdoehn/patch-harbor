@@ -32,14 +32,13 @@ def _output_script(value: str, *, exit_code: int = 0) -> str:
     )
 
 
-def test_acceptance_file_messages_inline_file_and_log(tmp_path: Path) -> None:
-    script_path = _script_path(tmp_path, "file-workflow")
+def test_acceptance_direct_script_message_plain_output_and_log(
+    tmp_path: Path,
+) -> None:
+    script_path = _script_path(tmp_path, "direct-workflow")
     script_body = native_value(
-        '[ "$(cat generated.txt)" = "acceptance-payload" ] || exit 31\n'
-        'printf "%s\\n" "file-accepted"',
-        'if ([System.IO.File]::ReadAllText("generated.txt") '
-        '-ne "acceptance-payload") { exit 31 }\n'
-        'Write-Output "file-accepted"',
+        'printf "%s\n" "direct-accepted"',
+        'Write-Output "direct-accepted"',
     )
     script_path.write_text(
         "\n".join(
@@ -48,9 +47,6 @@ def test_acceptance_file_messages_inline_file_and_log(tmp_path: Path) -> None:
                 "# PATCHHARBOR MESSAGE summary START",
                 "# Acceptance run with one informational message.",
                 "# PATCHHARBOR MESSAGE summary END",
-                "# PATCHHARBOR FILE generated.txt START",
-                "# acceptance-payload",
-                "# PATCHHARBOR FILE generated.txt END",
                 script_body,
                 "",
             )
@@ -71,15 +67,12 @@ def test_acceptance_file_messages_inline_file_and_log(tmp_path: Path) -> None:
     assert isinstance(completed.stdout, str)
     assert isinstance(completed.stderr, str)
     assert completed.returncode == 0
-    assert completed.stdout == "file-accepted\n"
-    assert (tmp_path / "generated.txt").read_text(encoding="utf-8") == (
-        "acceptance-payload"
-    )
+    assert completed.stdout == "direct-accepted\n"
 
     log_path = log_path_from_stderr(completed.stderr)
     try:
         log_text = log_path.read_text(encoding="utf-8")
-        assert "file-accepted\n" in log_text
+        assert "direct-accepted\n" in log_text
         assert "exit_code: 0\n" in log_text
     finally:
         log_path.unlink(missing_ok=True)

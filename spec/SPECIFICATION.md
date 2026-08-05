@@ -1,15 +1,15 @@
 # PatchHarbor – Spezifikation
 
-**Dateiname:** `SPECIFICATION.md`  
-**Produktversion:** `1.1.0`  
-**Spezifikationsstand:** 2026-08-04  
-**Status:** Verbindliches, implementierungsreifes Zielbild für PatchHarbor 1.1.0  
-**Projektname:** `PatchHarbor`  
-**Kommando:** `patchharbor`  
-**Skriptmarker:** `# PATCHHARBOR`  
+**Dateiname:** `SPECIFICATION.md`<br>
+**Produktversion:** `1.1.0`<br>
+**Spezifikationsstand:** 2026-08-04<br>
+**Status:** Verbindliches, implementierungsreifes Zielbild für PatchHarbor 1.1.0<br>
+**Projektname:** `PatchHarbor`<br>
+**Kommando:** `patchharbor`<br>
+**Skriptmarker:** `# PATCHHARBOR`<br>
 **Patch-Paketmarker:** `patch-harbor`
 
-Der Umsetzungs- und Commit-Plan ist von dieser Produktspezifikation getrennt und liegt unter `planning/1.1.0/commit-plan.md`. Änderungen am Produktziel werden in `spec/SPECIFICATION_CHANGELOG.md` dokumentiert.
+Der Umsetzungs- und Commit-Plan ist von dieser Produktspezifikation getrennt und liegt unter `planning/1.1.0/commit-plan-cleanup.md`. Änderungen am Produktziel werden in `spec/SPECIFICATION_CHANGELOG.md` dokumentiert.
 
 ---
 
@@ -2330,7 +2330,7 @@ Der Release-Audit prüft mindestens die Existenz und Konsistenz von:
 spec/SPECIFICATION.md
 spec/SPECIFICATION_CHANGELOG.md
 planning/1.0.0/commit-plan.md
-planning/1.1.0/commit-plan.md
+planning/1.1.0/commit-plan-cleanup.md
 ```
 
 Der erste 1.1.0-Dokumentationscommit aktualisiert den Audit-Test auf diese Struktur, ohne Produktionscode zu verändern.

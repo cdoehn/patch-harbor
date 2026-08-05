@@ -14,18 +14,19 @@ def _workflow_text() -> str:
     return WORKFLOW_PATH.read_text(encoding="utf-8")
 
 
-def test_acceptance_workflow_separates_release_gates_and_preview_lane() -> None:
+def test_acceptance_workflow_has_three_blocking_release_gates() -> None:
     text = _workflow_text()
 
-    assert "name: Release gate - Ubuntu 24.04" in text
-    assert "runner: ubuntu-24.04" in text
-    assert "name: Release gate - Windows 2025" in text
-    assert "runner: windows-2025" in text
-    assert "name: Preview - Ubuntu 26.04" in text
-    assert "runner: ubuntu-26.04" in text
-    assert text.count("preview: false") == 2
-    assert text.count("preview: true") == 1
-    assert "continue-on-error: ${{ matrix.preview }}" in text
+    for name, runner in (
+        ("Release gate - Ubuntu 24.04", "ubuntu-24.04"),
+        ("Release gate - Windows 2025", "windows-2025"),
+        ("Release gate - Ubuntu 26.04", "ubuntu-26.04"),
+    ):
+        assert f"name: {name}" in text
+        assert f"runner: {runner}" in text
+
+    assert "preview:" not in text
+    assert "continue-on-error" not in text
     assert "docker run" not in text
     assert "container:" not in text
 

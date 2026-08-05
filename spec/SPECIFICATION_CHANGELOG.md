@@ -1,6 +1,6 @@
 # PatchHarbor – Spezifikations-Changelog
 
-**Dateiname:** `SPECIFICATION_CHANGELOG.md`  
+**Dateiname:** `SPECIFICATION_CHANGELOG.md`<br>
 **Stand:** 2026-08-04
 
 Dieses Dokument protokolliert Änderungen am verbindlichen Produktziel. Es ist kein Git-Commit-Log und ersetzt nicht die getrennten Umsetzungspläne unter `planning/`.
@@ -166,7 +166,7 @@ Er aktualisiert zusätzlich den Release-Audit-Test auf:
 spec/SPECIFICATION.md
 spec/SPECIFICATION_CHANGELOG.md
 planning/1.0.0/commit-plan.md
-planning/1.1.0/commit-plan.md
+planning/1.1.0/commit-plan-cleanup.md
 ```
 
 Das allererste anschließende Code-Cleanup ist:

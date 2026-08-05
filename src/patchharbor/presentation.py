@@ -87,7 +87,6 @@ class DashboardPresentation(Protocol):
         script_index: int,
         script_total: int,
         messages: tuple[tuple[str, str], ...],
-        inline_files: tuple[PresentedFile, ...],
         warnings: tuple[str, ...],
     ) -> None:
         """Show context for the next script in the bundle."""
@@ -541,7 +540,6 @@ class TerminalDashboard:
         script_index: int,
         script_total: int,
         messages: tuple[tuple[str, str], ...],
-        inline_files: tuple[PresentedFile, ...],
         warnings: tuple[str, ...],
     ) -> None:
         with self._state_lock:
@@ -551,7 +549,7 @@ class TerminalDashboard:
                 script_index=script_index,
                 script_total=script_total,
                 messages=messages,
-                files=self._bundle_files + inline_files,
+                files=self._bundle_files,
                 output_lines=(),
                 discarded_output_lines=0,
                 warnings=self._request_warnings + warnings,

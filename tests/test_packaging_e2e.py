@@ -269,8 +269,6 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
         "--log",
     ):
         assert expected in run_help.stdout
-    for deferred in ("websocket", "clipboard", "ssh", "save mode"):
-        assert deferred not in run_help.stdout.lower()
 
     source_dir = tmp_path / "source"
     source_dir.mkdir()

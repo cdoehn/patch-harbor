@@ -49,8 +49,6 @@ def test_run_help_is_the_complete_public_command_reference(
         "--log",
     ):
         assert expected in help_text
-    for deferred in ("websocket", "clipboard", "ssh", "save mode"):
-        assert deferred not in help_text.lower()
 
 
 def test_fs_run_without_path_on_terminal_is_a_usage_error(
@@ -127,7 +125,6 @@ def test_interactive_terminal_wires_dashboard_and_restores_terminal(
             script_index=1,
             script_total=1,
             messages=(("commit.next", "Add terminal dashboard"),),
-            inline_files=(),
             warnings=(),
         )
         assert output.line_observer is not None

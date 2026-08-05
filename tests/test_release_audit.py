@@ -33,14 +33,6 @@ EXPECTED_RUNTIME_FILES = {
     "platform/runtime.py",
     "platform/windows.py",
 }
-DEFERRED_FEATURE_MODULES = {
-    "clipboard.py",
-    "git.py",
-    "save.py",
-    "ssh.py",
-    "tests.py",
-    "websocket.py",
-}
 
 
 def test_runtime_module_inventory_matches_the_release_architecture() -> None:
@@ -50,7 +42,6 @@ def test_runtime_module_inventory_matches_the_release_architecture() -> None:
     }
 
     assert observed == EXPECTED_RUNTIME_FILES
-    assert observed.isdisjoint(DEFERRED_FEATURE_MODULES)
 
 
 def test_release_entry_point_and_runtime_dependency_contract_are_exact() -> None:
@@ -87,25 +78,31 @@ def test_release_builder_uses_only_audited_source_inputs() -> None:
     assert not (PROJECT_ROOT / "MANIFEST.in").exists()
 
 
-def test_version_one_specification_and_plan_are_closed_without_publishing_deferred_scope() -> None:
-    specification = (
-        PROJECT_ROOT / "spec" / "SPECIFICATION.md"
-    ).read_text(encoding="utf-8")
-    plan = (
-        PROJECT_ROOT / "planning" / "1.0.0" / "commit-plan.md"
-    ).read_text(encoding="utf-8")
+def test_current_specification_changelog_and_cleanup_plan_are_published() -> None:
+    specification_path = PROJECT_ROOT / "spec" / "SPECIFICATION.md"
+    changelog_path = PROJECT_ROOT / "spec" / "SPECIFICATION_CHANGELOG.md"
+    current_plan_path = (
+        PROJECT_ROOT / "planning" / "1.1.0" / "commit-plan-cleanup.md"
+    )
+    historical_plan_path = PROJECT_ROOT / "planning" / "1.0.0" / "commit-plan.md"
 
-    assert "**Release-Version:** `1.0.0`" in specification
+    specification = specification_path.read_text(encoding="utf-8")
+    current_plan = current_plan_path.read_text(encoding="utf-8")
 
-    for document in (specification, plan):
-        for required in (
-            "## Review nach Step 4.d und Meilenstein 4",
-            "`60 / 60` geplante W-R-C-Commits",
-            "Release-Tag und Veröffentlichung bleiben bis zu grünen stabilen CI-Gates",
-            "WebSocket bleibt außerhalb von Version 1",
-        ):
-            assert required in document
-        assert "## Step 5." not in document
+    assert "**Produktversion:** `1.1.0`" in specification
+    assert "`spec/SPECIFICATION_CHANGELOG.md`" in specification
+    assert "`planning/1.1.0/commit-plan-cleanup.md`" in specification
+    assert changelog_path.is_file()
+    assert current_plan.strip()
+    assert "# PatchHarbor 1.1.0 – Cleanup- und Rückbau-Commit-Plan" in current_plan
+    assert (
+        "**Dateiname:** `planning/1.1.0/commit-plan-cleanup.md`"
+        in current_plan
+    )
+    assert not (
+        PROJECT_ROOT / "planning" / "1.1.0" / "commit-plan.md"
+    ).exists()
+    assert historical_plan_path.is_file()
 
 
 def test_release_builder_stages_only_the_release_source_set(
