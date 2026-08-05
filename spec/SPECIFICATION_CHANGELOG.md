@@ -1,6 +1,6 @@
 # PatchHarbor – Spezifikations-Changelog
 
-**Dateiname:** `SPECIFICATION_CHANGELOG.md`  
+**Dateiname:** `SPECIFICATION_CHANGELOG.md`<br>
 **Stand:** 2026-08-04
 
 Dieses Dokument protokolliert Änderungen am verbindlichen Produktziel. Es ist kein Git-Commit-Log und ersetzt nicht die getrennten Umsetzungspläne unter `planning/`.

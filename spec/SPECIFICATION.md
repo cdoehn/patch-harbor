@@ -1,12 +1,12 @@
 # PatchHarbor – Spezifikation
 
-**Dateiname:** `SPECIFICATION.md`  
-**Produktversion:** `1.1.0`  
-**Spezifikationsstand:** 2026-08-04  
-**Status:** Verbindliches, implementierungsreifes Zielbild für PatchHarbor 1.1.0  
-**Projektname:** `PatchHarbor`  
-**Kommando:** `patchharbor`  
-**Skriptmarker:** `# PATCHHARBOR`  
+**Dateiname:** `SPECIFICATION.md`<br>
+**Produktversion:** `1.1.0`<br>
+**Spezifikationsstand:** 2026-08-04<br>
+**Status:** Verbindliches, implementierungsreifes Zielbild für PatchHarbor 1.1.0<br>
+**Projektname:** `PatchHarbor`<br>
+**Kommando:** `patchharbor`<br>
+**Skriptmarker:** `# PATCHHARBOR`<br>
 **Patch-Paketmarker:** `patch-harbor`
 
 Der Umsetzungs- und Commit-Plan ist von dieser Produktspezifikation getrennt und liegt unter `planning/1.1.0/commit-plan.md`. Änderungen am Produktziel werden in `spec/SPECIFICATION_CHANGELOG.md` dokumentiert.

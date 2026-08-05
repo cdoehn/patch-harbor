@@ -1,9 +1,9 @@
 # PatchHarbor 1.1.0 – Cleanup- und Rückbau-Commit-Plan
 
-**Dateiname:** `planning/1.1.0/commit-plan.md`  
-**Zielversion:** `1.1.0`  
-**Planphase:** Rückbau und Bereinigung vor der Implementierung neuer 1.1.0-Funktionen  
-**Stand:** 2026-08-04  
+**Dateiname:** `planning/1.1.0/commit-plan.md`<br>
+**Zielversion:** `1.1.0`<br>
+**Planphase:** Rückbau und Bereinigung vor der Implementierung neuer 1.1.0-Funktionen<br>
+**Stand:** 2026-08-04<br>
 **Ausgangsbasis:** vorhandene Implementierung 1.0.0 mit der verbindlichen `spec/SPECIFICATION.md` und `spec/SPECIFICATION_CHANGELOG.md` für 1.1.0
 
 ---

@@ -12,7 +12,6 @@ jobs:
   acceptance:
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.runner }}
-    continue-on-error: ${{ matrix.preview }}
     timeout-minutes: 30
 
     strategy:
@@ -21,13 +20,10 @@ jobs:
         include:
           - name: Release gate - Ubuntu 24.04
             runner: ubuntu-24.04
-            preview: false
           - name: Release gate - Windows 2025
             runner: windows-2025
-            preview: false
-          - name: Preview - Ubuntu 26.04
+          - name: Release gate - Ubuntu 26.04
             runner: ubuntu-26.04
-            preview: true
 
     steps:
       - name: Check out repository
