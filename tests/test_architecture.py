@@ -356,13 +356,18 @@ def test_resource_budgets_have_one_low_level_policy_boundary() -> None:
     assert "class ResourcePolicy" in policy_source
     assert "DEFAULT_RESOURCE_POLICY" in policy_source
 
-    for module_name in ("sources", "bundles", "payload_files", "application"):
+    for module_name in ("sources", "bundles", "application"):
         source = (PACKAGE_ROOT / f"{module_name}.py").read_text(
             encoding="utf-8"
         )
         assert "patchharbor.resource_policy" in source
 
-    for module_name in ("sources", "bundles", "payload_files"):
+    payload_source = (PACKAGE_ROOT / "payload_files.py").read_text(
+        encoding="utf-8"
+    )
+    assert "patchharbor.resource_policy" not in payload_source
+
+    for module_name in ("sources", "bundles"):
         source = (PACKAGE_ROOT / f"{module_name}.py").read_text(
             encoding="utf-8"
         )

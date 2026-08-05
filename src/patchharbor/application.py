@@ -32,7 +32,6 @@ def _execute_bundle_script(
     timeout_seconds: float,
     output: OutputTargets | None = None,
     presentation: DashboardPresentation | None = None,
-    resource_policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY,
 ) -> int:
     parsed_script = parse_script(bundle_script.text)
     script_warnings = parsed_script.warnings
@@ -45,7 +44,6 @@ def _execute_bundle_script(
                 (message.name, message.text)
                 for message in parsed_script.messages
             ),
-            inline_files=(),
             warnings=script_warnings,
         )
     if output is not None:
@@ -97,7 +95,6 @@ def run_input_artifact(
             timeout_seconds=timeout_seconds,
             output=output,
             presentation=presentation,
-            resource_policy=resource_policy,
         )
         if last_exit_code != 0:
             return last_exit_code

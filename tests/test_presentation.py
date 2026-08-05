@@ -278,7 +278,6 @@ def test_dashboard_does_not_rewrite_unchanged_frames() -> None:
             script_index=1,
             script_total=1,
             messages=(),
-            inline_files=(),
             warnings=(),
         )
         _wait_until(lambda: stream.flush_count > initial_flush_count)
@@ -317,7 +316,7 @@ def test_dashboard_redraws_when_terminal_width_changes() -> None:
         dashboard.close()
 
 
-def test_application_supplies_messages_without_inline_files_to_presentation(
+def test_application_supplies_messages_to_presentation(
     tmp_path: Path,
 ) -> None:
     script_path = tmp_path / "presented-script.txt"
@@ -347,9 +346,10 @@ def test_application_supplies_messages_without_inline_files_to_presentation(
         "script_total": 1,
         "warnings": (),
     }
-    assert presentation.script is not None
-    assert presentation.script["script_name"] == str(script_path)
-    assert presentation.script["script_index"] == 1
-    assert presentation.script["script_total"] == 1
-    assert presentation.script["messages"] == (("commit.last", "Parser updated"),)
-    assert presentation.script["inline_files"] == ()
+    assert presentation.script == {
+        "script_name": str(script_path),
+        "script_index": 1,
+        "script_total": 1,
+        "messages": (("commit.last", "Parser updated"),),
+        "warnings": (),
+    }
