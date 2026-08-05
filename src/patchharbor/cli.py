@@ -177,13 +177,13 @@ def _register_command(
     stderr: TextIO,
 ) -> int:
     try:
-        repo_id, repository_path = register_repository(path or Path.cwd())
+        registration = register_repository(path or Path.cwd())
     except PatchHarborError as exc:
         print(format_tool_message(str(exc)), file=stderr)
         return int(exc.exit_code)
 
-    print(f"repo_id: {repo_id}", file=stdout)
-    print(f"repository_path: {repository_path}", file=stdout)
+    print(f"repo_id: {registration.repo_id}", file=stdout)
+    print(f"repository_path: {registration.path}", file=stdout)
     return 0
 
 

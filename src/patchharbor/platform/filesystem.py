@@ -16,6 +16,7 @@ class PathKind(Enum):
     REGULAR_FILE = auto()
     DIRECTORY = auto()
     SYMBOLIC_LINK = auto()
+    JUNCTION = auto()
     OTHER = auto()
 
 
@@ -34,6 +35,13 @@ def path_kind(path: Path) -> PathKind:
         mode = path.lstat().st_mode
     except FileNotFoundError:
         return PathKind.MISSING
+    except OSError as exc:
+        raise FileSystemOperationError("cannot inspect target", exc) from exc
+
+    junction_check = getattr(path, "is_junction", None)
+    try:
+        if callable(junction_check) and junction_check():
+            return PathKind.JUNCTION
     except OSError as exc:
         raise FileSystemOperationError("cannot inspect target", exc) from exc
 

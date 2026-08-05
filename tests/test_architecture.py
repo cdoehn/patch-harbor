@@ -151,6 +151,34 @@ def test_lower_layers_do_not_import_orchestration_or_unrelated_layers() -> None:
         assert _local_imports(module_name).isdisjoint(disallowed), module_name
 
 
+
+def test_registration_layers_have_one_directional_dependency_flow() -> None:
+    assert _local_imports("registration") == {
+        "errors",
+        "models",
+        "registry",
+        "repository",
+        "user_paths",
+    }
+    assert _local_imports("registry") == {
+        "errors",
+        "models",
+        "platform",
+        "user_paths",
+    }
+    assert _local_imports("repository") == {
+        "errors",
+        "models",
+        "physical_paths",
+        "platform",
+    }
+    assert _local_imports("user_paths") == {
+        "errors",
+        "physical_paths",
+    }
+    assert _local_imports("physical_paths") == set()
+
+
 def test_cli_depends_on_application_not_source_or_legacy_modules() -> None:
     imports = _local_imports("cli")
 

@@ -221,3 +221,73 @@ def test_register_respects_the_global_registry_lock(tmp_path: Path) -> None:
     assert completed.returncode == 8
     assert not (repository / ".patchharbor").exists()
     assert not _registry_path(environment).exists()
+
+
+@pytest.mark.parametrize("internal_kind", ["regular-file", "symlink"])
+def test_register_rejects_a_non_directory_internal_path(
+    tmp_path: Path,
+    internal_kind: str,
+) -> None:
+    repository = _create_repository(tmp_path / "repository")
+    internal = repository / ".patchharbor"
+    target = tmp_path / "external-target"
+    if internal_kind == "regular-file":
+        internal.write_bytes(b"not a directory\n")
+    else:
+        target.mkdir()
+        create_symlink_or_skip(
+            internal,
+            target,
+            target_is_directory=True,
+        )
+    environment = _isolated_user_environment(tmp_path / "user")
+
+    completed = run_cli(
+        repository,
+        "register",
+        environment_overrides=environment,
+    )
+
+    assert completed.returncode == 8
+    assert not _registry_path(environment).exists()
+    if internal_kind == "regular-file":
+        assert internal.read_bytes() == b"not a directory\n"
+    else:
+        assert internal.is_symlink()
+        assert not (target / "id").exists()
+
+
+@pytest.mark.skipif(os.name != "nt", reason="requires Windows junction support")
+def test_register_rejects_a_junction_as_internal_directory(
+    tmp_path: Path,
+) -> None:
+    repository = _create_repository(tmp_path / "repository")
+    target = tmp_path / "junction-target"
+    target.mkdir()
+    internal = repository / ".patchharbor"
+    completed_link = subprocess.run(
+        [
+            "cmd.exe",
+            "/d",
+            "/s",
+            "/c",
+            f'mklink /J "{internal}" "{target}"',
+        ],
+        check=False,
+        capture_output=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    if completed_link.returncode != 0:
+        pytest.skip("requires Windows junction creation support")
+    environment = _isolated_user_environment(tmp_path / "user")
+
+    completed = run_cli(
+        repository,
+        "register",
+        environment_overrides=environment,
+    )
+
+    assert completed.returncode == 8
+    assert not _registry_path(environment).exists()
+    assert not (target / "id").exists()

@@ -1,9 +1,10 @@
-"""Small immutable data carriers shared by PatchHarbor's input pipeline."""
+"""Small immutable data carriers shared by PatchHarbor."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from uuid import UUID, uuid4
 
 
 @dataclass(frozen=True)
@@ -37,3 +38,51 @@ class PatchBundle:
     scripts: tuple[BundleScript, ...]
     payloads: tuple[BundlePayload, ...] = ()
     warnings: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True, order=True)
+class RepositoryId:
+    """Canonical UUID-v4 identity of one local repository instance."""
+
+    value: str
+
+    def __post_init__(self) -> None:
+        try:
+            parsed = UUID(self.value)
+        except ValueError as exc:
+            raise ValueError("repository ID is not a valid UUID") from exc
+        if parsed.version != 4 or str(parsed) != self.value:
+            raise ValueError("repository ID is not a canonical UUID v4")
+
+    @classmethod
+    def new(cls) -> RepositoryId:
+        """Create one canonical UUID-v4 repository identity."""
+        return cls(str(uuid4()))
+
+    def __str__(self) -> str:
+        return self.value
+
+
+@dataclass(frozen=True)
+class RepositoryPath:
+    """Physically canonical absolute path of one local repository."""
+
+    value: Path
+
+    def __post_init__(self) -> None:
+        if not self.value.is_absolute():
+            raise ValueError("repository path must be absolute")
+
+    def __fspath__(self) -> str:
+        return str(self.value)
+
+    def __str__(self) -> str:
+        return str(self.value)
+
+
+@dataclass(frozen=True)
+class RegisteredRepository:
+    """Successful registration result passed between application layers."""
+
+    repo_id: RepositoryId
+    path: RepositoryPath

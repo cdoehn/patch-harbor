@@ -62,6 +62,7 @@ def test_path_kind_does_not_follow_symbolic_links(tmp_path: Path) -> None:
     assert path_kind(missing) is PathKind.MISSING
     assert path_kind(regular) is PathKind.REGULAR_FILE
     assert path_kind(directory) is PathKind.DIRECTORY
+    assert PathKind.JUNCTION is not PathKind.DIRECTORY
 
 
 def test_filesystem_operation_error_exposes_stable_operation() -> None:
