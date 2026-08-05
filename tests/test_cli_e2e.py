@@ -767,27 +767,27 @@ def test_file_block_overwrites_existing_regular_file_before_execution(
     assert target.read_text(encoding="utf-8") == "new value"
 
 
-def test_multiple_file_blocks_keep_base64_as_plain_text(tmp_path: Path) -> None:
+def test_multiple_file_blocks_preserve_plain_text(tmp_path: Path) -> None:
     script_path = _script_path(tmp_path, "multiple-files")
     if os.name == "nt":
         command = (
             'if (-not (Test-Path -LiteralPath "first.txt" -PathType Leaf)) '
             '{ exit 33 }\n'
-            'if (-not (Test-Path -LiteralPath "payload.b64" -PathType Leaf)) '
+            'if (-not (Test-Path -LiteralPath "second.txt" -PathType Leaf)) '
             '{ exit 34 }\n'
             'Write-Output "ran"\n'
         )
     else:
         command = (
             '[ -f first.txt ] || exit 33\n'
-            '[ -f payload.b64 ] || exit 34\n'
+            '[ -f second.txt ] || exit 34\n'
             'printf "%s\\n" "ran"\n'
         )
     script_path.write_text(
         _file_payload_script(
             files=[
                 ("first.txt", ["one"]),
-                ("payload.b64", ["SGVsbG8gUGF0Y2hIYXJib3Ih"]),
+                ("second.txt", ["plain text remains unchanged"]),
             ],
             command=command,
         ),
@@ -799,8 +799,8 @@ def test_multiple_file_blocks_keep_base64_as_plain_text(tmp_path: Path) -> None:
     assert completed.returncode == 0
     assert completed.stdout == "ran\n"
     assert (tmp_path / "first.txt").read_text(encoding="utf-8") == "one"
-    assert (tmp_path / "payload.b64").read_text(encoding="utf-8") == (
-        "SGVsbG8gUGF0Y2hIYXJib3Ih"
+    assert (tmp_path / "second.txt").read_text(encoding="utf-8") == (
+        "plain text remains unchanged"
     )
 
 

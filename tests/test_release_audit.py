@@ -33,14 +33,6 @@ EXPECTED_RUNTIME_FILES = {
     "platform/runtime.py",
     "platform/windows.py",
 }
-DEFERRED_FEATURE_MODULES = {
-    "clipboard.py",
-    "git.py",
-    "save.py",
-    "ssh.py",
-    "tests.py",
-    "websocket.py",
-}
 
 
 def test_runtime_module_inventory_matches_the_release_architecture() -> None:
@@ -50,7 +42,6 @@ def test_runtime_module_inventory_matches_the_release_architecture() -> None:
     }
 
     assert observed == EXPECTED_RUNTIME_FILES
-    assert observed.isdisjoint(DEFERRED_FEATURE_MODULES)
 
 
 def test_release_entry_point_and_runtime_dependency_contract_are_exact() -> None:

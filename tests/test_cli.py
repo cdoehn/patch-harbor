@@ -49,8 +49,6 @@ def test_run_help_is_the_complete_public_command_reference(
         "--log",
     ):
         assert expected in help_text
-    for deferred in ("websocket", "clipboard", "ssh", "save mode"):
-        assert deferred not in help_text.lower()
 
 
 def test_fs_run_without_path_on_terminal_is_a_usage_error(

@@ -130,17 +130,17 @@ def test_platform_zip_patchbundle_preserves_binary_payload(
         script_name = "apply.ps1"
         script = (
             f"{REQUIRED_MARKER}\n"
-            '$actual = [Convert]::ToBase64String('
-            '[IO.File]::ReadAllBytes("assets/blob.bin"))\n'
-            'if ($actual -ne "AAECf4D/UEFUQ0hIQVJCT1I=") { exit 42 }\n'
+            '$actual = [BitConverter]::ToString('
+            '[IO.File]::ReadAllBytes("assets/blob.bin")).Replace("-", "")\n'
+            'if ($actual -ne "0001027F80FF5041544348484152424F52") { exit 42 }\n'
             '[Console]::Out.WriteLine("bundle-ok")\n'
         )
     else:
         script_name = "apply.sh"
         script = (
             f"{REQUIRED_MARKER}\n"
-            'actual="$(base64 < assets/blob.bin | tr -d "\\n")"\n'
-            '[ "$actual" = "AAECf4D/UEFUQ0hIQVJCT1I=" ] || exit 42\n'
+            'actual="$(od -An -tx1 -v assets/blob.bin | tr -d " \\n")"\n'
+            '[ "$actual" = "0001027f80ff5041544348484152424f52" ] || exit 42\n'
             'printf "%s\\n" "bundle-ok"\n'
         )
     with zipfile.ZipFile(archive_path, "w") as archive:
