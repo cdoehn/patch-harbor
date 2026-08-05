@@ -317,7 +317,7 @@ def test_dashboard_redraws_when_terminal_width_changes() -> None:
         dashboard.close()
 
 
-def test_application_supplies_messages_and_inline_files_to_presentation(
+def test_application_supplies_messages_without_inline_files_to_presentation(
     tmp_path: Path,
 ) -> None:
     script_path = tmp_path / "presented-script.txt"
@@ -325,10 +325,7 @@ def test_application_supplies_messages_and_inline_files_to_presentation(
         "# PATCHHARBOR\n"
         "# PATCHHARBOR MESSAGE commit.last START\n"
         "# Parser updated\n"
-        "# PATCHHARBOR MESSAGE commit.last END\n"
-        "# PATCHHARBOR FILE note.txt START\n"
-        "# payload\n"
-        "# PATCHHARBOR FILE note.txt END\n",
+        "# PATCHHARBOR MESSAGE commit.last END\n",
         encoding="utf-8",
     )
     presentation = _RecordingPresentation()
@@ -355,11 +352,4 @@ def test_application_supplies_messages_and_inline_files_to_presentation(
     assert presentation.script["script_index"] == 1
     assert presentation.script["script_total"] == 1
     assert presentation.script["messages"] == (("commit.last", "Parser updated"),)
-    assert presentation.script["inline_files"] == (
-        PresentedFile(
-            name="note.txt",
-            size_bytes=7,
-            kind="FILE",
-        ),
-    )
-    assert (tmp_path / "note.txt").read_text(encoding="utf-8") == "payload"
+    assert presentation.script["inline_files"] == ()

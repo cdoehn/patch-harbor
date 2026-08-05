@@ -4,7 +4,6 @@ import pytest
 
 from patchharbor.parser import (
     Message,
-    PayloadFile,
     Metadata,
     ScriptFormatError,
     parse_script,
@@ -155,90 +154,4 @@ def test_duplicate_optional_data_warnings_are_reported_once() -> None:
     assert parsed.warnings == (
         "ignored invalid META directive",
         "discarded invalid MESSAGE block",
-    )
-
-
-def test_multiple_file_blocks_are_parsed_in_order() -> None:
-    parsed = parse_script(
-        "\n".join(
-            (
-                "# PATCHHARBOR",
-                "# PATCHHARBOR FILE first.txt START",
-                "# first line",
-                "#",
-                "# third line",
-                "# PATCHHARBOR FILE first.txt END",
-                "# PATCHHARBOR FILE payload.b64 START",
-                "# SGVsbG8=",
-                "# PATCHHARBOR FILE payload.b64 END",
-            )
-        )
-    )
-
-    assert parsed.payload_files == (
-        PayloadFile(name="first.txt", text="first line\n\nthird line"),
-        PayloadFile(name="payload.b64", text="SGVsbG8="),
-    )
-
-
-@pytest.mark.parametrize(
-    "name",
-    (
-        ".",
-        "..",
-        "folder/file.txt",
-        r"folder\file.txt",
-        "name.",
-        "name ",
-        "CON.txt",
-        "LPT9",
-        "ä.txt",
-        "a" * 129,
-    ),
-)
-def test_file_name_is_described_without_filesystem_validation(name: str) -> None:
-    parsed = parse_script(
-        "\n".join(
-            (
-                "# PATCHHARBOR",
-                f"# PATCHHARBOR FILE {name} START",
-                "# retained for payload validation",
-                f"# PATCHHARBOR FILE {name} END",
-            )
-        )
-    )
-
-    assert parsed.payload_files == (
-        PayloadFile(name=name, text="retained for payload validation"),
-    )
-    assert parsed.warnings == ()
-
-
-def test_damaged_file_blocks_are_discarded_without_losing_later_file() -> None:
-    parsed = parse_script(
-        "\n".join(
-            (
-                "# PATCHHARBOR",
-                "# PATCHHARBOR FILE mismatch.txt START",
-                "# ignored",
-                "# PATCHHARBOR FILE other.txt END",
-                "# PATCHHARBOR FILE uncommented.txt START",
-                "not commented",
-                "# PATCHHARBOR FILE uncommented.txt END",
-                "# PATCHHARBOR FILE good.txt START",
-                "# retained",
-                "# PATCHHARBOR FILE good.txt END",
-                "# PATCHHARBOR FILE unfinished.txt START",
-                "# ignored",
-            )
-        )
-    )
-
-    assert parsed.payload_files == (
-        PayloadFile(name="good.txt", text="retained"),
-    )
-    assert parsed.warnings == (
-        "discarded FILE 'mismatch.txt': END name 'other.txt' does not match",
-        "discarded FILE 'uncommented.txt': content is not fully commented",
-        "discarded FILE 'unfinished.txt': missing END marker",
     )

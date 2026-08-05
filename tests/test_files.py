@@ -384,7 +384,7 @@ def test_posix_fifo_bundle_target_is_not_replaced(tmp_path: Path) -> None:
     assert target.exists()
 
 
-def test_runner_applies_shared_policy_to_inline_file_before_execution(
+def test_runner_treats_file_directives_as_plain_script_comments(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -393,14 +393,14 @@ def test_runner_applies_shared_policy_to_inline_file_before_execution(
     import patchharbor.application as script_application
     from patchharbor.application import run_script_path
 
-    script_path = tmp_path / "oversized-inline.sh"
-    script_path.write_text(
+    script_path = tmp_path / "legacy-file-comments.sh"
+    script_text = (
         "# PATCHHARBOR\n"
         "# PATCHHARBOR FILE payload.txt START\n"
         "# 1234\n"
-        "# PATCHHARBOR FILE payload.txt END\n",
-        encoding="utf-8",
+        "# PATCHHARBOR FILE payload.txt END\n"
     )
+    script_path.write_text(script_text, encoding="utf-8")
     policy = ResourcePolicy(
         warning_bytes=1,
         max_input_artifact_bytes=1024,
@@ -411,20 +411,18 @@ def test_runner_applies_shared_policy_to_inline_file_before_execution(
     monkeypatch.setattr(
         script_application,
         "execute_script_text",
-        lambda script_text, **kwargs: executed.append(script_text) or 0,
+        lambda submitted_text, **kwargs: executed.append(submitted_text) or 0,
     )
 
-    with pytest.raises(PatchHarborError) as raised:
-        run_script_path(
-            script_path,
-            cwd=tmp_path,
-            timeout_seconds=1,
-            selection_input=StringIO(),
-            selection_output=StringIO(),
-            resource_policy=policy,
-        )
+    result = run_script_path(
+        script_path,
+        cwd=tmp_path,
+        timeout_seconds=1,
+        selection_input=StringIO(),
+        selection_output=StringIO(),
+        resource_policy=policy,
+    )
 
-    assert raised.value.exit_code is ExitCode.SOURCE_ERROR
-    assert "exceeds the 3 byte limit" in str(raised.value)
-    assert executed == []
+    assert result == 0
+    assert executed == [script_text]
     assert not (tmp_path / "payload.txt").exists()

@@ -87,40 +87,6 @@ def test_platform_uses_system_temp_for_staging_and_requested_cwd(
     assert not Path(observed_script).exists()
 
 
-def test_platform_inline_file_is_available_before_script_execution(
-    tmp_path: Path,
-) -> None:
-    source_path = tmp_path / "inline-payload.txt"
-    body = native_value(
-        (
-            '[ "$(cat platform.txt)" = "platform-data" ] || exit 41\n'
-            'printf "%s\\n" "inline-ok"'
-        ),
-        (
-            'if ([IO.File]::ReadAllText("platform.txt") -ne '
-            '"platform-data") { exit 41 }\n'
-            '[Console]::Out.WriteLine("inline-ok")'
-        ),
-    )
-    source_path.write_text(
-        f"{REQUIRED_MARKER}\n"
-        "# PATCHHARBOR FILE platform.txt START\n"
-        "# platform-data\n"
-        "# PATCHHARBOR FILE platform.txt END\n"
-        f"{body}\n",
-        encoding="utf-8",
-    )
-
-    completed = run_patchharbor(source_path, cwd=tmp_path)
-
-    assert completed.returncode == 0
-    assert completed.stdout == "inline-ok\n"
-    assert completed.stderr == ""
-    assert (tmp_path / "platform.txt").read_text(encoding="utf-8") == (
-        "platform-data"
-    )
-
-
 def test_platform_zip_patchbundle_preserves_binary_payload(
     tmp_path: Path,
 ) -> None:

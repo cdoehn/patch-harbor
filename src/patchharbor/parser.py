@@ -6,17 +6,13 @@ from dataclasses import dataclass
 import re
 
 
-
 REQUIRED_MARKER = "# PATCHHARBOR"
 _NAME = r"[A-Za-z0-9.]+"
 _META_PREFIX = "# PATCHHARBOR META "
 _META_PATTERN = re.compile(rf"^# PATCHHARBOR META ({_NAME})=(.*)$")
-_BLOCK_START_PATTERN = re.compile(
-    r"^# PATCHHARBOR (MESSAGE|FILE) (.+) START$"
-)
-_BLOCK_END_PATTERN = re.compile(
-    r"^# PATCHHARBOR (MESSAGE|FILE) (.+) END$"
-)
+_MESSAGE_START_PATTERN = re.compile(r"^# PATCHHARBOR MESSAGE (.+) START$")
+_MESSAGE_END_PATTERN = re.compile(r"^# PATCHHARBOR MESSAGE (.+) END$")
+_MESSAGE_START_PREFIX = "# PATCHHARBOR MESSAGE "
 
 
 class ScriptFormatError(ValueError):
@@ -40,21 +36,12 @@ class Message:
 
 
 @dataclass(frozen=True)
-class PayloadFile:
-    """One text file transferred alongside a script."""
-
-    name: str
-    text: str
-
-
-@dataclass(frozen=True)
 class ParsedScript:
     """Structured script data passed to later processing layers."""
 
     text: str
     metadata: tuple[Metadata, ...]
     messages: tuple[Message, ...]
-    payload_files: tuple[PayloadFile, ...]
     warnings: tuple[str, ...]
 
 
@@ -74,12 +61,8 @@ def _comment_content(line: str) -> str | None:
     return None
 
 
-def _invalid_block_start(line: str) -> str | None:
-    for kind in ("MESSAGE", "FILE"):
-        prefix = f"# PATCHHARBOR {kind} "
-        if line.startswith(prefix) and line.endswith(" START"):
-            return kind
-    return None
+def _invalid_message_start(line: str) -> bool:
+    return line.startswith(_MESSAGE_START_PREFIX) and line.endswith(" START")
 
 
 def parse_script(script_text: str) -> ParsedScript:
@@ -87,65 +70,54 @@ def parse_script(script_text: str) -> ParsedScript:
     validate_required_marker(script_text)
     metadata: list[Metadata] = []
     messages: list[Message] = []
-    payload_files: list[PayloadFile] = []
     warnings: list[str] = []
     seen_warnings: set[str] = set()
 
-    active_kind: str | None = None
     active_name: str | None = None
     active_content: list[str] = []
     active_content_is_valid = True
-    discarding_kind: str | None = None
+    discarding_message = False
 
     def warn(text: str) -> None:
         if text not in seen_warnings:
             warnings.append(text)
             seen_warnings.add(text)
 
-    def reset_active_block() -> None:
-        nonlocal active_kind, active_name, active_content
-        nonlocal active_content_is_valid
-        active_kind = None
+    def reset_active_message() -> None:
+        nonlocal active_name, active_content, active_content_is_valid
         active_name = None
         active_content = []
         active_content_is_valid = True
 
     for line in script_text.splitlines():
-        end_match = _BLOCK_END_PATTERN.fullmatch(line)
+        end_match = _MESSAGE_END_PATTERN.fullmatch(line)
 
-        if discarding_kind is not None:
-            if end_match and end_match.group(1) == discarding_kind:
-                discarding_kind = None
+        if discarding_message:
+            if end_match:
+                discarding_message = False
             continue
 
-        if active_kind is not None and active_name is not None:
+        if active_name is not None:
             if end_match:
-                end_kind, end_name = end_match.groups()
-                if end_kind != active_kind or end_name != active_name:
+                end_name = end_match.group(1)
+                if end_name != active_name:
                     warn(
-                        f"discarded {active_kind} {active_name!r}: "
+                        f"discarded MESSAGE {active_name!r}: "
                         f"END name {end_name!r} does not match"
                     )
                 elif not active_content_is_valid:
                     warn(
-                        f"discarded {active_kind} {active_name!r}: "
+                        f"discarded MESSAGE {active_name!r}: "
                         "content is not fully commented"
                     )
-                elif active_kind == "MESSAGE":
+                else:
                     messages.append(
                         Message(
                             name=active_name,
                             text="\n".join(active_content),
                         )
                     )
-                else:
-                    payload_files.append(
-                        PayloadFile(
-                            name=active_name,
-                            text="\n".join(active_content),
-                        )
-                    )
-                reset_active_block()
+                reset_active_message()
                 continue
 
             content_line = _comment_content(line)
@@ -168,27 +140,25 @@ def parse_script(script_text: str) -> ParsedScript:
             warn("ignored invalid META directive")
             continue
 
-        if start_match := _BLOCK_START_PATTERN.fullmatch(line):
-            kind, name = start_match.groups()
-            if kind == "MESSAGE" and re.fullmatch(_NAME, name) is None:
+        if start_match := _MESSAGE_START_PATTERN.fullmatch(line):
+            name = start_match.group(1)
+            if re.fullmatch(_NAME, name) is None:
                 warn("discarded invalid MESSAGE block")
-                discarding_kind = kind
+                discarding_message = True
             else:
-                active_kind = kind
                 active_name = name
             continue
 
-        if invalid_kind := _invalid_block_start(line):
-            warn(f"discarded invalid {invalid_kind} block")
-            discarding_kind = invalid_kind
+        if _invalid_message_start(line):
+            warn("discarded invalid MESSAGE block")
+            discarding_message = True
 
-    if active_kind is not None and active_name is not None:
-        warn(f"discarded {active_kind} {active_name!r}: missing END marker")
+    if active_name is not None:
+        warn(f"discarded MESSAGE {active_name!r}: missing END marker")
 
     return ParsedScript(
         text=script_text,
         metadata=tuple(metadata),
         messages=tuple(messages),
-        payload_files=tuple(payload_files),
         warnings=tuple(warnings),
     )
