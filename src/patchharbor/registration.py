@@ -5,14 +5,27 @@ from __future__ import annotations
 from collections import Counter
 from pathlib import Path
 
-from patchharbor.errors import ExitCode, PatchHarborError
+from patchharbor.errors import (
+    PatchHarborError,
+    registry_error,
+    repository_resolution_error,
+)
 from patchharbor.models import (
+    RegistryListResult,
+    RegistryMapping,
     RegistryRepository,
+    RegistrySnapshot,
     RegistryStatus,
     RepositoryId,
     RepositoryPath,
 )
-from patchharbor.registry import load_registry, registry_lock, write_registry
+from patchharbor.registry import (
+    load_registry,
+    registry_entries,
+    registry_lock,
+    registry_snapshot,
+    write_registry,
+)
 from patchharbor.repository import (
     apply_local_registration,
     canonicalize_repository_reference,
@@ -24,10 +37,6 @@ from patchharbor.repository import (
 from patchharbor.user_paths import registration_user_paths
 
 
-def _error(message: str) -> PatchHarborError:
-    return PatchHarborError(message, ExitCode.REPOSITORY_ERROR)
-
-
 def register_local_repository(
     path: Path,
 ) -> tuple[RepositoryId, RepositoryPath]:
@@ -35,19 +44,20 @@ def register_local_repository(
     user_paths = registration_user_paths()
     with registry_lock(user_paths):
         repository = inspect_repository(path)
-        repositories = load_registry(user_paths)
+        snapshot = load_registry(user_paths)
+        repositories = registry_entries(snapshot)
         existing_id, local_state = inspect_local_registration(repository)
         repo_id = existing_id or RepositoryId.new()
 
         try:
             apply_local_registration(local_state, repo_id)
             repositories[repo_id] = repository
-            write_registry(user_paths, repositories)
+            write_registry(user_paths, registry_snapshot(repositories))
         except PatchHarborError:
             try:
                 restore_local_registration(local_state)
             except PatchHarborError as rollback_error:
-                raise _error(
+                raise registry_error(
                     "registration failed and local state could not be restored"
                 ) from rollback_error
             raise
@@ -55,28 +65,82 @@ def register_local_repository(
     return repo_id, repository
 
 
-def list_registered_repositories() -> tuple[RegistryRepository, ...]:
-    """Read one locked registry snapshot and resolve every mapping status."""
+def resolve_registry_snapshot(snapshot: RegistrySnapshot) -> RegistryListResult:
+    """Resolve file-system status without changing the captured mappings."""
+    path_counts = Counter(
+        str(mapping.repository_path) for mapping in snapshot.repositories
+    )
+    repositories: list[RegistryRepository] = []
+    for mapping in snapshot.repositories:
+        status = registered_repository_status(
+            mapping.repository_path,
+            mapping.repo_id,
+        )
+        if path_counts[str(mapping.repository_path)] > 1:
+            status = RegistryStatus.CONFLICT
+        repositories.append(
+            RegistryRepository(
+                repo_id=mapping.repo_id,
+                repository_path=mapping.repository_path,
+                status=status,
+            )
+        )
+    return RegistryListResult(repositories=tuple(repositories))
+
+
+def list_registered_repositories() -> RegistryListResult:
+    """Capture one locked snapshot, then resolve its observed statuses."""
     user_paths = registration_user_paths()
     with registry_lock(user_paths):
-        repositories = load_registry(user_paths)
-        path_counts = Counter(str(path) for path in repositories.values())
-        result: list[RegistryRepository] = []
-        for repo_id, repository_path in sorted(
-            repositories.items(),
-            key=lambda item: str(item[0]).encode("ascii"),
-        ):
-            status = registered_repository_status(repository_path, repo_id)
-            if path_counts[str(repository_path)] > 1:
-                status = RegistryStatus.CONFLICT
-            result.append(
-                RegistryRepository(
-                    repo_id=repo_id,
-                    repository_path=repository_path,
-                    status=status,
-                )
+        snapshot = load_registry(user_paths)
+    return resolve_registry_snapshot(snapshot)
+
+
+def resolve_unregister_mapping(
+    snapshot: RegistrySnapshot,
+    selector: str,
+    *,
+    cwd: Path,
+) -> RegistryMapping:
+    """Resolve one exact canonical UUID or one exact canonical path."""
+    try:
+        selected_id = RepositoryId(selector)
+    except ValueError:
+        requested_path = Path(selector).expanduser()
+        if not requested_path.is_absolute():
+            requested_path = cwd / requested_path
+        selected_path = canonicalize_repository_reference(requested_path)
+        matches = tuple(
+            mapping
+            for mapping in snapshot.repositories
+            if mapping.repository_path == selected_path
+        )
+        if not matches:
+            raise repository_resolution_error("repository is not registered")
+        if len(matches) != 1:
+            raise repository_resolution_error(
+                "repository path has conflicting registrations"
             )
-        return tuple(result)
+        return matches[0]
+
+    for mapping in snapshot.repositories:
+        if mapping.repo_id == selected_id:
+            return mapping
+    raise repository_resolution_error("repository ID is not registered")
+
+
+def remove_registry_mapping(
+    snapshot: RegistrySnapshot,
+    repo_id: RepositoryId,
+) -> RegistrySnapshot:
+    """Return a new snapshot without exactly one repository ID."""
+    return RegistrySnapshot(
+        repositories=tuple(
+            mapping
+            for mapping in snapshot.repositories
+            if mapping.repo_id != repo_id
+        )
+    )
 
 
 def unregister_local_repository(
@@ -87,30 +151,10 @@ def unregister_local_repository(
     """Remove exactly one central mapping while preserving its local ID."""
     user_paths = registration_user_paths()
     with registry_lock(user_paths):
-        repositories = load_registry(user_paths)
-        try:
-            selected_id = RepositoryId(selector)
-        except ValueError:
-            requested_path = Path(selector).expanduser()
-            if not requested_path.is_absolute():
-                requested_path = cwd / requested_path
-            selected_path = canonicalize_repository_reference(requested_path)
-            matches = tuple(
-                (repo_id, repository_path)
-                for repo_id, repository_path in repositories.items()
-                if repository_path == selected_path
-            )
-            if not matches:
-                raise _error("repository is not registered")
-            if len(matches) != 1:
-                raise _error("repository path has conflicting registrations")
-            selected_id, selected_path = matches[0]
-        else:
-            try:
-                selected_path = repositories[selected_id]
-            except KeyError as exc:
-                raise _error("repository ID is not registered") from exc
-
-        del repositories[selected_id]
-        write_registry(user_paths, repositories)
-        return selected_id, selected_path
+        snapshot = load_registry(user_paths)
+        selected = resolve_unregister_mapping(snapshot, selector, cwd=cwd)
+        write_registry(
+            user_paths,
+            remove_registry_mapping(snapshot, selected.repo_id),
+        )
+        return selected.repo_id, selected.repository_path

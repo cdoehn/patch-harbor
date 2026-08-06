@@ -8,7 +8,7 @@ from contextlib import nullcontext
 import json
 from pathlib import Path
 import sys
-from typing import TextIO
+from typing import Any, TextIO
 
 from patchharbor import __version__
 from patchharbor.application import (
@@ -231,6 +231,46 @@ def _write_json_document(document: dict[str, object], stream: TextIO) -> None:
     stream.write("\n")
 
 
+def _json_envelope(
+    command: str,
+    *,
+    result: dict[str, object] | None,
+    error: PatchHarborError | None,
+    process_exit_code: int,
+) -> dict[str, object]:
+    structured_error: dict[str, object] | None = None
+    if error is not None:
+        structured_error = {
+            "kind": error.error_kind.value,
+            "message": str(error),
+            "patchharbor_error_code": int(error.exit_code),
+            "emergency_diagnostics_path": None,
+        }
+    return {
+        "output_version": 1,
+        "command": command,
+        "success": process_exit_code == 0,
+        "result": result,
+        "error": structured_error,
+        "process_exit_code": process_exit_code,
+    }
+
+
+def _registry_list_json_result(
+    result: Any,
+) -> dict[str, object]:
+    return {
+        "repositories": [
+            {
+                "repo_id": str(repository.repo_id),
+                "repository_path": str(repository.repository_path),
+                "status": repository.status.value,
+            }
+            for repository in result.repositories
+        ]
+    }
+
+
 def _registry_list_command(
     *,
     json_output: bool,
@@ -238,24 +278,17 @@ def _registry_list_command(
     stderr: TextIO,
 ) -> int:
     try:
-        repositories = registered_repositories()
+        result = registered_repositories()
     except PatchHarborError as exc:
         exit_code = int(exc.exit_code)
         if json_output:
             _write_json_document(
-                {
-                    "output_version": 1,
-                    "command": "registry.list",
-                    "success": False,
-                    "result": None,
-                    "error": {
-                        "kind": "registry_error",
-                        "message": str(exc),
-                        "patchharbor_error_code": exit_code,
-                        "emergency_diagnostics_path": None,
-                    },
-                    "process_exit_code": exit_code,
-                },
+                _json_envelope(
+                    "registry.list",
+                    result=None,
+                    error=exc,
+                    process_exit_code=exit_code,
+                ),
                 stdout,
             )
         else:
@@ -264,29 +297,16 @@ def _registry_list_command(
 
     if json_output:
         _write_json_document(
-            {
-                "output_version": 1,
-                "command": "registry.list",
-                "success": True,
-                "result": {
-                    "repositories": [
-                        {
-                            "repo_id": str(repository.repo_id),
-                            "repository_path": str(
-                                repository.repository_path
-                            ),
-                            "status": repository.status.value,
-                        }
-                        for repository in repositories
-                    ]
-                },
-                "error": None,
-                "process_exit_code": 0,
-            },
+            _json_envelope(
+                "registry.list",
+                result=_registry_list_json_result(result),
+                error=None,
+                process_exit_code=0,
+            ),
             stdout,
         )
     else:
-        for repository in repositories:
+        for repository in result.repositories:
             print(
                 f"{repository.repo_id}\t{repository.status.value}\t"
                 f"{repository.repository_path}",

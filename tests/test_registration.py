@@ -1,20 +1,31 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 import pytest
 
-from patchharbor.errors import ExitCode, PatchHarborError
+from patchharbor.errors import ErrorKind, ExitCode, PatchHarborError
 from patchharbor.models import RepositoryId, RepositoryPath
-from patchharbor.registration import register_local_repository
-from patchharbor.registry import registry_lock, write_registry
+from patchharbor.registration import (
+    list_registered_repositories,
+    register_local_repository,
+)
+from patchharbor.registry import (
+    registry_lock,
+    registry_snapshot,
+    write_registry,
+)
 from patchharbor.repository import (
     apply_local_registration,
     inspect_local_registration,
     inspect_repository,
 )
-from patchharbor.user_paths import RegistrationUserPaths
+from patchharbor.user_paths import (
+    RegistrationUserPaths,
+    registration_user_paths,
+)
 from tests.registration_support import (
     create_repository,
     git,
@@ -110,7 +121,7 @@ def test_registry_replacement_preserves_the_previous_snapshot_on_failure(
     }
 
     with pytest.raises(PatchHarborError) as captured:
-        write_registry(paths, entries)
+        write_registry(paths, registry_snapshot(entries))
 
     assert captured.value.exit_code is ExitCode.REPOSITORY_ERROR
     assert paths.registry_path.read_bytes() == previous_bytes
@@ -138,3 +149,49 @@ def test_registry_lock_is_removed_when_acquisition_setup_fails(
 
     assert captured.value.exit_code is ExitCode.REPOSITORY_ERROR
     assert not paths.registry_lock_path.exists()
+
+
+def test_registry_status_resolution_runs_after_snapshot_lock_is_released(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repository = create_repository(tmp_path / "repository")
+    set_isolated_user_environment(monkeypatch, tmp_path / "user")
+    register_local_repository(repository)
+    user_paths = registration_user_paths()
+    observed_lock_reacquisition = False
+
+    from patchharbor.repository import registered_repository_status as real_status
+
+    def resolve_status(*args: object, **kwargs: object):
+        nonlocal observed_lock_reacquisition
+        with registry_lock(user_paths):
+            observed_lock_reacquisition = True
+        return real_status(*args, **kwargs)
+
+    monkeypatch.setattr(
+        "patchharbor.registration.registered_repository_status",
+        resolve_status,
+    )
+
+    result = list_registered_repositories()
+
+    assert observed_lock_reacquisition is True
+    assert len(result.repositories) == 1
+    assert result.repositories[0].repository_path.value == repository.resolve()
+
+
+def test_registration_user_path_failures_use_the_registry_error_category(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    if os.name == "nt":
+        monkeypatch.delenv("APPDATA", raising=False)
+        monkeypatch.delenv("LOCALAPPDATA", raising=False)
+    else:
+        monkeypatch.delenv("HOME", raising=False)
+
+    with pytest.raises(PatchHarborError) as captured:
+        registration_user_paths()
+
+    assert captured.value.exit_code is ExitCode.REPOSITORY_ERROR
+    assert captured.value.error_kind is ErrorKind.REGISTRY_ERROR

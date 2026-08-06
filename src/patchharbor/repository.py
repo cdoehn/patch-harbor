@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 import subprocess
 
-from patchharbor.errors import ExitCode, PatchHarborError
+from patchharbor.errors import PatchHarborError, repository_resolution_error
 from patchharbor.models import (
     RegistryStatus,
     RepositoryId,
@@ -40,7 +40,7 @@ class LocalRegistrationState:
 
 
 def _error(message: str) -> PatchHarborError:
-    return PatchHarborError(message, ExitCode.REPOSITORY_ERROR)
+    return repository_resolution_error(message)
 
 
 def _run_git(

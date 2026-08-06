@@ -87,9 +87,31 @@ class RegistryStatus(str, Enum):
 
 
 @dataclass(frozen=True)
+class RegistryMapping:
+    """One immutable central mapping from repository ID to local path."""
+
+    repo_id: RepositoryId
+    repository_path: RepositoryPath
+
+
+@dataclass(frozen=True)
+class RegistrySnapshot:
+    """One complete, consistently read central registry snapshot."""
+
+    repositories: tuple[RegistryMapping, ...]
+
+
+@dataclass(frozen=True)
 class RegistryRepository:
     """One registered repository together with its observed status."""
 
     repo_id: RepositoryId
     repository_path: RepositoryPath
     status: RegistryStatus
+
+
+@dataclass(frozen=True)
+class RegistryListResult:
+    """Structured result of resolving all mappings in one snapshot."""
+
+    repositories: tuple[RegistryRepository, ...]

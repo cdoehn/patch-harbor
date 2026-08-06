@@ -418,6 +418,54 @@ def test_unregister_unknown_id_preserves_registry_and_local_identity(
     assert id_path.read_bytes() == id_before
 
 
+def test_unregister_selector_is_exact_and_uuid_shaped_paths_are_explicit(
+    tmp_path: Path,
+) -> None:
+    directory_name = str(uuid4())
+    repository = create_repository(tmp_path / directory_name)
+    environment = isolated_user_environment(tmp_path / "user")
+    registered = run_cli(
+        repository,
+        "register",
+        environment_overrides=environment,
+    )
+    assert registered.returncode == 0
+    registry_path = _registry_path(environment)
+    registry_before = registry_path.read_bytes()
+    registered_id = _registered_id(repository)
+
+    id_prefix = run_cli(
+        tmp_path,
+        "unregister",
+        registered_id[:8],
+        environment_overrides=environment,
+    )
+    bare_uuid_path = run_cli(
+        tmp_path,
+        "unregister",
+        directory_name,
+        environment_overrides=environment,
+    )
+
+    assert id_prefix.returncode == 8
+    assert bare_uuid_path.returncode == 8
+    assert registry_path.read_bytes() == registry_before
+
+    explicit_path = f".{os.sep}{directory_name}"
+    completed = run_cli(
+        tmp_path,
+        "unregister",
+        explicit_path,
+        environment_overrides=environment,
+    )
+
+    assert completed.returncode == 0
+    assert json.loads(registry_path.read_text(encoding="utf-8")) == {
+        "format_version": 1,
+        "repositories": {},
+    }
+
+
 def test_registry_list_reads_only_while_holding_the_global_lock(
     tmp_path: Path,
 ) -> None:
@@ -436,12 +484,29 @@ def test_registry_list_reads_only_while_holding_the_global_lock(
 
     assert completed.returncode == 8
     document = json.loads(completed.stdout)
+    assert set(document) == {
+        "output_version",
+        "command",
+        "success",
+        "result",
+        "error",
+        "process_exit_code",
+    }
     assert document["output_version"] == 1
     assert document["command"] == "registry.list"
     assert document["success"] is False
     assert document["result"] is None
     assert document["process_exit_code"] == 8
+    assert set(document["error"]) == {
+        "kind",
+        "message",
+        "patchharbor_error_code",
+        "emergency_diagnostics_path",
+    }
+    assert document["error"]["kind"] == "registry_error"
+    assert isinstance(document["error"]["message"], str)
     assert document["error"]["patchharbor_error_code"] == 8
+    assert document["error"]["emergency_diagnostics_path"] is None
 
 
 def test_unregister_respects_the_global_registry_lock(tmp_path: Path) -> None:

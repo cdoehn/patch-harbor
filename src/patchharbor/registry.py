@@ -2,14 +2,20 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from contextlib import contextmanager
 import json
 import os
 from pathlib import Path
 from typing import Iterator
 
-from patchharbor.errors import ExitCode, PatchHarborError
-from patchharbor.models import RepositoryId, RepositoryPath
+from patchharbor.errors import PatchHarborError, registry_error
+from patchharbor.models import (
+    RegistryMapping,
+    RegistrySnapshot,
+    RepositoryId,
+    RepositoryPath,
+)
 from patchharbor.platform.filesystem import (
     FileSystemOperationError,
     PathKind,
@@ -23,7 +29,30 @@ RegistryEntries = dict[RepositoryId, RepositoryPath]
 
 
 def _error(message: str) -> PatchHarborError:
-    return PatchHarborError(message, ExitCode.REPOSITORY_ERROR)
+    return registry_error(message)
+
+
+def registry_snapshot(
+    repositories: Mapping[RepositoryId, RepositoryPath],
+) -> RegistrySnapshot:
+    """Freeze one mapping set in canonical repository-ID order."""
+    return RegistrySnapshot(
+        repositories=tuple(
+            RegistryMapping(repo_id=repo_id, repository_path=repository_path)
+            for repo_id, repository_path in sorted(
+                repositories.items(),
+                key=lambda item: str(item[0]).encode("ascii"),
+            )
+        )
+    )
+
+
+def registry_entries(snapshot: RegistrySnapshot) -> RegistryEntries:
+    """Create a mutable working copy of one immutable registry snapshot."""
+    return {
+        mapping.repo_id: mapping.repository_path
+        for mapping in snapshot.repositories
+    }
 
 
 @contextmanager
@@ -61,7 +90,7 @@ def registry_lock(paths: RegistrationUserPaths) -> Iterator[None]:
                 pass
 
 
-def load_registry(paths: RegistrationUserPaths) -> RegistryEntries:
+def load_registry(paths: RegistrationUserPaths) -> RegistrySnapshot:
     """Read and validate one complete central registry snapshot."""
     path = paths.registry_path
     try:
@@ -69,7 +98,7 @@ def load_registry(paths: RegistrationUserPaths) -> RegistryEntries:
     except FileSystemOperationError as exc:
         raise _error(f"cannot inspect repository registry: {exc.cause}") from exc
     if kind is PathKind.MISSING:
-        return {}
+        return registry_snapshot({})
     if kind is not PathKind.REGULAR_FILE:
         raise _error("repository registry must be a regular file")
 
@@ -94,22 +123,19 @@ def load_registry(paths: RegistrationUserPaths) -> RegistryEntries:
         except ValueError as exc:
             raise _error(f"repository registry entry is invalid: {exc}") from exc
         entries[repo_id] = repository_path
-    return entries
+    return registry_snapshot(entries)
 
 
 def write_registry(
     paths: RegistrationUserPaths,
-    repositories: RegistryEntries,
+    snapshot: RegistrySnapshot,
 ) -> None:
-    """Publish one complete registry through atomic replacement."""
+    """Publish one complete immutable snapshot through atomic replacement."""
     document = {
         "format_version": 1,
         "repositories": {
-            str(repo_id): str(repository_path)
-            for repo_id, repository_path in sorted(
-                repositories.items(),
-                key=lambda item: str(item[0]).encode("ascii"),
-            )
+            str(mapping.repo_id): str(mapping.repository_path)
+            for mapping in snapshot.repositories
         },
     }
     encoded = (

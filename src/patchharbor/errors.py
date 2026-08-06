@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from enum import IntEnum
+from enum import Enum, IntEnum
 
 
 TOOL_PREFIX = "patchharbor:"
@@ -23,12 +23,45 @@ class ExitCode(IntEnum):
     INTERRUPTED = 130
 
 
+class ErrorKind(str, Enum):
+    """Stable machine-readable categories for structured tool failures."""
+
+    TOOL_ERROR = "tool_error"
+    REGISTRY_ERROR = "registry_error"
+    REPOSITORY_RESOLUTION_ERROR = "repository_resolution_error"
+
+
 class PatchHarborError(Exception):
     """A visible PatchHarbor failure that did not come from the script."""
 
-    def __init__(self, message: str, exit_code: ExitCode) -> None:
+    def __init__(
+        self,
+        message: str,
+        exit_code: ExitCode,
+        *,
+        error_kind: ErrorKind = ErrorKind.TOOL_ERROR,
+    ) -> None:
         super().__init__(message)
         self.exit_code = exit_code
+        self.error_kind = error_kind
+
+
+def registry_error(message: str) -> PatchHarborError:
+    """Create one centrally categorized registry failure."""
+    return PatchHarborError(
+        message,
+        ExitCode.REPOSITORY_ERROR,
+        error_kind=ErrorKind.REGISTRY_ERROR,
+    )
+
+
+def repository_resolution_error(message: str) -> PatchHarborError:
+    """Create one centrally categorized repository-resolution failure."""
+    return PatchHarborError(
+        message,
+        ExitCode.REPOSITORY_ERROR,
+        error_kind=ErrorKind.REPOSITORY_RESOLUTION_ERROR,
+    )
 
 
 def format_tool_message(message: str) -> str:

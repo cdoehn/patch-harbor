@@ -6,7 +6,7 @@ from dataclasses import dataclass
 import os
 from pathlib import Path
 
-from patchharbor.errors import ExitCode, PatchHarborError
+from patchharbor.errors import PatchHarborError, registry_error
 from patchharbor.physical_paths import physically_canonicalize
 
 
@@ -27,7 +27,7 @@ class RegistrationUserPaths:
 
 
 def _error(message: str) -> PatchHarborError:
-    return PatchHarborError(message, ExitCode.REPOSITORY_ERROR)
+    return registry_error(message)
 
 
 def registration_user_paths() -> RegistrationUserPaths:

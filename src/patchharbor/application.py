@@ -11,7 +11,7 @@ from patchharbor.execution import execute_script_text
 from patchharbor.models import (
     BundleScript,
     InputArtifact,
-    RegistryRepository,
+    RegistryListResult,
     RepositoryId,
     RepositoryPath,
 )
@@ -39,8 +39,8 @@ def register_repository(path: Path) -> tuple[RepositoryId, RepositoryPath]:
     return register_local_repository(path)
 
 
-def registered_repositories() -> tuple[RegistryRepository, ...]:
-    """Return one consistent view of all registered local instances."""
+def registered_repositories() -> RegistryListResult:
+    """Return one structured view of all registered local instances."""
     return list_registered_repositories()
 
 
