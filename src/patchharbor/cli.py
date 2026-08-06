@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 from collections.abc import Sequence
 from contextlib import nullcontext
+import json
 from pathlib import Path
 import sys
 from typing import TextIO
@@ -12,8 +13,10 @@ from typing import TextIO
 from patchharbor import __version__
 from patchharbor.application import (
     register_repository,
+    registered_repositories,
     run_script_path,
     run_standard_input,
+    unregister_repository,
 )
 from patchharbor.errors import (
     ExitCode,
@@ -86,6 +89,36 @@ def _build_parser() -> argparse.ArgumentParser:
         nargs="?",
         metavar="REPOSITORY",
         help="Git repository; defaults to the current directory",
+    )
+
+    registry_parser = commands.add_parser(
+        "registry",
+        help="inspect registered local repository instances",
+    )
+    registry_commands = registry_parser.add_subparsers(
+        dest="registry_command",
+        required=True,
+        metavar="COMMAND",
+    )
+    registry_list_parser = registry_commands.add_parser(
+        "list",
+        help="list registered local repository instances",
+    )
+    registry_list_parser.add_argument(
+        "--json",
+        action="store_true",
+        dest="json_output",
+        help="write the versioned machine-readable result",
+    )
+
+    unregister_parser = commands.add_parser(
+        "unregister",
+        help="remove one central repository registration",
+    )
+    unregister_parser.add_argument(
+        "repository_or_repo_id",
+        metavar="REPOSITORY_OR_REPO_ID",
+        help="registered repository path or canonical repository UUID",
     )
 
     fs_parser = commands.add_parser(
@@ -178,6 +211,101 @@ def _register_command(
 ) -> int:
     try:
         repo_id, repository_path = register_repository(path or Path.cwd())
+    except PatchHarborError as exc:
+        print(format_tool_message(str(exc)), file=stderr)
+        return int(exc.exit_code)
+
+    print(f"repo_id: {repo_id}", file=stdout)
+    print(f"repository_path: {repository_path}", file=stdout)
+    return 0
+
+
+def _write_json_document(document: dict[str, object], stream: TextIO) -> None:
+    json.dump(
+        document,
+        stream,
+        ensure_ascii=False,
+        allow_nan=False,
+        separators=(",", ":"),
+    )
+    stream.write("\n")
+
+
+def _registry_list_command(
+    *,
+    json_output: bool,
+    stdout: TextIO,
+    stderr: TextIO,
+) -> int:
+    try:
+        repositories = registered_repositories()
+    except PatchHarborError as exc:
+        exit_code = int(exc.exit_code)
+        if json_output:
+            _write_json_document(
+                {
+                    "output_version": 1,
+                    "command": "registry.list",
+                    "success": False,
+                    "result": None,
+                    "error": {
+                        "kind": "registry_error",
+                        "message": str(exc),
+                        "patchharbor_error_code": exit_code,
+                        "emergency_diagnostics_path": None,
+                    },
+                    "process_exit_code": exit_code,
+                },
+                stdout,
+            )
+        else:
+            print(format_tool_message(str(exc)), file=stderr)
+        return exit_code
+
+    if json_output:
+        _write_json_document(
+            {
+                "output_version": 1,
+                "command": "registry.list",
+                "success": True,
+                "result": {
+                    "repositories": [
+                        {
+                            "repo_id": str(repository.repo_id),
+                            "repository_path": str(
+                                repository.repository_path
+                            ),
+                            "status": repository.status.value,
+                        }
+                        for repository in repositories
+                    ]
+                },
+                "error": None,
+                "process_exit_code": 0,
+            },
+            stdout,
+        )
+    else:
+        for repository in repositories:
+            print(
+                f"{repository.repo_id}\t{repository.status.value}\t"
+                f"{repository.repository_path}",
+                file=stdout,
+            )
+    return 0
+
+
+def _unregister_command(
+    selector: str,
+    *,
+    stdout: TextIO,
+    stderr: TextIO,
+) -> int:
+    try:
+        repo_id, repository_path = unregister_repository(
+            selector,
+            cwd=Path.cwd(),
+        )
     except PatchHarborError as exc:
         print(format_tool_message(str(exc)), file=stderr)
         return int(exc.exit_code)
@@ -361,6 +489,20 @@ def main(
     if args.command == "register":
         return _register_command(
             args.repository,
+            stdout=actual_stdout,
+            stderr=actual_stderr,
+        )
+
+    if args.command == "registry" and args.registry_command == "list":
+        return _registry_list_command(
+            json_output=args.json_output,
+            stdout=actual_stdout,
+            stderr=actual_stderr,
+        )
+
+    if args.command == "unregister":
+        return _unregister_command(
+            args.repository_or_repo_id,
             stdout=actual_stdout,
             stderr=actual_stderr,
         )

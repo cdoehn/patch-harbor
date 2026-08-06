@@ -11,6 +11,7 @@ from patchharbor.execution import execute_script_text
 from patchharbor.models import (
     BundleScript,
     InputArtifact,
+    RegistryRepository,
     RepositoryId,
     RepositoryPath,
 )
@@ -18,7 +19,11 @@ from patchharbor.output import OutputTargets
 from patchharbor.parser import parse_script
 from patchharbor.payload_files import write_bundle_payloads
 from patchharbor.presentation import DashboardPresentation, PresentedFile
-from patchharbor.registration import register_local_repository
+from patchharbor.registration import (
+    list_registered_repositories,
+    register_local_repository,
+    unregister_local_repository,
+)
 from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY, ResourcePolicy
 from patchharbor.sources import (
     DirectoryCandidate,
@@ -32,6 +37,20 @@ from patchharbor.sources import (
 def register_repository(path: Path) -> tuple[RepositoryId, RepositoryPath]:
     """Register one local Git repository instance."""
     return register_local_repository(path)
+
+
+def registered_repositories() -> tuple[RegistryRepository, ...]:
+    """Return one consistent view of all registered local instances."""
+    return list_registered_repositories()
+
+
+def unregister_repository(
+    selector: str,
+    *,
+    cwd: Path,
+) -> tuple[RepositoryId, RepositoryPath]:
+    """Remove one central repository mapping."""
+    return unregister_local_repository(selector, cwd=cwd)
 
 
 def _execute_bundle_script(

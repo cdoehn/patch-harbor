@@ -3,8 +3,9 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import pytest
 
@@ -243,3 +244,229 @@ def test_register_rejects_a_junction_as_internal_directory(
     assert completed.returncode == 8
     assert not _registry_path(environment).exists()
     assert not (target / "id").exists()
+
+
+def _registered_id(repository: Path) -> str:
+    return (repository / ".patchharbor" / "id").read_text(
+        encoding="ascii"
+    ).strip()
+
+
+def test_registry_list_json_reports_sorted_real_repository_statuses(
+    tmp_path: Path,
+) -> None:
+    environment = isolated_user_environment(tmp_path / "user")
+    ok_repository = create_repository(tmp_path / "ok-repository")
+    missing_repository = create_repository(tmp_path / "missing-repository")
+    conflict_repository = create_repository(tmp_path / "conflict-repository")
+
+    for repository in (
+        conflict_repository,
+        ok_repository,
+        missing_repository,
+    ):
+        completed = run_cli(
+            tmp_path,
+            "register",
+            str(repository),
+            environment_overrides=environment,
+        )
+        assert completed.returncode == 0
+
+    repository_ids = {
+        ok_repository: _registered_id(ok_repository),
+        missing_repository: _registered_id(missing_repository),
+        conflict_repository: _registered_id(conflict_repository),
+    }
+    missing_path = str(missing_repository.resolve())
+    shutil.rmtree(missing_repository)
+    (conflict_repository / ".patchharbor" / "id").write_text(
+        f"{uuid4()}\n",
+        encoding="ascii",
+        newline="\n",
+    )
+
+    completed = run_cli(
+        tmp_path,
+        "registry",
+        "list",
+        "--json",
+        environment_overrides=environment,
+    )
+
+    assert completed.returncode == 0
+    document = json.loads(completed.stdout)
+    expected_entries = sorted(
+        [
+            {
+                "repo_id": repository_ids[ok_repository],
+                "repository_path": str(ok_repository.resolve()),
+                "status": "ok",
+            },
+            {
+                "repo_id": repository_ids[missing_repository],
+                "repository_path": missing_path,
+                "status": "missing",
+            },
+            {
+                "repo_id": repository_ids[conflict_repository],
+                "repository_path": str(conflict_repository.resolve()),
+                "status": "conflict",
+            },
+        ],
+        key=lambda entry: entry["repo_id"].encode("ascii"),
+    )
+    assert document == {
+        "output_version": 1,
+        "command": "registry.list",
+        "success": True,
+        "result": {"repositories": expected_entries},
+        "error": None,
+        "process_exit_code": 0,
+    }
+
+
+def test_unregister_by_id_removes_only_the_central_mapping(
+    tmp_path: Path,
+) -> None:
+    repository = create_repository(tmp_path / "repository")
+    environment = isolated_user_environment(tmp_path / "user")
+    registered = run_cli(
+        repository,
+        "register",
+        environment_overrides=environment,
+    )
+    assert registered.returncode == 0
+    id_path = repository / ".patchharbor" / "id"
+    repo_id = _registered_id(repository)
+    id_bytes = id_path.read_bytes()
+
+    completed = run_cli(
+        tmp_path,
+        "unregister",
+        repo_id,
+        environment_overrides=environment,
+    )
+
+    assert completed.returncode == 0
+    registry = json.loads(_registry_path(environment).read_text(encoding="utf-8"))
+    assert registry == {"format_version": 1, "repositories": {}}
+    assert id_path.read_bytes() == id_bytes
+
+    listed = run_cli(
+        tmp_path,
+        "registry",
+        "list",
+        "--json",
+        environment_overrides=environment,
+    )
+    assert listed.returncode == 0
+    assert json.loads(listed.stdout)["result"] == {"repositories": []}
+
+
+def test_unregister_by_path_can_remove_a_missing_repository_mapping(
+    tmp_path: Path,
+) -> None:
+    repository = create_repository(tmp_path / "repository")
+    environment = isolated_user_environment(tmp_path / "user")
+    registered = run_cli(
+        repository,
+        "register",
+        environment_overrides=environment,
+    )
+    assert registered.returncode == 0
+    repository_path = repository.resolve()
+    shutil.rmtree(repository)
+
+    completed = run_cli(
+        tmp_path,
+        "unregister",
+        str(repository_path),
+        environment_overrides=environment,
+    )
+
+    assert completed.returncode == 0
+    registry = json.loads(_registry_path(environment).read_text(encoding="utf-8"))
+    assert registry == {"format_version": 1, "repositories": {}}
+
+
+def test_unregister_unknown_id_preserves_registry_and_local_identity(
+    tmp_path: Path,
+) -> None:
+    repository = create_repository(tmp_path / "repository")
+    environment = isolated_user_environment(tmp_path / "user")
+    registered = run_cli(
+        repository,
+        "register",
+        environment_overrides=environment,
+    )
+    assert registered.returncode == 0
+    registry_path = _registry_path(environment)
+    registry_before = registry_path.read_bytes()
+    id_path = repository / ".patchharbor" / "id"
+    id_before = id_path.read_bytes()
+
+    completed = run_cli(
+        tmp_path,
+        "unregister",
+        str(uuid4()),
+        environment_overrides=environment,
+    )
+
+    assert completed.returncode == 8
+    assert registry_path.read_bytes() == registry_before
+    assert id_path.read_bytes() == id_before
+
+
+def test_registry_list_reads_only_while_holding_the_global_lock(
+    tmp_path: Path,
+) -> None:
+    environment = isolated_user_environment(tmp_path / "user")
+    lock_path = _registry_lock_path(environment)
+    lock_path.parent.mkdir(parents=True)
+    lock_path.write_text("occupied\n", encoding="ascii")
+
+    completed = run_cli(
+        tmp_path,
+        "registry",
+        "list",
+        "--json",
+        environment_overrides=environment,
+    )
+
+    assert completed.returncode == 8
+    document = json.loads(completed.stdout)
+    assert document["output_version"] == 1
+    assert document["command"] == "registry.list"
+    assert document["success"] is False
+    assert document["result"] is None
+    assert document["process_exit_code"] == 8
+    assert document["error"]["patchharbor_error_code"] == 8
+
+
+def test_unregister_respects_the_global_registry_lock(tmp_path: Path) -> None:
+    repository = create_repository(tmp_path / "repository")
+    environment = isolated_user_environment(tmp_path / "user")
+    registered = run_cli(
+        repository,
+        "register",
+        environment_overrides=environment,
+    )
+    assert registered.returncode == 0
+    registry_path = _registry_path(environment)
+    registry_before = registry_path.read_bytes()
+    id_path = repository / ".patchharbor" / "id"
+    id_before = id_path.read_bytes()
+    lock_path = _registry_lock_path(environment)
+    lock_path.write_text("occupied\n", encoding="ascii")
+
+    completed = run_cli(
+        tmp_path,
+        "unregister",
+        _registered_id(repository),
+        environment_overrides=environment,
+    )
+
+    assert completed.returncode == 8
+    assert registry_path.read_bytes() == registry_before
+    assert id_path.read_bytes() == id_before

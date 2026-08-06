@@ -8,7 +8,11 @@ from pathlib import Path
 import subprocess
 
 from patchharbor.errors import ExitCode, PatchHarborError
-from patchharbor.models import RepositoryId, RepositoryPath
+from patchharbor.models import (
+    RegistryStatus,
+    RepositoryId,
+    RepositoryPath,
+)
 from patchharbor.physical_paths import physically_canonicalize
 from patchharbor.platform.filesystem import (
     FileSystemOperationError,
@@ -93,6 +97,16 @@ def _has_reserved_segment(path: str) -> bool:
     )
 
 
+def canonicalize_repository_reference(requested_path: Path) -> RepositoryPath:
+    """Resolve a repository path reference even when its target is missing."""
+    try:
+        return RepositoryPath(
+            physically_canonicalize(requested_path, must_exist=False)
+        )
+    except (OSError, RuntimeError, ValueError) as exc:
+        raise _error(f"cannot resolve repository path: {exc}") from exc
+
+
 def inspect_repository(requested_path: Path) -> RepositoryPath:
     """Resolve and verify the immutable repository boundary for registration."""
     output = _run_git(
@@ -168,6 +182,43 @@ def _read_optional_regular_file(path: Path, *, description: str) -> bytes | None
         return path.read_bytes()
     except OSError as exc:
         raise _error(f"cannot read {description}: {exc}") from exc
+
+
+def registered_repository_status(
+    repository: RepositoryPath,
+    expected_id: RepositoryId,
+) -> RegistryStatus:
+    """Observe whether one central mapping still identifies its local instance."""
+    try:
+        root_kind = path_kind(repository.value)
+    except FileSystemOperationError:
+        return RegistryStatus.CONFLICT
+    if root_kind is PathKind.MISSING:
+        return RegistryStatus.MISSING
+    if root_kind is not PathKind.DIRECTORY:
+        return RegistryStatus.CONFLICT
+
+    internal = repository.value / _INTERNAL_DIRECTORY
+    id_path = internal / _ID_FILE
+    try:
+        if path_kind(internal) is not PathKind.DIRECTORY:
+            return RegistryStatus.CONFLICT
+        if path_kind(id_path) is not PathKind.REGULAR_FILE:
+            return RegistryStatus.CONFLICT
+        content = id_path.read_bytes()
+    except (OSError, FileSystemOperationError):
+        return RegistryStatus.CONFLICT
+
+    try:
+        text = content.decode("ascii")
+        observed_id = RepositoryId(text[:-1])
+    except (UnicodeDecodeError, ValueError):
+        return RegistryStatus.CONFLICT
+    if not text.endswith("\n") or text.count("\n") != 1:
+        return RegistryStatus.CONFLICT
+    if observed_id != expected_id:
+        return RegistryStatus.CONFLICT
+    return RegistryStatus.OK
 
 
 def _exclude_path(repository: RepositoryPath) -> Path:

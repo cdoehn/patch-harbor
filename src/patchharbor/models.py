@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import Enum
 from pathlib import Path
 from uuid import UUID, uuid4
 
@@ -75,3 +76,20 @@ class RepositoryPath:
 
     def __str__(self) -> str:
         return str(self.value)
+
+
+class RegistryStatus(str, Enum):
+    """Observed consistency of one central registry mapping."""
+
+    OK = "ok"
+    MISSING = "missing"
+    CONFLICT = "conflict"
+
+
+@dataclass(frozen=True)
+class RegistryRepository:
+    """One registered repository together with its observed status."""
+
+    repo_id: RepositoryId
+    repository_path: RepositoryPath
+    status: RegistryStatus
