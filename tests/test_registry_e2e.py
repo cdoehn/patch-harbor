@@ -9,45 +9,15 @@ from uuid import UUID
 import pytest
 
 from tests.platform_support import create_symlink_or_skip, run_cli
+from tests.registration_support import (
+    create_repository,
+    git,
+    isolated_user_environment,
+    local_exclude_path,
+)
 
 
 pytestmark = pytest.mark.e2e
-
-
-def _git(repository: Path, *arguments: str) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        ["git", *arguments],
-        cwd=repository,
-        check=True,
-        capture_output=True,
-        encoding="utf-8",
-        errors="strict",
-    )
-
-
-def _create_repository(path: Path, *, with_commit: bool = True) -> Path:
-    path.mkdir()
-    _git(path, "init", "--quiet")
-    _git(path, "config", "user.name", "PatchHarbor Test")
-    _git(path, "config", "user.email", "patchharbor@example.invalid")
-    if with_commit:
-        (path / "tracked.txt").write_text("base\n", encoding="utf-8")
-        _git(path, "add", "tracked.txt")
-        _git(path, "commit", "--quiet", "-m", "base")
-    return path
-
-
-def _isolated_user_environment(root: Path) -> dict[str, str]:
-    if os.name == "nt":
-        return {
-            "APPDATA": str(root / "appdata"),
-            "LOCALAPPDATA": str(root / "localappdata"),
-        }
-    return {
-        "HOME": str(root / "home"),
-        "XDG_CONFIG_HOME": str(root / "config"),
-        "XDG_STATE_HOME": str(root / "state"),
-    }
 
 
 def _registry_path(environment: dict[str, str]) -> Path:
@@ -72,26 +42,13 @@ def _registry_lock_path(environment: dict[str, str]) -> Path:
     )
 
 
-def _local_exclude_path(repository: Path) -> Path:
-    raw_path = _git(
-        repository,
-        "rev-parse",
-        "--git-path",
-        "info/exclude",
-    ).stdout.strip()
-    path = Path(raw_path)
-    if not path.is_absolute():
-        path = repository / path
-    return path.resolve()
-
-
 @pytest.mark.parametrize("explicit_path", [False, True])
 def test_register_creates_identity_registry_and_clean_git_state(
     tmp_path: Path,
     explicit_path: bool,
 ) -> None:
-    repository = _create_repository(tmp_path / "repository")
-    environment = _isolated_user_environment(tmp_path / "user")
+    repository = create_repository(tmp_path / "repository")
+    environment = isolated_user_environment(tmp_path / "user")
     invocation_directory = repository if not explicit_path else tmp_path
     arguments = (str(repository),) if explicit_path else ()
     gitignore_path = repository / ".gitignore"
@@ -119,15 +76,10 @@ def test_register_creates_identity_registry_and_clean_git_state(
     assert registry["format_version"] == 1
     assert registry["repositories"][repo_id] == str(repository.resolve())
 
-    exclude_lines = _local_exclude_path(repository).read_bytes().splitlines()
+    exclude_lines = local_exclude_path(repository).read_bytes().splitlines()
     assert b".patchharbor/" in exclude_lines
-    ignored = subprocess.run(
-        ["git", "check-ignore", "--quiet", ".patchharbor/id"],
-        cwd=repository,
-        check=False,
-    )
-    assert ignored.returncode == 0
-    assert _git(
+    git(repository, "check-ignore", "--quiet", ".patchharbor/id")
+    assert git(
         repository,
         "status",
         "--porcelain=v1",
@@ -142,10 +94,10 @@ def test_register_creates_identity_registry_and_clean_git_state(
 def test_register_physically_canonicalizes_an_explicit_repository_path(
     tmp_path: Path,
 ) -> None:
-    repository = _create_repository(tmp_path / "repository")
+    repository = create_repository(tmp_path / "repository")
     link = tmp_path / "repository-link"
     create_symlink_or_skip(link, repository, target_is_directory=True)
-    environment = _isolated_user_environment(tmp_path / "user")
+    environment = isolated_user_environment(tmp_path / "user")
 
     completed = run_cli(
         tmp_path,
@@ -163,11 +115,11 @@ def test_register_physically_canonicalizes_an_explicit_repository_path(
 
 
 def test_register_rejects_a_repository_without_a_commit(tmp_path: Path) -> None:
-    repository = _create_repository(
+    repository = create_repository(
         tmp_path / "repository",
         with_commit=False,
     )
-    environment = _isolated_user_environment(tmp_path / "user")
+    environment = isolated_user_environment(tmp_path / "user")
 
     completed = run_cli(
         repository,
@@ -185,14 +137,14 @@ def test_register_rejects_reserved_tracked_path_segments(
     tmp_path: Path,
     location: str,
 ) -> None:
-    repository = _create_repository(tmp_path / "repository")
+    repository = create_repository(tmp_path / "repository")
     reserved_file = repository / "nested" / ".PatchHarbor" / "blocked.txt"
     reserved_file.parent.mkdir(parents=True)
     reserved_file.write_text("blocked\n", encoding="utf-8")
-    _git(repository, "add", reserved_file.relative_to(repository).as_posix())
+    git(repository, "add", reserved_file.relative_to(repository).as_posix())
     if location == "base":
-        _git(repository, "commit", "--quiet", "-m", "reserved path")
-    environment = _isolated_user_environment(tmp_path / "user")
+        git(repository, "commit", "--quiet", "-m", "reserved path")
+    environment = isolated_user_environment(tmp_path / "user")
 
     completed = run_cli(
         repository,
@@ -206,8 +158,8 @@ def test_register_rejects_reserved_tracked_path_segments(
 
 
 def test_register_respects_the_global_registry_lock(tmp_path: Path) -> None:
-    repository = _create_repository(tmp_path / "repository")
-    environment = _isolated_user_environment(tmp_path / "user")
+    repository = create_repository(tmp_path / "repository")
+    environment = isolated_user_environment(tmp_path / "user")
     lock_path = _registry_lock_path(environment)
     lock_path.parent.mkdir(parents=True)
     lock_path.write_text("occupied\n", encoding="ascii")
@@ -228,7 +180,7 @@ def test_register_rejects_a_non_directory_internal_path(
     tmp_path: Path,
     internal_kind: str,
 ) -> None:
-    repository = _create_repository(tmp_path / "repository")
+    repository = create_repository(tmp_path / "repository")
     internal = repository / ".patchharbor"
     target = tmp_path / "external-target"
     if internal_kind == "regular-file":
@@ -240,7 +192,7 @@ def test_register_rejects_a_non_directory_internal_path(
             target,
             target_is_directory=True,
         )
-    environment = _isolated_user_environment(tmp_path / "user")
+    environment = isolated_user_environment(tmp_path / "user")
 
     completed = run_cli(
         repository,
@@ -261,7 +213,7 @@ def test_register_rejects_a_non_directory_internal_path(
 def test_register_rejects_a_junction_as_internal_directory(
     tmp_path: Path,
 ) -> None:
-    repository = _create_repository(tmp_path / "repository")
+    repository = create_repository(tmp_path / "repository")
     target = tmp_path / "junction-target"
     target.mkdir()
     internal = repository / ".patchharbor"
@@ -280,7 +232,7 @@ def test_register_rejects_a_junction_as_internal_directory(
     )
     if completed_link.returncode != 0:
         pytest.skip("requires Windows junction creation support")
-    environment = _isolated_user_environment(tmp_path / "user")
+    environment = isolated_user_environment(tmp_path / "user")
 
     completed = run_cli(
         repository,

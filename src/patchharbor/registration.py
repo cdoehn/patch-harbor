@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from patchharbor.errors import ExitCode, PatchHarborError
-from patchharbor.models import RegisteredRepository, RepositoryId
+from patchharbor.models import RepositoryId, RepositoryPath
 from patchharbor.registry import load_registry, registry_lock, write_registry
 from patchharbor.repository import (
     apply_local_registration,
@@ -20,7 +20,9 @@ def _error(message: str) -> PatchHarborError:
     return PatchHarborError(message, ExitCode.REPOSITORY_ERROR)
 
 
-def register_local_repository(path: Path) -> RegisteredRepository:
+def register_local_repository(
+    path: Path,
+) -> tuple[RepositoryId, RepositoryPath]:
     """Register one local Git repository as one consistent mutation."""
     user_paths = registration_user_paths()
     with registry_lock(user_paths):
@@ -33,7 +35,7 @@ def register_local_repository(path: Path) -> RegisteredRepository:
             apply_local_registration(local_state, repo_id)
             repositories[repo_id] = repository
             write_registry(user_paths, repositories)
-        except PatchHarborError as exc:
+        except PatchHarborError:
             try:
                 restore_local_registration(local_state)
             except PatchHarborError as rollback_error:
@@ -42,4 +44,4 @@ def register_local_repository(path: Path) -> RegisteredRepository:
                 ) from rollback_error
             raise
 
-    return RegisteredRepository(repo_id=repo_id, path=repository)
+    return repo_id, repository

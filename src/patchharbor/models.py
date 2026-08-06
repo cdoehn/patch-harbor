@@ -73,16 +73,5 @@ class RepositoryPath:
         if not self.value.is_absolute():
             raise ValueError("repository path must be absolute")
 
-    def __fspath__(self) -> str:
-        return str(self.value)
-
     def __str__(self) -> str:
         return str(self.value)
-
-
-@dataclass(frozen=True)
-class RegisteredRepository:
-    """Successful registration result passed between application layers."""
-
-    repo_id: RepositoryId
-    path: RepositoryPath

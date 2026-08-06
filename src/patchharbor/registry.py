@@ -101,7 +101,7 @@ def write_registry(
     paths: RegistrationUserPaths,
     repositories: RegistryEntries,
 ) -> None:
-    """Publish one syntactically checked registry through atomic replacement."""
+    """Publish one complete registry through atomic replacement."""
     document = {
         "format_version": 1,
         "repositories": {
@@ -116,11 +116,6 @@ def write_registry(
         json.dumps(document, ensure_ascii=False, indent=2, sort_keys=True)
         + "\n"
     ).encode("utf-8")
-    try:
-        json.loads(encoded.decode("utf-8"))
-    except (UnicodeError, json.JSONDecodeError) as exc:
-        raise _error("cannot serialize repository registry") from exc
-
     try:
         kind = path_kind(paths.registry_path)
     except FileSystemOperationError as exc:

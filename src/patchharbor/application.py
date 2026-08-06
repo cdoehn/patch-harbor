@@ -8,7 +8,12 @@ from typing import TextIO
 from patchharbor.bundles import resolve_patch_bundle
 from patchharbor.errors import ExitCode, PatchHarborError
 from patchharbor.execution import execute_script_text
-from patchharbor.models import BundleScript, InputArtifact, RegisteredRepository
+from patchharbor.models import (
+    BundleScript,
+    InputArtifact,
+    RepositoryId,
+    RepositoryPath,
+)
 from patchharbor.output import OutputTargets
 from patchharbor.parser import parse_script
 from patchharbor.payload_files import write_bundle_payloads
@@ -24,7 +29,7 @@ from patchharbor.sources import (
 )
 
 
-def register_repository(path: Path) -> RegisteredRepository:
+def register_repository(path: Path) -> tuple[RepositoryId, RepositoryPath]:
     """Register one local Git repository instance."""
     return register_local_repository(path)
 
