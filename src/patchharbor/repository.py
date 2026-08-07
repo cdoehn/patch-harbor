@@ -297,6 +297,13 @@ def apply_local_registration(
     repo_id: RepositoryId,
 ) -> None:
     """Atomically write the local exclude entry and repository identity."""
+    try:
+        canonical_id = RepositoryId(str(repo_id))
+    except ValueError as exc:
+        raise _error("repository ID is not a canonical UUID v4") from exc
+    if canonical_id != repo_id:
+        raise _error("repository ID is not a canonical UUID v4")
+
     if not state.internal_directory_existed:
         try:
             state.internal_directory.mkdir(mode=0o700)
@@ -325,7 +332,7 @@ def apply_local_registration(
         raise _error(".patchharbor/id must be a regular file")
     _atomic_write(
         state.id_path,
-        f"{repo_id}\n".encode("ascii"),
+        f"{canonical_id}\n".encode("ascii"),
         description="repository ID",
     )
 

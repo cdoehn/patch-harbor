@@ -195,3 +195,170 @@ def test_registration_user_path_failures_use_the_registry_error_category(
 
     assert captured.value.exit_code is ExitCode.REPOSITORY_ERROR
     assert captured.value.error_kind is ErrorKind.REGISTRY_ERROR
+
+
+def test_identity_and_registry_publication_share_the_global_lock(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repository = create_repository(tmp_path / "repository")
+    set_isolated_user_environment(monkeypatch, tmp_path / "user")
+    paths = registration_user_paths()
+    observed: list[str] = []
+
+    from patchharbor.repository import (
+        apply_local_registration as real_apply_local_registration,
+    )
+    from patchharbor.registry import write_registry as real_write_registry
+
+    def apply_while_locked(*args: object, **kwargs: object) -> None:
+        assert paths.registry_lock_path.is_file()
+        observed.append("local")
+        real_apply_local_registration(*args, **kwargs)
+
+    def write_while_locked(*args: object, **kwargs: object) -> None:
+        assert paths.registry_lock_path.is_file()
+        observed.append("registry")
+        real_write_registry(*args, **kwargs)
+
+    monkeypatch.setattr(
+        "patchharbor.registration.apply_local_registration",
+        apply_while_locked,
+    )
+    monkeypatch.setattr(
+        "patchharbor.registration.write_registry",
+        write_while_locked,
+    )
+
+    register_local_repository(repository)
+
+    assert observed == ["local", "registry"]
+    assert not paths.registry_lock_path.exists()
+
+
+def test_failure_after_registry_publication_restores_exact_previous_state(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repository = create_repository(tmp_path / "repository")
+    set_isolated_user_environment(monkeypatch, tmp_path / "user")
+    register_local_repository(repository)
+    paths = registration_user_paths()
+    id_path = repository / ".patchharbor" / "id"
+    exclude_path = local_exclude_path(repository)
+    id_before = id_path.read_bytes()
+    exclude_before = exclude_path.read_bytes()
+    registry_before = paths.registry_path.read_bytes()
+
+    from patchharbor.registry import write_registry as real_write_registry
+
+    def publish_then_fail(*args: object, **kwargs: object) -> None:
+        real_write_registry(*args, **kwargs)
+        raise PatchHarborError(
+            "injected post-publication failure",
+            ExitCode.REPOSITORY_ERROR,
+        )
+
+    monkeypatch.setattr(
+        "patchharbor.registration.write_registry",
+        publish_then_fail,
+    )
+
+    with pytest.raises(PatchHarborError):
+        register_local_repository(repository, new_id=True)
+
+    assert id_path.read_bytes() == id_before
+    assert exclude_path.read_bytes() == exclude_before
+    assert paths.registry_path.read_bytes() == registry_before
+    assert not tuple(paths.configuration_directory.glob(".patchharbor-*.tmp"))
+    assert not tuple((repository / ".patchharbor").glob(".patchharbor-*.tmp"))
+
+
+def test_failed_identity_rollback_is_reported_as_registry_inconsistency(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repository = create_repository(tmp_path / "repository")
+    set_isolated_user_environment(monkeypatch, tmp_path / "user")
+
+    from patchharbor.repository import (
+        apply_local_registration as real_apply_local_registration,
+    )
+
+    def mutate_then_fail(*args: object, **kwargs: object) -> None:
+        real_apply_local_registration(*args, **kwargs)
+        raise PatchHarborError(
+            "injected mutation failure",
+            ExitCode.REPOSITORY_ERROR,
+        )
+
+    def fail_local_restore(*_args: object, **_kwargs: object) -> None:
+        raise PatchHarborError(
+            "injected rollback failure",
+            ExitCode.REPOSITORY_ERROR,
+        )
+
+    monkeypatch.setattr(
+        "patchharbor.registration.apply_local_registration",
+        mutate_then_fail,
+    )
+    monkeypatch.setattr(
+        "patchharbor.registration.restore_local_registration",
+        fail_local_restore,
+    )
+
+    with pytest.raises(PatchHarborError) as captured:
+        register_local_repository(repository)
+
+    assert captured.value.exit_code is ExitCode.REPOSITORY_ERROR
+    assert captured.value.error_kind is ErrorKind.REGISTRY_ERROR
+
+
+def test_registry_persistence_rejects_a_noncanonical_repository_id(
+    tmp_path: Path,
+) -> None:
+    configuration = tmp_path / "configuration"
+    locks = tmp_path / "locks"
+    configuration.mkdir()
+    locks.mkdir()
+    paths = RegistrationUserPaths(configuration, locks)
+    invalid_id = object.__new__(RepositoryId)
+    object.__setattr__(invalid_id, "value", str(RepositoryId.new()).upper())
+    repository_path = RepositoryPath((tmp_path / "repository").resolve())
+
+    from patchharbor.models import RegistryMapping, RegistrySnapshot
+
+    snapshot = RegistrySnapshot(
+        repositories=(
+            RegistryMapping(
+                repo_id=invalid_id,
+                repository_path=repository_path,
+            ),
+        )
+    )
+
+    with pytest.raises(PatchHarborError) as captured:
+        write_registry(paths, snapshot)
+
+    assert captured.value.exit_code is ExitCode.REPOSITORY_ERROR
+    assert captured.value.error_kind is ErrorKind.REGISTRY_ERROR
+    assert not paths.registry_path.exists()
+
+
+def test_local_identity_persistence_rejects_a_noncanonical_repository_id(
+    tmp_path: Path,
+) -> None:
+    repository_path = create_repository(tmp_path / "repository")
+    repository = inspect_repository(repository_path)
+    _, state = inspect_local_registration(repository)
+    invalid_id = object.__new__(RepositoryId)
+    object.__setattr__(invalid_id, "value", str(RepositoryId.new()).upper())
+    exclude_before = state.exclude_path.read_bytes()
+
+    with pytest.raises(PatchHarborError) as captured:
+        apply_local_registration(state, invalid_id)
+
+    assert captured.value.exit_code is ExitCode.REPOSITORY_ERROR
+    assert captured.value.error_kind is ErrorKind.REPOSITORY_RESOLUTION_ERROR
+    assert not state.internal_directory.exists()
+    assert state.exclude_path.read_bytes() == exclude_before

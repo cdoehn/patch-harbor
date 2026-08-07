@@ -48,9 +48,11 @@ class RepositoryId:
     value: str
 
     def __post_init__(self) -> None:
+        if not isinstance(self.value, str):
+            raise ValueError("repository ID is not a valid UUID")
         try:
             parsed = UUID(self.value)
-        except ValueError as exc:
+        except (AttributeError, TypeError, ValueError) as exc:
             raise ValueError("repository ID is not a valid UUID") from exc
         if parsed.version != 4 or str(parsed) != self.value:
             raise ValueError("repository ID is not a canonical UUID v4")
