@@ -98,16 +98,20 @@ def _registry_entries(snapshot: RegistrySnapshot) -> RegistryEntries:
     return entries
 
 
-def set_registry_mapping(
+def replace_registry_mapping(
     snapshot: RegistrySnapshot,
     repo_id: RepositoryId,
     repository_path: RepositoryPath,
 ) -> RegistrySnapshot:
-    """Return a canonical snapshot containing the supplied mapping."""
-    repositories = _registry_entries(snapshot)
-    repositories[_canonical_repository_id(repo_id)] = _canonical_repository_path(
-        repository_path
-    )
+    """Return one snapshot with exactly one mapping for the ID and path."""
+    selected_id = _canonical_repository_id(repo_id)
+    selected_path = _canonical_repository_path(repository_path)
+    repositories = {
+        mapped_id: mapped_path
+        for mapped_id, mapped_path in _registry_entries(snapshot).items()
+        if mapped_path != selected_path
+    }
+    repositories[selected_id] = selected_path
     return registry_snapshot(repositories)
 
 
@@ -119,21 +123,6 @@ def remove_registry_mapping(
     repositories = _registry_entries(snapshot)
     repositories.pop(_canonical_repository_id(repo_id), None)
     return registry_snapshot(repositories)
-
-
-def remove_registry_path_mappings(
-    snapshot: RegistrySnapshot,
-    repository_path: RepositoryPath,
-) -> RegistrySnapshot:
-    """Return a snapshot without mappings for one exact canonical path."""
-    selected_path = _canonical_repository_path(repository_path)
-    return registry_snapshot(
-        {
-            repo_id: mapped_path
-            for repo_id, mapped_path in _registry_entries(snapshot).items()
-            if mapped_path != selected_path
-        }
-    )
 
 
 @contextmanager

@@ -328,21 +328,23 @@ def test_register_replaces_a_lost_identity_and_removes_the_old_path_mapping(
     }
 
 
-def test_register_new_id_replaces_the_same_instance_mapping(
+def test_register_reuses_a_local_identity_after_unregister(
     tmp_path: Path,
 ) -> None:
     repository = create_repository(tmp_path / "repository")
     registered = run_cli(repository, "register")
     assert registered.returncode == 0
-    old_id = _registered_id(repository)
+    repo_id = _registered_id(repository)
 
-    completed = run_cli(repository, "register", "--new-id")
+    unregistered = run_cli(tmp_path, "unregister", repo_id)
+    assert unregistered.returncode == 0
+
+    completed = run_cli(repository, "register")
 
     assert completed.returncode == 0
-    new_id = _registered_id(repository)
-    assert new_id != old_id
+    assert _registered_id(repository) == repo_id
     assert _registry_repositories() == {
-        new_id: str(repository.resolve()),
+        repo_id: str(repository.resolve()),
     }
 
 

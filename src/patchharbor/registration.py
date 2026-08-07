@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections import Counter
 from dataclasses import dataclass
-from enum import Enum
+from enum import Enum, auto
 from pathlib import Path
 
 from patchharbor.errors import (
@@ -27,9 +27,8 @@ from patchharbor.registry import (
     load_registry_state,
     registry_lock,
     remove_registry_mapping,
-    remove_registry_path_mappings,
     restore_registry_state,
-    set_registry_mapping,
+    replace_registry_mapping,
     write_registry,
 )
 from patchharbor.repository import (
@@ -44,146 +43,124 @@ from patchharbor.repository import (
 from patchharbor.user_paths import RegistrationUserPaths, registration_user_paths
 
 
-class IdentityTransitionKind(str, Enum):
-    """Explicit local-identity transition selected from one locked snapshot."""
+class _IdentityState(Enum):
+    """Observed relationship between one local ID and the registry."""
 
-    CREATE = "create"
-    KEEP = "keep"
-    MOVE = "move"
-    REPLACE = "replace"
-    SEPARATE = "separate"
+    LOCAL_ID_MISSING = auto()
+    ID_UNMAPPED = auto()
+    REGISTERED_HERE = auto()
+    REGISTERED_PATH_MISSING = auto()
+    REGISTERED_ELSEWHERE = auto()
+
+
+class _IdentityAction(Enum):
+    """Mutation selected for one observed identity state."""
+
+    NEW_ID = auto()
+    KEEP_ID = auto()
+    REJECT = auto()
+
+
+_IDENTITY_TRANSITIONS = {
+    _IdentityState.LOCAL_ID_MISSING: _IdentityAction.NEW_ID,
+    _IdentityState.ID_UNMAPPED: _IdentityAction.KEEP_ID,
+    _IdentityState.REGISTERED_HERE: _IdentityAction.KEEP_ID,
+    _IdentityState.REGISTERED_PATH_MISSING: _IdentityAction.KEEP_ID,
+    _IdentityState.REGISTERED_ELSEWHERE: _IdentityAction.REJECT,
+}
 
 
 @dataclass(frozen=True)
-class IdentityObservation:
-    """Identity facts observed while the global registry lock is held."""
-
-    registry_state: RegistryFileState
-    repository: RepositoryPath
-    local_id: RepositoryId | None
-    local_state: LocalRegistrationState
-    id_mapping: RegistryMapping | None
-    id_mapping_status: RegistryStatus | None
-    path_mappings: tuple[RegistryMapping, ...]
-
-
-@dataclass(frozen=True)
-class IdentityTransition:
+class _IdentityTransition:
     """One fully planned local-ID and central-registry mutation."""
 
-    kind: IdentityTransitionKind
-    observation: IdentityObservation
+    registry_state: RegistryFileState
+    local_state: LocalRegistrationState
     repo_id: RepositoryId
     next_snapshot: RegistrySnapshot
 
 
-def _mapping_for_id(
+def _identity_state(
     snapshot: RegistrySnapshot,
-    repo_id: RepositoryId,
-) -> RegistryMapping | None:
-    return next(
+    repository: RepositoryPath,
+    local_id: RepositoryId | None,
+) -> _IdentityState:
+    if local_id is None:
+        return _IdentityState.LOCAL_ID_MISSING
+
+    id_mapping = next(
         (
             mapping
             for mapping in snapshot.repositories
-            if mapping.repo_id == repo_id
+            if mapping.repo_id == local_id
         ),
         None,
     )
+    if id_mapping is None:
+        return _IdentityState.ID_UNMAPPED
+    if id_mapping.repository_path == repository:
+        return _IdentityState.REGISTERED_HERE
+    if (
+        registered_repository_status(
+            id_mapping.repository_path,
+            local_id,
+        )
+        is RegistryStatus.MISSING
+    ):
+        return _IdentityState.REGISTERED_PATH_MISSING
+    return _IdentityState.REGISTERED_ELSEWHERE
 
 
-def _observe_identity(
+def _plan_identity_transition(
     registry_state: RegistryFileState,
     repository: RepositoryPath,
     local_id: RepositoryId | None,
     local_state: LocalRegistrationState,
-) -> IdentityObservation:
-    snapshot = registry_state.snapshot
-    id_mapping = (
-        _mapping_for_id(snapshot, local_id)
-        if local_id is not None
-        else None
-    )
-    id_mapping_status: RegistryStatus | None = None
-    if id_mapping is not None and id_mapping.repository_path != repository:
-        id_mapping_status = registered_repository_status(
-            id_mapping.repository_path,
-            id_mapping.repo_id,
-        )
-    return IdentityObservation(
-        registry_state=registry_state,
-        repository=repository,
-        local_id=local_id,
-        local_state=local_state,
-        id_mapping=id_mapping,
-        id_mapping_status=id_mapping_status,
-        path_mappings=tuple(
-            mapping
-            for mapping in snapshot.repositories
-            if mapping.repository_path == repository
-        ),
-    )
-
-
-def _plan_identity_transition(
-    observation: IdentityObservation,
     *,
     new_id: bool,
-) -> IdentityTransition:
-    local_id = observation.local_id
-    id_mapping = observation.id_mapping
-
-    if new_id:
-        kind = IdentityTransitionKind.SEPARATE
-        repo_id = RepositoryId.new()
-    elif local_id is None:
-        kind = (
-            IdentityTransitionKind.REPLACE
-            if observation.path_mappings
-            else IdentityTransitionKind.CREATE
-        )
-        repo_id = RepositoryId.new()
-    elif id_mapping is None:
-        kind = IdentityTransitionKind.CREATE
-        repo_id = local_id
-    elif id_mapping.repository_path == observation.repository:
-        kind = IdentityTransitionKind.KEEP
-        repo_id = local_id
-    elif observation.id_mapping_status is RegistryStatus.MISSING:
-        kind = IdentityTransitionKind.MOVE
-        repo_id = local_id
-    else:
+) -> _IdentityTransition:
+    state = _identity_state(
+        registry_state.snapshot,
+        repository,
+        local_id,
+    )
+    action = (
+        _IdentityAction.NEW_ID
+        if new_id
+        else _IDENTITY_TRANSITIONS[state]
+    )
+    if action is _IdentityAction.REJECT:
         raise repository_resolution_error(
             "repository ID is already registered to another existing path"
         )
 
-    next_snapshot = remove_registry_path_mappings(
-        observation.registry_state.snapshot,
-        observation.repository,
-    )
-    next_snapshot = set_registry_mapping(
-        next_snapshot,
-        repo_id,
-        observation.repository,
-    )
-    return IdentityTransition(
-        kind=kind,
-        observation=observation,
+    repo_id = RepositoryId.new() if action is _IdentityAction.NEW_ID else local_id
+    if repo_id is None:
+        raise AssertionError("identity transition selected no repository ID")
+
+    return _IdentityTransition(
+        registry_state=registry_state,
+        local_state=local_state,
         repo_id=repo_id,
-        next_snapshot=next_snapshot,
+        next_snapshot=replace_registry_mapping(
+            registry_state.snapshot,
+            repo_id,
+            repository,
+        ),
     )
 
 
 def _restore_identity_transition(
     paths: RegistrationUserPaths,
-    transition: IdentityTransition,
+    transition: _IdentityTransition,
 ) -> None:
     failures: list[BaseException] = []
     try:
-        restore_local_registration(transition.observation.local_state)
+        restore_local_registration(transition.local_state)
     except PatchHarborError as exc:
         failures.append(exc)
     try:
-        restore_registry_state(paths, transition.observation.registry_state)
+        restore_registry_state(paths, transition.registry_state)
     except PatchHarborError as exc:
         failures.append(exc)
     if failures:
@@ -195,11 +172,11 @@ def _restore_identity_transition(
 
 def _commit_identity_transition(
     paths: RegistrationUserPaths,
-    transition: IdentityTransition,
+    transition: _IdentityTransition,
 ) -> None:
     try:
         apply_local_registration(
-            transition.observation.local_state,
+            transition.local_state,
             transition.repo_id,
         )
         write_registry(paths, transition.next_snapshot)
@@ -224,15 +201,12 @@ def register_local_repository(
     with registry_lock(user_paths):
         repository = inspect_repository(path)
         registry_state = load_registry_state(user_paths)
-        existing_id, local_state = inspect_local_registration(repository)
-        observation = _observe_identity(
+        local_id, local_state = inspect_local_registration(repository)
+        transition = _plan_identity_transition(
             registry_state,
             repository,
-            existing_id,
+            local_id,
             local_state,
-        )
-        transition = _plan_identity_transition(
-            observation,
             new_id=new_id,
         )
         _commit_identity_transition(user_paths, transition)
