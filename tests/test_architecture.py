@@ -158,6 +158,7 @@ def test_registration_layers_have_one_directional_dependency_flow() -> None:
         "models",
         "registry",
         "repository",
+        "repository_lock",
         "user_paths",
     }
     assert _local_imports("registry") == {
@@ -171,6 +172,11 @@ def test_registration_layers_have_one_directional_dependency_flow() -> None:
         "models",
         "physical_paths",
         "platform",
+    }
+    assert _local_imports("repository_lock") == {
+        "errors",
+        "models",
+        "user_paths",
     }
     assert _local_imports("user_paths") == {
         "errors",

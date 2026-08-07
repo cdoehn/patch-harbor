@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 import subprocess
+import sys
 
 import pytest
 
@@ -69,3 +70,99 @@ def local_exclude_path(repository: Path) -> Path:
     if not path.is_absolute():
         path = repository / path
     return path.resolve()
+
+
+_REPOSITORY_LOCK_HOLDER_PROGRAM = r"""
+import sys
+
+from patchharbor.models import RepositoryId
+from patchharbor.repository_lock import repository_lock
+from patchharbor.user_paths import registration_user_paths
+
+repo_id = RepositoryId(sys.argv[1])
+mode = sys.argv[2]
+with repository_lock(registration_user_paths(), repo_id, wait_seconds=0.0):
+    print("ready", flush=True)
+    if sys.stdin.buffer.read(1) != b"x":
+        raise RuntimeError("release token missing")
+    if mode == "error":
+        raise RuntimeError("expected holder failure")
+"""
+
+
+_REPOSITORY_LOCK_PROBE_PROGRAM = r"""
+import sys
+
+from patchharbor.errors import PatchHarborError
+from patchharbor.models import RepositoryId
+from patchharbor.repository_lock import repository_lock
+from patchharbor.user_paths import registration_user_paths
+
+try:
+    with repository_lock(
+        registration_user_paths(),
+        RepositoryId(sys.argv[1]),
+        wait_seconds=0.0,
+    ):
+        pass
+except PatchHarborError as exc:
+    raise SystemExit(int(exc.exit_code))
+"""
+
+
+def start_repository_lock_holder(
+    repo_id: str,
+    *,
+    environment: dict[str, str],
+    mode: str = "normal",
+) -> subprocess.Popen[str]:
+    """Start one synchronized process holding the repository lock."""
+    holder = subprocess.Popen(
+        [
+            sys.executable,
+            "-c",
+            _REPOSITORY_LOCK_HOLDER_PROGRAM,
+            repo_id,
+            mode,
+        ],
+        env=environment,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        encoding="utf-8",
+        errors="strict",
+    )
+    assert holder.stdout is not None
+    assert holder.stdout.readline() == "ready\n"
+    return holder
+
+
+def release_repository_lock_holder(holder: subprocess.Popen[str]) -> int:
+    """Release a synchronized holder and return its process exit code."""
+    assert holder.stdin is not None
+    holder.stdin.write("x")
+    holder.stdin.flush()
+    holder.stdin.close()
+    return holder.wait(timeout=10)
+
+
+def stop_repository_lock_holder(holder: subprocess.Popen[str]) -> None:
+    """Ensure a lock-holder process cannot survive a failed test."""
+    if holder.poll() is None:
+        holder.kill()
+        holder.wait(timeout=10)
+
+
+def probe_repository_lock(repo_id: str, environment: dict[str, str]) -> int:
+    """Try one immediate repository lock acquisition in a real process."""
+    completed = subprocess.run(
+        [sys.executable, "-c", _REPOSITORY_LOCK_PROBE_PROGRAM, repo_id],
+        env=environment,
+        stdin=subprocess.DEVNULL,
+        capture_output=True,
+        encoding="utf-8",
+        errors="strict",
+        timeout=10,
+        check=False,
+    )
+    return completed.returncode

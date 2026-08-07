@@ -40,6 +40,7 @@ from patchharbor.repository import (
     registered_repository_status,
     restore_local_registration,
 )
+from patchharbor.repository_lock import repository_lock
 from patchharbor.user_paths import RegistrationUserPaths, registration_user_paths
 
 
@@ -191,6 +192,27 @@ def _commit_identity_transition(
         raise primary_error
 
 
+def _new_identity_lock_id(
+    snapshot: RegistrySnapshot,
+    repository: RepositoryPath,
+    local_id: RepositoryId | None,
+    new_id: RepositoryId,
+) -> RepositoryId:
+    """Select the existing identity affected by an explicit replacement."""
+    if local_id is not None:
+        return local_id
+    path_ids = tuple(
+        mapping.repo_id
+        for mapping in snapshot.repositories
+        if mapping.repository_path == repository
+    )
+    if len(path_ids) > 1:
+        raise repository_resolution_error(
+            "repository path has conflicting registrations"
+        )
+    return path_ids[0] if path_ids else new_id
+
+
 def register_local_repository(
     path: Path,
     *,
@@ -209,7 +231,17 @@ def register_local_repository(
             local_state,
             new_id=new_id,
         )
-        _commit_identity_transition(user_paths, transition)
+        if new_id:
+            affected_id = _new_identity_lock_id(
+                registry_state.snapshot,
+                repository,
+                local_id,
+                transition.repo_id,
+            )
+            with repository_lock(user_paths, affected_id):
+                _commit_identity_transition(user_paths, transition)
+        else:
+            _commit_identity_transition(user_paths, transition)
 
     return transition.repo_id, repository
 
@@ -288,8 +320,14 @@ def unregister_local_repository(
     with registry_lock(user_paths):
         snapshot = load_registry(user_paths)
         selected = resolve_unregister_mapping(snapshot, selector, cwd=cwd)
-        write_registry(
-            user_paths,
-            remove_registry_mapping(snapshot, selected.repo_id),
+        next_snapshot = remove_registry_mapping(snapshot, selected.repo_id)
+        status = registered_repository_status(
+            selected.repository_path,
+            selected.repo_id,
         )
+        if status is RegistryStatus.MISSING:
+            write_registry(user_paths, next_snapshot)
+        else:
+            with repository_lock(user_paths, selected.repo_id):
+                write_registry(user_paths, next_snapshot)
         return selected.repo_id, selected.repository_path

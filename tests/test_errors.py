@@ -6,6 +6,7 @@ from patchharbor.errors import (
     format_tool_message,
     format_tool_warning,
     registry_error,
+    repository_busy_error,
     repository_resolution_error,
 )
 
@@ -19,6 +20,7 @@ def test_public_tool_exit_codes_are_complete_and_stable() -> None:
         "PAYLOAD_PREPARATION_ERROR": 6,
         "EXECUTION_ERROR": 7,
         "REPOSITORY_ERROR": 8,
+        "REPOSITORY_BUSY": 12,
         "TIMEOUT": 124,
         "INTERRUPTED": 130,
     }
@@ -31,9 +33,10 @@ def test_public_tool_message_prefixes_are_stable() -> None:
     )
 
 
-def test_repository_error_factories_share_exit_code_and_keep_categories() -> None:
+def test_repository_error_factories_keep_public_codes_and_categories() -> None:
     registry_failure = registry_error("registry failed")
     resolution_failure = repository_resolution_error("resolution failed")
+    busy_failure = repository_busy_error()
 
     assert registry_failure.exit_code is ExitCode.REPOSITORY_ERROR
     assert registry_failure.error_kind is ErrorKind.REGISTRY_ERROR
@@ -42,3 +45,5 @@ def test_repository_error_factories_share_exit_code_and_keep_categories() -> Non
         resolution_failure.error_kind
         is ErrorKind.REPOSITORY_RESOLUTION_ERROR
     )
+    assert busy_failure.exit_code is ExitCode.REPOSITORY_BUSY
+    assert busy_failure.error_kind is ErrorKind.REPOSITORY_BUSY

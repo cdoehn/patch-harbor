@@ -19,6 +19,7 @@ class ExitCode(IntEnum):
     PAYLOAD_PREPARATION_ERROR = 6
     EXECUTION_ERROR = 7
     REPOSITORY_ERROR = 8
+    REPOSITORY_BUSY = 12
     TIMEOUT = 124
     INTERRUPTED = 130
 
@@ -29,6 +30,7 @@ class ErrorKind(str, Enum):
     TOOL_ERROR = "tool_error"
     REGISTRY_ERROR = "registry_error"
     REPOSITORY_RESOLUTION_ERROR = "repository_resolution_error"
+    REPOSITORY_BUSY = "repository_busy"
 
 
 class PatchHarborError(Exception):
@@ -61,6 +63,15 @@ def repository_resolution_error(message: str) -> PatchHarborError:
         message,
         ExitCode.REPOSITORY_ERROR,
         error_kind=ErrorKind.REPOSITORY_RESOLUTION_ERROR,
+    )
+
+
+def repository_busy_error(message: str = "repository is busy") -> PatchHarborError:
+    """Create one failure for an already exclusively locked repository."""
+    return PatchHarborError(
+        message,
+        ExitCode.REPOSITORY_BUSY,
+        error_kind=ErrorKind.REPOSITORY_BUSY,
     )
 
 
