@@ -75,6 +75,20 @@ def remove_registry_mapping(
     return registry_snapshot(repositories)
 
 
+def remove_registry_path_mappings(
+    snapshot: RegistrySnapshot,
+    repository_path: RepositoryPath,
+) -> RegistrySnapshot:
+    """Return a snapshot without mappings for one exact canonical path."""
+    return registry_snapshot(
+        {
+            repo_id: mapped_path
+            for repo_id, mapped_path in _registry_entries(snapshot).items()
+            if mapped_path != repository_path
+        }
+    )
+
+
 @contextmanager
 def registry_lock(paths: RegistrationUserPaths) -> Iterator[None]:
     """Hold the single global registry mutation lock."""

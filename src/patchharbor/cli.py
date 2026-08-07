@@ -91,6 +91,12 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Git repository; defaults to the current directory",
     )
 
+    register_parser.add_argument(
+        "--new-id",
+        action="store_true",
+        help="replace this local instance identity with a new UUID",
+    )
+
     registry_parser = commands.add_parser(
         "registry",
         help="inspect registered local repository instances",
@@ -206,11 +212,15 @@ def _build_parser() -> argparse.ArgumentParser:
 def _register_command(
     path: Path | None,
     *,
+    new_id: bool,
     stdout: TextIO,
     stderr: TextIO,
 ) -> int:
     try:
-        repo_id, repository_path = register_repository(path or Path.cwd())
+        repo_id, repository_path = register_repository(
+            path or Path.cwd(),
+            new_id=new_id,
+        )
     except PatchHarborError as exc:
         print(format_tool_message(str(exc)), file=stderr)
         return int(exc.exit_code)
@@ -509,6 +519,7 @@ def main(
     if args.command == "register":
         return _register_command(
             args.repository,
+            new_id=args.new_id,
             stdout=actual_stdout,
             stderr=actual_stderr,
         )

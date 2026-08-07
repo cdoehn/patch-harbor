@@ -229,6 +229,152 @@ def _registered_id(repository: Path) -> str:
     ).strip()
 
 
+def _registry_repositories() -> dict[str, str]:
+    document = json.loads(_registry_path().read_text(encoding="utf-8"))
+    repositories = document["repositories"]
+    assert isinstance(repositories, dict)
+    return repositories
+
+
+def _create_repository_with_copied_identity(
+    source: Path,
+    destination: Path,
+) -> Path:
+    copied = create_repository(destination)
+    copied_identity = copied / ".patchharbor" / "id"
+    copied_identity.parent.mkdir()
+    copied_identity.write_bytes(
+        (source / ".patchharbor" / "id").read_bytes()
+    )
+    return copied
+
+
+def test_registering_the_same_instance_again_is_idempotent(
+    tmp_path: Path,
+) -> None:
+    repository = create_repository(tmp_path / "repository")
+    first = run_cli(repository, "register")
+    assert first.returncode == 0
+    repo_id = _registered_id(repository)
+    registry_before = _registry_path().read_bytes()
+    exclude_before = local_exclude_path(repository).read_bytes()
+
+    second = run_cli(repository, "register")
+
+    assert second.returncode == 0
+    assert _registered_id(repository) == repo_id
+    assert _registry_path().read_bytes() == registry_before
+    assert local_exclude_path(repository).read_bytes() == exclude_before
+
+
+def test_register_moves_an_identity_when_the_old_path_is_missing(
+    tmp_path: Path,
+) -> None:
+    original = create_repository(tmp_path / "original")
+    registered = run_cli(original, "register")
+    assert registered.returncode == 0
+    repo_id = _registered_id(original)
+    old_path = original.resolve()
+    moved = tmp_path / "moved"
+    original.rename(moved)
+
+    completed = run_cli(tmp_path, "register", str(moved))
+
+    assert completed.returncode == 0
+    assert not old_path.exists()
+    assert _registered_id(moved) == repo_id
+    assert _registry_repositories() == {
+        repo_id: str(moved.resolve()),
+    }
+
+
+def test_register_rejects_a_copied_identity_while_both_paths_exist(
+    tmp_path: Path,
+) -> None:
+    original = create_repository(tmp_path / "original")
+    registered = run_cli(original, "register")
+    assert registered.returncode == 0
+    repo_id = _registered_id(original)
+    registry_before = _registry_path().read_bytes()
+    copied = _create_repository_with_copied_identity(
+        original,
+        tmp_path / "copied",
+    )
+
+    completed = run_cli(tmp_path, "register", str(copied))
+
+    assert completed.returncode == 8
+    assert _registry_path().read_bytes() == registry_before
+    assert _registered_id(original) == repo_id
+    assert _registered_id(copied) == repo_id
+
+
+def test_register_replaces_a_lost_identity_and_removes_the_old_path_mapping(
+    tmp_path: Path,
+) -> None:
+    repository = create_repository(tmp_path / "repository")
+    registered = run_cli(repository, "register")
+    assert registered.returncode == 0
+    old_id = _registered_id(repository)
+    (repository / ".patchharbor" / "id").unlink()
+
+    completed = run_cli(repository, "register")
+
+    assert completed.returncode == 0
+    new_id = _registered_id(repository)
+    assert new_id != old_id
+    assert _registry_repositories() == {
+        new_id: str(repository.resolve()),
+    }
+
+
+def test_register_new_id_replaces_the_same_instance_mapping(
+    tmp_path: Path,
+) -> None:
+    repository = create_repository(tmp_path / "repository")
+    registered = run_cli(repository, "register")
+    assert registered.returncode == 0
+    old_id = _registered_id(repository)
+
+    completed = run_cli(repository, "register", "--new-id")
+
+    assert completed.returncode == 0
+    new_id = _registered_id(repository)
+    assert new_id != old_id
+    assert _registry_repositories() == {
+        new_id: str(repository.resolve()),
+    }
+
+
+def test_register_new_id_separates_a_copied_instance(
+    tmp_path: Path,
+) -> None:
+    original = create_repository(tmp_path / "original")
+    registered = run_cli(original, "register")
+    assert registered.returncode == 0
+    original_id = _registered_id(original)
+    copied = _create_repository_with_copied_identity(
+        original,
+        tmp_path / "copied",
+    )
+
+    completed = run_cli(
+        tmp_path,
+        "register",
+        "--new-id",
+        str(copied),
+    )
+
+    assert completed.returncode == 0
+    copied_id = _registered_id(copied)
+    assert copied_id != original_id
+    assert _registered_id(original) == original_id
+    assert _registry_repositories() == {
+        original_id: str(original.resolve()),
+        copied_id: str(copied.resolve()),
+    }
+
+
 def test_registry_list_json_reports_sorted_real_repository_statuses(
     tmp_path: Path,
 ) -> None:

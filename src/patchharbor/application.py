@@ -34,9 +34,13 @@ from patchharbor.sources import (
 )
 
 
-def register_repository(path: Path) -> tuple[RepositoryId, RepositoryPath]:
+def register_repository(
+    path: Path,
+    *,
+    new_id: bool = False,
+) -> tuple[RepositoryId, RepositoryPath]:
     """Register one local Git repository instance."""
-    return register_local_repository(path)
+    return register_local_repository(path, new_id=new_id)
 
 
 def registered_repositories() -> RegistryListResult:

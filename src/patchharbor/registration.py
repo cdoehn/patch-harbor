@@ -23,6 +23,7 @@ from patchharbor.registry import (
     load_registry,
     registry_lock,
     remove_registry_mapping,
+    remove_registry_path_mappings,
     set_registry_mapping,
     write_registry,
 )
@@ -37,8 +38,24 @@ from patchharbor.repository import (
 from patchharbor.user_paths import registration_user_paths
 
 
+def _mapping_for_id(
+    snapshot: RegistrySnapshot,
+    repo_id: RepositoryId,
+) -> RegistryMapping | None:
+    return next(
+        (
+            mapping
+            for mapping in snapshot.repositories
+            if mapping.repo_id == repo_id
+        ),
+        None,
+    )
+
+
 def register_local_repository(
     path: Path,
+    *,
+    new_id: bool = False,
 ) -> tuple[RepositoryId, RepositoryPath]:
     """Register one local Git repository as one consistent mutation."""
     user_paths = registration_user_paths()
@@ -46,14 +63,34 @@ def register_local_repository(
         repository = inspect_repository(path)
         snapshot = load_registry(user_paths)
         existing_id, local_state = inspect_local_registration(repository)
-        repo_id = existing_id or RepositoryId.new()
+
+        if new_id:
+            repo_id = RepositoryId.new()
+        else:
+            repo_id = existing_id or RepositoryId.new()
+            existing_mapping = _mapping_for_id(snapshot, repo_id)
+            if (
+                existing_mapping is not None
+                and existing_mapping.repository_path != repository
+                and registered_repository_status(
+                    existing_mapping.repository_path,
+                    repo_id,
+                ) is not RegistryStatus.MISSING
+            ):
+                raise repository_resolution_error(
+                    "repository ID is already registered to another existing path"
+                )
+
+        next_snapshot = remove_registry_path_mappings(snapshot, repository)
+        next_snapshot = set_registry_mapping(
+            next_snapshot,
+            repo_id,
+            repository,
+        )
 
         try:
             apply_local_registration(local_state, repo_id)
-            write_registry(
-                user_paths,
-                set_registry_mapping(snapshot, repo_id, repository),
-            )
+            write_registry(user_paths, next_snapshot)
         except PatchHarborError:
             try:
                 restore_local_registration(local_state)
