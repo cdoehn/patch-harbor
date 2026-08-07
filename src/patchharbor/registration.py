@@ -21,9 +21,9 @@ from patchharbor.models import (
 )
 from patchharbor.registry import (
     load_registry,
-    registry_entries,
     registry_lock,
-    registry_snapshot,
+    remove_registry_mapping,
+    set_registry_mapping,
     write_registry,
 )
 from patchharbor.repository import (
@@ -45,14 +45,15 @@ def register_local_repository(
     with registry_lock(user_paths):
         repository = inspect_repository(path)
         snapshot = load_registry(user_paths)
-        repositories = registry_entries(snapshot)
         existing_id, local_state = inspect_local_registration(repository)
         repo_id = existing_id or RepositoryId.new()
 
         try:
             apply_local_registration(local_state, repo_id)
-            repositories[repo_id] = repository
-            write_registry(user_paths, registry_snapshot(repositories))
+            write_registry(
+                user_paths,
+                set_registry_mapping(snapshot, repo_id, repository),
+            )
         except PatchHarborError:
             try:
                 restore_local_registration(local_state)
@@ -127,20 +128,6 @@ def resolve_unregister_mapping(
         if mapping.repo_id == selected_id:
             return mapping
     raise repository_resolution_error("repository ID is not registered")
-
-
-def remove_registry_mapping(
-    snapshot: RegistrySnapshot,
-    repo_id: RepositoryId,
-) -> RegistrySnapshot:
-    """Return a new snapshot without exactly one repository ID."""
-    return RegistrySnapshot(
-        repositories=tuple(
-            mapping
-            for mapping in snapshot.repositories
-            if mapping.repo_id != repo_id
-        )
-    )
 
 
 def unregister_local_repository(

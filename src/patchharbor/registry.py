@@ -47,12 +47,32 @@ def registry_snapshot(
     )
 
 
-def registry_entries(snapshot: RegistrySnapshot) -> RegistryEntries:
-    """Create a mutable working copy of one immutable registry snapshot."""
+def _registry_entries(snapshot: RegistrySnapshot) -> RegistryEntries:
     return {
         mapping.repo_id: mapping.repository_path
         for mapping in snapshot.repositories
     }
+
+
+def set_registry_mapping(
+    snapshot: RegistrySnapshot,
+    repo_id: RepositoryId,
+    repository_path: RepositoryPath,
+) -> RegistrySnapshot:
+    """Return a canonical snapshot containing the supplied mapping."""
+    repositories = _registry_entries(snapshot)
+    repositories[repo_id] = repository_path
+    return registry_snapshot(repositories)
+
+
+def remove_registry_mapping(
+    snapshot: RegistrySnapshot,
+    repo_id: RepositoryId,
+) -> RegistrySnapshot:
+    """Return a canonical snapshot without the supplied repository ID."""
+    repositories = _registry_entries(snapshot)
+    repositories.pop(repo_id, None)
+    return registry_snapshot(repositories)
 
 
 @contextmanager
@@ -90,17 +110,21 @@ def registry_lock(paths: RegistrationUserPaths) -> Iterator[None]:
                 pass
 
 
-def load_registry(paths: RegistrationUserPaths) -> RegistrySnapshot:
-    """Read and validate one complete central registry snapshot."""
-    path = paths.registry_path
+def _registry_file_kind(path: Path) -> PathKind:
     try:
         kind = path_kind(path)
     except FileSystemOperationError as exc:
         raise _error(f"cannot inspect repository registry: {exc.cause}") from exc
-    if kind is PathKind.MISSING:
-        return registry_snapshot({})
-    if kind is not PathKind.REGULAR_FILE:
+    if kind not in {PathKind.MISSING, PathKind.REGULAR_FILE}:
         raise _error("repository registry must be a regular file")
+    return kind
+
+
+def load_registry(paths: RegistrationUserPaths) -> RegistrySnapshot:
+    """Read and validate one complete central registry snapshot."""
+    path = paths.registry_path
+    if _registry_file_kind(path) is PathKind.MISSING:
+        return registry_snapshot({})
 
     try:
         document = json.loads(path.read_text(encoding="utf-8"))
@@ -142,12 +166,7 @@ def write_registry(
         json.dumps(document, ensure_ascii=False, indent=2, sort_keys=True)
         + "\n"
     ).encode("utf-8")
-    try:
-        kind = path_kind(paths.registry_path)
-    except FileSystemOperationError as exc:
-        raise _error(f"cannot inspect repository registry: {exc.cause}") from exc
-    if kind not in {PathKind.MISSING, PathKind.REGULAR_FILE}:
-        raise _error("repository registry must be a regular file")
+    _registry_file_kind(paths.registry_path)
     try:
         atomic_replace_bytes(paths.registry_path, encoded)
     except FileSystemOperationError as exc:

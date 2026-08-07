@@ -21,26 +21,36 @@ from tests.registration_support import (
 pytestmark = pytest.mark.e2e
 
 
-def _registry_path(environment: dict[str, str]) -> Path:
+def _registry_path() -> Path:
     if os.name == "nt":
-        return Path(environment["APPDATA"]) / "PatchHarbor" / "registry.json"
-    return Path(environment["XDG_CONFIG_HOME"]) / "patchharbor" / "registry.json"
+        return Path(os.environ["APPDATA"]) / "PatchHarbor" / "registry.json"
+    return Path(os.environ["XDG_CONFIG_HOME"]) / "patchharbor" / "registry.json"
 
 
-def _registry_lock_path(environment: dict[str, str]) -> Path:
+def _registry_lock_path() -> Path:
     if os.name == "nt":
         return (
-            Path(environment["LOCALAPPDATA"])
+            Path(os.environ["LOCALAPPDATA"])
             / "PatchHarbor"
             / "locks"
             / "registry.lock"
         )
     return (
-        Path(environment["XDG_STATE_HOME"])
+        Path(os.environ["XDG_STATE_HOME"])
         / "patchharbor"
         / "locks"
         / "registry.lock"
     )
+
+
+@pytest.fixture(autouse=True)
+def isolate_registry_environment(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Isolate registry state for every E2E behavior test."""
+    for name, value in isolated_user_environment(tmp_path / "user").items():
+        monkeypatch.setenv(name, value)
 
 
 @pytest.mark.parametrize("explicit_path", [False, True])
@@ -49,7 +59,6 @@ def test_register_creates_identity_registry_and_clean_git_state(
     explicit_path: bool,
 ) -> None:
     repository = create_repository(tmp_path / "repository")
-    environment = isolated_user_environment(tmp_path / "user")
     invocation_directory = repository if not explicit_path else tmp_path
     arguments = (str(repository),) if explicit_path else ()
     gitignore_path = repository / ".gitignore"
@@ -59,7 +68,6 @@ def test_register_creates_identity_registry_and_clean_git_state(
         invocation_directory,
         "register",
         *arguments,
-        environment_overrides=environment,
     )
 
     assert completed.returncode == 0
@@ -73,7 +81,7 @@ def test_register_creates_identity_registry_and_clean_git_state(
     assert parsed_id.version == 4
     assert str(parsed_id) == repo_id
 
-    registry = json.loads(_registry_path(environment).read_text(encoding="utf-8"))
+    registry = json.loads(_registry_path().read_text(encoding="utf-8"))
     assert registry["format_version"] == 1
     assert registry["repositories"][repo_id] == str(repository.resolve())
 
@@ -98,20 +106,14 @@ def test_register_physically_canonicalizes_an_explicit_repository_path(
     repository = create_repository(tmp_path / "repository")
     link = tmp_path / "repository-link"
     create_symlink_or_skip(link, repository, target_is_directory=True)
-    environment = isolated_user_environment(tmp_path / "user")
 
-    completed = run_cli(
-        tmp_path,
-        "register",
-        str(link),
-        environment_overrides=environment,
-    )
+    completed = run_cli(tmp_path, "register", str(link))
 
     assert completed.returncode == 0
     repo_id = (repository / ".patchharbor" / "id").read_text(
         encoding="ascii"
     ).strip()
-    registry = json.loads(_registry_path(environment).read_text(encoding="utf-8"))
+    registry = json.loads(_registry_path().read_text(encoding="utf-8"))
     assert registry["repositories"][repo_id] == str(repository.resolve())
 
 
@@ -120,17 +122,12 @@ def test_register_rejects_a_repository_without_a_commit(tmp_path: Path) -> None:
         tmp_path / "repository",
         with_commit=False,
     )
-    environment = isolated_user_environment(tmp_path / "user")
 
-    completed = run_cli(
-        repository,
-        "register",
-        environment_overrides=environment,
-    )
+    completed = run_cli(repository, "register")
 
     assert completed.returncode == 8
     assert not (repository / ".patchharbor").exists()
-    assert not _registry_path(environment).exists()
+    assert not _registry_path().exists()
 
 
 @pytest.mark.parametrize("location", ["base", "index"])
@@ -145,35 +142,25 @@ def test_register_rejects_reserved_tracked_path_segments(
     git(repository, "add", reserved_file.relative_to(repository).as_posix())
     if location == "base":
         git(repository, "commit", "--quiet", "-m", "reserved path")
-    environment = isolated_user_environment(tmp_path / "user")
 
-    completed = run_cli(
-        repository,
-        "register",
-        environment_overrides=environment,
-    )
+    completed = run_cli(repository, "register")
 
     assert completed.returncode == 8
     assert not (repository / ".patchharbor").exists()
-    assert not _registry_path(environment).exists()
+    assert not _registry_path().exists()
 
 
 def test_register_respects_the_global_registry_lock(tmp_path: Path) -> None:
     repository = create_repository(tmp_path / "repository")
-    environment = isolated_user_environment(tmp_path / "user")
-    lock_path = _registry_lock_path(environment)
+    lock_path = _registry_lock_path()
     lock_path.parent.mkdir(parents=True)
     lock_path.write_text("occupied\n", encoding="ascii")
 
-    completed = run_cli(
-        repository,
-        "register",
-        environment_overrides=environment,
-    )
+    completed = run_cli(repository, "register")
 
     assert completed.returncode == 8
     assert not (repository / ".patchharbor").exists()
-    assert not _registry_path(environment).exists()
+    assert not _registry_path().exists()
 
 
 @pytest.mark.parametrize("internal_kind", ["regular-file", "symlink"])
@@ -193,16 +180,11 @@ def test_register_rejects_a_non_directory_internal_path(
             target,
             target_is_directory=True,
         )
-    environment = isolated_user_environment(tmp_path / "user")
 
-    completed = run_cli(
-        repository,
-        "register",
-        environment_overrides=environment,
-    )
+    completed = run_cli(repository, "register")
 
     assert completed.returncode == 8
-    assert not _registry_path(environment).exists()
+    assert not _registry_path().exists()
     if internal_kind == "regular-file":
         assert internal.read_bytes() == b"not a directory\n"
     else:
@@ -233,16 +215,11 @@ def test_register_rejects_a_junction_as_internal_directory(
     )
     if completed_link.returncode != 0:
         pytest.skip("requires Windows junction creation support")
-    environment = isolated_user_environment(tmp_path / "user")
 
-    completed = run_cli(
-        repository,
-        "register",
-        environment_overrides=environment,
-    )
+    completed = run_cli(repository, "register")
 
     assert completed.returncode == 8
-    assert not _registry_path(environment).exists()
+    assert not _registry_path().exists()
     assert not (target / "id").exists()
 
 
@@ -255,7 +232,6 @@ def _registered_id(repository: Path) -> str:
 def test_registry_list_json_reports_sorted_real_repository_statuses(
     tmp_path: Path,
 ) -> None:
-    environment = isolated_user_environment(tmp_path / "user")
     ok_repository = create_repository(tmp_path / "ok-repository")
     missing_repository = create_repository(tmp_path / "missing-repository")
     conflict_repository = create_repository(tmp_path / "conflict-repository")
@@ -265,12 +241,7 @@ def test_registry_list_json_reports_sorted_real_repository_statuses(
         ok_repository,
         missing_repository,
     ):
-        completed = run_cli(
-            tmp_path,
-            "register",
-            str(repository),
-            environment_overrides=environment,
-        )
+        completed = run_cli(tmp_path, "register", str(repository))
         assert completed.returncode == 0
 
     repository_ids = {
@@ -286,13 +257,7 @@ def test_registry_list_json_reports_sorted_real_repository_statuses(
         newline="\n",
     )
 
-    completed = run_cli(
-        tmp_path,
-        "registry",
-        "list",
-        "--json",
-        environment_overrides=environment,
-    )
+    completed = run_cli(tmp_path, "registry", "list", "--json")
 
     assert completed.returncode == 0
     document = json.loads(completed.stdout)
@@ -330,36 +295,20 @@ def test_unregister_by_id_removes_only_the_central_mapping(
     tmp_path: Path,
 ) -> None:
     repository = create_repository(tmp_path / "repository")
-    environment = isolated_user_environment(tmp_path / "user")
-    registered = run_cli(
-        repository,
-        "register",
-        environment_overrides=environment,
-    )
+    registered = run_cli(repository, "register")
     assert registered.returncode == 0
     id_path = repository / ".patchharbor" / "id"
     repo_id = _registered_id(repository)
     id_bytes = id_path.read_bytes()
 
-    completed = run_cli(
-        tmp_path,
-        "unregister",
-        repo_id,
-        environment_overrides=environment,
-    )
+    completed = run_cli(tmp_path, "unregister", repo_id)
 
     assert completed.returncode == 0
-    registry = json.loads(_registry_path(environment).read_text(encoding="utf-8"))
+    registry = json.loads(_registry_path().read_text(encoding="utf-8"))
     assert registry == {"format_version": 1, "repositories": {}}
     assert id_path.read_bytes() == id_bytes
 
-    listed = run_cli(
-        tmp_path,
-        "registry",
-        "list",
-        "--json",
-        environment_overrides=environment,
-    )
+    listed = run_cli(tmp_path, "registry", "list", "--json")
     assert listed.returncode == 0
     assert json.loads(listed.stdout)["result"] == {"repositories": []}
 
@@ -368,25 +317,15 @@ def test_unregister_by_path_can_remove_a_missing_repository_mapping(
     tmp_path: Path,
 ) -> None:
     repository = create_repository(tmp_path / "repository")
-    environment = isolated_user_environment(tmp_path / "user")
-    registered = run_cli(
-        repository,
-        "register",
-        environment_overrides=environment,
-    )
+    registered = run_cli(repository, "register")
     assert registered.returncode == 0
     repository_path = repository.resolve()
     shutil.rmtree(repository)
 
-    completed = run_cli(
-        tmp_path,
-        "unregister",
-        str(repository_path),
-        environment_overrides=environment,
-    )
+    completed = run_cli(tmp_path, "unregister", str(repository_path))
 
     assert completed.returncode == 0
-    registry = json.loads(_registry_path(environment).read_text(encoding="utf-8"))
+    registry = json.loads(_registry_path().read_text(encoding="utf-8"))
     assert registry == {"format_version": 1, "repositories": {}}
 
 
@@ -394,24 +333,14 @@ def test_unregister_unknown_id_preserves_registry_and_local_identity(
     tmp_path: Path,
 ) -> None:
     repository = create_repository(tmp_path / "repository")
-    environment = isolated_user_environment(tmp_path / "user")
-    registered = run_cli(
-        repository,
-        "register",
-        environment_overrides=environment,
-    )
+    registered = run_cli(repository, "register")
     assert registered.returncode == 0
-    registry_path = _registry_path(environment)
+    registry_path = _registry_path()
     registry_before = registry_path.read_bytes()
     id_path = repository / ".patchharbor" / "id"
     id_before = id_path.read_bytes()
 
-    completed = run_cli(
-        tmp_path,
-        "unregister",
-        str(uuid4()),
-        environment_overrides=environment,
-    )
+    completed = run_cli(tmp_path, "unregister", str(uuid4()))
 
     assert completed.returncode == 8
     assert registry_path.read_bytes() == registry_before
@@ -423,41 +352,21 @@ def test_unregister_selector_is_exact_and_uuid_shaped_paths_are_explicit(
 ) -> None:
     directory_name = str(uuid4())
     repository = create_repository(tmp_path / directory_name)
-    environment = isolated_user_environment(tmp_path / "user")
-    registered = run_cli(
-        repository,
-        "register",
-        environment_overrides=environment,
-    )
+    registered = run_cli(repository, "register")
     assert registered.returncode == 0
-    registry_path = _registry_path(environment)
+    registry_path = _registry_path()
     registry_before = registry_path.read_bytes()
     registered_id = _registered_id(repository)
 
-    id_prefix = run_cli(
-        tmp_path,
-        "unregister",
-        registered_id[:8],
-        environment_overrides=environment,
-    )
-    bare_uuid_path = run_cli(
-        tmp_path,
-        "unregister",
-        directory_name,
-        environment_overrides=environment,
-    )
+    id_prefix = run_cli(tmp_path, "unregister", registered_id[:8])
+    bare_uuid_path = run_cli(tmp_path, "unregister", directory_name)
 
     assert id_prefix.returncode == 8
     assert bare_uuid_path.returncode == 8
     assert registry_path.read_bytes() == registry_before
 
     explicit_path = f".{os.sep}{directory_name}"
-    completed = run_cli(
-        tmp_path,
-        "unregister",
-        explicit_path,
-        environment_overrides=environment,
-    )
+    completed = run_cli(tmp_path, "unregister", explicit_path)
 
     assert completed.returncode == 0
     assert json.loads(registry_path.read_text(encoding="utf-8")) == {
@@ -469,68 +378,44 @@ def test_unregister_selector_is_exact_and_uuid_shaped_paths_are_explicit(
 def test_registry_list_reads_only_while_holding_the_global_lock(
     tmp_path: Path,
 ) -> None:
-    environment = isolated_user_environment(tmp_path / "user")
-    lock_path = _registry_lock_path(environment)
+    lock_path = _registry_lock_path()
     lock_path.parent.mkdir(parents=True)
     lock_path.write_text("occupied\n", encoding="ascii")
 
-    completed = run_cli(
-        tmp_path,
-        "registry",
-        "list",
-        "--json",
-        environment_overrides=environment,
-    )
+    completed = run_cli(tmp_path, "registry", "list", "--json")
 
     assert completed.returncode == 8
     document = json.loads(completed.stdout)
-    assert set(document) == {
-        "output_version",
-        "command",
-        "success",
-        "result",
-        "error",
-        "process_exit_code",
+    error = document["error"]
+    assert isinstance(error, dict)
+    assert isinstance(error.get("message"), str)
+    assert document == {
+        "output_version": 1,
+        "command": "registry.list",
+        "success": False,
+        "result": None,
+        "error": {
+            "kind": "registry_error",
+            "message": error["message"],
+            "patchharbor_error_code": 8,
+            "emergency_diagnostics_path": None,
+        },
+        "process_exit_code": 8,
     }
-    assert document["output_version"] == 1
-    assert document["command"] == "registry.list"
-    assert document["success"] is False
-    assert document["result"] is None
-    assert document["process_exit_code"] == 8
-    assert set(document["error"]) == {
-        "kind",
-        "message",
-        "patchharbor_error_code",
-        "emergency_diagnostics_path",
-    }
-    assert document["error"]["kind"] == "registry_error"
-    assert isinstance(document["error"]["message"], str)
-    assert document["error"]["patchharbor_error_code"] == 8
-    assert document["error"]["emergency_diagnostics_path"] is None
 
 
 def test_unregister_respects_the_global_registry_lock(tmp_path: Path) -> None:
     repository = create_repository(tmp_path / "repository")
-    environment = isolated_user_environment(tmp_path / "user")
-    registered = run_cli(
-        repository,
-        "register",
-        environment_overrides=environment,
-    )
+    registered = run_cli(repository, "register")
     assert registered.returncode == 0
-    registry_path = _registry_path(environment)
+    registry_path = _registry_path()
     registry_before = registry_path.read_bytes()
     id_path = repository / ".patchharbor" / "id"
     id_before = id_path.read_bytes()
-    lock_path = _registry_lock_path(environment)
+    lock_path = _registry_lock_path()
     lock_path.write_text("occupied\n", encoding="ascii")
 
-    completed = run_cli(
-        tmp_path,
-        "unregister",
-        _registered_id(repository),
-        environment_overrides=environment,
-    )
+    completed = run_cli(tmp_path, "unregister", _registered_id(repository))
 
     assert completed.returncode == 8
     assert registry_path.read_bytes() == registry_before
