@@ -21,8 +21,12 @@ from tests.registration_support import (
     git,
     isolated_user_environment,
     local_exclude_path,
+    probe_registry_lock,
+    release_registry_lock_holder,
     release_repository_lock_holder,
+    start_registry_lock_holder,
     start_repository_lock_holder,
+    stop_registry_lock_holder,
     stop_repository_lock_holder,
 )
 
@@ -161,15 +165,31 @@ def test_register_rejects_reserved_tracked_path_segments(
 
 def test_register_respects_the_global_registry_lock(tmp_path: Path) -> None:
     repository = create_repository(tmp_path / "repository")
+    holder = start_registry_lock_holder(environment=project_environment())
+    try:
+        completed = run_cli(repository, "register")
+
+        assert completed.returncode == 8
+        assert not (repository / ".patchharbor").exists()
+        assert not _registry_path().exists()
+    finally:
+        assert release_registry_lock_holder(holder) == 0
+        stop_registry_lock_holder(holder)
+
+
+def test_leftover_registry_lock_file_does_not_block_registration(
+    tmp_path: Path,
+) -> None:
+    repository = create_repository(tmp_path / "repository")
     lock_path = _registry_lock_path()
     lock_path.parent.mkdir(parents=True)
-    lock_path.write_text("occupied\n", encoding="ascii")
+    lock_path.write_text("left over by a terminated process\n", encoding="ascii")
 
     completed = run_cli(repository, "register")
 
-    assert completed.returncode == 8
-    assert not (repository / ".patchharbor").exists()
-    assert not _registry_path().exists()
+    assert completed.returncode == 0
+    assert (repository / ".patchharbor" / "id").is_file()
+    assert _registry_path().is_file()
 
 
 @pytest.mark.parametrize("internal_kind", ["regular-file", "symlink"])
@@ -535,30 +555,31 @@ def test_unregister_selector_is_exact_and_uuid_shaped_paths_are_explicit(
 def test_registry_list_reads_only_while_holding_the_global_lock(
     tmp_path: Path,
 ) -> None:
-    lock_path = _registry_lock_path()
-    lock_path.parent.mkdir(parents=True)
-    lock_path.write_text("occupied\n", encoding="ascii")
+    holder = start_registry_lock_holder(environment=project_environment())
+    try:
+        completed = run_cli(tmp_path, "registry", "list", "--json")
 
-    completed = run_cli(tmp_path, "registry", "list", "--json")
-
-    assert completed.returncode == 8
-    document = json.loads(completed.stdout)
-    error = document["error"]
-    assert isinstance(error, dict)
-    assert isinstance(error.get("message"), str)
-    assert document == {
-        "output_version": 1,
-        "command": "registry.list",
-        "success": False,
-        "result": None,
-        "error": {
-            "kind": "registry_error",
-            "message": error["message"],
-            "patchharbor_error_code": 8,
-            "emergency_diagnostics_path": None,
-        },
-        "process_exit_code": 8,
-    }
+        assert completed.returncode == 8
+        document = json.loads(completed.stdout)
+        error = document["error"]
+        assert isinstance(error, dict)
+        assert isinstance(error.get("message"), str)
+        assert document == {
+            "output_version": 1,
+            "command": "registry.list",
+            "success": False,
+            "result": None,
+            "error": {
+                "kind": "registry_error",
+                "message": error["message"],
+                "patchharbor_error_code": 8,
+                "emergency_diagnostics_path": None,
+            },
+            "process_exit_code": 8,
+        }
+    finally:
+        assert release_registry_lock_holder(holder) == 0
+        stop_registry_lock_holder(holder)
 
 
 def test_unregister_respects_the_global_registry_lock(tmp_path: Path) -> None:
@@ -569,14 +590,16 @@ def test_unregister_respects_the_global_registry_lock(tmp_path: Path) -> None:
     registry_before = registry_path.read_bytes()
     id_path = repository / ".patchharbor" / "id"
     id_before = id_path.read_bytes()
-    lock_path = _registry_lock_path()
-    lock_path.write_text("occupied\n", encoding="ascii")
+    holder = start_registry_lock_holder(environment=project_environment())
+    try:
+        completed = run_cli(tmp_path, "unregister", _registered_id(repository))
 
-    completed = run_cli(tmp_path, "unregister", _registered_id(repository))
-
-    assert completed.returncode == 8
-    assert registry_path.read_bytes() == registry_before
-    assert id_path.read_bytes() == id_before
+        assert completed.returncode == 8
+        assert registry_path.read_bytes() == registry_before
+        assert id_path.read_bytes() == id_before
+    finally:
+        assert release_registry_lock_holder(holder) == 0
+        stop_registry_lock_holder(holder)
 
 
 
@@ -589,9 +612,10 @@ def test_register_new_id_rejects_a_busy_repository_without_mutation(
     repo_id = _registered_id(repository)
     registry_before = _registry_path().read_bytes()
     id_before = (repository / ".patchharbor" / "id").read_bytes()
+    environment = project_environment()
     holder = start_repository_lock_holder(
         repo_id,
-        environment=project_environment(),
+        environment=environment,
     )
     try:
         completed = run_cli(repository, "register", "--new-id")
@@ -617,9 +641,10 @@ def test_unregister_holds_registry_lock_before_rejecting_a_busy_repository(
     repo_id = _registered_id(repository)
     registry_before = _registry_path().read_bytes()
     id_before = (repository / ".patchharbor" / "id").read_bytes()
+    environment = project_environment()
     holder = start_repository_lock_holder(
         repo_id,
-        environment=project_environment(),
+        environment=environment,
     )
     unregister_process: subprocess.Popen[str] | None = None
     try:
@@ -632,7 +657,7 @@ def test_unregister_holds_registry_lock_before_rejecting_a_busy_repository(
                 repo_id,
             ],
             cwd=tmp_path,
-            env=project_environment(),
+            env=environment,
             stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -641,8 +666,7 @@ def test_unregister_holds_registry_lock_before_rejecting_a_busy_repository(
         )
 
         deadline = time.monotonic() + 10.0
-        lock_path = _registry_lock_path()
-        while not lock_path.exists():
+        while probe_registry_lock(environment) != 8:
             if unregister_process.poll() is not None:
                 stdout, stderr = unregister_process.communicate()
                 pytest.fail(

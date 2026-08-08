@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from contextlib import contextmanager
 import json
 import os
 from pathlib import Path
+from typing import Iterator
 
 import pytest
 
@@ -11,6 +13,7 @@ from patchharbor.models import RepositoryId, RepositoryPath
 from patchharbor.registration import (
     list_registered_repositories,
     register_local_repository,
+    unregister_local_repository,
 )
 from patchharbor.registry import (
     registry_lock,
@@ -128,27 +131,19 @@ def test_registry_replacement_preserves_the_previous_snapshot_on_failure(
     assert not tuple(configuration.glob(".patchharbor-*.tmp"))
 
 
-def test_registry_lock_is_removed_when_acquisition_setup_fails(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_registry_lock_is_reusable_after_body_failure(tmp_path: Path) -> None:
     configuration = tmp_path / "configuration"
     locks = tmp_path / "locks"
     configuration.mkdir()
     locks.mkdir()
     paths = RegistrationUserPaths(configuration, locks)
 
-    def fail_pid_write(_descriptor: int, _content: bytes) -> int:
-        raise PermissionError("injected lock write failure")
-
-    monkeypatch.setattr("patchharbor.registry.os.write", fail_pid_write)
-
-    with pytest.raises(PatchHarborError) as captured:
+    with pytest.raises(RuntimeError, match="injected body failure"):
         with registry_lock(paths):
-            raise AssertionError("lock body must not run")
+            raise RuntimeError("injected body failure")
 
-    assert captured.value.exit_code is ExitCode.REPOSITORY_ERROR
-    assert not paths.registry_lock_path.exists()
+    with registry_lock(paths):
+        assert paths.registry_lock_path.is_file()
 
 
 def test_registry_status_resolution_runs_after_snapshot_lock_is_released(
@@ -211,13 +206,19 @@ def test_identity_and_registry_publication_share_the_global_lock(
     )
     from patchharbor.registry import write_registry as real_write_registry
 
+    def assert_registry_is_locked() -> None:
+        with pytest.raises(PatchHarborError) as captured:
+            with registry_lock(paths):
+                raise AssertionError("nested registry lock must not be acquired")
+        assert captured.value.exit_code is ExitCode.REPOSITORY_ERROR
+
     def apply_while_locked(*args: object, **kwargs: object) -> None:
-        assert paths.registry_lock_path.is_file()
+        assert_registry_is_locked()
         observed.append("local")
         real_apply_local_registration(*args, **kwargs)
 
     def write_while_locked(*args: object, **kwargs: object) -> None:
-        assert paths.registry_lock_path.is_file()
+        assert_registry_is_locked()
         observed.append("registry")
         real_write_registry(*args, **kwargs)
 
@@ -233,7 +234,82 @@ def test_identity_and_registry_publication_share_the_global_lock(
     register_local_repository(repository)
 
     assert observed == ["local", "registry"]
-    assert not paths.registry_lock_path.exists()
+    with registry_lock(paths):
+        assert paths.registry_lock_path.is_file()
+
+
+def test_new_id_revalidates_local_identity_after_repository_lock_acquisition(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repository = create_repository(tmp_path / "repository")
+    set_isolated_user_environment(monkeypatch, tmp_path / "user")
+    original_id, _ = register_local_repository(repository)
+    paths = registration_user_paths()
+    registry_before = paths.registry_path.read_bytes()
+    id_path = repository / ".patchharbor" / "id"
+    externally_changed_id = RepositoryId.new()
+
+    @contextmanager
+    def mutate_before_yield(*_args: object, **_kwargs: object) -> Iterator[None]:
+        id_path.write_text(
+            f"{externally_changed_id}\n",
+            encoding="ascii",
+            newline="\n",
+        )
+        yield
+
+    monkeypatch.setattr(
+        "patchharbor.registration.repository_lock",
+        mutate_before_yield,
+    )
+
+    with pytest.raises(PatchHarborError) as captured:
+        register_local_repository(repository, new_id=True)
+
+    assert captured.value.exit_code is ExitCode.REPOSITORY_ERROR
+    assert captured.value.error_kind is ErrorKind.REPOSITORY_RESOLUTION_ERROR
+    assert id_path.read_text(encoding="ascii") == f"{externally_changed_id}\n"
+    assert paths.registry_path.read_bytes() == registry_before
+    assert str(original_id).encode("ascii") in registry_before
+
+
+def test_unregister_revalidates_registry_mapping_after_repository_lock_acquisition(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repository = create_repository(tmp_path / "repository")
+    replacement = create_repository(tmp_path / "replacement")
+    set_isolated_user_environment(monkeypatch, tmp_path / "user")
+    repo_id, _ = register_local_repository(repository)
+    paths = registration_user_paths()
+    replacement_path = RepositoryPath(replacement.resolve())
+    externally_changed_snapshot = registry_snapshot(
+        {repo_id: replacement_path}
+    )
+
+    @contextmanager
+    def mutate_before_yield(*_args: object, **_kwargs: object) -> Iterator[None]:
+        write_registry(paths, externally_changed_snapshot)
+        yield
+
+    monkeypatch.setattr(
+        "patchharbor.registration.repository_lock",
+        mutate_before_yield,
+    )
+
+    with pytest.raises(PatchHarborError) as captured:
+        unregister_local_repository(str(repo_id), cwd=tmp_path)
+
+    assert captured.value.exit_code is ExitCode.REPOSITORY_ERROR
+    assert captured.value.error_kind is ErrorKind.REPOSITORY_RESOLUTION_ERROR
+    persisted = json.loads(paths.registry_path.read_text(encoding="utf-8"))
+    assert persisted["repositories"] == {
+        str(repo_id): str(replacement_path),
+    }
+    assert (repository / ".patchharbor" / "id").read_text(
+        encoding="ascii"
+    ) == f"{repo_id}\n"
 
 
 def test_failure_after_registry_publication_restores_exact_previous_state(

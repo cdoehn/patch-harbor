@@ -6,7 +6,6 @@ from collections.abc import Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
 import json
-import os
 from pathlib import Path
 from typing import Iterator
 
@@ -22,6 +21,11 @@ from patchharbor.platform.filesystem import (
     PathKind,
     atomic_replace_bytes,
     path_kind,
+)
+from patchharbor.platform.locking import (
+    LockOperationError,
+    LockUnavailable,
+    exclusive_file_lock,
 )
 from patchharbor.user_paths import RegistrationUserPaths
 
@@ -127,37 +131,22 @@ def remove_registry_mapping(
 
 @contextmanager
 def registry_lock(paths: RegistrationUserPaths) -> Iterator[None]:
-    """Hold the single global registry mutation lock."""
-    lock_path = paths.registry_lock_path
-    descriptor = -1
-    acquired = False
+    """Hold the single global registry lock without trusting file absence."""
+    lock = exclusive_file_lock(
+        paths.registry_lock_path,
+        wait_seconds=0.0,
+    )
     try:
-        try:
-            descriptor = os.open(
-                lock_path,
-                os.O_CREAT | os.O_EXCL | os.O_WRONLY,
-                0o600,
-            )
-            acquired = True
-            os.write(descriptor, f"{os.getpid()}\n".encode("ascii"))
-            os.close(descriptor)
-            descriptor = -1
-        except FileExistsError as exc:
-            raise _error("repository registry is busy") from exc
-        except OSError as exc:
-            raise _error(
-                f"cannot acquire repository registry lock: {exc}"
-            ) from exc
+        lock.__enter__()
+    except LockUnavailable as exc:
+        raise _error("repository registry is busy") from exc
+    except LockOperationError as exc:
+        raise _error(f"{exc.operation}: {exc.cause}") from exc
 
+    try:
         yield
     finally:
-        if descriptor >= 0:
-            os.close(descriptor)
-        if acquired:
-            try:
-                lock_path.unlink(missing_ok=True)
-            except OSError:
-                pass
+        lock.__exit__(None, None, None)
 
 
 def _registry_file_kind(path: Path) -> PathKind:

@@ -35,6 +35,7 @@ EXPECTED_RUNTIME_FILES = {
     "platform/errors.py",
     "platform/filesystem.py",
     "platform/lifecycle.py",
+    "platform/locking.py",
     "platform/posix.py",
     "platform/runtime.py",
     "platform/windows.py",

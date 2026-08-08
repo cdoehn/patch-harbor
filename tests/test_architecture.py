@@ -24,6 +24,55 @@ def _local_imports(module_name: str) -> set[str]:
     return imports
 
 
+def _called_name(expression: ast.expr) -> str | None:
+    if not isinstance(expression, ast.Call):
+        return None
+    function = expression.func
+    if isinstance(function, ast.Name):
+        return function.id
+    if isinstance(function, ast.Attribute):
+        return function.attr
+    return None
+
+
+def _repository_lock_without_registry_lock(
+    statements: list[ast.stmt],
+    *,
+    registry_owned: bool = False,
+) -> bool:
+    for statement in statements:
+        if isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            if _repository_lock_without_registry_lock(statement.body):
+                return True
+        elif isinstance(statement, ast.With):
+            names = {
+                _called_name(item.context_expr)
+                for item in statement.items
+            }
+            owns_registry = registry_owned or "registry_lock" in names
+            if "repository_lock" in names and not owns_registry:
+                return True
+            if _repository_lock_without_registry_lock(
+                statement.body,
+                registry_owned=owns_registry,
+            ):
+                return True
+        elif isinstance(statement, (ast.If, ast.For, ast.While, ast.Try)):
+            branches = [statement.body, statement.orelse]
+            if isinstance(statement, ast.Try):
+                branches.extend(handler.body for handler in statement.handlers)
+                branches.append(statement.finalbody)
+            if any(
+                _repository_lock_without_registry_lock(
+                    branch,
+                    registry_owned=registry_owned,
+                )
+                for branch in branches
+            ):
+                return True
+    return False
+
+
 def test_lower_layers_do_not_import_orchestration_or_unrelated_layers() -> None:
     forbidden = {
         "models": {
@@ -176,6 +225,7 @@ def test_registration_layers_have_one_directional_dependency_flow() -> None:
     assert _local_imports("repository_lock") == {
         "errors",
         "models",
+        "platform",
         "user_paths",
     }
     assert _local_imports("user_paths") == {
@@ -183,6 +233,30 @@ def test_registration_layers_have_one_directional_dependency_flow() -> None:
         "physical_paths",
     }
     assert _local_imports("physical_paths") == set()
+
+
+def test_lock_mechanics_are_confined_to_the_platform_boundary() -> None:
+    platform_source = (
+        PACKAGE_ROOT / "platform" / "locking.py"
+    ).read_text(encoding="utf-8")
+    assert "fcntl" in platform_source
+    assert "msvcrt" in platform_source
+
+    for module_name in ("registry", "repository_lock"):
+        source = (PACKAGE_ROOT / f"{module_name}.py").read_text(
+            encoding="utf-8"
+        )
+        assert "patchharbor.platform.locking" in source
+        assert "fcntl" not in source
+        assert "msvcrt" not in source
+        assert "import os" not in source
+
+
+def test_registration_never_acquires_repository_lock_before_registry_lock() -> None:
+    tree = ast.parse(
+        (PACKAGE_ROOT / "registration.py").read_text(encoding="utf-8")
+    )
+    assert not _repository_lock_without_registry_lock(tree.body)
 
 
 def test_cli_depends_on_application_not_source_or_legacy_modules() -> None:

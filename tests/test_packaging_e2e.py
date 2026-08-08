@@ -46,6 +46,7 @@ EXPECTED_RUNTIME_FILES = {
     "patchharbor/platform/errors.py",
     "patchharbor/platform/filesystem.py",
     "patchharbor/platform/lifecycle.py",
+    "patchharbor/platform/locking.py",
     "patchharbor/platform/posix.py",
     "patchharbor/platform/runtime.py",
     "patchharbor/platform/windows.py",

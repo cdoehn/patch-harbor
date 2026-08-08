@@ -11,6 +11,10 @@ from patchharbor.platform.filesystem import (
     PathKind,
     path_kind,
 )
+from patchharbor.platform.locking import (
+    LockUnavailable,
+    exclusive_file_lock,
+)
 from patchharbor.platform.runtime import is_windows
 
 
@@ -71,3 +75,18 @@ def test_filesystem_operation_error_exposes_stable_operation() -> None:
 
     assert str(error) == "cannot replace target"
     assert error.cause is cause
+
+
+def test_advisory_lock_uses_ownership_instead_of_file_existence(
+    tmp_path: Path,
+) -> None:
+    lock_path = tmp_path / "persistent.lock"
+    lock_path.write_bytes(b"leftover metadata\n")
+
+    with exclusive_file_lock(lock_path, wait_seconds=0.0):
+        with pytest.raises(LockUnavailable):
+            with exclusive_file_lock(lock_path, wait_seconds=0.0):
+                raise AssertionError("the same advisory lock must stay exclusive")
+
+    with exclusive_file_lock(lock_path, wait_seconds=0.0):
+        assert lock_path.is_file()

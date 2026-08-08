@@ -81,6 +81,16 @@ class _IdentityTransition:
     next_snapshot: RegistrySnapshot
 
 
+@dataclass(frozen=True)
+class _RegistrationObservation:
+    """Repository, registry, and local identity observed under one lock set."""
+
+    repository: RepositoryPath
+    registry_state: RegistryFileState
+    local_id: RepositoryId | None
+    local_state: LocalRegistrationState
+
+
 def _identity_state(
     snapshot: RegistrySnapshot,
     repository: RepositoryPath,
@@ -119,6 +129,7 @@ def _plan_identity_transition(
     local_state: LocalRegistrationState,
     *,
     new_id: bool,
+    replacement_id: RepositoryId | None = None,
 ) -> _IdentityTransition:
     state = _identity_state(
         registry_state.snapshot,
@@ -135,7 +146,10 @@ def _plan_identity_transition(
             "repository ID is already registered to another existing path"
         )
 
-    repo_id = RepositoryId.new() if action is _IdentityAction.NEW_ID else local_id
+    if action is _IdentityAction.NEW_ID:
+        repo_id = replacement_id or RepositoryId.new()
+    else:
+        repo_id = local_id
     if repo_id is None:
         raise AssertionError("identity transition selected no repository ID")
 
@@ -148,6 +162,21 @@ def _plan_identity_transition(
             repo_id,
             repository,
         ),
+    )
+
+
+def _observe_registration(
+    paths: RegistrationUserPaths,
+    path: Path,
+) -> _RegistrationObservation:
+    repository = inspect_repository(path)
+    registry_state = load_registry_state(paths)
+    local_id, local_state = inspect_local_registration(repository)
+    return _RegistrationObservation(
+        repository=repository,
+        registry_state=registry_state,
+        local_id=local_id,
+        local_state=local_state,
     )
 
 
@@ -213,6 +242,50 @@ def _new_identity_lock_id(
     return path_ids[0] if path_ids else new_id
 
 
+def _revalidate_new_identity_transition(
+    paths: RegistrationUserPaths,
+    path: Path,
+    expected: _RegistrationObservation,
+    *,
+    replacement_id: RepositoryId,
+    locked_id: RepositoryId,
+) -> _IdentityTransition:
+    """Re-read every identity boundary while both required locks are held."""
+    observed = _observe_registration(paths, path)
+    if observed.repository != expected.repository:
+        raise repository_resolution_error(
+            "repository path changed while acquiring its lock"
+        )
+    if observed.registry_state.snapshot != expected.registry_state.snapshot:
+        raise repository_resolution_error(
+            "repository registry changed while acquiring its lock"
+        )
+    if observed.local_id != expected.local_id:
+        raise repository_resolution_error(
+            "repository ID changed while acquiring its lock"
+        )
+
+    transition = _plan_identity_transition(
+        observed.registry_state,
+        observed.repository,
+        observed.local_id,
+        observed.local_state,
+        new_id=True,
+        replacement_id=replacement_id,
+    )
+    affected_id = _new_identity_lock_id(
+        observed.registry_state.snapshot,
+        observed.repository,
+        observed.local_id,
+        transition.repo_id,
+    )
+    if affected_id != locked_id:
+        raise repository_resolution_error(
+            "repository identity changed while acquiring its lock"
+        )
+    return transition
+
+
 def register_local_repository(
     path: Path,
     *,
@@ -221,29 +294,34 @@ def register_local_repository(
     """Register one local Git repository as one consistent mutation."""
     user_paths = registration_user_paths()
     with registry_lock(user_paths):
-        repository = inspect_repository(path)
-        registry_state = load_registry_state(user_paths)
-        local_id, local_state = inspect_local_registration(repository)
+        observed = _observe_registration(user_paths, path)
         transition = _plan_identity_transition(
-            registry_state,
-            repository,
-            local_id,
-            local_state,
+            observed.registry_state,
+            observed.repository,
+            observed.local_id,
+            observed.local_state,
             new_id=new_id,
         )
         if new_id:
             affected_id = _new_identity_lock_id(
-                registry_state.snapshot,
-                repository,
-                local_id,
+                observed.registry_state.snapshot,
+                observed.repository,
+                observed.local_id,
                 transition.repo_id,
             )
             with repository_lock(user_paths, affected_id):
+                transition = _revalidate_new_identity_transition(
+                    user_paths,
+                    path,
+                    observed,
+                    replacement_id=transition.repo_id,
+                    locked_id=affected_id,
+                )
                 _commit_identity_transition(user_paths, transition)
         else:
             _commit_identity_transition(user_paths, transition)
 
-    return transition.repo_id, repository
+    return transition.repo_id, observed.repository
 
 
 def resolve_registry_snapshot(snapshot: RegistrySnapshot) -> RegistryListResult:
@@ -310,6 +388,38 @@ def resolve_unregister_mapping(
     raise repository_resolution_error("repository ID is not registered")
 
 
+def _revalidate_unregister_mapping(
+    paths: RegistrationUserPaths,
+    selected: RegistryMapping,
+) -> RegistrySnapshot:
+    """Revalidate mapping, physical repository path, and local ID under locks."""
+    snapshot = load_registry(paths)
+    current = next(
+        (
+            mapping
+            for mapping in snapshot.repositories
+            if mapping.repo_id == selected.repo_id
+        ),
+        None,
+    )
+    if current != selected:
+        raise repository_resolution_error(
+            "repository registry changed while acquiring its lock"
+        )
+
+    repository = inspect_repository(selected.repository_path.value)
+    if repository != selected.repository_path:
+        raise repository_resolution_error(
+            "repository path changed while acquiring its lock"
+        )
+    local_id, _ = inspect_local_registration(repository)
+    if local_id != selected.repo_id:
+        raise repository_resolution_error(
+            "repository ID changed while acquiring its lock"
+        )
+    return snapshot
+
+
 def unregister_local_repository(
     selector: str,
     *,
@@ -329,5 +439,15 @@ def unregister_local_repository(
             write_registry(user_paths, next_snapshot)
         else:
             with repository_lock(user_paths, selected.repo_id):
-                write_registry(user_paths, next_snapshot)
+                locked_snapshot = _revalidate_unregister_mapping(
+                    user_paths,
+                    selected,
+                )
+                write_registry(
+                    user_paths,
+                    remove_registry_mapping(
+                        locked_snapshot,
+                        selected.repo_id,
+                    ),
+                )
         return selected.repo_id, selected.repository_path

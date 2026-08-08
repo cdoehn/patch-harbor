@@ -166,3 +166,82 @@ def probe_repository_lock(repo_id: str, environment: dict[str, str]) -> int:
         check=False,
     )
     return completed.returncode
+
+
+_REGISTRY_LOCK_HOLDER_PROGRAM = r"""
+import sys
+
+from patchharbor.registry import registry_lock
+from patchharbor.user_paths import registration_user_paths
+
+mode = sys.argv[1]
+with registry_lock(registration_user_paths()):
+    print("ready", flush=True)
+    if sys.stdin.buffer.read(1) != b"x":
+        raise RuntimeError("release token missing")
+    if mode == "error":
+        raise RuntimeError("expected holder failure")
+"""
+
+
+_REGISTRY_LOCK_PROBE_PROGRAM = r"""
+from patchharbor.errors import PatchHarborError
+from patchharbor.registry import registry_lock
+from patchharbor.user_paths import registration_user_paths
+
+try:
+    with registry_lock(registration_user_paths()):
+        pass
+except PatchHarborError as exc:
+    raise SystemExit(int(exc.exit_code))
+"""
+
+
+def start_registry_lock_holder(
+    *,
+    environment: dict[str, str],
+    mode: str = "normal",
+) -> subprocess.Popen[str]:
+    """Start one synchronized process holding the global registry lock."""
+    holder = subprocess.Popen(
+        [
+            sys.executable,
+            "-c",
+            _REGISTRY_LOCK_HOLDER_PROGRAM,
+            mode,
+        ],
+        env=environment,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        encoding="utf-8",
+        errors="strict",
+    )
+    assert holder.stdout is not None
+    assert holder.stdout.readline() == "ready\n"
+    return holder
+
+
+def release_registry_lock_holder(holder: subprocess.Popen[str]) -> int:
+    """Release a synchronized registry-lock holder."""
+    return release_repository_lock_holder(holder)
+
+
+def stop_registry_lock_holder(holder: subprocess.Popen[str]) -> None:
+    """Ensure a registry-lock holder cannot survive a failed test."""
+    stop_repository_lock_holder(holder)
+
+
+def probe_registry_lock(environment: dict[str, str]) -> int:
+    """Try one immediate global registry-lock acquisition in a real process."""
+    completed = subprocess.run(
+        [sys.executable, "-c", _REGISTRY_LOCK_PROBE_PROGRAM],
+        env=environment,
+        stdin=subprocess.DEVNULL,
+        capture_output=True,
+        encoding="utf-8",
+        errors="strict",
+        timeout=10,
+        check=False,
+    )
+    return completed.returncode
