@@ -10,6 +10,7 @@ from patchharbor.models import (
     GitObjectFormat,
     GitObjectId,
     RepositoryPath,
+    StagedRecord,
 )
 
 
@@ -105,3 +106,65 @@ def read_head_object_id(repository: RepositoryPath) -> GitObjectId:
         return GitObjectId(value=value, object_format=object_format)
     except ValueError as exc:
         raise _error("git returned an invalid HEAD object name") from exc
+
+
+def _nul_records(raw: bytes, description: str) -> tuple[bytes, ...]:
+    if not raw:
+        return ()
+    if not raw.endswith(b"\0"):
+        raise _error(f"git returned malformed {description}")
+    return tuple(raw[:-1].split(b"\0"))
+
+
+def read_staged_records(
+    repository: RepositoryPath,
+    base_commit: GitObjectId,
+) -> tuple[StagedRecord, ...]:
+    """Return canonical base-tree versus index differences in byte order."""
+    base_entries: dict[bytes, tuple[bytes, bytes]] = {}
+    raw_tree = run_git_bytes(
+        repository,
+        "ls-tree",
+        "-r",
+        "-z",
+        "--full-tree",
+        str(base_commit),
+    )
+    for raw_record in _nul_records(raw_tree, "base tree"):
+        try:
+            metadata, path = raw_record.split(b"\t", 1)
+            mode, _object_type, object_name = metadata.split(b" ", 2)
+        except ValueError as exc:
+            raise _error("git returned malformed base tree data") from exc
+        if not path or path in base_entries:
+            raise _error("git returned ambiguous base tree paths")
+        base_entries[path] = (mode, object_name)
+
+    index_entries: dict[bytes, tuple[bytes, bytes]] = {}
+    raw_index = run_git_bytes(repository, "ls-files", "--stage", "-z")
+    for raw_record in _nul_records(raw_index, "index"):
+        try:
+            metadata, path = raw_record.split(b"\t", 1)
+            mode, object_name, stage = metadata.split(b" ", 2)
+        except ValueError as exc:
+            raise _error("git returned malformed index data") from exc
+        if stage != b"0" or not path or path in index_entries:
+            raise _error("git returned an unsupported index state")
+        index_entries[path] = (mode, object_name)
+
+    records: list[StagedRecord] = []
+    for path in sorted(base_entries.keys() | index_entries.keys()):
+        head_mode, head_object = base_entries.get(path, (b"", b""))
+        index_mode, index_object = index_entries.get(path, (b"", b""))
+        if (head_mode, head_object) == (index_mode, index_object):
+            continue
+        records.append(
+            StagedRecord(
+                path=path,
+                head_mode=head_mode,
+                head_object=head_object,
+                index_mode=index_mode,
+                index_object=index_object,
+            )
+        )
+    return tuple(records)

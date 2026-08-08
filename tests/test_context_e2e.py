@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 
@@ -105,7 +106,7 @@ def test_context_rejects_an_unregistered_repository(tmp_path: Path) -> None:
     assert document["error"]["patchharbor_error_code"] == 8
 
 
-def test_context_fails_closed_for_a_dirty_state(tmp_path: Path) -> None:
+def test_context_fails_closed_for_an_unstaged_state(tmp_path: Path) -> None:
     repository = create_repository(tmp_path / "repository")
     assert run_cli(repository, "register").returncode == 0
     (repository / "tracked.txt").write_text("changed\n", encoding="utf-8")
@@ -195,3 +196,54 @@ def test_context_preserves_a_full_sha256_base_commit(tmp_path: Path) -> None:
     assert len(expected) == 64
     assert result["base_commit"] == expected
     assert result["state_fingerprint"] == CLEAN_FINGERPRINT
+
+
+def _framed_field(name: bytes, payload: bytes) -> bytes:
+    return name + b"\0" + len(payload).to_bytes(8, "big") + payload
+
+
+def _expected_staged_addition_fingerprint(
+    path: bytes,
+    object_name: bytes,
+) -> str:
+    stream = b"".join(
+        (
+            b"PATCHHARBOR_STATE_FINGERPRINT\0",
+            b"1\0",
+            _framed_field(b"staged-count", (1).to_bytes(8, "big")),
+            _framed_field(b"staged-path", path),
+            _framed_field(b"staged-head-mode", b""),
+            _framed_field(b"staged-head-object", b""),
+            _framed_field(b"staged-index-mode", b"100644"),
+            _framed_field(b"staged-index-object", object_name),
+            _framed_field(b"unstaged-count", (0).to_bytes(8, "big")),
+            _framed_field(b"untracked-count", (0).to_bytes(8, "big")),
+        )
+    )
+    return hashlib.sha256(stream).hexdigest()[:16]
+
+
+@pytest.mark.parametrize("object_format", [None, "sha256"])
+def test_context_reports_a_staged_binary_addition(
+    tmp_path: Path,
+    object_format: str | None,
+) -> None:
+    repository = create_repository(
+        tmp_path / "repository",
+        object_format=object_format,
+    )
+    assert run_cli(repository, "register").returncode == 0
+    base_commit = git(repository, "rev-parse", "HEAD").stdout.strip()
+
+    (repository / "app.bin").write_bytes(b"binary\x00payload\xff\r\n")
+    git(repository, "add", "app.bin")
+    index_object = git(repository, "rev-parse", ":app.bin").stdout.strip()
+
+    result = _context_result(repository)
+
+    assert result["base_commit"] == base_commit
+    assert result["dirty"] is True
+    assert result["state_fingerprint"] == _expected_staged_addition_fingerprint(
+        b"app.bin",
+        index_object.encode("ascii"),
+    )

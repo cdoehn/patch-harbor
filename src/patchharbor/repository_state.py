@@ -5,7 +5,11 @@ from __future__ import annotations
 from pathlib import Path
 
 from patchharbor.errors import PatchHarborError, repository_resolution_error
-from patchharbor.git_capture import read_head_object_id, run_git_bytes
+from patchharbor.git_capture import (
+    read_head_object_id,
+    read_staged_records,
+    run_git_bytes,
+)
 from patchharbor.locks import registry_lock, repository_lock
 from patchharbor.models import (
     RegistrySnapshot,
@@ -17,6 +21,7 @@ from patchharbor.registry import load_registry
 from patchharbor.repository import inspect_local_registration, inspect_repository
 from patchharbor.state_fingerprint import (
     FINGERPRINT_ALGORITHM,
+    encode_staged_record,
     state_fingerprint_digest,
 )
 from patchharbor.user_paths import RegistrationUserPaths, registration_user_paths
@@ -26,16 +31,26 @@ def _error(message: str) -> PatchHarborError:
     return repository_resolution_error(message)
 
 
-def _require_clean(repository: RepositoryPath) -> None:
-    status = run_git_bytes(
+def _require_no_unstaged_or_untracked(repository: RepositoryPath) -> None:
+    unstaged = run_git_bytes(
         repository,
-        "status",
-        "--porcelain=v1",
+        "diff-files",
+        "--raw",
         "-z",
-        "--untracked-files=all",
+        "--no-renames",
+        "--no-ext-diff",
+        "--",
     )
-    if status:
-        raise _error("repository state is not clean")
+    untracked = run_git_bytes(
+        repository,
+        "ls-files",
+        "--others",
+        "--exclude-standard",
+        "-z",
+        "--",
+    )
+    if unstaged or untracked:
+        raise _error("repository contains unsupported non-index changes")
 
 
 def _require_clean_for_registration(repository: RepositoryPath) -> None:
@@ -92,23 +107,37 @@ def require_clean_repository(path: Path) -> RepositoryPath:
     return repository
 
 
-def _capture_clean_context(
+def _capture_context(
     repository: RepositoryPath,
     repo_id: RepositoryId,
 ) -> RepositoryContext:
-    _require_clean(repository)
+    _require_no_unstaged_or_untracked(repository)
+    base_commit = read_head_object_id(repository)
+    staged = read_staged_records(repository, base_commit)
+    encoded_staged = tuple(
+        encode_staged_record(
+            path=record.path,
+            head_mode=record.head_mode,
+            head_object=record.head_object,
+            index_mode=record.index_mode,
+            index_object=record.index_object,
+        )
+        for record in staged
+    )
     return RepositoryContext(
         repo_id=repo_id,
         repository_path=repository,
-        base_commit=read_head_object_id(repository),
-        dirty=False,
-        state_fingerprint=state_fingerprint_digest()[:16],
+        base_commit=base_commit,
+        dirty=bool(staged),
+        state_fingerprint=state_fingerprint_digest(
+            staged_records=encoded_staged
+        )[:16],
         fingerprint_algorithm=FINGERPRINT_ALGORITHM,
     )
 
 
 def capture_repository_context(path: Path) -> RepositoryContext:
-    """Capture one clean registered repository while owning its lock."""
+    """Capture one supported registered repository while owning its lock."""
     paths = registration_user_paths()
     with registry_lock(paths):
         repository = inspect_repository(path)
@@ -120,4 +149,4 @@ def capture_repository_context(path: Path) -> RepositoryContext:
             locked_id = _registered_identity(paths, locked_repository)
             if locked_id != repo_id:
                 raise _error("repository identity changed while acquiring its lock")
-            return _capture_clean_context(locked_repository, locked_id)
+            return _capture_context(locked_repository, locked_id)

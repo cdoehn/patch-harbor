@@ -123,6 +123,17 @@ class GitObjectId:
 
 
 @dataclass(frozen=True)
+class StagedRecord:
+    """One canonical difference between the base tree and Git index."""
+
+    path: bytes
+    head_mode: bytes
+    head_object: bytes
+    index_mode: bytes
+    index_object: bytes
+
+
+@dataclass(frozen=True)
 class RepositoryContext:
     """One reproducible state description of a registered repository."""
 

@@ -13,6 +13,26 @@ def _framed_field(name: bytes, payload: bytes) -> bytes:
     return name + b"\0" + len(payload).to_bytes(8, "big") + payload
 
 
+def encode_staged_record(
+    *,
+    path: bytes,
+    head_mode: bytes,
+    head_object: bytes,
+    index_mode: bytes,
+    index_object: bytes,
+) -> bytes:
+    """Encode one staged record using the normative field order."""
+    return b"".join(
+        (
+            _framed_field(b"staged-path", path),
+            _framed_field(b"staged-head-mode", head_mode),
+            _framed_field(b"staged-head-object", head_object),
+            _framed_field(b"staged-index-mode", index_mode),
+            _framed_field(b"staged-index-object", index_object),
+        )
+    )
+
+
 def state_fingerprint_digest(
     *,
     staged_records: tuple[bytes, ...] = (),
