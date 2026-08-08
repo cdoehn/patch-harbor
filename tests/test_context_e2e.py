@@ -151,3 +151,45 @@ def test_context_respects_the_repository_lock(tmp_path: Path) -> None:
         assert retry.returncode == 0
     finally:
         stop_repository_lock_holder(holder)
+
+
+def _context_result(repository: Path) -> dict[str, object]:
+    completed = run_cli(repository, "context", "--json")
+    assert completed.returncode == 0
+    document = json.loads(completed.stdout)
+    result = document["result"]
+    assert isinstance(result, dict)
+    return result
+
+
+def test_clean_fingerprint_is_independent_of_the_base_commit(
+    tmp_path: Path,
+) -> None:
+    repository = create_repository(tmp_path / "repository")
+    assert run_cli(repository, "register").returncode == 0
+    before = _context_result(repository)
+
+    (repository / "tracked.txt").write_text("next base\n", encoding="utf-8")
+    git(repository, "add", "tracked.txt")
+    git(repository, "commit", "--quiet", "-m", "next base")
+    after = _context_result(repository)
+
+    assert before["base_commit"] != after["base_commit"]
+    assert before["state_fingerprint"] == after["state_fingerprint"]
+    assert before["dirty"] is False
+    assert after["dirty"] is False
+
+
+def test_context_preserves_a_full_sha256_base_commit(tmp_path: Path) -> None:
+    repository = create_repository(
+        tmp_path / "repository",
+        object_format="sha256",
+    )
+    assert run_cli(repository, "register").returncode == 0
+
+    result = _context_result(repository)
+    expected = git(repository, "rev-parse", "HEAD").stdout.strip()
+
+    assert len(expected) == 64
+    assert result["base_commit"] == expected
+    assert result["state_fingerprint"] == "7c9d2a24e397e0e5"

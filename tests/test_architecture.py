@@ -222,12 +222,17 @@ def test_registration_layers_have_one_directional_dependency_flow() -> None:
         "physical_paths",
         "platform",
     }
+    assert _local_imports("git_capture") == {"errors", "models"}
+    assert _local_imports("state_fingerprint") == set()
+    assert _local_imports("context_output") == {"models"}
     assert _local_imports("repository_state") == {
         "errors",
+        "git_capture",
         "locks",
         "models",
         "registry",
         "repository",
+        "state_fingerprint",
         "user_paths",
     }
     assert _local_imports("locks") == {
@@ -406,6 +411,7 @@ def test_cli_coordinates_only_public_composition_boundaries() -> None:
 
     assert imports == {
         "application",
+        "context_output",
         "errors",
         "execution",
         "output",

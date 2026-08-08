@@ -19,6 +19,7 @@ from patchharbor.application import (
     run_standard_input,
     unregister_repository,
 )
+from patchharbor.context_output import context_json_result, write_context_block
 from patchharbor.errors import (
     ExitCode,
     PatchHarborError,
@@ -228,34 +229,6 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _write_context_block(context: Any, stdout: TextIO) -> None:
-    print("PATCH_HARBOR_CONTEXT", file=stdout)
-    print(file=stdout)
-    print(f"repo_id: {context.repo_id}", file=stdout)
-    print(f"base_commit: {context.base_commit}", file=stdout)
-    print(f"dirty: {str(context.dirty).lower()}", file=stdout)
-    print(f"state_fingerprint: {context.state_fingerprint}", file=stdout)
-    print(f"fingerprint_algorithm: {context.fingerprint_algorithm}", file=stdout)
-    print(file=stdout)
-    print("INSTRUCTIONS:", file=stdout)
-    print("- Verwende diese Werte unverändert in patch.json.", file=stdout)
-    print(
-        "- Erzeuge bei geändertem Repository-Zustand einen neuen Kontext.",
-        file=stdout,
-    )
-
-
-def _context_json_result(context: Any) -> dict[str, object]:
-    return {
-        "repo_id": str(context.repo_id),
-        "repository_path": str(context.repository_path),
-        "base_commit": context.base_commit,
-        "dirty": context.dirty,
-        "state_fingerprint": context.state_fingerprint,
-        "fingerprint_algorithm": context.fingerprint_algorithm,
-    }
-
-
 def _register_command(
     path: Path | None,
     *,
@@ -272,7 +245,7 @@ def _register_command(
         print(format_tool_message(str(exc)), file=stderr)
         return int(exc.exit_code)
 
-    _write_context_block(context, stdout)
+    write_context_block(context, stdout)
     return 0
 
 
@@ -400,14 +373,14 @@ def _context_command(
         _write_json_document(
             _json_envelope(
                 "context",
-                result=_context_json_result(context),
+                result=context_json_result(context),
                 error=None,
                 process_exit_code=0,
             ),
             stdout,
         )
     else:
-        _write_context_block(context, stdout)
+        write_context_block(context, stdout)
     return 0
 
 

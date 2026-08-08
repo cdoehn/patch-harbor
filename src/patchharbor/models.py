@@ -80,13 +80,55 @@ class RepositoryPath:
         return str(self.value)
 
 
+class GitObjectFormat(str, Enum):
+    """Supported storage formats for full Git object names."""
+
+    SHA1 = "sha1"
+    SHA256 = "sha256"
+
+    @property
+    def object_id_hex_length(self) -> int:
+        return 40 if self is GitObjectFormat.SHA1 else 64
+
+    @classmethod
+    def for_hex_length(cls, length: int) -> GitObjectFormat:
+        if length == cls.SHA1.object_id_hex_length:
+            return cls.SHA1
+        if length == cls.SHA256.object_id_hex_length:
+            return cls.SHA256
+        raise ValueError("unsupported Git object ID length")
+
+
+@dataclass(frozen=True)
+class GitObjectId:
+    """One complete lowercase hexadecimal Git object name."""
+
+    value: str
+    object_format: GitObjectFormat
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.value, str):
+            raise ValueError("Git object ID must be text")
+        if not isinstance(self.object_format, GitObjectFormat):
+            raise ValueError("unsupported Git object format")
+        if len(self.value) != self.object_format.object_id_hex_length:
+            raise ValueError("Git object ID has the wrong length")
+        if self.value != self.value.lower() or any(
+            character not in "0123456789abcdef" for character in self.value
+        ):
+            raise ValueError("Git object ID must be lowercase hexadecimal")
+
+    def __str__(self) -> str:
+        return self.value
+
+
 @dataclass(frozen=True)
 class RepositoryContext:
     """One reproducible state description of a registered repository."""
 
     repo_id: RepositoryId
     repository_path: RepositoryPath
-    base_commit: str
+    base_commit: GitObjectId
     dirty: bool
     state_fingerprint: str
     fingerprint_algorithm: str

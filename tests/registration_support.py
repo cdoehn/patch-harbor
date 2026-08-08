@@ -22,10 +22,29 @@ def git(repository: Path, *arguments: str) -> subprocess.CompletedProcess[str]:
     )
 
 
-def create_repository(path: Path, *, with_commit: bool = True) -> Path:
+def create_repository(
+    path: Path,
+    *,
+    with_commit: bool = True,
+    object_format: str | None = None,
+) -> Path:
     """Create one real repository suitable for registration tests."""
     path.mkdir()
-    git(path, "init", "--quiet")
+    init_arguments = ["git", "init", "--quiet"]
+    if object_format is not None:
+        init_arguments.append(f"--object-format={object_format}")
+    initialized = subprocess.run(
+        init_arguments,
+        cwd=path,
+        capture_output=True,
+        encoding="utf-8",
+        errors="strict",
+        check=False,
+    )
+    if initialized.returncode != 0:
+        if object_format == "sha256":
+            pytest.skip("installed Git does not support SHA-256 repositories")
+        initialized.check_returncode()
     git(path, "config", "user.name", "PatchHarbor Test")
     git(path, "config", "user.email", "patchharbor@example.invalid")
     if with_commit:
