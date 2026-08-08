@@ -14,6 +14,7 @@ from patchharbor import __version__
 from patchharbor.application import (
     register_repository,
     registered_repositories,
+    repository_context,
     run_script_path,
     run_standard_input,
     unregister_repository,
@@ -127,6 +128,24 @@ def _build_parser() -> argparse.ArgumentParser:
         help="registered repository path or canonical repository UUID",
     )
 
+    context_parser = commands.add_parser(
+        "context",
+        help="describe one registered repository state",
+    )
+    context_parser.add_argument(
+        "repository",
+        type=Path,
+        nargs="?",
+        metavar="REPOSITORY",
+        help="registered Git repository; defaults to the current directory",
+    )
+    context_parser.add_argument(
+        "--json",
+        action="store_true",
+        dest="json_output",
+        help="write the versioned machine-readable result",
+    )
+
     fs_parser = commands.add_parser(
         "fs",
         help="run from the file system or standard input",
@@ -209,6 +228,34 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _write_context_block(context: Any, stdout: TextIO) -> None:
+    print("PATCH_HARBOR_CONTEXT", file=stdout)
+    print(file=stdout)
+    print(f"repo_id: {context.repo_id}", file=stdout)
+    print(f"base_commit: {context.base_commit}", file=stdout)
+    print(f"dirty: {str(context.dirty).lower()}", file=stdout)
+    print(f"state_fingerprint: {context.state_fingerprint}", file=stdout)
+    print(f"fingerprint_algorithm: {context.fingerprint_algorithm}", file=stdout)
+    print(file=stdout)
+    print("INSTRUCTIONS:", file=stdout)
+    print("- Verwende diese Werte unverändert in patch.json.", file=stdout)
+    print(
+        "- Erzeuge bei geändertem Repository-Zustand einen neuen Kontext.",
+        file=stdout,
+    )
+
+
+def _context_json_result(context: Any) -> dict[str, object]:
+    return {
+        "repo_id": str(context.repo_id),
+        "repository_path": str(context.repository_path),
+        "base_commit": context.base_commit,
+        "dirty": context.dirty,
+        "state_fingerprint": context.state_fingerprint,
+        "fingerprint_algorithm": context.fingerprint_algorithm,
+    }
+
+
 def _register_command(
     path: Path | None,
     *,
@@ -217,7 +264,7 @@ def _register_command(
     stderr: TextIO,
 ) -> int:
     try:
-        repo_id, repository_path = register_repository(
+        context = register_repository(
             path or Path.cwd(),
             new_id=new_id,
         )
@@ -225,8 +272,7 @@ def _register_command(
         print(format_tool_message(str(exc)), file=stderr)
         return int(exc.exit_code)
 
-    print(f"repo_id: {repo_id}", file=stdout)
-    print(f"repository_path: {repository_path}", file=stdout)
+    _write_context_block(context, stdout)
     return 0
 
 
@@ -322,6 +368,46 @@ def _registry_list_command(
                 f"{repository.repository_path}",
                 file=stdout,
             )
+    return 0
+
+
+def _context_command(
+    path: Path | None,
+    *,
+    json_output: bool,
+    stdout: TextIO,
+    stderr: TextIO,
+) -> int:
+    try:
+        context = repository_context(path or Path.cwd())
+    except PatchHarborError as exc:
+        exit_code = int(exc.exit_code)
+        if json_output:
+            _write_json_document(
+                _json_envelope(
+                    "context",
+                    result=None,
+                    error=exc,
+                    process_exit_code=exit_code,
+                ),
+                stdout,
+            )
+        else:
+            print(format_tool_message(str(exc)), file=stderr)
+        return exit_code
+
+    if json_output:
+        _write_json_document(
+            _json_envelope(
+                "context",
+                result=_context_json_result(context),
+                error=None,
+                process_exit_code=0,
+            ),
+            stdout,
+        )
+    else:
+        _write_context_block(context, stdout)
     return 0
 
 
@@ -534,6 +620,14 @@ def main(
     if args.command == "unregister":
         return _unregister_command(
             args.repository_or_repo_id,
+            stdout=actual_stdout,
+            stderr=actual_stderr,
+        )
+
+    if args.command == "context":
+        return _context_command(
+            args.repository,
+            json_output=args.json_output,
             stdout=actual_stdout,
             stderr=actual_stderr,
         )

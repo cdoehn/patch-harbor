@@ -80,6 +80,18 @@ class RepositoryPath:
         return str(self.value)
 
 
+@dataclass(frozen=True)
+class RepositoryContext:
+    """One reproducible state description of a registered repository."""
+
+    repo_id: RepositoryId
+    repository_path: RepositoryPath
+    base_commit: str
+    dirty: bool
+    state_fingerprint: str
+    fingerprint_algorithm: str
+
+
 class RegistryStatus(str, Enum):
     """Observed consistency of one central registry mapping."""
 

@@ -26,6 +26,7 @@ EXPECTED_RUNTIME_FILES = {
     "registration.py",
     "registry.py",
     "repository.py",
+    "repository_state.py",
     "locks.py",
     "resource_policy.py",
     "run_log.py",

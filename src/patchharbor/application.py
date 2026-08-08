@@ -12,6 +12,7 @@ from patchharbor.models import (
     BundleScript,
     InputArtifact,
     RegistryListResult,
+    RepositoryContext,
     RepositoryId,
     RepositoryPath,
 )
@@ -23,6 +24,10 @@ from patchharbor.registration import (
     list_registered_repositories,
     register_local_repository,
     unregister_local_repository,
+)
+from patchharbor.repository_state import (
+    capture_repository_context,
+    require_clean_repository,
 )
 from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY, ResourcePolicy
 from patchharbor.sources import (
@@ -38,9 +43,19 @@ def register_repository(
     path: Path,
     *,
     new_id: bool = False,
-) -> tuple[RepositoryId, RepositoryPath]:
-    """Register one local Git repository instance."""
-    return register_local_repository(path, new_id=new_id)
+) -> RepositoryContext:
+    """Register one local Git repository and return its current context."""
+    repository = require_clean_repository(path)
+    _repo_id, repository_path = register_local_repository(
+        repository.value,
+        new_id=new_id,
+    )
+    return capture_repository_context(repository_path.value)
+
+
+def repository_context(path: Path) -> RepositoryContext:
+    """Return the current reproducible context of one registered repository."""
+    return capture_repository_context(path)
 
 
 def registered_repositories() -> RegistryListResult:
