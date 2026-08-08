@@ -2175,7 +2175,7 @@ Empfohlene Verantwortlichkeiten:
 - `presentation.py` – Plain-Ausgabe, TUI, Farben und Rolling Buffer,
 - `registry.py` – zentrale Repository-Registrierung,
 - `repository_state.py` – Base-Commit, kanonischer Fingerprint und Snapshot-Zustand,
-- `repository_lock.py` – exklusive Sperre pro Repository-ID,
+- `locks.py` – globale Registry-Sperre und exklusive Sperre pro Repository-ID,
 - `patch_manifest.py` – `patch.json` und Schema,
 - `result_bundle.py` – vollständiges Result Bundle und atomare Veröffentlichung,
 - `models.py` – kleine unveränderliche Datenträger,
@@ -2194,7 +2194,7 @@ Abhängigkeitsregeln:
 - `patch_manifest` kennt weder Git noch Execution.
 - `registry` kennt weder TUI noch ZIP-Inhalte.
 - `repository_state` kennt weder TUI noch Watcher.
-- `repository_lock` kennt keine Ausführungs- oder Bundle-Semantik.
+- `locks` kennt keine Ausführungs- oder Bundle-Semantik.
 - `interpreters` kennt nur den kleinen Interpretervertrag.
 - `execution` kennt weder Registry, Git-Zustand, Result-Bundle-Struktur noch TUI.
 - `result_bundle` verwendet Repository-State- und Run-Log-Daten, führt aber keinen Patch aus.

@@ -25,7 +25,6 @@ from patchharbor.registry import (
     RegistryFileState,
     load_registry,
     load_registry_state,
-    registry_lock,
     remove_registry_mapping,
     restore_registry_state,
     replace_registry_mapping,
@@ -40,7 +39,7 @@ from patchharbor.repository import (
     registered_repository_status,
     restore_local_registration,
 )
-from patchharbor.repository_lock import repository_lock
+from patchharbor.locks import registry_lock, repository_lock
 from patchharbor.user_paths import RegistrationUserPaths, registration_user_paths
 
 

@@ -5,8 +5,6 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
-import sys
-import time
 from uuid import UUID, uuid4
 
 import pytest
@@ -21,7 +19,6 @@ from tests.registration_support import (
     git,
     isolated_user_environment,
     local_exclude_path,
-    probe_registry_lock,
     release_registry_lock_holder,
     release_repository_lock_holder,
     start_registry_lock_holder,
@@ -632,7 +629,7 @@ def test_register_new_id_rejects_a_busy_repository_without_mutation(
         stop_repository_lock_holder(holder)
 
 
-def test_unregister_holds_registry_lock_before_rejecting_a_busy_repository(
+def test_unregister_rejects_a_busy_repository_without_mutation(
     tmp_path: Path,
 ) -> None:
     repository = create_repository(tmp_path / "repository")
@@ -640,57 +637,22 @@ def test_unregister_holds_registry_lock_before_rejecting_a_busy_repository(
     assert registered.returncode == 0
     repo_id = _registered_id(repository)
     registry_before = _registry_path().read_bytes()
-    id_before = (repository / ".patchharbor" / "id").read_bytes()
-    environment = project_environment()
+    id_path = repository / ".patchharbor" / "id"
+    id_before = id_path.read_bytes()
     holder = start_repository_lock_holder(
         repo_id,
-        environment=environment,
+        environment=project_environment(),
     )
-    unregister_process: subprocess.Popen[str] | None = None
     try:
-        unregister_process = subprocess.Popen(
-            [
-                sys.executable,
-                "-m",
-                "patchharbor.cli",
-                "unregister",
-                repo_id,
-            ],
-            cwd=tmp_path,
-            env=environment,
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            encoding="utf-8",
-            errors="strict",
-        )
+        completed = run_cli(tmp_path, "unregister", repo_id)
 
-        deadline = time.monotonic() + 10.0
-        while probe_registry_lock(environment) != 8:
-            if unregister_process.poll() is not None:
-                stdout, stderr = unregister_process.communicate()
-                pytest.fail(
-                    "unregister ended before the registry lock was observed: "
-                    f"{unregister_process.returncode}; {stdout}; {stderr}"
-                )
-            if time.monotonic() >= deadline:
-                pytest.fail("registry lock was not observed")
-            time.sleep(0.01)
-
-        concurrent_list = run_cli(tmp_path, "registry", "list", "--json")
-        assert concurrent_list.returncode == 8
-
-        unregister_process.communicate(timeout=10)
-        assert unregister_process.returncode == 12
+        assert completed.returncode == 12
         assert _registry_path().read_bytes() == registry_before
-        assert (repository / ".patchharbor" / "id").read_bytes() == id_before
+        assert id_path.read_bytes() == id_before
 
         assert release_repository_lock_holder(holder) == 0
         retry = run_cli(tmp_path, "unregister", repo_id)
         assert retry.returncode == 0
         assert _registry_repositories() == {}
     finally:
-        if unregister_process is not None and unregister_process.poll() is None:
-            unregister_process.kill()
-            unregister_process.wait(timeout=10)
         stop_repository_lock_holder(holder)

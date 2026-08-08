@@ -375,15 +375,16 @@ def test_temporary_script_is_removed_after_timeout(tmp_path: Path) -> None:
         encoding="utf-8",
     )
 
-    timeout_seconds = "5" if os.name == "nt" else "0.05"
     completed = _run_patchharbor(
         script_path,
         tmp_path,
         "--timeout",
-        timeout_seconds,
+        "5",
     )
 
-    temporary_path = Path(observed_path.read_text(encoding="utf-8").strip())
+    recorded_path = observed_path.read_text(encoding="utf-8").strip()
+    assert recorded_path
+    temporary_path = Path(recorded_path)
     assert completed.returncode == 124
     assert not temporary_path.exists()
 

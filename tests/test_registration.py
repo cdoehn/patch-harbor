@@ -10,13 +10,13 @@ import pytest
 
 from patchharbor.errors import ErrorKind, ExitCode, PatchHarborError
 from patchharbor.models import RepositoryId, RepositoryPath
+from patchharbor.locks import registry_lock
 from patchharbor.registration import (
     list_registered_repositories,
     register_local_repository,
     unregister_local_repository,
 )
 from patchharbor.registry import (
-    registry_lock,
     registry_snapshot,
     write_registry,
 )
@@ -29,10 +29,12 @@ from patchharbor.user_paths import (
     RegistrationUserPaths,
     registration_user_paths,
 )
+from tests.platform_support import project_environment
 from tests.registration_support import (
     create_repository,
     git,
     local_exclude_path,
+    probe_registry_lock,
     set_isolated_user_environment,
 )
 
@@ -310,6 +312,46 @@ def test_unregister_revalidates_registry_mapping_after_repository_lock_acquisiti
     assert (repository / ".patchharbor" / "id").read_text(
         encoding="ascii"
     ) == f"{repo_id}\n"
+
+
+def test_unregister_owns_registry_lock_before_requesting_repository_lock(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repository = create_repository(tmp_path / "repository")
+    set_isolated_user_environment(monkeypatch, tmp_path / "user")
+    repo_id, _ = register_local_repository(repository)
+    paths = registration_user_paths()
+    id_path = repository / ".patchharbor" / "id"
+    id_before = id_path.read_bytes()
+
+    @contextmanager
+    def observe_registry_lock(
+        *_args: object,
+        **_kwargs: object,
+    ) -> Iterator[None]:
+        assert probe_registry_lock(project_environment()) == int(
+            ExitCode.REPOSITORY_ERROR
+        )
+        yield
+
+    monkeypatch.setattr(
+        "patchharbor.registration.repository_lock",
+        observe_registry_lock,
+    )
+
+    unregistered_id, unregistered_path = unregister_local_repository(
+        str(repo_id),
+        cwd=tmp_path,
+    )
+
+    assert unregistered_id == repo_id
+    assert unregistered_path.value == repository.resolve()
+    assert json.loads(paths.registry_path.read_text(encoding="utf-8")) == {
+        "format_version": 1,
+        "repositories": {},
+    }
+    assert id_path.read_bytes() == id_before
 
 
 def test_failure_after_registry_publication_restores_exact_previous_state(

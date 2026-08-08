@@ -205,9 +205,9 @@ def test_registration_layers_have_one_directional_dependency_flow() -> None:
     assert _local_imports("registration") == {
         "errors",
         "models",
+        "locks",
         "registry",
         "repository",
-        "repository_lock",
         "user_paths",
     }
     assert _local_imports("registry") == {
@@ -222,7 +222,7 @@ def test_registration_layers_have_one_directional_dependency_flow() -> None:
         "physical_paths",
         "platform",
     }
-    assert _local_imports("repository_lock") == {
+    assert _local_imports("locks") == {
         "errors",
         "models",
         "platform",
@@ -242,11 +242,13 @@ def test_lock_mechanics_are_confined_to_the_platform_boundary() -> None:
     assert "fcntl" in platform_source
     assert "msvcrt" in platform_source
 
-    for module_name in ("registry", "repository_lock"):
+    lock_source = (PACKAGE_ROOT / "locks.py").read_text(encoding="utf-8")
+    assert "patchharbor.platform.locking" in lock_source
+
+    for module_name in ("locks", "registry"):
         source = (PACKAGE_ROOT / f"{module_name}.py").read_text(
             encoding="utf-8"
         )
-        assert "patchharbor.platform.locking" in source
         assert "fcntl" not in source
         assert "msvcrt" not in source
         assert "import os" not in source

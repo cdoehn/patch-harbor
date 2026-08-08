@@ -273,11 +273,12 @@ Eine konkrete lokale Git-Repository-Instanz kann sicher registriert, wiedergefun
 
 ## Review nach Meilenstein 1
 
-- Definition of Done gegen das reale Verhalten prüfen.
-- falsche Annahmen und unnötig gewordene spätere Schritte dokumentieren.
-- verbleibenden Plan nur minimal anpassen.
-- sicherstellen, dass PatchHarbor weiterhin ein kontrollierter Runner bleibt.
-- Review im letzten Clean-Commit des Meilensteins abschließen; kein separater Review-Commit.
+**Ergebnis nach 1.d.C:**
+
+- Die Definition of Done ist durch echte Repository-, Registry- und Paralleltests abgedeckt.
+- Ein wartender Lock-Retry ist für den spezifizierten Busy-Vertrag nicht erforderlich; Locks werden einmalig und sofort erworben oder abgelehnt.
+- Der verbleibende Plan benötigt keine fachliche Änderung.
+- Es wurde keine Watcher-, Apply-, Fingerprint- oder Result-Bundle-Logik vorweggenommen; PatchHarbor bleibt ein kontrollierter Runner.
 
 ---
 

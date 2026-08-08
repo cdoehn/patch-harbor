@@ -76,12 +76,12 @@ _REPOSITORY_LOCK_HOLDER_PROGRAM = r"""
 import sys
 
 from patchharbor.models import RepositoryId
-from patchharbor.repository_lock import repository_lock
+from patchharbor.locks import repository_lock
 from patchharbor.user_paths import registration_user_paths
 
 repo_id = RepositoryId(sys.argv[1])
 mode = sys.argv[2]
-with repository_lock(registration_user_paths(), repo_id, wait_seconds=0.0):
+with repository_lock(registration_user_paths(), repo_id):
     print("ready", flush=True)
     if sys.stdin.buffer.read(1) != b"x":
         raise RuntimeError("release token missing")
@@ -95,14 +95,13 @@ import sys
 
 from patchharbor.errors import PatchHarborError
 from patchharbor.models import RepositoryId
-from patchharbor.repository_lock import repository_lock
+from patchharbor.locks import repository_lock
 from patchharbor.user_paths import registration_user_paths
 
 try:
     with repository_lock(
         registration_user_paths(),
         RepositoryId(sys.argv[1]),
-        wait_seconds=0.0,
     ):
         pass
 except PatchHarborError as exc:
@@ -171,7 +170,7 @@ def probe_repository_lock(repo_id: str, environment: dict[str, str]) -> int:
 _REGISTRY_LOCK_HOLDER_PROGRAM = r"""
 import sys
 
-from patchharbor.registry import registry_lock
+from patchharbor.locks import registry_lock
 from patchharbor.user_paths import registration_user_paths
 
 mode = sys.argv[1]
@@ -186,7 +185,7 @@ with registry_lock(registration_user_paths()):
 
 _REGISTRY_LOCK_PROBE_PROGRAM = r"""
 from patchharbor.errors import PatchHarborError
-from patchharbor.registry import registry_lock
+from patchharbor.locks import registry_lock
 from patchharbor.user_paths import registration_user_paths
 
 try:

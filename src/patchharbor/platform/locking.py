@@ -6,7 +6,6 @@ from contextlib import contextmanager
 import errno
 import os
 from pathlib import Path
-import time
 from typing import Iterator
 
 from patchharbor.platform.runtime import is_windows
@@ -70,18 +69,8 @@ def _release(descriptor: int) -> None:
 
 
 @contextmanager
-def exclusive_file_lock(
-    path: Path,
-    *,
-    wait_seconds: float,
-    retry_interval_seconds: float = 0.02,
-) -> Iterator[None]:
-    """Own one advisory lock through a single acquisition and cleanup path."""
-    if wait_seconds < 0:
-        raise ValueError("wait_seconds must not be negative")
-    if retry_interval_seconds <= 0:
-        raise ValueError("retry_interval_seconds must be positive")
-
+def exclusive_file_lock(path: Path) -> Iterator[None]:
+    """Acquire one advisory lock immediately and release it on every exit."""
     descriptor = -1
     acquired = False
     try:
@@ -90,19 +79,12 @@ def exclusive_file_lock(
         except OSError as exc:
             raise LockOperationError("cannot open lock file", exc) from exc
 
-        deadline = time.monotonic() + wait_seconds
-        while True:
-            try:
-                acquired = _try_acquire(descriptor)
-            except OSError as exc:
-                raise LockOperationError("cannot acquire file lock", exc) from exc
-            if acquired:
-                break
-
-            remaining = deadline - time.monotonic()
-            if remaining <= 0:
-                raise LockUnavailable
-            time.sleep(min(retry_interval_seconds, remaining))
+        try:
+            acquired = _try_acquire(descriptor)
+        except OSError as exc:
+            raise LockOperationError("cannot acquire file lock", exc) from exc
+        if not acquired:
+            raise LockUnavailable
 
         yield
     finally:

@@ -3,11 +3,9 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from contextlib import contextmanager
 from dataclasses import dataclass
 import json
 from pathlib import Path
-from typing import Iterator
 
 from patchharbor.errors import PatchHarborError, registry_error
 from patchharbor.models import (
@@ -21,11 +19,6 @@ from patchharbor.platform.filesystem import (
     PathKind,
     atomic_replace_bytes,
     path_kind,
-)
-from patchharbor.platform.locking import (
-    LockOperationError,
-    LockUnavailable,
-    exclusive_file_lock,
 )
 from patchharbor.user_paths import RegistrationUserPaths
 
@@ -128,25 +121,6 @@ def remove_registry_mapping(
     repositories.pop(_canonical_repository_id(repo_id), None)
     return registry_snapshot(repositories)
 
-
-@contextmanager
-def registry_lock(paths: RegistrationUserPaths) -> Iterator[None]:
-    """Hold the single global registry lock without trusting file absence."""
-    lock = exclusive_file_lock(
-        paths.registry_lock_path,
-        wait_seconds=0.0,
-    )
-    try:
-        lock.__enter__()
-    except LockUnavailable as exc:
-        raise _error("repository registry is busy") from exc
-    except LockOperationError as exc:
-        raise _error(f"{exc.operation}: {exc.cause}") from exc
-
-    try:
-        yield
-    finally:
-        lock.__exit__(None, None, None)
 
 
 def _registry_file_kind(path: Path) -> PathKind:
