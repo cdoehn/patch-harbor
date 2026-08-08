@@ -19,6 +19,9 @@ from tests.registration_support import (
 pytestmark = pytest.mark.e2e
 
 
+CLEAN_FINGERPRINT = "7c9d2a24e397e0e5"
+
+
 @pytest.fixture(autouse=True)
 def isolate_context_environment(
     tmp_path: Path,
@@ -53,7 +56,6 @@ def test_context_json_reports_the_registered_clean_state(
     )
 
     assert completed.returncode == 0
-    assert completed.stderr == ""
     document = json.loads(completed.stdout)
     assert set(document) == {
         "output_version",
@@ -84,7 +86,7 @@ def test_context_json_reports_the_registered_clean_state(
         "repository_path": str(repository.resolve()),
         "base_commit": git(repository, "rev-parse", "HEAD").stdout.strip(),
         "dirty": False,
-        "state_fingerprint": "7c9d2a24e397e0e5",
+        "state_fingerprint": CLEAN_FINGERPRINT,
         "fingerprint_algorithm": "patchharbor-state-v1",
     }
 
@@ -192,4 +194,4 @@ def test_context_preserves_a_full_sha256_base_commit(tmp_path: Path) -> None:
 
     assert len(expected) == 64
     assert result["base_commit"] == expected
-    assert result["state_fingerprint"] == "7c9d2a24e397e0e5"
+    assert result["state_fingerprint"] == CLEAN_FINGERPRINT

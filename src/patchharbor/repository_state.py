@@ -97,13 +97,12 @@ def _capture_clean_context(
     repo_id: RepositoryId,
 ) -> RepositoryContext:
     _require_clean(repository)
-    digest = state_fingerprint_digest()
     return RepositoryContext(
         repo_id=repo_id,
         repository_path=repository,
         base_commit=read_head_object_id(repository),
         dirty=False,
-        state_fingerprint=digest[:16],
+        state_fingerprint=state_fingerprint_digest()[:16],
         fingerprint_algorithm=FINGERPRINT_ALGORITHM,
     )
 

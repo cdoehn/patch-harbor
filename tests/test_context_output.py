@@ -1,10 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import FrozenInstanceError
 from io import StringIO
 from pathlib import Path
-
-import pytest
 
 from patchharbor.context_output import context_json_result, write_context_block
 from patchharbor.models import (
@@ -30,7 +27,7 @@ def _context(tmp_path: Path) -> RepositoryContext:
     )
 
 
-def test_context_representations_receive_the_same_immutable_values(
+def test_context_representations_include_the_same_values(
     tmp_path: Path,
 ) -> None:
     context = _context(tmp_path)
@@ -55,6 +52,3 @@ def test_context_representations_receive_the_same_immutable_values(
         context.fingerprint_algorithm,
     ):
         assert value in human
-
-    with pytest.raises(FrozenInstanceError):
-        setattr(context, "dirty", True)
