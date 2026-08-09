@@ -7,6 +7,13 @@ import hashlib
 
 FINGERPRINT_ALGORITHM = "patchharbor-state-v1"
 _FINGERPRINT_HEADER = b"PATCHHARBOR_STATE_FINGERPRINT\0" + b"1\0"
+_STAGED_FIELD_NAMES = (
+    b"staged-path",
+    b"staged-head-mode",
+    b"staged-head-object",
+    b"staged-index-mode",
+    b"staged-index-object",
+)
 
 
 def _framed_field(name: bytes, payload: bytes) -> bytes:
@@ -22,14 +29,10 @@ def encode_staged_record(
     index_object: bytes,
 ) -> bytes:
     """Encode one staged record using the normative field order."""
+    payloads = (path, head_mode, head_object, index_mode, index_object)
     return b"".join(
-        (
-            _framed_field(b"staged-path", path),
-            _framed_field(b"staged-head-mode", head_mode),
-            _framed_field(b"staged-head-object", head_object),
-            _framed_field(b"staged-index-mode", index_mode),
-            _framed_field(b"staged-index-object", index_object),
-        )
+        _framed_field(name, payload)
+        for name, payload in zip(_STAGED_FIELD_NAMES, payloads, strict=True)
     )
 
 

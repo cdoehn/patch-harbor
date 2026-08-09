@@ -161,11 +161,22 @@ def _validated_mode(raw: bytes, description: str) -> bytes:
     return raw
 
 
+def _next_sorted_path(
+    previous: bytes | None,
+    path: bytes,
+    description: str,
+) -> bytes:
+    if not path or (previous is not None and path <= previous):
+        raise _error(f"git returned ambiguous {description} paths")
+    return path
+
+
 def _parse_base_tree(
     raw: bytes,
     object_format: GitObjectFormat,
-) -> dict[bytes, _BaseTreeEntry]:
-    entries: dict[bytes, _BaseTreeEntry] = {}
+) -> tuple[_BaseTreeEntry, ...]:
+    entries: list[_BaseTreeEntry] = []
+    previous_path: bytes | None = None
     for raw_record in _nul_records(raw, "base tree"):
         try:
             metadata, path = raw_record.split(b"\t", 1)
@@ -174,51 +185,56 @@ def _parse_base_tree(
             raise _error("git returned malformed base tree data") from exc
         if object_type != b"blob":
             raise _error("git returned an unsupported base tree object type")
-        if not path or path in entries:
-            raise _error("git returned ambiguous base tree paths")
-        entries[path] = _BaseTreeEntry(
-            path=path,
-            mode=_validated_mode(mode, "base tree"),
-            object_name=_validated_object_name(
-                object_name,
-                object_format,
-                "base tree",
-            ),
+        previous_path = _next_sorted_path(previous_path, path, "base tree")
+        entries.append(
+            _BaseTreeEntry(
+                path=path,
+                mode=_validated_mode(mode, "base tree"),
+                object_name=_validated_object_name(
+                    object_name,
+                    object_format,
+                    "base tree",
+                ),
+            )
         )
-    return entries
+    return tuple(entries)
 
 
 def _parse_index(
     raw: bytes,
     object_format: GitObjectFormat,
-) -> dict[bytes, _IndexEntry]:
-    entries: dict[bytes, _IndexEntry] = {}
+) -> tuple[_IndexEntry, ...]:
+    entries: list[_IndexEntry] = []
+    previous_path: bytes | None = None
     for raw_record in _nul_records(raw, "index"):
         try:
             metadata, path = raw_record.split(b"\t", 1)
             mode, object_name, stage = metadata.split(b" ", 2)
         except ValueError as exc:
             raise _error("git returned malformed index data") from exc
-        if stage != b"0" or not path or path in entries:
+        if stage != b"0":
             raise _error("git returned an unsupported index state")
-        entries[path] = _IndexEntry(
-            path=path,
-            mode=_validated_mode(mode, "index"),
-            object_name=_validated_object_name(
-                object_name,
-                object_format,
-                "index",
-            ),
+        previous_path = _next_sorted_path(previous_path, path, "index")
+        entries.append(
+            _IndexEntry(
+                path=path,
+                mode=_validated_mode(mode, "index"),
+                object_name=_validated_object_name(
+                    object_name,
+                    object_format,
+                    "index",
+                ),
+            )
         )
-    return entries
+    return tuple(entries)
 
 
 def _require_index_blobs(
     repository: RepositoryPath,
-    entries: dict[bytes, _IndexEntry],
+    entries: tuple[_IndexEntry, ...],
 ) -> None:
     object_names = tuple(
-        dict.fromkeys(entry.object_name for entry in entries.values())
+        dict.fromkeys(entry.object_name for entry in entries)
     )
     if not object_names:
         return
@@ -254,6 +270,34 @@ def _staged_record(
     )
 
 
+def _compare_staged_entries(
+    base_entries: tuple[_BaseTreeEntry, ...],
+    index_entries: tuple[_IndexEntry, ...],
+) -> tuple[StagedRecord, ...]:
+    records: list[StagedRecord] = []
+    base_iterator = iter(base_entries)
+    index_iterator = iter(index_entries)
+    head = next(base_iterator, None)
+    index = next(index_iterator, None)
+
+    while head is not None or index is not None:
+        if index is None or (head is not None and head.path < index.path):
+            records.append(_staged_record(head.path, head, None))
+            head = next(base_iterator, None)
+            continue
+        if head is None or index.path < head.path:
+            records.append(_staged_record(index.path, None, index))
+            index = next(index_iterator, None)
+            continue
+
+        if (head.mode, head.object_name) != (index.mode, index.object_name):
+            records.append(_staged_record(head.path, head, index))
+        head = next(base_iterator, None)
+        index = next(index_iterator, None)
+
+    return tuple(records)
+
+
 def read_staged_records(
     repository: RepositoryPath,
     base_commit: GitObjectId,
@@ -275,13 +319,4 @@ def read_staged_records(
         base_commit.object_format,
     )
     _require_index_blobs(repository, index_entries)
-
-    records: list[StagedRecord] = []
-    for path in sorted(base_entries.keys() | index_entries.keys()):
-        head = base_entries.get(path)
-        index = index_entries.get(path)
-        if head is not None and index is not None:
-            if (head.mode, head.object_name) == (index.mode, index.object_name):
-                continue
-        records.append(_staged_record(path, head, index))
-    return tuple(records)
+    return _compare_staged_entries(base_entries, index_entries)

@@ -165,33 +165,31 @@ def test_staged_additions_preserve_binary_blob_ids_and_byte_order(
         assert record.index_object == expected_object.encode("ascii")
 
 
-def test_staged_modification_and_deletion_compare_head_with_index(
-    tmp_path: Path,
-) -> None:
+def test_staged_transitions_compare_base_and_index(tmp_path: Path) -> None:
     repository = create_repository(tmp_path / "repository")
     (repository / "deleted.txt").write_text("remove me\n", encoding="utf-8")
-    git(repository, "add", "deleted.txt")
+    (repository / "renamed-from.txt").write_text("move me\n", encoding="utf-8")
+    git(repository, "add", "deleted.txt", "renamed-from.txt")
     git(repository, "commit", "--quiet", "-m", "second base")
-    tracked_head = git(
-        repository,
-        "rev-parse",
-        "HEAD:tracked.txt",
-    ).stdout.strip()
-    deleted_head = git(
-        repository,
-        "rev-parse",
-        "HEAD:deleted.txt",
-    ).stdout.strip()
 
+    head_objects = {
+        path: git(repository, "rev-parse", f"HEAD:{path}").stdout.strip().encode(
+            "ascii"
+        )
+        for path in ("tracked.txt", "deleted.txt", "renamed-from.txt")
+    }
     (repository / "tracked.txt").write_text("staged change\n", encoding="utf-8")
     git(repository, "add", "tracked.txt")
     git(repository, "rm", "--quiet", "deleted.txt")
+    git(repository, "mv", "renamed-from.txt", "renamed-to.txt")
 
     records = {record.path: record for record in _staged_records(repository)}
 
     modified = records[b"tracked.txt"]
-    assert modified.head_mode == b"100644"
-    assert modified.head_object == tracked_head.encode("ascii")
+    assert (modified.head_mode, modified.head_object) == (
+        b"100644",
+        head_objects["tracked.txt"],
+    )
     assert modified.index_mode == b"100644"
     assert modified.index_object == git(
         repository,
@@ -200,10 +198,25 @@ def test_staged_modification_and_deletion_compare_head_with_index(
     ).stdout.strip().encode("ascii")
 
     deleted = records[b"deleted.txt"]
-    assert deleted.head_mode == b"100644"
-    assert deleted.head_object == deleted_head.encode("ascii")
-    assert deleted.index_mode == b""
-    assert deleted.index_object == b""
+    assert (deleted.head_mode, deleted.head_object) == (
+        b"100644",
+        head_objects["deleted.txt"],
+    )
+    assert (deleted.index_mode, deleted.index_object) == (b"", b"")
+
+    renamed_from = records[b"renamed-from.txt"]
+    assert (renamed_from.head_mode, renamed_from.head_object) == (
+        b"100644",
+        head_objects["renamed-from.txt"],
+    )
+    assert (renamed_from.index_mode, renamed_from.index_object) == (b"", b"")
+
+    renamed_to = records[b"renamed-to.txt"]
+    assert (renamed_to.head_mode, renamed_to.head_object) == (b"", b"")
+    assert (renamed_to.index_mode, renamed_to.index_object) == (
+        b"100644",
+        head_objects["renamed-from.txt"],
+    )
 
 
 @pytest.mark.skipif(
@@ -251,79 +264,43 @@ def _records_from_raw_git_state(
 
 
 @pytest.mark.parametrize(
-    "tree",
+    ("tree", "index"),
     [
-        b"100644 tree " + b"1" * 40 + b"\tentry\0",
-        b"120000 blob " + b"1" * 40 + b"\tentry\0",
-        b"100644 blob " + b"1" * 39 + b"\tentry\0",
-        b"100644 blob " + b"A" * 40 + b"\tentry\0",
+        (b"100644 tree " + b"1" * 40 + b"\tentry\0", b""),
+        (b"120000 blob " + b"1" * 40 + b"\tentry\0", b""),
+        (b"100644 blob " + b"1" * 39 + b"\tentry\0", b""),
+        (b"100644 blob " + b"A" * 40 + b"\tentry\0", b""),
+        (
+            b"100644 blob " + b"1" * 40 + b"\tz\0"
+            b"100644 blob " + b"2" * 40 + b"\ta\0",
+            b"",
+        ),
+        (b"", b"120000 " + b"1" * 40 + b" 0\tentry\0"),
+        (b"", b"100644 " + b"1" * 39 + b" 0\tentry\0"),
+        (b"", b"100644 " + b"A" * 40 + b" 0\tentry\0"),
+        (b"", b"100644 " + b"1" * 40 + b" 1\tentry\0"),
+        (
+            b"",
+            b"100644 " + b"1" * 40 + b" 0\tz\0"
+            b"100644 " + b"2" * 40 + b" 0\ta\0",
+        ),
     ],
 )
-def test_base_tree_rejects_non_blob_modes_or_invalid_object_names(
+def test_staged_capture_rejects_unsupported_raw_entries(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     tree: bytes,
-) -> None:
-    with pytest.raises(PatchHarborError) as captured:
-        _records_from_raw_git_state(
-            tmp_path,
-            monkeypatch,
-            tree=tree,
-            index=b"",
-        )
-
-    assert captured.value.exit_code == ExitCode.REPOSITORY_ERROR
-
-
-@pytest.mark.parametrize(
-    "index",
-    [
-        b"120000 " + b"1" * 40 + b" 0\tentry\0",
-        b"100644 " + b"1" * 39 + b" 0\tentry\0",
-        b"100644 " + b"A" * 40 + b" 0\tentry\0",
-        b"100644 " + b"1" * 40 + b" 1\tentry\0",
-    ],
-)
-def test_index_rejects_unsupported_modes_objects_or_stages(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
     index: bytes,
 ) -> None:
     with pytest.raises(PatchHarborError) as captured:
         _records_from_raw_git_state(
             tmp_path,
             monkeypatch,
-            tree=b"",
+            tree=tree,
             index=index,
         )
 
     assert captured.value.exit_code == ExitCode.REPOSITORY_ERROR
-
-
-def test_staged_rename_is_a_deletion_and_an_addition(tmp_path: Path) -> None:
-    repository = create_repository(tmp_path / "repository")
-    original_object = git(
-        repository,
-        "rev-parse",
-        "HEAD:tracked.txt",
-    ).stdout.strip().encode("ascii")
-    git(repository, "mv", "tracked.txt", "renamed.txt")
-
-    records = {record.path: record for record in _staged_records(repository)}
-
-    assert set(records) == {b"renamed.txt", b"tracked.txt"}
-    added = records[b"renamed.txt"]
-    assert (added.head_mode, added.head_object) == (b"", b"")
-    assert (added.index_mode, added.index_object) == (
-        b"100644",
-        original_object,
-    )
-    deleted = records[b"tracked.txt"]
-    assert (deleted.head_mode, deleted.head_object) == (
-        b"100644",
-        original_object,
-    )
-    assert (deleted.index_mode, deleted.index_object) == (b"", b"")
 
 
 def test_index_rejects_a_non_blob_object_even_with_a_file_mode(
