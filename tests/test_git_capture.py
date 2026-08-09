@@ -7,7 +7,13 @@ import subprocess
 import pytest
 
 from patchharbor import git_capture
-from patchharbor.models import GitObjectFormat, GitObjectId, RepositoryPath
+from patchharbor.errors import ExitCode, PatchHarborError
+from patchharbor.models import (
+    GitObjectFormat,
+    GitObjectId,
+    RepositoryPath,
+    StagedRecord,
+)
 from tests.registration_support import create_repository, git
 
 
@@ -221,3 +227,119 @@ def test_staged_mode_change_is_distinct_from_blob_content(
     assert record.head_mode == b"100644"
     assert record.index_mode == b"100755"
     assert record.head_object == record.index_object
+
+
+def _records_from_raw_git_state(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    tree: bytes,
+    index: bytes,
+    object_format: GitObjectFormat = GitObjectFormat.SHA1,
+) -> tuple[StagedRecord, ...]:
+    outputs = iter((tree, index))
+    monkeypatch.setattr(
+        git_capture,
+        "run_git_bytes",
+        lambda *_args: next(outputs),
+    )
+    object_name = "a" * object_format.object_id_hex_length
+    return git_capture.read_staged_records(
+        RepositoryPath(tmp_path.resolve()),
+        GitObjectId(value=object_name, object_format=object_format),
+    )
+
+
+@pytest.mark.parametrize(
+    "tree",
+    [
+        b"100644 tree " + b"1" * 40 + b"\tentry\0",
+        b"120000 blob " + b"1" * 40 + b"\tentry\0",
+        b"100644 blob " + b"1" * 39 + b"\tentry\0",
+        b"100644 blob " + b"A" * 40 + b"\tentry\0",
+    ],
+)
+def test_base_tree_rejects_non_blob_modes_or_invalid_object_names(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    tree: bytes,
+) -> None:
+    with pytest.raises(PatchHarborError) as captured:
+        _records_from_raw_git_state(
+            tmp_path,
+            monkeypatch,
+            tree=tree,
+            index=b"",
+        )
+
+    assert captured.value.exit_code == ExitCode.REPOSITORY_ERROR
+
+
+@pytest.mark.parametrize(
+    "index",
+    [
+        b"120000 " + b"1" * 40 + b" 0\tentry\0",
+        b"100644 " + b"1" * 39 + b" 0\tentry\0",
+        b"100644 " + b"A" * 40 + b" 0\tentry\0",
+        b"100644 " + b"1" * 40 + b" 1\tentry\0",
+    ],
+)
+def test_index_rejects_unsupported_modes_objects_or_stages(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    index: bytes,
+) -> None:
+    with pytest.raises(PatchHarborError) as captured:
+        _records_from_raw_git_state(
+            tmp_path,
+            monkeypatch,
+            tree=b"",
+            index=index,
+        )
+
+    assert captured.value.exit_code == ExitCode.REPOSITORY_ERROR
+
+
+def test_staged_rename_is_a_deletion_and_an_addition(tmp_path: Path) -> None:
+    repository = create_repository(tmp_path / "repository")
+    original_object = git(
+        repository,
+        "rev-parse",
+        "HEAD:tracked.txt",
+    ).stdout.strip().encode("ascii")
+    git(repository, "mv", "tracked.txt", "renamed.txt")
+
+    records = {record.path: record for record in _staged_records(repository)}
+
+    assert set(records) == {b"renamed.txt", b"tracked.txt"}
+    added = records[b"renamed.txt"]
+    assert (added.head_mode, added.head_object) == (b"", b"")
+    assert (added.index_mode, added.index_object) == (
+        b"100644",
+        original_object,
+    )
+    deleted = records[b"tracked.txt"]
+    assert (deleted.head_mode, deleted.head_object) == (
+        b"100644",
+        original_object,
+    )
+    assert (deleted.index_mode, deleted.index_object) == (b"", b"")
+
+
+def test_index_rejects_a_non_blob_object_even_with_a_file_mode(
+    tmp_path: Path,
+) -> None:
+    repository = create_repository(tmp_path / "repository")
+    tree_object = git(repository, "rev-parse", "HEAD^{tree}").stdout.strip()
+    git(
+        repository,
+        "update-index",
+        "--add",
+        "--cacheinfo",
+        f"100644,{tree_object},tree-as-file",
+    )
+
+    with pytest.raises(PatchHarborError) as captured:
+        _staged_records(repository)
+
+    assert captured.value.exit_code == ExitCode.REPOSITORY_ERROR
