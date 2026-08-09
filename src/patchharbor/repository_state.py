@@ -138,7 +138,6 @@ def _capture_context(
         encode_untracked_record(
             path=record.path,
             mode=record.mode,
-            size=record.size,
             content=record.content,
         )
         for record in state.untracked

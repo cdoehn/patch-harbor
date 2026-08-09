@@ -418,10 +418,8 @@ def _core_file_mode(repository: RepositoryPath) -> bool:
 
 
 @dataclass(frozen=True)
-class _WorktreeSnapshot:
-    kind: bytes
+class _RegularFileSnapshot:
     mode: bytes
-    size: int
     content: bytes
 
 
@@ -460,11 +458,11 @@ def _require_regular_file(metadata: os.stat_result) -> None:
         raise _error("working-tree entry is not a regular file")
 
 
-def _read_regular_worktree_snapshot(
+def _read_regular_file(
     target: os.PathLike[str],
     *,
     core_file_mode: bool,
-) -> _WorktreeSnapshot:
+) -> _RegularFileSnapshot:
     initial_metadata = _inspect_worktree_path(target)
     if initial_metadata is None:
         raise _error("working-tree path disappeared while being read")
@@ -516,13 +514,11 @@ def _read_regular_worktree_snapshot(
     ):
         raise _error("working-tree file changed while being read")
 
-    return _WorktreeSnapshot(
-        kind=b"regular",
+    return _RegularFileSnapshot(
         mode=_canonical_regular_file_mode(
             finished_metadata,
             core_file_mode=core_file_mode,
         ),
-        size=finished_metadata.st_size,
         content=content,
     )
 
@@ -538,26 +534,28 @@ def _read_worktree_record(
     if entry.status == b"D":
         if _inspect_worktree_path(target) is not None:
             raise _error("deleted working-tree path still exists")
-        snapshot = _WorktreeSnapshot(
-            kind=b"missing",
-            mode=b"",
-            size=0,
-            content=b"",
+        return UnstagedRecord(
+            path=entry.path,
+            status=entry.status,
+            index_mode=entry.index_mode,
+            index_object=entry.index_object,
+            worktree_kind=b"missing",
+            worktree_mode=b"",
+            worktree_content=b"",
         )
-    elif entry.status == b"M":
-        snapshot = _read_regular_worktree_snapshot(
-            target,
-            core_file_mode=core_file_mode,
-        )
-    else:
+    if entry.status != b"M":
         raise _error("git returned an unsupported unstaged status")
 
+    snapshot = _read_regular_file(
+        target,
+        core_file_mode=core_file_mode,
+    )
     return UnstagedRecord(
         path=entry.path,
         status=entry.status,
         index_mode=entry.index_mode,
         index_object=entry.index_object,
-        worktree_kind=snapshot.kind,
+        worktree_kind=b"regular",
         worktree_mode=snapshot.mode,
         worktree_content=snapshot.content,
     )
@@ -645,7 +643,7 @@ def read_untracked_records(
     core_file_mode = _core_file_mode(repository)
     records: list[UntrackedRecord] = []
     for path in paths:
-        snapshot = _read_regular_worktree_snapshot(
+        snapshot = _read_regular_file(
             repository.value.joinpath(*path.comparison_parts),
             core_file_mode=core_file_mode,
         )
@@ -653,7 +651,6 @@ def read_untracked_records(
             UntrackedRecord(
                 path=path.original_bytes,
                 mode=snapshot.mode,
-                size=snapshot.size,
                 content=snapshot.content,
             )
         )

@@ -152,12 +152,7 @@ class UntrackedRecord:
 
     path: bytes
     mode: bytes
-    size: int
     content: bytes
-
-    def __post_init__(self) -> None:
-        if self.size < 0 or self.size != len(self.content):
-            raise ValueError("untracked size does not match content")
 
 
 @dataclass(frozen=True)

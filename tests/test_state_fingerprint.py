@@ -60,7 +60,6 @@ def test_untracked_file_matches_the_normative_reference_vector() -> None:
     untracked = encode_untracked_record(
         path=b"note.txt",
         mode=b"100644",
-        size=6,
         content=b"hello\n",
     )
 

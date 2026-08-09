@@ -81,11 +81,10 @@ def encode_untracked_record(
     *,
     path: bytes,
     mode: bytes,
-    size: int,
     content: bytes,
 ) -> bytes:
     """Encode one untracked record using the normative field order."""
-    payloads = (path, mode, size.to_bytes(8, "big"), content)
+    payloads = (path, mode, len(content).to_bytes(8, "big"), content)
     return b"".join(
         _framed_field(name, payload)
         for name, payload in zip(_UNTRACKED_FIELD_NAMES, payloads, strict=True)

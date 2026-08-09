@@ -6,6 +6,8 @@ from pathlib import Path
 
 import pytest
 
+from patchharbor.models import RepositoryContext
+from patchharbor.repository_state import capture_repository_context
 from tests.platform_support import project_environment, run_cli
 from tests.registration_support import (
     create_repository,
@@ -113,25 +115,30 @@ def test_context_matches_the_normative_untracked_reference_vector(
     assert run_cli(repository, "register").returncode == 0
     (repository / "note.txt").write_bytes(b"hello\n")
 
-    result = _context_result(repository)
+    result = _captured_context(repository)
 
-    assert result["dirty"] is True
-    assert result["state_fingerprint"] == "05fe268b93ee2ea1"
+    assert result.dirty is True
+    assert result.state_fingerprint == "05fe268b93ee2ea1"
 
 
-def test_context_excludes_ignored_untracked_files(tmp_path: Path) -> None:
+def test_context_excludes_ignored_and_internal_untracked_files(
+    tmp_path: Path,
+) -> None:
     repository = create_repository(tmp_path / "repository")
     (repository / ".gitignore").write_text("ignored.bin\n", encoding="utf-8")
     git(repository, "add", ".gitignore")
     git(repository, "commit", "--quiet", "-m", "ignore fixture")
     assert run_cli(repository, "register").returncode == 0
-    clean = _context_result(repository)
+    clean = _captured_context(repository)
     (repository / "ignored.bin").write_bytes(b"ignored\x00payload")
+    (repository / ".patchharbor" / "transient.bin").write_bytes(
+        b"internal\x00payload"
+    )
 
-    ignored = _context_result(repository)
+    excluded = _captured_context(repository)
 
-    assert ignored["dirty"] is False
-    assert ignored["state_fingerprint"] == clean["state_fingerprint"]
+    assert excluded.dirty is False
+    assert excluded.state_fingerprint == clean.state_fingerprint
 
 
 def test_register_rejects_a_dirty_state_before_creating_identity(
@@ -170,13 +177,8 @@ def test_context_respects_the_repository_lock(tmp_path: Path) -> None:
         stop_repository_lock_holder(holder)
 
 
-def _context_result(repository: Path) -> dict[str, object]:
-    completed = run_cli(repository, "context", "--json")
-    assert completed.returncode == 0
-    document = json.loads(completed.stdout)
-    result = document["result"]
-    assert isinstance(result, dict)
-    return result
+def _captured_context(repository: Path) -> RepositoryContext:
+    return capture_repository_context(repository)
 
 
 def test_clean_fingerprint_is_independent_of_the_base_commit(
@@ -184,17 +186,17 @@ def test_clean_fingerprint_is_independent_of_the_base_commit(
 ) -> None:
     repository = create_repository(tmp_path / "repository")
     assert run_cli(repository, "register").returncode == 0
-    before = _context_result(repository)
+    before = _captured_context(repository)
 
     (repository / "tracked.txt").write_text("next base\n", encoding="utf-8")
     git(repository, "add", "tracked.txt")
     git(repository, "commit", "--quiet", "-m", "next base")
-    after = _context_result(repository)
+    after = _captured_context(repository)
 
-    assert before["base_commit"] != after["base_commit"]
-    assert before["state_fingerprint"] == after["state_fingerprint"]
-    assert before["dirty"] is False
-    assert after["dirty"] is False
+    assert before.base_commit != after.base_commit
+    assert before.state_fingerprint == after.state_fingerprint
+    assert before.dirty is False
+    assert after.dirty is False
 
 
 def test_untracked_fingerprint_is_independent_of_the_base_commit(
@@ -203,17 +205,17 @@ def test_untracked_fingerprint_is_independent_of_the_base_commit(
     repository = create_repository(tmp_path / "repository")
     assert run_cli(repository, "register").returncode == 0
     (repository / "note.txt").write_bytes(b"hello\n")
-    before = _context_result(repository)
+    before = _captured_context(repository)
 
     (repository / "tracked.txt").write_text("next base\n", encoding="utf-8")
     git(repository, "add", "tracked.txt")
     git(repository, "commit", "--quiet", "-m", "next base")
-    after = _context_result(repository)
+    after = _captured_context(repository)
 
-    assert before["base_commit"] != after["base_commit"]
-    assert before["state_fingerprint"] == after["state_fingerprint"]
-    assert before["dirty"] is True
-    assert after["dirty"] is True
+    assert before.base_commit != after.base_commit
+    assert before.state_fingerprint == after.state_fingerprint
+    assert before.dirty is True
+    assert after.dirty is True
 
 
 def test_context_preserves_a_full_sha256_base_commit(tmp_path: Path) -> None:
@@ -223,12 +225,12 @@ def test_context_preserves_a_full_sha256_base_commit(tmp_path: Path) -> None:
     )
     assert run_cli(repository, "register").returncode == 0
 
-    result = _context_result(repository)
+    result = _captured_context(repository)
     expected = git(repository, "rev-parse", "HEAD").stdout.strip()
 
     assert len(expected) == 64
-    assert result["base_commit"] == expected
-    assert result["state_fingerprint"] == CLEAN_FINGERPRINT
+    assert str(result.base_commit) == expected
+    assert result.state_fingerprint == CLEAN_FINGERPRINT
 
 
 @pytest.mark.parametrize("object_format", [None, "sha256"])
@@ -241,20 +243,20 @@ def test_context_fingerprint_tracks_unstaged_binary_bytes_and_line_endings(
         object_format=object_format,
     )
     assert run_cli(repository, "register").returncode == 0
-    clean = _context_result(repository)
+    clean = _captured_context(repository)
     tracked = repository / "tracked.txt"
     tracked.write_bytes(b"changed\x00payload\xff\r\n")
 
-    with_crlf = _context_result(repository)
+    with_crlf = _captured_context(repository)
     tracked.write_bytes(b"changed\x00payload\xff\n")
-    with_lf = _context_result(repository)
+    with_lf = _captured_context(repository)
 
-    assert with_crlf["base_commit"] == clean["base_commit"]
-    assert with_lf["base_commit"] == clean["base_commit"]
-    assert with_crlf["dirty"] is True
-    assert with_lf["dirty"] is True
-    assert with_crlf["state_fingerprint"] != clean["state_fingerprint"]
-    assert with_lf["state_fingerprint"] != with_crlf["state_fingerprint"]
+    assert with_crlf.base_commit == clean.base_commit
+    assert with_lf.base_commit == clean.base_commit
+    assert with_crlf.dirty is True
+    assert with_lf.dirty is True
+    assert with_crlf.state_fingerprint != clean.state_fingerprint
+    assert with_lf.state_fingerprint != with_crlf.state_fingerprint
 
 
 def test_context_fingerprint_distinguishes_modification_and_deletion(
@@ -262,18 +264,18 @@ def test_context_fingerprint_distinguishes_modification_and_deletion(
 ) -> None:
     repository = create_repository(tmp_path / "repository")
     assert run_cli(repository, "register").returncode == 0
-    clean = _context_result(repository)
+    clean = _captured_context(repository)
     tracked = repository / "tracked.txt"
     tracked.write_bytes(b"changed\n")
-    modified = _context_result(repository)
+    modified = _captured_context(repository)
     tracked.unlink()
-    deleted = _context_result(repository)
+    deleted = _captured_context(repository)
 
-    assert modified["dirty"] is True
-    assert deleted["dirty"] is True
-    assert modified["state_fingerprint"] != clean["state_fingerprint"]
-    assert deleted["state_fingerprint"] != clean["state_fingerprint"]
-    assert deleted["state_fingerprint"] != modified["state_fingerprint"]
+    assert modified.dirty is True
+    assert deleted.dirty is True
+    assert modified.state_fingerprint != clean.state_fingerprint
+    assert deleted.state_fingerprint != clean.state_fingerprint
+    assert deleted.state_fingerprint != modified.state_fingerprint
 
 
 @pytest.mark.skipif(
@@ -286,15 +288,15 @@ def test_context_fingerprint_tracks_an_unstaged_executable_mode(
     repository = create_repository(tmp_path / "repository")
     assert run_cli(repository, "register").returncode == 0
     git(repository, "config", "core.fileMode", "true")
-    clean = _context_result(repository)
+    clean = _captured_context(repository)
     tracked = repository / "tracked.txt"
     tracked.chmod(tracked.stat().st_mode | 0o111)
 
-    executable = _context_result(repository)
+    executable = _captured_context(repository)
 
-    assert executable["base_commit"] == clean["base_commit"]
-    assert executable["dirty"] is True
-    assert executable["state_fingerprint"] != clean["state_fingerprint"]
+    assert executable.base_commit == clean.base_commit
+    assert executable.dirty is True
+    assert executable.state_fingerprint != clean.state_fingerprint
 
 
 @pytest.mark.parametrize("object_format", [None, "sha256"])
@@ -307,15 +309,15 @@ def test_context_fingerprint_tracks_a_staged_binary_addition(
         object_format=object_format,
     )
     assert run_cli(repository, "register").returncode == 0
-    clean = _context_result(repository)
+    clean = _captured_context(repository)
     (repository / "app.bin").write_bytes(b"binary\x00payload\xff\r\n")
     git(repository, "add", "app.bin")
 
-    staged = _context_result(repository)
+    staged = _captured_context(repository)
 
-    assert staged["base_commit"] == clean["base_commit"]
-    assert staged["dirty"] is True
-    assert staged["state_fingerprint"] != clean["state_fingerprint"]
+    assert staged.base_commit == clean.base_commit
+    assert staged.dirty is True
+    assert staged.state_fingerprint != clean.state_fingerprint
 
 
 def test_context_combines_staged_unstaged_and_untracked_state(
@@ -329,13 +331,13 @@ def test_context_combines_staged_unstaged_and_untracked_state(
     (repository / "tracked.txt").write_bytes(b"unstaged\r\n")
     (repository / "untracked.bin").write_bytes(b"untracked\xff")
 
-    combined = _context_result(repository)
-    assert combined["dirty"] is True
+    combined = _captured_context(repository)
+    assert combined.dirty is True
 
     git(repository, "reset", "--hard", "HEAD")
     (repository / "staged.bin").unlink(missing_ok=True)
     (repository / "untracked.bin").unlink()
-    clean = _context_result(repository)
+    clean = _captured_context(repository)
 
-    assert combined["state_fingerprint"] != clean["state_fingerprint"]
-    assert clean["dirty"] is False
+    assert combined.state_fingerprint != clean.state_fingerprint
+    assert clean.dirty is False
