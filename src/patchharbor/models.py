@@ -155,6 +155,24 @@ class UntrackedRecord:
     size: int
     content: bytes
 
+    def __post_init__(self) -> None:
+        if self.size < 0 or self.size != len(self.content):
+            raise ValueError("untracked size does not match content")
+
+
+@dataclass(frozen=True)
+class RepositoryState:
+    """One immutable capture of all supported non-HEAD state."""
+
+    staged: tuple[StagedRecord, ...] = ()
+    unstaged: tuple[UnstagedRecord, ...] = ()
+    untracked: tuple[UntrackedRecord, ...] = ()
+
+    @property
+    def dirty(self) -> bool:
+        """Whether any supported state differs from HEAD."""
+        return bool(self.staged or self.unstaged or self.untracked)
+
 
 @dataclass(frozen=True)
 class RepositoryContext:

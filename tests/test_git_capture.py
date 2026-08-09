@@ -13,6 +13,7 @@ from patchharbor.models import (
     GitObjectId,
     RepositoryPath,
     StagedRecord,
+    UntrackedRecord,
 )
 from tests.registration_support import create_repository, git
 
@@ -669,3 +670,91 @@ def test_untracked_capture_respects_an_executable_mode(tmp_path: Path) -> None:
     assert records[0].mode == b"100755"
     assert records[0].size == len(b"#!/bin/sh\n")
     assert records[0].content == b"#!/bin/sh\n"
+
+
+def test_untracked_capture_preserves_utf8_path_bytes_and_nested_target(
+    tmp_path: Path,
+) -> None:
+    repository = create_repository(tmp_path / "repository")
+    nested = repository / "Grüße"
+    nested.mkdir()
+    target = nested / "é.txt"
+    target.write_bytes(b"utf8 path\x00payload\n")
+
+    records = _untracked_records(repository)
+
+    assert len(records) == 1
+    assert records[0].path == "Grüße/é.txt".encode("utf-8")
+    assert records[0].size == len(records[0].content)
+    assert records[0].content == b"utf8 path\x00payload\n"
+
+
+def test_untracked_capture_rejects_a_non_utf8_git_path(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        git_capture,
+        "run_git_bytes",
+        lambda *_args, **_kwargs: b"invalid-\xff.bin\0",
+    )
+
+    with pytest.raises(PatchHarborError) as captured:
+        git_capture.read_untracked_records(
+            RepositoryPath(tmp_path.resolve())
+        )
+
+    _assert_repository_capture_error(captured)
+
+
+@pytest.mark.skipif(
+    os.name == "nt",
+    reason="creating symbolic links is not generally available on Windows",
+)
+def test_untracked_capture_never_follows_a_symbolic_link(tmp_path: Path) -> None:
+    repository = create_repository(tmp_path / "repository")
+    outside = tmp_path / "outside.bin"
+    outside.write_bytes(b"must not be captured")
+    (repository / "link.bin").symlink_to(outside)
+
+    with pytest.raises(PatchHarborError) as captured:
+        _untracked_records(repository)
+
+    _assert_repository_capture_error(captured)
+
+
+def test_untracked_file_replacement_during_capture_is_rejected(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repository = create_repository(tmp_path / "repository")
+    target = repository / "new.bin"
+    target.write_bytes(b"first content")
+    real_open = os.open
+    replaced = False
+
+    def replacing_open(path: os.PathLike[str], flags: int, *args: int) -> int:
+        nonlocal replaced
+        if not replaced and os.fspath(path) == os.fspath(target):
+            replaced = True
+            target.replace(repository / "original.bin")
+            target.write_bytes(b"replacement")
+        return real_open(path, flags, *args)
+
+    monkeypatch.setattr(git_capture.os, "open", replacing_open)
+
+    with pytest.raises(PatchHarborError) as captured:
+        _untracked_records(repository)
+
+    assert replaced is True
+    _assert_repository_capture_error(captured)
+
+
+def test_untracked_record_rejects_a_size_content_mismatch() -> None:
+    with pytest.raises(ValueError):
+        UntrackedRecord(
+            path=b"new.bin",
+            mode=b"100644",
+            size=8,
+            content=b"payload",
+        )

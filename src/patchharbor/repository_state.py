@@ -14,10 +14,12 @@ from patchharbor.git_capture import (
 )
 from patchharbor.locks import registry_lock, repository_lock
 from patchharbor.models import (
+    GitObjectId,
     RegistrySnapshot,
     RepositoryContext,
     RepositoryId,
     RepositoryPath,
+    RepositoryState,
 )
 from patchharbor.registry import load_registry
 from patchharbor.repository import inspect_local_registration, inspect_repository
@@ -89,16 +91,27 @@ def require_clean_repository(path: Path) -> RepositoryPath:
     return repository
 
 
+def _capture_repository_state(
+    repository: RepositoryPath,
+    base_commit: GitObjectId,
+) -> RepositoryState:
+    """Capture all supported non-HEAD state in one immutable value."""
+    return RepositoryState(
+        staged=read_staged_records(repository, base_commit),
+        unstaged=read_unstaged_records(
+            repository,
+            base_commit.object_format,
+        ),
+        untracked=read_untracked_records(repository),
+    )
+
+
 def _capture_context(
     repository: RepositoryPath,
     repo_id: RepositoryId,
 ) -> RepositoryContext:
     base_commit = read_head_object_id(repository)
-    staged = read_staged_records(repository, base_commit)
-    unstaged = read_unstaged_records(
-        repository,
-        base_commit.object_format,
-    )
+    state = _capture_repository_state(repository, base_commit)
     encoded_staged = tuple(
         encode_staged_record(
             path=record.path,
@@ -107,7 +120,7 @@ def _capture_context(
             index_mode=record.index_mode,
             index_object=record.index_object,
         )
-        for record in staged
+        for record in state.staged
     )
     encoded_unstaged = tuple(
         encode_unstaged_record(
@@ -119,9 +132,8 @@ def _capture_context(
             worktree_mode=record.worktree_mode,
             worktree_content=record.worktree_content,
         )
-        for record in unstaged
+        for record in state.unstaged
     )
-    untracked = read_untracked_records(repository)
     encoded_untracked = tuple(
         encode_untracked_record(
             path=record.path,
@@ -129,13 +141,13 @@ def _capture_context(
             size=record.size,
             content=record.content,
         )
-        for record in untracked
+        for record in state.untracked
     )
     return RepositoryContext(
         repo_id=repo_id,
         repository_path=repository,
         base_commit=base_commit,
-        dirty=bool(staged or unstaged or untracked),
+        dirty=state.dirty,
         state_fingerprint=state_fingerprint_digest(
             staged_records=encoded_staged,
             unstaged_records=encoded_unstaged,

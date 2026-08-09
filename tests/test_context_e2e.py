@@ -316,3 +316,26 @@ def test_context_fingerprint_tracks_a_staged_binary_addition(
     assert staged["base_commit"] == clean["base_commit"]
     assert staged["dirty"] is True
     assert staged["state_fingerprint"] != clean["state_fingerprint"]
+
+
+def test_context_combines_staged_unstaged_and_untracked_state(
+    tmp_path: Path,
+) -> None:
+    repository = create_repository(tmp_path / "repository")
+    assert run_cli(repository, "register").returncode == 0
+
+    (repository / "staged.bin").write_bytes(b"staged\x00")
+    git(repository, "add", "staged.bin")
+    (repository / "tracked.txt").write_bytes(b"unstaged\r\n")
+    (repository / "untracked.bin").write_bytes(b"untracked\xff")
+
+    combined = _context_result(repository)
+    assert combined["dirty"] is True
+
+    git(repository, "reset", "--hard", "HEAD")
+    (repository / "staged.bin").unlink(missing_ok=True)
+    (repository / "untracked.bin").unlink()
+    clean = _context_result(repository)
+
+    assert combined["state_fingerprint"] != clean["state_fingerprint"]
+    assert clean["dirty"] is False

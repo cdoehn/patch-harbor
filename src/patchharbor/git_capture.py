@@ -421,6 +421,7 @@ def _core_file_mode(repository: RepositoryPath) -> bool:
 class _WorktreeSnapshot:
     kind: bytes
     mode: bytes
+    size: int
     content: bytes
 
 
@@ -451,12 +452,12 @@ def _inspect_worktree_path(target: os.PathLike[str]) -> os.stat_result | None:
     except FileNotFoundError:
         return None
     except OSError as exc:
-        raise _error("cannot inspect an unstaged working-tree path") from exc
+        raise _error("cannot inspect a working-tree path") from exc
 
 
 def _require_regular_file(metadata: os.stat_result) -> None:
     if not stat.S_ISREG(metadata.st_mode):
-        raise _error("unstaged working-tree entry is not a regular file")
+        raise _error("working-tree entry is not a regular file")
 
 
 def _read_regular_worktree_snapshot(
@@ -466,7 +467,7 @@ def _read_regular_worktree_snapshot(
 ) -> _WorktreeSnapshot:
     initial_metadata = _inspect_worktree_path(target)
     if initial_metadata is None:
-        raise _error("modified working-tree path disappeared")
+        raise _error("working-tree path disappeared while being read")
     _require_regular_file(initial_metadata)
 
     flags = os.O_RDONLY
@@ -496,7 +497,7 @@ def _read_regular_worktree_snapshot(
     except PatchHarborError:
         raise
     except OSError as exc:
-        raise _error("cannot read an unstaged working-tree file") from exc
+        raise _error("cannot read a working-tree file") from exc
     finally:
         if descriptor is not None:
             try:
@@ -521,6 +522,7 @@ def _read_regular_worktree_snapshot(
             finished_metadata,
             core_file_mode=core_file_mode,
         ),
+        size=finished_metadata.st_size,
         content=content,
     )
 
@@ -539,6 +541,7 @@ def _read_worktree_record(
         snapshot = _WorktreeSnapshot(
             kind=b"missing",
             mode=b"",
+            size=0,
             content=b"",
         )
     elif entry.status == b"M":
@@ -588,11 +591,38 @@ def read_unstaged_records(
     )
 
 
-def _parse_untracked_paths(raw: bytes) -> tuple[bytes, ...]:
-    paths = _nul_records(raw, "untracked paths")
-    if any(not path for path in paths) or len(set(paths)) != len(paths):
+@dataclass(frozen=True)
+class _UntrackedPath:
+    original_bytes: bytes
+    comparison_parts: tuple[str, ...]
+
+
+def _untracked_path(raw: bytes) -> _UntrackedPath:
+    try:
+        decoded = raw.decode("utf-8", errors="strict")
+    except UnicodeDecodeError as exc:
+        raise _error("git returned a non-UTF-8 untracked path") from exc
+
+    parts = tuple(decoded.split("/"))
+    if not parts or any(part in ("", ".", "..") for part in parts):
+        raise _error("git returned an invalid untracked path")
+    return _UntrackedPath(
+        original_bytes=raw,
+        comparison_parts=parts,
+    )
+
+
+def _parse_untracked_paths(raw: bytes) -> tuple[_UntrackedPath, ...]:
+    raw_paths = _nul_records(raw, "untracked paths")
+    if (
+        any(not path for path in raw_paths)
+        or len(set(raw_paths)) != len(raw_paths)
+    ):
         raise _error("git returned ambiguous untracked paths")
-    return tuple(sorted(paths))
+    return tuple(
+        _untracked_path(path)
+        for path in sorted(raw_paths)
+    )
 
 
 def read_untracked_records(
@@ -616,14 +646,14 @@ def read_untracked_records(
     records: list[UntrackedRecord] = []
     for path in paths:
         snapshot = _read_regular_worktree_snapshot(
-            repository.value / os.fsdecode(path),
+            repository.value.joinpath(*path.comparison_parts),
             core_file_mode=core_file_mode,
         )
         records.append(
             UntrackedRecord(
-                path=path,
+                path=path.original_bytes,
                 mode=snapshot.mode,
-                size=len(snapshot.content),
+                size=snapshot.size,
                 content=snapshot.content,
             )
         )
