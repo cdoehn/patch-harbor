@@ -7,7 +7,11 @@ import os
 import stat
 import subprocess
 
-from patchharbor.errors import PatchHarborError, repository_resolution_error
+from patchharbor.errors import (
+    PatchHarborError,
+    repository_resolution_error,
+    unsupported_repository_state_error,
+)
 from patchharbor.models import (
     GitObjectFormat,
     GitObjectId,
@@ -40,6 +44,10 @@ def _error(message: str) -> PatchHarborError:
     return repository_resolution_error(message)
 
 
+def _unsupported(message: str) -> PatchHarborError:
+    return unsupported_repository_state_error(message)
+
+
 def _controlled_git_environment() -> dict[str, str]:
     environment = os.environ.copy()
     for name in _REDIRECTING_GIT_ENVIRONMENT:
@@ -65,6 +73,7 @@ def run_git_bytes(
     repository: RepositoryPath,
     *arguments: str,
     input_bytes: bytes | None = None,
+    accepted_returncodes: tuple[int, ...] = (0,),
 ) -> bytes:
     """Run one non-interactive Git query and return stdout unchanged."""
     command = [
@@ -95,7 +104,7 @@ def run_git_bytes(
     except OSError as exc:
         raise _error(f"cannot start git: {exc}") from exc
 
-    if completed.returncode != 0:
+    if completed.returncode not in accepted_returncodes:
         detail = completed.stderr.decode("utf-8", errors="replace").strip()
         suffix = f": {detail}" if detail else ""
         raise _error(f"cannot capture repository context{suffix}")
@@ -162,7 +171,7 @@ def _validated_object_name(
 
 def _validated_file_mode(raw: bytes, description: str) -> bytes:
     if raw not in _SUPPORTED_FILE_MODES:
-        raise _error(f"git returned an unsupported {description} mode")
+        raise _unsupported(f"git returned an unsupported {description} mode")
     return raw
 
 
@@ -198,13 +207,16 @@ def _parse_base_tree(
             mode, object_type, object_name = metadata.split(b" ", 2)
         except ValueError as exc:
             raise _error("git returned malformed base tree data") from exc
+        validated_mode = _validated_file_mode(mode, "base tree")
         if object_type != b"blob":
-            raise _error("git returned an unsupported base tree object type")
+            raise _unsupported(
+                "git returned an unsupported base tree object type"
+            )
         previous_path = _next_sorted_path(previous_path, path, "base tree")
         entries.append(
             _BaseTreeEntry(
                 path=path,
-                mode=_validated_file_mode(mode, "base tree"),
+                mode=validated_mode,
                 object_name=_validated_object_name(
                     object_name,
                     object_format,
@@ -228,7 +240,7 @@ def _parse_index(
         except ValueError as exc:
             raise _error("git returned malformed index data") from exc
         if stage != b"0":
-            raise _error("git returned an unsupported index state")
+            raise _unsupported("git returned an unsupported index state")
         previous_path = _next_sorted_path(previous_path, path, "index")
         entries.append(
             _IndexEntry(
@@ -268,7 +280,7 @@ def _require_index_blobs(
         except ValueError as exc:
             raise _error("git returned malformed index object data") from exc
         if observed_name != expected_name or object_type != b"blob":
-            raise _error("git returned an unsupported index object type")
+            raise _unsupported("git returned an unsupported index object type")
 
 
 def _staged_record(
@@ -372,7 +384,7 @@ def _parse_unstaged_diff(
             raise _error("git returned malformed unstaged diff data") from exc
 
         if status_byte not in (b"M", b"D"):
-            raise _error("git returned an unsupported unstaged status")
+            raise _unsupported("git returned an unsupported unstaged status")
         _validated_file_mode(index_mode, "unstaged index")
         _validated_object_name(
             index_object,
@@ -400,7 +412,7 @@ def _parse_unstaged_diff(
     return tuple(sorted(entries, key=lambda entry: entry.path))
 
 
-def _core_file_mode(repository: RepositoryPath) -> bool:
+def _boolean_config(repository: RepositoryPath, name: str) -> bool:
     value = run_git_bytes(
         repository,
         "config",
@@ -408,13 +420,182 @@ def _core_file_mode(repository: RepositoryPath) -> bool:
         "--null",
         "--default=false",
         "--get",
-        "core.fileMode",
+        name,
     )
     if value == b"true\0":
         return True
     if value == b"false\0":
         return False
-    raise _error("git returned an invalid core.fileMode value")
+    raise _error(f"git returned an invalid {name} value")
+
+
+def _core_file_mode(repository: RepositoryPath) -> bool:
+    return _boolean_config(repository, "core.fileMode")
+
+
+def _require_supported_index_flags(repository: RepositoryPath) -> None:
+    raw = run_git_bytes(repository, "ls-files", "-v", "-z")
+    for record in _nul_records(raw, "index flags"):
+        if len(record) < 3 or record[1:2] != b" " or not record[2:]:
+            raise _error("git returned malformed index flag data")
+        tag = record[0]
+        if tag == ord("S"):
+            raise _unsupported("skip-worktree index entries are not supported")
+        if ord("a") <= tag <= ord("z"):
+            raise _unsupported(
+                "assume-unchanged index entries are not supported"
+            )
+
+
+def _ignored_directory_prefixes(
+    repository: RepositoryPath,
+) -> tuple[bytes, ...]:
+    records = _nul_records(
+        run_git_bytes(
+            repository,
+            "ls-files",
+            "--others",
+            "--ignored",
+            "--exclude-standard",
+            "--directory",
+            "-z",
+            "--",
+        ),
+        "ignored directories",
+    )
+    return tuple(record for record in records if record.endswith(b"/"))
+
+
+def _relative_path_bytes(
+    repository: RepositoryPath,
+    target: os.PathLike[str],
+) -> bytes:
+    try:
+        relative = os.path.relpath(target, repository.value)
+    except (OSError, ValueError) as exc:
+        raise _error("cannot inspect a working-tree path") from exc
+    return os.fsencode(relative.replace(os.sep, "/"))
+
+
+def _is_ignored_directory(
+    path: bytes,
+    ignored_prefixes: tuple[bytes, ...],
+) -> bool:
+    candidate = path + b"/"
+    return any(candidate.startswith(prefix) for prefix in ignored_prefixes)
+
+
+def _special_worktree_paths(
+    repository: RepositoryPath,
+) -> tuple[bytes, ...]:
+    ignored_prefixes = _ignored_directory_prefixes(repository)
+    special_paths: list[bytes] = []
+    root = repository.value
+
+    def fail_walk(exc: OSError) -> None:
+        raise _error("cannot inspect the working tree") from exc
+
+    for current, directories, files in os.walk(
+        root,
+        topdown=True,
+        onerror=fail_walk,
+        followlinks=False,
+    ):
+        current_path = os.fspath(current)
+        retained_directories: list[str] = []
+        for name in directories:
+            target = os.path.join(current_path, name)
+            relative = _relative_path_bytes(repository, target)
+            if (
+                current_path == os.fspath(root)
+                and name in (".git", ".patchharbor")
+            ):
+                continue
+            if _is_ignored_directory(relative, ignored_prefixes):
+                continue
+            try:
+                metadata = os.lstat(target)
+            except OSError as exc:
+                raise _error("cannot inspect a working-tree path") from exc
+            is_junction = bool(
+                getattr(os.path, "isjunction", lambda _path: False)(target)
+            )
+            if is_junction or not stat.S_ISDIR(metadata.st_mode):
+                if not stat.S_ISREG(metadata.st_mode):
+                    special_paths.append(relative)
+                continue
+            retained_directories.append(name)
+        directories[:] = retained_directories
+
+        for name in files:
+            if (
+                current_path == os.fspath(root)
+                and name in (".git", ".patchharbor")
+            ):
+                continue
+            target = os.path.join(current_path, name)
+            relative = _relative_path_bytes(repository, target)
+            try:
+                metadata = os.lstat(target)
+            except OSError as exc:
+                raise _error("cannot inspect a working-tree path") from exc
+            if not stat.S_ISREG(metadata.st_mode):
+                special_paths.append(relative)
+
+    return tuple(sorted(set(special_paths)))
+
+
+def _require_no_special_worktree_entries(repository: RepositoryPath) -> None:
+    special_paths = _special_worktree_paths(repository)
+    if not special_paths:
+        return
+    ignored = set(
+        _nul_records(
+            run_git_bytes(
+                repository,
+                "check-ignore",
+                "-z",
+                "--stdin",
+                input_bytes=b"".join(path + b"\0" for path in special_paths),
+                accepted_returncodes=(0, 1),
+            ),
+            "ignored special paths",
+        )
+    )
+    candidates = set(special_paths)
+    if not ignored.issubset(candidates):
+        raise _error("git returned unexpected ignored path data")
+    if candidates - ignored:
+        raise _unsupported("working tree contains a special file type")
+
+
+def require_supported_repository_state(
+    repository: RepositoryPath,
+    object_format: GitObjectFormat,
+) -> None:
+    """Reject Git states the safe repository path cannot describe."""
+    if run_git_bytes(repository, "ls-files", "--unmerged", "-z"):
+        raise _unsupported("unresolved merge stages are not supported")
+
+    _require_supported_index_flags(repository)
+    if _boolean_config(repository, "core.sparseCheckout"):
+        raise _unsupported("sparse checkout is not supported")
+    if _boolean_config(repository, "index.sparse"):
+        raise _unsupported("sparse index is not supported")
+
+    _require_no_special_worktree_entries(repository)
+    _parse_unstaged_diff(
+        run_git_bytes(
+            repository,
+            "diff-files",
+            "--raw",
+            "-z",
+            "--no-renames",
+            "--no-ext-diff",
+            "--",
+        ),
+        object_format,
+    )
 
 
 @dataclass(frozen=True)
@@ -455,7 +636,7 @@ def _inspect_worktree_path(target: os.PathLike[str]) -> os.stat_result | None:
 
 def _require_regular_file(metadata: os.stat_result) -> None:
     if not stat.S_ISREG(metadata.st_mode):
-        raise _error("working-tree entry is not a regular file")
+        raise _unsupported("working-tree entry is not a regular file")
 
 
 def _read_regular_file(
@@ -532,7 +713,10 @@ def _read_worktree_record(
     target = repository.value / os.fsdecode(entry.path)
 
     if entry.status == b"D":
-        if _inspect_worktree_path(target) is not None:
+        existing = _inspect_worktree_path(target)
+        if existing is not None:
+            if not stat.S_ISREG(existing.st_mode):
+                raise _unsupported("working-tree entry is not a regular file")
             raise _error("deleted working-tree path still exists")
         return UnstagedRecord(
             path=entry.path,

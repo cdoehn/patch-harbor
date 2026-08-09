@@ -10,6 +10,7 @@ from patchharbor.git_capture import (
     read_staged_records,
     read_unstaged_records,
     read_untracked_records,
+    require_supported_repository_state,
     run_git_bytes,
 )
 from patchharbor.locks import registry_lock, repository_lock
@@ -96,6 +97,10 @@ def _capture_repository_state(
     base_commit: GitObjectId,
 ) -> RepositoryState:
     """Capture all supported non-HEAD state in one immutable value."""
+    require_supported_repository_state(
+        repository,
+        base_commit.object_format,
+    )
     return RepositoryState(
         staged=read_staged_records(repository, base_commit),
         unstaged=read_unstaged_records(

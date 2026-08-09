@@ -264,25 +264,59 @@ def _records_from_raw_git_state(
 
 
 @pytest.mark.parametrize(
-    ("tree", "index"),
+    ("tree", "index", "expected_exit_code"),
     [
-        (b"100644 tree " + b"1" * 40 + b"\tentry\0", b""),
-        (b"120000 blob " + b"1" * 40 + b"\tentry\0", b""),
-        (b"100644 blob " + b"1" * 39 + b"\tentry\0", b""),
-        (b"100644 blob " + b"A" * 40 + b"\tentry\0", b""),
+        (
+            b"100644 tree " + b"1" * 40 + b"\tentry\0",
+            b"",
+            ExitCode.UNSUPPORTED_REPOSITORY_STATE,
+        ),
+        (
+            b"120000 blob " + b"1" * 40 + b"\tentry\0",
+            b"",
+            ExitCode.UNSUPPORTED_REPOSITORY_STATE,
+        ),
+        (
+            b"100644 blob " + b"1" * 39 + b"\tentry\0",
+            b"",
+            ExitCode.REPOSITORY_ERROR,
+        ),
+        (
+            b"100644 blob " + b"A" * 40 + b"\tentry\0",
+            b"",
+            ExitCode.REPOSITORY_ERROR,
+        ),
         (
             b"100644 blob " + b"1" * 40 + b"\tz\0"
             b"100644 blob " + b"2" * 40 + b"\ta\0",
             b"",
+            ExitCode.REPOSITORY_ERROR,
         ),
-        (b"", b"120000 " + b"1" * 40 + b" 0\tentry\0"),
-        (b"", b"100644 " + b"1" * 39 + b" 0\tentry\0"),
-        (b"", b"100644 " + b"A" * 40 + b" 0\tentry\0"),
-        (b"", b"100644 " + b"1" * 40 + b" 1\tentry\0"),
+        (
+            b"",
+            b"120000 " + b"1" * 40 + b" 0\tentry\0",
+            ExitCode.UNSUPPORTED_REPOSITORY_STATE,
+        ),
+        (
+            b"",
+            b"100644 " + b"1" * 39 + b" 0\tentry\0",
+            ExitCode.REPOSITORY_ERROR,
+        ),
+        (
+            b"",
+            b"100644 " + b"A" * 40 + b" 0\tentry\0",
+            ExitCode.REPOSITORY_ERROR,
+        ),
+        (
+            b"",
+            b"100644 " + b"1" * 40 + b" 1\tentry\0",
+            ExitCode.UNSUPPORTED_REPOSITORY_STATE,
+        ),
         (
             b"",
             b"100644 " + b"1" * 40 + b" 0\tz\0"
             b"100644 " + b"2" * 40 + b" 0\ta\0",
+            ExitCode.REPOSITORY_ERROR,
         ),
     ],
 )
@@ -291,6 +325,7 @@ def test_staged_capture_rejects_unsupported_raw_entries(
     monkeypatch: pytest.MonkeyPatch,
     tree: bytes,
     index: bytes,
+    expected_exit_code: ExitCode,
 ) -> None:
     with pytest.raises(PatchHarborError) as captured:
         _records_from_raw_git_state(
@@ -300,7 +335,7 @@ def test_staged_capture_rejects_unsupported_raw_entries(
             index=index,
         )
 
-    assert captured.value.exit_code == ExitCode.REPOSITORY_ERROR
+    assert captured.value.exit_code is expected_exit_code
 
 
 def test_index_rejects_a_non_blob_object_even_with_a_file_mode(
@@ -319,7 +354,10 @@ def test_index_rejects_a_non_blob_object_even_with_a_file_mode(
     with pytest.raises(PatchHarborError) as captured:
         _staged_records(repository)
 
-    assert captured.value.exit_code == ExitCode.REPOSITORY_ERROR
+    assert (
+        captured.value.exit_code
+        is ExitCode.UNSUPPORTED_REPOSITORY_STATE
+    )
 
 
 def _unstaged_records(repository: Path):
@@ -444,6 +482,19 @@ def _assert_repository_capture_error(
     assert captured.value.error_kind is ErrorKind.REPOSITORY_RESOLUTION_ERROR
 
 
+def _assert_unsupported_repository_state(
+    captured: pytest.ExceptionInfo[PatchHarborError],
+) -> None:
+    assert (
+        captured.value.exit_code
+        is ExitCode.UNSUPPORTED_REPOSITORY_STATE
+    )
+    assert (
+        captured.value.error_kind
+        is ErrorKind.UNSUPPORTED_REPOSITORY_STATE
+    )
+
+
 @pytest.mark.parametrize("status", [b"A", b"T", b"U"])
 def test_unstaged_capture_accepts_only_modified_and_deleted_statuses(
     tmp_path: Path,
@@ -474,7 +525,7 @@ def test_unstaged_capture_accepts_only_modified_and_deleted_statuses(
             GitObjectFormat.SHA1,
         )
 
-    _assert_repository_capture_error(captured)
+    _assert_unsupported_repository_state(captured)
 
 
 def test_malformed_unstaged_git_data_is_a_repository_error(
@@ -537,7 +588,7 @@ def test_unstaged_capture_never_follows_a_symbolic_link(
             GitObjectFormat.for_hex_length(len(object_name)),
         )
 
-    _assert_repository_capture_error(captured)
+    _assert_unsupported_repository_state(captured)
 
 
 def test_deleted_tracked_path_must_really_be_missing(tmp_path: Path) -> None:
@@ -549,7 +600,7 @@ def test_deleted_tracked_path_must_really_be_missing(tmp_path: Path) -> None:
     with pytest.raises(PatchHarborError) as captured:
         _unstaged_records(repository)
 
-    _assert_repository_capture_error(captured)
+    _assert_unsupported_repository_state(captured)
 
 
 def test_unstaged_read_failure_is_categorized(
@@ -701,7 +752,7 @@ def test_untracked_capture_never_follows_a_symbolic_link(tmp_path: Path) -> None
     with pytest.raises(PatchHarborError) as captured:
         _untracked_records(repository)
 
-    _assert_repository_capture_error(captured)
+    _assert_unsupported_repository_state(captured)
 
 
 def test_untracked_file_replacement_during_capture_is_rejected(

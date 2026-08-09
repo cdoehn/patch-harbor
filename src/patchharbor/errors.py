@@ -20,6 +20,7 @@ class ExitCode(IntEnum):
     EXECUTION_ERROR = 7
     REPOSITORY_ERROR = 8
     REPOSITORY_BUSY = 12
+    UNSUPPORTED_REPOSITORY_STATE = 13
     TIMEOUT = 124
     INTERRUPTED = 130
 
@@ -31,6 +32,7 @@ class ErrorKind(str, Enum):
     REGISTRY_ERROR = "registry_error"
     REPOSITORY_RESOLUTION_ERROR = "repository_resolution_error"
     REPOSITORY_BUSY = "repository_busy"
+    UNSUPPORTED_REPOSITORY_STATE = "unsupported_repository_state"
 
 
 class PatchHarborError(Exception):
@@ -72,6 +74,15 @@ def repository_busy_error(message: str = "repository is busy") -> PatchHarborErr
         message,
         ExitCode.REPOSITORY_BUSY,
         error_kind=ErrorKind.REPOSITORY_BUSY,
+    )
+
+
+def unsupported_repository_state_error(message: str) -> PatchHarborError:
+    """Create one failure for state the safe repository path cannot model."""
+    return PatchHarborError(
+        message,
+        ExitCode.UNSUPPORTED_REPOSITORY_STATE,
+        error_kind=ErrorKind.UNSUPPORTED_REPOSITORY_STATE,
     )
 
 
