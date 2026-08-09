@@ -1,6 +1,7 @@
 from patchharbor.state_fingerprint import (
     encode_staged_record,
     encode_unstaged_record,
+    encode_untracked_record,
     state_fingerprint_digest,
 )
 
@@ -52,4 +53,17 @@ def test_unstaged_modification_matches_the_normative_reference_vector() -> None:
 
     assert state_fingerprint_digest(unstaged_records=(unstaged,)) == (
         "fa106451ef080706f5f24269d0dc2192bd50ef6f5ac69215485771137a8d3010"
+    )
+
+
+def test_untracked_file_matches_the_normative_reference_vector() -> None:
+    untracked = encode_untracked_record(
+        path=b"note.txt",
+        mode=b"100644",
+        size=6,
+        content=b"hello\n",
+    )
+
+    assert state_fingerprint_digest(untracked_records=(untracked,)) == (
+        "05fe268b93ee2ea113d23b0dfc1becd7bfe881f8992e91b7e2ea8bdea2745310"
     )

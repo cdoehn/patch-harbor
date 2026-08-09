@@ -615,3 +615,57 @@ def test_unstaged_file_replacement_during_capture_is_rejected(
 
     assert replaced is True
     _assert_repository_capture_error(captured)
+
+
+def _untracked_records(repository: Path):
+    return git_capture.read_untracked_records(
+        RepositoryPath(repository.resolve())
+    )
+
+
+def test_untracked_capture_preserves_sorted_binary_and_empty_files(
+    tmp_path: Path,
+) -> None:
+    repository = create_repository(tmp_path / "repository")
+    (repository / ".gitignore").write_text("ignored.bin\n", encoding="utf-8")
+    git(repository, "add", ".gitignore")
+    git(repository, "commit", "--quiet", "-m", "ignore fixture")
+    (repository / "z-empty.bin").write_bytes(b"")
+    (repository / "a-binary.bin").write_bytes(
+        b"binary\x00payload\xff\r\n"
+    )
+    (repository / "ignored.bin").write_bytes(b"not part of the state")
+
+    records = _untracked_records(repository)
+
+    assert tuple(record.path for record in records) == (
+        b"a-binary.bin",
+        b"z-empty.bin",
+    )
+    binary, empty = records
+    assert binary.mode == b"100644"
+    assert binary.size == len(binary.content)
+    assert binary.content == b"binary\x00payload\xff\r\n"
+    assert empty.mode == b"100644"
+    assert empty.size == 0
+    assert empty.content == b""
+
+
+@pytest.mark.skipif(
+    os.name == "nt",
+    reason="executable mode is not a portable Windows working-tree behavior",
+)
+def test_untracked_capture_respects_an_executable_mode(tmp_path: Path) -> None:
+    repository = create_repository(tmp_path / "repository")
+    git(repository, "config", "core.fileMode", "true")
+    script = repository / "run.sh"
+    script.write_bytes(b"#!/bin/sh\n")
+    script.chmod(script.stat().st_mode | 0o111)
+
+    records = _untracked_records(repository)
+
+    assert len(records) == 1
+    assert records[0].path == b"run.sh"
+    assert records[0].mode == b"100755"
+    assert records[0].size == len(b"#!/bin/sh\n")
+    assert records[0].content == b"#!/bin/sh\n"

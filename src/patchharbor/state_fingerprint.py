@@ -23,6 +23,12 @@ _UNSTAGED_FIELD_NAMES = (
     b"unstaged-worktree-mode",
     b"unstaged-worktree-content",
 )
+_UNTRACKED_FIELD_NAMES = (
+    b"untracked-path",
+    b"untracked-mode",
+    b"untracked-size",
+    b"untracked-content",
+)
 
 
 def _framed_field(name: bytes, payload: bytes) -> bytes:
@@ -68,6 +74,21 @@ def encode_unstaged_record(
     return b"".join(
         _framed_field(name, payload)
         for name, payload in zip(_UNSTAGED_FIELD_NAMES, payloads, strict=True)
+    )
+
+
+def encode_untracked_record(
+    *,
+    path: bytes,
+    mode: bytes,
+    size: int,
+    content: bytes,
+) -> bytes:
+    """Encode one untracked record using the normative field order."""
+    payloads = (path, mode, size.to_bytes(8, "big"), content)
+    return b"".join(
+        _framed_field(name, payload)
+        for name, payload in zip(_UNTRACKED_FIELD_NAMES, payloads, strict=True)
     )
 
 

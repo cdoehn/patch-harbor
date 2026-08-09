@@ -106,20 +106,32 @@ def test_context_rejects_an_unregistered_repository(tmp_path: Path) -> None:
     assert document["error"]["patchharbor_error_code"] == 8
 
 
-def test_context_still_fails_closed_for_an_untracked_state(
+def test_context_matches_the_normative_untracked_reference_vector(
     tmp_path: Path,
 ) -> None:
     repository = create_repository(tmp_path / "repository")
     assert run_cli(repository, "register").returncode == 0
-    (repository / "untracked.txt").write_text("new\n", encoding="utf-8")
+    (repository / "note.txt").write_bytes(b"hello\n")
 
-    completed = run_cli(repository, "context", "--json")
+    result = _context_result(repository)
 
-    assert completed.returncode == 8
-    document = json.loads(completed.stdout)
-    assert document["success"] is False
-    assert document["result"] is None
-    assert document["process_exit_code"] == 8
+    assert result["dirty"] is True
+    assert result["state_fingerprint"] == "05fe268b93ee2ea1"
+
+
+def test_context_excludes_ignored_untracked_files(tmp_path: Path) -> None:
+    repository = create_repository(tmp_path / "repository")
+    (repository / ".gitignore").write_text("ignored.bin\n", encoding="utf-8")
+    git(repository, "add", ".gitignore")
+    git(repository, "commit", "--quiet", "-m", "ignore fixture")
+    assert run_cli(repository, "register").returncode == 0
+    clean = _context_result(repository)
+    (repository / "ignored.bin").write_bytes(b"ignored\x00payload")
+
+    ignored = _context_result(repository)
+
+    assert ignored["dirty"] is False
+    assert ignored["state_fingerprint"] == clean["state_fingerprint"]
 
 
 def test_register_rejects_a_dirty_state_before_creating_identity(
@@ -183,6 +195,25 @@ def test_clean_fingerprint_is_independent_of_the_base_commit(
     assert before["state_fingerprint"] == after["state_fingerprint"]
     assert before["dirty"] is False
     assert after["dirty"] is False
+
+
+def test_untracked_fingerprint_is_independent_of_the_base_commit(
+    tmp_path: Path,
+) -> None:
+    repository = create_repository(tmp_path / "repository")
+    assert run_cli(repository, "register").returncode == 0
+    (repository / "note.txt").write_bytes(b"hello\n")
+    before = _context_result(repository)
+
+    (repository / "tracked.txt").write_text("next base\n", encoding="utf-8")
+    git(repository, "add", "tracked.txt")
+    git(repository, "commit", "--quiet", "-m", "next base")
+    after = _context_result(repository)
+
+    assert before["base_commit"] != after["base_commit"]
+    assert before["state_fingerprint"] == after["state_fingerprint"]
+    assert before["dirty"] is True
+    assert after["dirty"] is True
 
 
 def test_context_preserves_a_full_sha256_base_commit(tmp_path: Path) -> None:

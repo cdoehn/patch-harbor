@@ -147,6 +147,16 @@ class UnstagedRecord:
 
 
 @dataclass(frozen=True)
+class UntrackedRecord:
+    """One canonical non-ignored file outside the Git index."""
+
+    path: bytes
+    mode: bytes
+    size: int
+    content: bytes
+
+
+@dataclass(frozen=True)
 class RepositoryContext:
     """One reproducible state description of a registered repository."""
 

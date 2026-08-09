@@ -9,6 +9,7 @@ from patchharbor.git_capture import (
     read_head_object_id,
     read_staged_records,
     read_unstaged_records,
+    read_untracked_records,
     run_git_bytes,
 )
 from patchharbor.locks import registry_lock, repository_lock
@@ -24,6 +25,7 @@ from patchharbor.state_fingerprint import (
     FINGERPRINT_ALGORITHM,
     encode_staged_record,
     encode_unstaged_record,
+    encode_untracked_record,
     state_fingerprint_digest,
 )
 from patchharbor.user_paths import RegistrationUserPaths, registration_user_paths
@@ -31,19 +33,6 @@ from patchharbor.user_paths import RegistrationUserPaths, registration_user_path
 
 def _error(message: str) -> PatchHarborError:
     return repository_resolution_error(message)
-
-
-def _require_no_untracked(repository: RepositoryPath) -> None:
-    untracked = run_git_bytes(
-        repository,
-        "ls-files",
-        "--others",
-        "--exclude-standard",
-        "-z",
-        "--",
-    )
-    if untracked:
-        raise _error("repository contains unsupported untracked files")
 
 
 def _require_clean_for_registration(repository: RepositoryPath) -> None:
@@ -104,7 +93,6 @@ def _capture_context(
     repository: RepositoryPath,
     repo_id: RepositoryId,
 ) -> RepositoryContext:
-    _require_no_untracked(repository)
     base_commit = read_head_object_id(repository)
     staged = read_staged_records(repository, base_commit)
     unstaged = read_unstaged_records(
@@ -133,14 +121,25 @@ def _capture_context(
         )
         for record in unstaged
     )
+    untracked = read_untracked_records(repository)
+    encoded_untracked = tuple(
+        encode_untracked_record(
+            path=record.path,
+            mode=record.mode,
+            size=record.size,
+            content=record.content,
+        )
+        for record in untracked
+    )
     return RepositoryContext(
         repo_id=repo_id,
         repository_path=repository,
         base_commit=base_commit,
-        dirty=bool(staged or unstaged),
+        dirty=bool(staged or unstaged or untracked),
         state_fingerprint=state_fingerprint_digest(
             staged_records=encoded_staged,
             unstaged_records=encoded_unstaged,
+            untracked_records=encoded_untracked,
         )[:16],
         fingerprint_algorithm=FINGERPRINT_ALGORITHM,
     )

@@ -14,6 +14,7 @@ from patchharbor.models import (
     RepositoryPath,
     StagedRecord,
     UnstagedRecord,
+    UntrackedRecord,
 )
 
 
@@ -585,3 +586,45 @@ def read_unstaged_records(
         )
         for entry in entries
     )
+
+
+def _parse_untracked_paths(raw: bytes) -> tuple[bytes, ...]:
+    paths = _nul_records(raw, "untracked paths")
+    if any(not path for path in paths) or len(set(paths)) != len(paths):
+        raise _error("git returned ambiguous untracked paths")
+    return tuple(sorted(paths))
+
+
+def read_untracked_records(
+    repository: RepositoryPath,
+) -> tuple[UntrackedRecord, ...]:
+    """Return canonical non-ignored untracked files in byte order."""
+    paths = _parse_untracked_paths(
+        run_git_bytes(
+            repository,
+            "ls-files",
+            "--others",
+            "--exclude-standard",
+            "-z",
+            "--",
+        )
+    )
+    if not paths:
+        return ()
+
+    core_file_mode = _core_file_mode(repository)
+    records: list[UntrackedRecord] = []
+    for path in paths:
+        snapshot = _read_regular_worktree_snapshot(
+            repository.value / os.fsdecode(path),
+            core_file_mode=core_file_mode,
+        )
+        records.append(
+            UntrackedRecord(
+                path=path,
+                mode=snapshot.mode,
+                size=len(snapshot.content),
+                content=snapshot.content,
+            )
+        )
+    return tuple(records)
