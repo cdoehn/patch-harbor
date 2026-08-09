@@ -429,6 +429,7 @@ def _raw_unstaged_outputs(repository: Path) -> tuple[bytes, bytes]:
             resolved,
             "config",
             "--bool",
+            "--null",
             "--default=false",
             "--get",
             "core.fileMode",
@@ -523,7 +524,7 @@ def test_unstaged_capture_never_follows_a_symbolic_link(
             b" M\0tracked.txt\0",
         )
     )
-    outputs = iter((raw, b"false\n"))
+    outputs = iter((raw, b"false\0"))
     monkeypatch.setattr(
         git_capture,
         "run_git_bytes",

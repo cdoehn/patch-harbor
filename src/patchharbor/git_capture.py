@@ -127,7 +127,10 @@ def _nul_records(raw: bytes, description: str) -> tuple[bytes, ...]:
     return tuple(raw[:-1].split(b"\0"))
 
 
-_SUPPORTED_FILE_MODES = frozenset((b"100644", b"100755"))
+_REGULAR_FILE_MODE = b"100644"
+_EXECUTABLE_FILE_MODE = b"100755"
+_MISSING_FILE_MODE = b"000000"
+_SUPPORTED_FILE_MODES = frozenset((_REGULAR_FILE_MODE, _EXECUTABLE_FILE_MODE))
 
 
 @dataclass(frozen=True)
@@ -149,18 +152,27 @@ def _validated_object_name(
     object_format: GitObjectFormat,
     description: str,
 ) -> bytes:
-    try:
-        value = raw.decode("ascii", errors="strict")
-        GitObjectId(value=value, object_format=object_format)
-    except (UnicodeDecodeError, ValueError) as exc:
-        raise _error(f"git returned an invalid {description} object name") from exc
+    if len(raw) != object_format.object_id_hex_length or any(
+        byte not in b"0123456789abcdef" for byte in raw
+    ):
+        raise _error(f"git returned an invalid {description} object name")
     return raw
 
 
-def _validated_mode(raw: bytes, description: str) -> bytes:
+def _validated_file_mode(raw: bytes, description: str) -> bytes:
     if raw not in _SUPPORTED_FILE_MODES:
         raise _error(f"git returned an unsupported {description} mode")
     return raw
+
+
+def _canonical_regular_file_mode(
+    metadata: os.stat_result,
+    *,
+    core_file_mode: bool,
+) -> bytes:
+    if core_file_mode and metadata.st_mode & 0o111:
+        return _EXECUTABLE_FILE_MODE
+    return _REGULAR_FILE_MODE
 
 
 def _next_sorted_path(
@@ -191,7 +203,7 @@ def _parse_base_tree(
         entries.append(
             _BaseTreeEntry(
                 path=path,
-                mode=_validated_mode(mode, "base tree"),
+                mode=_validated_file_mode(mode, "base tree"),
                 object_name=_validated_object_name(
                     object_name,
                     object_format,
@@ -220,7 +232,7 @@ def _parse_index(
         entries.append(
             _IndexEntry(
                 path=path,
-                mode=_validated_mode(mode, "index"),
+                mode=_validated_file_mode(mode, "index"),
                 object_name=_validated_object_name(
                     object_name,
                     object_format,
@@ -360,7 +372,7 @@ def _parse_unstaged_diff(
 
         if status_byte not in (b"M", b"D"):
             raise _error("git returned an unsupported unstaged status")
-        _validated_mode(index_mode, "unstaged index")
+        _validated_file_mode(index_mode, "unstaged index")
         _validated_object_name(
             index_object,
             object_format,
@@ -370,10 +382,10 @@ def _parse_unstaged_diff(
         if worktree_object != zero_object:
             raise _error("git returned an invalid unstaged worktree object")
         if status_byte == b"D":
-            if reported_worktree_mode != b"000000":
+            if reported_worktree_mode != _MISSING_FILE_MODE:
                 raise _error("git returned an invalid deleted worktree mode")
-        elif reported_worktree_mode not in _SUPPORTED_FILE_MODES:
-            raise _error("git returned an unsupported worktree mode")
+        else:
+            _validated_file_mode(reported_worktree_mode, "worktree")
 
         entries.append(
             _UnstagedEntry(
@@ -388,18 +400,18 @@ def _parse_unstaged_diff(
 
 
 def _core_file_mode(repository: RepositoryPath) -> bool:
-    raw = run_git_bytes(
+    value = run_git_bytes(
         repository,
         "config",
         "--bool",
+        "--null",
         "--default=false",
         "--get",
         "core.fileMode",
     )
-    value = raw.strip()
-    if value == b"true":
+    if value == b"true\0":
         return True
-    if value == b"false":
+    if value == b"false\0":
         return False
     raise _error("git returned an invalid core.fileMode value")
 
@@ -444,16 +456,6 @@ def _inspect_worktree_path(target: os.PathLike[str]) -> os.stat_result | None:
 def _require_regular_file(metadata: os.stat_result) -> None:
     if not stat.S_ISREG(metadata.st_mode):
         raise _error("unstaged working-tree entry is not a regular file")
-
-
-def _canonical_worktree_mode(
-    metadata: os.stat_result,
-    *,
-    core_file_mode: bool,
-) -> bytes:
-    if core_file_mode and metadata.st_mode & 0o111:
-        return b"100755"
-    return b"100644"
 
 
 def _read_regular_worktree_snapshot(
@@ -514,7 +516,7 @@ def _read_regular_worktree_snapshot(
 
     return _WorktreeSnapshot(
         kind=b"regular",
-        mode=_canonical_worktree_mode(
+        mode=_canonical_regular_file_mode(
             finished_metadata,
             core_file_mode=core_file_mode,
         ),

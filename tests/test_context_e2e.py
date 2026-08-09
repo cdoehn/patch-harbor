@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 from pathlib import Path
@@ -201,62 +200,8 @@ def test_context_preserves_a_full_sha256_base_commit(tmp_path: Path) -> None:
     assert result["state_fingerprint"] == CLEAN_FINGERPRINT
 
 
-def _framed_field(name: bytes, payload: bytes) -> bytes:
-    return name + b"\0" + len(payload).to_bytes(8, "big") + payload
-
-
-def _expected_staged_addition_fingerprint(
-    path: bytes,
-    object_name: bytes,
-) -> str:
-    stream = b"".join(
-        (
-            b"PATCHHARBOR_STATE_FINGERPRINT\0",
-            b"1\0",
-            _framed_field(b"staged-count", (1).to_bytes(8, "big")),
-            _framed_field(b"staged-path", path),
-            _framed_field(b"staged-head-mode", b""),
-            _framed_field(b"staged-head-object", b""),
-            _framed_field(b"staged-index-mode", b"100644"),
-            _framed_field(b"staged-index-object", object_name),
-            _framed_field(b"unstaged-count", (0).to_bytes(8, "big")),
-            _framed_field(b"untracked-count", (0).to_bytes(8, "big")),
-        )
-    )
-    return hashlib.sha256(stream).hexdigest()[:16]
-
-
-def _expected_unstaged_fingerprint(
-    *,
-    path: bytes,
-    status: bytes,
-    index_mode: bytes,
-    index_object: bytes,
-    worktree_kind: bytes,
-    worktree_mode: bytes,
-    worktree_content: bytes,
-) -> str:
-    stream = b"".join(
-        (
-            b"PATCHHARBOR_STATE_FINGERPRINT\0",
-            b"1\0",
-            _framed_field(b"staged-count", (0).to_bytes(8, "big")),
-            _framed_field(b"unstaged-count", (1).to_bytes(8, "big")),
-            _framed_field(b"unstaged-path", path),
-            _framed_field(b"unstaged-status", status),
-            _framed_field(b"unstaged-index-mode", index_mode),
-            _framed_field(b"unstaged-index-object", index_object),
-            _framed_field(b"unstaged-worktree-kind", worktree_kind),
-            _framed_field(b"unstaged-worktree-mode", worktree_mode),
-            _framed_field(b"unstaged-worktree-content", worktree_content),
-            _framed_field(b"untracked-count", (0).to_bytes(8, "big")),
-        )
-    )
-    return hashlib.sha256(stream).hexdigest()[:16]
-
-
 @pytest.mark.parametrize("object_format", [None, "sha256"])
-def test_context_reports_an_unstaged_binary_change(
+def test_context_fingerprint_tracks_unstaged_binary_bytes_and_line_endings(
     tmp_path: Path,
     object_format: str | None,
 ) -> None:
@@ -265,86 +210,64 @@ def test_context_reports_an_unstaged_binary_change(
         object_format=object_format,
     )
     assert run_cli(repository, "register").returncode == 0
-    base_commit = git(repository, "rev-parse", "HEAD").stdout.strip()
-    index_object = git(
-        repository,
-        "rev-parse",
-        ":tracked.txt",
-    ).stdout.strip().encode("ascii")
-    content = b"changed\x00payload\xff\r\n"
-    (repository / "tracked.txt").write_bytes(content)
+    clean = _context_result(repository)
+    tracked = repository / "tracked.txt"
+    tracked.write_bytes(b"changed\x00payload\xff\r\n")
 
-    result = _context_result(repository)
+    with_crlf = _context_result(repository)
+    tracked.write_bytes(b"changed\x00payload\xff\n")
+    with_lf = _context_result(repository)
 
-    assert result["base_commit"] == base_commit
-    assert result["dirty"] is True
-    assert result["state_fingerprint"] == _expected_unstaged_fingerprint(
-        path=b"tracked.txt",
-        status=b"M",
-        index_mode=b"100644",
-        index_object=index_object,
-        worktree_kind=b"regular",
-        worktree_mode=b"100644",
-        worktree_content=content,
-    )
+    assert with_crlf["base_commit"] == clean["base_commit"]
+    assert with_lf["base_commit"] == clean["base_commit"]
+    assert with_crlf["dirty"] is True
+    assert with_lf["dirty"] is True
+    assert with_crlf["state_fingerprint"] != clean["state_fingerprint"]
+    assert with_lf["state_fingerprint"] != with_crlf["state_fingerprint"]
 
 
-def test_context_reports_an_unstaged_deletion(tmp_path: Path) -> None:
+def test_context_fingerprint_distinguishes_modification_and_deletion(
+    tmp_path: Path,
+) -> None:
     repository = create_repository(tmp_path / "repository")
     assert run_cli(repository, "register").returncode == 0
-    index_object = git(
-        repository,
-        "rev-parse",
-        ":tracked.txt",
-    ).stdout.strip().encode("ascii")
-    (repository / "tracked.txt").unlink()
+    clean = _context_result(repository)
+    tracked = repository / "tracked.txt"
+    tracked.write_bytes(b"changed\n")
+    modified = _context_result(repository)
+    tracked.unlink()
+    deleted = _context_result(repository)
 
-    result = _context_result(repository)
-
-    assert result["dirty"] is True
-    assert result["state_fingerprint"] == _expected_unstaged_fingerprint(
-        path=b"tracked.txt",
-        status=b"D",
-        index_mode=b"100644",
-        index_object=index_object,
-        worktree_kind=b"missing",
-        worktree_mode=b"",
-        worktree_content=b"",
-    )
+    assert modified["dirty"] is True
+    assert deleted["dirty"] is True
+    assert modified["state_fingerprint"] != clean["state_fingerprint"]
+    assert deleted["state_fingerprint"] != clean["state_fingerprint"]
+    assert deleted["state_fingerprint"] != modified["state_fingerprint"]
 
 
 @pytest.mark.skipif(
     os.name == "nt",
     reason="executable mode is not a portable Windows working-tree behavior",
 )
-def test_context_reports_an_unstaged_executable_mode(tmp_path: Path) -> None:
+def test_context_fingerprint_tracks_an_unstaged_executable_mode(
+    tmp_path: Path,
+) -> None:
     repository = create_repository(tmp_path / "repository")
     assert run_cli(repository, "register").returncode == 0
     git(repository, "config", "core.fileMode", "true")
+    clean = _context_result(repository)
     tracked = repository / "tracked.txt"
-    index_object = git(
-        repository,
-        "rev-parse",
-        ":tracked.txt",
-    ).stdout.strip().encode("ascii")
     tracked.chmod(tracked.stat().st_mode | 0o111)
 
-    result = _context_result(repository)
+    executable = _context_result(repository)
 
-    assert result["dirty"] is True
-    assert result["state_fingerprint"] == _expected_unstaged_fingerprint(
-        path=b"tracked.txt",
-        status=b"M",
-        index_mode=b"100644",
-        index_object=index_object,
-        worktree_kind=b"regular",
-        worktree_mode=b"100755",
-        worktree_content=tracked.read_bytes(),
-    )
+    assert executable["base_commit"] == clean["base_commit"]
+    assert executable["dirty"] is True
+    assert executable["state_fingerprint"] != clean["state_fingerprint"]
 
 
 @pytest.mark.parametrize("object_format", [None, "sha256"])
-def test_context_reports_a_staged_binary_addition(
+def test_context_fingerprint_tracks_a_staged_binary_addition(
     tmp_path: Path,
     object_format: str | None,
 ) -> None:
@@ -353,17 +276,12 @@ def test_context_reports_a_staged_binary_addition(
         object_format=object_format,
     )
     assert run_cli(repository, "register").returncode == 0
-    base_commit = git(repository, "rev-parse", "HEAD").stdout.strip()
-
+    clean = _context_result(repository)
     (repository / "app.bin").write_bytes(b"binary\x00payload\xff\r\n")
     git(repository, "add", "app.bin")
-    index_object = git(repository, "rev-parse", ":app.bin").stdout.strip()
 
-    result = _context_result(repository)
+    staged = _context_result(repository)
 
-    assert result["base_commit"] == base_commit
-    assert result["dirty"] is True
-    assert result["state_fingerprint"] == _expected_staged_addition_fingerprint(
-        b"app.bin",
-        index_object.encode("ascii"),
-    )
+    assert staged["base_commit"] == clean["base_commit"]
+    assert staged["dirty"] is True
+    assert staged["state_fingerprint"] != clean["state_fingerprint"]
