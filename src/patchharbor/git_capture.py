@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import os
+import stat
 import subprocess
 
 from patchharbor.errors import PatchHarborError, repository_resolution_error
@@ -12,6 +13,7 @@ from patchharbor.models import (
     GitObjectId,
     RepositoryPath,
     StagedRecord,
+    UnstagedRecord,
 )
 
 
@@ -320,3 +322,153 @@ def read_staged_records(
     )
     _require_index_blobs(repository, index_entries)
     return _compare_staged_entries(base_entries, index_entries)
+
+
+@dataclass(frozen=True)
+class _UnstagedEntry:
+    path: bytes
+    status: bytes
+    index_mode: bytes
+    index_object: bytes
+
+
+def _parse_unstaged_diff(
+    raw: bytes,
+    object_format: GitObjectFormat,
+) -> tuple[_UnstagedEntry, ...]:
+    parts = _nul_records(raw, "unstaged diff")
+    if len(parts) % 2:
+        raise _error("git returned malformed unstaged diff data")
+
+    entries: list[_UnstagedEntry] = []
+    seen_paths: set[bytes] = set()
+    iterator = iter(parts)
+    for metadata, path in zip(iterator, iterator, strict=True):
+        if not metadata.startswith(b":") or not path or path in seen_paths:
+            raise _error("git returned malformed unstaged diff data")
+        seen_paths.add(path)
+        try:
+            (
+                index_mode,
+                reported_worktree_mode,
+                index_object,
+                worktree_object,
+                status_byte,
+            ) = metadata[1:].split(b" ")
+        except ValueError as exc:
+            raise _error("git returned malformed unstaged diff data") from exc
+
+        if status_byte not in (b"M", b"D"):
+            raise _error("git returned an unsupported unstaged status")
+        _validated_mode(index_mode, "unstaged index")
+        _validated_object_name(
+            index_object,
+            object_format,
+            "unstaged index",
+        )
+        zero_object = b"0" * object_format.object_id_hex_length
+        if worktree_object != zero_object:
+            raise _error("git returned an invalid unstaged worktree object")
+        if status_byte == b"D":
+            if reported_worktree_mode != b"000000":
+                raise _error("git returned an invalid deleted worktree mode")
+        elif reported_worktree_mode not in _SUPPORTED_FILE_MODES:
+            raise _error("git returned an unsupported worktree mode")
+
+        entries.append(
+            _UnstagedEntry(
+                path=path,
+                status=status_byte,
+                index_mode=index_mode,
+                index_object=index_object,
+            )
+        )
+
+    return tuple(sorted(entries, key=lambda entry: entry.path))
+
+
+def _core_file_mode(repository: RepositoryPath) -> bool:
+    raw = run_git_bytes(
+        repository,
+        "config",
+        "--bool",
+        "--default=false",
+        "--get",
+        "core.fileMode",
+    )
+    value = raw.strip()
+    if value == b"true":
+        return True
+    if value == b"false":
+        return False
+    raise _error("git returned an invalid core.fileMode value")
+
+
+def _read_worktree_record(
+    repository: RepositoryPath,
+    entry: _UnstagedEntry,
+    *,
+    core_file_mode: bool,
+) -> UnstagedRecord:
+    if entry.status == b"D":
+        return UnstagedRecord(
+            path=entry.path,
+            status=entry.status,
+            index_mode=entry.index_mode,
+            index_object=entry.index_object,
+            worktree_kind=b"missing",
+            worktree_mode=b"",
+            worktree_content=b"",
+        )
+
+    target = repository.value / os.fsdecode(entry.path)
+    try:
+        metadata = target.stat()
+        content = target.read_bytes()
+    except OSError as exc:
+        raise _error("cannot read an unstaged working-tree file") from exc
+    if not stat.S_ISREG(metadata.st_mode):
+        raise _error("unstaged working-tree entry is not a regular file")
+
+    worktree_mode = (
+        b"100755"
+        if core_file_mode and metadata.st_mode & 0o111
+        else b"100644"
+    )
+    return UnstagedRecord(
+        path=entry.path,
+        status=entry.status,
+        index_mode=entry.index_mode,
+        index_object=entry.index_object,
+        worktree_kind=b"regular",
+        worktree_mode=worktree_mode,
+        worktree_content=content,
+    )
+
+
+def read_unstaged_records(
+    repository: RepositoryPath,
+    object_format: GitObjectFormat,
+) -> tuple[UnstagedRecord, ...]:
+    """Return canonical index versus working-tree differences."""
+    entries = _parse_unstaged_diff(
+        run_git_bytes(
+            repository,
+            "diff-files",
+            "--raw",
+            "-z",
+            "--no-renames",
+            "--no-ext-diff",
+            "--",
+        ),
+        object_format,
+    )
+    core_file_mode = _core_file_mode(repository)
+    return tuple(
+        _read_worktree_record(
+            repository,
+            entry,
+            core_file_mode=core_file_mode,
+        )
+        for entry in entries
+    )

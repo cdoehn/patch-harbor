@@ -8,6 +8,7 @@ from patchharbor.errors import PatchHarborError, repository_resolution_error
 from patchharbor.git_capture import (
     read_head_object_id,
     read_staged_records,
+    read_unstaged_records,
     run_git_bytes,
 )
 from patchharbor.locks import registry_lock, repository_lock
@@ -22,6 +23,7 @@ from patchharbor.repository import inspect_local_registration, inspect_repositor
 from patchharbor.state_fingerprint import (
     FINGERPRINT_ALGORITHM,
     encode_staged_record,
+    encode_unstaged_record,
     state_fingerprint_digest,
 )
 from patchharbor.user_paths import RegistrationUserPaths, registration_user_paths
@@ -31,16 +33,7 @@ def _error(message: str) -> PatchHarborError:
     return repository_resolution_error(message)
 
 
-def _require_no_unstaged_or_untracked(repository: RepositoryPath) -> None:
-    unstaged = run_git_bytes(
-        repository,
-        "diff-files",
-        "--raw",
-        "-z",
-        "--no-renames",
-        "--no-ext-diff",
-        "--",
-    )
+def _require_no_untracked(repository: RepositoryPath) -> None:
     untracked = run_git_bytes(
         repository,
         "ls-files",
@@ -49,8 +42,8 @@ def _require_no_unstaged_or_untracked(repository: RepositoryPath) -> None:
         "-z",
         "--",
     )
-    if unstaged or untracked:
-        raise _error("repository contains unsupported non-index changes")
+    if untracked:
+        raise _error("repository contains unsupported untracked files")
 
 
 def _require_clean_for_registration(repository: RepositoryPath) -> None:
@@ -111,9 +104,13 @@ def _capture_context(
     repository: RepositoryPath,
     repo_id: RepositoryId,
 ) -> RepositoryContext:
-    _require_no_unstaged_or_untracked(repository)
+    _require_no_untracked(repository)
     base_commit = read_head_object_id(repository)
     staged = read_staged_records(repository, base_commit)
+    unstaged = read_unstaged_records(
+        repository,
+        base_commit.object_format,
+    )
     encoded_staged = tuple(
         encode_staged_record(
             path=record.path,
@@ -124,13 +121,26 @@ def _capture_context(
         )
         for record in staged
     )
+    encoded_unstaged = tuple(
+        encode_unstaged_record(
+            path=record.path,
+            status=record.status,
+            index_mode=record.index_mode,
+            index_object=record.index_object,
+            worktree_kind=record.worktree_kind,
+            worktree_mode=record.worktree_mode,
+            worktree_content=record.worktree_content,
+        )
+        for record in unstaged
+    )
     return RepositoryContext(
         repo_id=repo_id,
         repository_path=repository,
         base_commit=base_commit,
-        dirty=bool(staged),
+        dirty=bool(staged or unstaged),
         state_fingerprint=state_fingerprint_digest(
-            staged_records=encoded_staged
+            staged_records=encoded_staged,
+            unstaged_records=encoded_unstaged,
         )[:16],
         fingerprint_algorithm=FINGERPRINT_ALGORITHM,
     )

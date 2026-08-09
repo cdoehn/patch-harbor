@@ -320,3 +320,94 @@ def test_index_rejects_a_non_blob_object_even_with_a_file_mode(
         _staged_records(repository)
 
     assert captured.value.exit_code == ExitCode.REPOSITORY_ERROR
+
+
+def _unstaged_records(repository: Path):
+    resolved = RepositoryPath(repository.resolve())
+    return git_capture.read_unstaged_records(
+        resolved,
+        git_capture.read_head_object_id(resolved).object_format,
+    )
+
+
+@pytest.mark.parametrize("object_format", [None, "sha256"])
+def test_unstaged_change_preserves_index_identity_and_worktree_bytes(
+    tmp_path: Path,
+    object_format: str | None,
+) -> None:
+    repository = create_repository(
+        tmp_path / "repository",
+        object_format=object_format,
+    )
+    tracked = repository / "tracked.txt"
+    content = b"changed\x00payload\xff\r\n"
+    tracked.write_bytes(content)
+
+    records = _unstaged_records(repository)
+
+    assert len(records) == 1
+    record = records[0]
+    assert record.path == b"tracked.txt"
+    assert record.status == b"M"
+    assert record.index_mode == b"100644"
+    assert record.index_object == git(
+        repository,
+        "rev-parse",
+        ":tracked.txt",
+    ).stdout.strip().encode("ascii")
+    assert record.worktree_kind == b"regular"
+    assert record.worktree_mode == b"100644"
+    assert record.worktree_content == content
+
+
+def test_unstaged_deletion_records_a_missing_worktree_side(
+    tmp_path: Path,
+) -> None:
+    repository = create_repository(tmp_path / "repository")
+    index_object = git(
+        repository,
+        "rev-parse",
+        ":tracked.txt",
+    ).stdout.strip().encode("ascii")
+    (repository / "tracked.txt").unlink()
+
+    records = _unstaged_records(repository)
+
+    assert len(records) == 1
+    record = records[0]
+    assert record.path == b"tracked.txt"
+    assert record.status == b"D"
+    assert record.index_mode == b"100644"
+    assert record.index_object == index_object
+    assert record.worktree_kind == b"missing"
+    assert record.worktree_mode == b""
+    assert record.worktree_content == b""
+
+
+@pytest.mark.skipif(
+    os.name == "nt",
+    reason="executable mode is not a portable Windows working-tree behavior",
+)
+@pytest.mark.parametrize(
+    ("core_file_mode", "expected_mode"),
+    [("true", b"100755"), ("false", b"100644")],
+)
+def test_unstaged_worktree_mode_respects_core_file_mode(
+    tmp_path: Path,
+    core_file_mode: str,
+    expected_mode: bytes,
+) -> None:
+    repository = create_repository(tmp_path / "repository")
+    git(repository, "config", "core.fileMode", core_file_mode)
+    tracked = repository / "tracked.txt"
+    tracked.chmod(tracked.stat().st_mode | 0o111)
+    tracked.write_bytes(b"mode and content changed\n")
+
+    records = _unstaged_records(repository)
+
+    assert len(records) == 1
+    record = records[0]
+    assert record.status == b"M"
+    assert record.index_mode == b"100644"
+    assert record.worktree_mode == expected_mode
+    assert record.worktree_content == tracked.read_bytes()

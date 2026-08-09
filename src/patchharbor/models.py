@@ -134,6 +134,19 @@ class StagedRecord:
 
 
 @dataclass(frozen=True)
+class UnstagedRecord:
+    """One canonical difference between Git index and working tree."""
+
+    path: bytes
+    status: bytes
+    index_mode: bytes
+    index_object: bytes
+    worktree_kind: bytes
+    worktree_mode: bytes
+    worktree_content: bytes
+
+
+@dataclass(frozen=True)
 class RepositoryContext:
     """One reproducible state description of a registered repository."""
 

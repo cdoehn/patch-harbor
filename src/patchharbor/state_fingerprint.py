@@ -14,6 +14,15 @@ _STAGED_FIELD_NAMES = (
     b"staged-index-mode",
     b"staged-index-object",
 )
+_UNSTAGED_FIELD_NAMES = (
+    b"unstaged-path",
+    b"unstaged-status",
+    b"unstaged-index-mode",
+    b"unstaged-index-object",
+    b"unstaged-worktree-kind",
+    b"unstaged-worktree-mode",
+    b"unstaged-worktree-content",
+)
 
 
 def _framed_field(name: bytes, payload: bytes) -> bytes:
@@ -33,6 +42,32 @@ def encode_staged_record(
     return b"".join(
         _framed_field(name, payload)
         for name, payload in zip(_STAGED_FIELD_NAMES, payloads, strict=True)
+    )
+
+
+def encode_unstaged_record(
+    *,
+    path: bytes,
+    status: bytes,
+    index_mode: bytes,
+    index_object: bytes,
+    worktree_kind: bytes,
+    worktree_mode: bytes,
+    worktree_content: bytes,
+) -> bytes:
+    """Encode one unstaged record using the normative field order."""
+    payloads = (
+        path,
+        status,
+        index_mode,
+        index_object,
+        worktree_kind,
+        worktree_mode,
+        worktree_content,
+    )
+    return b"".join(
+        _framed_field(name, payload)
+        for name, payload in zip(_UNSTAGED_FIELD_NAMES, payloads, strict=True)
     )
 
 
