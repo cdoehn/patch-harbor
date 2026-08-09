@@ -404,45 +404,156 @@ def _core_file_mode(repository: RepositoryPath) -> bool:
     raise _error("git returned an invalid core.fileMode value")
 
 
+@dataclass(frozen=True)
+class _WorktreeSnapshot:
+    kind: bytes
+    mode: bytes
+    content: bytes
+
+
+def _metadata_signature(metadata: os.stat_result) -> tuple[int, ...]:
+    return (
+        metadata.st_dev,
+        metadata.st_ino,
+        stat.S_IFMT(metadata.st_mode),
+        stat.S_IMODE(metadata.st_mode),
+        metadata.st_size,
+        metadata.st_mtime_ns,
+        metadata.st_ctime_ns,
+    )
+
+
+def _same_file_state(
+    first: os.stat_result,
+    second: os.stat_result,
+) -> bool:
+    return os.path.samestat(first, second) and (
+        _metadata_signature(first) == _metadata_signature(second)
+    )
+
+
+def _inspect_worktree_path(target: os.PathLike[str]) -> os.stat_result | None:
+    try:
+        return os.lstat(target)
+    except FileNotFoundError:
+        return None
+    except OSError as exc:
+        raise _error("cannot inspect an unstaged working-tree path") from exc
+
+
+def _require_regular_file(metadata: os.stat_result) -> None:
+    if not stat.S_ISREG(metadata.st_mode):
+        raise _error("unstaged working-tree entry is not a regular file")
+
+
+def _canonical_worktree_mode(
+    metadata: os.stat_result,
+    *,
+    core_file_mode: bool,
+) -> bytes:
+    if core_file_mode and metadata.st_mode & 0o111:
+        return b"100755"
+    return b"100644"
+
+
+def _read_regular_worktree_snapshot(
+    target: os.PathLike[str],
+    *,
+    core_file_mode: bool,
+) -> _WorktreeSnapshot:
+    initial_metadata = _inspect_worktree_path(target)
+    if initial_metadata is None:
+        raise _error("modified working-tree path disappeared")
+    _require_regular_file(initial_metadata)
+
+    flags = os.O_RDONLY
+    flags |= getattr(os, "O_BINARY", 0)
+    flags |= getattr(os, "O_CLOEXEC", 0)
+    flags |= getattr(os, "O_NOFOLLOW", 0)
+
+    descriptor: int | None = None
+    try:
+        descriptor = os.open(target, flags)
+        opened_metadata = os.fstat(descriptor)
+        _require_regular_file(opened_metadata)
+        if not _same_file_state(initial_metadata, opened_metadata):
+            raise _error("working-tree file changed while being read")
+
+        current_metadata = _inspect_worktree_path(target)
+        if current_metadata is None:
+            raise _error("working-tree file changed while being read")
+        _require_regular_file(current_metadata)
+        if not _same_file_state(opened_metadata, current_metadata):
+            raise _error("working-tree file changed while being read")
+
+        with os.fdopen(descriptor, "rb", closefd=True) as handle:
+            descriptor = None
+            content = handle.read()
+            finished_metadata = os.fstat(handle.fileno())
+    except PatchHarborError:
+        raise
+    except OSError as exc:
+        raise _error("cannot read an unstaged working-tree file") from exc
+    finally:
+        if descriptor is not None:
+            try:
+                os.close(descriptor)
+            except OSError:
+                pass
+
+    final_metadata = _inspect_worktree_path(target)
+    if final_metadata is None:
+        raise _error("working-tree file changed while being read")
+    _require_regular_file(final_metadata)
+    if (
+        not _same_file_state(opened_metadata, finished_metadata)
+        or not _same_file_state(finished_metadata, final_metadata)
+        or len(content) != finished_metadata.st_size
+    ):
+        raise _error("working-tree file changed while being read")
+
+    return _WorktreeSnapshot(
+        kind=b"regular",
+        mode=_canonical_worktree_mode(
+            finished_metadata,
+            core_file_mode=core_file_mode,
+        ),
+        content=content,
+    )
+
+
 def _read_worktree_record(
     repository: RepositoryPath,
     entry: _UnstagedEntry,
     *,
     core_file_mode: bool,
 ) -> UnstagedRecord:
-    if entry.status == b"D":
-        return UnstagedRecord(
-            path=entry.path,
-            status=entry.status,
-            index_mode=entry.index_mode,
-            index_object=entry.index_object,
-            worktree_kind=b"missing",
-            worktree_mode=b"",
-            worktree_content=b"",
-        )
-
     target = repository.value / os.fsdecode(entry.path)
-    try:
-        metadata = target.stat()
-        content = target.read_bytes()
-    except OSError as exc:
-        raise _error("cannot read an unstaged working-tree file") from exc
-    if not stat.S_ISREG(metadata.st_mode):
-        raise _error("unstaged working-tree entry is not a regular file")
 
-    worktree_mode = (
-        b"100755"
-        if core_file_mode and metadata.st_mode & 0o111
-        else b"100644"
-    )
+    if entry.status == b"D":
+        if _inspect_worktree_path(target) is not None:
+            raise _error("deleted working-tree path still exists")
+        snapshot = _WorktreeSnapshot(
+            kind=b"missing",
+            mode=b"",
+            content=b"",
+        )
+    elif entry.status == b"M":
+        snapshot = _read_regular_worktree_snapshot(
+            target,
+            core_file_mode=core_file_mode,
+        )
+    else:
+        raise _error("git returned an unsupported unstaged status")
+
     return UnstagedRecord(
         path=entry.path,
         status=entry.status,
         index_mode=entry.index_mode,
         index_object=entry.index_object,
-        worktree_kind=b"regular",
-        worktree_mode=worktree_mode,
-        worktree_content=content,
+        worktree_kind=snapshot.kind,
+        worktree_mode=snapshot.mode,
+        worktree_content=snapshot.content,
     )
 
 

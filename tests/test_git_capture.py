@@ -7,7 +7,7 @@ import subprocess
 import pytest
 
 from patchharbor import git_capture
-from patchharbor.errors import ExitCode, PatchHarborError
+from patchharbor.errors import ErrorKind, ExitCode, PatchHarborError
 from patchharbor.models import (
     GitObjectFormat,
     GitObjectId,
@@ -411,3 +411,206 @@ def test_unstaged_worktree_mode_respects_core_file_mode(
     assert record.index_mode == b"100644"
     assert record.worktree_mode == expected_mode
     assert record.worktree_content == tracked.read_bytes()
+
+
+def _raw_unstaged_outputs(repository: Path) -> tuple[bytes, bytes]:
+    resolved = RepositoryPath(repository.resolve())
+    return (
+        git_capture.run_git_bytes(
+            resolved,
+            "diff-files",
+            "--raw",
+            "-z",
+            "--no-renames",
+            "--no-ext-diff",
+            "--",
+        ),
+        git_capture.run_git_bytes(
+            resolved,
+            "config",
+            "--bool",
+            "--default=false",
+            "--get",
+            "core.fileMode",
+        ),
+    )
+
+
+def _assert_repository_capture_error(
+    captured: pytest.ExceptionInfo[PatchHarborError],
+) -> None:
+    assert captured.value.exit_code is ExitCode.REPOSITORY_ERROR
+    assert captured.value.error_kind is ErrorKind.REPOSITORY_RESOLUTION_ERROR
+
+
+@pytest.mark.parametrize("status", [b"A", b"T", b"U"])
+def test_unstaged_capture_accepts_only_modified_and_deleted_statuses(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    status: bytes,
+) -> None:
+    object_name = b"1" * GitObjectFormat.SHA1.object_id_hex_length
+    raw = b"".join(
+        (
+            b":100644 100644 ",
+            object_name,
+            b" ",
+            b"0" * GitObjectFormat.SHA1.object_id_hex_length,
+            b" ",
+            status,
+            b"\0tracked.txt\0",
+        )
+    )
+    monkeypatch.setattr(
+        git_capture,
+        "run_git_bytes",
+        lambda *_args, **_kwargs: raw,
+    )
+
+    with pytest.raises(PatchHarborError) as captured:
+        git_capture.read_unstaged_records(
+            RepositoryPath(tmp_path.resolve()),
+            GitObjectFormat.SHA1,
+        )
+
+    _assert_repository_capture_error(captured)
+
+
+def test_malformed_unstaged_git_data_is_a_repository_error(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        git_capture,
+        "run_git_bytes",
+        lambda *_args, **_kwargs: b"malformed-without-nul",
+    )
+
+    with pytest.raises(PatchHarborError) as captured:
+        git_capture.read_unstaged_records(
+            RepositoryPath(tmp_path.resolve()),
+            GitObjectFormat.SHA1,
+        )
+
+    _assert_repository_capture_error(captured)
+
+
+@pytest.mark.skipif(
+    os.name == "nt",
+    reason="creating symbolic links is not generally available on Windows",
+)
+def test_unstaged_capture_never_follows_a_symbolic_link(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repository = create_repository(tmp_path / "repository")
+    tracked = repository / "tracked.txt"
+    target = tmp_path / "target.txt"
+    target.write_bytes(b"must not be captured\n")
+    tracked.unlink()
+    tracked.symlink_to(target)
+    object_name = git(
+        repository,
+        "rev-parse",
+        ":tracked.txt",
+    ).stdout.strip().encode("ascii")
+    raw = b"".join(
+        (
+            b":100644 100644 ",
+            object_name,
+            b" ",
+            b"0" * len(object_name),
+            b" M\0tracked.txt\0",
+        )
+    )
+    outputs = iter((raw, b"false\n"))
+    monkeypatch.setattr(
+        git_capture,
+        "run_git_bytes",
+        lambda *_args, **_kwargs: next(outputs),
+    )
+
+    with pytest.raises(PatchHarborError) as captured:
+        git_capture.read_unstaged_records(
+            RepositoryPath(repository.resolve()),
+            GitObjectFormat.for_hex_length(len(object_name)),
+        )
+
+    _assert_repository_capture_error(captured)
+
+
+def test_deleted_tracked_path_must_really_be_missing(tmp_path: Path) -> None:
+    repository = create_repository(tmp_path / "repository")
+    tracked = repository / "tracked.txt"
+    tracked.unlink()
+    tracked.mkdir()
+
+    with pytest.raises(PatchHarborError) as captured:
+        _unstaged_records(repository)
+
+    _assert_repository_capture_error(captured)
+
+
+def test_unstaged_read_failure_is_categorized(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repository = create_repository(tmp_path / "repository")
+    tracked = repository / "tracked.txt"
+    tracked.write_bytes(b"changed\n")
+    resolved = RepositoryPath(repository.resolve())
+    object_format = git_capture.read_head_object_id(resolved).object_format
+    outputs = iter(_raw_unstaged_outputs(repository))
+    monkeypatch.setattr(
+        git_capture,
+        "run_git_bytes",
+        lambda *_args, **_kwargs: next(outputs),
+    )
+    real_open = os.open
+
+    def denied_open(path: os.PathLike[str], flags: int, *args: int) -> int:
+        if os.fspath(path) == os.fspath(tracked):
+            raise PermissionError("injected read denial")
+        return real_open(path, flags, *args)
+
+    monkeypatch.setattr(git_capture.os, "open", denied_open)
+
+    with pytest.raises(PatchHarborError) as captured:
+        git_capture.read_unstaged_records(resolved, object_format)
+
+    _assert_repository_capture_error(captured)
+
+
+def test_unstaged_file_replacement_during_capture_is_rejected(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repository = create_repository(tmp_path / "repository")
+    tracked = repository / "tracked.txt"
+    tracked.write_bytes(b"first changed content\n")
+    resolved = RepositoryPath(repository.resolve())
+    object_format = git_capture.read_head_object_id(resolved).object_format
+    outputs = iter(_raw_unstaged_outputs(repository))
+    monkeypatch.setattr(
+        git_capture,
+        "run_git_bytes",
+        lambda *_args, **_kwargs: next(outputs),
+    )
+    real_open = os.open
+    replaced = False
+
+    def replacing_open(path: os.PathLike[str], flags: int, *args: int) -> int:
+        nonlocal replaced
+        if not replaced and os.fspath(path) == os.fspath(tracked):
+            replaced = True
+            tracked.replace(repository / "original.txt")
+            tracked.write_bytes(b"replacement content\n")
+        return real_open(path, flags, *args)
+
+    monkeypatch.setattr(git_capture.os, "open", replacing_open)
+
+    with pytest.raises(PatchHarborError) as captured:
+        git_capture.read_unstaged_records(resolved, object_format)
+
+    assert replaced is True
+    _assert_repository_capture_error(captured)
