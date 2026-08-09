@@ -110,6 +110,39 @@ def test_register_creates_identity_registry_and_clean_git_state(
         assert gitignore_path.read_bytes() == gitignore_before
 
 
+def test_repository_operations_ignore_redirecting_git_environment(
+    tmp_path: Path,
+) -> None:
+    repository = create_repository(tmp_path / "repository")
+    poisoned_environment = {
+        "GIT_DIR": str(tmp_path / "wrong.git"),
+        "GIT_WORK_TREE": str(tmp_path / "wrong-worktree"),
+        "GIT_INDEX_FILE": str(tmp_path / "wrong-index"),
+        "GIT_EXTERNAL_DIFF": str(tmp_path / "wrong-diff"),
+        "GIT_CONFIG_COUNT": "1",
+        "GIT_CONFIG_KEY_0": "core.sparseCheckout",
+        "GIT_CONFIG_VALUE_0": "true",
+    }
+
+    registered = run_cli(
+        repository,
+        "register",
+        environment_overrides=poisoned_environment,
+    )
+    context = run_cli(
+        repository,
+        "context",
+        "--json",
+        environment_overrides=poisoned_environment,
+    )
+
+    assert registered.returncode == 0
+    assert context.returncode == 0
+    document = json.loads(context.stdout)
+    assert document["success"] is True
+    assert document["result"]["dirty"] is False
+
+
 def test_register_physically_canonicalizes_an_explicit_repository_path(
     tmp_path: Path,
 ) -> None:

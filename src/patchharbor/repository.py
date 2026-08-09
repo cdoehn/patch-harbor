@@ -3,11 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-import os
 from pathlib import Path
-import subprocess
 
 from patchharbor.errors import PatchHarborError, repository_resolution_error
+from patchharbor.git_commands import nul_records, run_git_bytes
 from patchharbor.models import (
     RegistryStatus,
     RepositoryId,
@@ -43,46 +42,10 @@ def _error(message: str) -> PatchHarborError:
     return repository_resolution_error(message)
 
 
-def _run_git(
-    *arguments: str,
-    cwd: Path | None = None,
-) -> bytes:
-    environment = os.environ.copy()
-    environment.update(
-        {
-            "GIT_PAGER": "cat",
-            "GIT_TERMINAL_PROMPT": "0",
-            "LC_ALL": "C",
-        }
-    )
-    try:
-        completed = subprocess.run(
-            ["git", *arguments],
-            cwd=cwd,
-            env=environment,
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            check=False,
-        )
-    except FileNotFoundError as exc:
-        raise _error("git executable is not available") from exc
-    except OSError as exc:
-        raise _error(f"cannot start git: {exc}") from exc
-
-    if completed.returncode != 0:
-        detail = completed.stderr.decode("utf-8", errors="replace").strip()
-        suffix = f": {detail}" if detail else ""
-        raise _error(f"git repository check failed{suffix}")
-    return completed.stdout
-
-
 def _tracked_paths(repository: RepositoryPath, *arguments: str) -> tuple[str, ...]:
-    raw = _run_git(*arguments, cwd=repository.value)
+    raw = run_git_bytes(*arguments, cwd=repository.value)
     paths: list[str] = []
-    for value in raw.split(b"\0"):
-        if not value:
-            continue
+    for value in nul_records(raw, "tracked repository paths"):
         try:
             paths.append(value.decode("utf-8", errors="strict"))
         except UnicodeDecodeError as exc:
@@ -109,7 +72,7 @@ def canonicalize_repository_reference(requested_path: Path) -> RepositoryPath:
 
 def inspect_repository(requested_path: Path) -> RepositoryPath:
     """Resolve and verify the immutable repository boundary for registration."""
-    output = _run_git(
+    output = run_git_bytes(
         "-C",
         str(requested_path.expanduser()),
         "rev-parse",
@@ -128,7 +91,7 @@ def inspect_repository(requested_path: Path) -> RepositoryPath:
     except (OSError, RuntimeError, ValueError) as exc:
         raise _error(f"cannot resolve repository path: {exc}") from exc
 
-    _run_git(
+    run_git_bytes(
         "rev-parse",
         "--verify",
         "--quiet",
@@ -222,7 +185,7 @@ def registered_repository_status(
 
 
 def _exclude_path(repository: RepositoryPath) -> Path:
-    output = _run_git(
+    output = run_git_bytes(
         "rev-parse",
         "--git-path",
         "info/exclude",

@@ -1,16 +1,20 @@
-"""Byte-exact Git command boundary for repository-state capture."""
+"""Byte-exact capture of supported Git repository state."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 import os
 import stat
-import subprocess
 
 from patchharbor.errors import (
     PatchHarborError,
     repository_resolution_error,
     unsupported_repository_state_error,
+)
+from patchharbor.git_commands import (
+    nul_records as _nul_records,
+    read_boolean_config,
+    run_git_bytes as _run_git_bytes,
 )
 from patchharbor.models import (
     GitObjectFormat,
@@ -22,24 +26,6 @@ from patchharbor.models import (
 )
 
 
-_REDIRECTING_GIT_ENVIRONMENT = (
-    "GIT_ALTERNATE_OBJECT_DIRECTORIES",
-    "GIT_CEILING_DIRECTORIES",
-    "GIT_COMMON_DIR",
-    "GIT_DIR",
-    "GIT_DIFF_OPTS",
-    "GIT_EXTERNAL_DIFF",
-    "GIT_GLOB_PATHSPECS",
-    "GIT_ICASE_PATHSPECS",
-    "GIT_INDEX_FILE",
-    "GIT_LITERAL_PATHSPECS",
-    "GIT_NAMESPACE",
-    "GIT_NOGLOB_PATHSPECS",
-    "GIT_OBJECT_DIRECTORY",
-    "GIT_WORK_TREE",
-)
-
-
 def _error(message: str) -> PatchHarborError:
     return repository_resolution_error(message)
 
@@ -48,67 +34,19 @@ def _unsupported(message: str) -> PatchHarborError:
     return unsupported_repository_state_error(message)
 
 
-def _controlled_git_environment() -> dict[str, str]:
-    environment = os.environ.copy()
-    for name in _REDIRECTING_GIT_ENVIRONMENT:
-        environment.pop(name, None)
-    environment.pop("GIT_CONFIG_PARAMETERS", None)
-    environment.pop("GIT_CONFIG_COUNT", None)
-    for name in tuple(environment):
-        if name.startswith(("GIT_CONFIG_KEY_", "GIT_CONFIG_VALUE_")):
-            environment.pop(name, None)
-    environment.update(
-        {
-            "GIT_OPTIONAL_LOCKS": "0",
-            "GIT_PAGER": "cat",
-            "GIT_TERMINAL_PROMPT": "0",
-            "LANG": "C",
-            "LC_ALL": "C",
-        }
-    )
-    return environment
-
-
 def run_git_bytes(
     repository: RepositoryPath,
     *arguments: str,
     input_bytes: bytes | None = None,
     accepted_returncodes: tuple[int, ...] = (0,),
 ) -> bytes:
-    """Run one non-interactive Git query and return stdout unchanged."""
-    command = [
-        "git",
-        "--no-pager",
-        "-c",
-        "color.ui=false",
-        "-c",
-        "diff.external=",
+    """Run one canonical Git query in the repository root."""
+    return _run_git_bytes(
         *arguments,
-    ]
-    run_options: dict[str, object] = {
-        "cwd": repository.value,
-        "env": _controlled_git_environment(),
-        "stdout": subprocess.PIPE,
-        "stderr": subprocess.PIPE,
-        "check": False,
-    }
-    if input_bytes is None:
-        run_options["stdin"] = subprocess.DEVNULL
-    else:
-        run_options["input"] = input_bytes
-
-    try:
-        completed = subprocess.run(command, **run_options)
-    except FileNotFoundError as exc:
-        raise _error("git executable is not available") from exc
-    except OSError as exc:
-        raise _error(f"cannot start git: {exc}") from exc
-
-    if completed.returncode not in accepted_returncodes:
-        detail = completed.stderr.decode("utf-8", errors="replace").strip()
-        suffix = f": {detail}" if detail else ""
-        raise _error(f"cannot capture repository context{suffix}")
-    return completed.stdout
+        cwd=repository.value,
+        input_bytes=input_bytes,
+        accepted_returncodes=accepted_returncodes,
+    )
 
 
 def read_head_object_id(repository: RepositoryPath) -> GitObjectId:
@@ -127,14 +65,6 @@ def read_head_object_id(repository: RepositoryPath) -> GitObjectId:
         return GitObjectId(value=value, object_format=object_format)
     except ValueError as exc:
         raise _error("git returned an invalid HEAD object name") from exc
-
-
-def _nul_records(raw: bytes, description: str) -> tuple[bytes, ...]:
-    if not raw:
-        return ()
-    if not raw.endswith(b"\0"):
-        raise _error(f"git returned malformed {description}")
-    return tuple(raw[:-1].split(b"\0"))
 
 
 _REGULAR_FILE_MODE = b"100644"
@@ -349,6 +279,17 @@ def read_staged_records(
     return _compare_staged_entries(base_entries, index_entries)
 
 
+_RAW_UNSTAGED_DIFF_ARGUMENTS = (
+    "diff-files",
+    "--raw",
+    "-z",
+    "--no-renames",
+    "--no-ext-diff",
+    "--no-textconv",
+    "--",
+)
+
+
 @dataclass(frozen=True)
 class _UnstagedEntry:
     path: bytes
@@ -413,20 +354,7 @@ def _parse_unstaged_diff(
 
 
 def _boolean_config(repository: RepositoryPath, name: str) -> bool:
-    value = run_git_bytes(
-        repository,
-        "config",
-        "--bool",
-        "--null",
-        "--default=false",
-        "--get",
-        name,
-    )
-    if value == b"true\0":
-        return True
-    if value == b"false\0":
-        return False
-    raise _error(f"git returned an invalid {name} value")
+    return read_boolean_config(repository.value, name, missing=False)
 
 
 def _core_file_mode(repository: RepositoryPath) -> bool:
@@ -587,12 +515,7 @@ def require_supported_repository_state(
     _parse_unstaged_diff(
         run_git_bytes(
             repository,
-            "diff-files",
-            "--raw",
-            "-z",
-            "--no-renames",
-            "--no-ext-diff",
-            "--",
+            *_RAW_UNSTAGED_DIFF_ARGUMENTS,
         ),
         object_format,
     )
@@ -753,12 +676,7 @@ def read_unstaged_records(
     entries = _parse_unstaged_diff(
         run_git_bytes(
             repository,
-            "diff-files",
-            "--raw",
-            "-z",
-            "--no-renames",
-            "--no-ext-diff",
-            "--",
+            *_RAW_UNSTAGED_DIFF_ARGUMENTS,
         ),
         object_format,
     )

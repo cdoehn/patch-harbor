@@ -29,6 +29,7 @@ EXPECTED_RUNTIME_FILES = {
     "patchharbor/errors.py",
     "patchharbor/execution.py",
     "patchharbor/git_capture.py",
+    "patchharbor/git_commands.py",
     "patchharbor/interpreters.py",
     "patchharbor/models.py",
     "patchharbor/output.py",

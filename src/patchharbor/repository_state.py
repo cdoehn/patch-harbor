@@ -11,8 +11,8 @@ from patchharbor.git_capture import (
     read_unstaged_records,
     read_untracked_records,
     require_supported_repository_state,
-    run_git_bytes,
 )
+from patchharbor.git_commands import run_git_bytes
 from patchharbor.locks import registry_lock, repository_lock
 from patchharbor.models import (
     GitObjectId,
@@ -40,7 +40,6 @@ def _error(message: str) -> PatchHarborError:
 
 def _require_clean_for_registration(repository: RepositoryPath) -> None:
     status = run_git_bytes(
-        repository,
         "status",
         "--porcelain=v1",
         "-z",
@@ -48,6 +47,7 @@ def _require_clean_for_registration(repository: RepositoryPath) -> None:
         "--",
         ".",
         ":(exclude).patchharbor",
+        cwd=repository.value,
     )
     if status:
         raise _error("repository state is not clean")
@@ -92,11 +92,11 @@ def require_clean_repository(path: Path) -> RepositoryPath:
     return repository
 
 
-def _capture_repository_state(
+def capture_repository_state(
     repository: RepositoryPath,
     base_commit: GitObjectId,
 ) -> RepositoryState:
-    """Capture all supported non-HEAD state in one immutable value."""
+    """Validate and capture all supported non-HEAD repository state."""
     require_supported_repository_state(
         repository,
         base_commit.object_format,
@@ -116,7 +116,7 @@ def _capture_context(
     repo_id: RepositoryId,
 ) -> RepositoryContext:
     base_commit = read_head_object_id(repository)
-    state = _capture_repository_state(repository, base_commit)
+    state = capture_repository_state(repository, base_commit)
     encoded_staged = tuple(
         encode_staged_record(
             path=record.path,

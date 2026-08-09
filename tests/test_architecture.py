@@ -218,16 +218,19 @@ def test_registration_layers_have_one_directional_dependency_flow() -> None:
     }
     assert _local_imports("repository") == {
         "errors",
+        "git_commands",
         "models",
         "physical_paths",
         "platform",
     }
-    assert _local_imports("git_capture") == {"errors", "models"}
+    assert _local_imports("git_commands") == {"errors"}
+    assert _local_imports("git_capture") == {"errors", "git_commands", "models"}
     assert _local_imports("state_fingerprint") == set()
     assert _local_imports("context_output") == {"models"}
     assert _local_imports("repository_state") == {
         "errors",
         "git_capture",
+        "git_commands",
         "locks",
         "models",
         "registry",
@@ -246,6 +249,20 @@ def test_registration_layers_have_one_directional_dependency_flow() -> None:
         "physical_paths",
     }
     assert _local_imports("physical_paths") == set()
+
+
+def test_git_processes_are_confined_to_the_canonical_command_boundary() -> None:
+    command_source = (PACKAGE_ROOT / "git_commands.py").read_text(
+        encoding="utf-8"
+    )
+    assert "subprocess.run" in command_source
+
+    for module_name in ("repository", "repository_state", "git_capture"):
+        source = (PACKAGE_ROOT / f"{module_name}.py").read_text(
+            encoding="utf-8"
+        )
+        assert "import subprocess" not in source
+        assert "subprocess.run" not in source
 
 
 def test_lock_mechanics_are_confined_to_the_platform_boundary() -> None:

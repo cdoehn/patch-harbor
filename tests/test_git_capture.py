@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from pathlib import Path
 import os
-import subprocess
 
 import pytest
 
@@ -49,65 +48,6 @@ def test_git_object_id_rejects_incomplete_or_noncanonical_values(
 ) -> None:
     with pytest.raises(ValueError):
         GitObjectId(value=value, object_format=object_format)
-
-
-def test_git_boundary_returns_bytes_under_a_controlled_environment(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    repository = RepositoryPath(tmp_path.resolve())
-    captured: dict[str, object] = {}
-    raw_stdout = b"raw\x00\xffbytes\n"
-
-    def fake_run(
-        command: list[str],
-        **options: object,
-    ) -> subprocess.CompletedProcess[bytes]:
-        captured["command"] = command
-        captured.update(options)
-        return subprocess.CompletedProcess(
-            command,
-            0,
-            stdout=raw_stdout,
-            stderr=b"",
-        )
-
-    monkeypatch.setenv("GIT_DIR", "redirected")
-    monkeypatch.setenv("GIT_WORK_TREE", "redirected")
-    monkeypatch.setenv("GIT_EXTERNAL_DIFF", "external-tool")
-    monkeypatch.setenv("GIT_CONFIG_COUNT", "1")
-    monkeypatch.setenv("GIT_CONFIG_KEY_0", "color.ui")
-    monkeypatch.setenv("GIT_CONFIG_VALUE_0", "always")
-    monkeypatch.setattr(git_capture.subprocess, "run", fake_run)
-
-    assert git_capture.run_git_bytes(repository, "status", "-z") == raw_stdout
-    assert captured["cwd"] == repository.value
-    assert captured["stdin"] is subprocess.DEVNULL
-    assert captured["stdout"] is subprocess.PIPE
-    assert captured["stderr"] is subprocess.PIPE
-    assert "encoding" not in captured
-    assert "text" not in captured
-
-    command = captured["command"]
-    assert command[:6] == [
-        "git",
-        "--no-pager",
-        "-c",
-        "color.ui=false",
-        "-c",
-        "diff.external=",
-    ]
-    environment = captured["env"]
-    assert isinstance(environment, dict)
-    assert environment["LC_ALL"] == "C"
-    assert environment["LANG"] == "C"
-    assert environment["GIT_OPTIONAL_LOCKS"] == "0"
-    assert "GIT_DIR" not in environment
-    assert "GIT_WORK_TREE" not in environment
-    assert "GIT_EXTERNAL_DIFF" not in environment
-    assert "GIT_CONFIG_COUNT" not in environment
-    assert "GIT_CONFIG_KEY_0" not in environment
-    assert "GIT_CONFIG_VALUE_0" not in environment
 
 
 @pytest.mark.parametrize(
@@ -780,3 +720,43 @@ def test_untracked_file_replacement_during_capture_is_rejected(
 
     assert replaced is True
     _assert_repository_capture_error(captured)
+
+
+def test_unstaged_query_disables_configurable_diff_behavior(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured_arguments: list[tuple[str, ...]] = []
+
+    def fake_run_git_bytes(
+        _repository: RepositoryPath,
+        *arguments: str,
+        **_options: object,
+    ) -> bytes:
+        captured_arguments.append(arguments)
+        return b""
+
+    monkeypatch.setattr(git_capture, "run_git_bytes", fake_run_git_bytes)
+    monkeypatch.setattr(
+        git_capture,
+        "read_boolean_config",
+        lambda *_args, **_kwargs: False,
+    )
+
+    records = git_capture.read_unstaged_records(
+        RepositoryPath(tmp_path.resolve()),
+        GitObjectFormat.SHA1,
+    )
+
+    assert records == ()
+    assert captured_arguments == [
+        (
+            "diff-files",
+            "--raw",
+            "-z",
+            "--no-renames",
+            "--no-ext-diff",
+            "--no-textconv",
+            "--",
+        )
+    ]
