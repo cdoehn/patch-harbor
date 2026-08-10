@@ -4,10 +4,14 @@ from pathlib import Path
 
 import pytest
 
+from patchharbor import repository_state
 from patchharbor.errors import ErrorKind, ExitCode, PatchHarborError
 from patchharbor.git_capture import read_head_object_id
 from patchharbor.models import RepositoryPath
-from patchharbor.repository_state import capture_repository_state
+from patchharbor.repository_state import (
+    capture_consistent_repository_snapshot,
+    capture_repository_state,
+)
 from tests.registration_support import create_repository, git
 
 
@@ -50,3 +54,40 @@ def test_reusable_state_capture_applies_the_unsupported_state_guard(
 
     assert captured.value.exit_code is ExitCode.UNSUPPORTED_REPOSITORY_STATE
     assert captured.value.error_kind is ErrorKind.UNSUPPORTED_REPOSITORY_STATE
+
+
+def test_consistent_snapshot_rejects_a_repository_change_during_capture(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repository = create_repository(tmp_path / "repository")
+    resolved = RepositoryPath(repository.resolve())
+    original_reader = repository_state.read_untracked_records
+    changed = False
+
+    def read_then_change(repository_path: RepositoryPath):
+        nonlocal changed
+        records = original_reader(repository_path)
+        if not changed:
+            changed = True
+            (repository / "tracked.txt").write_bytes(b"changed during capture\n")
+        return records
+
+    monkeypatch.setattr(
+        repository_state,
+        "read_untracked_records",
+        read_then_change,
+    )
+
+    with pytest.raises(PatchHarborError) as captured:
+        capture_consistent_repository_snapshot(resolved)
+
+    assert captured.value.exit_code is ExitCode.REPOSITORY_ERROR
+    assert captured.value.error_kind is ErrorKind.REPOSITORY_RESOLUTION_ERROR
+
+    monkeypatch.setattr(
+        repository_state,
+        "read_untracked_records",
+        original_reader,
+    )
+    assert capture_consistent_repository_snapshot(resolved).state.dirty is True

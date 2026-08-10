@@ -6,11 +6,12 @@ from pathlib import Path
 import pytest
 
 from patchharbor.errors import ErrorKind, ExitCode, PatchHarborError
-from patchharbor.git_capture import (
-    read_head_object_id,
-    require_portable_repository_paths,
-)
+from patchharbor.git_capture import read_head_object_id
 from patchharbor.models import RepositoryPath
+from patchharbor.repository_paths import (
+    RepositoryRelativePath,
+    validate_repository_paths,
+)
 from patchharbor.repository_state import capture_repository_state
 from tests.registration_support import create_repository, git
 
@@ -29,6 +30,29 @@ def _assert_unsupported(callable_object) -> None:
 def _capture(repository: Path) -> None:
     resolved = RepositoryPath(repository.resolve())
     capture_repository_state(resolved, read_head_object_id(resolved))
+
+
+def test_repository_path_keeps_original_bytes_and_separate_portable_views(
+) -> None:
+    raw = "Folder/Straße.txt".encode("utf-8")
+
+    path = RepositoryRelativePath(raw)
+
+    assert path.original_bytes == raw
+    assert path.decoded == "Folder/Straße.txt"
+    assert path.parts == ("Folder", "Straße.txt")
+    assert path.collision_key == "folder/strasse.txt"
+
+
+def test_repository_path_resolution_uses_the_validated_posix_parts(
+    tmp_path: Path,
+) -> None:
+    repository = RepositoryPath(tmp_path.resolve())
+    path = RepositoryRelativePath(b"nested/file.bin")
+
+    assert path.resolve_from(repository) == (
+        tmp_path.resolve() / "nested" / "file.bin"
+    )
 
 
 @pytest.mark.parametrize(
@@ -59,7 +83,7 @@ def _capture(repository: Path) -> None:
     ],
 )
 def test_portable_repository_paths_reject_unsafe_segments(path: bytes) -> None:
-    _assert_unsupported(lambda: require_portable_repository_paths((path,)))
+    _assert_unsupported(lambda: validate_repository_paths((path,)))
 
 
 @pytest.mark.parametrize(
@@ -80,14 +104,14 @@ def test_portable_repository_paths_reject_windows_device_names(
     device_name: str,
 ) -> None:
     _assert_unsupported(
-        lambda: require_portable_repository_paths(
+        lambda: validate_repository_paths(
             (f"nested/{device_name}".encode("utf-8"),)
         )
     )
 
 
 def test_portable_repository_paths_use_casefold_without_normalization() -> None:
-    require_portable_repository_paths(
+    validate_repository_paths(
         (
             "é.txt".encode("utf-8"),
             "e\u0301.txt".encode("utf-8"),
@@ -98,7 +122,7 @@ def test_portable_repository_paths_use_casefold_without_normalization() -> None:
     )
 
     _assert_unsupported(
-        lambda: require_portable_repository_paths(
+        lambda: validate_repository_paths(
             ("Straße.txt".encode("utf-8"), b"STRASSE.TXT")
         )
     )

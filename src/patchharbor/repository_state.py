@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contextlib import ExitStack
 from pathlib import Path
 
 from patchharbor.errors import PatchHarborError, repository_resolution_error
@@ -11,7 +12,6 @@ from patchharbor.git_capture import (
     read_staged_records,
     read_unstaged_records,
     read_untracked_records,
-    require_portable_repository_paths,
     require_supported_repository_state,
 )
 from patchharbor.git_commands import run_git_bytes
@@ -22,6 +22,7 @@ from patchharbor.models import (
     RepositoryContext,
     RepositoryId,
     RepositoryPath,
+    RepositorySnapshot,
     RepositoryState,
 )
 from patchharbor.registry import load_registry
@@ -30,6 +31,7 @@ from patchharbor.repository import (
     inspect_repository,
     inspect_repository_root,
 )
+from patchharbor.repository_paths import validate_repository_paths
 from patchharbor.state_fingerprint import (
     FINGERPRINT_ALGORITHM,
     encode_staged_record,
@@ -115,7 +117,7 @@ def capture_repository_state(
         ),
         untracked=read_untracked_records(repository),
     )
-    require_portable_repository_paths(
+    validate_repository_paths(
         (
             *read_base_and_index_paths(repository, base_commit),
             *(record.path for record in state.staged),
@@ -126,12 +128,35 @@ def capture_repository_state(
     return state
 
 
-def _capture_context(
+def capture_repository_snapshot(
+    repository: RepositoryPath,
+) -> RepositorySnapshot:
+    """Capture one complete base commit and supported non-HEAD state."""
+    base_commit = read_head_object_id(repository)
+    return RepositorySnapshot(
+        base_commit=base_commit,
+        state=capture_repository_state(repository, base_commit),
+    )
+
+
+def capture_consistent_repository_snapshot(
+    repository: RepositoryPath,
+) -> RepositorySnapshot:
+    """Return one stable snapshot or reject concurrent repository changes."""
+    first = capture_repository_snapshot(repository)
+    second = capture_repository_snapshot(repository)
+    if first != second:
+        raise _error("repository changed while being read")
+    return second
+
+
+def repository_context_from_snapshot(
     repository: RepositoryPath,
     repo_id: RepositoryId,
+    snapshot: RepositorySnapshot,
 ) -> RepositoryContext:
-    base_commit = read_head_object_id(repository)
-    state = capture_repository_state(repository, base_commit)
+    """Build one context from an immutable, already captured snapshot."""
+    state = snapshot.state
     encoded_staged = tuple(
         encode_staged_record(
             path=record.path,
@@ -165,7 +190,7 @@ def _capture_context(
     return RepositoryContext(
         repo_id=repo_id,
         repository_path=repository,
-        base_commit=base_commit,
+        base_commit=snapshot.base_commit,
         dirty=state.dirty,
         state_fingerprint=state_fingerprint_digest(
             staged_records=encoded_staged,
@@ -177,16 +202,25 @@ def _capture_context(
 
 
 def capture_repository_context(path: Path) -> RepositoryContext:
-    """Capture one supported registered repository while owning its lock."""
+    """Capture one registered repository and release its lock after capture."""
     paths = registration_user_paths()
-    with registry_lock(paths):
-        repository = inspect_repository_root(path)
-        repo_id = _registered_identity(paths, repository)
-        with repository_lock(paths, repo_id):
+    with ExitStack() as repository_scope:
+        with registry_lock(paths):
+            repository = inspect_repository_root(path)
+            repo_id = _registered_identity(paths, repository)
+            repository_scope.enter_context(repository_lock(paths, repo_id))
+
             locked_repository = inspect_repository_root(repository.value)
             if locked_repository != repository:
                 raise _error("repository path changed while acquiring its lock")
             locked_id = _registered_identity(paths, locked_repository)
             if locked_id != repo_id:
                 raise _error("repository identity changed while acquiring its lock")
-            return _capture_context(locked_repository, locked_id)
+
+        snapshot = capture_consistent_repository_snapshot(locked_repository)
+
+    return repository_context_from_snapshot(
+        locked_repository,
+        locked_id,
+        snapshot,
+    )

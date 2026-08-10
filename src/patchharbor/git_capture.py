@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import Enum
 import os
@@ -26,6 +25,10 @@ from patchharbor.models import (
     UnstagedRecord,
     UntrackedRecord,
 )
+from patchharbor.repository_paths import (
+    RepositoryRelativePath,
+    validate_repository_paths,
+)
 
 
 def _error(message: str) -> PatchHarborError:
@@ -36,62 +39,10 @@ class _UnsupportedState(Enum):
     INDEX = "repository index state is not supported"
     SPARSE = "sparse repository state is not supported"
     ENTRY_TYPE = "repository contains an unsupported entry type"
-    PATH = "repository contains a non-portable path"
 
 
 def _unsupported(state: _UnsupportedState) -> PatchHarborError:
     return unsupported_repository_state_error(state.value)
-
-
-_WINDOWS_INVALID_PATH_CHARACTERS = frozenset('<>:"\\|?*')
-_RESERVED_WINDOWS_DEVICE_NAMES = frozenset(
-    {"con", "prn", "aux", "nul", "conin$", "conout$", "clock$"}
-    | {f"com{number}" for number in range(1, 10)}
-    | {f"lpt{number}" for number in range(1, 10)}
-)
-
-
-def _portable_repository_path_key(raw: bytes) -> str:
-    try:
-        decoded = raw.decode("utf-8", errors="strict")
-    except UnicodeDecodeError as exc:
-        raise _unsupported(_UnsupportedState.PATH) from exc
-
-    segments = decoded.split("/")
-    if not segments or any(segment in ("", ".", "..") for segment in segments):
-        raise _unsupported(_UnsupportedState.PATH)
-
-    for segment in segments:
-        if any(
-            ord(character) <= 0x1F or ord(character) == 0x7F
-            for character in segment
-        ):
-            raise _unsupported(_UnsupportedState.PATH)
-        if any(
-            character in _WINDOWS_INVALID_PATH_CHARACTERS
-            for character in segment
-        ):
-            raise _unsupported(_UnsupportedState.PATH)
-        if segment.endswith((".", " ")):
-            raise _unsupported(_UnsupportedState.PATH)
-
-        folded = segment.casefold()
-        if folded in (".git", ".patchharbor"):
-            raise _unsupported(_UnsupportedState.PATH)
-        if folded.split(".", 1)[0] in _RESERVED_WINDOWS_DEVICE_NAMES:
-            raise _unsupported(_UnsupportedState.PATH)
-
-    return decoded.casefold()
-
-
-def require_portable_repository_paths(paths: Iterable[bytes]) -> None:
-    """Reject paths that cannot identify one portable repository state."""
-    observed: dict[str, bytes] = {}
-    for raw in paths:
-        key = _portable_repository_path_key(raw)
-        previous = observed.setdefault(key, raw)
-        if previous != raw:
-            raise _unsupported(_UnsupportedState.PATH)
 
 
 def _parse_repository_path_list(
@@ -786,38 +737,16 @@ def read_unstaged_records(
     )
 
 
-@dataclass(frozen=True)
-class _UntrackedPath:
-    original_bytes: bytes
-    comparison_parts: tuple[str, ...]
-
-
-def _untracked_path(raw: bytes) -> _UntrackedPath:
-    try:
-        decoded = raw.decode("utf-8", errors="strict")
-    except UnicodeDecodeError as exc:
-        raise _unsupported(_UnsupportedState.PATH) from exc
-
-    parts = tuple(decoded.split("/"))
-    if not parts or any(part in ("", ".", "..") for part in parts):
-        raise _unsupported(_UnsupportedState.PATH)
-    return _UntrackedPath(
-        original_bytes=raw,
-        comparison_parts=parts,
-    )
-
-
-def _parse_untracked_paths(raw: bytes) -> tuple[_UntrackedPath, ...]:
+def _parse_untracked_paths(
+    raw: bytes,
+) -> tuple[RepositoryRelativePath, ...]:
     raw_paths = _nul_records(raw, "untracked paths")
-    if (
-        any(not path for path in raw_paths)
-        or len(set(raw_paths)) != len(raw_paths)
-    ):
+    if any(not path for path in raw_paths):
         raise _error("git returned ambiguous untracked paths")
-    return tuple(
-        _untracked_path(path)
-        for path in sorted(raw_paths)
-    )
+    paths = validate_repository_paths(raw_paths)
+    if len(paths) != len(raw_paths):
+        raise _error("git returned ambiguous untracked paths")
+    return paths
 
 
 def read_untracked_records(
@@ -841,7 +770,7 @@ def read_untracked_records(
     records: list[UntrackedRecord] = []
     for path in paths:
         snapshot = _read_regular_file(
-            repository.value.joinpath(*path.comparison_parts),
+            path.resolve_from(repository),
             core_file_mode=core_file_mode,
         )
         records.append(

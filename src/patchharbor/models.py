@@ -170,6 +170,14 @@ class RepositoryState:
 
 
 @dataclass(frozen=True)
+class RepositorySnapshot:
+    """One immutable base commit and its captured non-HEAD state."""
+
+    base_commit: GitObjectId
+    state: RepositoryState
+
+
+@dataclass(frozen=True)
 class RepositoryContext:
     """One reproducible state description of a registered repository."""
 

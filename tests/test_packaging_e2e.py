@@ -40,6 +40,7 @@ EXPECTED_RUNTIME_FILES = {
     "patchharbor/registration.py",
     "patchharbor/registry.py",
     "patchharbor/repository.py",
+    "patchharbor/repository_paths.py",
     "patchharbor/repository_state.py",
     "patchharbor/locks.py",
     "patchharbor/resource_policy.py",

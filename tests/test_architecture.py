@@ -224,7 +224,13 @@ def test_registration_layers_have_one_directional_dependency_flow() -> None:
         "platform",
     }
     assert _local_imports("git_commands") == {"errors"}
-    assert _local_imports("git_capture") == {"errors", "git_commands", "models"}
+    assert _local_imports("git_capture") == {
+        "errors",
+        "git_commands",
+        "models",
+        "repository_paths",
+    }
+    assert _local_imports("repository_paths") == {"errors", "models"}
     assert _local_imports("state_fingerprint") == set()
     assert _local_imports("context_output") == {"models"}
     assert _local_imports("repository_state") == {
@@ -235,6 +241,7 @@ def test_registration_layers_have_one_directional_dependency_flow() -> None:
         "models",
         "registry",
         "repository",
+        "repository_paths",
         "state_fingerprint",
         "user_paths",
     }
