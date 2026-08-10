@@ -30,6 +30,7 @@ from patchharbor.repository_state import (
     require_clean_repository,
 )
 from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY, ResourcePolicy
+from patchharbor.result_bundle import ManualResultBundle, create_manual_result_bundle
 from patchharbor.sources import (
     DirectoryCandidate,
     file_input_artifact,
@@ -56,6 +57,11 @@ def register_repository(
 def repository_context(path: Path) -> RepositoryContext:
     """Return the current reproducible context of one registered repository."""
     return capture_repository_context(path)
+
+
+def bundle_repository(path: Path) -> ManualResultBundle:
+    """Create one manual Result Bundle for a registered repository."""
+    return create_manual_result_bundle(path)
 
 
 def registered_repositories() -> RegistryListResult:

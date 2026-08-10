@@ -245,6 +245,18 @@ def test_registration_layers_have_one_directional_dependency_flow() -> None:
         "state_fingerprint",
         "user_paths",
     }
+    assert _local_imports("result_bundle") == {
+        "errors",
+        "git_commands",
+        "locks",
+        "models",
+        "physical_paths",
+        "registry",
+        "repository",
+        "repository_paths",
+        "repository_state",
+        "user_paths",
+    }
     assert _local_imports("locks") == {
         "errors",
         "models",
@@ -264,7 +276,12 @@ def test_git_processes_are_confined_to_the_canonical_command_boundary() -> None:
     )
     assert "subprocess.run" in command_source
 
-    for module_name in ("repository", "repository_state", "git_capture"):
+    for module_name in (
+        "repository",
+        "repository_state",
+        "git_capture",
+        "result_bundle",
+    ):
         source = (PACKAGE_ROOT / f"{module_name}.py").read_text(
             encoding="utf-8"
         )

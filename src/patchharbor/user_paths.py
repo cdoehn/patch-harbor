@@ -25,6 +25,11 @@ class RegistrationUserPaths:
     def registry_lock_path(self) -> Path:
         return self.lock_directory / "registry.lock"
 
+    @property
+    def result_directory(self) -> Path:
+        """Return the default user-specific Result Bundle directory."""
+        return self.lock_directory.parent / "results"
+
 
 def _error(message: str) -> PatchHarborError:
     return registry_error(message)

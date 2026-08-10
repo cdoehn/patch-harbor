@@ -19,6 +19,7 @@ class ExitCode(IntEnum):
     PAYLOAD_PREPARATION_ERROR = 6
     EXECUTION_ERROR = 7
     REPOSITORY_ERROR = 8
+    RESULT_BUNDLE_ERROR = 11
     REPOSITORY_BUSY = 12
     UNSUPPORTED_REPOSITORY_STATE = 13
     TIMEOUT = 124
@@ -31,6 +32,7 @@ class ErrorKind(str, Enum):
     TOOL_ERROR = "tool_error"
     REGISTRY_ERROR = "registry_error"
     REPOSITORY_RESOLUTION_ERROR = "repository_resolution_error"
+    RESULT_BUNDLE_ERROR = "result_bundle_error"
     REPOSITORY_BUSY = "repository_busy"
     UNSUPPORTED_REPOSITORY_STATE = "unsupported_repository_state"
 
@@ -65,6 +67,15 @@ def repository_resolution_error(message: str) -> PatchHarborError:
         message,
         ExitCode.REPOSITORY_ERROR,
         error_kind=ErrorKind.REPOSITORY_RESOLUTION_ERROR,
+    )
+
+
+def result_bundle_error(message: str) -> PatchHarborError:
+    """Create one failure for manual Result Bundle generation."""
+    return PatchHarborError(
+        message,
+        ExitCode.RESULT_BUNDLE_ERROR,
+        error_kind=ErrorKind.RESULT_BUNDLE_ERROR,
     )
 
 

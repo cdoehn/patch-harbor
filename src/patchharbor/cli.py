@@ -12,6 +12,7 @@ from typing import Any, TextIO
 
 from patchharbor import __version__
 from patchharbor.application import (
+    bundle_repository,
     register_repository,
     registered_repositories,
     repository_context,
@@ -145,6 +146,18 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         dest="json_output",
         help="write the versioned machine-readable result",
+    )
+
+    bundle_parser = commands.add_parser(
+        "bundle",
+        help="create a Result Bundle for one registered repository",
+    )
+    bundle_parser.add_argument(
+        "repository",
+        type=Path,
+        nargs="?",
+        metavar="REPOSITORY",
+        help="registered Git repository; defaults to the current directory",
     )
 
     fs_parser = commands.add_parser(
@@ -384,6 +397,23 @@ def _context_command(
     return 0
 
 
+def _bundle_command(
+    path: Path | None,
+    *,
+    stdout: TextIO,
+    stderr: TextIO,
+) -> int:
+    try:
+        result = bundle_repository(path or Path.cwd())
+    except PatchHarborError as exc:
+        print(format_tool_message(str(exc)), file=stderr)
+        return int(exc.exit_code)
+
+    print(f"run_id: {result.run_id}", file=stdout)
+    print(f"result_bundle_path: {result.path}", file=stdout)
+    return 0
+
+
 def _unregister_command(
     selector: str,
     *,
@@ -601,6 +631,13 @@ def main(
         return _context_command(
             args.repository,
             json_output=args.json_output,
+            stdout=actual_stdout,
+            stderr=actual_stderr,
+        )
+
+    if args.command == "bundle":
+        return _bundle_command(
+            args.repository,
             stdout=actual_stdout,
             stderr=actual_stderr,
         )
