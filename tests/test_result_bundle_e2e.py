@@ -72,6 +72,7 @@ def test_manual_bundle_materializes_committed_blobs_without_export_rules(
             b"substituted.txt export-subst\n"
         ),
         "exported-away.txt": b"still committed\x00bytes\n",
+        "executable.sh": b"#!/bin/sh\nexit 0\n",
         "nested/data.bin": b"binary\x00payload\xff\r\n",
         "substituted.txt": b"commit=$Format:%H$\n",
     }
@@ -79,7 +80,10 @@ def test_manual_bundle_materializes_committed_blobs_without_export_rules(
         target = repository.joinpath(*relative_path.split("/"))
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(content)
+        if relative_path == "executable.sh":
+            os.chmod(target, 0o755)
     git(repository, "add", "--all")
+    git(repository, "update-index", "--chmod=+x", "executable.sh")
     git(repository, "commit", "--quiet", "-m", "base with export attributes")
     assert run_cli(repository, "register").returncode == 0
 
@@ -91,8 +95,17 @@ def test_manual_bundle_materializes_committed_blobs_without_export_rules(
     bundles = _result_bundles()
     assert len(bundles) == 1
     with zipfile.ZipFile(bundles[0]) as archive:
-        names = set(archive.namelist())
+        archive_names = archive.namelist()
+        names = set(archive_names)
         expected_base_names = {f"base/{path}" for path in committed}
+        base_names_in_archive_order = [
+            name.removeprefix("base/")
+            for name in archive_names
+            if name.startswith("base/")
+        ]
+        assert [name.encode("utf-8") for name in base_names_in_archive_order] == sorted(
+            name.encode("utf-8") for name in base_names_in_archive_order
+        )
         assert expected_base_names.issubset(names)
         assert {name for name in names if name.startswith("base/")} == (
             expected_base_names
@@ -113,6 +126,8 @@ def test_manual_bundle_materializes_committed_blobs_without_export_rules(
                 "show",
                 f"HEAD:{relative_path}",
             )
+        executable_mode = archive.getinfo("base/executable.sh").external_attr >> 16
+        assert executable_mode & 0o777 == 0o755
 
         manifest = json.loads(archive.read("manifest.json"))
         context = json.loads(archive.read("context.json"))
@@ -173,3 +188,36 @@ def test_manual_bundle_respects_the_repository_lock(tmp_path: Path) -> None:
         assert release_repository_lock_holder(holder) == 0
     finally:
         stop_repository_lock_holder(holder)
+
+
+def test_manual_bundle_keeps_the_committed_lfs_pointer_without_smudging(
+    tmp_path: Path,
+) -> None:
+    repository = create_repository(tmp_path / "repository", with_commit=False)
+    pointer = (
+        b"version https://git-lfs.github.com/spec/v1\n"
+        b"oid sha256:" + (b"a" * 64) + b"\n"
+        b"size 123456\n"
+    )
+    (repository / ".gitattributes").write_bytes(b"large.bin filter=lfs\n")
+    (repository / "large.bin").write_bytes(pointer)
+    git(repository, "add", "--all")
+    git(repository, "commit", "--quiet", "-m", "base with LFS pointer")
+
+    git(repository, "config", "filter.lfs.clean", "cat")
+    git(
+        repository,
+        "config",
+        "filter.lfs.smudge",
+        "patchharbor-smudge-must-not-run",
+    )
+    git(repository, "config", "filter.lfs.required", "true")
+    assert run_cli(repository, "register").returncode == 0
+
+    completed = run_cli(repository, "bundle")
+
+    assert completed.returncode == 0
+    bundles = _result_bundles()
+    assert len(bundles) == 1
+    with zipfile.ZipFile(bundles[0]) as archive:
+        assert archive.read("base/large.bin") == pointer

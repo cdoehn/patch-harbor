@@ -245,16 +245,26 @@ def test_registration_layers_have_one_directional_dependency_flow() -> None:
         "state_fingerprint",
         "user_paths",
     }
-    assert _local_imports("result_bundle") == {
+    assert _local_imports("git_objects") == {
         "errors",
         "git_commands",
+        "models",
+        "repository_paths",
+    }
+    assert _local_imports("result_bundle_writer") == {
+        "errors",
+        "git_objects",
+    }
+    assert _local_imports("result_bundle") == {
+        "errors",
+        "git_objects",
         "locks",
         "models",
         "physical_paths",
         "registry",
         "repository",
-        "repository_paths",
         "repository_state",
+        "result_bundle_writer",
         "user_paths",
     }
     assert _local_imports("locks") == {
@@ -280,6 +290,7 @@ def test_git_processes_are_confined_to_the_canonical_command_boundary() -> None:
         "repository",
         "repository_state",
         "git_capture",
+        "git_objects",
         "result_bundle",
     ):
         source = (PACKAGE_ROOT / f"{module_name}.py").read_text(
@@ -287,6 +298,21 @@ def test_git_processes_are_confined_to_the_canonical_command_boundary() -> None:
         )
         assert "import subprocess" not in source
         assert "subprocess.run" not in source
+
+
+def test_result_bundle_writing_is_separate_from_repository_capture() -> None:
+    writer_source = (PACKAGE_ROOT / "result_bundle_writer.py").read_text(
+        encoding="utf-8"
+    )
+    git_object_source = (PACKAGE_ROOT / "git_objects.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert "zipfile.ZipFile" in writer_source
+    assert "repository_state" not in writer_source
+    assert "run_git_bytes" not in writer_source
+    assert "zipfile" not in git_object_source
+    assert "capture_repository" not in git_object_source
 
 
 def test_lock_mechanics_are_confined_to_the_platform_boundary() -> None:
