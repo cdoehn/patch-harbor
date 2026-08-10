@@ -6,10 +6,12 @@ from pathlib import Path
 
 from patchharbor.errors import PatchHarborError, repository_resolution_error
 from patchharbor.git_capture import (
+    read_base_and_index_paths,
     read_head_object_id,
     read_staged_records,
     read_unstaged_records,
     read_untracked_records,
+    require_portable_repository_paths,
     require_supported_repository_state,
 )
 from patchharbor.git_commands import run_git_bytes
@@ -23,7 +25,11 @@ from patchharbor.models import (
     RepositoryState,
 )
 from patchharbor.registry import load_registry
-from patchharbor.repository import inspect_local_registration, inspect_repository
+from patchharbor.repository import (
+    inspect_local_registration,
+    inspect_repository,
+    inspect_repository_root,
+)
 from patchharbor.state_fingerprint import (
     FINGERPRINT_ALGORITHM,
     encode_staged_record,
@@ -101,7 +107,7 @@ def capture_repository_state(
         repository,
         base_commit.object_format,
     )
-    return RepositoryState(
+    state = RepositoryState(
         staged=read_staged_records(repository, base_commit),
         unstaged=read_unstaged_records(
             repository,
@@ -109,6 +115,15 @@ def capture_repository_state(
         ),
         untracked=read_untracked_records(repository),
     )
+    require_portable_repository_paths(
+        (
+            *read_base_and_index_paths(repository, base_commit),
+            *(record.path for record in state.staged),
+            *(record.path for record in state.unstaged),
+            *(record.path for record in state.untracked),
+        )
+    )
+    return state
 
 
 def _capture_context(
@@ -165,10 +180,10 @@ def capture_repository_context(path: Path) -> RepositoryContext:
     """Capture one supported registered repository while owning its lock."""
     paths = registration_user_paths()
     with registry_lock(paths):
-        repository = inspect_repository(path)
+        repository = inspect_repository_root(path)
         repo_id = _registered_identity(paths, repository)
         with repository_lock(paths, repo_id):
-            locked_repository = inspect_repository(repository.value)
+            locked_repository = inspect_repository_root(repository.value)
             if locked_repository != repository:
                 raise _error("repository path changed while acquiring its lock")
             locked_id = _registered_identity(paths, locked_repository)

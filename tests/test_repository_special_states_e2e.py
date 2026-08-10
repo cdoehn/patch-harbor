@@ -208,3 +208,14 @@ def test_context_ignores_a_special_entry_excluded_by_git(tmp_path: Path) -> None
     document = json.loads(completed.stdout)
     assert document["success"] is True
     assert document["result"]["dirty"] is False
+
+
+def test_context_rejects_a_nonportable_tracked_path(tmp_path: Path) -> None:
+    repository = create_repository(tmp_path / "repository")
+    _register(repository)
+    target = repository / "nested" / ".PatchHarbor" / "payload.txt"
+    target.parent.mkdir(parents=True)
+    target.write_text("payload\n", encoding="utf-8")
+    git(repository, "add", target.relative_to(repository).as_posix())
+
+    _assert_context_rejects_unsupported_state(repository)

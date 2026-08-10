@@ -640,7 +640,7 @@ def test_untracked_capture_rejects_a_non_utf8_git_path(
             RepositoryPath(tmp_path.resolve())
         )
 
-    _assert_repository_capture_error(captured)
+    _assert_unsupported_repository_state(captured)
 
 
 @pytest.mark.skipif(

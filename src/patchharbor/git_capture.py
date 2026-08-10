@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import Enum
 import os
@@ -35,10 +36,102 @@ class _UnsupportedState(Enum):
     INDEX = "repository index state is not supported"
     SPARSE = "sparse repository state is not supported"
     ENTRY_TYPE = "repository contains an unsupported entry type"
+    PATH = "repository contains a non-portable path"
 
 
 def _unsupported(state: _UnsupportedState) -> PatchHarborError:
     return unsupported_repository_state_error(state.value)
+
+
+_WINDOWS_INVALID_PATH_CHARACTERS = frozenset('<>:"\\|?*')
+_RESERVED_WINDOWS_DEVICE_NAMES = frozenset(
+    {"con", "prn", "aux", "nul", "conin$", "conout$", "clock$"}
+    | {f"com{number}" for number in range(1, 10)}
+    | {f"lpt{number}" for number in range(1, 10)}
+)
+
+
+def _portable_repository_path_key(raw: bytes) -> str:
+    try:
+        decoded = raw.decode("utf-8", errors="strict")
+    except UnicodeDecodeError as exc:
+        raise _unsupported(_UnsupportedState.PATH) from exc
+
+    segments = decoded.split("/")
+    if not segments or any(segment in ("", ".", "..") for segment in segments):
+        raise _unsupported(_UnsupportedState.PATH)
+
+    for segment in segments:
+        if any(
+            ord(character) <= 0x1F or ord(character) == 0x7F
+            for character in segment
+        ):
+            raise _unsupported(_UnsupportedState.PATH)
+        if any(
+            character in _WINDOWS_INVALID_PATH_CHARACTERS
+            for character in segment
+        ):
+            raise _unsupported(_UnsupportedState.PATH)
+        if segment.endswith((".", " ")):
+            raise _unsupported(_UnsupportedState.PATH)
+
+        folded = segment.casefold()
+        if folded in (".git", ".patchharbor"):
+            raise _unsupported(_UnsupportedState.PATH)
+        if folded.split(".", 1)[0] in _RESERVED_WINDOWS_DEVICE_NAMES:
+            raise _unsupported(_UnsupportedState.PATH)
+
+    return decoded.casefold()
+
+
+def require_portable_repository_paths(paths: Iterable[bytes]) -> None:
+    """Reject paths that cannot identify one portable repository state."""
+    observed: dict[str, bytes] = {}
+    for raw in paths:
+        key = _portable_repository_path_key(raw)
+        previous = observed.setdefault(key, raw)
+        if previous != raw:
+            raise _unsupported(_UnsupportedState.PATH)
+
+
+def _parse_repository_path_list(
+    raw: bytes,
+    description: str,
+) -> tuple[bytes, ...]:
+    paths = _nul_records(raw, description)
+    if any(not path for path in paths) or len(set(paths)) != len(paths):
+        raise _error(f"git returned ambiguous {description}")
+    return paths
+
+
+def read_base_and_index_paths(
+    repository: RepositoryPath,
+    base_commit: GitObjectId,
+) -> tuple[bytes, ...]:
+    """Return every path represented by the base tree or current index."""
+    base_paths = _parse_repository_path_list(
+        run_git_bytes(
+            repository,
+            "ls-tree",
+            "-r",
+            "-z",
+            "--name-only",
+            "--full-tree",
+            str(base_commit),
+        ),
+        "base tree paths",
+    )
+    index_paths = _parse_repository_path_list(
+        run_git_bytes(
+            repository,
+            "ls-files",
+            "--cached",
+            "-z",
+            "--",
+        ),
+        "index paths",
+    )
+    return (*base_paths, *index_paths)
 
 
 def run_git_bytes(
@@ -703,11 +796,11 @@ def _untracked_path(raw: bytes) -> _UntrackedPath:
     try:
         decoded = raw.decode("utf-8", errors="strict")
     except UnicodeDecodeError as exc:
-        raise _error("git returned a non-UTF-8 untracked path") from exc
+        raise _unsupported(_UnsupportedState.PATH) from exc
 
     parts = tuple(decoded.split("/"))
     if not parts or any(part in ("", ".", "..") for part in parts):
-        raise _error("git returned an invalid untracked path")
+        raise _unsupported(_UnsupportedState.PATH)
     return _UntrackedPath(
         original_bytes=raw,
         comparison_parts=parts,

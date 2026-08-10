@@ -70,8 +70,8 @@ def canonicalize_repository_reference(requested_path: Path) -> RepositoryPath:
         raise _error(f"cannot resolve repository path: {exc}") from exc
 
 
-def inspect_repository(requested_path: Path) -> RepositoryPath:
-    """Resolve and verify the immutable repository boundary for registration."""
+def inspect_repository_root(requested_path: Path) -> RepositoryPath:
+    """Resolve and verify one local Git repository with a committed HEAD."""
     output = run_git_bytes(
         "-C",
         str(requested_path.expanduser()),
@@ -98,6 +98,12 @@ def inspect_repository(requested_path: Path) -> RepositoryPath:
         "HEAD^{commit}",
         cwd=repository.value,
     )
+    return repository
+
+
+def inspect_repository(requested_path: Path) -> RepositoryPath:
+    """Resolve a repository and enforce the registration-only local boundary."""
+    repository = inspect_repository_root(requested_path)
     base_paths = _tracked_paths(
         repository,
         "ls-tree",
