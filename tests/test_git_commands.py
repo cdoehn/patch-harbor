@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 import subprocess
 
@@ -7,123 +8,58 @@ import pytest
 
 from patchharbor import git_commands
 from patchharbor.errors import ErrorKind, ExitCode, PatchHarborError
+from tests.registration_support import create_repository, git
 
 
-def test_git_queries_use_one_canonical_non_interactive_boundary(
+def test_git_queries_ignore_redirecting_process_environment(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    captured: dict[str, object] = {}
-    raw_stdout = b"raw\x00\xffbytes\n"
+    repository = create_repository(tmp_path / "repository")
+    redirected = create_repository(tmp_path / "redirected")
 
-    def fake_run(
-        command: list[str],
-        **options: object,
-    ) -> subprocess.CompletedProcess[bytes]:
-        captured["command"] = command
-        captured.update(options)
-        return subprocess.CompletedProcess(
-            command,
-            0,
-            stdout=raw_stdout,
-            stderr=b"",
-        )
-
-    monkeypatch.setenv("GIT_DIR", "redirected")
-    monkeypatch.setenv("GIT_WORK_TREE", "redirected")
-    monkeypatch.setenv("GIT_INDEX_FILE", "redirected")
-    monkeypatch.setenv("GIT_EXTERNAL_DIFF", "external-tool")
+    monkeypatch.setenv("GIT_DIR", str(redirected / ".git"))
+    monkeypatch.setenv("GIT_WORK_TREE", str(redirected))
+    monkeypatch.setenv("GIT_INDEX_FILE", str(redirected / ".git" / "index"))
+    monkeypatch.setenv("GIT_EXTERNAL_DIFF", "must-not-run")
     monkeypatch.setenv("GIT_CONFIG_COUNT", "1")
-    monkeypatch.setenv("GIT_CONFIG_KEY_0", "color.ui")
-    monkeypatch.setenv("GIT_CONFIG_VALUE_0", "always")
-    monkeypatch.setattr(git_commands.subprocess, "run", fake_run)
+    monkeypatch.setenv("GIT_CONFIG_KEY_0", "core.bare")
+    monkeypatch.setenv("GIT_CONFIG_VALUE_0", "true")
 
-    assert git_commands.run_git_bytes(
-        "status",
-        "-z",
-        cwd=tmp_path.resolve(),
-    ) == raw_stdout
-    assert captured["cwd"] == tmp_path.resolve()
-    assert captured["stdin"] is subprocess.DEVNULL
-    assert captured["stdout"] is subprocess.PIPE
-    assert captured["stderr"] is subprocess.PIPE
-    assert "encoding" not in captured
-    assert "text" not in captured
-
-    command = captured["command"]
-    assert command == [
-        "git",
-        "--no-pager",
-        "-c",
-        "color.ui=false",
-        "-c",
-        "diff.external=",
-        "-c",
-        "diff.renames=false",
-        "-c",
-        "status.renames=false",
-        "status",
-        "-z",
-    ]
-    environment = captured["env"]
-    assert isinstance(environment, dict)
-    assert environment["LC_ALL"] == "C"
-    assert environment["LANG"] == "C"
-    assert environment["GIT_OPTIONAL_LOCKS"] == "0"
-    assert environment["GIT_PAGER"] == "cat"
-    assert environment["GIT_TERMINAL_PROMPT"] == "0"
-    for name in (
-        "GIT_DIR",
-        "GIT_WORK_TREE",
-        "GIT_INDEX_FILE",
-        "GIT_EXTERNAL_DIFF",
-        "GIT_CONFIG_COUNT",
-        "GIT_CONFIG_KEY_0",
-        "GIT_CONFIG_VALUE_0",
-    ):
-        assert name not in environment
-
-
-@pytest.mark.parametrize(
-    ("returncode", "stdout", "expected"),
-    [
-        (1, b"", False),
-        (0, b"false\0", False),
-        (0, b"true\0", True),
-    ],
-)
-def test_missing_and_explicit_boolean_config_values_are_canonical(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    returncode: int,
-    stdout: bytes,
-    expected: bool,
-) -> None:
-    def fake_run(
-        command: list[str],
-        **_options: object,
-    ) -> subprocess.CompletedProcess[bytes]:
-        return subprocess.CompletedProcess(
-            command,
-            returncode,
-            stdout=stdout,
-            stderr=b"",
-        )
-
-    monkeypatch.setattr(git_commands.subprocess, "run", fake_run)
-
-    assert (
-        git_commands.read_boolean_config(
-            tmp_path.resolve(),
-            "core.sparseCheckout",
-        )
-        is expected
+    output = git_commands.run_git_bytes(
+        "rev-parse",
+        "--show-toplevel",
+        cwd=repository,
     )
 
+    observed_root = Path(output.decode("utf-8", errors="strict").strip())
+    assert observed_root.resolve() == repository.resolve()
 
-def test_malformed_boolean_config_is_a_repository_error(
+
+def test_git_query_preserves_binary_input_and_raw_stdout(tmp_path: Path) -> None:
+    repository = create_repository(tmp_path / "repository")
+    payload = b"raw\x00input\xff\r\n"
+    head = git(repository, "rev-parse", "HEAD").stdout.strip()
+    object_format = "sha1" if len(head) == 40 else "sha256"
+    digest = hashlib.new(object_format)
+    digest.update(f"blob {len(payload)}\0".encode("ascii"))
+    digest.update(payload)
+
+    output = git_commands.run_git_bytes(
+        "hash-object",
+        "--stdin",
+        cwd=repository,
+        input_bytes=payload,
+    )
+
+    assert output == f"{digest.hexdigest()}\n".encode("ascii")
+
+
+@pytest.mark.parametrize("stderr", [b"first git diagnostic", b"other\xffdiagnostic"])
+def test_git_failures_share_one_repository_error_category(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
+    stderr: bytes,
 ) -> None:
     def fake_run(
         command: list[str],
@@ -131,17 +67,54 @@ def test_malformed_boolean_config_is_a_repository_error(
     ) -> subprocess.CompletedProcess[bytes]:
         return subprocess.CompletedProcess(
             command,
-            0,
-            stdout=b"maybe\0",
-            stderr=b"",
+            128,
+            stdout=b"",
+            stderr=stderr,
         )
 
     monkeypatch.setattr(git_commands.subprocess, "run", fake_run)
 
     with pytest.raises(PatchHarborError) as captured:
+        git_commands.run_git_bytes("status", cwd=tmp_path.resolve())
+
+    assert captured.value.exit_code is ExitCode.REPOSITORY_ERROR
+    assert captured.value.error_kind is ErrorKind.REPOSITORY_RESOLUTION_ERROR
+
+
+@pytest.mark.parametrize(
+    ("configured_value", "expected"),
+    [
+        (None, False),
+        ("false", False),
+        ("true", True),
+    ],
+)
+def test_missing_and_explicit_boolean_config_values_are_canonical(
+    tmp_path: Path,
+    configured_value: str | None,
+    expected: bool,
+) -> None:
+    repository = create_repository(tmp_path / "repository")
+    if configured_value is not None:
+        git(repository, "config", "feature.enabled", configured_value)
+
+    assert (
         git_commands.read_boolean_config(
-            tmp_path.resolve(),
-            "core.sparseCheckout",
+            repository,
+            "feature.enabled",
+        )
+        is expected
+    )
+
+
+def test_malformed_boolean_config_is_a_repository_error(tmp_path: Path) -> None:
+    repository = create_repository(tmp_path / "repository")
+    git(repository, "config", "feature.enabled", "maybe")
+
+    with pytest.raises(PatchHarborError) as captured:
+        git_commands.read_boolean_config(
+            repository,
+            "feature.enabled",
         )
 
     assert captured.value.exit_code is ExitCode.REPOSITORY_ERROR

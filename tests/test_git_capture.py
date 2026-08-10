@@ -391,30 +391,6 @@ def test_unstaged_worktree_mode_respects_core_file_mode(
     assert record.worktree_content == tracked.read_bytes()
 
 
-def _raw_unstaged_outputs(repository: Path) -> tuple[bytes, bytes]:
-    resolved = RepositoryPath(repository.resolve())
-    return (
-        git_capture.run_git_bytes(
-            resolved,
-            "diff-files",
-            "--raw",
-            "-z",
-            "--no-renames",
-            "--no-ext-diff",
-            "--",
-        ),
-        git_capture.run_git_bytes(
-            resolved,
-            "config",
-            "--bool",
-            "--null",
-            "--default=false",
-            "--get",
-            "core.fileMode",
-        ),
-    )
-
-
 def _assert_repository_capture_error(
     captured: pytest.ExceptionInfo[PatchHarborError],
 ) -> None:
@@ -552,12 +528,6 @@ def test_unstaged_read_failure_is_categorized(
     tracked.write_bytes(b"changed\n")
     resolved = RepositoryPath(repository.resolve())
     object_format = git_capture.read_head_object_id(resolved).object_format
-    outputs = iter(_raw_unstaged_outputs(repository))
-    monkeypatch.setattr(
-        git_capture,
-        "run_git_bytes",
-        lambda *_args, **_kwargs: next(outputs),
-    )
     real_open = os.open
 
     def denied_open(path: os.PathLike[str], flags: int, *args: int) -> int:
@@ -582,12 +552,6 @@ def test_unstaged_file_replacement_during_capture_is_rejected(
     tracked.write_bytes(b"first changed content\n")
     resolved = RepositoryPath(repository.resolve())
     object_format = git_capture.read_head_object_id(resolved).object_format
-    outputs = iter(_raw_unstaged_outputs(repository))
-    monkeypatch.setattr(
-        git_capture,
-        "run_git_bytes",
-        lambda *_args, **_kwargs: next(outputs),
-    )
     real_open = os.open
     replaced = False
 
@@ -722,41 +686,22 @@ def test_untracked_file_replacement_during_capture_is_rejected(
     _assert_repository_capture_error(captured)
 
 
-def test_unstaged_query_disables_configurable_diff_behavior(
+def test_unstaged_capture_is_stable_under_diff_configuration(
     tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    captured_arguments: list[tuple[str, ...]] = []
+    repository = create_repository(tmp_path / "repository")
+    tracked = repository / "tracked.txt"
+    tracked.write_bytes(b"configured diff must not change raw state\n")
+    baseline = _unstaged_records(repository)
 
-    def fake_run_git_bytes(
-        _repository: RepositoryPath,
-        *arguments: str,
-        **_options: object,
-    ) -> bytes:
-        captured_arguments.append(arguments)
-        return b""
-
-    monkeypatch.setattr(git_capture, "run_git_bytes", fake_run_git_bytes)
-    monkeypatch.setattr(
-        git_capture,
-        "read_boolean_config",
-        lambda *_args, **_kwargs: False,
+    git(repository, "config", "color.ui", "always")
+    git(repository, "config", "diff.renames", "true")
+    git(repository, "config", "status.renames", "true")
+    git(repository, "config", "diff.external", "must-not-run")
+    git(repository, "config", "diff.fixture.textconv", "must-not-run")
+    (repository / ".gitattributes").write_text(
+        "tracked.txt diff=fixture\n",
+        encoding="utf-8",
     )
 
-    records = git_capture.read_unstaged_records(
-        RepositoryPath(tmp_path.resolve()),
-        GitObjectFormat.SHA1,
-    )
-
-    assert records == ()
-    assert captured_arguments == [
-        (
-            "diff-files",
-            "--raw",
-            "-z",
-            "--no-renames",
-            "--no-ext-diff",
-            "--no-textconv",
-            "--",
-        )
-    ]
+    assert _unstaged_records(repository) == baseline

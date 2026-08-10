@@ -73,20 +73,17 @@ def run_git_bytes(
 ) -> bytes:
     """Run one canonical Git query and return stdout unchanged."""
     command = [*_CANONICAL_GIT_PREFIX, *arguments]
-    run_options: dict[str, object] = {
-        "cwd": cwd,
-        "env": _controlled_environment(),
-        "stdout": subprocess.PIPE,
-        "stderr": subprocess.PIPE,
-        "check": False,
-    }
-    if input_bytes is None:
-        run_options["stdin"] = subprocess.DEVNULL
-    else:
-        run_options["input"] = input_bytes
-
     try:
-        completed = subprocess.run(command, **run_options)
+        completed = subprocess.run(
+            command,
+            cwd=cwd,
+            env=_controlled_environment(),
+            stdin=subprocess.DEVNULL if input_bytes is None else None,
+            input=input_bytes,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
     except FileNotFoundError as exc:
         raise _error("git executable is not available") from exc
     except OSError as exc:

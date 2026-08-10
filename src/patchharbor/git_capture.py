@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import Enum
 import os
 import stat
 
@@ -30,8 +31,14 @@ def _error(message: str) -> PatchHarborError:
     return repository_resolution_error(message)
 
 
-def _unsupported(message: str) -> PatchHarborError:
-    return unsupported_repository_state_error(message)
+class _UnsupportedState(Enum):
+    INDEX = "repository index state is not supported"
+    SPARSE = "sparse repository state is not supported"
+    ENTRY_TYPE = "repository contains an unsupported entry type"
+
+
+def _unsupported(state: _UnsupportedState) -> PatchHarborError:
+    return unsupported_repository_state_error(state.value)
 
 
 def run_git_bytes(
@@ -99,9 +106,9 @@ def _validated_object_name(
     return raw
 
 
-def _validated_file_mode(raw: bytes, description: str) -> bytes:
+def _validated_file_mode(raw: bytes) -> bytes:
     if raw not in _SUPPORTED_FILE_MODES:
-        raise _unsupported(f"git returned an unsupported {description} mode")
+        raise _unsupported(_UnsupportedState.ENTRY_TYPE)
     return raw
 
 
@@ -137,11 +144,9 @@ def _parse_base_tree(
             mode, object_type, object_name = metadata.split(b" ", 2)
         except ValueError as exc:
             raise _error("git returned malformed base tree data") from exc
-        validated_mode = _validated_file_mode(mode, "base tree")
+        validated_mode = _validated_file_mode(mode)
         if object_type != b"blob":
-            raise _unsupported(
-                "git returned an unsupported base tree object type"
-            )
+            raise _unsupported(_UnsupportedState.ENTRY_TYPE)
         previous_path = _next_sorted_path(previous_path, path, "base tree")
         entries.append(
             _BaseTreeEntry(
@@ -170,12 +175,12 @@ def _parse_index(
         except ValueError as exc:
             raise _error("git returned malformed index data") from exc
         if stage != b"0":
-            raise _unsupported("git returned an unsupported index state")
+            raise _unsupported(_UnsupportedState.INDEX)
         previous_path = _next_sorted_path(previous_path, path, "index")
         entries.append(
             _IndexEntry(
                 path=path,
-                mode=_validated_file_mode(mode, "index"),
+                mode=_validated_file_mode(mode),
                 object_name=_validated_object_name(
                     object_name,
                     object_format,
@@ -210,7 +215,7 @@ def _require_index_blobs(
         except ValueError as exc:
             raise _error("git returned malformed index object data") from exc
         if observed_name != expected_name or object_type != b"blob":
-            raise _unsupported("git returned an unsupported index object type")
+            raise _unsupported(_UnsupportedState.ENTRY_TYPE)
 
 
 def _staged_record(
@@ -325,8 +330,8 @@ def _parse_unstaged_diff(
             raise _error("git returned malformed unstaged diff data") from exc
 
         if status_byte not in (b"M", b"D"):
-            raise _unsupported("git returned an unsupported unstaged status")
-        _validated_file_mode(index_mode, "unstaged index")
+            raise _unsupported(_UnsupportedState.INDEX)
+        _validated_file_mode(index_mode)
         _validated_object_name(
             index_object,
             object_format,
@@ -339,7 +344,7 @@ def _parse_unstaged_diff(
             if reported_worktree_mode != _MISSING_FILE_MODE:
                 raise _error("git returned an invalid deleted worktree mode")
         else:
-            _validated_file_mode(reported_worktree_mode, "worktree")
+            _validated_file_mode(reported_worktree_mode)
 
         entries.append(
             _UnstagedEntry(
@@ -368,11 +373,9 @@ def _require_supported_index_flags(repository: RepositoryPath) -> None:
             raise _error("git returned malformed index flag data")
         tag = record[0]
         if tag == ord("S"):
-            raise _unsupported("skip-worktree index entries are not supported")
+            raise _unsupported(_UnsupportedState.INDEX)
         if ord("a") <= tag <= ord("z"):
-            raise _unsupported(
-                "assume-unchanged index entries are not supported"
-            )
+            raise _unsupported(_UnsupportedState.INDEX)
 
 
 def _ignored_directory_prefixes(
@@ -494,7 +497,7 @@ def _require_no_special_worktree_entries(repository: RepositoryPath) -> None:
     if not ignored.issubset(candidates):
         raise _error("git returned unexpected ignored path data")
     if candidates - ignored:
-        raise _unsupported("working tree contains a special file type")
+        raise _unsupported(_UnsupportedState.ENTRY_TYPE)
 
 
 def require_supported_repository_state(
@@ -503,13 +506,13 @@ def require_supported_repository_state(
 ) -> None:
     """Reject Git states the safe repository path cannot describe."""
     if run_git_bytes(repository, "ls-files", "--unmerged", "-z"):
-        raise _unsupported("unresolved merge stages are not supported")
+        raise _unsupported(_UnsupportedState.INDEX)
 
     _require_supported_index_flags(repository)
     if _boolean_config(repository, "core.sparseCheckout"):
-        raise _unsupported("sparse checkout is not supported")
+        raise _unsupported(_UnsupportedState.SPARSE)
     if _boolean_config(repository, "index.sparse"):
-        raise _unsupported("sparse index is not supported")
+        raise _unsupported(_UnsupportedState.SPARSE)
 
     _require_no_special_worktree_entries(repository)
     _parse_unstaged_diff(
@@ -559,7 +562,7 @@ def _inspect_worktree_path(target: os.PathLike[str]) -> os.stat_result | None:
 
 def _require_regular_file(metadata: os.stat_result) -> None:
     if not stat.S_ISREG(metadata.st_mode):
-        raise _unsupported("working-tree entry is not a regular file")
+        raise _unsupported(_UnsupportedState.ENTRY_TYPE)
 
 
 def _read_regular_file(
@@ -638,8 +641,7 @@ def _read_worktree_record(
     if entry.status == b"D":
         existing = _inspect_worktree_path(target)
         if existing is not None:
-            if not stat.S_ISREG(existing.st_mode):
-                raise _unsupported("working-tree entry is not a regular file")
+            _require_regular_file(existing)
             raise _error("deleted working-tree path still exists")
         return UnstagedRecord(
             path=entry.path,
