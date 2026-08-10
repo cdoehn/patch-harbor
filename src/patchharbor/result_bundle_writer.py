@@ -32,6 +32,19 @@ def _zip_info(name: str, *, executable: bool = False) -> zipfile.ZipInfo:
     return info
 
 
+def _write_entry(
+    archive: zipfile.ZipFile,
+    name: str,
+    content: bytes | memoryview,
+    *,
+    executable: bool = False,
+) -> None:
+    archive.writestr(
+        _zip_info(name, executable=executable),
+        content,
+    )
+
+
 def write_result_bundle(
     path: Path,
     *,
@@ -48,22 +61,18 @@ def write_result_bundle(
             compression=zipfile.ZIP_DEFLATED,
             allowZip64=True,
         ) as archive:
-            archive.writestr(_zip_info("manifest.json"), _json_bytes(manifest))
-            archive.writestr(
-                _zip_info("context.json"),
-                _json_bytes(context_document),
-            )
-            archive.writestr(
-                _zip_info("logs/run.json"),
-                _json_bytes(run_document),
-            )
+            for name, document in (
+                ("manifest.json", manifest),
+                ("context.json", context_document),
+                ("logs/run.json", run_document),
+            ):
+                _write_entry(archive, name, _json_bytes(document))
             for entry in base_entries:
-                archive.writestr(
-                    _zip_info(
-                        f"base/{entry.path.decoded}",
-                        executable=entry.executable,
-                    ),
+                _write_entry(
+                    archive,
+                    f"base/{entry.path.decoded}",
                     entry.content,
+                    executable=entry.executable,
                 )
     except (OSError, RuntimeError, ValueError, zipfile.LargeZipFile) as exc:
         try:

@@ -4,7 +4,6 @@ from datetime import datetime
 import json
 import os
 from pathlib import Path
-import subprocess
 from uuid import UUID
 import zipfile
 
@@ -32,18 +31,6 @@ def isolate_bundle_environment(
 ) -> None:
     for name, value in isolated_user_environment(tmp_path / "user").items():
         monkeypatch.setenv(name, value)
-
-
-def _git_bytes(repository: Path, *arguments: str) -> bytes:
-    completed = subprocess.run(
-        ["git", *arguments],
-        cwd=repository,
-        stdin=subprocess.DEVNULL,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        check=True,
-    )
-    return completed.stdout
 
 
 def _result_bundles() -> tuple[Path, ...]:
@@ -106,26 +93,13 @@ def test_manual_bundle_materializes_committed_blobs_without_export_rules(
         assert [name.encode("utf-8") for name in base_names_in_archive_order] == sorted(
             name.encode("utf-8") for name in base_names_in_archive_order
         )
-        assert expected_base_names.issubset(names)
-        assert {name for name in names if name.startswith("base/")} == (
-            expected_base_names
-        )
-        assert {"manifest.json", "context.json", "logs/run.json"}.issubset(
-            names
-        )
-        assert "logs/execution.log" not in names
-        assert not any(
-            segment.casefold() in {".git", ".patchharbor"}
-            for name in names
-            for segment in name.split("/")
-        )
-
-        for relative_path in committed:
-            assert archive.read(f"base/{relative_path}") == _git_bytes(
-                repository,
-                "show",
-                f"HEAD:{relative_path}",
-            )
+        assert names == expected_base_names | {
+            "manifest.json",
+            "context.json",
+            "logs/run.json",
+        }
+        for relative_path, expected_content in committed.items():
+            assert archive.read(f"base/{relative_path}") == expected_content
         executable_mode = archive.getinfo("base/executable.sh").external_attr >> 16
         assert executable_mode & 0o777 == 0o755
 

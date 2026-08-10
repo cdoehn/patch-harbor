@@ -34,7 +34,7 @@ class BaseBundleEntry:
     path: RepositoryRelativePath
     mode: bytes
     object_id: GitObjectId
-    content: bytes
+    content: memoryview
 
     @property
     def executable(self) -> bool:
@@ -113,6 +113,7 @@ def parse_batch_blob_response(
 ) -> tuple[BaseBundleEntry, ...]:
     """Validate one complete ``git cat-file --batch`` byte response."""
     cursor = 0
+    response = memoryview(raw)
     materialized: list[BaseBundleEntry] = []
 
     for entry in entries:
@@ -134,13 +135,9 @@ def parse_batch_blob_response(
 
         content_start = header_end + 1
         content_end = content_start + size
-        if content_end > len(raw):
+        if content_end >= len(response) or response[content_end] != 0x0A:
             raise _error("git returned truncated blob data")
-        content = raw[content_start:content_end]
-        if len(content) != size:
-            raise _error("git returned truncated blob data")
-        if raw[content_end : content_end + 1] != b"\n":
-            raise _error("git returned truncated blob data")
+        content = response[content_start:content_end]
 
         materialized.append(
             BaseBundleEntry(
