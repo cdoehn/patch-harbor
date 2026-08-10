@@ -524,11 +524,13 @@ Eine konkrete lokale Git-Repository-Instanz kann sicher registriert, wiedergefun
 
 ## Review nach Meilenstein 2
 
-- Definition of Done gegen das reale Verhalten prüfen.
-- falsche Annahmen und unnötig gewordene spätere Schritte dokumentieren.
-- verbleibenden Plan nur minimal anpassen.
-- sicherstellen, dass PatchHarbor weiterhin ein kontrollierter Runner bleibt.
-- Review im letzten Clean-Commit des Meilensteins abschließen; kein separater Review-Commit.
+**Ergebnis nach 2.f.C:**
+
+- Die Definition of Done ist durch die vier normativen Encoder-Vektoren sowie echte Git-Integrationstests für clean, staged, unstaged und untracked Zustände abgedeckt.
+- `patchharbor-state-v1` ist als Kompatibilitätsgrenze abgeschlossen; jede spätere Änderung der Byte-Rahmung benötigt eine neue Algorithmuskennung.
+- Portable Pfade werden einmal vor der Datensatzaufnahme validiert; Fingerprint-Datensätze enthalten nur bereits geprüfte Pfadbytes.
+- Eine zusätzliche Normalisierungs-, Cache- oder Git-Patch-Abstraktion ist nicht erforderlich; der verbleibende Plan benötigt keine fachliche Änderung.
+- Es wurde keine Result-Bundle-, Apply- oder Watcher-Logik vorweggenommen; PatchHarbor bleibt ein kontrollierter Runner.
 
 ---
 

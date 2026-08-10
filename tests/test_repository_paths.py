@@ -16,9 +16,6 @@ from patchharbor.repository_state import capture_repository_state
 from tests.registration_support import create_repository, git
 
 
-pytestmark = pytest.mark.e2e
-
-
 def _assert_unsupported(callable_object) -> None:
     with pytest.raises(PatchHarborError) as captured:
         callable_object()
@@ -129,6 +126,7 @@ def test_portable_repository_paths_use_casefold_without_normalization() -> None:
 
 
 @pytest.mark.parametrize("source", ["base", "index", "untracked"])
+@pytest.mark.e2e
 def test_repository_state_validates_the_union_of_git_paths(
     tmp_path: Path,
     source: str,
@@ -150,6 +148,7 @@ def test_repository_state_validates_the_union_of_git_paths(
     os.name == "nt",
     reason="requires two casefold-colliding names in one working tree",
 )
+@pytest.mark.e2e
 def test_repository_state_rejects_casefold_collisions_across_sources(
     tmp_path: Path,
 ) -> None:
@@ -166,6 +165,7 @@ def test_repository_state_rejects_casefold_collisions_across_sources(
     os.name == "nt",
     reason="requires a POSIX file name that is not valid UTF-8",
 )
+@pytest.mark.e2e
 def test_repository_state_rejects_non_utf8_git_paths(tmp_path: Path) -> None:
     repository = create_repository(tmp_path / "repository")
     raw_path = os.fsencode(repository) + b"/invalid-\xff.bin"

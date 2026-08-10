@@ -25,10 +25,7 @@ from patchharbor.models import (
     UnstagedRecord,
     UntrackedRecord,
 )
-from patchharbor.repository_paths import (
-    RepositoryRelativePath,
-    validate_repository_paths,
-)
+from patchharbor.repository_paths import RepositoryRelativePath
 
 
 def _error(message: str) -> PatchHarborError:
@@ -546,7 +543,6 @@ def _require_no_special_worktree_entries(repository: RepositoryPath) -> None:
 
 def require_supported_repository_state(
     repository: RepositoryPath,
-    object_format: GitObjectFormat,
 ) -> None:
     """Reject Git states the safe repository path cannot describe."""
     if run_git_bytes(repository, "ls-files", "--unmerged", "-z"):
@@ -559,13 +555,6 @@ def require_supported_repository_state(
         raise _unsupported(_UnsupportedState.SPARSE)
 
     _require_no_special_worktree_entries(repository)
-    _parse_unstaged_diff(
-        run_git_bytes(
-            repository,
-            *_RAW_UNSTAGED_DIFF_ARGUMENTS,
-        ),
-        object_format,
-    )
 
 
 @dataclass(frozen=True)
@@ -737,32 +726,30 @@ def read_unstaged_records(
     )
 
 
-def _parse_untracked_paths(
-    raw: bytes,
-) -> tuple[RepositoryRelativePath, ...]:
-    raw_paths = _nul_records(raw, "untracked paths")
-    if any(not path for path in raw_paths):
-        raise _error("git returned ambiguous untracked paths")
-    paths = validate_repository_paths(raw_paths)
-    if len(paths) != len(raw_paths):
-        raise _error("git returned ambiguous untracked paths")
-    return paths
+def read_untracked_paths(repository: RepositoryPath) -> tuple[bytes, ...]:
+    """Return non-ignored untracked path bytes in canonical order."""
+    return tuple(
+        sorted(
+            _parse_repository_path_list(
+                run_git_bytes(
+                    repository,
+                    "ls-files",
+                    "--others",
+                    "--exclude-standard",
+                    "-z",
+                    "--",
+                ),
+                "untracked paths",
+            )
+        )
+    )
 
 
 def read_untracked_records(
     repository: RepositoryPath,
+    paths: tuple[RepositoryRelativePath, ...],
 ) -> tuple[UntrackedRecord, ...]:
-    """Return canonical non-ignored untracked files in byte order."""
-    paths = _parse_untracked_paths(
-        run_git_bytes(
-            repository,
-            "ls-files",
-            "--others",
-            "--exclude-standard",
-            "-z",
-            "--",
-        )
-    )
+    """Read canonical untracked records from already validated paths."""
     if not paths:
         return ()
 

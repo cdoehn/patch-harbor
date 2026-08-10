@@ -8,11 +8,15 @@ from patchharbor import repository_state
 from patchharbor.errors import ErrorKind, ExitCode, PatchHarborError
 from patchharbor.git_capture import read_head_object_id
 from patchharbor.models import RepositoryPath
+from patchharbor.repository_paths import RepositoryRelativePath
 from patchharbor.repository_state import (
     capture_consistent_repository_snapshot,
     capture_repository_state,
 )
 from tests.registration_support import create_repository, git
+
+
+pytestmark = pytest.mark.e2e
 
 
 def _capture(repository: Path):
@@ -65,9 +69,12 @@ def test_consistent_snapshot_rejects_a_repository_change_during_capture(
     original_reader = repository_state.read_untracked_records
     changed = False
 
-    def read_then_change(repository_path: RepositoryPath):
+    def read_then_change(
+        repository_path: RepositoryPath,
+        paths: tuple[RepositoryRelativePath, ...],
+    ):
         nonlocal changed
-        records = original_reader(repository_path)
+        records = original_reader(repository_path, paths)
         if not changed:
             changed = True
             (repository / "tracked.txt").write_bytes(b"changed during capture\n")

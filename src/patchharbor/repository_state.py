@@ -11,6 +11,7 @@ from patchharbor.git_capture import (
     read_head_object_id,
     read_staged_records,
     read_unstaged_records,
+    read_untracked_paths,
     read_untracked_records,
     require_supported_repository_state,
 )
@@ -105,27 +106,27 @@ def capture_repository_state(
     base_commit: GitObjectId,
 ) -> RepositoryState:
     """Validate and capture all supported non-HEAD repository state."""
-    require_supported_repository_state(
-        repository,
-        base_commit.object_format,
+    require_supported_repository_state(repository)
+    raw_untracked_paths = read_untracked_paths(repository)
+    validated_paths = validate_repository_paths(
+        (
+            *read_base_and_index_paths(repository, base_commit),
+            *raw_untracked_paths,
+        )
     )
-    state = RepositoryState(
+    paths_by_bytes = {path.original_bytes: path for path in validated_paths}
+    untracked_paths = tuple(
+        paths_by_bytes[raw_path]
+        for raw_path in raw_untracked_paths
+    )
+    return RepositoryState(
         staged=read_staged_records(repository, base_commit),
         unstaged=read_unstaged_records(
             repository,
             base_commit.object_format,
         ),
-        untracked=read_untracked_records(repository),
+        untracked=read_untracked_records(repository, untracked_paths),
     )
-    validate_repository_paths(
-        (
-            *read_base_and_index_paths(repository, base_commit),
-            *(record.path for record in state.staged),
-            *(record.path for record in state.unstaged),
-            *(record.path for record in state.untracked),
-        )
-    )
-    return state
 
 
 def capture_repository_snapshot(
