@@ -5,13 +5,12 @@ from __future__ import annotations
 from contextlib import ExitStack
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from hashlib import sha256
 from pathlib import Path
 from time import monotonic
 from uuid import UUID, uuid4
 
 from patchharbor.errors import result_bundle_error
-from patchharbor.git_objects import BaseBundleEntry, capture_base_bundle_entries
+from patchharbor.git_objects import capture_base_bundle_entries
 from patchharbor.git_patches import capture_change_patches
 from patchharbor.locks import registry_lock, repository_lock
 from patchharbor.models import (
@@ -19,7 +18,6 @@ from patchharbor.models import (
     RepositoryContext,
     RepositoryId,
     RepositoryPath,
-    UntrackedRecord,
 )
 from patchharbor.physical_paths import physically_canonicalize
 from patchharbor.registry import load_registry
@@ -28,10 +26,13 @@ from patchharbor.repository_state import (
     capture_consistent_repository_snapshot,
     repository_context_from_snapshot,
 )
-from patchharbor.result_bundle_writer import (
-    UntrackedBundleEntry,
-    write_result_bundle,
+from patchharbor.result_bundle_snapshot import (
+    ResultBaseEntry,
+    ResultBundleSnapshot,
+    ResultUntrackedEntry,
+    build_result_bundle_snapshot,
 )
+from patchharbor.result_bundle_writer import write_result_bundle
 from patchharbor.user_paths import RegistrationUserPaths, registration_user_paths
 
 
@@ -96,41 +97,28 @@ def _default_result_directory(paths: RegistrationUserPaths) -> Path:
 
 
 def _base_entry_documents(
-    entries: tuple[BaseBundleEntry, ...],
+    entries: tuple[ResultBaseEntry, ...],
 ) -> list[dict[str, object]]:
     return [
         {
             "path": entry.path.decoded,
-            "git_mode": entry.mode.decode("ascii"),
+            "git_mode": entry.git_mode,
             "object_id": str(entry.object_id),
-            "size": len(entry.content),
+            "size": entry.size,
         }
-        for entry in sorted(entries, key=lambda item: item.path.original_bytes)
+        for entry in entries
     ]
 
 
-def _untracked_bundle_entries(
-    records: tuple[UntrackedRecord, ...],
-) -> tuple[UntrackedBundleEntry, ...]:
-    return tuple(
-        UntrackedBundleEntry(
-            path=record.path.decode("utf-8", errors="strict"),
-            mode=record.mode,
-            content=record.content,
-        )
-        for record in sorted(records, key=lambda item: item.path)
-    )
-
-
 def _untracked_entry_documents(
-    entries: tuple[UntrackedBundleEntry, ...],
+    entries: tuple[ResultUntrackedEntry, ...],
 ) -> list[dict[str, object]]:
     return [
         {
-            "path": entry.path,
-            "mode": entry.mode.decode("ascii"),
-            "size": len(entry.content),
-            "sha256": sha256(entry.content).hexdigest(),
+            "path": entry.path.decoded,
+            "mode": entry.mode,
+            "size": entry.size,
+            "sha256": entry.content_sha256,
         }
         for entry in entries
     ]
@@ -141,8 +129,7 @@ def _manifest_document(
     run_id: UUID,
     context: RepositoryContext,
     created_at: str,
-    base_entries: tuple[BaseBundleEntry, ...],
-    untracked_entries: tuple[UntrackedBundleEntry, ...],
+    snapshot: ResultBundleSnapshot,
 ) -> dict[str, object]:
     return {
         "marker": _RESULT_MARKER,
@@ -158,8 +145,10 @@ def _manifest_document(
         "execution_present": False,
         "primary_result": "success",
         "result_bundle_status": "created",
-        "base_entries": _base_entry_documents(base_entries),
-        "untracked_entries": _untracked_entry_documents(untracked_entries),
+        "base_entries": _base_entry_documents(snapshot.base_entries),
+        "untracked_entries": _untracked_entry_documents(
+            snapshot.untracked_entries
+        ),
     }
 
 
@@ -252,10 +241,26 @@ def create_manual_result_bundle(path: Path) -> ManualResultBundle:
             locked_repository,
             context.base_commit,
         )
-        untracked_entries = _untracked_bundle_entries(snapshot.state.untracked)
         change_patches = capture_change_patches(
             locked_repository,
             context.base_commit,
+        )
+        bundle_snapshot = build_result_bundle_snapshot(
+            base_entries=(
+                (
+                    entry.path.original_bytes,
+                    entry.mode,
+                    entry.object_id,
+                    entry.content,
+                )
+                for entry in base_entries
+            ),
+            staged_patch=change_patches.staged,
+            unstaged_patch=change_patches.unstaged,
+            untracked_entries=(
+                (record.path, record.mode, record.content)
+                for record in snapshot.state.untracked
+            ),
         )
         result_directory = _default_result_directory(paths)
         filename_timestamp = started.strftime("%Y%m%d_%H%M%S")
@@ -271,8 +276,7 @@ def create_manual_result_bundle(path: Path) -> ManualResultBundle:
                 run_id=run_id,
                 context=context,
                 created_at=created_at,
-                base_entries=base_entries,
-                untracked_entries=untracked_entries,
+                snapshot=bundle_snapshot,
             ),
             context_document=_context_document(
                 context,
@@ -285,10 +289,7 @@ def create_manual_result_bundle(path: Path) -> ManualResultBundle:
                 ended_at=_timestamp(ended),
                 duration_seconds=max(0.0, monotonic() - started_monotonic),
             ),
-            base_entries=base_entries,
-            staged_patch=change_patches.staged,
-            unstaged_patch=change_patches.unstaged,
-            untracked_entries=untracked_entries,
+            snapshot=bundle_snapshot,
         )
 
     return ManualResultBundle(run_id=run_id, context=context, path=result_path)

@@ -1,29 +1,14 @@
-"""Write already captured PatchHarbor Result Bundle data to one ZIP."""
+"""Write one already captured PatchHarbor Result Bundle to a ZIP."""
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import json
 from pathlib import Path
 import stat
 import zipfile
 
 from patchharbor.errors import result_bundle_error
-from patchharbor.git_objects import BaseBundleEntry
-
-
-@dataclass(frozen=True)
-class UntrackedBundleEntry:
-    """One validated untracked file ready for Result Bundle writing."""
-
-    path: str
-    mode: bytes
-    content: bytes
-
-    @property
-    def executable(self) -> bool:
-        """Whether the canonical file mode marks this file executable."""
-        return self.mode == b"100755"
+from patchharbor.result_bundle_snapshot import ResultBundleSnapshot
 
 
 def _json_bytes(document: dict[str, object]) -> bytes:
@@ -66,12 +51,9 @@ def write_result_bundle(
     manifest: dict[str, object],
     context_document: dict[str, object],
     run_document: dict[str, object],
-    base_entries: tuple[BaseBundleEntry, ...],
-    staged_patch: bytes,
-    unstaged_patch: bytes,
-    untracked_entries: tuple[UntrackedBundleEntry, ...],
+    snapshot: ResultBundleSnapshot,
 ) -> None:
-    """Write one fully captured Result Bundle."""
+    """Write one fully captured Result Bundle without reading the repository."""
     try:
         with zipfile.ZipFile(
             path,
@@ -85,22 +67,27 @@ def write_result_bundle(
                 ("logs/run.json", run_document),
             ):
                 _write_entry(archive, name, _json_bytes(document))
-            for entry in base_entries:
+            for entry in snapshot.base_entries:
                 _write_entry(
                     archive,
                     f"base/{entry.path.decoded}",
                     entry.content,
                     executable=entry.executable,
                 )
-            _write_entry(archive, "changes/staged.patch", staged_patch)
-            _write_entry(archive, "changes/unstaged.patch", unstaged_patch)
-            for entry in sorted(
-                untracked_entries,
-                key=lambda item: item.path.encode("utf-8"),
-            ):
+            _write_entry(
+                archive,
+                "changes/staged.patch",
+                snapshot.staged_patch,
+            )
+            _write_entry(
+                archive,
+                "changes/unstaged.patch",
+                snapshot.unstaged_patch,
+            )
+            for entry in snapshot.untracked_entries:
                 _write_entry(
                     archive,
-                    f"untracked/{entry.path}",
+                    f"untracked/{entry.path.decoded}",
                     entry.content,
                     executable=entry.executable,
                 )

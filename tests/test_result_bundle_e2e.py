@@ -237,7 +237,7 @@ def test_manual_bundle_captures_untracked_bytes_modes_and_hashes(
 ) -> None:
     repository = create_repository(tmp_path / "repository", with_commit=False)
     (repository / ".gitignore").write_bytes(
-        b"ignored.bin\nignored-directory/\n"
+        b"ignored.bin\nignored-directory/\n.env\n"
     )
     (repository / "base.txt").write_bytes(b"committed base\n")
     git(repository, "add", "--all")
@@ -259,6 +259,7 @@ def test_manual_bundle_captures_untracked_bytes_modes_and_hashes(
         expected_executable_mode = "100755"
 
     (repository / "ignored.bin").write_bytes(b"ignored\x00secret")
+    (repository / ".env").write_bytes(b"TOKEN=ignored-secret\n")
     (repository / "ignored-directory").mkdir()
     (repository / "ignored-directory" / "secret.txt").write_bytes(b"ignored")
 
@@ -270,9 +271,13 @@ def test_manual_bundle_captures_untracked_bytes_modes_and_hashes(
     with zipfile.ZipFile(bundles[0]) as archive:
         names = set(archive.namelist())
         manifest = json.loads(archive.read("manifest.json"))
-        for relative_path, expected_content in untracked.items():
-            assert archive.read(f"untracked/{relative_path}") == expected_content
+        archived_untracked = {
+            relative_path: archive.read(f"untracked/{relative_path}")
+            for relative_path in untracked
+        }
+        assert archived_untracked == untracked
         assert "untracked/ignored.bin" not in names
+        assert "untracked/.env" not in names
         assert "untracked/ignored-directory/secret.txt" not in names
         assert not any(".patchharbor" in name.casefold() for name in names)
 
@@ -300,6 +305,10 @@ def test_manual_bundle_captures_untracked_bytes_modes_and_hashes(
             "sha256": sha256(untracked["tools/local.sh"]).hexdigest(),
         },
     ]
+    for entry in manifest["untracked_entries"]:
+        content = archived_untracked[entry["path"]]
+        assert entry["size"] == len(content)
+        assert entry["sha256"] == sha256(content).hexdigest()
     assert [entry["path"] for entry in manifest["base_entries"]] == [
         ".gitignore",
         "base.txt",

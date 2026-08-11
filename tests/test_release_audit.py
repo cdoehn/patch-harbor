@@ -34,6 +34,7 @@ EXPECTED_RUNTIME_FILES = {
     "repository_paths.py",
     "repository_state.py",
     "result_bundle.py",
+    "result_bundle_snapshot.py",
     "result_bundle_writer.py",
     "locks.py",
     "resource_policy.py",

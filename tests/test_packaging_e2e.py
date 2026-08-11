@@ -45,6 +45,7 @@ EXPECTED_RUNTIME_FILES = {
     "patchharbor/repository_paths.py",
     "patchharbor/repository_state.py",
     "patchharbor/result_bundle.py",
+    "patchharbor/result_bundle_snapshot.py",
     "patchharbor/result_bundle_writer.py",
     "patchharbor/locks.py",
     "patchharbor/resource_policy.py",
