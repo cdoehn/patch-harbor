@@ -10,7 +10,10 @@ from time import monotonic
 from uuid import UUID, uuid4
 
 from patchharbor.errors import result_bundle_error
-from patchharbor.git_objects import capture_base_bundle_entries
+from patchharbor.git_objects import (
+    capture_base_bundle_entries,
+    capture_change_patches,
+)
 from patchharbor.locks import registry_lock, repository_lock
 from patchharbor.models import (
     RegistrySnapshot,
@@ -168,7 +171,7 @@ def _run_document(
 
 
 def create_manual_result_bundle(path: Path) -> ManualResultBundle:
-    """Create one base-only Result Bundle for a registered clean repository."""
+    """Create one Result Bundle for a registered supported repository."""
     started = _utc_now()
     started_monotonic = monotonic()
     run_id = uuid4()
@@ -197,12 +200,16 @@ def create_manual_result_bundle(path: Path) -> ManualResultBundle:
             locked_id,
             snapshot,
         )
-        if context.dirty:
+        if snapshot.state.untracked:
             raise result_bundle_error(
-                "base-only Result Bundles require a clean repository"
+                "Result Bundles with untracked files are not supported yet"
             )
 
         base_entries = capture_base_bundle_entries(
+            locked_repository,
+            context.base_commit,
+        )
+        change_patches = capture_change_patches(
             locked_repository,
             context.base_commit,
         )
@@ -233,6 +240,8 @@ def create_manual_result_bundle(path: Path) -> ManualResultBundle:
                 duration_seconds=max(0.0, monotonic() - started_monotonic),
             ),
             base_entries=base_entries,
+            staged_patch=change_patches.staged,
+            unstaged_patch=change_patches.unstaged,
         )
 
     return ManualResultBundle(run_id=run_id, context=context, path=result_path)

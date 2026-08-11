@@ -52,8 +52,10 @@ def write_result_bundle(
     context_document: dict[str, object],
     run_document: dict[str, object],
     base_entries: tuple[BaseBundleEntry, ...],
+    staged_patch: bytes,
+    unstaged_patch: bytes,
 ) -> None:
-    """Write one fully captured base-only Result Bundle."""
+    """Write one fully captured Result Bundle."""
     try:
         with zipfile.ZipFile(
             path,
@@ -74,6 +76,8 @@ def write_result_bundle(
                     entry.content,
                     executable=entry.executable,
                 )
+            _write_entry(archive, "changes/staged.patch", staged_patch)
+            _write_entry(archive, "changes/unstaged.patch", unstaged_patch)
     except (OSError, RuntimeError, ValueError, zipfile.LargeZipFile) as exc:
         try:
             path.unlink(missing_ok=True)

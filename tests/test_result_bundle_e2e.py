@@ -4,6 +4,7 @@ from datetime import datetime
 import json
 import os
 from pathlib import Path
+import stat
 from uuid import UUID
 import zipfile
 
@@ -44,6 +45,52 @@ def _assert_rfc3339_utc(value: object) -> None:
     assert isinstance(value, str)
     assert value.endswith("Z")
     datetime.fromisoformat(value.removesuffix("Z") + "+00:00")
+
+
+def _materialize_base_repository(
+    archive: zipfile.ZipFile,
+    destination: Path,
+) -> Path:
+    destination.mkdir()
+    git(destination, "init", "--quiet")
+    git(destination, "config", "user.name", "PatchHarbor Test")
+    git(destination, "config", "user.email", "patchharbor@example.invalid")
+
+    base_entries = tuple(
+        info for info in archive.infolist() if info.filename.startswith("base/")
+    )
+    for info in base_entries:
+        relative_path = info.filename.removeprefix("base/")
+        target = destination.joinpath(*relative_path.split("/"))
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(archive.read(info))
+
+    git(destination, "add", "--all")
+    for info in base_entries:
+        relative_path = info.filename.removeprefix("base/")
+        executable = bool((info.external_attr >> 16) & stat.S_IXUSR)
+        git(
+            destination,
+            "update-index",
+            "--chmod=+x" if executable else "--chmod=-x",
+            "--",
+            relative_path,
+        )
+    git(destination, "commit", "--quiet", "-m", "materialized base")
+    return destination
+
+
+def _tracked_worktree(repository: Path) -> dict[str, bytes | None]:
+    raw_paths = git(repository, "ls-files", "-z").stdout
+    return {
+        relative_path: (
+            repository.joinpath(*relative_path.split("/")).read_bytes()
+            if repository.joinpath(*relative_path.split("/")).is_file()
+            else None
+        )
+        for relative_path in raw_paths.rstrip("\0").split("\0")
+        if relative_path
+    }
 
 
 @pytest.mark.parametrize("explicit_path", [False, True])
@@ -96,8 +143,12 @@ def test_manual_bundle_materializes_committed_blobs_without_export_rules(
         assert names == expected_base_names | {
             "manifest.json",
             "context.json",
+            "changes/staged.patch",
+            "changes/unstaged.patch",
             "logs/run.json",
         }
+        assert archive.read("changes/staged.patch") == b""
+        assert archive.read("changes/unstaged.patch") == b""
         for relative_path, expected_content in committed.items():
             assert archive.read(f"base/{relative_path}") == expected_content
         executable_mode = archive.getinfo("base/executable.sh").external_attr >> 16
@@ -143,6 +194,85 @@ def test_manual_bundle_materializes_committed_blobs_without_export_rules(
     assert run["process_exit_code"] == 0
     _assert_rfc3339_utc(run["started_at"])
     _assert_rfc3339_utc(run["ended_at"])
+
+
+def test_manual_bundle_patches_reconstruct_staged_and_unstaged_state(
+    tmp_path: Path,
+) -> None:
+    repository = create_repository(tmp_path / "repository", with_commit=False)
+    base_files = {
+        "layered.bin": b"base-layer\x00\xff\n",
+        "staged-only.bin": b"base-staged\x00\n",
+        "unstaged-only.bin": b"base-unstaged\x00\n",
+        "staged-mode.sh": b"#!/bin/sh\nexit 0\n",
+        "unstaged-mode.sh": b"#!/bin/sh\nexit 0\n",
+    }
+    for relative_path, content in base_files.items():
+        (repository / relative_path).write_bytes(content)
+    if os.name != "nt":
+        os.chmod(repository / "unstaged-mode.sh", 0o755)
+        git(repository, "config", "core.filemode", "true")
+    git(repository, "add", "--all")
+    git(repository, "update-index", "--chmod=+x", "unstaged-mode.sh")
+    git(repository, "commit", "--quiet", "-m", "binary and mode base")
+    assert run_cli(repository, "register").returncode == 0
+
+    (repository / "layered.bin").write_bytes(b"staged-layer\x00\xfe\n")
+    (repository / "staged-only.bin").write_bytes(b"staged-only\x00\xfd\n")
+    git(repository, "add", "layered.bin", "staged-only.bin")
+    git(repository, "update-index", "--chmod=+x", "staged-mode.sh")
+    if os.name != "nt":
+        os.chmod(repository / "staged-mode.sh", 0o755)
+
+    (repository / "layered.bin").write_bytes(b"working-layer\x00\xfc\n")
+    (repository / "unstaged-only.bin").write_bytes(
+        b"unstaged-only\x00\xfb\n"
+    )
+    if os.name != "nt":
+        os.chmod(repository / "unstaged-mode.sh", 0o644)
+
+    expected_context = json.loads(
+        run_cli(repository, "context", "--json").stdout
+    )["result"]
+    source_index_tree = git(repository, "write-tree").stdout.strip()
+
+    completed = run_cli(repository, "bundle")
+
+    assert completed.returncode == 0
+    bundles = _result_bundles()
+    assert len(bundles) == 1
+    reconstructed = tmp_path / "reconstructed"
+    with zipfile.ZipFile(bundles[0]) as archive:
+        staged_patch = archive.read("changes/staged.patch")
+        unstaged_patch = archive.read("changes/unstaged.patch")
+        context = json.loads(archive.read("context.json"))
+        _materialize_base_repository(archive, reconstructed)
+
+    assert staged_patch
+    assert unstaged_patch
+    assert context["dirty"] is True
+    assert context["base_commit"] == expected_context["base_commit"]
+    assert context["state_fingerprint"] == expected_context["state_fingerprint"]
+
+    staged_path = tmp_path / "staged.patch"
+    unstaged_path = tmp_path / "unstaged.patch"
+    staged_path.write_bytes(staged_patch)
+    unstaged_path.write_bytes(unstaged_patch)
+
+    git(reconstructed, "apply", "--index", "--binary", str(staged_path))
+    assert git(reconstructed, "write-tree").stdout.strip() == source_index_tree
+
+    git(reconstructed, "apply", "--binary", str(unstaged_path))
+    assert git(reconstructed, "write-tree").stdout.strip() == source_index_tree
+    assert _tracked_worktree(reconstructed) == _tracked_worktree(repository)
+
+    if os.name != "nt":
+        for relative_path in ("staged-mode.sh", "unstaged-mode.sh"):
+            expected_mode = (repository / relative_path).stat().st_mode
+            reconstructed_mode = (reconstructed / relative_path).stat().st_mode
+            assert bool(expected_mode & stat.S_IXUSR) == bool(
+                reconstructed_mode & stat.S_IXUSR
+            )
 
 
 def test_manual_bundle_respects_the_repository_lock(tmp_path: Path) -> None:
