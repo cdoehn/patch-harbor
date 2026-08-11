@@ -17,22 +17,6 @@ class GitChangePatches:
     unstaged: bytes
 
 
-def _capture_patch(
-    repository: RepositoryPath,
-    *arguments: str,
-) -> bytes:
-    try:
-        return run_git_bytes(
-            "diff",
-            *arguments,
-            cwd=repository.value,
-        )
-    except PatchHarborError as exc:
-        raise result_bundle_error(
-            "cannot capture repository change patches"
-        ) from exc
-
-
 def capture_change_patches(
     repository: RepositoryPath,
     base_commit: GitObjectId,
@@ -43,16 +27,23 @@ def capture_change_patches(
         "--full-index",
         *CANONICAL_DIFF_ARGUMENTS,
     )
-    staged = _capture_patch(
-        repository,
-        "--cached",
-        *reconstruction_arguments,
-        str(base_commit),
-        "--",
-    )
-    unstaged = _capture_patch(
-        repository,
-        *reconstruction_arguments,
-        "--",
-    )
+    try:
+        staged = run_git_bytes(
+            "diff",
+            "--cached",
+            *reconstruction_arguments,
+            str(base_commit),
+            "--",
+            cwd=repository.value,
+        )
+        unstaged = run_git_bytes(
+            "diff",
+            *reconstruction_arguments,
+            "--",
+            cwd=repository.value,
+        )
+    except PatchHarborError as exc:
+        raise result_bundle_error(
+            "cannot capture repository change patches"
+        ) from exc
     return GitChangePatches(staged=staged, unstaged=unstaged)

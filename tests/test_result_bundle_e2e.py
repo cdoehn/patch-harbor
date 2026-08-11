@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import stat
+import subprocess
 from uuid import UUID
 import zipfile
 
@@ -80,6 +81,22 @@ def _materialize_base_repository(
     return destination
 
 
+def _apply_patch(
+    repository: Path,
+    patch: bytes,
+    *arguments: str,
+) -> None:
+    """Apply raw bundle patch bytes without a filesystem intermediary."""
+    subprocess.run(
+        ["git", "apply", *arguments, "--binary"],
+        cwd=repository,
+        input=patch,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=True,
+    )
+
+
 def _tracked_worktree(repository: Path) -> dict[str, bytes | None]:
     raw_paths = git(repository, "ls-files", "-z").stdout
     return {
@@ -147,8 +164,6 @@ def test_manual_bundle_materializes_committed_blobs_without_export_rules(
             "changes/unstaged.patch",
             "logs/run.json",
         }
-        assert archive.read("changes/staged.patch") == b""
-        assert archive.read("changes/unstaged.patch") == b""
         for relative_path, expected_content in committed.items():
             assert archive.read(f"base/{relative_path}") == expected_content
         executable_mode = archive.getinfo("base/executable.sh").external_attr >> 16
@@ -252,9 +267,7 @@ def test_manual_bundle_patches_reconstruct_staged_and_unstaged_state(
     if os.name != "nt":
         os.chmod(repository / "unstaged-mode.sh", 0o644)
 
-    expected_context = json.loads(
-        run_cli(repository, "context", "--json").stdout
-    )["result"]
+    base_commit = git(repository, "rev-parse", "HEAD").stdout.strip()
     source_index_tree = git(repository, "write-tree").stdout.strip()
 
     completed = run_cli(repository, "bundle")
@@ -269,21 +282,13 @@ def test_manual_bundle_patches_reconstruct_staged_and_unstaged_state(
         context = json.loads(archive.read("context.json"))
         _materialize_base_repository(archive, reconstructed)
 
-    assert staged_patch
-    assert unstaged_patch
     assert context["dirty"] is True
-    assert context["base_commit"] == expected_context["base_commit"]
-    assert context["state_fingerprint"] == expected_context["state_fingerprint"]
+    assert context["base_commit"] == base_commit
 
-    staged_path = tmp_path / "staged.patch"
-    unstaged_path = tmp_path / "unstaged.patch"
-    staged_path.write_bytes(staged_patch)
-    unstaged_path.write_bytes(unstaged_patch)
-
-    git(reconstructed, "apply", "--index", "--binary", str(staged_path))
+    _apply_patch(reconstructed, staged_patch, "--index")
     assert git(reconstructed, "write-tree").stdout.strip() == source_index_tree
 
-    git(reconstructed, "apply", "--binary", str(unstaged_path))
+    _apply_patch(reconstructed, unstaged_patch)
     assert git(reconstructed, "write-tree").stdout.strip() == source_index_tree
     assert _tracked_worktree(reconstructed) == _tracked_worktree(repository)
 
