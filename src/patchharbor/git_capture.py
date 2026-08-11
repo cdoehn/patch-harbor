@@ -13,6 +13,7 @@ from patchharbor.errors import (
     unsupported_repository_state_error,
 )
 from patchharbor.git_commands import (
+    CANONICAL_DIFF_ARGUMENTS,
     nul_records as _nul_records,
     read_boolean_config,
     run_git_bytes as _run_git_bytes,
@@ -329,9 +330,7 @@ _RAW_UNSTAGED_DIFF_ARGUMENTS = (
     "diff-files",
     "--raw",
     "-z",
-    "--no-renames",
-    "--no-ext-diff",
-    "--no-textconv",
+    *CANONICAL_DIFF_ARGUMENTS,
     "--",
 )
 

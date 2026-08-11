@@ -40,6 +40,14 @@ _CANONICAL_GIT_PREFIX = (
 )
 
 
+CANONICAL_DIFF_ARGUMENTS = (
+    "--no-renames",
+    "--no-ext-diff",
+    "--no-textconv",
+    "--no-color",
+)
+
+
 def _error(message: str) -> PatchHarborError:
     return repository_resolution_error(message)
 

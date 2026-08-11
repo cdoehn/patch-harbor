@@ -251,6 +251,11 @@ def test_registration_layers_have_one_directional_dependency_flow() -> None:
         "models",
         "repository_paths",
     }
+    assert _local_imports("git_patches") == {
+        "errors",
+        "git_commands",
+        "models",
+    }
     assert _local_imports("result_bundle_writer") == {
         "errors",
         "git_objects",
@@ -258,6 +263,7 @@ def test_registration_layers_have_one_directional_dependency_flow() -> None:
     assert _local_imports("result_bundle") == {
         "errors",
         "git_objects",
+        "git_patches",
         "locks",
         "models",
         "physical_paths",
@@ -291,6 +297,7 @@ def test_git_processes_are_confined_to_the_canonical_command_boundary() -> None:
         "repository_state",
         "git_capture",
         "git_objects",
+        "git_patches",
         "result_bundle",
     ):
         source = (PACKAGE_ROOT / f"{module_name}.py").read_text(
@@ -307,12 +314,17 @@ def test_result_bundle_writing_is_separate_from_repository_capture() -> None:
     git_object_source = (PACKAGE_ROOT / "git_objects.py").read_text(
         encoding="utf-8"
     )
+    git_patch_source = (PACKAGE_ROOT / "git_patches.py").read_text(
+        encoding="utf-8"
+    )
 
     assert "zipfile.ZipFile" in writer_source
     assert "repository_state" not in writer_source
     assert "run_git_bytes" not in writer_source
     assert "zipfile" not in git_object_source
     assert "capture_repository" not in git_object_source
+    assert "zipfile" not in git_patch_source
+    assert "git_capture" not in git_patch_source
 
 
 def test_lock_mechanics_are_confined_to_the_platform_boundary() -> None:

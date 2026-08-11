@@ -19,14 +19,6 @@ _SUPPORTED_BASE_MODES = frozenset((_REGULAR_FILE_MODE, _EXECUTABLE_FILE_MODE))
 
 
 @dataclass(frozen=True)
-class GitChangePatches:
-    """Raw staged and unstaged reconstruction patches for one repository."""
-
-    staged: bytes
-    unstaged: bytes
-
-
-@dataclass(frozen=True)
 class BaseTreeEntry:
     """One validated regular blob reference in the committed base tree."""
 
@@ -175,39 +167,6 @@ def _run_bundle_git(
         )
     except PatchHarborError as exc:
         raise _error("cannot read committed Git objects") from exc
-
-
-def capture_change_patches(
-    repository: RepositoryPath,
-    base_commit: GitObjectId,
-) -> GitChangePatches:
-    """Capture byte-exact staged and unstaged reconstruction patches."""
-    common_arguments = (
-        "--binary",
-        "--full-index",
-        "--no-renames",
-        "--no-ext-diff",
-        "--no-textconv",
-        "--no-color",
-    )
-    try:
-        staged = run_git_bytes(
-            "diff",
-            "--cached",
-            *common_arguments,
-            str(base_commit),
-            "--",
-            cwd=repository.value,
-        )
-        unstaged = run_git_bytes(
-            "diff",
-            *common_arguments,
-            "--",
-            cwd=repository.value,
-        )
-    except PatchHarborError as exc:
-        raise _error("cannot capture repository change patches") from exc
-    return GitChangePatches(staged=staged, unstaged=unstaged)
 
 
 def capture_base_bundle_entries(

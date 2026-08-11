@@ -19,6 +19,7 @@ EXPECTED_RUNTIME_FILES = {
     "execution.py",
     "git_capture.py",
     "git_objects.py",
+    "git_patches.py",
     "git_commands.py",
     "interpreters.py",
     "models.py",

@@ -198,9 +198,11 @@ def test_manual_bundle_materializes_committed_blobs_without_export_rules(
 
 def test_manual_bundle_patches_reconstruct_staged_and_unstaged_state(
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     repository = create_repository(tmp_path / "repository", with_commit=False)
     base_files = {
+        ".gitattributes": b"*.bin diff=patchharbor-unsafe\n",
         "layered.bin": b"base-layer\x00\xff\n",
         "staged-only.bin": b"base-staged\x00\n",
         "unstaged-only.bin": b"base-unstaged\x00\n",
@@ -215,6 +217,25 @@ def test_manual_bundle_patches_reconstruct_staged_and_unstaged_state(
     git(repository, "add", "--all")
     git(repository, "update-index", "--chmod=+x", "unstaged-mode.sh")
     git(repository, "commit", "--quiet", "-m", "binary and mode base")
+    git(
+        repository,
+        "config",
+        "diff.external",
+        "patchharbor-external-diff-must-not-run",
+    )
+    git(
+        repository,
+        "config",
+        "diff.patchharbor-unsafe.textconv",
+        "patchharbor-textconv-must-not-run",
+    )
+    git(repository, "config", "color.ui", "always")
+    git(repository, "config", "diff.renames", "true")
+    monkeypatch.setenv(
+        "GIT_EXTERNAL_DIFF",
+        "patchharbor-environment-diff-must-not-run",
+    )
+    monkeypatch.setenv("GIT_DIFF_OPTS", "--stat")
     assert run_cli(repository, "register").returncode == 0
 
     (repository / "layered.bin").write_bytes(b"staged-layer\x00\xfe\n")

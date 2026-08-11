@@ -10,10 +10,8 @@ from time import monotonic
 from uuid import UUID, uuid4
 
 from patchharbor.errors import result_bundle_error
-from patchharbor.git_objects import (
-    capture_base_bundle_entries,
-    capture_change_patches,
-)
+from patchharbor.git_objects import capture_base_bundle_entries
+from patchharbor.git_patches import capture_change_patches
 from patchharbor.locks import registry_lock, repository_lock
 from patchharbor.models import (
     RegistrySnapshot,
