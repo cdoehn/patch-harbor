@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from hashlib import sha256
 import json
 import os
 from pathlib import Path
@@ -199,6 +200,26 @@ def test_manual_bundle_materializes_committed_blobs_without_export_rules(
     assert manifest["repo_id"] == context["repo_id"]
     assert manifest["base_commit"] == context["base_commit"]
     assert manifest["state_fingerprint"] == context["state_fingerprint"]
+    expected_base_entries = [
+        {
+            "path": relative_path,
+            "git_mode": (
+                "100755" if relative_path == "executable.sh" else "100644"
+            ),
+            "object_id": git(
+                repository,
+                "rev-parse",
+                f"HEAD:{relative_path}",
+            ).stdout.strip(),
+            "size": len(committed[relative_path]),
+        }
+        for relative_path in sorted(
+            committed,
+            key=lambda path: path.encode("utf-8"),
+        )
+    ]
+    assert manifest["base_entries"] == expected_base_entries
+    assert manifest["untracked_entries"] == []
     assert run["run_id"] == manifest["run_id"]
     assert run["operation"] == "bundle"
     assert run["repository_resolved"] is True
@@ -209,6 +230,80 @@ def test_manual_bundle_materializes_committed_blobs_without_export_rules(
     assert run["process_exit_code"] == 0
     _assert_rfc3339_utc(run["started_at"])
     _assert_rfc3339_utc(run["ended_at"])
+
+
+def test_manual_bundle_captures_untracked_bytes_modes_and_hashes(
+    tmp_path: Path,
+) -> None:
+    repository = create_repository(tmp_path / "repository", with_commit=False)
+    (repository / ".gitignore").write_bytes(
+        b"ignored.bin\nignored-directory/\n"
+    )
+    (repository / "base.txt").write_bytes(b"committed base\n")
+    git(repository, "add", "--all")
+    git(repository, "commit", "--quiet", "-m", "base with ignore rules")
+    assert run_cli(repository, "register").returncode == 0
+
+    untracked = {
+        "artifacts/binary.dat": b"binary\x00payload\xff\r\n",
+        "tools/local.sh": b"#!/bin/sh\nprintf local\n",
+    }
+    for relative_path, content in untracked.items():
+        target = repository.joinpath(*relative_path.split("/"))
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(content)
+    expected_executable_mode = "100644"
+    if os.name != "nt":
+        git(repository, "config", "core.filemode", "true")
+        os.chmod(repository / "tools/local.sh", 0o755)
+        expected_executable_mode = "100755"
+
+    (repository / "ignored.bin").write_bytes(b"ignored\x00secret")
+    (repository / "ignored-directory").mkdir()
+    (repository / "ignored-directory" / "secret.txt").write_bytes(b"ignored")
+
+    completed = run_cli(repository, "bundle")
+
+    assert completed.returncode == 0
+    bundles = _result_bundles()
+    assert len(bundles) == 1
+    with zipfile.ZipFile(bundles[0]) as archive:
+        names = set(archive.namelist())
+        manifest = json.loads(archive.read("manifest.json"))
+        for relative_path, expected_content in untracked.items():
+            assert archive.read(f"untracked/{relative_path}") == expected_content
+        assert "untracked/ignored.bin" not in names
+        assert "untracked/ignored-directory/secret.txt" not in names
+        assert not any(".patchharbor" in name.casefold() for name in names)
+
+        binary_mode = (
+            archive.getinfo("untracked/artifacts/binary.dat").external_attr >> 16
+        )
+        executable_mode = (
+            archive.getinfo("untracked/tools/local.sh").external_attr >> 16
+        )
+
+    assert binary_mode & 0o777 == 0o644
+    assert executable_mode & 0o777 == int(expected_executable_mode[-3:], 8)
+    assert manifest["dirty"] is True
+    assert manifest["untracked_entries"] == [
+        {
+            "path": "artifacts/binary.dat",
+            "mode": "100644",
+            "size": len(untracked["artifacts/binary.dat"]),
+            "sha256": sha256(untracked["artifacts/binary.dat"]).hexdigest(),
+        },
+        {
+            "path": "tools/local.sh",
+            "mode": expected_executable_mode,
+            "size": len(untracked["tools/local.sh"]),
+            "sha256": sha256(untracked["tools/local.sh"]).hexdigest(),
+        },
+    ]
+    assert [entry["path"] for entry in manifest["base_entries"]] == [
+        ".gitignore",
+        "base.txt",
+    ]
 
 
 def test_manual_bundle_patches_reconstruct_staged_and_unstaged_state(

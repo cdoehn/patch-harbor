@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 import json
 from pathlib import Path
 import stat
@@ -9,6 +10,20 @@ import zipfile
 
 from patchharbor.errors import result_bundle_error
 from patchharbor.git_objects import BaseBundleEntry
+
+
+@dataclass(frozen=True)
+class UntrackedBundleEntry:
+    """One validated untracked file ready for Result Bundle writing."""
+
+    path: str
+    mode: bytes
+    content: bytes
+
+    @property
+    def executable(self) -> bool:
+        """Whether the canonical file mode marks this file executable."""
+        return self.mode == b"100755"
 
 
 def _json_bytes(document: dict[str, object]) -> bytes:
@@ -54,6 +69,7 @@ def write_result_bundle(
     base_entries: tuple[BaseBundleEntry, ...],
     staged_patch: bytes,
     unstaged_patch: bytes,
+    untracked_entries: tuple[UntrackedBundleEntry, ...],
 ) -> None:
     """Write one fully captured Result Bundle."""
     try:
@@ -78,6 +94,16 @@ def write_result_bundle(
                 )
             _write_entry(archive, "changes/staged.patch", staged_patch)
             _write_entry(archive, "changes/unstaged.patch", unstaged_patch)
+            for entry in sorted(
+                untracked_entries,
+                key=lambda item: item.path.encode("utf-8"),
+            ):
+                _write_entry(
+                    archive,
+                    f"untracked/{entry.path}",
+                    entry.content,
+                    executable=entry.executable,
+                )
     except (OSError, RuntimeError, ValueError, zipfile.LargeZipFile) as exc:
         try:
             path.unlink(missing_ok=True)
