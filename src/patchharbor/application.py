@@ -59,9 +59,16 @@ def repository_context(path: Path) -> RepositoryContext:
     return capture_repository_context(path)
 
 
-def bundle_repository(path: Path) -> ManualResultBundle:
+def bundle_repository(
+    path: Path,
+    *,
+    output_directory: Path | None = None,
+) -> ManualResultBundle:
     """Create one manual Result Bundle for a registered repository."""
-    return create_manual_result_bundle(path)
+    return create_manual_result_bundle(
+        path,
+        output_directory=output_directory,
+    )
 
 
 def registered_repositories() -> RegistryListResult:

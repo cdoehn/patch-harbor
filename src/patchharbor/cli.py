@@ -159,6 +159,12 @@ def _build_parser() -> argparse.ArgumentParser:
         metavar="REPOSITORY",
         help="registered Git repository; defaults to the current directory",
     )
+    bundle_parser.add_argument(
+        "--output-dir",
+        type=Path,
+        metavar="DIRECTORY",
+        help="publish the Result Bundle in this directory",
+    )
 
     fs_parser = commands.add_parser(
         "fs",
@@ -400,11 +406,15 @@ def _context_command(
 def _bundle_command(
     path: Path | None,
     *,
+    output_directory: Path | None,
     stdout: TextIO,
     stderr: TextIO,
 ) -> int:
     try:
-        result = bundle_repository(path or Path.cwd())
+        result = bundle_repository(
+            path or Path.cwd(),
+            output_directory=output_directory,
+        )
     except PatchHarborError as exc:
         print(format_tool_message(str(exc)), file=stderr)
         return int(exc.exit_code)
@@ -638,6 +648,7 @@ def main(
     if args.command == "bundle":
         return _bundle_command(
             args.repository,
+            output_directory=args.output_dir,
             stdout=actual_stdout,
             stderr=actual_stderr,
         )

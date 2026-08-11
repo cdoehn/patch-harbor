@@ -151,6 +151,25 @@ def test_staged_mode_change_is_distinct_from_blob_content(
     assert record.head_object == record.index_object
 
 
+@pytest.mark.skipif(
+    os.name == "nt",
+    reason="executable mode is not a portable Windows working-tree behavior",
+)
+def test_matching_staged_and_worktree_mode_is_not_an_unstaged_change(
+    tmp_path: Path,
+) -> None:
+    repository = create_repository(tmp_path / "repository")
+    git(repository, "config", "core.fileMode", "true")
+    tracked = repository / "tracked.txt"
+    git(repository, "update-index", "--chmod=+x", "tracked.txt")
+    tracked.chmod(tracked.stat().st_mode | 0o111)
+
+    state = _repository_state(repository)
+
+    assert len(state.staged) == 1
+    assert state.unstaged == ()
+
+
 def test_index_rejects_a_non_blob_object_even_with_a_file_mode(
     tmp_path: Path,
 ) -> None:

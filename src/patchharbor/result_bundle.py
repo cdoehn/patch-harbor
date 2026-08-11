@@ -5,11 +5,13 @@ from __future__ import annotations
 from contextlib import ExitStack
 from dataclasses import dataclass
 from datetime import datetime, timezone
+import os
 from pathlib import Path
 from time import monotonic
 from uuid import UUID, uuid4
+import zipfile
 
-from patchharbor.errors import result_bundle_error
+from patchharbor.errors import PatchHarborError, result_bundle_error
 from patchharbor.git_objects import capture_base_bundle_entries
 from patchharbor.git_patches import capture_change_patches
 from patchharbor.locks import registry_lock, repository_lock
@@ -31,7 +33,7 @@ from patchharbor.result_bundle_snapshot import (
     build_result_bundle_snapshot,
 )
 from patchharbor.result_bundle_writer import write_result_bundle
-from patchharbor.user_paths import RegistrationUserPaths, registration_user_paths
+from patchharbor.user_paths import registration_user_paths
 
 
 _RESULT_MARKER = "patch-harbor-result-bundle"
@@ -75,24 +77,120 @@ def _require_registered_mapping(
 
 
 def _registered_identity(
-    paths: RegistrationUserPaths,
+    snapshot: RegistrySnapshot,
     repository: RepositoryPath,
 ) -> RepositoryId:
     repo_id, _ = inspect_local_registration(repository)
     if repo_id is None:
         raise result_bundle_error("repository has no local PatchHarbor identity")
-    _require_registered_mapping(load_registry(paths), repo_id, repository)
+    _require_registered_mapping(snapshot, repo_id, repository)
     return repo_id
 
 
-def _default_result_directory(paths: RegistrationUserPaths) -> Path:
-    directory = paths.result_directory
+def _is_within(path: Path, parent: Path) -> bool:
     try:
-        directory.mkdir(parents=True, exist_ok=True)
-        return physically_canonicalize(directory, must_exist=True)
+        path.relative_to(parent)
+    except ValueError:
+        return False
+    return True
+
+
+def _require_result_directory_outside_repositories(
+    directory: Path,
+    snapshot: RegistrySnapshot,
+) -> None:
+    for mapping in snapshot.repositories:
+        repository_root = mapping.repository_path.value
+        if directory == repository_root or _is_within(
+            directory,
+            repository_root,
+        ):
+            raise result_bundle_error(
+                "Result Bundle directory overlaps a registered repository"
+            )
+
+
+def _result_directory(
+    requested: Path,
+    snapshot: RegistrySnapshot,
+) -> Path:
+    try:
+        candidate = physically_canonicalize(requested, must_exist=False)
+        _require_result_directory_outside_repositories(candidate, snapshot)
+        candidate.mkdir(parents=True, exist_ok=True)
+        directory = physically_canonicalize(candidate, must_exist=True)
+        _require_result_directory_outside_repositories(directory, snapshot)
+        if not directory.is_dir():
+            raise OSError("Result Bundle path is not a directory")
+        return directory
+    except PatchHarborError:
+        raise
     except (OSError, RuntimeError) as exc:
         raise result_bundle_error("cannot create the Result Bundle directory") from exc
 
+
+_REQUIRED_RESULT_BUNDLE_ENTRIES = frozenset(
+    (
+        "manifest.json",
+        "context.json",
+        "changes/staged.patch",
+        "changes/unstaged.patch",
+        "logs/run.json",
+    )
+)
+
+
+def _verify_result_bundle(path: Path) -> None:
+    try:
+        with zipfile.ZipFile(path, mode="r") as archive:
+            names = archive.namelist()
+            if any(
+                names.count(name) != 1
+                for name in _REQUIRED_RESULT_BUNDLE_ENTRIES
+            ):
+                raise result_bundle_error(
+                    "Result Bundle is missing a required entry"
+                )
+            if archive.testzip() is not None:
+                raise result_bundle_error("Result Bundle failed its CRC check")
+    except PatchHarborError:
+        raise
+    except (OSError, RuntimeError, ValueError, zipfile.BadZipFile) as exc:
+        raise result_bundle_error("cannot verify the Result Bundle") from exc
+
+
+def _publish_result_bundle(
+    final_path: Path,
+    *,
+    manifest: dict[str, object],
+    context_document: dict[str, object],
+    run_document: dict[str, object],
+    snapshot: ResultBundleSnapshot,
+) -> None:
+    temporary_path = final_path.with_name(
+        f".{final_path.name}.{uuid4()}.tmp"
+    )
+    try:
+        if final_path.exists() or final_path.is_symlink():
+            raise result_bundle_error("Result Bundle destination already exists")
+        write_result_bundle(
+            temporary_path,
+            manifest=manifest,
+            context_document=context_document,
+            run_document=run_document,
+            snapshot=snapshot,
+        )
+        _verify_result_bundle(temporary_path)
+        os.replace(temporary_path, final_path)
+    except PatchHarborError:
+        raise
+    except OSError as exc:
+        raise result_bundle_error("cannot publish the Result Bundle") from exc
+    finally:
+        try:
+            temporary_path.unlink(missing_ok=True)
+        except OSError:
+            pass
 
 
 def _manifest_document(
@@ -175,7 +273,11 @@ def _run_document(
     }
 
 
-def create_manual_result_bundle(path: Path) -> ManualResultBundle:
+def create_manual_result_bundle(
+    path: Path,
+    *,
+    output_directory: Path | None = None,
+) -> ManualResultBundle:
     """Create one Result Bundle for a registered supported repository."""
     started = _utc_now()
     started_monotonic = monotonic()
@@ -184,8 +286,13 @@ def create_manual_result_bundle(path: Path) -> ManualResultBundle:
 
     with ExitStack() as repository_scope:
         with registry_lock(paths):
+            registry_snapshot = load_registry(paths)
             repository = inspect_repository_root(path)
-            repo_id = _registered_identity(paths, repository)
+            repo_id = _registered_identity(registry_snapshot, repository)
+            result_directory = _result_directory(
+                output_directory or paths.result_directory,
+                registry_snapshot,
+            )
             repository_scope.enter_context(repository_lock(paths, repo_id))
 
             locked_repository = inspect_repository_root(repository.value)
@@ -193,11 +300,16 @@ def create_manual_result_bundle(path: Path) -> ManualResultBundle:
                 raise result_bundle_error(
                     "repository path changed while acquiring its lock"
                 )
-            locked_id = _registered_identity(paths, locked_repository)
+            locked_registry = load_registry(paths)
+            locked_id = _registered_identity(locked_registry, locked_repository)
             if locked_id != repo_id:
                 raise result_bundle_error(
                     "repository identity changed while acquiring its lock"
                 )
+            _require_result_directory_outside_repositories(
+                result_directory,
+                locked_registry,
+            )
 
         snapshot = capture_consistent_repository_snapshot(locked_repository)
         context = repository_context_from_snapshot(
@@ -230,7 +342,19 @@ def create_manual_result_bundle(path: Path) -> ManualResultBundle:
                 for record in snapshot.state.untracked
             ),
         )
-        result_directory = _default_result_directory(paths)
+        final_snapshot = capture_consistent_repository_snapshot(
+            locked_repository
+        )
+        final_context = repository_context_from_snapshot(
+            locked_repository,
+            locked_id,
+            final_snapshot,
+        )
+        if final_snapshot != snapshot or final_context != context:
+            raise result_bundle_error(
+                "repository changed while the Result Bundle was captured"
+            )
+
         filename_timestamp = started.strftime("%Y%m%d_%H%M%S")
         result_path = result_directory / (
             f"patchharbor_result_{filename_timestamp}_{run_id}.zip"
@@ -238,7 +362,7 @@ def create_manual_result_bundle(path: Path) -> ManualResultBundle:
 
         ended = _utc_now()
         created_at = _timestamp(started)
-        write_result_bundle(
+        _publish_result_bundle(
             result_path,
             manifest=_manifest_document(
                 run_id=run_id,

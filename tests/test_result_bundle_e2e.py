@@ -12,6 +12,9 @@ import zipfile
 
 import pytest
 
+import patchharbor.result_bundle as result_bundle_module
+from patchharbor.errors import ExitCode, PatchHarborError
+from patchharbor.result_bundle import create_manual_result_bundle
 from patchharbor.user_paths import registration_user_paths
 from tests.platform_support import project_environment, run_cli
 from tests.registration_support import (
@@ -452,3 +455,169 @@ def test_manual_bundle_keeps_the_committed_lfs_pointer_without_smudging(
     assert len(bundles) == 1
     with zipfile.ZipFile(bundles[0]) as archive:
         assert archive.read("base/large.bin") == pointer
+
+
+def test_manual_bundle_uses_physically_resolved_explicit_output_directory(
+    tmp_path: Path,
+) -> None:
+    repository = create_repository(tmp_path / "repository")
+    assert run_cli(repository, "register").returncode == 0
+
+    physical_output = tmp_path / "physical-results"
+    physical_output.mkdir()
+    requested_output = physical_output
+    if os.name != "nt":
+        requested_output = tmp_path / "result-link"
+        requested_output.symlink_to(physical_output, target_is_directory=True)
+
+    completed = run_cli(
+        repository,
+        "bundle",
+        "--output-dir",
+        str(requested_output),
+    )
+
+    assert completed.returncode == 0
+    published = tuple(physical_output.glob("patchharbor_result_*.zip"))
+    assert len(published) == 1
+    assert tuple(
+        path for path in physical_output.iterdir() if path != published[0]
+    ) == ()
+    assert _result_bundles() == ()
+    with zipfile.ZipFile(published[0]) as archive:
+        assert archive.testzip() is None
+        assert {
+            "manifest.json",
+            "context.json",
+            "changes/staged.patch",
+            "changes/unstaged.patch",
+            "logs/run.json",
+        }.issubset(archive.namelist())
+
+
+def test_manual_bundle_rejects_output_inside_any_registered_repository(
+    tmp_path: Path,
+) -> None:
+    target = create_repository(tmp_path / "target")
+    other = create_repository(tmp_path / "other")
+    assert run_cli(target, "register").returncode == 0
+    assert run_cli(other, "register").returncode == 0
+    forbidden_output = other / "generated" / "results"
+
+    completed = run_cli(
+        target,
+        "bundle",
+        "--output-dir",
+        str(forbidden_output),
+    )
+
+    assert completed.returncode == int(ExitCode.RESULT_BUNDLE_ERROR)
+    assert not forbidden_output.exists()
+    assert _result_bundles() == ()
+
+
+def test_manual_bundle_rejects_repository_change_during_capture(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repository = create_repository(tmp_path / "repository")
+    assert run_cli(repository, "register").returncode == 0
+    output_directory = tmp_path / "results"
+    original_capture = result_bundle_module.capture_base_bundle_entries
+
+    def capture_and_mutate(*args: object, **kwargs: object) -> object:
+        entries = original_capture(*args, **kwargs)
+        (repository / "tracked.txt").write_bytes(b"changed during capture\n")
+        return entries
+
+    monkeypatch.setattr(
+        result_bundle_module,
+        "capture_base_bundle_entries",
+        capture_and_mutate,
+    )
+
+    with pytest.raises(PatchHarborError) as captured:
+        create_manual_result_bundle(
+            repository,
+            output_directory=output_directory,
+        )
+
+    assert captured.value.exit_code == ExitCode.RESULT_BUNDLE_ERROR
+    assert output_directory.is_dir()
+    assert tuple(output_directory.iterdir()) == ()
+
+
+def test_manual_bundle_publishes_from_verified_temporary_zip_in_result_directory(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repository = create_repository(tmp_path / "repository")
+    assert run_cli(repository, "register").returncode == 0
+    output_directory = tmp_path / "results"
+    observed: dict[str, Path] = {}
+    real_replace = result_bundle_module.os.replace
+
+    def observe_replace(source: object, destination: object) -> None:
+        source_path = Path(source)  # type: ignore[arg-type]
+        destination_path = Path(destination)  # type: ignore[arg-type]
+        assert source_path.parent == output_directory.resolve()
+        assert destination_path.parent == output_directory.resolve()
+        assert source_path.name.startswith(".patchharbor_result_")
+        assert source_path.name.endswith(".tmp")
+        assert source_path.is_file()
+        assert not destination_path.exists()
+        with zipfile.ZipFile(source_path) as archive:
+            assert archive.testzip() is None
+        observed["source"] = source_path
+        observed["destination"] = destination_path
+        real_replace(source_path, destination_path)
+
+    monkeypatch.setattr(result_bundle_module.os, "replace", observe_replace)
+
+    result = create_manual_result_bundle(
+        repository,
+        output_directory=output_directory,
+    )
+
+    assert result.path == observed["destination"]
+    assert result.path.is_file()
+    assert not observed["source"].exists()
+    assert tuple(output_directory.iterdir()) == (result.path,)
+
+
+@pytest.mark.parametrize("verification_failure", ("missing", "crc"))
+def test_manual_bundle_leaves_no_published_or_temporary_file_after_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    verification_failure: str,
+) -> None:
+    repository = create_repository(tmp_path / "repository")
+    assert run_cli(repository, "register").returncode == 0
+    output_directory = tmp_path / "results"
+
+    if verification_failure == "missing":
+        def write_incomplete(path: Path, **_options: object) -> None:
+            with zipfile.ZipFile(path, mode="x") as archive:
+                archive.writestr("manifest.json", b"{}\n")
+
+        monkeypatch.setattr(
+            result_bundle_module,
+            "write_result_bundle",
+            write_incomplete,
+        )
+    else:
+        monkeypatch.setattr(
+            zipfile.ZipFile,
+            "testzip",
+            lambda self: self.namelist()[0],
+        )
+
+    with pytest.raises(PatchHarborError) as captured:
+        create_manual_result_bundle(
+            repository,
+            output_directory=output_directory,
+        )
+
+    assert captured.value.exit_code == ExitCode.RESULT_BUNDLE_ERROR
+    assert output_directory.is_dir()
+    assert tuple(output_directory.iterdir()) == ()

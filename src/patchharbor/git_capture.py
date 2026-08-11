@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
+import hashlib
 import os
 import stat
 
@@ -662,12 +663,23 @@ def _read_regular_file(
     )
 
 
+def _git_blob_object_name(
+    content: bytes,
+    object_format: GitObjectFormat,
+) -> bytes:
+    digest = hashlib.new(object_format.value, usedforsecurity=False)
+    digest.update(f"blob {len(content)}\0".encode("ascii"))
+    digest.update(content)
+    return digest.hexdigest().encode("ascii")
+
+
 def _read_worktree_record(
     repository: RepositoryPath,
     entry: _UnstagedEntry,
     *,
     core_file_mode: bool,
-) -> UnstagedRecord:
+    object_format: GitObjectFormat,
+) -> UnstagedRecord | None:
     target = repository.value / os.fsdecode(entry.path)
 
     if entry.status == b"D":
@@ -691,6 +703,12 @@ def _read_worktree_record(
         target,
         core_file_mode=core_file_mode,
     )
+    if (
+        snapshot.mode == entry.index_mode
+        and _git_blob_object_name(snapshot.content, object_format)
+        == entry.index_object
+    ):
+        return None
     return UnstagedRecord(
         path=entry.path,
         status=entry.status,
@@ -715,14 +733,16 @@ def read_unstaged_records(
         object_format,
     )
     core_file_mode = _core_file_mode(repository)
-    return tuple(
+    records = tuple(
         _read_worktree_record(
             repository,
             entry,
             core_file_mode=core_file_mode,
+            object_format=object_format,
         )
         for entry in entries
     )
+    return tuple(record for record in records if record is not None)
 
 
 def read_untracked_paths(repository: RepositoryPath) -> tuple[bytes, ...]:
