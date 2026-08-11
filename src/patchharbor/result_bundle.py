@@ -27,9 +27,7 @@ from patchharbor.repository_state import (
     repository_context_from_snapshot,
 )
 from patchharbor.result_bundle_snapshot import (
-    ResultBaseEntry,
     ResultBundleSnapshot,
-    ResultUntrackedEntry,
     build_result_bundle_snapshot,
 )
 from patchharbor.result_bundle_writer import write_result_bundle
@@ -96,33 +94,6 @@ def _default_result_directory(paths: RegistrationUserPaths) -> Path:
         raise result_bundle_error("cannot create the Result Bundle directory") from exc
 
 
-def _base_entry_documents(
-    entries: tuple[ResultBaseEntry, ...],
-) -> list[dict[str, object]]:
-    return [
-        {
-            "path": entry.path.decoded,
-            "git_mode": entry.git_mode,
-            "object_id": str(entry.object_id),
-            "size": entry.size,
-        }
-        for entry in entries
-    ]
-
-
-def _untracked_entry_documents(
-    entries: tuple[ResultUntrackedEntry, ...],
-) -> list[dict[str, object]]:
-    return [
-        {
-            "path": entry.path.decoded,
-            "mode": entry.mode,
-            "size": entry.size,
-            "sha256": entry.content_sha256,
-        }
-        for entry in entries
-    ]
-
 
 def _manifest_document(
     *,
@@ -145,10 +116,7 @@ def _manifest_document(
         "execution_present": False,
         "primary_result": "success",
         "result_bundle_status": "created",
-        "base_entries": _base_entry_documents(snapshot.base_entries),
-        "untracked_entries": _untracked_entry_documents(
-            snapshot.untracked_entries
-        ),
+        **snapshot.manifest_entries(),
     }
 
 

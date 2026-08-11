@@ -17,29 +17,69 @@ def _object_id(value: str = "1" * 40) -> GitObjectId:
     return GitObjectId(value=value, object_format=GitObjectFormat.SHA1)
 
 
-def test_snapshot_bytes_drive_metadata_and_zip_entries(tmp_path: Path) -> None:
-    base_content = memoryview(b"committed\x00bytes\n")
-    untracked_content = b"local\x00bytes\xff\r\n"
+def test_snapshot_bytes_drive_manifest_and_zip_in_canonical_order(
+    tmp_path: Path,
+) -> None:
+    base_contents = {
+        "alpha/base.dat": b"alpha\x00bytes\n",
+        "zeta/tool.sh": b"#!/bin/sh\nexit 0\n",
+    }
+    base_modes = {"alpha/base.dat": "100644", "zeta/tool.sh": "100755"}
+    base_objects = {"alpha/base.dat": "1" * 40, "zeta/tool.sh": "2" * 40}
+    untracked_contents = {
+        "artifacts/local.dat": b"local\x00bytes\xff\r\n",
+        "tools/local.sh": b"#!/bin/sh\nprintf local\n",
+    }
+    untracked_modes = {
+        "artifacts/local.dat": "100644",
+        "tools/local.sh": "100755",
+    }
     snapshot = build_result_bundle_snapshot(
         base_entries=(
-            (b"bin/base.dat", b"100644", _object_id(), base_content),
+            (
+                path.encode("utf-8"),
+                base_modes[path].encode("ascii"),
+                _object_id(base_objects[path]),
+                memoryview(base_contents[path]),
+            )
+            for path in reversed(tuple(base_contents))
         ),
         staged_patch=b"staged\x00patch",
         unstaged_patch=b"unstaged\x00patch",
         untracked_entries=(
-            (b"tools/local.sh", b"100755", untracked_content),
+            (
+                path.encode("utf-8"),
+                untracked_modes[path].encode("ascii"),
+                untracked_contents[path],
+            )
+            for path in reversed(tuple(untracked_contents))
         ),
     )
 
-    base_entry = snapshot.base_entries[0]
-    untracked_entry = snapshot.untracked_entries[0]
-    assert base_entry.path.original_bytes == b"bin/base.dat"
-    assert base_entry.size == len(base_content)
-    assert base_entry.git_mode == "100644"
-    assert untracked_entry.path.original_bytes == b"tools/local.sh"
-    assert untracked_entry.size == len(untracked_content)
-    assert untracked_entry.content_sha256 == sha256(untracked_content).hexdigest()
-    assert untracked_entry.mode == "100755"
+    manifest_entries = snapshot.manifest_entries()
+    assert [entry["path"] for entry in manifest_entries["base_entries"]] == sorted(
+        base_contents, key=lambda path: path.encode("utf-8")
+    )
+    assert [
+        entry["path"] for entry in manifest_entries["untracked_entries"]
+    ] == sorted(untracked_contents, key=lambda path: path.encode("utf-8"))
+    for entry in manifest_entries["base_entries"]:
+        relative_path = entry["path"]
+        assert entry == {
+            "path": relative_path,
+            "git_mode": base_modes[relative_path],
+            "object_id": base_objects[relative_path],
+            "size": len(base_contents[relative_path]),
+        }
+    for entry in manifest_entries["untracked_entries"]:
+        relative_path = entry["path"]
+        content = untracked_contents[relative_path]
+        assert entry == {
+            "path": relative_path,
+            "mode": untracked_modes[relative_path],
+            "size": len(content),
+            "sha256": sha256(content).hexdigest(),
+        }
 
     destination = tmp_path / "result.zip"
     write_result_bundle(
@@ -51,16 +91,19 @@ def test_snapshot_bytes_drive_metadata_and_zip_entries(tmp_path: Path) -> None:
     )
 
     with zipfile.ZipFile(destination) as archive:
-        assert archive.read("base/bin/base.dat") == base_content
+        for relative_path, expected in base_contents.items():
+            assert archive.read(f"base/{relative_path}") == expected
         assert archive.read("changes/staged.patch") == b"staged\x00patch"
         assert archive.read("changes/unstaged.patch") == b"unstaged\x00patch"
-        assert archive.read("untracked/tools/local.sh") == untracked_content
-        base_mode = archive.getinfo("base/bin/base.dat").external_attr >> 16
+        for relative_path, expected in untracked_contents.items():
+            assert archive.read(f"untracked/{relative_path}") == expected
+
+        base_mode = archive.getinfo("base/zeta/tool.sh").external_attr >> 16
         untracked_mode = (
             archive.getinfo("untracked/tools/local.sh").external_attr >> 16
         )
 
-    assert stat.S_IMODE(base_mode) == 0o644
+    assert stat.S_IMODE(base_mode) == 0o755
     assert stat.S_IMODE(untracked_mode) == 0o755
 
 

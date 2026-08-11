@@ -89,6 +89,29 @@ class ResultBundleSnapshot:
     unstaged_patch: bytes
     untracked_entries: tuple[ResultUntrackedEntry, ...]
 
+    def manifest_entries(self) -> dict[str, list[dict[str, object]]]:
+        """Return canonically ordered manifest arrays from captured entries."""
+        return {
+            "base_entries": [
+                {
+                    "path": entry.path.decoded,
+                    "git_mode": entry.git_mode,
+                    "object_id": str(entry.object_id),
+                    "size": entry.size,
+                }
+                for entry in self.base_entries
+            ],
+            "untracked_entries": [
+                {
+                    "path": entry.path.decoded,
+                    "mode": entry.mode,
+                    "size": entry.size,
+                    "sha256": entry.content_sha256,
+                }
+                for entry in self.untracked_entries
+            ],
+        }
+
 
 def _require_unique_paths(paths: tuple[bytes, ...], description: str) -> None:
     if len(paths) != len(set(paths)):

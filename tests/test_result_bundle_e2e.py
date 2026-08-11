@@ -245,8 +245,9 @@ def test_manual_bundle_captures_untracked_bytes_modes_and_hashes(
     assert run_cli(repository, "register").returncode == 0
 
     untracked = {
-        "artifacts/binary.dat": b"binary\x00payload\xff\r\n",
         "tools/local.sh": b"#!/bin/sh\nprintf local\n",
+        "notes/token.txt": b"API_KEY=not-filtered\n",
+        "artifacts/binary.dat": b"binary\x00payload\xff\r\n",
     }
     for relative_path, content in untracked.items():
         target = repository.joinpath(*relative_path.split("/"))
@@ -271,44 +272,40 @@ def test_manual_bundle_captures_untracked_bytes_modes_and_hashes(
     with zipfile.ZipFile(bundles[0]) as archive:
         names = set(archive.namelist())
         manifest = json.loads(archive.read("manifest.json"))
-        archived_untracked = {
-            relative_path: archive.read(f"untracked/{relative_path}")
-            for relative_path in untracked
-        }
-        assert archived_untracked == untracked
+        entries = manifest["untracked_entries"]
+        entry_paths = [entry["path"] for entry in entries]
+
+        assert [path.encode("utf-8") for path in entry_paths] == sorted(
+            path.encode("utf-8") for path in untracked
+        )
+        for entry in entries:
+            relative_path = entry["path"]
+            content = archive.read(f"untracked/{relative_path}")
+            expected_mode = (
+                expected_executable_mode
+                if relative_path == "tools/local.sh"
+                else "100644"
+            )
+            archived_mode = (
+                archive.getinfo(f"untracked/{relative_path}").external_attr
+                >> 16
+            )
+
+            assert content == untracked[relative_path]
+            assert entry == {
+                "path": relative_path,
+                "mode": expected_mode,
+                "size": len(content),
+                "sha256": sha256(content).hexdigest(),
+            }
+            assert archived_mode & 0o777 == int(expected_mode[-3:], 8)
+
         assert "untracked/ignored.bin" not in names
         assert "untracked/.env" not in names
         assert "untracked/ignored-directory/secret.txt" not in names
         assert not any(".patchharbor" in name.casefold() for name in names)
 
-        binary_mode = (
-            archive.getinfo("untracked/artifacts/binary.dat").external_attr >> 16
-        )
-        executable_mode = (
-            archive.getinfo("untracked/tools/local.sh").external_attr >> 16
-        )
-
-    assert binary_mode & 0o777 == 0o644
-    assert executable_mode & 0o777 == int(expected_executable_mode[-3:], 8)
     assert manifest["dirty"] is True
-    assert manifest["untracked_entries"] == [
-        {
-            "path": "artifacts/binary.dat",
-            "mode": "100644",
-            "size": len(untracked["artifacts/binary.dat"]),
-            "sha256": sha256(untracked["artifacts/binary.dat"]).hexdigest(),
-        },
-        {
-            "path": "tools/local.sh",
-            "mode": expected_executable_mode,
-            "size": len(untracked["tools/local.sh"]),
-            "sha256": sha256(untracked["tools/local.sh"]).hexdigest(),
-        },
-    ]
-    for entry in manifest["untracked_entries"]:
-        content = archived_untracked[entry["path"]]
-        assert entry["size"] == len(content)
-        assert entry["sha256"] == sha256(content).hexdigest()
     assert [entry["path"] for entry in manifest["base_entries"]] == [
         ".gitignore",
         "base.txt",
