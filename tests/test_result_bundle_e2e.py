@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from datetime import datetime
 from hashlib import sha256
+from io import StringIO
 import json
 import os
 from pathlib import Path
@@ -14,8 +15,10 @@ import zipfile
 
 import pytest
 
+import patchharbor.result_bundle as result_bundle_module
 import patchharbor.result_bundle_capture as result_bundle_capture_module
 import patchharbor.result_bundle_publication as result_bundle_publication_module
+from patchharbor.cli import main as cli_main
 from patchharbor.errors import ExitCode, PatchHarborError
 from patchharbor.platform.filesystem import MetadataSyncStatus
 from patchharbor.result_bundle import create_manual_result_bundle
@@ -42,6 +45,11 @@ def isolate_bundle_environment(
 ) -> None:
     for name, value in isolated_user_environment(tmp_path / "user").items():
         monkeypatch.setenv(name, value)
+    system_temp = tmp_path / "system-temp"
+    system_temp.mkdir()
+    for name in ("TMPDIR", "TEMP", "TMP"):
+        monkeypatch.setenv(name, str(system_temp))
+    monkeypatch.setattr(result_bundle_module.tempfile, "tempdir", str(system_temp))
 
 
 def _result_bundles() -> tuple[Path, ...]:
@@ -258,6 +266,205 @@ def test_manual_bundle_materializes_committed_blobs_without_export_rules(
     _assert_rfc3339_utc(run["ended_at"])
 
 
+def test_manual_bundle_json_completion_matches_persisted_run_report(
+    tmp_path: Path,
+) -> None:
+    repository = create_repository(tmp_path / "repository")
+    assert run_cli(repository, "register").returncode == 0
+
+    completed = run_cli(repository, "bundle", "--json")
+
+    assert completed.returncode == 0
+    assert completed.stdout.endswith("\n")
+    assert "\n" not in completed.stdout[:-1]
+    envelope = json.loads(completed.stdout)
+    assert set(envelope) == {
+        "output_version",
+        "command",
+        "success",
+        "result",
+        "error",
+        "process_exit_code",
+    }
+    assert envelope["output_version"] == 1
+    assert envelope["command"] == "bundle"
+    assert envelope["success"] is True
+    assert envelope["error"] is None
+    assert envelope["process_exit_code"] == 0
+    result = envelope["result"]
+    assert isinstance(result, dict)
+    assert set(result) == {
+        "run_id",
+        "repo_id",
+        "repository_path",
+        "base_commit",
+        "state_fingerprint",
+        "fingerprint_algorithm",
+        "result_bundle_status",
+        "result_bundle_path",
+        "emergency_diagnostics_path",
+    }
+    assert result["repository_path"] == str(repository.resolve())
+    assert result["result_bundle_status"] == "created"
+    assert result["emergency_diagnostics_path"] is None
+    result_path = Path(result["result_bundle_path"])
+    assert result_path.is_absolute()
+    assert result_path.is_file()
+
+    with zipfile.ZipFile(result_path) as archive:
+        run = json.loads(archive.read("logs/run.json"))
+        assert "logs/execution.log" not in archive.namelist()
+
+    assert run["run_id"] == result["run_id"]
+    assert run["operation"] == "bundle"
+    assert run["repository_path"] == result["repository_path"]
+    assert run["base_commit"] == result["base_commit"]
+    assert run["state_fingerprint"] == result["state_fingerprint"]
+    assert run["warnings"] == []
+    assert run["execution_present"] is False
+    assert run["result_bundle"] == {
+        "attempted": True,
+        "status": "created",
+        "error": None,
+    }
+    assert run["process_exit_code"] == 0
+    assert isinstance(run["duration_seconds"], float)
+    assert run["duration_seconds"] >= 0.0
+    system_temp = Path(os.environ["TMPDIR"])
+    assert tuple(system_temp.glob("patchharbor-*")) == ()
+
+
+def test_manual_bundle_failure_returns_exit_11_and_emergency_run_report(
+    tmp_path: Path,
+) -> None:
+    repository = create_repository(tmp_path / "repository")
+    assert run_cli(repository, "register").returncode == 0
+    forbidden_output = repository / "generated" / "results"
+
+    completed = run_cli(
+        repository,
+        "bundle",
+        "--json",
+        "--output-dir",
+        str(forbidden_output),
+    )
+
+    assert completed.returncode == int(ExitCode.RESULT_BUNDLE_ERROR)
+    assert completed.stdout.endswith("\n")
+    assert "\n" not in completed.stdout[:-1]
+    envelope = json.loads(completed.stdout)
+    assert envelope["command"] == "bundle"
+    assert envelope["success"] is False
+    assert envelope["result"] is None
+    assert envelope["process_exit_code"] == int(ExitCode.RESULT_BUNDLE_ERROR)
+    error = envelope["error"]
+    assert isinstance(error, dict)
+    assert set(error) == {
+        "kind",
+        "message",
+        "patchharbor_error_code",
+        "emergency_diagnostics_path",
+    }
+    assert error["kind"] == "result_bundle_error"
+    assert error["patchharbor_error_code"] == int(ExitCode.RESULT_BUNDLE_ERROR)
+    emergency_path = Path(error["emergency_diagnostics_path"])
+    assert emergency_path.is_absolute()
+    assert emergency_path.is_dir()
+    assert str(emergency_path) in completed.stderr
+    assert not forbidden_output.exists()
+    assert not tuple(repository.rglob(".patchharbor_result_*.tmp"))
+    assert not tuple(repository.rglob("patchharbor_result_*.zip"))
+
+    run = json.loads((emergency_path / "run.json").read_text(encoding="utf-8"))
+    assert UUID(run["run_id"]).version == 4
+    assert run["operation"] == "bundle"
+    assert run["repository_resolved"] is True
+    assert run["repository_path"] == str(repository.resolve())
+    assert run["warnings"] == []
+    assert run["execution_present"] is False
+    assert run["result_bundle"]["attempted"] is True
+    assert run["result_bundle"]["status"] == "failed"
+    assert isinstance(run["result_bundle"]["error"], str)
+    assert run["process_exit_code"] == int(ExitCode.RESULT_BUNDLE_ERROR)
+
+
+def test_manual_bundle_unresolved_repository_records_not_attempted_status(
+    tmp_path: Path,
+) -> None:
+    repository = create_repository(tmp_path / "repository")
+
+    completed = run_cli(repository, "bundle", "--json")
+
+    assert completed.returncode == int(ExitCode.RESULT_BUNDLE_ERROR)
+    envelope = json.loads(completed.stdout)
+    emergency_path = Path(
+        envelope["error"]["emergency_diagnostics_path"]
+    )
+    run = json.loads((emergency_path / "run.json").read_text(encoding="utf-8"))
+    assert run["repository_resolved"] is False
+    assert run["result_bundle"] == {
+        "attempted": False,
+        "status": "not_attempted",
+        "error": run["result_bundle"]["error"],
+    }
+    assert isinstance(run["result_bundle"]["error"], str)
+    assert run["process_exit_code"] == int(ExitCode.RESULT_BUNDLE_ERROR)
+
+
+def test_manual_bundle_surfaces_failed_emergency_rescue(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repository = create_repository(tmp_path / "repository")
+    assert run_cli(repository, "register").returncode == 0
+    controlled_run_directory = tmp_path / "controlled-emergency"
+
+    def create_controlled_run_directory(_run_id: UUID) -> Path:
+        controlled_run_directory.mkdir()
+        return controlled_run_directory.resolve()
+
+    def reject_run_report(
+        _run_directory: Path,
+        _document: dict[str, object],
+    ) -> None:
+        raise OSError("simulated emergency diagnostics failure")
+
+    monkeypatch.setattr(
+        result_bundle_module,
+        "_create_private_run_directory",
+        create_controlled_run_directory,
+    )
+    monkeypatch.setattr(
+        result_bundle_module,
+        "_write_run_document",
+        reject_run_report,
+    )
+
+    stdout = StringIO()
+    stderr = StringIO()
+    exit_code = cli_main(
+        [
+            "bundle",
+            str(repository),
+            "--json",
+            "--output-dir",
+            str(repository / "forbidden-results"),
+        ],
+        stdin=StringIO(),
+        stdout=stdout,
+        stderr=stderr,
+    )
+
+    assert exit_code == int(ExitCode.RESULT_BUNDLE_ERROR)
+    envelope = json.loads(stdout.getvalue())
+    assert envelope["success"] is False
+    assert envelope["process_exit_code"] == int(ExitCode.RESULT_BUNDLE_ERROR)
+    assert envelope["error"]["emergency_diagnostics_path"] is None
+    assert stderr.getvalue().strip()
+    assert not controlled_run_directory.exists()
+    assert not tuple(repository.rglob("patchharbor_result_*.zip"))
+
+
 def test_manual_bundle_captures_untracked_bytes_modes_and_hashes(
     tmp_path: Path,
 ) -> None:
@@ -440,7 +647,7 @@ def test_manual_bundle_respects_the_repository_lock(tmp_path: Path) -> None:
     )
     try:
         completed = run_cli(repository, "bundle")
-        assert completed.returncode == 12
+        assert completed.returncode == int(ExitCode.RESULT_BUNDLE_ERROR)
         assert _result_bundles() == ()
         assert release_repository_lock_holder(holder) == 0
     finally:

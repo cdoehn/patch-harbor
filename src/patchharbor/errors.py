@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from enum import Enum, IntEnum
+from pathlib import Path
 
 
 TOOL_PREFIX = "patchharbor:"
@@ -46,10 +47,14 @@ class PatchHarborError(Exception):
         exit_code: ExitCode,
         *,
         error_kind: ErrorKind = ErrorKind.TOOL_ERROR,
+        emergency_diagnostics_path: Path | None = None,
+        emergency_diagnostics_failed: bool = False,
     ) -> None:
         super().__init__(message)
         self.exit_code = exit_code
         self.error_kind = error_kind
+        self.emergency_diagnostics_path = emergency_diagnostics_path
+        self.emergency_diagnostics_failed = emergency_diagnostics_failed
 
 
 def registry_error(message: str) -> PatchHarborError:
@@ -70,12 +75,19 @@ def repository_resolution_error(message: str) -> PatchHarborError:
     )
 
 
-def result_bundle_error(message: str) -> PatchHarborError:
+def result_bundle_error(
+    message: str,
+    *,
+    emergency_diagnostics_path: Path | None = None,
+    emergency_diagnostics_failed: bool = False,
+) -> PatchHarborError:
     """Create one failure for manual Result Bundle generation."""
     return PatchHarborError(
         message,
         ExitCode.RESULT_BUNDLE_ERROR,
         error_kind=ErrorKind.RESULT_BUNDLE_ERROR,
+        emergency_diagnostics_path=emergency_diagnostics_path,
+        emergency_diagnostics_failed=emergency_diagnostics_failed,
     )
 
 

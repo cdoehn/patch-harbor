@@ -165,6 +165,12 @@ def _build_parser() -> argparse.ArgumentParser:
         metavar="DIRECTORY",
         help="publish the Result Bundle in this directory",
     )
+    bundle_parser.add_argument(
+        "--json",
+        action="store_true",
+        dest="json_output",
+        help="write the versioned machine-readable result",
+    )
 
     fs_parser = commands.add_parser(
         "fs",
@@ -292,7 +298,11 @@ def _json_envelope(
             "kind": error.error_kind.value,
             "message": str(error),
             "patchharbor_error_code": int(error.exit_code),
-            "emergency_diagnostics_path": None,
+            "emergency_diagnostics_path": (
+                None
+                if error.emergency_diagnostics_path is None
+                else str(error.emergency_diagnostics_path)
+            ),
         }
     return {
         "output_version": 1,
@@ -403,10 +413,44 @@ def _context_command(
     return 0
 
 
+def _bundle_json_result(result: Any) -> dict[str, object]:
+    context = result.context
+    return {
+        "run_id": str(result.run_id),
+        "repo_id": str(context.repo_id),
+        "repository_path": str(context.repository_path),
+        "base_commit": str(context.base_commit),
+        "state_fingerprint": context.state_fingerprint,
+        "fingerprint_algorithm": context.fingerprint_algorithm,
+        "result_bundle_status": "created",
+        "result_bundle_path": str(result.path),
+        "emergency_diagnostics_path": None,
+    }
+
+
+def _write_emergency_diagnostics_notice(
+    error: PatchHarborError,
+    stderr: TextIO,
+) -> None:
+    if error.emergency_diagnostics_path is not None:
+        print(
+            format_tool_message(
+                f"emergency diagnostics: {error.emergency_diagnostics_path}"
+            ),
+            file=stderr,
+        )
+    elif error.emergency_diagnostics_failed:
+        print(
+            format_tool_message("emergency diagnostics could not be saved"),
+            file=stderr,
+        )
+
+
 def _bundle_command(
     path: Path | None,
     *,
     output_directory: Path | None,
+    json_output: bool,
     stdout: TextIO,
     stderr: TextIO,
 ) -> int:
@@ -416,11 +460,35 @@ def _bundle_command(
             output_directory=output_directory,
         )
     except PatchHarborError as exc:
-        print(format_tool_message(str(exc)), file=stderr)
-        return int(exc.exit_code)
+        exit_code = int(exc.exit_code)
+        if json_output:
+            _write_json_document(
+                _json_envelope(
+                    "bundle",
+                    result=None,
+                    error=exc,
+                    process_exit_code=exit_code,
+                ),
+                stdout,
+            )
+        else:
+            print(format_tool_message(str(exc)), file=stderr)
+        _write_emergency_diagnostics_notice(exc, stderr)
+        return exit_code
 
-    print(f"run_id: {result.run_id}", file=stdout)
-    print(f"result_bundle_path: {result.path}", file=stdout)
+    if json_output:
+        _write_json_document(
+            _json_envelope(
+                "bundle",
+                result=_bundle_json_result(result),
+                error=None,
+                process_exit_code=0,
+            ),
+            stdout,
+        )
+    else:
+        print(f"run_id: {result.run_id}", file=stdout)
+        print(f"result_bundle_path: {result.path}", file=stdout)
     return 0
 
 
@@ -649,6 +717,7 @@ def main(
         return _bundle_command(
             args.repository,
             output_directory=args.output_dir,
+            json_output=args.json_output,
             stdout=actual_stdout,
             stderr=actual_stderr,
         )
