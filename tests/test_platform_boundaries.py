@@ -5,12 +5,14 @@ from pathlib import Path
 
 import pytest
 
+import patchharbor.platform.filesystem as filesystem_module
 from patchharbor.platform.errors import describe_os_error
 from patchharbor.platform.filesystem import (
     FileSystemOperationError,
     MetadataSyncStatus,
     PathKind,
     path_kind,
+    replace_path,
     sync_directory_best_effort,
     sync_regular_file_best_effort,
 )
@@ -108,3 +110,28 @@ def test_best_effort_metadata_sync_reports_actual_platform_support(
     assert directory_status is not MetadataSyncStatus.FAILED
     if is_windows():
         assert directory_status is MetadataSyncStatus.UNSUPPORTED
+
+
+def test_replace_path_does_not_fallback_to_cross_filesystem_copy(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source = tmp_path / "temporary.zip"
+    target = tmp_path / "result.zip"
+    source.write_bytes(b"verified bundle")
+
+    def reject_cross_device_replace(_source: object, _target: object) -> None:
+        raise OSError(errno.EXDEV, "cross-device link")
+
+    monkeypatch.setattr(
+        filesystem_module.os,
+        "replace",
+        reject_cross_device_replace,
+    )
+
+    with pytest.raises(FileSystemOperationError) as captured:
+        replace_path(source, target)
+
+    assert captured.value.cause.errno == errno.EXDEV
+    assert source.read_bytes() == b"verified bundle"
+    assert not target.exists()

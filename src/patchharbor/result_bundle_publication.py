@@ -9,7 +9,6 @@ import zipfile
 
 from patchharbor.errors import PatchHarborError, result_bundle_error
 from patchharbor.platform.filesystem import (
-    FileSystemOperationError,
     MetadataSyncStatus,
     PathKind,
     path_kind,
@@ -107,19 +106,28 @@ def publish_result_bundle(
     snapshot: ResultBundleSnapshot,
 ) -> PublishedResultBundle:
     """Write, verify, best-effort sync, and atomically publish one bundle."""
+    temporary_created = False
     try:
         if path_kind(publication.final_path) is not PathKind.MISSING:
             raise result_bundle_error("Result Bundle destination already exists")
         if path_kind(publication.temporary_path) is not PathKind.MISSING:
             raise result_bundle_error("Result Bundle temporary path already exists")
 
-        write_result_bundle(
-            publication.temporary_path,
-            manifest=manifest,
-            context_document=context_document,
-            run_document=run_document,
-            snapshot=snapshot,
-        )
+        try:
+            with publication.temporary_path.open("xb") as destination:
+                temporary_created = True
+                write_result_bundle(
+                    destination,
+                    manifest=manifest,
+                    context_document=context_document,
+                    run_document=run_document,
+                    snapshot=snapshot,
+                )
+        except PatchHarborError:
+            raise
+        except OSError as exc:
+            raise result_bundle_error("cannot create the Result Bundle") from exc
+
         _verify_result_bundle(publication.temporary_path)
         temporary_file_sync = sync_regular_file_best_effort(
             publication.temporary_path
@@ -144,9 +152,8 @@ def publish_result_bundle(
         )
     except PatchHarborError:
         raise
-    except FileSystemOperationError as exc:
-        raise result_bundle_error("cannot publish the Result Bundle") from exc
     except OSError as exc:
         raise result_bundle_error("cannot publish the Result Bundle") from exc
     finally:
-        _remove_temporary_file(publication.temporary_path)
+        if temporary_created:
+            _remove_temporary_file(publication.temporary_path)

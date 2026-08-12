@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 import stat
 import zipfile
+from typing import BinaryIO
 
 from patchharbor.errors import result_bundle_error
 from patchharbor.result_bundle_snapshot import ResultBundleSnapshot
@@ -46,18 +46,18 @@ def _write_entry(
 
 
 def write_result_bundle(
-    path: Path,
+    destination: BinaryIO,
     *,
     manifest: dict[str, object],
     context_document: dict[str, object],
     run_document: dict[str, object],
     snapshot: ResultBundleSnapshot,
 ) -> None:
-    """Write one fully captured Result Bundle without reading the repository."""
+    """Write one captured Result Bundle to a caller-owned binary stream."""
     try:
         with zipfile.ZipFile(
-            path,
-            mode="x",
+            destination,
+            mode="w",
             compression=zipfile.ZIP_DEFLATED,
             allowZip64=True,
         ) as archive:
@@ -92,8 +92,4 @@ def write_result_bundle(
                     executable=entry.executable,
                 )
     except (OSError, RuntimeError, ValueError, zipfile.LargeZipFile) as exc:
-        try:
-            path.unlink(missing_ok=True)
-        except OSError:
-            pass
         raise result_bundle_error("cannot create the Result Bundle") from exc

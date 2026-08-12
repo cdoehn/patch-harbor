@@ -82,13 +82,14 @@ def test_snapshot_bytes_drive_manifest_and_zip_in_canonical_order(
         }
 
     destination = tmp_path / "result.zip"
-    write_result_bundle(
-        destination,
-        manifest={},
-        context_document={},
-        run_document={},
-        snapshot=snapshot,
-    )
+    with destination.open("xb") as bundle_file:
+        write_result_bundle(
+            bundle_file,
+            manifest={},
+            context_document={},
+            run_document={},
+            snapshot=snapshot,
+        )
 
     with zipfile.ZipFile(destination) as archive:
         for relative_path, expected in base_contents.items():

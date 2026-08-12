@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import datetime
 from hashlib import sha256
 import json
@@ -7,6 +8,7 @@ import os
 from pathlib import Path
 import stat
 import subprocess
+from typing import BinaryIO
 from uuid import UUID
 import zipfile
 
@@ -47,6 +49,24 @@ def _result_bundles() -> tuple[Path, ...]:
     if not directory.exists():
         return ()
     return tuple(sorted(directory.glob("patchharbor_result_*.zip")))
+
+
+def _synchronize_after_base_capture(
+    monkeypatch: pytest.MonkeyPatch,
+    action: Callable[[], None],
+) -> None:
+    original_capture = result_bundle_capture_module.capture_base_bundle_entries
+
+    def capture_then_act(*args: object, **kwargs: object) -> object:
+        entries = original_capture(*args, **kwargs)
+        action()
+        return entries
+
+    monkeypatch.setattr(
+        result_bundle_capture_module,
+        "capture_base_bundle_entries",
+        capture_then_act,
+    )
 
 
 def _assert_rfc3339_utc(value: object) -> None:
@@ -526,18 +546,11 @@ def test_manual_bundle_rejects_repository_change_during_capture(
     repository = create_repository(tmp_path / "repository")
     assert run_cli(repository, "register").returncode == 0
     output_directory = tmp_path / "results"
-    original_capture = result_bundle_capture_module.capture_base_bundle_entries
 
-    def capture_and_mutate(*args: object, **kwargs: object) -> object:
-        entries = original_capture(*args, **kwargs)
+    def mutate_repository() -> None:
         (repository / "tracked.txt").write_bytes(b"changed during capture\n")
-        return entries
 
-    monkeypatch.setattr(
-        result_bundle_capture_module,
-        "capture_base_bundle_entries",
-        capture_and_mutate,
-    )
+    _synchronize_after_base_capture(monkeypatch, mutate_repository)
 
     with pytest.raises(PatchHarborError) as captured:
         create_manual_result_bundle(
@@ -603,8 +616,11 @@ def test_manual_bundle_leaves_no_published_or_temporary_file_after_failure(
     output_directory = tmp_path / "results"
 
     if verification_failure == "missing":
-        def write_incomplete(path: Path, **_options: object) -> None:
-            with zipfile.ZipFile(path, mode="x") as archive:
+        def write_incomplete(
+            destination: BinaryIO,
+            **_options: object,
+        ) -> None:
+            with zipfile.ZipFile(destination, mode="w") as archive:
                 archive.writestr("manifest.json", b"{}\n")
 
         monkeypatch.setattr(
@@ -747,19 +763,12 @@ def test_manual_bundle_rejects_output_directory_retargeted_during_capture(
     assert run_cli(other, "register").returncode == 0
     output_directory = tmp_path / "results"
     moved_directory = tmp_path / "original-results"
-    original_capture = result_bundle_capture_module.capture_base_bundle_entries
 
-    def capture_and_retarget(*args: object, **kwargs: object) -> object:
-        entries = original_capture(*args, **kwargs)
+    def retarget_output_directory() -> None:
         output_directory.rename(moved_directory)
         _create_directory_alias(output_directory, other)
-        return entries
 
-    monkeypatch.setattr(
-        result_bundle_capture_module,
-        "capture_base_bundle_entries",
-        capture_and_retarget,
-    )
+    _synchronize_after_base_capture(monkeypatch, retarget_output_directory)
 
     with pytest.raises(PatchHarborError) as captured:
         create_manual_result_bundle(
@@ -783,9 +792,15 @@ def test_manual_bundle_holds_and_releases_lock_when_publication_fails(
     ).strip()
     environment = project_environment()
     observed: list[int] = []
+    output_directory = tmp_path / "results"
 
-    def fail_while_probing(_path: Path, **_options: object) -> None:
+    def fail_while_probing(
+        destination: BinaryIO,
+        **_options: object,
+    ) -> None:
         observed.append(probe_repository_lock(repo_id, environment))
+        destination.write(b"partial bundle")
+        destination.flush()
         raise OSError("simulated publication failure")
 
     monkeypatch.setattr(
@@ -797,9 +812,10 @@ def test_manual_bundle_holds_and_releases_lock_when_publication_fails(
     with pytest.raises(PatchHarborError) as captured:
         create_manual_result_bundle(
             repository,
-            output_directory=tmp_path / "results",
+            output_directory=output_directory,
         )
 
     assert captured.value.exit_code == ExitCode.RESULT_BUNDLE_ERROR
     assert observed == [int(ExitCode.REPOSITORY_BUSY)]
+    assert tuple(output_directory.iterdir()) == ()
     assert probe_repository_lock(repo_id, environment) == 0
