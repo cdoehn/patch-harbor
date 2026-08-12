@@ -8,8 +8,11 @@ import pytest
 from patchharbor.platform.errors import describe_os_error
 from patchharbor.platform.filesystem import (
     FileSystemOperationError,
+    MetadataSyncStatus,
     PathKind,
     path_kind,
+    sync_directory_best_effort,
+    sync_regular_file_best_effort,
 )
 from patchharbor.platform.locking import (
     LockUnavailable,
@@ -90,3 +93,18 @@ def test_advisory_lock_uses_ownership_instead_of_file_existence(
 
     with exclusive_file_lock(lock_path):
         assert lock_path.is_file()
+
+
+def test_best_effort_metadata_sync_reports_actual_platform_support(
+    tmp_path: Path,
+) -> None:
+    regular_file = tmp_path / "result.zip"
+    regular_file.write_bytes(b"result bundle bytes")
+
+    file_status = sync_regular_file_best_effort(regular_file)
+    directory_status = sync_directory_best_effort(tmp_path)
+
+    assert file_status is not MetadataSyncStatus.FAILED
+    assert directory_status is not MetadataSyncStatus.FAILED
+    if is_windows():
+        assert directory_status is MetadataSyncStatus.UNSUPPORTED

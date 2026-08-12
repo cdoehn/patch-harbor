@@ -12,8 +12,10 @@ import zipfile
 
 import pytest
 
-import patchharbor.result_bundle as result_bundle_module
+import patchharbor.result_bundle_capture as result_bundle_capture_module
+import patchharbor.result_bundle_publication as result_bundle_publication_module
 from patchharbor.errors import ExitCode, PatchHarborError
+from patchharbor.platform.filesystem import MetadataSyncStatus
 from patchharbor.result_bundle import create_manual_result_bundle
 from patchharbor.user_paths import registration_user_paths
 from tests.platform_support import project_environment, run_cli
@@ -21,6 +23,7 @@ from tests.registration_support import (
     create_repository,
     git,
     isolated_user_environment,
+    probe_repository_lock,
     release_repository_lock_holder,
     start_repository_lock_holder,
     stop_repository_lock_holder,
@@ -523,7 +526,7 @@ def test_manual_bundle_rejects_repository_change_during_capture(
     repository = create_repository(tmp_path / "repository")
     assert run_cli(repository, "register").returncode == 0
     output_directory = tmp_path / "results"
-    original_capture = result_bundle_module.capture_base_bundle_entries
+    original_capture = result_bundle_capture_module.capture_base_bundle_entries
 
     def capture_and_mutate(*args: object, **kwargs: object) -> object:
         entries = original_capture(*args, **kwargs)
@@ -531,7 +534,7 @@ def test_manual_bundle_rejects_repository_change_during_capture(
         return entries
 
     monkeypatch.setattr(
-        result_bundle_module,
+        result_bundle_capture_module,
         "capture_base_bundle_entries",
         capture_and_mutate,
     )
@@ -555,7 +558,7 @@ def test_manual_bundle_publishes_from_verified_temporary_zip_in_result_directory
     assert run_cli(repository, "register").returncode == 0
     output_directory = tmp_path / "results"
     observed: dict[str, Path] = {}
-    real_replace = result_bundle_module.os.replace
+    real_replace = result_bundle_publication_module.replace_path
 
     def observe_replace(source: object, destination: object) -> None:
         source_path = Path(source)  # type: ignore[arg-type]
@@ -572,7 +575,11 @@ def test_manual_bundle_publishes_from_verified_temporary_zip_in_result_directory
         observed["destination"] = destination_path
         real_replace(source_path, destination_path)
 
-    monkeypatch.setattr(result_bundle_module.os, "replace", observe_replace)
+    monkeypatch.setattr(
+        result_bundle_publication_module,
+        "replace_path",
+        observe_replace,
+    )
 
     result = create_manual_result_bundle(
         repository,
@@ -601,7 +608,7 @@ def test_manual_bundle_leaves_no_published_or_temporary_file_after_failure(
                 archive.writestr("manifest.json", b"{}\n")
 
         monkeypatch.setattr(
-            result_bundle_module,
+            result_bundle_publication_module,
             "write_result_bundle",
             write_incomplete,
         )
@@ -621,3 +628,178 @@ def test_manual_bundle_leaves_no_published_or_temporary_file_after_failure(
     assert captured.value.exit_code == ExitCode.RESULT_BUNDLE_ERROR
     assert output_directory.is_dir()
     assert tuple(output_directory.iterdir()) == ()
+
+
+def _create_directory_alias(alias: Path, target: Path) -> None:
+    if os.name == "nt":
+        completed = subprocess.run(
+            ["cmd.exe", "/d", "/c", "mklink", "/J", str(alias), str(target)],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if completed.returncode != 0:
+            pytest.skip("Windows directory junctions are unavailable")
+        return
+    alias.symlink_to(target, target_is_directory=True)
+
+
+def test_manual_bundle_rejects_physical_output_alias_inside_repository(
+    tmp_path: Path,
+) -> None:
+    target = create_repository(tmp_path / "target")
+    other = create_repository(tmp_path / "other")
+    assert run_cli(target, "register").returncode == 0
+    assert run_cli(other, "register").returncode == 0
+    alias = tmp_path / "other-alias"
+    _create_directory_alias(alias, other)
+    forbidden_output = alias / "generated" / "results"
+
+    completed = run_cli(
+        target,
+        "bundle",
+        "--output-dir",
+        str(forbidden_output),
+    )
+
+    assert completed.returncode == int(ExitCode.RESULT_BUNDLE_ERROR)
+    assert not (other / "generated").exists()
+    assert _result_bundles() == ()
+
+
+def test_manual_bundle_holds_repository_lock_through_publication(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repository = create_repository(tmp_path / "repository")
+    assert run_cli(repository, "register").returncode == 0
+    repo_id = (repository / ".patchharbor" / "id").read_text(
+        encoding="ascii"
+    ).strip()
+    environment = project_environment()
+    real_replace = result_bundle_publication_module.replace_path
+    observed: list[int] = []
+
+    def replace_while_probing(source: Path, destination: Path) -> None:
+        observed.append(probe_repository_lock(repo_id, environment))
+        real_replace(source, destination)
+
+    monkeypatch.setattr(
+        result_bundle_publication_module,
+        "replace_path",
+        replace_while_probing,
+    )
+
+    result = create_manual_result_bundle(
+        repository,
+        output_directory=tmp_path / "results",
+    )
+
+    assert result.path.is_file()
+    assert observed == [int(ExitCode.REPOSITORY_BUSY)]
+    assert probe_repository_lock(repo_id, environment) == 0
+
+
+def test_manual_bundle_reports_best_effort_sync_outcomes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repository = create_repository(tmp_path / "repository")
+    assert run_cli(repository, "register").returncode == 0
+    directory_statuses = iter(
+        (MetadataSyncStatus.UNSUPPORTED, MetadataSyncStatus.FAILED)
+    )
+    monkeypatch.setattr(
+        result_bundle_publication_module,
+        "sync_regular_file_best_effort",
+        lambda _path: MetadataSyncStatus.FAILED,
+    )
+    monkeypatch.setattr(
+        result_bundle_publication_module,
+        "sync_directory_best_effort",
+        lambda _path: next(directory_statuses),
+    )
+
+    result = create_manual_result_bundle(
+        repository,
+        output_directory=tmp_path / "results",
+    )
+
+    assert result.path.is_file()
+    assert result.publication_durability.temporary_file is MetadataSyncStatus.FAILED
+    assert (
+        result.publication_durability.directory_before_replace
+        is MetadataSyncStatus.UNSUPPORTED
+    )
+    assert (
+        result.publication_durability.directory_after_replace
+        is MetadataSyncStatus.FAILED
+    )
+
+
+def test_manual_bundle_rejects_output_directory_retargeted_during_capture(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repository = create_repository(tmp_path / "repository")
+    other = create_repository(tmp_path / "other")
+    assert run_cli(repository, "register").returncode == 0
+    assert run_cli(other, "register").returncode == 0
+    output_directory = tmp_path / "results"
+    moved_directory = tmp_path / "original-results"
+    original_capture = result_bundle_capture_module.capture_base_bundle_entries
+
+    def capture_and_retarget(*args: object, **kwargs: object) -> object:
+        entries = original_capture(*args, **kwargs)
+        output_directory.rename(moved_directory)
+        _create_directory_alias(output_directory, other)
+        return entries
+
+    monkeypatch.setattr(
+        result_bundle_capture_module,
+        "capture_base_bundle_entries",
+        capture_and_retarget,
+    )
+
+    with pytest.raises(PatchHarborError) as captured:
+        create_manual_result_bundle(
+            repository,
+            output_directory=output_directory,
+        )
+
+    assert captured.value.exit_code == ExitCode.RESULT_BUNDLE_ERROR
+    assert not tuple(other.glob("patchharbor_result_*.zip"))
+    assert tuple(moved_directory.iterdir()) == ()
+
+
+def test_manual_bundle_holds_and_releases_lock_when_publication_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repository = create_repository(tmp_path / "repository")
+    assert run_cli(repository, "register").returncode == 0
+    repo_id = (repository / ".patchharbor" / "id").read_text(
+        encoding="ascii"
+    ).strip()
+    environment = project_environment()
+    observed: list[int] = []
+
+    def fail_while_probing(_path: Path, **_options: object) -> None:
+        observed.append(probe_repository_lock(repo_id, environment))
+        raise OSError("simulated publication failure")
+
+    monkeypatch.setattr(
+        result_bundle_publication_module,
+        "write_result_bundle",
+        fail_while_probing,
+    )
+
+    with pytest.raises(PatchHarborError) as captured:
+        create_manual_result_bundle(
+            repository,
+            output_directory=tmp_path / "results",
+        )
+
+    assert captured.value.exit_code == ExitCode.RESULT_BUNDLE_ERROR
+    assert observed == [int(ExitCode.REPOSITORY_BUSY)]
+    assert probe_repository_lock(repo_id, environment) == 0
