@@ -17,6 +17,7 @@ from patchharbor.platform.filesystem import (
     sync_regular_file_best_effort,
 )
 from patchharbor.result_bundle_snapshot import ResultBundleSnapshot
+from patchharbor.run_report import RunReport
 from patchharbor.result_bundle_writer import write_result_bundle
 
 
@@ -102,7 +103,7 @@ def publish_result_bundle(
     *,
     manifest: dict[str, object],
     context_document: dict[str, object],
-    run_document: dict[str, object],
+    run_report: RunReport,
     snapshot: ResultBundleSnapshot,
 ) -> PublishedResultBundle:
     """Write, verify, best-effort sync, and atomically publish one bundle."""
@@ -120,7 +121,7 @@ def publish_result_bundle(
                     destination,
                     manifest=manifest,
                     context_document=context_document,
-                    run_document=run_document,
+                    run_report=run_report,
                     snapshot=snapshot,
                 )
         except PatchHarborError:

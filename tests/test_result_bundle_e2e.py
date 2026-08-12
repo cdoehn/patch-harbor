@@ -334,6 +334,24 @@ def test_manual_bundle_json_completion_matches_persisted_run_report(
     assert tuple(system_temp.glob("patchharbor-*")) == ()
 
 
+def test_manual_bundle_structured_outputs_do_not_capture_secret_environment(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    secret = "do-not-log-this-token-123"
+    monkeypatch.setenv("PATCHHARBOR_TEST_TOKEN", secret)
+    repository = create_repository(tmp_path / "repository")
+    assert run_cli(repository, "register").returncode == 0
+
+    completed = run_cli(repository, "bundle", "--json")
+
+    assert completed.returncode == 0
+    assert secret not in completed.stdout
+    result_path = Path(json.loads(completed.stdout)["result"]["result_bundle_path"])
+    with zipfile.ZipFile(result_path) as archive:
+        assert secret.encode("utf-8") not in archive.read("logs/run.json")
+
+
 def test_manual_bundle_failure_returns_exit_11_and_emergency_run_report(
     tmp_path: Path,
 ) -> None:
@@ -385,6 +403,7 @@ def test_manual_bundle_failure_returns_exit_11_and_emergency_run_report(
     assert run["result_bundle"]["attempted"] is True
     assert run["result_bundle"]["status"] == "failed"
     assert isinstance(run["result_bundle"]["error"], str)
+    assert error["message"] == run["result_bundle"]["error"]
     assert run["process_exit_code"] == int(ExitCode.RESULT_BUNDLE_ERROR)
 
 
@@ -397,11 +416,19 @@ def test_manual_bundle_unresolved_repository_records_not_attempted_status(
 
     assert completed.returncode == int(ExitCode.RESULT_BUNDLE_ERROR)
     envelope = json.loads(completed.stdout)
+    assert envelope["error"]["kind"] == "repository_resolution_error"
+    assert envelope["error"]["patchharbor_error_code"] == int(
+        ExitCode.RESULT_BUNDLE_ERROR
+    )
     emergency_path = Path(
         envelope["error"]["emergency_diagnostics_path"]
     )
     run = json.loads((emergency_path / "run.json").read_text(encoding="utf-8"))
     assert run["repository_resolved"] is False
+    assert run["primary_result"]["kind"] == "repository_error"
+    assert run["primary_result"]["patchharbor_error_code"] == int(
+        ExitCode.REPOSITORY_ERROR
+    )
     assert run["result_bundle"] == {
         "attempted": False,
         "status": "not_attempted",
@@ -425,7 +452,7 @@ def test_manual_bundle_surfaces_failed_emergency_rescue(
 
     def reject_run_report(
         _run_directory: Path,
-        _document: dict[str, object],
+        _report: object,
     ) -> None:
         raise OSError("simulated emergency diagnostics failure")
 
@@ -646,8 +673,21 @@ def test_manual_bundle_respects_the_repository_lock(tmp_path: Path) -> None:
         environment=project_environment(),
     )
     try:
-        completed = run_cli(repository, "bundle")
+        completed = run_cli(repository, "bundle", "--json")
         assert completed.returncode == int(ExitCode.RESULT_BUNDLE_ERROR)
+        envelope = json.loads(completed.stdout)
+        assert envelope["error"]["kind"] == "repository_busy"
+        emergency_path = Path(
+            envelope["error"]["emergency_diagnostics_path"]
+        )
+        run = json.loads(
+            (emergency_path / "run.json").read_text(encoding="utf-8")
+        )
+        assert run["primary_result"]["kind"] == "repository_busy"
+        assert run["primary_result"]["patchharbor_error_code"] == int(
+            ExitCode.REPOSITORY_BUSY
+        )
+        assert run["process_exit_code"] == int(ExitCode.RESULT_BUNDLE_ERROR)
         assert _result_bundles() == ()
         assert release_repository_lock_holder(holder) == 0
     finally:

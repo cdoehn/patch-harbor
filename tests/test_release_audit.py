@@ -42,6 +42,7 @@ EXPECTED_RUNTIME_FILES = {
     "locks.py",
     "resource_policy.py",
     "run_log.py",
+    "run_report.py",
     "sources.py",
     "state_fingerprint.py",
     "user_paths.py",

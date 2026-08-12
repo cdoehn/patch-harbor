@@ -11,6 +11,7 @@ from patchharbor.errors import ExitCode, PatchHarborError
 from patchharbor.models import GitObjectFormat, GitObjectId
 from patchharbor.result_bundle_snapshot import build_result_bundle_snapshot
 from patchharbor.result_bundle_writer import write_result_bundle
+from tests.run_report_support import successful_bundle_run_report
 
 
 def _object_id(value: str = "1" * 40) -> GitObjectId:
@@ -87,7 +88,10 @@ def test_snapshot_bytes_drive_manifest_and_zip_in_canonical_order(
             bundle_file,
             manifest={},
             context_document={},
-            run_document={},
+            run_report=successful_bundle_run_report(
+                tmp_path / "repository",
+                destination,
+            ),
             snapshot=snapshot,
         )
 

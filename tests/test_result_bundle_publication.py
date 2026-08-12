@@ -14,6 +14,7 @@ from patchharbor.result_bundle_publication import (
     publish_result_bundle,
 )
 from patchharbor.result_bundle_snapshot import build_result_bundle_snapshot
+from tests.run_report_support import successful_bundle_run_report
 
 
 def _publish_empty_bundle(final_path: Path) -> None:
@@ -25,7 +26,10 @@ def _publish_empty_bundle(final_path: Path) -> None:
         publication,
         manifest={},
         context_document={},
-        run_document={},
+        run_report=successful_bundle_run_report(
+            final_path.parent / "repository",
+            final_path,
+        ),
         snapshot=build_result_bundle_snapshot(
             base_entries=(),
             staged_patch=b"",

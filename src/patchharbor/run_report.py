@@ -1,0 +1,464 @@
+"""Immutable structured outcomes shared by Result Bundles and JSON CLI output."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, replace
+from datetime import datetime, timezone
+from enum import Enum
+import math
+import os
+from pathlib import Path
+from time import monotonic
+from typing import Mapping
+from uuid import UUID, uuid4
+
+from patchharbor.models import RepositoryContext, RepositoryId, RepositoryPath
+
+
+_SECRET_ENV_MARKERS = (
+    "ACCESS_KEY",
+    "API_KEY",
+    "CREDENTIAL",
+    "PASSWORD",
+    "PASSWD",
+    "PRIVATE_KEY",
+    "SECRET",
+    "TOKEN",
+)
+
+
+class RunOperation(str, Enum):
+    """Public operations that produce the shared structured run contract."""
+
+    BUNDLE = "bundle"
+    APPLY = "apply"
+
+
+class PrimaryResultKind(str, Enum):
+    """Stable primary-result categories defined by the 1.1.0 contract."""
+
+    SUCCESS = "success"
+    DRY_RUN_SUCCESS = "dry_run_success"
+    VALIDATION_ERROR = "validation_error"
+    REPOSITORY_ERROR = "repository_error"
+    STATE_MISMATCH = "state_mismatch"
+    REPOSITORY_BUSY = "repository_busy"
+    ENTRYPOINT_EXIT = "entrypoint_exit"
+    TIMEOUT = "timeout"
+    INTERRUPTED = "interrupted"
+    EXECUTION_ERROR = "execution_error"
+
+
+class ResultBundleStatus(str, Enum):
+    """Stable status of the Result-Bundle side of one run."""
+
+    CREATED = "created"
+    FAILED = "failed"
+    NOT_ATTEMPTED = "not_attempted"
+
+
+def canonical_uuid_text(value: UUID) -> str:
+    """Return one canonical UUID-v4 string or reject the value."""
+    text = str(value)
+    if value.version != 4 or UUID(text) != value or text != text.lower():
+        raise ValueError("run ID must be a canonical UUID v4")
+    return text
+
+
+def rfc3339_utc(value: datetime) -> str:
+    """Render one timezone-aware timestamp as RFC-3339 UTC with ``Z``."""
+    if value.tzinfo is None or value.utcoffset() is None:
+        raise ValueError("run timestamp must be timezone-aware")
+    return (
+        value.astimezone(timezone.utc)
+        .isoformat(timespec="seconds")
+        .replace("+00:00", "Z")
+    )
+
+
+def finite_duration_seconds(value: float) -> float:
+    """Keep structured durations finite and non-negative."""
+    duration = float(value)
+    if not math.isfinite(duration) or duration < 0.0:
+        return 0.0
+    return duration
+
+
+def physical_absolute_path(path: Path) -> Path:
+    """Return the physically canonical absolute representation of one path."""
+    return path.expanduser().resolve(strict=False)
+
+
+def physical_absolute_path_text(path: Path | RepositoryPath | None) -> str | None:
+    """Serialize one path through the shared physical absolute-path boundary."""
+    if path is None:
+        return None
+    raw_path = path.value if isinstance(path, RepositoryPath) else path
+    return str(physical_absolute_path(raw_path))
+
+
+def sanitize_structured_text(
+    value: str,
+    *,
+    environment: Mapping[str, str] | None = None,
+) -> str:
+    """Redact secret-looking environment values from structured output text."""
+    sanitized = value
+    source = os.environ if environment is None else environment
+    for name, secret in source.items():
+        if not secret:
+            continue
+        normalized_name = name.upper()
+        if any(marker in normalized_name for marker in _SECRET_ENV_MARKERS):
+            sanitized = sanitized.replace(secret, "[redacted]")
+    return sanitized
+
+
+@dataclass(frozen=True)
+class RunSession:
+    """One generated run identity together with its starting clocks."""
+
+    run_id: UUID
+    started_at: datetime
+    started_monotonic: float
+
+    def __post_init__(self) -> None:
+        canonical_uuid_text(self.run_id)
+        rfc3339_utc(self.started_at)
+        if not math.isfinite(float(self.started_monotonic)):
+            raise ValueError("run monotonic start must be finite")
+
+    @classmethod
+    def start(cls) -> RunSession:
+        """Start one run using the system UTC and monotonic clocks."""
+        return cls(
+            run_id=uuid4(),
+            started_at=datetime.now(timezone.utc),
+            started_monotonic=monotonic(),
+        )
+
+    @property
+    def filename_timestamp(self) -> str:
+        """Stable UTC timestamp component for Result-Bundle filenames."""
+        return self.started_at.astimezone(timezone.utc).strftime("%Y%m%d_%H%M%S")
+
+    def finish(
+        self,
+        *,
+        ended_at: datetime | None = None,
+        ended_monotonic: float | None = None,
+    ) -> RunTiming:
+        """Finish the session while keeping duration JSON-safe."""
+        actual_ended_at = ended_at or datetime.now(timezone.utc)
+        actual_ended_monotonic = (
+            monotonic() if ended_monotonic is None else ended_monotonic
+        )
+        return RunTiming(
+            run_id=self.run_id,
+            started_at=self.started_at,
+            ended_at=actual_ended_at,
+            duration_seconds=finite_duration_seconds(
+                actual_ended_monotonic - self.started_monotonic
+            ),
+        )
+
+
+@dataclass(frozen=True)
+class RunTiming:
+    """Completed wall-clock and monotonic timing of one run."""
+
+    run_id: UUID
+    started_at: datetime
+    ended_at: datetime
+    duration_seconds: float
+
+    def __post_init__(self) -> None:
+        canonical_uuid_text(self.run_id)
+        rfc3339_utc(self.started_at)
+        rfc3339_utc(self.ended_at)
+        object.__setattr__(
+            self,
+            "duration_seconds",
+            finite_duration_seconds(self.duration_seconds),
+        )
+
+    @property
+    def started_at_text(self) -> str:
+        return rfc3339_utc(self.started_at)
+
+    @property
+    def ended_at_text(self) -> str:
+        return rfc3339_utc(self.ended_at)
+
+
+@dataclass(frozen=True)
+class PrimaryResult:
+    """The primary side of one run, independent from bundle publication."""
+
+    kind: PrimaryResultKind
+    success: bool
+    patchharbor_error_code: int | None
+    entrypoint_started: bool = False
+    entrypoint_exit_code: int | None = None
+    timed_out: bool = False
+    interrupted: bool = False
+
+    @classmethod
+    def success_result(cls) -> PrimaryResult:
+        return cls(
+            kind=PrimaryResultKind.SUCCESS,
+            success=True,
+            patchharbor_error_code=None,
+        )
+
+    @classmethod
+    def tool_failure(
+        cls,
+        *,
+        kind: PrimaryResultKind,
+        patchharbor_error_code: int,
+    ) -> PrimaryResult:
+        return cls(
+            kind=kind,
+            success=False,
+            patchharbor_error_code=patchharbor_error_code,
+        )
+
+    def as_document(self) -> dict[str, object]:
+        return {
+            "kind": self.kind.value,
+            "success": self.success,
+            "patchharbor_error_code": self.patchharbor_error_code,
+            "entrypoint_started": self.entrypoint_started,
+            "entrypoint_exit_code": self.entrypoint_exit_code,
+            "timed_out": self.timed_out,
+            "interrupted": self.interrupted,
+        }
+
+
+@dataclass(frozen=True)
+class ResultBundleResult:
+    """Result-Bundle outcome kept separate from the primary result."""
+
+    attempted: bool
+    status: ResultBundleStatus
+    path: Path | None = None
+    error: str | None = None
+    emergency_diagnostics_path: Path | None = None
+
+    def __post_init__(self) -> None:
+        if self.status is ResultBundleStatus.NOT_ATTEMPTED and self.attempted:
+            raise ValueError("not_attempted Result Bundle cannot be attempted")
+        if self.status is not ResultBundleStatus.NOT_ATTEMPTED and not self.attempted:
+            raise ValueError("created or failed Result Bundle must be attempted")
+        if self.status is ResultBundleStatus.CREATED:
+            if (
+                self.path is None
+                or self.error is not None
+                or self.emergency_diagnostics_path is not None
+            ):
+                raise ValueError(
+                    "created Result Bundle requires only a published path"
+                )
+        else:
+            if self.path is not None:
+                raise ValueError("failed or unattempted Result Bundle has no path")
+            if self.error is None:
+                raise ValueError(
+                    "failed or unattempted Result Bundle requires an error"
+                )
+
+        if self.path is not None:
+            object.__setattr__(self, "path", physical_absolute_path(self.path))
+        if self.emergency_diagnostics_path is not None:
+            object.__setattr__(
+                self,
+                "emergency_diagnostics_path",
+                physical_absolute_path(self.emergency_diagnostics_path),
+            )
+        if self.error is not None:
+            object.__setattr__(
+                self,
+                "error",
+                sanitize_structured_text(self.error),
+            )
+
+    @classmethod
+    def created(cls, path: Path) -> ResultBundleResult:
+        return cls(
+            attempted=True,
+            status=ResultBundleStatus.CREATED,
+            path=path,
+        )
+
+    @classmethod
+    def failed(cls, error: str) -> ResultBundleResult:
+        return cls(
+            attempted=True,
+            status=ResultBundleStatus.FAILED,
+            error=error,
+        )
+
+    @classmethod
+    def not_attempted(cls, error: str) -> ResultBundleResult:
+        return cls(
+            attempted=False,
+            status=ResultBundleStatus.NOT_ATTEMPTED,
+            error=error,
+        )
+
+    def with_emergency_diagnostics(
+        self,
+        path: Path | None,
+    ) -> ResultBundleResult:
+        return replace(self, emergency_diagnostics_path=path)
+
+    def as_run_document(self) -> dict[str, object]:
+        return {
+            "attempted": self.attempted,
+            "status": self.status.value,
+            "error": self.error,
+        }
+
+
+@dataclass(frozen=True)
+class RunReport:
+    """Single source for persisted and machine-readable run completion data."""
+
+    timing: RunTiming
+    operation: RunOperation
+    dry_run: bool
+    context: RepositoryContext | None
+    repository: RepositoryPath | None
+    repo_id: RepositoryId | None
+    warnings: tuple[str, ...]
+    primary_result: PrimaryResult
+    result_bundle: ResultBundleResult
+    process_exit_code: int
+
+    def __post_init__(self) -> None:
+        if isinstance(self.process_exit_code, bool) or not isinstance(
+            self.process_exit_code, int
+        ):
+            raise ValueError("process exit code must be an integer")
+        object.__setattr__(
+            self,
+            "warnings",
+            tuple(sanitize_structured_text(warning) for warning in self.warnings),
+        )
+        if self.context is not None:
+            if self.repository not in (None, self.context.repository_path):
+                raise ValueError("run repository conflicts with its context")
+            if self.repo_id not in (None, self.context.repo_id):
+                raise ValueError("run repository ID conflicts with its context")
+        if self.result_bundle.status is ResultBundleStatus.NOT_ATTEMPTED:
+            if self.repository_resolved:
+                raise ValueError(
+                    "Result Bundle may be not_attempted only before repository resolution"
+                )
+        if self.operation is RunOperation.BUNDLE:
+            if self.dry_run or self.execution_present:
+                raise ValueError("manual bundle runs cannot execute or be dry-runs")
+            if self.primary_result.success:
+                if (
+                    self.result_bundle.status is not ResultBundleStatus.CREATED
+                    or self.process_exit_code != 0
+                ):
+                    raise ValueError(
+                        "successful manual bundle requires a created bundle and exit 0"
+                    )
+            elif (
+                self.result_bundle.status is ResultBundleStatus.CREATED
+                or self.process_exit_code != 11
+            ):
+                raise ValueError(
+                    "failed manual bundle requires failure status and exit 11"
+                )
+
+    @property
+    def run_id(self) -> UUID:
+        return self.timing.run_id
+
+    @property
+    def resolved_repository(self) -> RepositoryPath | None:
+        if self.context is not None:
+            return self.context.repository_path
+        return self.repository
+
+    @property
+    def resolved_repo_id(self) -> RepositoryId | None:
+        if self.context is not None:
+            return self.context.repo_id
+        return self.repo_id
+
+    @property
+    def repository_resolved(self) -> bool:
+        return self.resolved_repository is not None and self.resolved_repo_id is not None
+
+    @property
+    def execution_present(self) -> bool:
+        """An execution log exists only after an entrypoint actually started."""
+        return self.primary_result.entrypoint_started
+
+    def with_result_bundle(self, result: ResultBundleResult) -> RunReport:
+        return replace(self, result_bundle=result)
+
+    def as_run_document(self) -> dict[str, object]:
+        context = self.context
+        return {
+            "run_id": canonical_uuid_text(self.run_id),
+            "operation": self.operation.value,
+            "dry_run": self.dry_run,
+            "started_at": self.timing.started_at_text,
+            "ended_at": self.timing.ended_at_text,
+            "duration_seconds": self.timing.duration_seconds,
+            "repository_resolved": self.repository_resolved,
+            "repo_id": (
+                None
+                if self.resolved_repo_id is None
+                else str(self.resolved_repo_id)
+            ),
+            "repository_path": physical_absolute_path_text(
+                self.resolved_repository
+            ),
+            "base_commit": None if context is None else str(context.base_commit),
+            "state_fingerprint": (
+                None if context is None else context.state_fingerprint
+            ),
+            "fingerprint_algorithm": (
+                None if context is None else context.fingerprint_algorithm
+            ),
+            "warnings": list(self.warnings),
+            "execution_present": self.execution_present,
+            "primary_result": self.primary_result.as_document(),
+            "result_bundle": self.result_bundle.as_run_document(),
+            "process_exit_code": self.process_exit_code,
+        }
+
+    def manual_bundle_json_result(self) -> dict[str, object]:
+        """Return the closed successful ``bundle --json`` result object."""
+        if (
+            self.operation is not RunOperation.BUNDLE
+            or not self.primary_result.success
+            or self.context is None
+            or self.result_bundle.status is not ResultBundleStatus.CREATED
+            or self.result_bundle.path is None
+        ):
+            raise ValueError("run report is not a successful manual bundle")
+        return {
+            "run_id": canonical_uuid_text(self.run_id),
+            "repo_id": str(self.context.repo_id),
+            "repository_path": physical_absolute_path_text(
+                self.context.repository_path
+            ),
+            "base_commit": str(self.context.base_commit),
+            "state_fingerprint": self.context.state_fingerprint,
+            "fingerprint_algorithm": self.context.fingerprint_algorithm,
+            "result_bundle_status": self.result_bundle.status.value,
+            "result_bundle_path": physical_absolute_path_text(
+                self.result_bundle.path
+            ),
+            "emergency_diagnostics_path": physical_absolute_path_text(
+                self.result_bundle.emergency_diagnostics_path
+            ),
+        }

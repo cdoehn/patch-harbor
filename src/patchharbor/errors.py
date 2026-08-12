@@ -49,12 +49,14 @@ class PatchHarborError(Exception):
         error_kind: ErrorKind = ErrorKind.TOOL_ERROR,
         emergency_diagnostics_path: Path | None = None,
         emergency_diagnostics_failed: bool = False,
+        run_report: object | None = None,
     ) -> None:
         super().__init__(message)
         self.exit_code = exit_code
         self.error_kind = error_kind
         self.emergency_diagnostics_path = emergency_diagnostics_path
         self.emergency_diagnostics_failed = emergency_diagnostics_failed
+        self.run_report = run_report
 
 
 def registry_error(message: str) -> PatchHarborError:

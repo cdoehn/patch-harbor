@@ -34,6 +34,11 @@ from patchharbor.presentation import (
     terminal_supports_dashboard,
 )
 from patchharbor.run_log import temporary_run_log
+from patchharbor.run_report import (
+    RunReport,
+    physical_absolute_path_text,
+    sanitize_structured_text,
+)
 
 
 def _configure_utf8_standard_stream(stream: TextIO, *, errors: str) -> None:
@@ -294,14 +299,21 @@ def _json_envelope(
 ) -> dict[str, object]:
     structured_error: dict[str, object] | None = None
     if error is not None:
+        report = error.run_report if isinstance(error.run_report, RunReport) else None
+        report_error = (
+            None if report is None else report.result_bundle.error
+        )
+        emergency_path = (
+            error.emergency_diagnostics_path
+            if report is None
+            else report.result_bundle.emergency_diagnostics_path
+        )
         structured_error = {
             "kind": error.error_kind.value,
-            "message": str(error),
+            "message": sanitize_structured_text(report_error or str(error)),
             "patchharbor_error_code": int(error.exit_code),
-            "emergency_diagnostics_path": (
-                None
-                if error.emergency_diagnostics_path is None
-                else str(error.emergency_diagnostics_path)
+            "emergency_diagnostics_path": physical_absolute_path_text(
+                emergency_path
             ),
         }
     return {
@@ -414,18 +426,7 @@ def _context_command(
 
 
 def _bundle_json_result(result: Any) -> dict[str, object]:
-    context = result.context
-    return {
-        "run_id": str(result.run_id),
-        "repo_id": str(context.repo_id),
-        "repository_path": str(context.repository_path),
-        "base_commit": str(context.base_commit),
-        "state_fingerprint": context.state_fingerprint,
-        "fingerprint_algorithm": context.fingerprint_algorithm,
-        "result_bundle_status": "created",
-        "result_bundle_path": str(result.path),
-        "emergency_diagnostics_path": None,
-    }
+    return result.report.manual_bundle_json_result()
 
 
 def _write_emergency_diagnostics_notice(

@@ -264,6 +264,7 @@ def test_registration_layers_have_one_directional_dependency_flow() -> None:
     assert _local_imports("result_bundle_writer") == {
         "errors",
         "result_bundle_snapshot",
+        "run_report",
     }
     assert _local_imports("result_bundle_capture") == {
         "errors",
@@ -284,6 +285,7 @@ def test_registration_layers_have_one_directional_dependency_flow() -> None:
         "platform",
         "result_bundle_snapshot",
         "result_bundle_writer",
+        "run_report",
     }
     assert _local_imports("result_bundle") == {
         "errors",
@@ -295,8 +297,10 @@ def test_registration_layers_have_one_directional_dependency_flow() -> None:
         "result_bundle_publication",
         "result_bundle_snapshot",
         "result_bundle_target",
+        "run_report",
         "user_paths",
     }
+    assert _local_imports("run_report") == {"models"}
     assert _local_imports("locks") == {
         "errors",
         "models",
@@ -544,6 +548,7 @@ def test_cli_coordinates_only_public_composition_boundaries() -> None:
         "platform",
         "presentation",
         "run_log",
+        "run_report",
     }
 
 

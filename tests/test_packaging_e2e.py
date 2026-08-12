@@ -53,6 +53,7 @@ EXPECTED_RUNTIME_FILES = {
     "patchharbor/locks.py",
     "patchharbor/resource_policy.py",
     "patchharbor/run_log.py",
+    "patchharbor/run_report.py",
     "patchharbor/sources.py",
     "patchharbor/state_fingerprint.py",
     "patchharbor/user_paths.py",

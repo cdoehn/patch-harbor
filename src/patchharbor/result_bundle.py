@@ -4,16 +4,20 @@ from __future__ import annotations
 
 from contextlib import ExitStack
 from dataclasses import dataclass
-from datetime import datetime, timezone
 import json
 import os
 from pathlib import Path
 import shutil
 import tempfile
-from time import monotonic
-from uuid import UUID, uuid4
+from uuid import UUID
 
-from patchharbor.errors import PatchHarborError, result_bundle_error
+from patchharbor.errors import (
+    ErrorKind,
+    ExitCode,
+    PatchHarborError,
+    repository_resolution_error,
+    result_bundle_error,
+)
 from patchharbor.locks import registry_lock, repository_lock
 from patchharbor.models import (
     RegistrySnapshot,
@@ -34,6 +38,15 @@ from patchharbor.result_bundle_target import (
     prepare_result_bundle_target,
     revalidate_result_bundle_target,
 )
+from patchharbor.run_report import (
+    PrimaryResult,
+    PrimaryResultKind,
+    ResultBundleResult,
+    RunOperation,
+    RunReport,
+    RunSession,
+    canonical_uuid_text,
+)
 from patchharbor.user_paths import registration_user_paths
 
 
@@ -45,18 +58,26 @@ _RESULT_FORMAT_VERSION = 1
 class ManualResultBundle:
     """One successfully created manual Result Bundle."""
 
-    run_id: UUID
-    context: RepositoryContext
-    path: Path
+    report: RunReport
     publication_durability: PublicationDurability
 
+    @property
+    def run_id(self) -> UUID:
+        return self.report.run_id
 
-def _utc_now() -> datetime:
-    return datetime.now(timezone.utc)
+    @property
+    def context(self) -> RepositoryContext:
+        context = self.report.context
+        if context is None:
+            raise RuntimeError("successful manual bundle has no repository context")
+        return context
 
-
-def _timestamp(value: datetime) -> str:
-    return value.isoformat(timespec="seconds").replace("+00:00", "Z")
+    @property
+    def path(self) -> Path:
+        path = self.report.result_bundle.path
+        if path is None:
+            raise RuntimeError("successful manual bundle has no published path")
+        return path
 
 
 def _create_private_run_directory(run_id: UUID) -> Path:
@@ -69,12 +90,12 @@ def _create_private_run_directory(run_id: UUID) -> Path:
 
 def _write_run_document(
     run_directory: Path,
-    document: dict[str, object],
+    report: RunReport,
 ) -> None:
     """Atomically store one structured run report in the private run directory."""
     payload = (
         json.dumps(
-            document,
+            report.as_run_document(),
             ensure_ascii=False,
             allow_nan=False,
             separators=(",", ":"),
@@ -116,9 +137,13 @@ def _require_registered_mapping(
         if mapping.repository_path == repository
     )
     if len(id_matches) != 1 or id_matches[0].repository_path != repository:
-        raise result_bundle_error("repository identity is not registered for this path")
+        raise repository_resolution_error(
+            "repository identity is not registered for this path"
+        )
     if len(path_matches) != 1 or path_matches[0].repo_id != repo_id:
-        raise result_bundle_error("repository path has conflicting registrations")
+        raise repository_resolution_error(
+            "repository path has conflicting registrations"
+        )
 
 
 def _registered_identity(
@@ -127,124 +152,72 @@ def _registered_identity(
 ) -> RepositoryId:
     repo_id, _ = inspect_local_registration(repository)
     if repo_id is None:
-        raise result_bundle_error("repository has no local PatchHarbor identity")
+        raise repository_resolution_error(
+            "repository has no local PatchHarbor identity"
+        )
     _require_registered_mapping(snapshot, repo_id, repository)
     return repo_id
 
 
 def _manifest_document(
     *,
-    run_id: UUID,
-    context: RepositoryContext,
-    created_at: str,
+    report: RunReport,
     snapshot: ResultBundleSnapshot,
 ) -> dict[str, object]:
+    context = report.context
+    if context is None:
+        raise ValueError("successful Result Bundle report has no context")
     return {
         "marker": _RESULT_MARKER,
         "format_version": _RESULT_FORMAT_VERSION,
-        "created_at": created_at,
-        "run_id": str(run_id),
+        "created_at": report.timing.started_at_text,
+        "run_id": canonical_uuid_text(report.run_id),
         "repo_id": str(context.repo_id),
         "base_commit": str(context.base_commit),
         "state_fingerprint": context.state_fingerprint,
         "fingerprint_algorithm": context.fingerprint_algorithm,
         "dirty": context.dirty,
-        "dry_run": False,
-        "execution_present": False,
-        "primary_result": "success",
-        "result_bundle_status": "created",
+        "dry_run": report.dry_run,
+        "execution_present": report.execution_present,
+        "primary_result": report.primary_result.kind.value,
+        "result_bundle_status": report.result_bundle.status.value,
         **snapshot.manifest_entries(),
     }
 
 
-def _context_document(
-    context: RepositoryContext,
-    *,
-    created_at: str,
-) -> dict[str, object]:
+def _context_document(report: RunReport) -> dict[str, object]:
+    context = report.context
+    if context is None:
+        raise ValueError("successful Result Bundle report has no context")
     return {
         "repo_id": str(context.repo_id),
         "base_commit": str(context.base_commit),
         "dirty": context.dirty,
         "state_fingerprint": context.state_fingerprint,
         "fingerprint_algorithm": context.fingerprint_algorithm,
-        "created_at": created_at,
+        "created_at": report.timing.started_at_text,
     }
 
 
-def _run_document(
-    *,
-    run_id: UUID,
-    context: RepositoryContext | None,
-    repository: RepositoryPath | None,
-    repo_id: RepositoryId | None,
-    started_at: str,
-    ended_at: str,
-    duration_seconds: float,
-    bundle_status: str,
-    bundle_error: str | None,
-    process_exit_code: int,
-) -> dict[str, object]:
-    resolved_repository = context.repository_path if context is not None else repository
-    resolved_repo_id = context.repo_id if context is not None else repo_id
-    succeeded = process_exit_code == 0
-    repository_resolved = (
-        resolved_repository is not None and resolved_repo_id is not None
-    )
-    bundle_attempted = succeeded or repository_resolved
-    effective_bundle_status = (
-        bundle_status if bundle_attempted else "not_attempted"
-    )
-    return {
-        "run_id": str(run_id),
-        "operation": "bundle",
-        "dry_run": False,
-        "started_at": started_at,
-        "ended_at": ended_at,
-        "duration_seconds": duration_seconds,
-        "repository_resolved": repository_resolved,
-        "repo_id": None if resolved_repo_id is None else str(resolved_repo_id),
-        "repository_path": (
-            None if resolved_repository is None else str(resolved_repository)
-        ),
-        "base_commit": (
-            None if context is None else str(context.base_commit)
-        ),
-        "state_fingerprint": (
-            None if context is None else context.state_fingerprint
-        ),
-        "fingerprint_algorithm": (
-            None if context is None else context.fingerprint_algorithm
-        ),
-        "warnings": [],
-        "execution_present": False,
-        "primary_result": {
-            "kind": "success" if succeeded else "execution_error",
-            "success": succeeded,
-            "patchharbor_error_code": (
-                None if succeeded else 11
-            ),
-            "entrypoint_started": False,
-            "entrypoint_exit_code": None,
-            "timed_out": False,
-            "interrupted": False,
-        },
-        "result_bundle": {
-            "attempted": bundle_attempted,
-            "status": effective_bundle_status,
-            "error": bundle_error,
-        },
-        "process_exit_code": process_exit_code,
-    }
+def _primary_kind_for_error(error: PatchHarborError) -> PrimaryResultKind:
+    if error.error_kind is ErrorKind.REPOSITORY_BUSY:
+        return PrimaryResultKind.REPOSITORY_BUSY
+    if error.error_kind in {
+        ErrorKind.REGISTRY_ERROR,
+        ErrorKind.REPOSITORY_RESOLUTION_ERROR,
+        ErrorKind.UNSUPPORTED_REPOSITORY_STATE,
+    }:
+        return PrimaryResultKind.REPOSITORY_ERROR
+    return PrimaryResultKind.EXECUTION_ERROR
 
 
 def _preserve_emergency_diagnostics(
     run_directory: Path,
-    run_document: dict[str, object],
+    report: RunReport,
 ) -> tuple[Path | None, bool]:
     """Best-effort preserve run.json and report whether rescue itself failed."""
     try:
-        _write_run_document(run_directory, run_document)
+        _write_run_document(run_directory, report)
         return run_directory.resolve(strict=True), False
     except (OSError, RuntimeError, TypeError, ValueError):
         _remove_private_run_directory(run_directory)
@@ -254,35 +227,47 @@ def _preserve_emergency_diagnostics(
 def _manual_bundle_failure(
     error: PatchHarborError,
     *,
-    run_id: UUID,
+    session: RunSession,
     run_directory: Path,
     context: RepositoryContext | None,
     repository: RepositoryPath | None,
     repo_id: RepositoryId | None,
-    started_at: str,
-    started_monotonic: float,
 ) -> PatchHarborError:
-    ended = _utc_now()
-    run_document = _run_document(
-        run_id=run_id,
+    repository_resolved = repository is not None and repo_id is not None
+    bundle_result = (
+        ResultBundleResult.failed(str(error))
+        if repository_resolved
+        else ResultBundleResult.not_attempted(str(error))
+    )
+    report = RunReport(
+        timing=session.finish(),
+        operation=RunOperation.BUNDLE,
+        dry_run=False,
         context=context,
         repository=repository,
         repo_id=repo_id,
-        started_at=started_at,
-        ended_at=_timestamp(ended),
-        duration_seconds=max(0.0, monotonic() - started_monotonic),
-        bundle_status="failed",
-        bundle_error=str(error),
-        process_exit_code=11,
+        warnings=(),
+        primary_result=PrimaryResult.tool_failure(
+            kind=_primary_kind_for_error(error),
+            patchharbor_error_code=int(error.exit_code),
+        ),
+        result_bundle=bundle_result,
+        process_exit_code=int(ExitCode.RESULT_BUNDLE_ERROR),
     )
     emergency_path, rescue_failed = _preserve_emergency_diagnostics(
         run_directory,
-        run_document,
+        report,
     )
-    return result_bundle_error(
+    report = report.with_result_bundle(
+        report.result_bundle.with_emergency_diagnostics(emergency_path)
+    )
+    return PatchHarborError(
         str(error),
+        ExitCode.RESULT_BUNDLE_ERROR,
+        error_kind=error.error_kind,
         emergency_diagnostics_path=emergency_path,
         emergency_diagnostics_failed=rescue_failed,
+        run_report=report,
     )
 
 
@@ -292,12 +277,9 @@ def create_manual_result_bundle(
     output_directory: Path | None = None,
 ) -> ManualResultBundle:
     """Create one Result Bundle for a registered supported repository."""
-    started = _utc_now()
-    started_at = _timestamp(started)
-    started_monotonic = monotonic()
-    run_id = uuid4()
+    session = RunSession.start()
     try:
-        run_directory = _create_private_run_directory(run_id)
+        run_directory = _create_private_run_directory(session.run_id)
     except (OSError, RuntimeError) as exc:
         raise result_bundle_error(
             "cannot create emergency diagnostics for the Result Bundle",
@@ -309,8 +291,9 @@ def create_manual_result_bundle(
     resolved_repo_id: RepositoryId | None = None
     try:
         paths = registration_user_paths()
-        filename_timestamp = started.strftime("%Y%m%d_%H%M%S")
-        filename = f"patchharbor_result_{filename_timestamp}_{run_id}.zip"
+        filename = (
+            f"patchharbor_result_{session.filename_timestamp}_{session.run_id}.zip"
+        )
 
         with ExitStack() as repository_scope:
             with registry_lock(paths):
@@ -328,13 +311,13 @@ def create_manual_result_bundle(
 
                 locked_repository = inspect_repository_root(repository.value)
                 if locked_repository != repository:
-                    raise result_bundle_error(
+                    raise repository_resolution_error(
                         "repository path changed while acquiring its lock"
                     )
                 locked_registry = load_registry(paths)
                 locked_id = _registered_identity(locked_registry, locked_repository)
                 if locked_id != repo_id:
-                    raise result_bundle_error(
+                    raise repository_resolution_error(
                         "repository identity changed while acquiring its lock"
                     )
                 revalidate_result_bundle_target(target, locked_registry)
@@ -343,67 +326,55 @@ def create_manual_result_bundle(
             revalidate_result_bundle_target(target, locked_registry)
             context = captured.context
             bundle_snapshot = captured.bundle_snapshot
-            ended = _utc_now()
-            run_document = _run_document(
-                run_id=run_id,
+            report = RunReport(
+                timing=session.finish(),
+                operation=RunOperation.BUNDLE,
+                dry_run=False,
                 context=context,
                 repository=resolved_repository,
                 repo_id=resolved_repo_id,
-                started_at=started_at,
-                ended_at=_timestamp(ended),
-                duration_seconds=max(0.0, monotonic() - started_monotonic),
-                bundle_status="created",
-                bundle_error=None,
+                warnings=(),
+                primary_result=PrimaryResult.success_result(),
+                result_bundle=ResultBundleResult.created(target.final_path),
                 process_exit_code=0,
             )
-            _write_run_document(run_directory, run_document)
+            _write_run_document(run_directory, report)
             publication = prepare_result_bundle_publication(
                 target.final_path,
-                run_id=run_id,
+                run_id=session.run_id,
             )
             published = publish_result_bundle(
                 publication,
                 manifest=_manifest_document(
-                    run_id=run_id,
-                    context=context,
-                    created_at=started_at,
+                    report=report,
                     snapshot=bundle_snapshot,
                 ),
-                context_document=_context_document(
-                    context,
-                    created_at=started_at,
-                ),
-                run_document=run_document,
+                context_document=_context_document(report),
+                run_report=report,
                 snapshot=bundle_snapshot,
             )
     except PatchHarborError as exc:
         raise _manual_bundle_failure(
             exc,
-            run_id=run_id,
+            session=session,
             run_directory=run_directory,
             context=context,
             repository=resolved_repository,
             repo_id=resolved_repo_id,
-            started_at=started_at,
-            started_monotonic=started_monotonic,
         ) from exc
     except (OSError, RuntimeError, TypeError, ValueError) as exc:
         wrapped = result_bundle_error("cannot create the Result Bundle")
         raise _manual_bundle_failure(
             wrapped,
-            run_id=run_id,
+            session=session,
             run_directory=run_directory,
             context=context,
             repository=resolved_repository,
             repo_id=resolved_repo_id,
-            started_at=started_at,
-            started_monotonic=started_monotonic,
         ) from exc
 
     _remove_private_run_directory(run_directory)
     return ManualResultBundle(
-        run_id=run_id,
-        context=context,
-        path=published.path,
+        report=report,
         publication_durability=published.durability,
     )

@@ -9,6 +9,7 @@ from typing import BinaryIO
 
 from patchharbor.errors import result_bundle_error
 from patchharbor.result_bundle_snapshot import ResultBundleSnapshot
+from patchharbor.run_report import RunReport
 
 
 def _json_bytes(document: dict[str, object]) -> bytes:
@@ -50,7 +51,7 @@ def write_result_bundle(
     *,
     manifest: dict[str, object],
     context_document: dict[str, object],
-    run_document: dict[str, object],
+    run_report: RunReport,
     snapshot: ResultBundleSnapshot,
 ) -> None:
     """Write one captured Result Bundle to a caller-owned binary stream."""
@@ -64,7 +65,7 @@ def write_result_bundle(
             for name, document in (
                 ("manifest.json", manifest),
                 ("context.json", context_document),
-                ("logs/run.json", run_document),
+                ("logs/run.json", run_report.as_run_document()),
             ):
                 _write_entry(archive, name, _json_bytes(document))
             for entry in snapshot.base_entries:
