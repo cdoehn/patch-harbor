@@ -18,6 +18,7 @@ from patchharbor.application import (
     run_script_path,
     run_standard_input,
     unregister_repository,
+    validate_patch_package,
 )
 from patchharbor.context_output import context_json_result, write_context_block
 from patchharbor.errors import (
@@ -175,6 +176,23 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         dest="json_output",
         help="write the versioned machine-readable result",
+    )
+
+    apply_parser = commands.add_parser(
+        "apply",
+        help="validate or apply one repository-bound patch package",
+    )
+    apply_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        required=True,
+        help="validate the patch package without changing a repository",
+    )
+    apply_parser.add_argument(
+        "patch_zip",
+        type=Path,
+        metavar="PATCH_ZIP",
+        help="ZIP patch package containing a root patch.json",
     )
 
     fs_parser = commands.add_parser(
@@ -482,6 +500,22 @@ def _bundle_command(
     return 0
 
 
+def _apply_command(
+    path: Path,
+    *,
+    stdout: TextIO,
+    stderr: TextIO,
+) -> int:
+    try:
+        validate_patch_package(path)
+    except PatchHarborError as exc:
+        print(format_tool_message(str(exc)), file=stderr)
+        return int(exc.exit_code)
+
+    print(f"validated_patch_package: {path}", file=stdout)
+    return 0
+
+
 def _unregister_command(
     selector: str,
     *,
@@ -708,6 +742,13 @@ def main(
             args.repository,
             output_directory=args.output_dir,
             json_output=args.json_output,
+            stdout=actual_stdout,
+            stderr=actual_stderr,
+        )
+
+    if args.command == "apply":
+        return _apply_command(
+            args.patch_zip,
             stdout=actual_stdout,
             stderr=actual_stderr,
         )

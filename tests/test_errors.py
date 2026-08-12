@@ -22,6 +22,7 @@ def test_public_tool_exit_codes_are_complete_and_stable() -> None:
         "PAYLOAD_PREPARATION_ERROR": 6,
         "EXECUTION_ERROR": 7,
         "REPOSITORY_ERROR": 8,
+        "PATCH_PACKAGE_ERROR": 10,
         "RESULT_BUNDLE_ERROR": 11,
         "REPOSITORY_BUSY": 12,
         "UNSUPPORTED_REPOSITORY_STATE": 13,
