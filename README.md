@@ -21,3 +21,14 @@ patchharbor --help
 patchharbor fs run --help
 patchharbor --version
 ```
+
+## Result Bundles
+
+`patchharbor bundle [REPOSITORY]` creates a complete repository snapshot
+without Git history. It contains every file from the current base commit,
+staged and unstaged changes, and every non-ignored untracked regular file.
+
+Review a Result Bundle before sharing it. It can contain complete source code
+and secrets from non-ignored files. PatchHarbor excludes `.git`, the local
+`.patchharbor/id`, and ignored untracked files, but it does not perform
+general secret detection.

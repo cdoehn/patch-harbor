@@ -5,7 +5,6 @@ from __future__ import annotations
 import argparse
 from collections.abc import Sequence
 from contextlib import nullcontext
-import json
 from pathlib import Path
 import sys
 from typing import Any, TextIO
@@ -27,6 +26,7 @@ from patchharbor.errors import (
     format_tool_message,
 )
 from patchharbor.execution import DEFAULT_TIMEOUT_SECONDS
+from patchharbor.json_document import serialize_json_document
 from patchharbor.output import OutputTargets
 from patchharbor.platform.errors import describe_os_error
 from patchharbor.presentation import (
@@ -280,14 +280,7 @@ def _register_command(
 
 
 def _write_json_document(document: dict[str, object], stream: TextIO) -> None:
-    json.dump(
-        document,
-        stream,
-        ensure_ascii=False,
-        allow_nan=False,
-        separators=(",", ":"),
-    )
-    stream.write("\n")
+    stream.write(serialize_json_document(document))
 
 
 def _json_envelope(
@@ -425,10 +418,6 @@ def _context_command(
     return 0
 
 
-def _bundle_json_result(result: Any) -> dict[str, object]:
-    return result.report.manual_bundle_json_result()
-
-
 def _write_emergency_diagnostics_notice(
     error: PatchHarborError,
     stderr: TextIO,
@@ -481,7 +470,7 @@ def _bundle_command(
         _write_json_document(
             _json_envelope(
                 "bundle",
-                result=_bundle_json_result(result),
+                result=result.report.manual_bundle_result(),
                 error=None,
                 process_exit_code=0,
             ),

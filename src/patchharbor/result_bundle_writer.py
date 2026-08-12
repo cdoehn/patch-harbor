@@ -2,26 +2,14 @@
 
 from __future__ import annotations
 
-import json
 import stat
 import zipfile
 from typing import BinaryIO
 
 from patchharbor.errors import result_bundle_error
+from patchharbor.json_document import serialize_json_document
 from patchharbor.result_bundle_snapshot import ResultBundleSnapshot
 from patchharbor.run_report import RunReport
-
-
-def _json_bytes(document: dict[str, object]) -> bytes:
-    return (
-        json.dumps(
-            document,
-            ensure_ascii=False,
-            allow_nan=False,
-            separators=(",", ":"),
-        )
-        + "\n"
-    ).encode("utf-8")
 
 
 def _zip_info(name: str, *, executable: bool = False) -> zipfile.ZipInfo:
@@ -67,7 +55,11 @@ def write_result_bundle(
                 ("context.json", context_document),
                 ("logs/run.json", run_report.as_run_document()),
             ):
-                _write_entry(archive, name, _json_bytes(document))
+                _write_entry(
+                    archive,
+                    name,
+                    serialize_json_document(document).encode("utf-8"),
+                )
             for entry in snapshot.base_entries:
                 _write_entry(
                     archive,

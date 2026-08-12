@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from contextlib import ExitStack
 from dataclasses import dataclass
-import json
 import os
 from pathlib import Path
 import shutil
@@ -18,6 +17,7 @@ from patchharbor.errors import (
     repository_resolution_error,
     result_bundle_error,
 )
+from patchharbor.json_document import serialize_json_document
 from patchharbor.locks import registry_lock, repository_lock
 from patchharbor.models import (
     RegistrySnapshot,
@@ -45,7 +45,6 @@ from patchharbor.run_report import (
     RunOperation,
     RunReport,
     RunSession,
-    canonical_uuid_text,
 )
 from patchharbor.user_paths import registration_user_paths
 
@@ -93,15 +92,7 @@ def _write_run_document(
     report: RunReport,
 ) -> None:
     """Atomically store one structured run report in the private run directory."""
-    payload = (
-        json.dumps(
-            report.as_run_document(),
-            ensure_ascii=False,
-            allow_nan=False,
-            separators=(",", ":"),
-        )
-        + "\n"
-    ).encode("utf-8")
+    payload = serialize_json_document(report.as_run_document()).encode("utf-8")
     destination = run_directory / "run.json"
     temporary = run_directory / ".run.json.tmp"
     try:
@@ -171,7 +162,7 @@ def _manifest_document(
         "marker": _RESULT_MARKER,
         "format_version": _RESULT_FORMAT_VERSION,
         "created_at": report.timing.started_at_text,
-        "run_id": canonical_uuid_text(report.run_id),
+        "run_id": report.run_id_text,
         "repo_id": str(context.repo_id),
         "base_commit": str(context.base_commit),
         "state_fingerprint": context.state_fingerprint,
@@ -179,8 +170,8 @@ def _manifest_document(
         "dirty": context.dirty,
         "dry_run": report.dry_run,
         "execution_present": report.execution_present,
-        "primary_result": report.primary_result.kind.value,
-        "result_bundle_status": report.result_bundle.status.value,
+        "primary_result": report.primary_result.kind_text,
+        "result_bundle_status": report.result_bundle.status_text,
         **snapshot.manifest_entries(),
     }
 

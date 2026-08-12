@@ -203,6 +203,11 @@ class PrimaryResult:
     timed_out: bool = False
     interrupted: bool = False
 
+    @property
+    def kind_text(self) -> str:
+        """Return the stable public primary-result kind."""
+        return self.kind.value
+
     @classmethod
     def success_result(cls) -> PrimaryResult:
         return cls(
@@ -226,7 +231,7 @@ class PrimaryResult:
 
     def as_document(self) -> dict[str, object]:
         return {
-            "kind": self.kind.value,
+            "kind": self.kind_text,
             "success": self.success,
             "patchharbor_error_code": self.patchharbor_error_code,
             "entrypoint_started": self.entrypoint_started,
@@ -283,6 +288,11 @@ class ResultBundleResult:
                 sanitize_structured_text(self.error),
             )
 
+    @property
+    def status_text(self) -> str:
+        """Return the stable public Result-Bundle status."""
+        return self.status.value
+
     @classmethod
     def created(cls, path: Path) -> ResultBundleResult:
         return cls(
@@ -316,7 +326,7 @@ class ResultBundleResult:
     def as_run_document(self) -> dict[str, object]:
         return {
             "attempted": self.attempted,
-            "status": self.status.value,
+            "status": self.status_text,
             "error": self.error,
         }
 
@@ -380,6 +390,11 @@ class RunReport:
         return self.timing.run_id
 
     @property
+    def run_id_text(self) -> str:
+        """Return the stable public run identifier."""
+        return canonical_uuid_text(self.run_id)
+
+    @property
     def resolved_repository(self) -> RepositoryPath | None:
         if self.context is not None:
             return self.context.repository_path
@@ -406,7 +421,7 @@ class RunReport:
     def as_run_document(self) -> dict[str, object]:
         context = self.context
         return {
-            "run_id": canonical_uuid_text(self.run_id),
+            "run_id": self.run_id_text,
             "operation": self.operation.value,
             "dry_run": self.dry_run,
             "started_at": self.timing.started_at_text,
@@ -435,7 +450,7 @@ class RunReport:
             "process_exit_code": self.process_exit_code,
         }
 
-    def manual_bundle_json_result(self) -> dict[str, object]:
+    def manual_bundle_result(self) -> dict[str, object]:
         """Return the closed successful ``bundle --json`` result object."""
         if (
             self.operation is not RunOperation.BUNDLE
@@ -446,7 +461,7 @@ class RunReport:
         ):
             raise ValueError("run report is not a successful manual bundle")
         return {
-            "run_id": canonical_uuid_text(self.run_id),
+            "run_id": self.run_id_text,
             "repo_id": str(self.context.repo_id),
             "repository_path": physical_absolute_path_text(
                 self.context.repository_path
@@ -454,7 +469,7 @@ class RunReport:
             "base_commit": str(self.context.base_commit),
             "state_fingerprint": self.context.state_fingerprint,
             "fingerprint_algorithm": self.context.fingerprint_algorithm,
-            "result_bundle_status": self.result_bundle.status.value,
+            "result_bundle_status": self.result_bundle.status_text,
             "result_bundle_path": physical_absolute_path_text(
                 self.result_bundle.path
             ),

@@ -233,6 +233,7 @@ def test_registration_layers_have_one_directional_dependency_flow() -> None:
     assert _local_imports("repository_paths") == {"errors", "models"}
     assert _local_imports("state_fingerprint") == set()
     assert _local_imports("context_output") == {"models"}
+    assert _local_imports("json_document") == set()
     assert _local_imports("repository_state") == {
         "errors",
         "git_capture",
@@ -263,6 +264,7 @@ def test_registration_layers_have_one_directional_dependency_flow() -> None:
     }
     assert _local_imports("result_bundle_writer") == {
         "errors",
+        "json_document",
         "result_bundle_snapshot",
         "run_report",
     }
@@ -289,6 +291,7 @@ def test_registration_layers_have_one_directional_dependency_flow() -> None:
     }
     assert _local_imports("result_bundle") == {
         "errors",
+        "json_document",
         "locks",
         "models",
         "registry",
@@ -544,6 +547,7 @@ def test_cli_coordinates_only_public_composition_boundaries() -> None:
         "context_output",
         "errors",
         "execution",
+        "json_document",
         "output",
         "platform",
         "presentation",

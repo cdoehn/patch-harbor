@@ -70,7 +70,52 @@ def test_run_report_drives_persisted_and_bundle_json_results(tmp_path: Path) -> 
     )
 
     persisted = report.as_run_document()
-    completion = report.manual_bundle_json_result()
+    completion = report.manual_bundle_result()
+
+    assert set(persisted) == {
+        "run_id",
+        "operation",
+        "dry_run",
+        "started_at",
+        "ended_at",
+        "duration_seconds",
+        "repository_resolved",
+        "repo_id",
+        "repository_path",
+        "base_commit",
+        "state_fingerprint",
+        "fingerprint_algorithm",
+        "warnings",
+        "execution_present",
+        "primary_result",
+        "result_bundle",
+        "process_exit_code",
+    }
+    assert set(persisted["primary_result"]) == {
+        "kind",
+        "success",
+        "patchharbor_error_code",
+        "entrypoint_started",
+        "entrypoint_exit_code",
+        "timed_out",
+        "interrupted",
+    }
+    assert set(persisted["result_bundle"]) == {
+        "attempted",
+        "status",
+        "error",
+    }
+    assert set(completion) == {
+        "run_id",
+        "repo_id",
+        "repository_path",
+        "base_commit",
+        "state_fingerprint",
+        "fingerprint_algorithm",
+        "result_bundle_status",
+        "result_bundle_path",
+        "emergency_diagnostics_path",
+    }
 
     assert persisted["run_id"] == completion["run_id"]
     assert persisted["repo_id"] == completion["repo_id"]

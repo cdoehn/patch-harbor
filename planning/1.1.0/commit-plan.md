@@ -742,11 +742,13 @@ Eine konkrete lokale Git-Repository-Instanz kann sicher registriert, wiedergefun
 
 ## Review nach Meilenstein 3
 
-- Definition of Done gegen das reale Verhalten prüfen.
-- falsche Annahmen und unnötig gewordene spätere Schritte dokumentieren.
-- verbleibenden Plan nur minimal anpassen.
-- sicherstellen, dass PatchHarbor weiterhin ein kontrollierter Runner bleibt.
-- Review im letzten Clean-Commit des Meilensteins abschließen; kein separater Review-Commit.
+**Ergebnis nach 3.e.C:**
+
+- Die Definition of Done ist durch echte Rekonstruktions-, Binär-, Modus-, Race-, Lock- und Publikationstests abgedeckt.
+- Strukturierte JSON-Dokumente verwenden eine gemeinsame Serialisierungsgrenze; Tests prüfen die geschlossenen Datenverträge statt Whitespace oder Schlüsselformatierung.
+- Die Bundle-Engine besteht aus unveränderlicher Aufnahme, Writer, Zielprüfung und atomarer Veröffentlichung und ist damit für Dry-Run und Apply freigegeben.
+- Ein reduziertes Bundle, ein zweiter `snapshot/`-Baum und automatische Secret-Erkennung sind nicht erforderlich; die README weist knapp auf den vollständigen Snapshot und mögliche Secrets hin.
+- Der verbleibende Plan benötigt keine fachliche Änderung; es wurde keine Apply-, Entrypoint- oder Watcher-Logik vorweggenommen und PatchHarbor bleibt ein kontrollierter Runner.
 
 ---
 

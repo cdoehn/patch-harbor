@@ -275,8 +275,6 @@ def test_manual_bundle_json_completion_matches_persisted_run_report(
     completed = run_cli(repository, "bundle", "--json")
 
     assert completed.returncode == 0
-    assert completed.stdout.endswith("\n")
-    assert "\n" not in completed.stdout[:-1]
     envelope = json.loads(completed.stdout)
     assert set(envelope) == {
         "output_version",
@@ -368,8 +366,6 @@ def test_manual_bundle_failure_returns_exit_11_and_emergency_run_report(
     )
 
     assert completed.returncode == int(ExitCode.RESULT_BUNDLE_ERROR)
-    assert completed.stdout.endswith("\n")
-    assert "\n" not in completed.stdout[:-1]
     envelope = json.loads(completed.stdout)
     assert envelope["command"] == "bundle"
     assert envelope["success"] is False
