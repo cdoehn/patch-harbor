@@ -12,6 +12,10 @@ import pytest
 from patchharbor.patch_manifest import PATCH_FORMAT_VERSION, PATCH_MARKER
 from patchharbor.state_fingerprint import FINGERPRINT_ALGORITHM
 from tests.platform_support import run_cli
+from tests.registration_support import (
+    create_repository,
+    isolated_user_environment,
+)
 
 
 pytestmark = pytest.mark.e2e
@@ -61,29 +65,86 @@ def _write_package(
         archive.writestr("files/payload.bin", b"\x00payload\xff")
 
 
-def _run_dry_run(package: Path, cwd: Path):
-    return run_cli(cwd, "apply", "--dry-run", str(package))
+def _run_dry_run(
+    package: Path,
+    cwd: Path,
+    *,
+    environment: dict[str, str] | None = None,
+):
+    return run_cli(
+        cwd,
+        "apply",
+        "--dry-run",
+        str(package),
+        environment_overrides=environment,
+    )
+
+
+def _registered_context(
+    repository: Path,
+    user_root: Path,
+) -> tuple[dict[str, str], dict[str, object]]:
+    environment = isolated_user_environment(user_root)
+    assert run_cli(
+        repository,
+        "register",
+        environment_overrides=environment,
+    ).returncode == 0
+    completed = run_cli(
+        repository,
+        "context",
+        "--json",
+        environment_overrides=environment,
+    )
+    assert completed.returncode == 0
+    envelope = json.loads(completed.stdout)
+    result = envelope["result"]
+    assert isinstance(result, dict)
+    return environment, result
+
+
+def _manifest_for_context(context: dict[str, object]) -> bytes:
+    document = dict(_VALID_MANIFEST)
+    document.update(
+        {
+            "repo_id": context["repo_id"],
+            "base_commit": context["base_commit"],
+            "state_fingerprint": context["state_fingerprint"],
+            "fingerprint_algorithm": context["fingerprint_algorithm"],
+        }
+    )
+    return _manifest_bytes(document)
 
 
 def test_dry_run_validates_actual_zip_bytes_without_mutation(
     tmp_path: Path,
 ) -> None:
+    repository = create_repository(tmp_path / "repository")
+    environment, context = _registered_context(repository, tmp_path / "user")
     working_directory = tmp_path / "working"
     working_directory.mkdir()
     package = tmp_path / "not-a-zip-extension.data"
-    _write_package(package)
+    _write_package(package, manifest=_manifest_for_context(context))
     before = package.read_bytes()
 
-    completed = _run_dry_run(package, working_directory)
+    completed = _run_dry_run(
+        package,
+        working_directory,
+        environment=environment,
+    )
 
     assert completed.returncode == 0
     assert package.read_bytes() == before
     assert list(working_directory.iterdir()) == []
+    assert not (repository / "executed.txt").exists()
+    assert not (repository / "files" / "payload.bin").exists()
 
 
 def test_dry_run_never_executes_entrypoint_marker_payload_or_nested_archive(
     tmp_path: Path,
 ) -> None:
+    repository = create_repository(tmp_path / "repository")
+    environment, context = _registered_context(repository, tmp_path / "user")
     package = tmp_path / "classification.zip"
     nested = BytesIO()
     with zipfile.ZipFile(nested, "w") as archive:
@@ -92,7 +153,7 @@ def test_dry_run_never_executes_entrypoint_marker_payload_or_nested_archive(
             "# PATCHHARBOR\nprintf nested > nested-ran.txt\n",
         )
     with zipfile.ZipFile(package, "w") as archive:
-        archive.writestr("patch.json", _manifest_bytes())
+        archive.writestr("patch.json", _manifest_for_context(context))
         archive.writestr(
             "run.sh",
             "# PATCHHARBOR\nprintf entrypoint > entrypoint-ran.txt\n",
@@ -103,21 +164,32 @@ def test_dry_run_never_executes_entrypoint_marker_payload_or_nested_archive(
         )
         archive.writestr("nested.zip", nested.getvalue())
 
-    completed = _run_dry_run(package, tmp_path)
+    completed = _run_dry_run(
+        package,
+        tmp_path,
+        environment=environment,
+    )
 
     assert completed.returncode == 0
-    assert not (tmp_path / "entrypoint-ran.txt").exists()
-    assert not (tmp_path / "helper-ran.txt").exists()
-    assert not (tmp_path / "nested-ran.txt").exists()
+    assert not (repository / "entrypoint-ran.txt").exists()
+    assert not (repository / "helper-ran.txt").exists()
+    assert not (repository / "nested-ran.txt").exists()
 
 
 def test_dry_run_accepts_a_full_sha256_object_id(tmp_path: Path) -> None:
-    manifest = dict(_VALID_MANIFEST)
-    manifest["base_commit"] = "a" * 64
+    repository = create_repository(
+        tmp_path / "repository",
+        object_format="sha256",
+    )
+    environment, context = _registered_context(repository, tmp_path / "user")
     package = tmp_path / "sha256-package"
-    _write_package(package, manifest=_manifest_bytes(manifest))
+    _write_package(package, manifest=_manifest_for_context(context))
 
-    completed = _run_dry_run(package, tmp_path)
+    completed = _run_dry_run(
+        package,
+        tmp_path,
+        environment=environment,
+    )
 
     assert completed.returncode == 0
 

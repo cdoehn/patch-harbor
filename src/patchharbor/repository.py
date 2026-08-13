@@ -254,6 +254,19 @@ def inspect_local_registration(
     )
 
 
+def require_local_repository_identity(
+    repository: RepositoryPath,
+    expected_id: RepositoryId,
+) -> None:
+    """Require the exact local ID and reserved local exclude contract."""
+    observed_id, state = inspect_local_registration(repository)
+    if observed_id != expected_id:
+        raise _error("repository ID does not match its registered identity")
+    exclude_lines = (state.exclude_content or b"").splitlines()
+    if _EXCLUDE_ENTRY not in exclude_lines:
+        raise _error("repository does not locally exclude .patchharbor")
+
+
 def _atomic_write(path: Path, content: bytes, *, description: str) -> None:
     try:
         atomic_replace_bytes(path, content)

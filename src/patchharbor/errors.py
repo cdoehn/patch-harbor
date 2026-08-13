@@ -20,6 +20,7 @@ class ExitCode(IntEnum):
     PAYLOAD_PREPARATION_ERROR = 6
     EXECUTION_ERROR = 7
     REPOSITORY_ERROR = 8
+    STATE_MISMATCH = 9
     PATCH_PACKAGE_ERROR = 10
     RESULT_BUNDLE_ERROR = 11
     REPOSITORY_BUSY = 12
@@ -34,6 +35,7 @@ class ErrorKind(str, Enum):
     TOOL_ERROR = "tool_error"
     REGISTRY_ERROR = "registry_error"
     REPOSITORY_RESOLUTION_ERROR = "repository_resolution_error"
+    STATE_MISMATCH = "state_mismatch"
     RESULT_BUNDLE_ERROR = "result_bundle_error"
     REPOSITORY_BUSY = "repository_busy"
     UNSUPPORTED_REPOSITORY_STATE = "unsupported_repository_state"
@@ -76,6 +78,24 @@ def repository_resolution_error(message: str) -> PatchHarborError:
         message,
         ExitCode.REPOSITORY_ERROR,
         error_kind=ErrorKind.REPOSITORY_RESOLUTION_ERROR,
+    )
+
+
+def state_mismatch_error(
+    message: str,
+    *,
+    emergency_diagnostics_path: Path | None = None,
+    emergency_diagnostics_failed: bool = False,
+    run_report: object | None = None,
+) -> PatchHarborError:
+    """Create one failure for a repository state that differs from the manifest."""
+    return PatchHarborError(
+        message,
+        ExitCode.STATE_MISMATCH,
+        error_kind=ErrorKind.STATE_MISMATCH,
+        emergency_diagnostics_path=emergency_diagnostics_path,
+        emergency_diagnostics_failed=emergency_diagnostics_failed,
+        run_report=run_report,
     )
 
 

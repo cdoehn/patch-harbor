@@ -1,0 +1,293 @@
+from __future__ import annotations
+
+import json
+import os
+from pathlib import Path
+from uuid import uuid4
+import zipfile
+
+import pytest
+
+from patchharbor.errors import ExitCode
+from patchharbor.patch_manifest import PATCH_FORMAT_VERSION, PATCH_MARKER
+from patchharbor.state_fingerprint import FINGERPRINT_ALGORITHM
+from tests.platform_support import project_environment, run_cli
+from tests.registration_support import (
+    create_repository,
+    git,
+    isolated_user_environment,
+    local_exclude_path,
+    release_repository_lock_holder,
+    start_repository_lock_holder,
+    stop_repository_lock_holder,
+)
+
+
+pytestmark = pytest.mark.e2e
+
+
+def _register_context(
+    repository: Path,
+    user_root: Path,
+) -> tuple[dict[str, str], dict[str, object]]:
+    environment = isolated_user_environment(user_root)
+    registered = run_cli(
+        repository,
+        "register",
+        environment_overrides=environment,
+    )
+    assert registered.returncode == 0
+
+    completed = run_cli(
+        repository,
+        "context",
+        "--json",
+        environment_overrides=environment,
+    )
+    assert completed.returncode == 0
+    envelope = json.loads(completed.stdout)
+    result = envelope["result"]
+    assert isinstance(result, dict)
+    return environment, result
+
+
+def _manifest(context: dict[str, object]) -> dict[str, object]:
+    return {
+        "marker": PATCH_MARKER,
+        "format_version": PATCH_FORMAT_VERSION,
+        "repo_id": context["repo_id"],
+        "base_commit": context["base_commit"],
+        "state_fingerprint": context["state_fingerprint"],
+        "fingerprint_algorithm": FINGERPRINT_ALGORITHM,
+        "entrypoint": "run.sh",
+    }
+
+
+def _write_package(
+    path: Path,
+    manifest: dict[str, object],
+) -> None:
+    with zipfile.ZipFile(path, "w") as archive:
+        archive.writestr(
+            "patch.json",
+            json.dumps(
+                manifest,
+                ensure_ascii=False,
+                allow_nan=False,
+                separators=(",", ":"),
+            ).encode("utf-8"),
+        )
+        archive.writestr(
+            "run.sh",
+            "# PATCHHARBOR\nprintf executed > executed.txt\n",
+        )
+        archive.writestr("files/payload.bin", b"\x00payload\xff")
+
+
+def _run_dry_run(
+    package: Path,
+    caller: Path,
+    environment: dict[str, str],
+):
+    caller.mkdir(exist_ok=True)
+    return run_cli(
+        caller,
+        "apply",
+        "--dry-run",
+        str(package),
+        environment_overrides=environment,
+    )
+
+
+def _result_directory(environment: dict[str, str]) -> Path:
+    if os.name == "nt":
+        return Path(environment["LOCALAPPDATA"]) / "PatchHarbor" / "results"
+    return Path(environment["XDG_STATE_HOME"]) / "patchharbor" / "results"
+
+
+def _result_bundles(environment: dict[str, str]) -> tuple[Path, ...]:
+    directory = _result_directory(environment)
+    if not directory.exists():
+        return ()
+    return tuple(sorted(directory.glob("patchharbor_result_*.zip")))
+
+
+def _different_hex(value: str) -> str:
+    replacement = "0" if value[0] != "0" else "1"
+    return replacement + value[1:]
+
+
+def _assert_repository_unmodified(repository: Path) -> None:
+    assert not (repository / "executed.txt").exists()
+    assert not (repository / "files" / "payload.bin").exists()
+
+
+def test_matching_manifest_resolves_exact_registered_repository_without_mutation(
+    tmp_path: Path,
+) -> None:
+    repository = create_repository(tmp_path / "repository")
+    environment, context = _register_context(repository, tmp_path / "user")
+    package = tmp_path / "patch.zip"
+    _write_package(package, _manifest(context))
+
+    completed = _run_dry_run(package, tmp_path / "caller", environment)
+
+    assert completed.returncode == 0
+    _assert_repository_unmodified(repository)
+
+
+def test_unknown_repository_id_is_rejected_before_snapshot(
+    tmp_path: Path,
+) -> None:
+    repository = create_repository(tmp_path / "repository")
+    environment, context = _register_context(repository, tmp_path / "user")
+    manifest = _manifest(context)
+    manifest["repo_id"] = str(uuid4())
+    package = tmp_path / "unknown.zip"
+    _write_package(package, manifest)
+
+    completed = _run_dry_run(package, tmp_path / "caller", environment)
+
+    assert completed.returncode == int(ExitCode.REPOSITORY_ERROR)
+    assert _result_bundles(environment) == ()
+    _assert_repository_unmodified(repository)
+
+
+@pytest.mark.parametrize(
+    "local_conflict",
+    ("different-id", "missing-exclude", "tracked-reserved-path"),
+)
+def test_local_repository_identity_conflict_is_rejected_before_snapshot(
+    tmp_path: Path,
+    local_conflict: str,
+) -> None:
+    repository = create_repository(tmp_path / "repository")
+    environment, context = _register_context(repository, tmp_path / "user")
+    package = tmp_path / f"{local_conflict}.zip"
+    _write_package(package, _manifest(context))
+
+    if local_conflict == "different-id":
+        (repository / ".patchharbor" / "id").write_text(
+            f"{uuid4()}\n",
+            encoding="ascii",
+        )
+    elif local_conflict == "missing-exclude":
+        exclude = local_exclude_path(repository)
+        lines = exclude.read_bytes().splitlines(keepends=True)
+        exclude.write_bytes(
+            b"".join(
+                line
+                for line in lines
+                if line.rstrip(b"\r\n") != b".patchharbor/"
+            )
+        )
+    else:
+        git(repository, "add", "-f", ".patchharbor/id")
+
+    completed = _run_dry_run(package, tmp_path / "caller", environment)
+
+    assert completed.returncode == int(ExitCode.REPOSITORY_ERROR)
+    assert _result_bundles(environment) == ()
+    _assert_repository_unmodified(repository)
+
+
+@pytest.mark.parametrize(
+    "mismatch",
+    ("base-commit", "object-format", "fingerprint"),
+)
+def test_state_mismatch_returns_nine_and_bundles_actual_repository_state(
+    tmp_path: Path,
+    mismatch: str,
+) -> None:
+    repository = create_repository(tmp_path / "repository")
+    environment, context = _register_context(repository, tmp_path / "user")
+    manifest = _manifest(context)
+    if mismatch == "base-commit":
+        manifest["base_commit"] = _different_hex(str(context["base_commit"]))
+    elif mismatch == "object-format":
+        manifest["base_commit"] = "a" * 64
+    else:
+        manifest["state_fingerprint"] = _different_hex(
+            str(context["state_fingerprint"])
+        )
+    package = tmp_path / f"{mismatch}.zip"
+    _write_package(package, manifest)
+
+    completed = _run_dry_run(package, tmp_path / "caller", environment)
+
+    assert completed.returncode == int(ExitCode.STATE_MISMATCH)
+    _assert_repository_unmodified(repository)
+    bundles = _result_bundles(environment)
+    assert len(bundles) == 1
+
+    with zipfile.ZipFile(bundles[0]) as archive:
+        names = set(archive.namelist())
+        result_manifest = json.loads(archive.read("manifest.json"))
+        actual_context = json.loads(archive.read("context.json"))
+        run_report = json.loads(archive.read("logs/run.json"))
+
+    assert "logs/execution.log" not in names
+    assert actual_context["repo_id"] == context["repo_id"]
+    assert actual_context["base_commit"] == context["base_commit"]
+    assert actual_context["state_fingerprint"] == context["state_fingerprint"]
+    assert actual_context["fingerprint_algorithm"] == FINGERPRINT_ALGORITHM
+    assert result_manifest["expected_base_commit"] == manifest["base_commit"]
+    assert result_manifest["actual_base_commit"] == context["base_commit"]
+    assert (
+        result_manifest["expected_state_fingerprint"]
+        == manifest["state_fingerprint"]
+    )
+    assert (
+        result_manifest["actual_state_fingerprint"]
+        == context["state_fingerprint"]
+    )
+    assert (
+        result_manifest["expected_fingerprint_algorithm"]
+        == manifest["fingerprint_algorithm"]
+    )
+    assert (
+        result_manifest["actual_fingerprint_algorithm"]
+        == FINGERPRINT_ALGORITHM
+    )
+    assert run_report["operation"] == "apply"
+    assert run_report["dry_run"] is True
+    assert run_report["repository_resolved"] is True
+    assert run_report["primary_result"] == {
+        "kind": "state_mismatch",
+        "success": False,
+        "patchharbor_error_code": int(ExitCode.STATE_MISMATCH),
+        "entrypoint_started": False,
+        "entrypoint_exit_code": None,
+        "timed_out": False,
+        "interrupted": False,
+    }
+    assert run_report["result_bundle"] == {
+        "attempted": True,
+        "status": "created",
+        "error": None,
+    }
+    assert run_report["process_exit_code"] == int(ExitCode.STATE_MISMATCH)
+
+
+def test_busy_repository_is_rejected_before_safe_resolution(
+    tmp_path: Path,
+) -> None:
+    repository = create_repository(tmp_path / "repository")
+    environment, context = _register_context(repository, tmp_path / "user")
+    package = tmp_path / "busy.zip"
+    _write_package(package, _manifest(context))
+    holder = start_repository_lock_holder(
+        str(context["repo_id"]),
+        environment=project_environment(environment),
+    )
+    try:
+        completed = _run_dry_run(package, tmp_path / "caller", environment)
+    finally:
+        try:
+            assert release_repository_lock_holder(holder) == 0
+        finally:
+            stop_repository_lock_holder(holder)
+
+    assert completed.returncode == int(ExitCode.REPOSITORY_BUSY)
+    assert _result_bundles(environment) == ()
+    _assert_repository_unmodified(repository)

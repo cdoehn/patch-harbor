@@ -19,6 +19,7 @@ from patchharbor.application import (
     run_standard_input,
     resolve_patch_package,
     unregister_repository,
+    validate_patch_package_repository,
 )
 from patchharbor.context_output import context_json_result, write_context_block
 from patchharbor.errors import (
@@ -515,7 +516,24 @@ def _apply_command(
 
     for warning in package.warnings:
         print(format_tool_warning(warning), file=stderr)
+
+    try:
+        context = validate_patch_package_repository(package)
+    except PatchHarborError as exc:
+        print(format_tool_message(str(exc)), file=stderr)
+        report = exc.run_report if isinstance(exc.run_report, RunReport) else None
+        if report is not None and report.result_bundle.path is not None:
+            print(
+                format_tool_message(
+                    f"result bundle: {report.result_bundle.path}"
+                ),
+                file=stderr,
+            )
+        _write_emergency_diagnostics_notice(exc, stderr)
+        return int(exc.exit_code)
+
     print(f"validated_patch_package: {path}", file=stdout)
+    print(f"repository_path: {context.repository_path}", file=stdout)
     return 0
 
 

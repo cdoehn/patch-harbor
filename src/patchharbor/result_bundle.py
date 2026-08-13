@@ -25,6 +25,7 @@ from patchharbor.models import (
     RepositoryId,
     RepositoryPath,
 )
+from patchharbor.patch_manifest import PatchManifest
 from patchharbor.registry import load_registry
 from patchharbor.repository import inspect_local_registration, inspect_repository_root
 from patchharbor.result_bundle_capture import capture_result_bundle
@@ -154,11 +155,12 @@ def _manifest_document(
     *,
     report: RunReport,
     snapshot: ResultBundleSnapshot,
+    expected_manifest: PatchManifest | None = None,
 ) -> dict[str, object]:
     context = report.context
     if context is None:
         raise ValueError("successful Result Bundle report has no context")
-    return {
+    document: dict[str, object] = {
         "marker": _RESULT_MARKER,
         "format_version": _RESULT_FORMAT_VERSION,
         "created_at": report.timing.started_at_text,
@@ -174,6 +176,24 @@ def _manifest_document(
         "result_bundle_status": report.result_bundle.status_text,
         **snapshot.manifest_entries(),
     }
+    if expected_manifest is not None:
+        document.update(
+            {
+                "expected_base_commit": str(expected_manifest.base_commit),
+                "actual_base_commit": str(context.base_commit),
+                "expected_state_fingerprint": (
+                    expected_manifest.state_fingerprint
+                ),
+                "actual_state_fingerprint": context.state_fingerprint,
+                "expected_fingerprint_algorithm": (
+                    expected_manifest.fingerprint_algorithm
+                ),
+                "actual_fingerprint_algorithm": (
+                    context.fingerprint_algorithm
+                ),
+            }
+        )
+    return document
 
 
 def _context_document(report: RunReport) -> dict[str, object]:
@@ -260,6 +280,140 @@ def _manual_bundle_failure(
         emergency_diagnostics_failed=rescue_failed,
         run_report=report,
     )
+
+
+def _state_mismatch_primary_result() -> PrimaryResult:
+    return PrimaryResult.tool_failure(
+        kind=PrimaryResultKind.STATE_MISMATCH,
+        patchharbor_error_code=int(ExitCode.STATE_MISMATCH),
+    )
+
+
+def _failed_apply_bundle_report(
+    *,
+    session: RunSession,
+    repository: RepositoryPath,
+    repo_id: RepositoryId,
+    context: RepositoryContext,
+    warnings: tuple[str, ...],
+    error: str,
+) -> RunReport:
+    return RunReport(
+        timing=session.finish(),
+        operation=RunOperation.APPLY,
+        dry_run=True,
+        context=context,
+        repository=repository,
+        repo_id=repo_id,
+        warnings=warnings,
+        primary_result=_state_mismatch_primary_result(),
+        result_bundle=ResultBundleResult.failed(error),
+        process_exit_code=int(ExitCode.STATE_MISMATCH),
+    )
+
+
+def create_state_mismatch_result_bundle(
+    repository: RepositoryPath,
+    repo_id: RepositoryId,
+    registry_snapshot: RegistrySnapshot,
+    actual_context: RepositoryContext,
+    expected_manifest: PatchManifest,
+    *,
+    warnings: tuple[str, ...],
+    session: RunSession,
+) -> RunReport:
+    """Attempt one dry-run Result Bundle while the repository lock is held."""
+    try:
+        run_directory = _create_private_run_directory(session.run_id)
+    except (OSError, RuntimeError):
+        return _failed_apply_bundle_report(
+            session=session,
+            repository=repository,
+            repo_id=repo_id,
+            context=actual_context,
+            warnings=warnings,
+            error="cannot create emergency diagnostics for the Result Bundle",
+        )
+
+    try:
+        paths = registration_user_paths()
+        filename = (
+            f"patchharbor_result_{session.filename_timestamp}_{session.run_id}.zip"
+        )
+        target = prepare_result_bundle_target(
+            paths.result_directory,
+            registry_snapshot,
+            filename=filename,
+        )
+        captured = capture_result_bundle(repository, repo_id)
+        revalidate_result_bundle_target(target, registry_snapshot)
+        report = RunReport(
+            timing=session.finish(),
+            operation=RunOperation.APPLY,
+            dry_run=True,
+            context=captured.context,
+            repository=repository,
+            repo_id=repo_id,
+            warnings=warnings,
+            primary_result=_state_mismatch_primary_result(),
+            result_bundle=ResultBundleResult.created(target.final_path),
+            process_exit_code=int(ExitCode.STATE_MISMATCH),
+        )
+        _write_run_document(run_directory, report)
+        publication = prepare_result_bundle_publication(
+            target.final_path,
+            run_id=session.run_id,
+        )
+        publish_result_bundle(
+            publication,
+            manifest=_manifest_document(
+                report=report,
+                snapshot=captured.bundle_snapshot,
+                expected_manifest=expected_manifest,
+            ),
+            context_document=_context_document(report),
+            run_report=report,
+            snapshot=captured.bundle_snapshot,
+        )
+    except PatchHarborError as exc:
+        report = _failed_apply_bundle_report(
+            session=session,
+            repository=repository,
+            repo_id=repo_id,
+            context=actual_context,
+            warnings=warnings,
+            error=str(exc),
+        )
+        emergency_path, rescue_failed = _preserve_emergency_diagnostics(
+            run_directory,
+            report,
+        )
+        if rescue_failed:
+            return report
+        return report.with_result_bundle(
+            report.result_bundle.with_emergency_diagnostics(emergency_path)
+        )
+    except (OSError, RuntimeError, TypeError, ValueError):
+        report = _failed_apply_bundle_report(
+            session=session,
+            repository=repository,
+            repo_id=repo_id,
+            context=actual_context,
+            warnings=warnings,
+            error="cannot create the Result Bundle",
+        )
+        emergency_path, rescue_failed = _preserve_emergency_diagnostics(
+            run_directory,
+            report,
+        )
+        if rescue_failed:
+            return report
+        return report.with_result_bundle(
+            report.result_bundle.with_emergency_diagnostics(emergency_path)
+        )
+
+    _remove_private_run_directory(run_directory)
+    return report
 
 
 def create_manual_result_bundle(

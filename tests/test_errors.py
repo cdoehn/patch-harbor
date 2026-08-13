@@ -8,6 +8,7 @@ from patchharbor.errors import (
     patch_package_error,
     registry_error,
     result_bundle_error,
+    state_mismatch_error,
     repository_busy_error,
     repository_resolution_error,
     unsupported_repository_state_error,
@@ -23,6 +24,7 @@ def test_public_tool_exit_codes_are_complete_and_stable() -> None:
         "PAYLOAD_PREPARATION_ERROR": 6,
         "EXECUTION_ERROR": 7,
         "REPOSITORY_ERROR": 8,
+        "STATE_MISMATCH": 9,
         "PATCH_PACKAGE_ERROR": 10,
         "RESULT_BUNDLE_ERROR": 11,
         "REPOSITORY_BUSY": 12,
@@ -43,6 +45,7 @@ def test_error_factories_keep_public_codes_and_categories() -> None:
     registry_failure = registry_error("registry failed")
     resolution_failure = repository_resolution_error("resolution failed")
     result_bundle_failure = result_bundle_error("bundle failed")
+    mismatch_failure = state_mismatch_error("state mismatch")
     busy_failure = repository_busy_error()
     package_failure = patch_package_error("package failed")
     unsupported_failure = unsupported_repository_state_error(
@@ -62,6 +65,8 @@ def test_error_factories_keep_public_codes_and_categories() -> None:
     assert (
         result_bundle_failure.error_kind is ErrorKind.RESULT_BUNDLE_ERROR
     )
+    assert mismatch_failure.exit_code is ExitCode.STATE_MISMATCH
+    assert mismatch_failure.error_kind is ErrorKind.STATE_MISMATCH
     assert busy_failure.exit_code is ExitCode.REPOSITORY_BUSY
     assert busy_failure.error_kind is ErrorKind.REPOSITORY_BUSY
     assert package_failure.exit_code is ExitCode.PATCH_PACKAGE_ERROR

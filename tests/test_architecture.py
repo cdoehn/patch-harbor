@@ -335,6 +335,7 @@ def test_registration_layers_have_one_directional_dependency_flow() -> None:
         "json_document",
         "locks",
         "models",
+        "patch_manifest",
         "registry",
         "repository",
         "result_bundle_capture",

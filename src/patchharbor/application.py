@@ -2,20 +2,29 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+from contextlib import ExitStack, contextmanager
 from pathlib import Path
 from typing import TextIO
 
 from patchharbor.bundles import resolve_patch_bundle
-from patchharbor.errors import ExitCode, PatchHarborError
+from patchharbor.errors import (
+    ExitCode,
+    PatchHarborError,
+    repository_resolution_error,
+    state_mismatch_error,
+)
 from patchharbor.execution import execute_script_text
 from patchharbor.models import (
     BundleScript,
     InputArtifact,
     RegistryListResult,
+    RegistrySnapshot,
     RepositoryContext,
     RepositoryId,
     RepositoryPath,
 )
+from patchharbor.locks import registry_lock, repository_lock
 from patchharbor.output import OutputTargets
 from patchharbor.parser import parse_script
 from patchharbor.patch_manifest import PatchManifest
@@ -31,12 +40,24 @@ from patchharbor.registration import (
     register_local_repository,
     unregister_local_repository,
 )
+from patchharbor.registry import load_registry
+from patchharbor.repository import (
+    inspect_repository,
+    require_local_repository_identity,
+)
 from patchharbor.repository_state import (
+    capture_consistent_repository_snapshot,
     capture_repository_context,
+    repository_context_from_snapshot,
     require_clean_repository,
 )
 from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY, ResourcePolicy
-from patchharbor.result_bundle import ManualResultBundle, create_manual_result_bundle
+from patchharbor.result_bundle import (
+    ManualResultBundle,
+    create_manual_result_bundle,
+    create_state_mismatch_result_bundle,
+)
+from patchharbor.run_report import ResultBundleStatus, RunSession
 from patchharbor.sources import (
     DirectoryCandidate,
     file_input_artifact,
@@ -44,6 +65,7 @@ from patchharbor.sources import (
     select_directory_candidate,
     stdin_input_artifact,
 )
+from patchharbor.user_paths import registration_user_paths
 
 
 def resolve_patch_package(
@@ -62,6 +84,132 @@ def validate_patch_package(
 ) -> PatchManifest:
     """Validate one complete patch package through the package boundary."""
     return _validate_patch_package(path, resource_policy=resource_policy)
+
+
+def _repository_path_for_id(
+    snapshot: RegistrySnapshot,
+    repo_id: RepositoryId,
+) -> RepositoryPath:
+    id_matches = tuple(
+        mapping
+        for mapping in snapshot.repositories
+        if mapping.repo_id == repo_id
+    )
+    if len(id_matches) != 1:
+        raise repository_resolution_error("repository ID is not registered")
+    selected = id_matches[0]
+    path_matches = tuple(
+        mapping
+        for mapping in snapshot.repositories
+        if mapping.repository_path == selected.repository_path
+    )
+    if len(path_matches) != 1 or path_matches[0].repo_id != repo_id:
+        raise repository_resolution_error(
+            "repository path has conflicting registrations"
+        )
+    return selected.repository_path
+
+
+def _inspect_registered_repository(
+    snapshot: RegistrySnapshot,
+    repo_id: RepositoryId,
+) -> RepositoryPath:
+    expected_path = _repository_path_for_id(snapshot, repo_id)
+    repository = inspect_repository(expected_path.value)
+    if repository != expected_path:
+        raise repository_resolution_error(
+            "registered repository path no longer identifies the same repository"
+        )
+    require_local_repository_identity(repository, repo_id)
+    return repository
+
+
+@contextmanager
+def _locked_apply_repository(
+    repo_id: RepositoryId,
+) -> Iterator[tuple[RepositoryPath, RegistrySnapshot]]:
+    paths = registration_user_paths()
+    with ExitStack() as repository_scope:
+        with registry_lock(paths):
+            initial_snapshot = load_registry(paths)
+            repository = _inspect_registered_repository(
+                initial_snapshot,
+                repo_id,
+            )
+            repository_scope.enter_context(repository_lock(paths, repo_id))
+
+            locked_snapshot = load_registry(paths)
+            locked_repository = _inspect_registered_repository(
+                locked_snapshot,
+                repo_id,
+            )
+            if locked_repository != repository:
+                raise repository_resolution_error(
+                    "repository path changed while acquiring its lock"
+                )
+
+        yield locked_repository, locked_snapshot
+
+
+def _manifest_state_mismatch(
+    manifest: PatchManifest,
+    context: RepositoryContext,
+) -> str | None:
+    if (
+        manifest.base_commit.object_format
+        is not context.base_commit.object_format
+    ):
+        return "patch package base commit uses a different Git object format"
+    if manifest.base_commit != context.base_commit:
+        return "patch package base commit does not match repository HEAD"
+    if manifest.fingerprint_algorithm != context.fingerprint_algorithm:
+        return "patch package fingerprint algorithm does not match repository context"
+    if manifest.state_fingerprint != context.state_fingerprint:
+        return "patch package fingerprint does not match repository state"
+    return None
+
+
+def validate_patch_package_repository(
+    package: ValidatedPatchPackage,
+) -> RepositoryContext:
+    """Resolve, lock, and compare the repository named by one patch package."""
+    session = RunSession.start()
+    manifest = package.manifest
+    with _locked_apply_repository(manifest.repo_id) as (
+        repository,
+        registry_snapshot,
+    ):
+        snapshot = capture_consistent_repository_snapshot(repository)
+        context = repository_context_from_snapshot(
+            repository,
+            manifest.repo_id,
+            snapshot,
+        )
+        mismatch = _manifest_state_mismatch(manifest, context)
+        if mismatch is None:
+            return context
+
+        report = create_state_mismatch_result_bundle(
+            repository,
+            manifest.repo_id,
+            registry_snapshot,
+            context,
+            manifest,
+            warnings=package.warnings,
+            session=session,
+        )
+        bundle_result = report.result_bundle
+        raise state_mismatch_error(
+            mismatch,
+            emergency_diagnostics_path=(
+                bundle_result.emergency_diagnostics_path
+            ),
+            emergency_diagnostics_failed=(
+                bundle_result.status is ResultBundleStatus.FAILED
+                and bundle_result.emergency_diagnostics_path is None
+            ),
+            run_report=report,
+        )
 
 
 def register_repository(
