@@ -18,6 +18,7 @@ from patchharbor.zip_payloads import (
     NotZipArchiveError,
     ZipPayloadError,
     read_zip_payloads,
+    zip_payload_warnings,
 )
 
 
@@ -44,56 +45,49 @@ def _classify_patch_payloads(
     resource_policy: ResourcePolicy,
     package_path: Path,
 ) -> ValidatedPatchPackage:
-    manifest_payloads = tuple(
-        payload
-        for payload in payloads
-        if payload.relative_path == PATCH_MANIFEST_NAME
+    manifest_payload = next(
+        (
+            payload
+            for payload in payloads
+            if payload.relative_path == PATCH_MANIFEST_NAME
+        ),
+        None,
     )
-    if len(manifest_payloads) != 1:
+    if manifest_payload is None:
         raise patch_package_error(
             "patch package must contain exactly one regular root patch.json"
         )
 
-    manifest = parse_patch_manifest(manifest_payloads[0].content)
+    manifest = parse_patch_manifest(manifest_payload.content)
     try:
         entrypoint_path = normalize_bundle_path(manifest.entrypoint)
     except BundlePathError as exc:
         raise _unsafe_patch_zip(package_path, exc) from exc
 
-    entrypoints = tuple(
-        payload
-        for payload in payloads
-        if payload.relative_path == entrypoint_path
-    )
-    if len(entrypoints) != 1:
+    entrypoint: BundlePayload | None = None
+    package_payloads: list[BundlePayload] = []
+    for payload in payloads:
+        if payload is manifest_payload:
+            continue
+        if payload.relative_path == entrypoint_path:
+            entrypoint = payload
+        else:
+            package_payloads.append(payload)
+
+    if entrypoint is None:
         raise patch_package_error(
             "patch.json entrypoint must reference exactly one regular ZIP entry"
         )
 
-    entrypoint = entrypoints[0]
-    package_payloads = tuple(
-        payload
-        for payload in payloads
-        if payload.relative_path not in {
-            PATCH_MANIFEST_NAME,
-            entrypoint_path,
-        }
-    )
-    warnings = tuple(
-        warning
-        for payload in (entrypoint, *package_payloads)
-        if (
-            warning := resource_policy.large_content_warning(
-                f"ZIP entry {payload.relative_path!r}",
-                len(payload.content),
-            )
-        )
-        is not None
+    payload_tuple = tuple(package_payloads)
+    warnings = zip_payload_warnings(
+        (entrypoint, *payload_tuple),
+        policy=resource_policy,
     )
     return ValidatedPatchPackage(
         manifest=manifest,
         entrypoint=entrypoint,
-        payloads=package_payloads,
+        payloads=payload_tuple,
         warnings=warnings,
     )
 

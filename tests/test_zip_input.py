@@ -85,7 +85,17 @@ def test_zip_without_scripts_is_rejected_even_with_binary_payloads(
     assert str(raised.value).startswith("no valid PatchHarbor scripts found")
 
 
-@pytest.mark.parametrize("entry_type", (stat.S_IFLNK, stat.S_IFIFO))
+@pytest.mark.parametrize(
+    "entry_type",
+    (
+        stat.S_IFLNK,
+        stat.S_IFCHR,
+        stat.S_IFBLK,
+        stat.S_IFIFO,
+        stat.S_IFSOCK,
+    ),
+    ids=("symlink", "character-device", "block-device", "fifo", "socket"),
+)
 def test_zip_rejects_links_and_special_entries_before_any_script_runs(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -111,6 +121,29 @@ def test_zip_rejects_links_and_special_entries_before_any_script_runs(
 
     assert raised.value.exit_code is ExitCode.SOURCE_ERROR
     assert "unsupported entry type" in str(raised.value)
+    assert executed == []
+
+
+def test_zip_rejects_directory_entries_with_content_before_execution(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    archive_path = tmp_path / "directory-content.zip"
+    with zipfile.ZipFile(archive_path, "w") as archive:
+        archive.writestr("run.sh", f"{REQUIRED_MARKER}\n")
+        archive.writestr("files/", b"not-empty")
+
+    executed: list[str] = []
+    monkeypatch.setattr(
+        script_application,
+        "execute_script_text",
+        lambda script_text, **kwargs: executed.append(script_text) or 0,
+    )
+
+    with pytest.raises(PatchHarborError) as raised:
+        _run_path(archive_path, tmp_path)
+
+    assert raised.value.exit_code is ExitCode.SOURCE_ERROR
     assert executed == []
 
 

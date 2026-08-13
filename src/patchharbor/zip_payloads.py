@@ -77,7 +77,7 @@ class _ZipReadBudget:
         archive: zipfile.ZipFile,
         member: _ValidatedZipMember,
     ) -> bytes:
-        chunks: list[bytes] = []
+        content = bytearray()
         entry_bytes_read = 0
         try:
             with archive.open(member.entry, "r") as stream:
@@ -94,7 +94,7 @@ class _ZipReadBudget:
                             "uncompressed data exceeds "
                             f"{self.policy.max_zip_total_bytes} bytes"
                         )
-                    chunks.append(chunk)
+                    content.extend(chunk)
         except ZipPayloadError:
             raise
         except (
@@ -111,15 +111,7 @@ class _ZipReadBudget:
             raise ZipArchiveReadError(
                 f"entry {member.relative_path!r} size changed while reading"
             )
-        return b"".join(chunks)
-
-
-def is_zip_archive(path: Path) -> bool:
-    """Return whether the current artifact bytes form a ZIP archive."""
-    try:
-        return zipfile.is_zipfile(path)
-    except OSError:
-        return False
+        return bytes(content)
 
 
 def _validate_input_artifact(path: Path, policy: ResourcePolicy) -> None:
@@ -198,11 +190,21 @@ def read_zip_payloads(
 ) -> tuple[BundlePayload, ...]:
     """Fully validate and read every regular ZIP member in archive order."""
     _validate_input_artifact(path, policy)
-    if not is_zip_archive(path):
-        raise NotZipArchiveError("artifact is not a ZIP archive")
+    try:
+        archive = zipfile.ZipFile(path, "r")
+    except zipfile.BadZipFile as exc:
+        raise NotZipArchiveError("artifact is not a ZIP archive") from exc
+    except (
+        NotImplementedError,
+        OSError,
+        RuntimeError,
+        ValueError,
+        zipfile.LargeZipFile,
+    ) as exc:
+        raise ZipArchiveReadError(str(exc)) from exc
 
     try:
-        with zipfile.ZipFile(path, "r") as archive:
+        with archive:
             entries = archive.infolist()
             budget = _ZipReadBudget(policy)
             budget.validate_declared_entries(entries)
@@ -226,3 +228,22 @@ def read_zip_payloads(
         zipfile.LargeZipFile,
     ) as exc:
         raise ZipArchiveReadError(str(exc)) from exc
+
+
+def zip_payload_warnings(
+    payloads: tuple[BundlePayload, ...],
+    *,
+    policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY,
+) -> tuple[str, ...]:
+    """Return shared large-content warnings without copying payload bytes."""
+    return tuple(
+        warning
+        for payload in payloads
+        if (
+            warning := policy.large_content_warning(
+                f"ZIP entry {payload.relative_path!r}",
+                len(payload.content),
+            )
+        )
+        is not None
+    )

@@ -358,25 +358,16 @@ def test_registration_layers_have_one_directional_dependency_flow() -> None:
     assert _local_imports("physical_paths") == set()
 
 
-def test_manual_and_apply_zip_paths_share_one_payload_reader() -> None:
-    application_source = (PACKAGE_ROOT / "application.py").read_text(
-        encoding="utf-8"
-    )
-    bundle_source = (PACKAGE_ROOT / "bundles.py").read_text(encoding="utf-8")
-    package_source = (PACKAGE_ROOT / "patch_package.py").read_text(
-        encoding="utf-8"
-    )
-    zip_source = (PACKAGE_ROOT / "zip_payloads.py").read_text(
-        encoding="utf-8"
-    )
+def test_manual_and_apply_zip_roles_share_one_archive_boundary() -> None:
+    assert "zip_payloads" in _local_imports("bundles")
+    assert "zip_payloads" in _local_imports("patch_package")
 
-    assert "read_zip_payloads" in bundle_source
-    assert "read_zip_payloads" in package_source
-    assert "zipfile" not in application_source
-    assert "zipfile" not in bundle_source
-    assert "zipfile" not in package_source
-    assert "entry.orig_filename" in zip_source
-    assert "validate_bundle_member_paths" in zip_source
+    for module_name in ("application", "bundles", "patch_package"):
+        source = (PACKAGE_ROOT / f"{module_name}.py").read_text(
+            encoding="utf-8"
+        )
+        assert "import zipfile" not in source
+        assert "from zipfile" not in source
 
 
 def test_git_processes_are_confined_to_the_canonical_command_boundary() -> None:

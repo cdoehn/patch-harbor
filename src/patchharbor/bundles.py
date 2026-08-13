@@ -17,8 +17,8 @@ from patchharbor.zip_payloads import (
     NotZipArchiveError,
     ZipArchiveReadError,
     ZipResourceLimitError,
-    is_zip_archive,
     read_zip_payloads,
+    zip_payload_warnings,
 )
 
 
@@ -104,23 +104,11 @@ def _read_direct_artifact(
 
 def _classify_zip_payloads(
     payloads: tuple[BundlePayload, ...],
-    policy: ResourcePolicy,
-) -> tuple[
-    tuple[BundleScript, ...],
-    tuple[BundlePayload, ...],
-    tuple[str, ...],
-]:
+) -> tuple[tuple[BundleScript, ...], tuple[BundlePayload, ...]]:
     scripts: list[BundleScript] = []
     files: list[BundlePayload] = []
-    warnings: list[str] = []
 
     for payload in payloads:
-        if warning := policy.large_content_warning(
-            f"ZIP entry {payload.relative_path!r}",
-            len(payload.content),
-        ):
-            warnings.append(warning)
-
         try:
             script_text = payload.content.decode("utf-8")
             validate_required_marker(script_text)
@@ -135,7 +123,7 @@ def _classify_zip_payloads(
             )
         )
 
-    return tuple(scripts), tuple(files), tuple(warnings)
+    return tuple(scripts), tuple(files)
 
 
 def _no_valid_zip_script(artifact: InputArtifact) -> PatchHarborError:
@@ -174,30 +162,38 @@ def _try_direct_script(
     )
 
 
-def _resolve_zip_bundle(
+def _read_zip_payloads(
     artifact: InputArtifact,
     policy: ResourcePolicy,
-    artifact_warnings: tuple[str, ...],
-) -> PatchBundle:
+) -> tuple[BundlePayload, ...] | None:
     try:
-        raw_payloads = read_zip_payloads(artifact.path, policy=policy)
+        return read_zip_payloads(artifact.path, policy=policy)
+    except NotZipArchiveError:
+        return None
     except ZipResourceLimitError as exc:
         raise _zip_limit_error(artifact, str(exc)) from exc
     except InvalidZipArchiveError as exc:
         raise _invalid_zip_bundle(artifact, exc) from exc
-    except (NotZipArchiveError, ZipArchiveReadError) as exc:
+    except ZipArchiveReadError as exc:
         raise _zip_source_error(artifact, exc) from exc
 
-    scripts, payloads, entry_warnings = _classify_zip_payloads(
-        raw_payloads,
-        policy,
-    )
+
+def _resolve_zip_bundle(
+    artifact: InputArtifact,
+    policy: ResourcePolicy,
+    artifact_warnings: tuple[str, ...],
+    raw_payloads: tuple[BundlePayload, ...],
+) -> PatchBundle:
+    scripts, payloads = _classify_zip_payloads(raw_payloads)
     if not scripts:
         raise _no_valid_zip_script(artifact)
     return PatchBundle(
         scripts=scripts,
         payloads=payloads,
-        warnings=artifact_warnings + entry_warnings,
+        warnings=(
+            artifact_warnings
+            + zip_payload_warnings(raw_payloads, policy=policy)
+        ),
     )
 
 
@@ -208,8 +204,14 @@ def resolve_patch_bundle(
 ) -> PatchBundle:
     """Resolve one source-neutral artifact to an ordered PatchBundle."""
     artifact_warnings = _artifact_warnings(artifact, policy)
-    if is_zip_archive(artifact.path):
-        return _resolve_zip_bundle(artifact, policy, artifact_warnings)
+    raw_payloads = _read_zip_payloads(artifact, policy)
+    if raw_payloads is not None:
+        return _resolve_zip_bundle(
+            artifact,
+            policy,
+            artifact_warnings,
+            raw_payloads,
+        )
 
     raw_content = _read_direct_artifact(artifact, policy)
     direct_script, direct_error, direct_was_utf8 = _try_direct_script(
@@ -228,7 +230,7 @@ def resolve_patch_bundle(
         or raw_content.startswith(_ZIP_SIGNATURES)
     )
     if zip_hint:
-        return _resolve_zip_bundle(artifact, policy, artifact_warnings)
+        raise _zip_source_error(artifact, "artifact is not a ZIP archive")
     if direct_was_utf8:
         raise direct_error
     raise PatchHarborError(
