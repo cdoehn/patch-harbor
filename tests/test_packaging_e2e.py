@@ -22,6 +22,7 @@ RELEASE_VERSION = "1.0.0"
 EXPECTED_RUNTIME_FILES = {
     "patchharbor/__init__.py",
     "patchharbor/application.py",
+    "patchharbor/apply_repository.py",
     "patchharbor/bundle_paths.py",
     "patchharbor/bundles.py",
     "patchharbor/cli.py",

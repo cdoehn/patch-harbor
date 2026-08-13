@@ -191,6 +191,12 @@ def _build_parser() -> argparse.ArgumentParser:
         help="validate the patch package without changing a repository",
     )
     apply_parser.add_argument(
+        "--output-dir",
+        type=Path,
+        metavar="DIRECTORY",
+        help="publish a Result Bundle in this directory when one is attempted",
+    )
+    apply_parser.add_argument(
         "patch_zip",
         type=Path,
         metavar="PATCH_ZIP",
@@ -505,6 +511,7 @@ def _bundle_command(
 def _apply_command(
     path: Path,
     *,
+    output_directory: Path | None,
     stdout: TextIO,
     stderr: TextIO,
 ) -> int:
@@ -518,7 +525,10 @@ def _apply_command(
         print(format_tool_warning(warning), file=stderr)
 
     try:
-        context = validate_patch_package_repository(package)
+        context = validate_patch_package_repository(
+            package,
+            output_directory=output_directory,
+        )
     except PatchHarborError as exc:
         print(format_tool_message(str(exc)), file=stderr)
         report = exc.run_report if isinstance(exc.run_report, RunReport) else None
@@ -770,6 +780,7 @@ def main(
     if args.command == "apply":
         return _apply_command(
             args.patch_zip,
+            output_directory=args.output_dir,
             stdout=actual_stdout,
             stderr=actual_stderr,
         )

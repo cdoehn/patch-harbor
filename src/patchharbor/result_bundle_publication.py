@@ -2,8 +2,13 @@
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 from dataclasses import dataclass
+import os
 from pathlib import Path
+import secrets
+import stat
+from typing import BinaryIO, Iterator
 from uuid import UUID
 import zipfile
 
@@ -17,7 +22,7 @@ from patchharbor.platform.filesystem import (
     sync_regular_file_best_effort,
 )
 from patchharbor.result_bundle_snapshot import ResultBundleSnapshot
-from patchharbor.run_report import RunReport
+from patchharbor.run_report import RunReport, RunSession
 from patchharbor.result_bundle_writer import write_result_bundle
 
 
@@ -38,6 +43,17 @@ class ResultBundlePublication:
 
     temporary_path: Path
     final_path: Path
+    reservation_stat: os.stat_result | None = None
+    reservation_token: bytes | None = None
+
+    def __post_init__(self) -> None:
+        if (self.reservation_stat is None) != (self.reservation_token is None):
+            raise ValueError("Result Bundle reservation is incomplete")
+
+    @property
+    def reserved(self) -> bool:
+        """Whether PatchHarbor already owns the temporary path."""
+        return self.reservation_stat is not None
 
 
 @dataclass(frozen=True)
@@ -57,6 +73,13 @@ class PublishedResultBundle:
     durability: PublicationDurability
 
 
+def result_bundle_filename(session: RunSession) -> str:
+    """Return the unique final filename for one structured run session."""
+    return (
+        f"patchharbor_result_{session.filename_timestamp}_{session.run_id}.zip"
+    )
+
+
 def prepare_result_bundle_publication(
     final_path: Path,
     *,
@@ -69,6 +92,107 @@ def prepare_result_bundle_publication(
     return ResultBundlePublication(
         temporary_path=temporary_path,
         final_path=final_path,
+    )
+
+
+def reserve_result_bundle_publication(
+    final_path: Path,
+    *,
+    run_id: UUID,
+) -> ResultBundlePublication:
+    """Exclusively reserve the same-directory temporary path for a later run."""
+    publication = prepare_result_bundle_publication(
+        final_path,
+        run_id=run_id,
+    )
+    try:
+        if path_kind(publication.final_path) is not PathKind.MISSING:
+            raise result_bundle_error("Result Bundle destination already exists")
+        reservation_token = secrets.token_bytes(32)
+        with publication.temporary_path.open("xb") as destination:
+            destination.write(reservation_token)
+            destination.flush()
+            reservation_stat = os.fstat(destination.fileno())
+    except PatchHarborError:
+        raise
+    except OSError as exc:
+        raise result_bundle_error(
+            "cannot reserve the Result Bundle temporary path"
+        ) from exc
+    return ResultBundlePublication(
+        temporary_path=publication.temporary_path,
+        final_path=publication.final_path,
+        reservation_stat=reservation_stat,
+        reservation_token=reservation_token,
+    )
+
+
+def _same_regular_file(
+    path: Path,
+    expected: os.stat_result,
+    expected_token: bytes | None = None,
+) -> bool:
+    try:
+        observed = os.lstat(path)
+    except FileNotFoundError:
+        return False
+    except OSError:
+        return False
+    if not stat.S_ISREG(observed.st_mode) or not os.path.samestat(
+        observed,
+        expected,
+    ):
+        return False
+    if expected_token is None:
+        return True
+    try:
+        with path.open("rb") as stream:
+            opened = os.fstat(stream.fileno())
+            return (
+                os.path.samestat(observed, opened)
+                and stream.read() == expected_token
+            )
+    except OSError:
+        return False
+
+
+def _require_owned_temporary_file(
+    path: Path,
+    expected: os.stat_result,
+) -> None:
+    if not _same_regular_file(path, expected):
+        raise result_bundle_error(
+            "Result Bundle temporary file changed during publication"
+        )
+
+
+def _remove_owned_temporary_file(
+    path: Path,
+    expected: os.stat_result | None,
+    expected_token: bytes | None = None,
+) -> None:
+    if expected is None or not _same_regular_file(
+        path,
+        expected,
+        expected_token,
+    ):
+        return
+    try:
+        path.unlink()
+    except FileNotFoundError:
+        pass
+    except OSError:
+        pass
+
+
+def release_result_bundle_publication(
+    publication: ResultBundlePublication,
+) -> None:
+    """Release one unused reservation without touching another process' file."""
+    _remove_owned_temporary_file(
+        publication.temporary_path,
+        publication.reservation_stat,
+        publication.reservation_token,
     )
 
 
@@ -91,11 +215,49 @@ def _verify_result_bundle(path: Path) -> None:
         raise result_bundle_error("cannot verify the Result Bundle") from exc
 
 
-def _remove_temporary_file(path: Path) -> None:
+@contextmanager
+def _publication_destination(
+    publication: ResultBundlePublication,
+) -> Iterator[tuple[BinaryIO, os.stat_result]]:
+    stream: BinaryIO | None = None
     try:
-        path.unlink(missing_ok=True)
-    except OSError:
-        pass
+        if publication.reservation_stat is None:
+            if path_kind(publication.temporary_path) is not PathKind.MISSING:
+                raise result_bundle_error(
+                    "Result Bundle temporary path already exists"
+                )
+            stream = publication.temporary_path.open("xb")
+            owned_stat = os.fstat(stream.fileno())
+        else:
+            stream = publication.temporary_path.open("r+b")
+            owned_stat = os.fstat(stream.fileno())
+            observed = os.lstat(publication.temporary_path)
+            if (
+                not stat.S_ISREG(observed.st_mode)
+                or not os.path.samestat(observed, owned_stat)
+                or not os.path.samestat(
+                    publication.reservation_stat,
+                    owned_stat,
+                )
+            ):
+                raise result_bundle_error(
+                    "Result Bundle temporary reservation changed"
+                )
+            stream.seek(0)
+            if stream.read() != publication.reservation_token:
+                raise result_bundle_error(
+                    "Result Bundle temporary reservation changed"
+                )
+            stream.seek(0)
+            stream.truncate(0)
+        yield stream, owned_stat
+    except PatchHarborError:
+        raise
+    except OSError as exc:
+        raise result_bundle_error("cannot create the Result Bundle") from exc
+    finally:
+        if stream is not None:
+            stream.close()
 
 
 def publish_result_bundle(
@@ -107,34 +269,44 @@ def publish_result_bundle(
     snapshot: ResultBundleSnapshot,
 ) -> PublishedResultBundle:
     """Write, verify, best-effort sync, and atomically publish one bundle."""
-    temporary_created = False
+    owned_stat = publication.reservation_stat
+    owned_token = publication.reservation_token
     try:
         if path_kind(publication.final_path) is not PathKind.MISSING:
             raise result_bundle_error("Result Bundle destination already exists")
-        if path_kind(publication.temporary_path) is not PathKind.MISSING:
-            raise result_bundle_error("Result Bundle temporary path already exists")
 
-        try:
-            with publication.temporary_path.open("xb") as destination:
-                temporary_created = True
-                write_result_bundle(
-                    destination,
-                    manifest=manifest,
-                    context_document=context_document,
-                    run_report=run_report,
-                    snapshot=snapshot,
-                )
-        except PatchHarborError:
-            raise
-        except OSError as exc:
-            raise result_bundle_error("cannot create the Result Bundle") from exc
+        with _publication_destination(publication) as (
+            destination,
+            destination_stat,
+        ):
+            owned_stat = destination_stat
+            owned_token = None
+            write_result_bundle(
+                destination,
+                manifest=manifest,
+                context_document=context_document,
+                run_report=run_report,
+                snapshot=snapshot,
+            )
 
+        _require_owned_temporary_file(
+            publication.temporary_path,
+            owned_stat,
+        )
         _verify_result_bundle(publication.temporary_path)
+        _require_owned_temporary_file(
+            publication.temporary_path,
+            owned_stat,
+        )
         temporary_file_sync = sync_regular_file_best_effort(
             publication.temporary_path
         )
         directory_before_replace = sync_directory_best_effort(
             publication.temporary_path.parent
+        )
+        _require_owned_temporary_file(
+            publication.temporary_path,
+            owned_stat,
         )
         replace_path(
             publication.temporary_path,
@@ -156,5 +328,8 @@ def publish_result_bundle(
     except OSError as exc:
         raise result_bundle_error("cannot publish the Result Bundle") from exc
     finally:
-        if temporary_created:
-            _remove_temporary_file(publication.temporary_path)
+        _remove_owned_temporary_file(
+            publication.temporary_path,
+            owned_stat,
+            owned_token,
+        )

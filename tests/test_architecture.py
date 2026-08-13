@@ -275,6 +275,19 @@ def test_registration_layers_have_one_directional_dependency_flow() -> None:
         "resource_policy",
         "zip_payloads",
     }
+    assert _local_imports("apply_repository") == {
+        "errors",
+        "locks",
+        "models",
+        "patch_manifest",
+        "registry",
+        "repository",
+        "repository_state",
+        "result_bundle_publication",
+        "result_bundle_target",
+        "run_report",
+        "user_paths",
+    }
     assert _local_imports("repository_state") == {
         "errors",
         "git_capture",
@@ -473,6 +486,23 @@ def test_cli_depends_on_application_not_source_or_legacy_modules() -> None:
 def test_legacy_facade_modules_are_removed() -> None:
     assert not (PACKAGE_ROOT / "input.py").exists()
     assert not (PACKAGE_ROOT / "files.py").exists()
+
+
+
+def test_apply_resolution_is_not_duplicated_in_application() -> None:
+    imports = _local_imports("application")
+
+    assert "apply_repository" in imports
+    assert imports.isdisjoint(
+        {
+            "locks",
+            "registry",
+            "repository",
+            "result_bundle_publication",
+            "result_bundle_target",
+            "user_paths",
+        }
+    )
 
 
 def test_runtime_module_dependencies_are_acyclic() -> None:

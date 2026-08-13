@@ -276,3 +276,30 @@ def test_run_timestamps_uuid_and_paths_are_canonical(tmp_path: Path) -> None:
     assert physical_absolute_path_text(tmp_path / "missing" / "result.zip") == str(
         (tmp_path / "missing" / "result.zip").resolve()
     )
+
+
+def test_resolved_apply_report_cannot_leave_bundle_unattempted(
+    tmp_path: Path,
+) -> None:
+    repository = tmp_path / "repository"
+    repository.mkdir()
+    context = _context(repository)
+
+    with pytest.raises(ValueError):
+        RunReport(
+            timing=_timing(),
+            operation=RunOperation.APPLY,
+            dry_run=True,
+            context=context,
+            repository=context.repository_path,
+            repo_id=context.repo_id,
+            warnings=(),
+            primary_result=PrimaryResult.tool_failure(
+                kind=PrimaryResultKind.STATE_MISMATCH,
+                patchharbor_error_code=9,
+            ),
+            result_bundle=ResultBundleResult.not_attempted(
+                "repository has already been resolved"
+            ),
+            process_exit_code=9,
+        )

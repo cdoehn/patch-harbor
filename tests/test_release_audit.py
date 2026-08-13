@@ -11,6 +11,7 @@ PACKAGE_ROOT = PROJECT_ROOT / "src" / "patchharbor"
 EXPECTED_RUNTIME_FILES = {
     "__init__.py",
     "application.py",
+    "apply_repository.py",
     "bundle_paths.py",
     "bundles.py",
     "cli.py",

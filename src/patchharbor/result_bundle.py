@@ -31,11 +31,14 @@ from patchharbor.repository import inspect_local_registration, inspect_repositor
 from patchharbor.result_bundle_capture import capture_result_bundle
 from patchharbor.result_bundle_publication import (
     PublicationDurability,
+    ResultBundlePublication,
     prepare_result_bundle_publication,
     publish_result_bundle,
+    result_bundle_filename,
 )
 from patchharbor.result_bundle_snapshot import ResultBundleSnapshot
 from patchharbor.result_bundle_target import (
+    ResultBundleTarget,
     prepare_result_bundle_target,
     revalidate_result_bundle_target,
 )
@@ -319,6 +322,8 @@ def create_state_mismatch_result_bundle(
     actual_context: RepositoryContext,
     expected_manifest: PatchManifest,
     *,
+    target: ResultBundleTarget,
+    publication: ResultBundlePublication,
     warnings: tuple[str, ...],
     session: RunSession,
 ) -> RunReport:
@@ -336,15 +341,6 @@ def create_state_mismatch_result_bundle(
         )
 
     try:
-        paths = registration_user_paths()
-        filename = (
-            f"patchharbor_result_{session.filename_timestamp}_{session.run_id}.zip"
-        )
-        target = prepare_result_bundle_target(
-            paths.result_directory,
-            registry_snapshot,
-            filename=filename,
-        )
         captured = capture_result_bundle(repository, repo_id)
         revalidate_result_bundle_target(target, registry_snapshot)
         report = RunReport(
@@ -360,10 +356,6 @@ def create_state_mismatch_result_bundle(
             process_exit_code=int(ExitCode.STATE_MISMATCH),
         )
         _write_run_document(run_directory, report)
-        publication = prepare_result_bundle_publication(
-            target.final_path,
-            run_id=session.run_id,
-        )
         publish_result_bundle(
             publication,
             manifest=_manifest_document(
@@ -436,9 +428,7 @@ def create_manual_result_bundle(
     resolved_repo_id: RepositoryId | None = None
     try:
         paths = registration_user_paths()
-        filename = (
-            f"patchharbor_result_{session.filename_timestamp}_{session.run_id}.zip"
-        )
+        filename = result_bundle_filename(session)
 
         with ExitStack() as repository_scope:
             with registry_lock(paths):

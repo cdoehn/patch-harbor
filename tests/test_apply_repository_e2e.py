@@ -16,6 +16,7 @@ from tests.registration_support import (
     create_repository,
     git,
     isolated_user_environment,
+    probe_repository_lock,
     local_exclude_path,
     release_repository_lock_holder,
     start_repository_lock_holder,
@@ -269,6 +270,46 @@ def test_state_mismatch_returns_nine_and_bundles_actual_repository_state(
     assert run_report["process_exit_code"] == int(ExitCode.STATE_MISMATCH)
 
 
+def test_state_mismatch_uses_physically_resolved_output_directory(
+    tmp_path: Path,
+) -> None:
+    repository = create_repository(tmp_path / "repository")
+    environment, context = _register_context(repository, tmp_path / "user")
+    manifest = _manifest(context)
+    manifest["state_fingerprint"] = _different_hex(
+        str(context["state_fingerprint"])
+    )
+    package = tmp_path / "mismatch.zip"
+    _write_package(package, manifest)
+    physical_output = tmp_path / "physical-results"
+    physical_output.mkdir()
+    requested_output = physical_output
+    if os.name != "nt":
+        requested_output = tmp_path / "result-link"
+        requested_output.symlink_to(
+            physical_output,
+            target_is_directory=True,
+        )
+    caller = tmp_path / "caller"
+    caller.mkdir()
+
+    completed = run_cli(
+        caller,
+        "apply",
+        "--dry-run",
+        "--output-dir",
+        str(requested_output),
+        str(package),
+        environment_overrides=environment,
+    )
+
+    assert completed.returncode == int(ExitCode.STATE_MISMATCH)
+    assert len(tuple(physical_output.glob("patchharbor_result_*.zip"))) == 1
+    assert not tuple(physical_output.glob(".*.tmp"))
+    assert _result_bundles(environment) == ()
+    _assert_repository_unmodified(repository)
+
+
 def test_busy_repository_is_rejected_before_safe_resolution(
     tmp_path: Path,
 ) -> None:
@@ -291,3 +332,48 @@ def test_busy_repository_is_rejected_before_safe_resolution(
     assert completed.returncode == int(ExitCode.REPOSITORY_BUSY)
     assert _result_bundles(environment) == ()
     _assert_repository_unmodified(repository)
+
+
+def test_repo_id_is_the_only_repository_selection_key(
+    tmp_path: Path,
+) -> None:
+    left_parent = tmp_path / "left"
+    right_parent = tmp_path / "right"
+    left_parent.mkdir()
+    right_parent.mkdir()
+    first = create_repository(left_parent / "project")
+    second = create_repository(right_parent / "project")
+    for repository in (first, second):
+        git(repository, "branch", "-M", "shared")
+        git(
+            repository,
+            "remote",
+            "add",
+            "origin",
+            "https://example.invalid/shared.git",
+        )
+
+    user_root = tmp_path / "user"
+    environment, first_context = _register_context(first, user_root)
+    _same_environment, second_context = _register_context(second, user_root)
+    package = tmp_path / "project.zip"
+    _write_package(package, _manifest(second_context))
+    holder = start_repository_lock_holder(
+        str(second_context["repo_id"]),
+        environment=project_environment(environment),
+    )
+    try:
+        completed = _run_dry_run(package, first, environment)
+    finally:
+        try:
+            assert release_repository_lock_holder(holder) == 0
+        finally:
+            stop_repository_lock_holder(holder)
+
+    assert completed.returncode == int(ExitCode.REPOSITORY_BUSY)
+    assert probe_repository_lock(
+        str(first_context["repo_id"]),
+        project_environment(environment),
+    ) == 0
+    _assert_repository_unmodified(first)
+    _assert_repository_unmodified(second)
