@@ -12,6 +12,7 @@ MAX_BUNDLE_SEGMENT_CHARS = 128
 _SEGMENT_PATTERN = re.compile(
     rf"^[A-Za-z0-9._-]{{1,{MAX_BUNDLE_SEGMENT_CHARS}}}$"
 )
+_RESERVED_INTERNAL_SEGMENTS = {".git", ".patchharbor"}
 _WINDOWS_RESERVED_NAMES = {
     "CON",
     "PRN",
@@ -74,6 +75,10 @@ def normalize_bundle_path(raw_path: str, *, is_directory: bool = False) -> str:
         if not is_safe_path_segment(segment):
             raise BundlePathError(
                 f"unsafe path segment {segment!r} in {raw_path!r}"
+            )
+        if segment.casefold() in _RESERVED_INTERNAL_SEGMENTS:
+            raise BundlePathError(
+                f"reserved internal path segment {segment!r} in {raw_path!r}"
             )
     return "/".join(segments)
 

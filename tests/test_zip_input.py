@@ -120,6 +120,8 @@ def test_zip_rejects_links_and_special_entries_before_any_script_runs(
         "/absolute.bin",
         "folder\\payload.bin",
         "CON/data.bin",
+        ".git/config",
+        "files/.PATCHHARBOR/id",
         "folder/./payload.bin",
         "folder/\x1b-control.bin",
         f"{'a' * 129}/payload.bin",

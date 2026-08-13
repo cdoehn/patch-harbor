@@ -36,6 +36,8 @@ def test_safe_bundle_paths_are_portable(path: str) -> None:
         "CON/payload.bin",
         "folder/NUL.txt",
         "folder//payload.bin",
+        ".git/config",
+        "files/.PATCHHARBOR/id",
         f"{'a' * 129}/payload.bin",
         "a/" + "b" * 511,
     ),

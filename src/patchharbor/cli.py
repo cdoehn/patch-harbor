@@ -17,14 +17,15 @@ from patchharbor.application import (
     repository_context,
     run_script_path,
     run_standard_input,
+    resolve_patch_package,
     unregister_repository,
-    validate_patch_package,
 )
 from patchharbor.context_output import context_json_result, write_context_block
 from patchharbor.errors import (
     ExitCode,
     PatchHarborError,
     format_tool_message,
+    format_tool_warning,
 )
 from patchharbor.execution import DEFAULT_TIMEOUT_SECONDS
 from patchharbor.json_document import serialize_json_document
@@ -507,11 +508,13 @@ def _apply_command(
     stderr: TextIO,
 ) -> int:
     try:
-        validate_patch_package(path)
+        package = resolve_patch_package(path)
     except PatchHarborError as exc:
         print(format_tool_message(str(exc)), file=stderr)
         return int(exc.exit_code)
 
+    for warning in package.warnings:
+        print(format_tool_warning(warning), file=stderr)
     print(f"validated_patch_package: {path}", file=stdout)
     return 0
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from io import BytesIO
 import json
 from pathlib import Path
 import stat
@@ -45,7 +46,10 @@ def _write_package(
 ) -> None:
     with zipfile.ZipFile(path, "w") as archive:
         payload = _manifest_bytes() if manifest is None else manifest
-        archive.writestr(manifest_info or manifest_name, payload)
+        archive.writestr(
+            manifest_info or manifest_name,
+            b"" if manifest_info is not None and manifest_info.is_dir() else payload,
+        )
         if duplicate_manifest:
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore", UserWarning)
@@ -77,6 +81,36 @@ def test_dry_run_validates_actual_zip_bytes_without_mutation(
     assert list(working_directory.iterdir()) == []
 
 
+def test_dry_run_never_executes_entrypoint_marker_payload_or_nested_archive(
+    tmp_path: Path,
+) -> None:
+    package = tmp_path / "classification.zip"
+    nested = BytesIO()
+    with zipfile.ZipFile(nested, "w") as archive:
+        archive.writestr(
+            "nested.sh",
+            "# PATCHHARBOR\nprintf nested > nested-ran.txt\n",
+        )
+    with zipfile.ZipFile(package, "w") as archive:
+        archive.writestr("patch.json", _manifest_bytes())
+        archive.writestr(
+            "run.sh",
+            "# PATCHHARBOR\nprintf entrypoint > entrypoint-ran.txt\n",
+        )
+        archive.writestr(
+            "helper.sh",
+            "# PATCHHARBOR\nprintf helper > helper-ran.txt\n",
+        )
+        archive.writestr("nested.zip", nested.getvalue())
+
+    completed = _run_dry_run(package, tmp_path)
+
+    assert completed.returncode == 0
+    assert not (tmp_path / "entrypoint-ran.txt").exists()
+    assert not (tmp_path / "helper-ran.txt").exists()
+    assert not (tmp_path / "nested-ran.txt").exists()
+
+
 def test_dry_run_accepts_a_full_sha256_object_id(tmp_path: Path) -> None:
     manifest = dict(_VALID_MANIFEST)
     manifest["base_commit"] = "a" * 64
@@ -98,11 +132,11 @@ def test_dry_run_rejects_a_non_zip_despite_zip_extension(tmp_path: Path) -> None
 
 
 @pytest.mark.parametrize(
-    ("manifest_name", "manifest_info"),
+    ("manifest_name", "manifest_info", "expected_exit"),
     [
-        ("files/patch.json", None),
-        ("patch.json", zipfile.ZipInfo("patch.json")),
-        ("patch.json", zipfile.ZipInfo("patch.json")),
+        ("files/patch.json", None, 10),
+        ("patch.json", zipfile.ZipInfo("patch.json/"), 10),
+        ("patch.json", zipfile.ZipInfo("patch.json"), 4),
     ],
     ids=("nested", "directory", "symlink"),
 )
@@ -110,6 +144,7 @@ def test_dry_run_requires_one_regular_root_manifest(
     tmp_path: Path,
     manifest_name: str,
     manifest_info: zipfile.ZipInfo | None,
+    expected_exit: int,
     request: pytest.FixtureRequest,
 ) -> None:
     package = tmp_path / f"{request.node.callspec.id}.zip"
@@ -128,7 +163,7 @@ def test_dry_run_requires_one_regular_root_manifest(
 
     completed = _run_dry_run(package, tmp_path)
 
-    assert completed.returncode == 10
+    assert completed.returncode == expected_exit
 
 
 def test_dry_run_rejects_duplicate_root_manifests(tmp_path: Path) -> None:
@@ -137,7 +172,7 @@ def test_dry_run_rejects_duplicate_root_manifests(tmp_path: Path) -> None:
 
     completed = _run_dry_run(package, tmp_path)
 
-    assert completed.returncode == 10
+    assert completed.returncode == 4
 
 
 def test_dry_run_propagates_invalid_manifest_documents(tmp_path: Path) -> None:
