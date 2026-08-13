@@ -234,6 +234,11 @@ def test_registration_layers_have_one_directional_dependency_flow() -> None:
     assert _local_imports("state_fingerprint") == set()
     assert _local_imports("context_output") == {"models"}
     assert _local_imports("json_document") == set()
+    assert _local_imports("patch_manifest") == {
+        "errors",
+        "models",
+        "state_fingerprint",
+    }
     assert _local_imports("repository_state") == {
         "errors",
         "git_capture",

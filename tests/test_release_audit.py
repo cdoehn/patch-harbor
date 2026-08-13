@@ -26,6 +26,7 @@ EXPECTED_RUNTIME_FILES = {
     "models.py",
     "output.py",
     "parser.py",
+    "patch_manifest.py",
     "payload_files.py",
     "physical_paths.py",
     "presentation.py",

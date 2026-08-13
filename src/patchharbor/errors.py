@@ -37,6 +37,7 @@ class ErrorKind(str, Enum):
     RESULT_BUNDLE_ERROR = "result_bundle_error"
     REPOSITORY_BUSY = "repository_busy"
     UNSUPPORTED_REPOSITORY_STATE = "unsupported_repository_state"
+    PATCH_PACKAGE_ERROR = "patch_package_error"
 
 
 class PatchHarborError(Exception):
@@ -75,6 +76,15 @@ def repository_resolution_error(message: str) -> PatchHarborError:
         message,
         ExitCode.REPOSITORY_ERROR,
         error_kind=ErrorKind.REPOSITORY_RESOLUTION_ERROR,
+    )
+
+
+def patch_package_error(message: str) -> PatchHarborError:
+    """Create one centrally categorized patch-package failure."""
+    return PatchHarborError(
+        message,
+        ExitCode.PATCH_PACKAGE_ERROR,
+        error_kind=ErrorKind.PATCH_PACKAGE_ERROR,
     )
 
 

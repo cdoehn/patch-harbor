@@ -5,6 +5,7 @@ from patchharbor.errors import (
     ExitCode,
     format_tool_message,
     format_tool_warning,
+    patch_package_error,
     registry_error,
     result_bundle_error,
     repository_busy_error,
@@ -38,11 +39,12 @@ def test_public_tool_message_prefixes_are_stable() -> None:
     )
 
 
-def test_repository_error_factories_keep_public_codes_and_categories() -> None:
+def test_error_factories_keep_public_codes_and_categories() -> None:
     registry_failure = registry_error("registry failed")
     resolution_failure = repository_resolution_error("resolution failed")
     result_bundle_failure = result_bundle_error("bundle failed")
     busy_failure = repository_busy_error()
+    package_failure = patch_package_error("package failed")
     unsupported_failure = unsupported_repository_state_error(
         "unsupported state"
     )
@@ -62,6 +64,8 @@ def test_repository_error_factories_keep_public_codes_and_categories() -> None:
     )
     assert busy_failure.exit_code is ExitCode.REPOSITORY_BUSY
     assert busy_failure.error_kind is ErrorKind.REPOSITORY_BUSY
+    assert package_failure.exit_code is ExitCode.PATCH_PACKAGE_ERROR
+    assert package_failure.error_kind is ErrorKind.PATCH_PACKAGE_ERROR
     assert (
         unsupported_failure.exit_code
         is ExitCode.UNSUPPORTED_REPOSITORY_STATE
