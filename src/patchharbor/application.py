@@ -2,27 +2,13 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from io import DEFAULT_BUFFER_SIZE
 from pathlib import Path
-import stat
 from typing import TextIO
-import zipfile
 
-from patchharbor.bundle_paths import (
-    BundlePathError,
-    normalize_bundle_path,
-    validate_bundle_member_paths,
-)
 from patchharbor.bundles import resolve_patch_bundle
-from patchharbor.errors import (
-    ExitCode,
-    PatchHarborError,
-    patch_package_error,
-)
+from patchharbor.errors import ExitCode, PatchHarborError
 from patchharbor.execution import execute_script_text
 from patchharbor.models import (
-    BundlePayload,
     BundleScript,
     InputArtifact,
     RegistryListResult,
@@ -32,13 +18,13 @@ from patchharbor.models import (
 )
 from patchharbor.output import OutputTargets
 from patchharbor.parser import parse_script
-from patchharbor.patch_manifest import (
-    PATCH_MANIFEST_NAME,
-    PatchManifest,
-    parse_patch_manifest,
+from patchharbor.patch_manifest import PatchManifest
+from patchharbor.patch_package import (
+    ValidatedPatchPackage,
+    resolve_patch_package as _resolve_patch_package,
+    validate_patch_package as _validate_patch_package,
 )
 from patchharbor.payload_files import write_bundle_payloads
-from patchharbor.platform.errors import describe_os_error
 from patchharbor.presentation import DashboardPresentation, PresentedFile
 from patchharbor.registration import (
     list_registered_repositories,
@@ -60,306 +46,13 @@ from patchharbor.sources import (
 )
 
 
-def _patch_source_error(path: Path, detail: object) -> PatchHarborError:
-    return PatchHarborError(
-        f"cannot read patch package {path}: {detail}",
-        ExitCode.SOURCE_ERROR,
-    )
-
-
-def _unsafe_patch_zip(path: Path, detail: object) -> PatchHarborError:
-    return PatchHarborError(
-        f"unsafe or unreadable patch ZIP {path}: {detail}",
-        ExitCode.SOURCE_ERROR,
-    )
-
-
-@dataclass(frozen=True, slots=True)
-class ValidatedPatchPackage:
-    """One fully read and classified format-1 patch package."""
-
-    manifest: PatchManifest
-    entrypoint: BundlePayload
-    payloads: tuple[BundlePayload, ...]
-    warnings: tuple[str, ...] = ()
-
-
-@dataclass(frozen=True, slots=True)
-class _ValidatedPatchMember:
-    entry: zipfile.ZipInfo
-    relative_path: str
-    is_directory: bool
-
-
-@dataclass(slots=True)
-class _PatchZipReadBudget:
-    package_path: Path
-    resource_policy: ResourcePolicy
-    total_bytes_read: int = 0
-
-    def validate_declared_entries(
-        self,
-        entries: list[zipfile.ZipInfo],
-    ) -> None:
-        if len(entries) > self.resource_policy.max_zip_entries:
-            raise _unsafe_patch_zip(
-                self.package_path,
-                "ZIP entry count exceeds the resource limit",
-            )
-
-        declared_total = 0
-        for entry in entries:
-            if entry.file_size > self.resource_policy.max_content_bytes:
-                raise _unsafe_patch_zip(
-                    self.package_path,
-                    f"ZIP entry {entry.orig_filename!r} exceeds "
-                    "the content size limit",
-                )
-            declared_total += entry.file_size
-            if declared_total > self.resource_policy.max_zip_total_bytes:
-                raise _unsafe_patch_zip(
-                    self.package_path,
-                    "ZIP uncompressed data exceeds the total size limit",
-                )
-
-    def read_member(
-        self,
-        archive: zipfile.ZipFile,
-        member: _ValidatedPatchMember,
-    ) -> bytes:
-        chunks: list[bytes] = []
-        entry_bytes_read = 0
-        try:
-            with archive.open(member.entry, "r") as stream:
-                while chunk := stream.read(DEFAULT_BUFFER_SIZE):
-                    entry_bytes_read += len(chunk)
-                    self.total_bytes_read += len(chunk)
-                    if (
-                        entry_bytes_read
-                        > self.resource_policy.max_content_bytes
-                    ):
-                        raise _unsafe_patch_zip(
-                            self.package_path,
-                            f"ZIP entry {member.relative_path!r} exceeds "
-                            "the content size limit while reading",
-                        )
-                    if (
-                        self.total_bytes_read
-                        > self.resource_policy.max_zip_total_bytes
-                    ):
-                        raise _unsafe_patch_zip(
-                            self.package_path,
-                            "ZIP uncompressed data exceeds the total size "
-                            "limit while reading",
-                        )
-                    chunks.append(chunk)
-        except PatchHarborError:
-            raise
-        except (
-            NotImplementedError,
-            OSError,
-            RuntimeError,
-            zipfile.BadZipFile,
-        ) as exc:
-            raise _unsafe_patch_zip(
-                self.package_path,
-                f"cannot read ZIP entry {member.relative_path!r}: {exc}",
-            ) from exc
-
-        if entry_bytes_read != member.entry.file_size:
-            raise _unsafe_patch_zip(
-                self.package_path,
-                f"ZIP entry {member.relative_path!r} size changed while "
-                "reading",
-            )
-        return b"".join(chunks)
-
-
-def _patch_member_is_directory(
-    entry: zipfile.ZipInfo,
-    *,
-    package_path: Path,
-) -> bool:
-    if entry.create_system != 3:
-        if entry.is_dir() and entry.file_size != 0:
-            raise _unsafe_patch_zip(
-                package_path,
-                f"directory ZIP entry {entry.orig_filename!r} has content",
-            )
-        return entry.is_dir()
-
-    file_type = stat.S_IFMT(entry.external_attr >> 16)
-    if entry.is_dir():
-        if entry.file_size != 0:
-            raise _unsafe_patch_zip(
-                package_path,
-                f"directory ZIP entry {entry.orig_filename!r} has content",
-            )
-        if file_type not in (0, stat.S_IFDIR):
-            raise _unsafe_patch_zip(
-                package_path,
-                f"unsupported ZIP entry type for {entry.orig_filename!r}",
-            )
-        return True
-
-    if file_type not in (0, stat.S_IFREG):
-        raise _unsafe_patch_zip(
-            package_path,
-            f"unsupported ZIP entry type for {entry.orig_filename!r}",
-        )
-    return False
-
-
-def _validate_patch_members(
-    entries: list[zipfile.ZipInfo],
-    *,
-    package_path: Path,
-) -> tuple[_ValidatedPatchMember, ...]:
-    member_kinds = tuple(
-        (
-            entry,
-            _patch_member_is_directory(entry, package_path=package_path),
-        )
-        for entry in entries
-    )
-    try:
-        relative_paths = validate_bundle_member_paths(
-            (entry.orig_filename, is_directory)
-            for entry, is_directory in member_kinds
-        )
-    except BundlePathError as exc:
-        raise _unsafe_patch_zip(package_path, exc) from exc
-
-    return tuple(
-        _ValidatedPatchMember(
-            entry=entry,
-            relative_path=relative_path,
-            is_directory=is_directory,
-        )
-        for (entry, is_directory), relative_path in zip(
-            member_kinds,
-            relative_paths,
-            strict=True,
-        )
-    )
-
-
-def _read_and_classify_patch_package(
-    archive: zipfile.ZipFile,
-    *,
-    package_path: Path,
-    resource_policy: ResourcePolicy,
-) -> ValidatedPatchPackage:
-    entries = archive.infolist()
-    budget = _PatchZipReadBudget(package_path, resource_policy)
-    budget.validate_declared_entries(entries)
-    members = _validate_patch_members(entries, package_path=package_path)
-
-    manifest_members = tuple(
-        member
-        for member in members
-        if not member.is_directory
-        and member.relative_path == PATCH_MANIFEST_NAME
-    )
-    if len(manifest_members) != 1:
-        raise patch_package_error(
-            "patch package must contain exactly one regular root patch.json"
-        )
-
-    contents: dict[str, bytes] = {}
-    for member in members:
-        if member.is_directory:
-            continue
-        contents[member.relative_path] = budget.read_member(archive, member)
-
-    manifest = parse_patch_manifest(contents[PATCH_MANIFEST_NAME])
-    try:
-        entrypoint_path = normalize_bundle_path(manifest.entrypoint)
-    except BundlePathError as exc:
-        raise _unsafe_patch_zip(package_path, exc) from exc
-
-    entrypoint_members = tuple(
-        member
-        for member in members
-        if not member.is_directory
-        and member.relative_path == entrypoint_path
-    )
-    if len(entrypoint_members) != 1:
-        raise patch_package_error(
-            "patch.json entrypoint must reference exactly one regular ZIP entry"
-        )
-
-    entrypoint = BundlePayload(
-        relative_path=entrypoint_path,
-        content=contents[entrypoint_path],
-    )
-    payloads = tuple(
-        BundlePayload(
-            relative_path=member.relative_path,
-            content=contents[member.relative_path],
-        )
-        for member in members
-        if not member.is_directory
-        and member.relative_path not in {
-            PATCH_MANIFEST_NAME,
-            entrypoint_path,
-        }
-    )
-
-    warnings = tuple(
-        warning
-        for item in (entrypoint, *payloads)
-        if (
-            warning := resource_policy.large_content_warning(
-                f"ZIP entry {item.relative_path!r}",
-                len(item.content),
-            )
-        )
-        is not None
-    )
-    return ValidatedPatchPackage(
-        manifest=manifest,
-        entrypoint=entrypoint,
-        payloads=payloads,
-        warnings=warnings,
-    )
-
-
 def resolve_patch_package(
     path: Path,
     *,
     resource_policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY,
 ) -> ValidatedPatchPackage:
-    """Read, validate, and classify one format-1 patch package."""
-    try:
-        metadata = path.stat()
-    except OSError as exc:
-        raise _patch_source_error(path, describe_os_error(exc)) from exc
-    if not stat.S_ISREG(metadata.st_mode):
-        raise _patch_source_error(path, "not a regular file")
-    if metadata.st_size > resource_policy.max_input_artifact_bytes:
-        raise _patch_source_error(path, "input artifact exceeds the size limit")
-
-    try:
-        if not zipfile.is_zipfile(path):
-            raise patch_package_error("patch package is not a ZIP archive")
-        with zipfile.ZipFile(path, "r") as archive:
-            return _read_and_classify_patch_package(
-                archive,
-                package_path=path,
-                resource_policy=resource_policy,
-            )
-    except PatchHarborError:
-        raise
-    except (
-        NotImplementedError,
-        OSError,
-        RuntimeError,
-        ValueError,
-        zipfile.BadZipFile,
-        zipfile.LargeZipFile,
-    ) as exc:
-        raise _unsafe_patch_zip(path, exc) from exc
+    """Resolve one complete patch package through the package boundary."""
+    return _resolve_patch_package(path, resource_policy=resource_policy)
 
 
 def validate_patch_package(
@@ -367,11 +60,8 @@ def validate_patch_package(
     *,
     resource_policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY,
 ) -> PatchManifest:
-    """Validate one complete package and return its typed manifest."""
-    return resolve_patch_package(
-        path,
-        resource_policy=resource_policy,
-    ).manifest
+    """Validate one complete patch package through the package boundary."""
+    return _validate_patch_package(path, resource_policy=resource_policy)
 
 
 def register_repository(

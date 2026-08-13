@@ -2,15 +2,6 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from io import DEFAULT_BUFFER_SIZE
-import stat
-import zipfile
-
-from patchharbor.bundle_paths import (
-    BundlePathError,
-    validate_bundle_member_paths,
-)
 from patchharbor.errors import ExitCode, PatchHarborError
 from patchharbor.models import (
     BundlePayload,
@@ -21,76 +12,17 @@ from patchharbor.models import (
 from patchharbor.parser import ScriptFormatError, validate_required_marker
 from patchharbor.platform.errors import describe_os_error
 from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY, ResourcePolicy
+from patchharbor.zip_payloads import (
+    InvalidZipArchiveError,
+    NotZipArchiveError,
+    ZipArchiveReadError,
+    ZipResourceLimitError,
+    is_zip_archive,
+    read_zip_payloads,
+)
 
 
 _ZIP_SIGNATURES = (b"PK\x03\x04", b"PK\x05\x06", b"PK\x07\x08")
-
-
-@dataclass(frozen=True)
-class _ValidatedZipMember:
-    entry: zipfile.ZipInfo
-    relative_path: str
-    is_directory: bool
-
-
-@dataclass(slots=True)
-class _ZipReadBudget:
-    """Coordinate declared and observed ZIP limits for one resolution."""
-
-    artifact: InputArtifact
-    policy: ResourcePolicy
-    total_bytes_read: int = 0
-
-    def validate_declared_entries(self, entries: list[zipfile.ZipInfo]) -> None:
-        if len(entries) > self.policy.max_zip_entries:
-            raise _zip_limit_error(
-                self.artifact,
-                f"more than {self.policy.max_zip_entries} entries",
-            )
-
-        declared_total = 0
-        for entry in entries:
-            if entry.file_size > self.policy.max_content_bytes:
-                raise _zip_limit_error(
-                    self.artifact,
-                    f"entry {entry.filename!r} exceeds "
-                    f"{self.policy.max_content_bytes} bytes",
-                )
-            declared_total += entry.file_size
-            if declared_total > self.policy.max_zip_total_bytes:
-                raise _zip_limit_error(
-                    self.artifact,
-                    "uncompressed data exceeds "
-                    f"{self.policy.max_zip_total_bytes} bytes",
-                )
-
-    def read_member(
-        self,
-        archive: zipfile.ZipFile,
-        member: _ValidatedZipMember,
-    ) -> bytes:
-        chunks: list[bytes] = []
-        entry_bytes_read = 0
-
-        with archive.open(member.entry, "r") as stream:
-            while chunk := stream.read(DEFAULT_BUFFER_SIZE):
-                entry_bytes_read += len(chunk)
-                self.total_bytes_read += len(chunk)
-                if entry_bytes_read > self.policy.max_content_bytes:
-                    raise _zip_limit_error(
-                        self.artifact,
-                        f"entry {member.relative_path!r} exceeds "
-                        f"{self.policy.max_content_bytes} bytes",
-                    )
-                if self.total_bytes_read > self.policy.max_zip_total_bytes:
-                    raise _zip_limit_error(
-                        self.artifact,
-                        "uncompressed data exceeds "
-                        f"{self.policy.max_zip_total_bytes} bytes",
-                    )
-                chunks.append(chunk)
-
-        return b"".join(chunks)
 
 
 def _artifact_source_error(
@@ -170,114 +102,40 @@ def _read_direct_artifact(
     return raw_content
 
 
-def _zip_member_is_directory(
-    entry: zipfile.ZipInfo,
-    *,
-    artifact: InputArtifact,
-) -> bool:
-    if entry.create_system != 3:
-        return entry.is_dir()
-
-    file_type = stat.S_IFMT(entry.external_attr >> 16)
-    if entry.is_dir():
-        if file_type not in (0, stat.S_IFDIR):
-            raise _invalid_zip_bundle(
-                artifact,
-                f"unsupported entry type for {entry.filename!r}",
-            )
-        return True
-
-    if file_type not in (0, stat.S_IFREG):
-        raise _invalid_zip_bundle(
-            artifact,
-            f"unsupported entry type for {entry.filename!r}",
-        )
-    return False
-
-
-def _validate_zip_members(
-    entries: list[zipfile.ZipInfo],
-    *,
-    artifact: InputArtifact,
-) -> tuple[_ValidatedZipMember, ...]:
-    member_kinds = tuple(
-        (
-            entry,
-            _zip_member_is_directory(entry, artifact=artifact),
-        )
-        for entry in entries
-    )
-    try:
-        normalized_paths = validate_bundle_member_paths(
-            (entry.orig_filename, is_directory)
-            for entry, is_directory in member_kinds
-        )
-    except BundlePathError as exc:
-        raise _invalid_zip_bundle(artifact, exc) from exc
-
-    return tuple(
-        _ValidatedZipMember(
-            entry=entry,
-            relative_path=relative_path,
-            is_directory=is_directory,
-        )
-        for (entry, is_directory), relative_path in zip(
-            member_kinds,
-            normalized_paths,
-            strict=True,
-        )
-    )
-
-
-def _read_zip_members(
-    archive: zipfile.ZipFile,
-    *,
-    artifact: InputArtifact,
+def _classify_zip_payloads(
+    payloads: tuple[BundlePayload, ...],
     policy: ResourcePolicy,
 ) -> tuple[
     tuple[BundleScript, ...],
     tuple[BundlePayload, ...],
     tuple[str, ...],
 ]:
-    entries = archive.infolist()
-    budget = _ZipReadBudget(artifact=artifact, policy=policy)
-    budget.validate_declared_entries(entries)
-    members = _validate_zip_members(entries, artifact=artifact)
     scripts: list[BundleScript] = []
-    payloads: list[BundlePayload] = []
+    files: list[BundlePayload] = []
     warnings: list[str] = []
 
-    for member in members:
-        if member.is_directory:
-            continue
-
-        raw_content = budget.read_member(archive, member)
+    for payload in payloads:
         if warning := policy.large_content_warning(
-            f"ZIP entry {member.relative_path!r}",
-            len(raw_content),
+            f"ZIP entry {payload.relative_path!r}",
+            len(payload.content),
         ):
             warnings.append(warning)
 
         try:
-            script_text = raw_content.decode("utf-8")
+            script_text = payload.content.decode("utf-8")
             validate_required_marker(script_text)
         except (UnicodeError, ScriptFormatError):
-            payloads.append(
-                BundlePayload(
-                    relative_path=member.relative_path,
-                    content=raw_content,
-                )
-            )
+            files.append(payload)
             continue
 
         scripts.append(
             BundleScript(
                 text=script_text,
-                display_name=member.relative_path,
+                display_name=payload.relative_path,
             )
         )
 
-    return tuple(scripts), tuple(payloads), tuple(warnings)
+    return tuple(scripts), tuple(files), tuple(warnings)
 
 
 def _no_valid_zip_script(artifact: InputArtifact) -> PatchHarborError:
@@ -322,21 +180,18 @@ def _resolve_zip_bundle(
     artifact_warnings: tuple[str, ...],
 ) -> PatchBundle:
     try:
-        with zipfile.ZipFile(artifact.path) as archive:
-            scripts, payloads, entry_warnings = _read_zip_members(
-                archive,
-                artifact=artifact,
-                policy=policy,
-            )
-    except zipfile.BadZipFile as exc:
-        raise _zip_source_error(artifact, exc) from exc
-    except PatchHarborError:
-        raise
-    except OSError as exc:
-        raise _zip_source_error(artifact, describe_os_error(exc)) from exc
-    except RuntimeError as exc:
+        raw_payloads = read_zip_payloads(artifact.path, policy=policy)
+    except ZipResourceLimitError as exc:
+        raise _zip_limit_error(artifact, str(exc)) from exc
+    except InvalidZipArchiveError as exc:
+        raise _invalid_zip_bundle(artifact, exc) from exc
+    except (NotZipArchiveError, ZipArchiveReadError) as exc:
         raise _zip_source_error(artifact, exc) from exc
 
+    scripts, payloads, entry_warnings = _classify_zip_payloads(
+        raw_payloads,
+        policy,
+    )
     if not scripts:
         raise _no_valid_zip_script(artifact)
     return PatchBundle(
@@ -353,7 +208,7 @@ def resolve_patch_bundle(
 ) -> PatchBundle:
     """Resolve one source-neutral artifact to an ordered PatchBundle."""
     artifact_warnings = _artifact_warnings(artifact, policy)
-    if zipfile.is_zipfile(artifact.path):
+    if is_zip_archive(artifact.path):
         return _resolve_zip_bundle(artifact, policy, artifact_warnings)
 
     raw_content = _read_direct_artifact(artifact, policy)

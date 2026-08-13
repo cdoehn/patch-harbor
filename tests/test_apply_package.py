@@ -9,8 +9,11 @@ import zipfile
 
 import pytest
 
-import patchharbor.application as application
-from patchharbor.application import resolve_patch_package, validate_patch_package
+import patchharbor.zip_payloads as zip_payloads
+from patchharbor.patch_package import (
+    resolve_patch_package,
+    validate_patch_package,
+)
 from patchharbor.errors import ExitCode, PatchHarborError
 from patchharbor.patch_manifest import PATCH_FORMAT_VERSION, PATCH_MARKER
 from patchharbor.resource_policy import ResourcePolicy
@@ -130,6 +133,21 @@ def test_package_rejects_unsafe_and_internal_paths(
     _write_package(package_path, entries=((unsafe_path, b"payload"),))
 
     _assert_source_error(package_path)
+
+
+def test_archive_safety_is_checked_before_manifest_roles(
+    tmp_path: Path,
+) -> None:
+    package_path = tmp_path / "unsafe-before-manifest.zip"
+    with zipfile.ZipFile(package_path, "w") as archive:
+        archive.writestr("patch.json", b"not-json")
+        archive.writestr("run.sh", _ENTRYPOINT)
+        archive.writestr("../escape.bin", b"payload")
+
+    with pytest.raises(PatchHarborError) as captured:
+        resolve_patch_package(package_path)
+
+    assert captured.value.exit_code is ExitCode.SOURCE_ERROR
 
 
 def test_package_rejects_directory_entries_with_content(tmp_path: Path) -> None:
@@ -283,7 +301,7 @@ def test_live_read_budget_rejects_underreported_entry_bytes(
         max_content_bytes=512,
         max_zip_total_bytes=4096,
     )
-    original_open = application.zipfile.ZipFile.open
+    original_open = zip_payloads.zipfile.ZipFile.open
 
     def open_with_extra_bytes(
         archive: zipfile.ZipFile,
@@ -307,7 +325,7 @@ def test_live_read_budget_rejects_underreported_entry_bytes(
         )
 
     monkeypatch.setattr(
-        application.zipfile.ZipFile,
+        zip_payloads.zipfile.ZipFile,
         "open",
         open_with_extra_bytes,
     )
@@ -327,7 +345,7 @@ def test_live_total_budget_rejects_underreported_uncompressed_bytes(
         max_content_bytes=1024,
         max_zip_total_bytes=declared_total + 4,
     )
-    original_open = application.zipfile.ZipFile.open
+    original_open = zip_payloads.zipfile.ZipFile.open
 
     def open_with_extra_bytes(
         archive: zipfile.ZipFile,
@@ -351,7 +369,7 @@ def test_live_total_budget_rejects_underreported_uncompressed_bytes(
         )
 
     monkeypatch.setattr(
-        application.zipfile.ZipFile,
+        zip_payloads.zipfile.ZipFile,
         "open",
         open_with_extra_bytes,
     )

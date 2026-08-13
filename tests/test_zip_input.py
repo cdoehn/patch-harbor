@@ -11,6 +11,7 @@ from patchharbor.errors import ExitCode, PatchHarborError
 import patchharbor.application as script_application
 from patchharbor.application import discover_directory_candidates, run_script_path
 import patchharbor.bundles as script_bundles
+import patchharbor.zip_payloads as zip_payloads
 from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY, ResourcePolicy
 from patchharbor.sources import file_input_artifact
 
@@ -364,7 +365,7 @@ def test_zip_live_bytes_use_the_same_policy_as_preflight(
         archive.writestr("run.sh", f"{REQUIRED_MARKER}\n")
         archive.writestr("payload.bin", b"x")
 
-    original_open = script_bundles.zipfile.ZipFile.open
+    original_open = zip_payloads.zipfile.ZipFile.open
 
     def open_with_misreported_payload(
         archive: zipfile.ZipFile,
@@ -388,7 +389,7 @@ def test_zip_live_bytes_use_the_same_policy_as_preflight(
         )
 
     monkeypatch.setattr(
-        script_bundles.zipfile.ZipFile,
+        zip_payloads.zipfile.ZipFile,
         "open",
         open_with_misreported_payload,
     )
