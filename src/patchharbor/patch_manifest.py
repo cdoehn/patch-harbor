@@ -13,7 +13,7 @@ from patchharbor.state_fingerprint import FINGERPRINT_ALGORITHM
 PATCH_MANIFEST_NAME = "patch.json"
 PATCH_MARKER = "patch-harbor"
 PATCH_FORMAT_VERSION = 1
-PATCH_MANIFEST_FIELDS = frozenset(
+_PATCH_MANIFEST_FIELDS = frozenset(
     {
         "marker",
         "format_version",
@@ -88,7 +88,7 @@ def _require_string(document: dict[str, object], field: str) -> str:
 def parse_patch_manifest(payload: bytes) -> PatchManifest:
     """Parse manifest bytes without performing I/O or repository access."""
     document = _parse_json_object(payload)
-    if set(document) != PATCH_MANIFEST_FIELDS:
+    if set(document) != _PATCH_MANIFEST_FIELDS:
         raise patch_package_error(
             "patch.json must contain exactly the seven format-1 fields"
         )

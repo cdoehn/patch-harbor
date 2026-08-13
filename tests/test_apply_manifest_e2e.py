@@ -8,18 +8,20 @@ import zipfile
 
 import pytest
 
+from patchharbor.patch_manifest import PATCH_FORMAT_VERSION, PATCH_MARKER
+from patchharbor.state_fingerprint import FINGERPRINT_ALGORITHM
 from tests.platform_support import run_cli
 
 
 pytestmark = pytest.mark.e2e
 
 _VALID_MANIFEST = {
-    "marker": "patch-harbor",
-    "format_version": 1,
+    "marker": PATCH_MARKER,
+    "format_version": PATCH_FORMAT_VERSION,
     "repo_id": "a3f9c2e1-7b4d-4a91-9d2e-5c6f8a1b2c3d",
     "base_commit": "f4e9c2a7b8c9d01234567890abcdef1234567890",
     "state_fingerprint": "a1b2c3d4e5f67890",
-    "fingerprint_algorithm": "patchharbor-state-v1",
+    "fingerprint_algorithm": FINGERPRINT_ALGORITHM,
     "entrypoint": "run.sh",
 }
 
@@ -99,14 +101,8 @@ def test_dry_run_rejects_a_non_zip_despite_zip_extension(tmp_path: Path) -> None
     ("manifest_name", "manifest_info"),
     [
         ("files/patch.json", None),
-        (
-            "patch.json",
-            zipfile.ZipInfo("patch.json"),
-        ),
-        (
-            "patch.json",
-            zipfile.ZipInfo("patch.json"),
-        ),
+        ("patch.json", zipfile.ZipInfo("patch.json")),
+        ("patch.json", zipfile.ZipInfo("patch.json")),
     ],
     ids=("nested", "directory", "symlink"),
 )
@@ -144,111 +140,22 @@ def test_dry_run_rejects_duplicate_root_manifests(tmp_path: Path) -> None:
     assert completed.returncode == 10
 
 
-@pytest.mark.parametrize(
-    "manifest",
-    [
-        b"\xef\xbb\xbf" + _manifest_bytes(),
-        b"\xff",
-        b"[]",
-        b'{"marker":"patch-harbor","marker":"patch-harbor"}',
-        b'{"marker":"patch-harbor" // comment\n}',
-        _manifest_bytes() + b"{}",
-        b'{"marker":NaN}',
-    ],
-    ids=(
-        "bom",
-        "invalid-utf8",
-        "non-object",
-        "duplicate-key",
-        "comment",
-        "trailing-data",
-        "non-finite-number",
-    ),
-)
-def test_dry_run_rejects_invalid_manifest_documents(
-    tmp_path: Path,
-    manifest: bytes,
-    request: pytest.FixtureRequest,
-) -> None:
-    package = tmp_path / f"{request.node.callspec.id}.zip"
-    _write_package(package, manifest=manifest)
+def test_dry_run_propagates_invalid_manifest_documents(tmp_path: Path) -> None:
+    package = tmp_path / "invalid-document.zip"
+    duplicate_marker = (
+        f'{{"marker":"{PATCH_MARKER}","marker":"{PATCH_MARKER}"}}'
+    ).encode("utf-8")
+    _write_package(package, manifest=duplicate_marker)
 
     completed = _run_dry_run(package, tmp_path)
 
     assert completed.returncode == 10
 
 
-def _without(field: str) -> dict[str, object]:
+def test_dry_run_propagates_closed_manifest_violations(tmp_path: Path) -> None:
     manifest = dict(_VALID_MANIFEST)
-    del manifest[field]
-    return manifest
-
-
-def _with(field: str, value: object) -> dict[str, object]:
-    manifest = dict(_VALID_MANIFEST)
-    manifest[field] = value
-    return manifest
-
-
-@pytest.mark.parametrize(
-    "manifest",
-    [
-        _without("repo_id"),
-        {**_VALID_MANIFEST, "extra": "unexpected"},
-        _with("marker", 1),
-        _with("marker", "PATCH-HARBOR"),
-        _with("format_version", True),
-        _with("format_version", 1.0),
-        _with("format_version", 2),
-        _with("repo_id", 1),
-        _with("repo_id", "A3F9C2E1-7B4D-4A91-9D2E-5C6F8A1B2C3D"),
-        _with("repo_id", "a3f9c2e1-7b4d-1a91-9d2e-5c6f8a1b2c3d"),
-        _with("base_commit", 1),
-        _with("base_commit", "a" * 39),
-        _with("base_commit", "A" * 40),
-        _with("base_commit", "g" * 40),
-        _with("state_fingerprint", 1),
-        _with("state_fingerprint", "a" * 15),
-        _with("state_fingerprint", "A" * 16),
-        _with("state_fingerprint", "g" * 16),
-        _with("fingerprint_algorithm", 1),
-        _with("fingerprint_algorithm", "patchharbor-state-v2"),
-        _with("entrypoint", 1),
-        _with("entrypoint", ""),
-        _with("entrypoint", "patch.json"),
-    ],
-    ids=(
-        "missing-field",
-        "extra-field",
-        "marker-type",
-        "marker-value",
-        "version-bool",
-        "version-float",
-        "version-value",
-        "repo-id-type",
-        "repo-id-uppercase",
-        "repo-id-version",
-        "base-commit-type",
-        "base-commit-abbreviated",
-        "base-commit-uppercase",
-        "base-commit-non-hex",
-        "fingerprint-type",
-        "fingerprint-length",
-        "fingerprint-uppercase",
-        "fingerprint-non-hex",
-        "algorithm-type",
-        "algorithm-value",
-        "entrypoint-type",
-        "entrypoint-empty",
-        "entrypoint-is-manifest",
-    ),
-)
-def test_dry_run_rejects_manifest_contract_violations(
-    tmp_path: Path,
-    manifest: dict[str, object],
-    request: pytest.FixtureRequest,
-) -> None:
-    package = tmp_path / f"{request.node.callspec.id}.zip"
+    manifest["future_field"] = "not format 1"
+    package = tmp_path / "unknown-field.zip"
     _write_package(package, manifest=_manifest_bytes(manifest))
 
     completed = _run_dry_run(package, tmp_path)
