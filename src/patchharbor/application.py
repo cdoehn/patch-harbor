@@ -74,24 +74,6 @@ def validate_patch_package(
     return _validate_patch_package(path, resource_policy=resource_policy)
 
 
-def _manifest_state_mismatch(
-    manifest: PatchManifest,
-    context: RepositoryContext,
-) -> str | None:
-    if (
-        manifest.base_commit.object_format
-        is not context.base_commit.object_format
-    ):
-        return "patch package base commit uses a different Git object format"
-    if manifest.base_commit != context.base_commit:
-        return "patch package base commit does not match repository HEAD"
-    if manifest.fingerprint_algorithm != context.fingerprint_algorithm:
-        return "patch package fingerprint algorithm does not match repository context"
-    if manifest.state_fingerprint != context.state_fingerprint:
-        return "patch package fingerprint does not match repository state"
-    return None
-
-
 def validate_patch_package_repository(
     package: ValidatedPatchPackage,
     *,
@@ -106,8 +88,7 @@ def validate_patch_package_repository(
         output_directory=output_directory,
     ) as resolved:
         context = resolved.context
-        mismatch = _manifest_state_mismatch(manifest, context)
-        if mismatch is None:
+        if resolved.matches_manifest_state(manifest):
             return context
 
         report = create_state_mismatch_result_bundle(
@@ -123,7 +104,7 @@ def validate_patch_package_repository(
         )
         bundle_result = report.result_bundle
         raise state_mismatch_error(
-            mismatch,
+            "patch package does not match the resolved repository state",
             emergency_diagnostics_path=(
                 bundle_result.emergency_diagnostics_path
             ),

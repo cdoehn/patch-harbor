@@ -71,36 +71,47 @@ class SafeResolvedRepository:
         if not self.result_publication.reserved:
             raise ValueError("apply Result Bundle publication must be reserved")
 
+    def matches_manifest_state(self, manifest: PatchManifest) -> bool:
+        """Whether the manifest names this exact resolved repository state."""
+        return (
+            manifest.repo_id == self.repo_id
+            and manifest.base_commit == self.context.base_commit
+            and manifest.fingerprint_algorithm
+            == self.context.fingerprint_algorithm
+            and manifest.state_fingerprint == self.context.state_fingerprint
+        )
+
 
 def _repository_path_for_id(
     snapshot: RegistrySnapshot,
     repo_id: RepositoryId,
 ) -> RepositoryPath:
-    id_matches = tuple(
-        mapping
-        for mapping in snapshot.repositories
-        if mapping.repo_id == repo_id
-    )
-    if len(id_matches) != 1:
+    selected = None
+    for mapping in snapshot.repositories:
+        if mapping.repo_id != repo_id:
+            continue
+        if selected is not None:
+            raise repository_resolution_error(
+                "repository ID has conflicting registrations"
+            )
+        selected = mapping
+    if selected is None:
         raise repository_resolution_error("repository ID is not registered")
-    selected = id_matches[0]
-    path_matches = tuple(
-        mapping
+    if any(
+        mapping.repo_id != repo_id
+        and mapping.repository_path == selected.repository_path
         for mapping in snapshot.repositories
-        if mapping.repository_path == selected.repository_path
-    )
-    if len(path_matches) != 1 or path_matches[0].repo_id != repo_id:
+    ):
         raise repository_resolution_error(
             "repository path has conflicting registrations"
         )
     return selected.repository_path
 
 
-def _inspect_registered_repository(
-    snapshot: RegistrySnapshot,
+def _inspect_repository_identity(
+    expected_path: RepositoryPath,
     repo_id: RepositoryId,
 ) -> RepositoryPath:
-    expected_path = _repository_path_for_id(snapshot, repo_id)
     repository = inspect_repository(expected_path.value)
     if repository != expected_path:
         raise repository_resolution_error(
@@ -140,14 +151,10 @@ def safely_resolved_repository(
                 publication,
             )
 
-            repository = _inspect_registered_repository(
-                initial_registry,
+            repository = _inspect_repository_identity(
+                expected_repository,
                 manifest.repo_id,
             )
-            if repository != expected_repository:
-                raise repository_resolution_error(
-                    "registered repository path changed during validation"
-                )
 
             lock_path = repository_lock_path(paths, manifest.repo_id)
             repository_scope.enter_context(
@@ -155,14 +162,18 @@ def safely_resolved_repository(
             )
 
             locked_registry = load_registry(paths)
-            locked_repository = _inspect_registered_repository(
+            locked_path = _repository_path_for_id(
                 locked_registry,
                 manifest.repo_id,
             )
-            if locked_repository != repository:
+            if locked_path != repository:
                 raise repository_resolution_error(
                     "repository path changed while acquiring its lock"
                 )
+            locked_repository = _inspect_repository_identity(
+                locked_path,
+                manifest.repo_id,
+            )
             revalidate_result_bundle_target(target, locked_registry)
 
         snapshot = capture_consistent_repository_snapshot(locked_repository)

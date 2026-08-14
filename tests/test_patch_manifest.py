@@ -11,7 +11,6 @@ from patchharbor.patch_manifest import (
     PATCH_MARKER,
     PatchManifest,
     parse_patch_manifest,
-    require_manifest_object_format,
 )
 from patchharbor.state_fingerprint import FINGERPRINT_ALGORITHM
 
@@ -156,14 +155,3 @@ def test_closed_contract_rejects_distinct_schema_violations(
 )
 def test_json_contract_rejects_ambiguous_documents(payload: bytes) -> None:
     _assert_package_error(payload)
-
-
-def test_repository_object_format_must_match_the_manifest_commit() -> None:
-    manifest = parse_patch_manifest(_payload())
-
-    require_manifest_object_format(manifest, GitObjectFormat.SHA1)
-    with pytest.raises(PatchHarborError) as captured:
-        require_manifest_object_format(manifest, GitObjectFormat.SHA256)
-
-    assert captured.value.exit_code is ExitCode.PATCH_PACKAGE_ERROR
-    assert captured.value.error_kind is ErrorKind.PATCH_PACKAGE_ERROR

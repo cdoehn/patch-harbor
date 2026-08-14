@@ -147,14 +147,3 @@ def parse_patch_manifest(payload: bytes) -> PatchManifest:
         fingerprint_algorithm=fingerprint_algorithm,
         entrypoint=entrypoint,
     )
-
-
-def require_manifest_object_format(
-    manifest: PatchManifest,
-    object_format: GitObjectFormat,
-) -> None:
-    """Reject a syntactically valid object ID for a different repository format."""
-    if manifest.base_commit.object_format is not object_format:
-        raise patch_package_error(
-            "patch.json base_commit does not match the repository object format"
-        )
