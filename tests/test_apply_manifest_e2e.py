@@ -47,6 +47,10 @@ def _write_package(
     manifest_name: str = "patch.json",
     manifest_info: zipfile.ZipInfo | None = None,
     duplicate_manifest: bool = False,
+    entrypoint: bytes = (
+        b"# PATCHHARBOR\n"
+        b"printf 'executed' > executed.txt\n"
+    ),
 ) -> None:
     with zipfile.ZipFile(path, "w") as archive:
         payload = _manifest_bytes() if manifest is None else manifest
@@ -58,10 +62,7 @@ def _write_package(
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore", UserWarning)
                 archive.writestr("patch.json", payload)
-        archive.writestr(
-            "run.sh",
-            "# PATCHHARBOR\nprintf 'executed' > executed.txt\n",
-        )
+        archive.writestr("run.sh", entrypoint)
         archive.writestr("files/payload.bin", b"\x00payload\xff")
 
 
@@ -174,6 +175,32 @@ def test_dry_run_never_executes_entrypoint_marker_payload_or_nested_archive(
     assert not (repository / "entrypoint-ran.txt").exists()
     assert not (repository / "helper-ran.txt").exists()
     assert not (repository / "nested-ran.txt").exists()
+
+
+
+def test_dry_run_rejects_markerless_entrypoint_without_mutation(
+    tmp_path: Path,
+) -> None:
+    repository = create_repository(tmp_path / "repository")
+    environment, context = _registered_context(repository, tmp_path / "user")
+    package = tmp_path / "markerless.zip"
+    _write_package(
+        package,
+        manifest=_manifest_for_context(context),
+        entrypoint=b"printf executed > executed.txt\n",
+    )
+
+    caller = tmp_path / "caller"
+    caller.mkdir()
+    completed = _run_dry_run(
+        package,
+        caller,
+        environment=environment,
+    )
+
+    assert completed.returncode == 3
+    assert not (repository / "executed.txt").exists()
+    assert not (repository / "files" / "payload.bin").exists()
 
 
 def test_dry_run_accepts_a_full_sha256_object_id(tmp_path: Path) -> None:

@@ -2,11 +2,14 @@ from __future__ import annotations
 
 from dataclasses import replace
 from pathlib import Path
+import tempfile
 
 import pytest
 
+import patchharbor.application as application_module
 import patchharbor.result_bundle_publication as publication_module
 from patchharbor.application import (
+    preflight_patch_package_repository,
     register_repository,
     validate_patch_package_repository,
 )
@@ -44,15 +47,30 @@ def _manifest(context: RepositoryContext) -> PatchManifest:
     )
 
 
-def _package(manifest: PatchManifest) -> ValidatedPatchPackage:
+def _package(
+    manifest: PatchManifest,
+    *,
+    entrypoint: bytes = b"# PATCHHARBOR\n",
+    payloads: tuple[BundlePayload, ...] = (),
+) -> ValidatedPatchPackage:
     return ValidatedPatchPackage(
         manifest=manifest,
         entrypoint=BundlePayload(
             relative_path="run.sh",
-            content=b"# PATCHHARBOR\n",
+            content=entrypoint,
         ),
-        payloads=(),
+        payloads=payloads,
     )
+
+
+def _set_private_temp(
+    monkeypatch: pytest.MonkeyPatch,
+    path: Path,
+) -> None:
+    path.mkdir()
+    for name in ("TMPDIR", "TEMP", "TMP"):
+        monkeypatch.setenv(name, str(path))
+    monkeypatch.setattr(tempfile, "tempdir", None)
 
 
 def test_safe_resolution_owns_output_reservation_and_repository_lock(
@@ -157,3 +175,178 @@ def test_state_mismatch_publishes_while_repository_lock_is_held(
     bundles = tuple(output_directory.glob("patchharbor_result_*.zip"))
     assert len(bundles) == 1
     assert not tuple(output_directory.glob(".*.tmp"))
+
+
+
+def test_matching_package_preflights_private_resources_and_cleans_them(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    set_isolated_user_environment(monkeypatch, tmp_path / "user")
+    private_temp = tmp_path / "private-temp"
+    _set_private_temp(monkeypatch, private_temp)
+    repository = create_repository(tmp_path / "repository")
+    context = register_repository(repository)
+    entrypoint = (
+        b"# PATCHHARBOR\r\n"
+        b"# PATCHHARBOR META invalid\r\n"
+        b"# PATCHHARBOR MESSAGE bad name START\r\n"
+        b"# ignored\r\n"
+        b"# PATCHHARBOR MESSAGE bad name END\r\n"
+    )
+    payload = BundlePayload(
+        relative_path="files/payload.bin",
+        content=b"\x00payload\xff",
+    )
+
+    preflight = preflight_patch_package_repository(
+        _package(
+            _manifest(context),
+            entrypoint=entrypoint,
+            payloads=(payload,),
+        )
+    )
+
+    assert preflight.context == context
+    assert preflight.warnings
+    assert tuple(private_temp.iterdir()) == ()
+    assert not (repository / "run.sh").exists()
+    assert not (repository / "files" / "payload.bin").exists()
+
+
+@pytest.mark.parametrize(
+    ("entrypoint", "expected_exit"),
+    (
+        (b"printf invalid\n", ExitCode.NO_VALID_SCRIPT),
+        (b"# PATCHHARBOR\n\xff", ExitCode.NO_VALID_SCRIPT),
+        (
+            b"#!/usr/bin/env python3\n# PATCHHARBOR\n",
+            ExitCode.INTERPRETER_ERROR,
+        ),
+    ),
+)
+def test_entrypoint_preflight_rejects_invalid_scripts_without_repository_files(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    entrypoint: bytes,
+    expected_exit: ExitCode,
+) -> None:
+    set_isolated_user_environment(monkeypatch, tmp_path / "user")
+    private_temp = tmp_path / "private-temp"
+    _set_private_temp(monkeypatch, private_temp)
+    repository = create_repository(tmp_path / "repository")
+    context = register_repository(repository)
+
+    with pytest.raises(PatchHarborError) as captured:
+        validate_patch_package_repository(
+            _package(
+                _manifest(context),
+                entrypoint=entrypoint,
+                payloads=(
+                    BundlePayload(
+                        relative_path="files/payload.bin",
+                        content=b"payload",
+                    ),
+                ),
+            )
+        )
+
+    assert captured.value.exit_code is expected_exit
+    assert tuple(private_temp.iterdir()) == ()
+    assert not (repository / "run.sh").exists()
+    assert not (repository / "files" / "payload.bin").exists()
+
+
+def test_payload_preflight_detects_staged_content_mismatch(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    set_isolated_user_environment(monkeypatch, tmp_path / "user")
+    private_temp = tmp_path / "private-temp"
+    _set_private_temp(monkeypatch, private_temp)
+    repository = create_repository(tmp_path / "repository")
+    context = register_repository(repository)
+    original_write = application_module._write_private_resource
+
+    def write_corrupted_payload(path: Path, content: bytes) -> None:
+        if "payloads" in path.parts:
+            original_write(path, content + b"corruption")
+        else:
+            original_write(path, content)
+
+    monkeypatch.setattr(
+        application_module,
+        "_write_private_resource",
+        write_corrupted_payload,
+    )
+
+    with pytest.raises(PatchHarborError) as captured:
+        validate_patch_package_repository(
+            _package(
+                _manifest(context),
+                payloads=(
+                    BundlePayload(
+                        relative_path="files/payload.bin",
+                        content=b"payload",
+                    ),
+                ),
+            )
+        )
+
+    assert captured.value.exit_code is ExitCode.PAYLOAD_PREPARATION_ERROR
+    assert tuple(private_temp.iterdir()) == ()
+    assert not (repository / "files" / "payload.bin").exists()
+
+
+def test_interpreter_availability_is_checked_before_payload_preparation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    set_isolated_user_environment(monkeypatch, tmp_path / "user")
+    private_temp = tmp_path / "private-temp"
+    _set_private_temp(monkeypatch, private_temp)
+    repository = create_repository(tmp_path / "repository")
+    context = register_repository(repository)
+    staged_roles: list[str] = []
+    original_write = application_module._write_private_resource
+
+    def record_private_write(path: Path, content: bytes) -> None:
+        staged_roles.append(
+            "payload" if "payloads" in path.parts else "entrypoint"
+        )
+        original_write(path, content)
+
+    def missing_interpreter(_spec: object) -> str:
+        raise PatchHarborError(
+            "interpreter unavailable",
+            ExitCode.INTERPRETER_ERROR,
+        )
+
+    monkeypatch.setattr(
+        application_module,
+        "_write_private_resource",
+        record_private_write,
+    )
+    monkeypatch.setattr(
+        application_module,
+        "resolve_interpreter",
+        missing_interpreter,
+    )
+
+    with pytest.raises(PatchHarborError) as captured:
+        validate_patch_package_repository(
+            _package(
+                _manifest(context),
+                payloads=(
+                    BundlePayload(
+                        relative_path="files/payload.bin",
+                        content=b"payload",
+                    ),
+                ),
+            )
+        )
+
+    assert captured.value.exit_code is ExitCode.INTERPRETER_ERROR
+    assert staged_roles == ["entrypoint"]
+    assert tuple(private_temp.iterdir()) == ()
+    assert not (repository / "files" / "payload.bin").exists()

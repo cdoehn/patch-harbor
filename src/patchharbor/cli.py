@@ -17,9 +17,9 @@ from patchharbor.application import (
     repository_context,
     run_script_path,
     run_standard_input,
+    preflight_patch_package_repository,
     resolve_patch_package,
     unregister_repository,
-    validate_patch_package_repository,
 )
 from patchharbor.context_output import context_json_result, write_context_block
 from patchharbor.errors import (
@@ -525,7 +525,7 @@ def _apply_command(
         print(format_tool_warning(warning), file=stderr)
 
     try:
-        context = validate_patch_package_repository(
+        preflight = preflight_patch_package_repository(
             package,
             output_directory=output_directory,
         )
@@ -542,8 +542,14 @@ def _apply_command(
         _write_emergency_diagnostics_notice(exc, stderr)
         return int(exc.exit_code)
 
+    for warning in preflight.warnings:
+        print(format_tool_warning(warning), file=stderr)
+
     print(f"validated_patch_package: {path}", file=stdout)
-    print(f"repository_path: {context.repository_path}", file=stdout)
+    print(
+        f"repository_path: {preflight.context.repository_path}",
+        file=stdout,
+    )
     return 0
 
 
