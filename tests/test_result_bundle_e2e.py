@@ -16,6 +16,7 @@ import zipfile
 import pytest
 
 import patchharbor.result_bundle as result_bundle_module
+import patchharbor.temporary_resources as temporary_resources_module
 import patchharbor.result_bundle_capture as result_bundle_capture_module
 import patchharbor.result_bundle_publication as result_bundle_publication_module
 from patchharbor.cli import main as cli_main
@@ -49,7 +50,11 @@ def isolate_bundle_environment(
     system_temp.mkdir()
     for name in ("TMPDIR", "TEMP", "TMP"):
         monkeypatch.setenv(name, str(system_temp))
-    monkeypatch.setattr(result_bundle_module.tempfile, "tempdir", str(system_temp))
+    monkeypatch.setattr(
+        temporary_resources_module.tempfile,
+        "tempdir",
+        str(system_temp),
+    )
 
 
 def _result_bundles() -> tuple[Path, ...]:

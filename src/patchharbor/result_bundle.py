@@ -6,8 +6,6 @@ from contextlib import ExitStack
 from dataclasses import dataclass
 import os
 from pathlib import Path
-import shutil
-import tempfile
 from uuid import UUID
 
 from patchharbor.errors import (
@@ -50,6 +48,10 @@ from patchharbor.run_report import (
     RunReport,
     RunSession,
 )
+from patchharbor.temporary_resources import (
+    create_private_request_directory,
+    remove_private_request_directory,
+)
 from patchharbor.user_paths import registration_user_paths
 
 
@@ -85,10 +87,7 @@ class ManualResultBundle:
 
 def _create_private_run_directory(run_id: UUID) -> Path:
     """Create one private per-run diagnostics directory in the system temp."""
-    temporary_root = Path(tempfile.gettempdir()).resolve(strict=True)
-    run_directory = temporary_root / f"patchharbor-{run_id}"
-    run_directory.mkdir(mode=0o700)
-    return run_directory.resolve(strict=True)
+    return create_private_request_directory(name=f"patchharbor-{run_id}")
 
 
 def _write_run_document(
@@ -112,10 +111,7 @@ def _write_run_document(
 
 
 def _remove_private_run_directory(run_directory: Path) -> None:
-    try:
-        shutil.rmtree(run_directory)
-    except OSError:
-        pass
+    remove_private_request_directory(run_directory)
 
 
 def _require_registered_mapping(

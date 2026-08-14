@@ -22,6 +22,7 @@ RELEASE_VERSION = "1.0.0"
 EXPECTED_RUNTIME_FILES = {
     "patchharbor/__init__.py",
     "patchharbor/application.py",
+    "patchharbor/apply_preflight.py",
     "patchharbor/apply_repository.py",
     "patchharbor/bundle_paths.py",
     "patchharbor/bundles.py",
@@ -60,6 +61,7 @@ EXPECTED_RUNTIME_FILES = {
     "patchharbor/run_report.py",
     "patchharbor/sources.py",
     "patchharbor/state_fingerprint.py",
+    "patchharbor/temporary_resources.py",
     "patchharbor/user_paths.py",
     "patchharbor/zip_payloads.py",
     "patchharbor/platform/__init__.py",
@@ -236,7 +238,10 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
             "PIPX_BIN_DIR": str(pipx_bin),
             "PIPX_MAN_DIR": str(tmp_path / "pipx-man"),
             "PIPX_DEFAULT_PYTHON": sys.executable,
+            "PIPX_DEFAULT_BACKEND": "pip",
+            "PIPX_DISABLE_SHARED_LIBS_AUTO_UPGRADE": "1",
             "PIP_DISABLE_PIP_VERSION_CHECK": "1",
+            "PIP_NO_INDEX": "1",
         }
     )
     install = _run(
@@ -245,6 +250,7 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
             "-m",
             "pipx",
             "install",
+            "--skip-maintenance",
             "--python",
             sys.executable,
             str(wheels[0]),

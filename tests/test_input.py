@@ -8,7 +8,7 @@ import stat
 import pytest
 
 import patchharbor.application as script_application
-import patchharbor.sources as script_sources
+import patchharbor.temporary_resources as temporary_resources
 from patchharbor.application import run_script_path
 from patchharbor.bundles import resolve_patch_bundle
 from patchharbor.errors import ExitCode, PatchHarborError
@@ -95,15 +95,7 @@ def test_stdin_budget_failure_removes_secure_temporary_artifact(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    created_paths: list[Path] = []
-    real_mkstemp = script_sources.tempfile.mkstemp
-
-    def recording_mkstemp(*, prefix: str) -> tuple[int, str]:
-        descriptor, raw_path = real_mkstemp(prefix=prefix, dir=tmp_path)
-        created_paths.append(Path(raw_path))
-        return descriptor, raw_path
-
-    monkeypatch.setattr(script_sources.tempfile, "mkstemp", recording_mkstemp)
+    monkeypatch.setattr(temporary_resources.tempfile, "tempdir", str(tmp_path))
     policy = ResourcePolicy(
         warning_bytes=1,
         max_input_artifact_bytes=3,
@@ -117,20 +109,14 @@ def test_stdin_budget_failure_removes_secure_temporary_artifact(
 
     assert raised.value.exit_code is ExitCode.SOURCE_ERROR
     assert "resource limit exceeded" in str(raised.value)
-    assert len(created_paths) == 1
-    assert not created_paths[0].exists()
+    assert not tuple(tmp_path.glob("patchharbor-input-*"))
 
 
 def test_stdin_artifact_uses_unique_user_only_temporary_files(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    real_mkstemp = script_sources.tempfile.mkstemp
-
-    def local_mkstemp(*, prefix: str) -> tuple[int, str]:
-        return real_mkstemp(prefix=prefix, dir=tmp_path)
-
-    monkeypatch.setattr(script_sources.tempfile, "mkstemp", local_mkstemp)
+    monkeypatch.setattr(temporary_resources.tempfile, "tempdir", str(tmp_path))
 
     with stdin_input_artifact(BytesIO(b"# PATCHHARBOR\n")) as first:
         first_path = first.path
@@ -144,6 +130,7 @@ def test_stdin_artifact_uses_unique_user_only_temporary_files(
 
     assert not first_path.exists()
     assert not second_path.exists()
+    assert not tuple(tmp_path.glob("patchharbor-input-*"))
 
 
 def test_direct_reader_rechecks_budget_after_artifact_creation(

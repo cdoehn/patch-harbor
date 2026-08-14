@@ -339,9 +339,9 @@ def test_temporary_script_is_removed_after_execution(tmp_path: Path) -> None:
 
     temporary_path = Path(completed.stdout.strip())
     assert completed.returncode == 0
-    assert normalized_path(temporary_path.parent) == normalized_path(
-        tempfile.gettempdir()
-    )
+    temporary_root = Path(tempfile.gettempdir()).resolve()
+    assert temporary_path.resolve(strict=False).is_relative_to(temporary_root)
+    assert temporary_path.parent.name.startswith("patchharbor-script-")
     assert not temporary_path.exists()
 
 

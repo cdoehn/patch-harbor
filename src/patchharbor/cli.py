@@ -525,10 +525,19 @@ def _apply_command(
         print(format_tool_warning(warning), file=stderr)
 
     try:
-        preflight = preflight_patch_package_repository(
+        with preflight_patch_package_repository(
             package,
             output_directory=output_directory,
-        )
+        ) as preflight:
+            for warning in preflight.warnings:
+                print(format_tool_warning(warning), file=stderr)
+
+            print(f"validated_patch_package: {path}", file=stdout)
+            print(
+                f"repository_path: {preflight.context.repository_path}",
+                file=stdout,
+            )
+            return 0
     except PatchHarborError as exc:
         print(format_tool_message(str(exc)), file=stderr)
         report = exc.run_report if isinstance(exc.run_report, RunReport) else None
@@ -541,16 +550,6 @@ def _apply_command(
             )
         _write_emergency_diagnostics_notice(exc, stderr)
         return int(exc.exit_code)
-
-    for warning in preflight.warnings:
-        print(format_tool_warning(warning), file=stderr)
-
-    print(f"validated_patch_package: {path}", file=stdout)
-    print(
-        f"repository_path: {preflight.context.repository_path}",
-        file=stdout,
-    )
-    return 0
 
 
 def _unregister_command(

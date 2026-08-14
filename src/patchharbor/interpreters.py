@@ -9,13 +9,21 @@ from patchharbor.errors import ExitCode, PatchHarborError
 from patchharbor.platform.runtime import find_executable, is_windows
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class InterpreterSpec:
     """One supported interpreter before executable lookup."""
 
     executable: str
     script_suffix: str
     arguments: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class ResolvedInterpreter:
+    """One selected interpreter together with its resolved executable path."""
+
+    spec: InterpreterSpec
+    executable_path: str
 
 
 _POWERSHELL_ARGUMENTS = ("-NoLogo", "-NoProfile", "-NonInteractive", "-File")
@@ -81,6 +89,19 @@ def resolve_interpreter(spec: InterpreterSpec) -> str:
             ExitCode.INTERPRETER_ERROR,
         )
     return executable_path
+
+
+def resolve_script_interpreter(
+    script_text: str,
+    *,
+    os_name: str | None = None,
+) -> ResolvedInterpreter:
+    """Select and resolve the fixed interpreter for one script."""
+    spec = select_interpreter(script_text, os_name=os_name)
+    return ResolvedInterpreter(
+        spec=spec,
+        executable_path=resolve_interpreter(spec),
+    )
 
 
 def build_interpreter_command(

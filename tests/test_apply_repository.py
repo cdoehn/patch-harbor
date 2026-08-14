@@ -6,7 +6,7 @@ import tempfile
 
 import pytest
 
-import patchharbor.application as application_module
+import patchharbor.apply_preflight as apply_preflight_module
 import patchharbor.result_bundle_publication as publication_module
 from patchharbor.application import (
     preflight_patch_package_repository,
@@ -199,19 +199,40 @@ def test_matching_package_preflights_private_resources_and_cleans_them(
         content=b"\x00payload\xff",
     )
 
-    preflight = preflight_patch_package_repository(
+    entrypoint_path: Path
+    payload_path: Path
+    environment = project_environment()
+    with preflight_patch_package_repository(
         _package(
             _manifest(context),
             entrypoint=entrypoint,
             payloads=(payload,),
         )
-    )
+    ) as preflight:
+        prepared = preflight.prepared_package
+        entrypoint_path = prepared.entrypoint.path
+        payload_path = prepared.payloads[0].path
 
-    assert preflight.context == context
-    assert preflight.warnings
+        assert preflight.context == context
+        assert preflight.warnings
+        assert entrypoint_path.read_bytes() == entrypoint
+        assert prepared.entrypoint.size_bytes == len(entrypoint)
+        assert len(prepared.entrypoint.sha256_hex) == 64
+        assert prepared.entrypoint.interpreter.executable_path
+        assert prepared.payloads[0].relative_path == "files/payload.bin"
+        assert payload_path.read_bytes() == payload.content
+        assert prepared.payloads[0].size_bytes == len(payload.content)
+        assert len(prepared.payloads[0].sha256_hex) == 64
+        assert not (repository / "run.sh").exists()
+        assert not (repository / "files" / "payload.bin").exists()
+        assert probe_repository_lock(str(context.repo_id), environment) == int(
+            ExitCode.REPOSITORY_BUSY
+        )
+
+    assert probe_repository_lock(str(context.repo_id), environment) == 0
+    assert not entrypoint_path.exists()
+    assert not payload_path.exists()
     assert tuple(private_temp.iterdir()) == ()
-    assert not (repository / "run.sh").exists()
-    assert not (repository / "files" / "payload.bin").exists()
 
 
 @pytest.mark.parametrize(
@@ -266,7 +287,7 @@ def test_payload_preflight_detects_staged_content_mismatch(
     _set_private_temp(monkeypatch, private_temp)
     repository = create_repository(tmp_path / "repository")
     context = register_repository(repository)
-    original_write = application_module._write_private_resource
+    original_write = apply_preflight_module.write_private_bytes
 
     def write_corrupted_payload(path: Path, content: bytes) -> None:
         if "payloads" in path.parts:
@@ -275,8 +296,8 @@ def test_payload_preflight_detects_staged_content_mismatch(
             original_write(path, content)
 
     monkeypatch.setattr(
-        application_module,
-        "_write_private_resource",
+        apply_preflight_module,
+        "write_private_bytes",
         write_corrupted_payload,
     )
 
@@ -308,7 +329,7 @@ def test_interpreter_availability_is_checked_before_payload_preparation(
     repository = create_repository(tmp_path / "repository")
     context = register_repository(repository)
     staged_roles: list[str] = []
-    original_write = application_module._write_private_resource
+    original_write = apply_preflight_module.write_private_bytes
 
     def record_private_write(path: Path, content: bytes) -> None:
         staged_roles.append(
@@ -316,20 +337,20 @@ def test_interpreter_availability_is_checked_before_payload_preparation(
         )
         original_write(path, content)
 
-    def missing_interpreter(_spec: object) -> str:
+    def missing_interpreter(_script_text: str) -> object:
         raise PatchHarborError(
             "interpreter unavailable",
             ExitCode.INTERPRETER_ERROR,
         )
 
     monkeypatch.setattr(
-        application_module,
-        "_write_private_resource",
+        apply_preflight_module,
+        "write_private_bytes",
         record_private_write,
     )
     monkeypatch.setattr(
-        application_module,
-        "resolve_interpreter",
+        apply_preflight_module,
+        "resolve_script_interpreter",
         missing_interpreter,
     )
 

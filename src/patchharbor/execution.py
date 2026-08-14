@@ -4,21 +4,22 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from contextlib import contextmanager
-import os
 from pathlib import Path
 import sys
-import tempfile
 
 from patchharbor.errors import ExitCode, PatchHarborError
 from patchharbor.interpreters import (
     InterpreterSpec,
     build_interpreter_command,
-    resolve_interpreter,
-    select_interpreter,
+    resolve_script_interpreter,
 )
 from patchharbor.output import OutputTargets, ProcessOutputCapture
 from patchharbor.platform import ProcessState, create_process_tree
 from patchharbor.platform.errors import describe_os_error
+from patchharbor.temporary_resources import (
+    private_request_directory,
+    write_private_bytes,
+)
 
 
 DEFAULT_TIMEOUT_SECONDS = 300.0
@@ -26,20 +27,11 @@ DEFAULT_TIMEOUT_SECONDS = 300.0
 
 @contextmanager
 def _temporary_script_file(script_text: str, *, suffix: str) -> Iterator[Path]:
-    """Write script text to a secure system-temp file and remove it afterwards."""
-    descriptor, raw_path = tempfile.mkstemp(
-        prefix="patchharbor-",
-        suffix=suffix,
-        text=True,
-    )
-    script_path = Path(raw_path)
-
-    try:
-        with os.fdopen(descriptor, "w", encoding="utf-8", newline="") as handle:
-            handle.write(script_text)
+    """Write one script inside the shared private request lifecycle."""
+    with private_request_directory(prefix="patchharbor-script-") as directory:
+        script_path = directory / f"script{suffix}"
+        write_private_bytes(script_path, script_text.encode("utf-8"))
         yield script_path
-    finally:
-        script_path.unlink(missing_ok=True)
 
 
 def execute_script_text(
@@ -50,18 +42,17 @@ def execute_script_text(
     output: OutputTargets | None = None,
 ) -> int:
     """Stage and execute script text with a supported interpreter."""
-    selected = select_interpreter(script_text)
-    executable_path = resolve_interpreter(selected)
+    resolved = resolve_script_interpreter(script_text)
 
     try:
         with _temporary_script_file(
             script_text,
-            suffix=selected.script_suffix,
+            suffix=resolved.spec.script_suffix,
         ) as script_path:
             return _execute_staged_script(
                 script_path,
-                interpreter=selected,
-                executable_path=executable_path,
+                interpreter=resolved.spec,
+                executable_path=resolved.executable_path,
                 cwd=cwd,
                 timeout_seconds=timeout_seconds,
                 output=output,

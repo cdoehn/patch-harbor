@@ -81,10 +81,12 @@ def test_platform_uses_system_temp_for_staging_and_requested_cwd(
         encoding="utf-8"
     ).strip()
     assert normalized_path(observed_cwd) == normalized_path(working_directory)
-    assert normalized_path(Path(observed_script).parent) == normalized_path(
-        system_temp
-    )
-    assert not Path(observed_script).exists()
+    observed_script_path = Path(observed_script)
+    assert normalized_path(
+        observed_script_path.parent.parent
+    ) == normalized_path(system_temp)
+    assert observed_script_path.parent.name.startswith("patchharbor-script-")
+    assert not observed_script_path.exists()
 
 
 def test_platform_zip_patchbundle_preserves_binary_payload(

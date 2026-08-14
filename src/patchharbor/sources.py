@@ -8,13 +8,16 @@ from dataclasses import dataclass
 from io import DEFAULT_BUFFER_SIZE
 import os
 from pathlib import Path
-import tempfile
 from typing import TextIO
 
 from patchharbor.errors import ExitCode, PatchHarborError
 from patchharbor.models import InputArtifact
 from patchharbor.platform.errors import describe_os_error
 from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY, ResourcePolicy
+from patchharbor.temporary_resources import (
+    create_private_file,
+    private_request_directory,
+)
 
 
 def _input_limit_error(
@@ -55,49 +58,59 @@ def stdin_input_artifact(
     policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY,
 ) -> Iterator[InputArtifact]:
     """Copy standard input as bounded bytes to one secure temporary artifact."""
-    descriptor, raw_path = tempfile.mkstemp(
-        prefix="patchharbor-input-",
-    )
-    artifact_path = Path(raw_path)
     byte_stream = getattr(stream, "buffer", stream)
     bytes_written = 0
 
     try:
-        try:
-            with os.fdopen(descriptor, "wb") as handle:
-                while True:
-                    chunk = _read_stream_chunk(
-                        byte_stream,
-                        DEFAULT_BUFFER_SIZE,
-                    )
-                    if chunk is None:
-                        break
-                    if (
-                        bytes_written + len(chunk)
-                        > policy.max_input_artifact_bytes
-                    ):
-                        raise _input_limit_error("standard input", policy)
-                    handle.write(chunk)
-                    bytes_written += len(chunk)
-        except (OSError, TypeError, UnicodeError) as exc:
-            raise PatchHarborError(
-                "cannot read script source standard input: "
-                f"{describe_os_error(exc) if isinstance(exc, OSError) else exc}",
-                ExitCode.SOURCE_ERROR,
-            ) from exc
+        with private_request_directory(prefix="patchharbor-input-") as directory:
+            artifact_path = directory / "input.bin"
+            descriptor: int | None = None
+            try:
+                descriptor = create_private_file(artifact_path)
+                with os.fdopen(descriptor, "wb") as handle:
+                    descriptor = None
+                    while True:
+                        chunk = _read_stream_chunk(
+                            byte_stream,
+                            DEFAULT_BUFFER_SIZE,
+                        )
+                        if chunk is None:
+                            break
+                        if (
+                            bytes_written + len(chunk)
+                            > policy.max_input_artifact_bytes
+                        ):
+                            raise _input_limit_error("standard input", policy)
+                        handle.write(chunk)
+                        bytes_written += len(chunk)
+            except (OSError, TypeError, UnicodeError) as exc:
+                raise PatchHarborError(
+                    "cannot read script source standard input: "
+                    f"{describe_os_error(exc) if isinstance(exc, OSError) else exc}",
+                    ExitCode.SOURCE_ERROR,
+                ) from exc
+            finally:
+                if descriptor is not None:
+                    os.close(descriptor)
 
-        if bytes_written == 0:
-            raise PatchHarborError(
-                "no script input received",
-                ExitCode.USAGE_ERROR,
+            if bytes_written == 0:
+                raise PatchHarborError(
+                    "no script input received",
+                    ExitCode.USAGE_ERROR,
+                )
+
+            yield InputArtifact(
+                path=artifact_path,
+                display_name="standard input",
             )
-
-        yield InputArtifact(
-            path=artifact_path,
-            display_name="standard input",
-        )
-    finally:
-        artifact_path.unlink(missing_ok=True)
+    except PatchHarborError:
+        raise
+    except OSError as exc:
+        raise PatchHarborError(
+            "cannot read script source standard input: "
+            f"{describe_os_error(exc)}",
+            ExitCode.SOURCE_ERROR,
+        ) from exc
 
 
 @dataclass(frozen=True)

@@ -130,6 +130,31 @@ def test_lower_layers_do_not_import_orchestration_or_unrelated_layers() -> None:
             "presentation",
             "sources",
         },
+        "temporary_resources": {
+            "application",
+            "apply_preflight",
+            "bundles",
+            "execution",
+            "interpreters",
+            "parser",
+            "patch_package",
+            "payload_files",
+            "platform",
+            "presentation",
+            "sources",
+        },
+        "apply_preflight": {
+            "application",
+            "apply_repository",
+            "bundles",
+            "execution",
+            "payload_files",
+            "presentation",
+            "registration",
+            "repository_state",
+            "result_bundle",
+            "sources",
+        },
         "sources": {
             "application",
             "bundles",
@@ -275,6 +300,16 @@ def test_registration_layers_have_one_directional_dependency_flow() -> None:
         "resource_policy",
         "zip_payloads",
     }
+    assert _local_imports("temporary_resources") == set()
+    assert _local_imports("apply_preflight") == {
+        "errors",
+        "interpreters",
+        "parser",
+        "patch_package",
+        "physical_paths",
+        "platform",
+        "temporary_resources",
+    }
     assert _local_imports("apply_repository") == {
         "errors",
         "locks",
@@ -356,6 +391,7 @@ def test_registration_layers_have_one_directional_dependency_flow() -> None:
         "result_bundle_snapshot",
         "result_bundle_target",
         "run_report",
+        "temporary_resources",
         "user_paths",
     }
     assert _local_imports("run_report") == {"models"}
@@ -382,6 +418,31 @@ def test_manual_and_apply_zip_roles_share_one_archive_boundary() -> None:
         )
         assert "import zipfile" not in source
         assert "from zipfile" not in source
+
+
+def test_private_temporary_lifecycle_is_shared_without_repository_coupling() -> None:
+    for module_name in (
+        "apply_preflight",
+        "execution",
+        "sources",
+        "result_bundle",
+    ):
+        assert "temporary_resources" in _local_imports(module_name)
+        source = (PACKAGE_ROOT / f"{module_name}.py").read_text(encoding="utf-8")
+        assert "import tempfile" not in source
+        assert "from tempfile" not in source
+
+    preflight_imports = _local_imports("apply_preflight")
+    assert preflight_imports.isdisjoint(
+        {
+            "application",
+            "apply_repository",
+            "execution",
+            "payload_files",
+            "repository_state",
+            "result_bundle",
+        }
+    )
 
 
 def test_git_processes_are_confined_to_the_canonical_command_boundary() -> None:
