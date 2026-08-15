@@ -325,9 +325,6 @@ def _json_envelope(
     structured_error: dict[str, object] | None = None
     if error is not None:
         report = error.run_report if isinstance(error.run_report, RunReport) else None
-        report_error = (
-            None if report is None else report.result_bundle.error
-        )
         emergency_path = (
             error.emergency_diagnostics_path
             if report is None
@@ -335,7 +332,7 @@ def _json_envelope(
         )
         structured_error = {
             "kind": error.error_kind.value,
-            "message": sanitize_structured_text(report_error or str(error)),
+            "message": sanitize_structured_text(str(error)),
             "patchharbor_error_code": int(error.exit_code),
             "emergency_diagnostics_path": physical_absolute_path_text(
                 emergency_path
@@ -549,8 +546,12 @@ def _apply_command(
             output_directory=output_directory,
         )
     except PatchHarborError as exc:
-        exit_code = int(exc.exit_code)
         report = exc.run_report if isinstance(exc.run_report, RunReport) else None
+        exit_code = (
+            int(exc.exit_code)
+            if report is None
+            else report.process_exit_code
+        )
         if json_output:
             _write_json_document(
                 _json_envelope(
@@ -582,7 +583,7 @@ def _apply_command(
                 "apply",
                 result=report.apply_result(),
                 error=None,
-                process_exit_code=0,
+                process_exit_code=report.process_exit_code,
             ),
             stdout,
         )
@@ -590,7 +591,7 @@ def _apply_command(
         print(f"run_id: {report.run_id_text}", file=stdout)
         print(f"repository_path: {report.resolved_repository}", file=stdout)
         print(f"result_bundle_path: {report.result_bundle.path}", file=stdout)
-    return 0
+    return report.process_exit_code
 
 
 def _unregister_command(

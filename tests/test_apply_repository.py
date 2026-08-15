@@ -9,6 +9,8 @@ import pytest
 import patchharbor.apply_preflight as apply_preflight_module
 import patchharbor.result_bundle_publication as publication_module
 from patchharbor.application import (
+    ApplyMutationGate,
+    dry_run_patch_package,
     preflight_patch_package_repository,
     register_repository,
     validate_patch_package_repository,
@@ -22,7 +24,11 @@ from patchharbor.patch_manifest import (
     PatchManifest,
 )
 from patchharbor.patch_package import ValidatedPatchPackage
-from patchharbor.run_report import RunSession
+from patchharbor.run_report import (
+    PrimaryResultKind,
+    ResultBundleStatus,
+    RunSession,
+)
 from tests.platform_support import project_environment
 from tests.registration_support import (
     create_repository,
@@ -177,6 +183,143 @@ def test_state_mismatch_publishes_while_repository_lock_is_held(
     assert not tuple(output_directory.glob(".*.tmp"))
 
 
+def test_dry_run_publishes_before_releasing_repository_lock(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    set_isolated_user_environment(monkeypatch, tmp_path / "user")
+    repository = create_repository(tmp_path / "repository")
+    context = register_repository(repository)
+    environment = project_environment()
+    observed_lock_codes: list[int] = []
+    original_replace = publication_module.replace_path
+
+    def replace_while_observing_lock(source: Path, target: Path) -> None:
+        observed_lock_codes.append(
+            probe_repository_lock(str(context.repo_id), environment)
+        )
+        original_replace(source, target)
+
+    monkeypatch.setattr(
+        publication_module,
+        "replace_path",
+        replace_while_observing_lock,
+    )
+
+    report = dry_run_patch_package(
+        _package(_manifest(context)),
+        output_directory=tmp_path / "results",
+    )
+
+    assert report.primary_result.success is True
+    assert observed_lock_codes == [int(ExitCode.REPOSITORY_BUSY)]
+    assert probe_repository_lock(str(context.repo_id), environment) == 0
+
+
+def test_successful_primary_outcome_becomes_exit_eleven_when_bundle_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    set_isolated_user_environment(monkeypatch, tmp_path / "user")
+    repository = create_repository(tmp_path / "repository")
+    context = register_repository(repository)
+
+    def fail_publication(_source: Path, _target: Path) -> None:
+        raise OSError("publication failed")
+
+    monkeypatch.setattr(
+        publication_module,
+        "replace_path",
+        fail_publication,
+    )
+
+    with pytest.raises(PatchHarborError) as captured:
+        dry_run_patch_package(
+            _package(_manifest(context)),
+            output_directory=tmp_path / "results",
+        )
+
+    report = captured.value.run_report
+    assert captured.value.exit_code is ExitCode.RESULT_BUNDLE_ERROR
+    assert report is not None
+    assert report.primary_result.kind is PrimaryResultKind.DRY_RUN_SUCCESS
+    assert report.result_bundle.status is ResultBundleStatus.FAILED
+    assert report.process_exit_code == int(ExitCode.RESULT_BUNDLE_ERROR)
+
+
+def test_primary_failure_keeps_its_exit_code_when_bundle_also_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    set_isolated_user_environment(monkeypatch, tmp_path / "user")
+    repository = create_repository(tmp_path / "repository")
+    context = register_repository(repository)
+
+    def fail_publication(_source: Path, _target: Path) -> None:
+        raise OSError("publication failed")
+
+    monkeypatch.setattr(
+        publication_module,
+        "replace_path",
+        fail_publication,
+    )
+
+    with pytest.raises(PatchHarborError) as captured:
+        dry_run_patch_package(
+            _package(
+                _manifest(context),
+                entrypoint=b"#!/usr/bin/env python3\n# PATCHHARBOR\n",
+            ),
+            output_directory=tmp_path / "results",
+        )
+
+    report = captured.value.run_report
+    assert captured.value.exit_code is ExitCode.INTERPRETER_ERROR
+    assert report is not None
+    assert report.primary_result.kind is PrimaryResultKind.VALIDATION_ERROR
+    assert report.result_bundle.status is ResultBundleStatus.FAILED
+    assert report.process_exit_code == int(ExitCode.INTERPRETER_ERROR)
+
+
+def test_preflight_failure_bundles_before_releasing_repository_lock(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    set_isolated_user_environment(monkeypatch, tmp_path / "user")
+    repository = create_repository(tmp_path / "repository")
+    context = register_repository(repository)
+    environment = project_environment()
+    observed_lock_codes: list[int] = []
+    original_replace = publication_module.replace_path
+
+    def replace_while_observing_lock(source: Path, target: Path) -> None:
+        observed_lock_codes.append(
+            probe_repository_lock(str(context.repo_id), environment)
+        )
+        original_replace(source, target)
+
+    monkeypatch.setattr(
+        publication_module,
+        "replace_path",
+        replace_while_observing_lock,
+    )
+
+    with pytest.raises(PatchHarborError) as captured:
+        dry_run_patch_package(
+            _package(
+                _manifest(context),
+                entrypoint=b"#!/usr/bin/env python3\n# PATCHHARBOR\n",
+            ),
+            output_directory=tmp_path / "results",
+        )
+
+    report = captured.value.run_report
+    assert captured.value.exit_code is ExitCode.INTERPRETER_ERROR
+    assert report is not None
+    assert report.result_bundle.path is not None
+    assert observed_lock_codes == [int(ExitCode.REPOSITORY_BUSY)]
+    assert probe_repository_lock(str(context.repo_id), environment) == 0
+
 
 def test_matching_package_preflights_private_resources_and_cleans_them(
     tmp_path: Path,
@@ -202,13 +345,15 @@ def test_matching_package_preflights_private_resources_and_cleans_them(
     entrypoint_path: Path
     payload_path: Path
     environment = project_environment()
-    with preflight_patch_package_repository(
-        _package(
-            _manifest(context),
-            entrypoint=entrypoint,
-            payloads=(payload,),
-        )
-    ) as preflight:
+    package = _package(
+        _manifest(context),
+        entrypoint=entrypoint,
+        payloads=(payload,),
+    )
+    with preflight_patch_package_repository(package) as preflight:
+        assert isinstance(preflight, ApplyMutationGate)
+        assert preflight.package is package
+        assert preflight.resolved.context == context
         prepared = preflight.prepared_package
         entrypoint_path = prepared.entrypoint.path
         payload_path = prepared.payloads[0].path

@@ -15,6 +15,7 @@ from patchharbor.models import (
     RepositoryPath,
 )
 from patchharbor.run_report import (
+    ApplyPrimaryOutcome,
     PrimaryResult,
     PrimaryResultKind,
     ResultBundleResult,
@@ -188,6 +189,35 @@ def test_run_report_redacts_secret_environment_values(
         allow_nan=False,
     )
 
+
+def test_apply_primary_outcome_is_independent_from_bundle_publication() -> None:
+    dry_run = ApplyPrimaryOutcome.dry_run_success()
+    failure = ApplyPrimaryOutcome.tool_failure(
+        kind=PrimaryResultKind.VALIDATION_ERROR,
+        exit_code=3,
+    )
+
+    assert dry_run.result.kind is PrimaryResultKind.DRY_RUN_SUCCESS
+    assert dry_run.result.success is True
+    assert dry_run.exit_code == 0
+    assert failure.result.kind is PrimaryResultKind.VALIDATION_ERROR
+    assert failure.result.success is False
+    assert failure.result.patchharbor_error_code == 3
+    assert failure.exit_code == 3
+
+    with pytest.raises(ValueError):
+        ApplyPrimaryOutcome(
+            result=PrimaryResult.dry_run_success_result(),
+            exit_code=11,
+        )
+    with pytest.raises(ValueError):
+        ApplyPrimaryOutcome(
+            result=PrimaryResult.tool_failure(
+                kind=PrimaryResultKind.VALIDATION_ERROR,
+                patchharbor_error_code=3,
+            ),
+            exit_code=5,
+        )
 
 
 def test_result_bundle_outcome_rejects_inconsistent_state(tmp_path: Path) -> None:

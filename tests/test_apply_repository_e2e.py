@@ -226,6 +226,21 @@ def test_dry_run_json_publishes_unchanged_snapshot_without_execution(
         "error": None,
     }
     assert run_report["process_exit_code"] == 0
+    assert (
+        result["run_id"]
+        == result_manifest["run_id"]
+        == run_report["run_id"]
+    )
+    assert (
+        result["primary_result"]["kind"]
+        == result_manifest["primary_result"]
+        == run_report["primary_result"]["kind"]
+    )
+    assert (
+        result["result_bundle"]["status"]
+        == result_manifest["result_bundle_status"]
+        == run_report["result_bundle"]["status"]
+    )
     assert _repository_files(repository) == before
     _assert_repository_unmodified(repository)
 
@@ -389,6 +404,21 @@ def test_state_mismatch_returns_nine_and_bundles_actual_repository_state(
         "error": None,
     }
     assert run_report["process_exit_code"] == int(ExitCode.STATE_MISMATCH)
+    assert (
+        envelope["result"]["run_id"]
+        == result_manifest["run_id"]
+        == run_report["run_id"]
+    )
+    assert (
+        envelope["result"]["primary_result"]["kind"]
+        == result_manifest["primary_result"]
+        == run_report["primary_result"]["kind"]
+    )
+    assert (
+        envelope["result"]["result_bundle"]["status"]
+        == result_manifest["result_bundle_status"]
+        == run_report["result_bundle"]["status"]
+    )
 
 
 def test_state_mismatch_uses_physically_resolved_output_directory(

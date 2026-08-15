@@ -259,6 +259,54 @@ class PrimaryResult:
         }
 
 
+@dataclass(frozen=True, slots=True)
+class ApplyPrimaryOutcome:
+    """One primary apply outcome before Result-Bundle publication."""
+
+    result: PrimaryResult
+    exit_code: int
+
+    def __post_init__(self) -> None:
+        if isinstance(self.exit_code, bool) or not isinstance(self.exit_code, int):
+            raise ValueError("primary exit code must be an integer")
+        if self.result.success != (self.exit_code == 0):
+            raise ValueError("primary success and exit code disagree")
+        if (
+            self.result.patchharbor_error_code is not None
+            and self.result.patchharbor_error_code != self.exit_code
+        ):
+            raise ValueError("primary tool error code and exit code disagree")
+
+    @classmethod
+    def success(cls) -> ApplyPrimaryOutcome:
+        return cls(
+            result=PrimaryResult.success_result(),
+            exit_code=0,
+        )
+
+    @classmethod
+    def dry_run_success(cls) -> ApplyPrimaryOutcome:
+        return cls(
+            result=PrimaryResult.dry_run_success_result(),
+            exit_code=0,
+        )
+
+    @classmethod
+    def tool_failure(
+        cls,
+        *,
+        kind: PrimaryResultKind,
+        exit_code: int,
+    ) -> ApplyPrimaryOutcome:
+        return cls(
+            result=PrimaryResult.tool_failure(
+                kind=kind,
+                patchharbor_error_code=exit_code,
+            ),
+            exit_code=exit_code,
+        )
+
+
 @dataclass(frozen=True)
 class ResultBundleResult:
     """Result-Bundle outcome kept separate from the primary result."""

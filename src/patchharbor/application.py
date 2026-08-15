@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TextIO
@@ -12,7 +12,10 @@ from patchharbor.apply_preflight import (
     PreparedPatchPackage,
     prepare_patch_package,
 )
-from patchharbor.apply_repository import safely_resolved_repository
+from patchharbor.apply_repository import (
+    SafeResolvedRepository,
+    safely_resolved_repository,
+)
 from patchharbor.bundles import resolve_patch_bundle
 from patchharbor.errors import (
     ErrorKind,
@@ -51,12 +54,16 @@ from patchharbor.repository_state import (
 from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY, ResourcePolicy
 from patchharbor.result_bundle import (
     ManualResultBundle,
-    create_dry_run_failure_result_bundle,
-    create_dry_run_success_result_bundle,
+    create_apply_result_bundle,
     create_manual_result_bundle,
-    create_state_mismatch_result_bundle,
 )
-from patchharbor.run_report import ResultBundleStatus, RunReport, RunSession
+from patchharbor.run_report import (
+    ApplyPrimaryOutcome,
+    PrimaryResultKind,
+    ResultBundleStatus,
+    RunReport,
+    RunSession,
+)
 from patchharbor.sources import (
     DirectoryCandidate,
     file_input_artifact,
@@ -67,15 +74,25 @@ from patchharbor.sources import (
 
 
 @dataclass(frozen=True, slots=True)
-class ApplyPreflightResult:
-    """One locked repository context plus checked private package inputs."""
+class ApplyMutationGate:
+    """All checked inputs required before the first repository mutation."""
 
-    context: RepositoryContext
+    session: RunSession
+    resolved: SafeResolvedRepository
+    package: ValidatedPatchPackage
     prepared_package: PreparedPatchPackage
+
+    def __post_init__(self) -> None:
+        if not self.resolved.matches_manifest_state(self.package.manifest):
+            raise ValueError("mutation gate requires the exact manifest state")
+
+    @property
+    def context(self) -> RepositoryContext:
+        return self.resolved.context
 
     @property
     def warnings(self) -> tuple[str, ...]:
-        return self.prepared_package.warnings
+        return (*self.package.warnings, *self.prepared_package.warnings)
 
 
 def resolve_patch_package(
@@ -96,54 +113,60 @@ def validate_patch_package(
     return _validate_patch_package(path, resource_policy=resource_policy)
 
 
-@contextmanager
-def preflight_patch_package_repository(
+def _primary_kind_for_apply_error(
+    error: PatchHarborError,
+) -> PrimaryResultKind:
+    if error.error_kind is ErrorKind.STATE_MISMATCH:
+        return PrimaryResultKind.STATE_MISMATCH
+    if error.error_kind is ErrorKind.REPOSITORY_BUSY:
+        return PrimaryResultKind.REPOSITORY_BUSY
+    if error.error_kind in {
+        ErrorKind.REGISTRY_ERROR,
+        ErrorKind.REPOSITORY_RESOLUTION_ERROR,
+        ErrorKind.UNSUPPORTED_REPOSITORY_STATE,
+    }:
+        return PrimaryResultKind.REPOSITORY_ERROR
+    if error.exit_code in {
+        ExitCode.NO_VALID_SCRIPT,
+        ExitCode.INTERPRETER_ERROR,
+        ExitCode.PAYLOAD_PREPARATION_ERROR,
+        ExitCode.PATCH_PACKAGE_ERROR,
+    }:
+        return PrimaryResultKind.VALIDATION_ERROR
+    return PrimaryResultKind.EXECUTION_ERROR
+
+
+def _primary_outcome_for_error(
+    error: PatchHarborError,
+) -> ApplyPrimaryOutcome:
+    return ApplyPrimaryOutcome.tool_failure(
+        kind=_primary_kind_for_apply_error(error),
+        exit_code=int(error.exit_code),
+    )
+
+
+def _complete_apply_result_bundle(
+    resolved: SafeResolvedRepository,
     package: ValidatedPatchPackage,
     *,
-    output_directory: Path | None = None,
-) -> Iterator[ApplyPreflightResult]:
-    """Yield one locked repository plus checked private package inputs."""
-    session = RunSession.start()
-    manifest = package.manifest
-    with safely_resolved_repository(
-        manifest,
+    session: RunSession,
+    dry_run: bool,
+    warnings: tuple[str, ...],
+    primary_outcome: ApplyPrimaryOutcome,
+) -> RunReport:
+    return create_apply_result_bundle(
+        resolved.repository,
+        resolved.repo_id,
+        resolved.registry_snapshot,
+        resolved.context,
+        package.manifest,
+        target=resolved.result_target,
+        publication=resolved.result_publication,
+        warnings=warnings,
         session=session,
-        output_directory=output_directory,
-    ) as resolved:
-        context = resolved.context
-        if not resolved.matches_manifest_state(manifest):
-            report = create_state_mismatch_result_bundle(
-                resolved.repository,
-                resolved.repo_id,
-                resolved.registry_snapshot,
-                context,
-                manifest,
-                target=resolved.result_target,
-                publication=resolved.result_publication,
-                warnings=package.warnings,
-                session=session,
-            )
-            bundle_result = report.result_bundle
-            raise state_mismatch_error(
-                "patch package does not match the resolved repository state",
-                emergency_diagnostics_path=(
-                    bundle_result.emergency_diagnostics_path
-                ),
-                emergency_diagnostics_failed=(
-                    bundle_result.status is ResultBundleStatus.FAILED
-                    and bundle_result.emergency_diagnostics_path is None
-                ),
-                run_report=report,
-            )
-
-        with prepare_patch_package(
-            package,
-            repository=resolved.repository.value,
-        ) as prepared_package:
-            yield ApplyPreflightResult(
-                context=context,
-                prepared_package=prepared_package,
-            )
+        dry_run=dry_run,
+        primary_outcome=primary_outcome,
+    )
 
 
 def _reported_apply_error(
@@ -155,9 +178,7 @@ def _reported_apply_error(
         str(error),
         error.exit_code,
         error_kind=error.error_kind,
-        emergency_diagnostics_path=(
-            bundle_result.emergency_diagnostics_path
-        ),
+        emergency_diagnostics_path=bundle_result.emergency_diagnostics_path,
         emergency_diagnostics_failed=(
             bundle_result.status is ResultBundleStatus.FAILED
             and bundle_result.emergency_diagnostics_path is None
@@ -166,20 +187,75 @@ def _reported_apply_error(
     )
 
 
-def _dry_run_bundle_error(report: RunReport) -> PatchHarborError:
+def _result_bundle_error(report: RunReport) -> PatchHarborError:
     bundle_result = report.result_bundle
     return PatchHarborError(
         bundle_result.error or "cannot create the Result Bundle",
         ExitCode.RESULT_BUNDLE_ERROR,
         error_kind=ErrorKind.RESULT_BUNDLE_ERROR,
-        emergency_diagnostics_path=(
-            bundle_result.emergency_diagnostics_path
-        ),
+        emergency_diagnostics_path=bundle_result.emergency_diagnostics_path,
         emergency_diagnostics_failed=(
             bundle_result.emergency_diagnostics_path is None
         ),
         run_report=report,
     )
+
+
+@contextmanager
+def preflight_patch_package_repository(
+    package: ValidatedPatchPackage,
+    *,
+    output_directory: Path | None = None,
+    session: RunSession | None = None,
+    dry_run: bool = True,
+) -> Iterator[ApplyMutationGate]:
+    """Yield the explicit mutation gate while private inputs and locks live."""
+    actual_session = session or RunSession.start()
+    manifest = package.manifest
+    with safely_resolved_repository(
+        manifest,
+        session=actual_session,
+        output_directory=output_directory,
+    ) as resolved:
+        if not resolved.matches_manifest_state(manifest):
+            error = state_mismatch_error(
+                "patch package does not match the resolved repository state"
+            )
+            report = _complete_apply_result_bundle(
+                resolved,
+                package,
+                session=actual_session,
+                dry_run=dry_run,
+                warnings=package.warnings,
+                primary_outcome=_primary_outcome_for_error(error),
+            )
+            raise _reported_apply_error(error, report)
+
+        with ExitStack() as private_resources:
+            try:
+                prepared_package = private_resources.enter_context(
+                    prepare_patch_package(
+                        package,
+                        repository=resolved.repository.value,
+                    )
+                )
+            except PatchHarborError as error:
+                report = _complete_apply_result_bundle(
+                    resolved,
+                    package,
+                    session=actual_session,
+                    dry_run=dry_run,
+                    warnings=package.warnings,
+                    primary_outcome=_primary_outcome_for_error(error),
+                )
+                raise _reported_apply_error(error, report) from error
+
+            yield ApplyMutationGate(
+                session=actual_session,
+                resolved=resolved,
+                package=package,
+                prepared_package=prepared_package,
+            )
 
 
 def dry_run_patch_package(
@@ -189,72 +265,22 @@ def dry_run_patch_package(
 ) -> RunReport:
     """Complete one safe dry-run and publish its unchanged Result Bundle."""
     session = RunSession.start()
-    manifest = package.manifest
-    with safely_resolved_repository(
-        manifest,
-        session=session,
+    with preflight_patch_package_repository(
+        package,
         output_directory=output_directory,
-    ) as resolved:
-        context = resolved.context
-        if not resolved.matches_manifest_state(manifest):
-            report = create_state_mismatch_result_bundle(
-                resolved.repository,
-                resolved.repo_id,
-                resolved.registry_snapshot,
-                context,
-                manifest,
-                target=resolved.result_target,
-                publication=resolved.result_publication,
-                warnings=package.warnings,
-                session=session,
-            )
-            bundle_result = report.result_bundle
-            raise state_mismatch_error(
-                "patch package does not match the resolved repository state",
-                emergency_diagnostics_path=(
-                    bundle_result.emergency_diagnostics_path
-                ),
-                emergency_diagnostics_failed=(
-                    bundle_result.status is ResultBundleStatus.FAILED
-                    and bundle_result.emergency_diagnostics_path is None
-                ),
-                run_report=report,
-            )
-
-        try:
-            with prepare_patch_package(
-                package,
-                repository=resolved.repository.value,
-            ) as prepared_package:
-                warnings = (*package.warnings, *prepared_package.warnings)
-        except PatchHarborError as error:
-            report = create_dry_run_failure_result_bundle(
-                resolved.repository,
-                resolved.repo_id,
-                resolved.registry_snapshot,
-                context,
-                manifest,
-                error,
-                target=resolved.result_target,
-                publication=resolved.result_publication,
-                warnings=package.warnings,
-                session=session,
-            )
-            raise _reported_apply_error(error, report) from error
-
-        report = create_dry_run_success_result_bundle(
-            resolved.repository,
-            resolved.repo_id,
-            resolved.registry_snapshot,
-            context,
-            manifest,
-            target=resolved.result_target,
-            publication=resolved.result_publication,
-            warnings=warnings,
+        session=session,
+        dry_run=True,
+    ) as mutation_gate:
+        report = _complete_apply_result_bundle(
+            mutation_gate.resolved,
+            package,
             session=session,
+            dry_run=True,
+            warnings=mutation_gate.warnings,
+            primary_outcome=ApplyPrimaryOutcome.dry_run_success(),
         )
         if report.result_bundle.status is ResultBundleStatus.FAILED:
-            raise _dry_run_bundle_error(report)
+            raise _result_bundle_error(report)
         return report
 
 
@@ -263,12 +289,12 @@ def validate_patch_package_repository(
     *,
     output_directory: Path | None = None,
 ) -> RepositoryContext:
-    """Validate one package against its repository and preflight resources."""
+    """Validate one package through the shared pre-mutation pipeline."""
     with preflight_patch_package_repository(
         package,
         output_directory=output_directory,
-    ) as preflight:
-        return preflight.context
+    ) as mutation_gate:
+        return mutation_gate.context
 
 
 def register_repository(
