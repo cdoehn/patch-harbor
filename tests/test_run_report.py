@@ -303,3 +303,51 @@ def test_resolved_apply_report_cannot_leave_bundle_unattempted(
             ),
             process_exit_code=9,
         )
+
+def test_apply_result_reports_dry_run_without_execution(tmp_path: Path) -> None:
+    repository = tmp_path / "repository"
+    repository.mkdir()
+    context = _context(repository)
+    bundle_path = tmp_path / "results" / "dry-run.zip"
+    report = RunReport(
+        timing=_timing(),
+        operation=RunOperation.APPLY,
+        dry_run=True,
+        context=context,
+        repository=context.repository_path,
+        repo_id=context.repo_id,
+        warnings=(),
+        primary_result=PrimaryResult.dry_run_success_result(),
+        result_bundle=ResultBundleResult.created(bundle_path),
+        process_exit_code=0,
+    )
+
+    result = report.apply_result()
+
+    assert set(result) == {
+        "run_id",
+        "repository_resolved",
+        "repo_id",
+        "repository_path",
+        "primary_result",
+        "result_bundle",
+    }
+    assert result["repository_resolved"] is True
+    assert result["repo_id"] == str(context.repo_id)
+    assert result["repository_path"] == str(repository.resolve())
+    assert result["primary_result"] == {
+        "kind": "dry_run_success",
+        "entrypoint_started": False,
+        "entrypoint_exit_code": None,
+        "timed_out": False,
+        "interrupted": False,
+        "patchharbor_error_code": None,
+    }
+    assert result["result_bundle"] == {
+        "attempted": True,
+        "status": "created",
+        "path": str(bundle_path.resolve()),
+        "emergency_diagnostics_path": None,
+    }
+    assert report.as_run_document()["execution_present"] is False
+    json.dumps(result, allow_nan=False)

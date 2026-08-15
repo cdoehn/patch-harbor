@@ -217,6 +217,14 @@ class PrimaryResult:
         )
 
     @classmethod
+    def dry_run_success_result(cls) -> PrimaryResult:
+        return cls(
+            kind=PrimaryResultKind.DRY_RUN_SUCCESS,
+            success=True,
+            patchharbor_error_code=None,
+        )
+
+    @classmethod
     def tool_failure(
         cls,
         *,
@@ -238,6 +246,16 @@ class PrimaryResult:
             "entrypoint_exit_code": self.entrypoint_exit_code,
             "timed_out": self.timed_out,
             "interrupted": self.interrupted,
+        }
+
+    def as_apply_document(self) -> dict[str, object]:
+        return {
+            "kind": self.kind_text,
+            "entrypoint_started": self.entrypoint_started,
+            "entrypoint_exit_code": self.entrypoint_exit_code,
+            "timed_out": self.timed_out,
+            "interrupted": self.interrupted,
+            "patchharbor_error_code": self.patchharbor_error_code,
         }
 
 
@@ -328,6 +346,16 @@ class ResultBundleResult:
             "attempted": self.attempted,
             "status": self.status_text,
             "error": self.error,
+        }
+
+    def as_apply_document(self) -> dict[str, object]:
+        return {
+            "attempted": self.attempted,
+            "status": self.status_text,
+            "path": physical_absolute_path_text(self.path),
+            "emergency_diagnostics_path": physical_absolute_path_text(
+                self.emergency_diagnostics_path
+            ),
         }
 
 
@@ -448,6 +476,25 @@ class RunReport:
             "primary_result": self.primary_result.as_document(),
             "result_bundle": self.result_bundle.as_run_document(),
             "process_exit_code": self.process_exit_code,
+        }
+
+    def apply_result(self) -> dict[str, object]:
+        """Return the closed ``apply --json`` result object."""
+        if self.operation is not RunOperation.APPLY:
+            raise ValueError("run report is not an apply result")
+        return {
+            "run_id": self.run_id_text,
+            "repository_resolved": self.repository_resolved,
+            "repo_id": (
+                None
+                if self.resolved_repo_id is None
+                else str(self.resolved_repo_id)
+            ),
+            "repository_path": physical_absolute_path_text(
+                self.resolved_repository
+            ),
+            "primary_result": self.primary_result.as_apply_document(),
+            "result_bundle": self.result_bundle.as_apply_document(),
         }
 
     def manual_bundle_result(self) -> dict[str, object]:

@@ -71,12 +71,18 @@ def _run_dry_run(
     cwd: Path,
     *,
     environment: dict[str, str] | None = None,
+    json_output: bool = False,
+    output_directory: Path | None = None,
 ):
+    arguments = ["apply", "--dry-run"]
+    if json_output:
+        arguments.append("--json")
+    if output_directory is not None:
+        arguments.extend(("--output-dir", str(output_directory)))
+    arguments.append(str(package))
     return run_cli(
         cwd,
-        "apply",
-        "--dry-run",
-        str(package),
+        *arguments,
         environment_overrides=environment,
     )
 
@@ -192,13 +198,45 @@ def test_dry_run_rejects_markerless_entrypoint_without_mutation(
 
     caller = tmp_path / "caller"
     caller.mkdir()
+    output_directory = tmp_path / "results"
     completed = _run_dry_run(
         package,
         caller,
         environment=environment,
+        json_output=True,
+        output_directory=output_directory,
     )
 
     assert completed.returncode == 3
+    envelope = json.loads(completed.stdout)
+    assert envelope["success"] is False
+    assert envelope["process_exit_code"] == 3
+    assert envelope["error"]["patchharbor_error_code"] == 3
+    result = envelope["result"]
+    assert result["repository_resolved"] is True
+    assert result["primary_result"] == {
+        "kind": "validation_error",
+        "entrypoint_started": False,
+        "entrypoint_exit_code": None,
+        "timed_out": False,
+        "interrupted": False,
+        "patchharbor_error_code": 3,
+    }
+    assert result["result_bundle"]["attempted"] is True
+    assert result["result_bundle"]["status"] == "created"
+    bundle_path = Path(result["result_bundle"]["path"])
+    assert bundle_path.is_file()
+    with zipfile.ZipFile(bundle_path) as archive:
+        names = set(archive.namelist())
+        manifest = json.loads(archive.read("manifest.json"))
+        run_report = json.loads(archive.read("logs/run.json"))
+    assert "logs/execution.log" not in names
+    assert manifest["dry_run"] is True
+    assert manifest["entrypoint_started"] is False
+    assert manifest["execution_present"] is False
+    assert manifest["primary_result"] == "validation_error"
+    assert run_report["primary_result"]["kind"] == "validation_error"
+    assert run_report["execution_present"] is False
     assert not (repository / "executed.txt").exists()
     assert not (repository / "files" / "payload.bin").exists()
 

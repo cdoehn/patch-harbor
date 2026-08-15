@@ -12,12 +12,12 @@ from typing import Any, TextIO
 from patchharbor import __version__
 from patchharbor.application import (
     bundle_repository,
+    dry_run_patch_package,
     register_repository,
     registered_repositories,
     repository_context,
     run_script_path,
     run_standard_input,
-    preflight_patch_package_repository,
     resolve_patch_package,
     unregister_repository,
 )
@@ -195,6 +195,12 @@ def _build_parser() -> argparse.ArgumentParser:
         type=Path,
         metavar="DIRECTORY",
         help="publish a Result Bundle in this directory when one is attempted",
+    )
+    apply_parser.add_argument(
+        "--json",
+        action="store_true",
+        dest="json_output",
+        help="write the versioned machine-readable result",
     )
     apply_parser.add_argument(
         "patch_zip",
@@ -512,44 +518,79 @@ def _apply_command(
     path: Path,
     *,
     output_directory: Path | None,
+    json_output: bool,
     stdout: TextIO,
     stderr: TextIO,
 ) -> int:
     try:
         package = resolve_patch_package(path)
     except PatchHarborError as exc:
-        print(format_tool_message(str(exc)), file=stderr)
-        return int(exc.exit_code)
+        exit_code = int(exc.exit_code)
+        if json_output:
+            _write_json_document(
+                _json_envelope(
+                    "apply",
+                    result=None,
+                    error=exc,
+                    process_exit_code=exit_code,
+                ),
+                stdout,
+            )
+        else:
+            print(format_tool_message(str(exc)), file=stderr)
+        return exit_code
 
     for warning in package.warnings:
         print(format_tool_warning(warning), file=stderr)
 
     try:
-        with preflight_patch_package_repository(
+        report = dry_run_patch_package(
             package,
             output_directory=output_directory,
-        ) as preflight:
-            for warning in preflight.warnings:
-                print(format_tool_warning(warning), file=stderr)
-
-            print(f"validated_patch_package: {path}", file=stdout)
-            print(
-                f"repository_path: {preflight.context.repository_path}",
-                file=stdout,
-            )
-            return 0
+        )
     except PatchHarborError as exc:
-        print(format_tool_message(str(exc)), file=stderr)
+        exit_code = int(exc.exit_code)
         report = exc.run_report if isinstance(exc.run_report, RunReport) else None
-        if report is not None and report.result_bundle.path is not None:
-            print(
-                format_tool_message(
-                    f"result bundle: {report.result_bundle.path}"
+        if json_output:
+            _write_json_document(
+                _json_envelope(
+                    "apply",
+                    result=(None if report is None else report.apply_result()),
+                    error=exc,
+                    process_exit_code=exit_code,
                 ),
-                file=stderr,
+                stdout,
             )
+        else:
+            print(format_tool_message(str(exc)), file=stderr)
+            if report is not None and report.result_bundle.path is not None:
+                print(
+                    format_tool_message(
+                        f"result bundle: {report.result_bundle.path}"
+                    ),
+                    file=stderr,
+                )
         _write_emergency_diagnostics_notice(exc, stderr)
-        return int(exc.exit_code)
+        return exit_code
+
+    for warning in report.warnings[len(package.warnings) :]:
+        print(format_tool_warning(warning), file=stderr)
+
+    if json_output:
+        _write_json_document(
+            _json_envelope(
+                "apply",
+                result=report.apply_result(),
+                error=None,
+                process_exit_code=0,
+            ),
+            stdout,
+        )
+    else:
+        print(f"run_id: {report.run_id_text}", file=stdout)
+        print(f"repository_path: {report.resolved_repository}", file=stdout)
+        print(f"result_bundle_path: {report.result_bundle.path}", file=stdout)
+    return 0
 
 
 def _unregister_command(
@@ -786,6 +827,7 @@ def main(
         return _apply_command(
             args.patch_zip,
             output_directory=args.output_dir,
+            json_output=args.json_output,
             stdout=actual_stdout,
             stderr=actual_stderr,
         )

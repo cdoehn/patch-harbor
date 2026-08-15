@@ -15,6 +15,7 @@ from patchharbor.apply_preflight import (
 from patchharbor.apply_repository import safely_resolved_repository
 from patchharbor.bundles import resolve_patch_bundle
 from patchharbor.errors import (
+    ErrorKind,
     ExitCode,
     PatchHarborError,
     state_mismatch_error,
@@ -50,10 +51,12 @@ from patchharbor.repository_state import (
 from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY, ResourcePolicy
 from patchharbor.result_bundle import (
     ManualResultBundle,
+    create_dry_run_failure_result_bundle,
+    create_dry_run_success_result_bundle,
     create_manual_result_bundle,
     create_state_mismatch_result_bundle,
 )
-from patchharbor.run_report import ResultBundleStatus, RunSession
+from patchharbor.run_report import ResultBundleStatus, RunReport, RunSession
 from patchharbor.sources import (
     DirectoryCandidate,
     file_input_artifact,
@@ -141,6 +144,118 @@ def preflight_patch_package_repository(
                 context=context,
                 prepared_package=prepared_package,
             )
+
+
+def _reported_apply_error(
+    error: PatchHarborError,
+    report: RunReport,
+) -> PatchHarborError:
+    bundle_result = report.result_bundle
+    return PatchHarborError(
+        str(error),
+        error.exit_code,
+        error_kind=error.error_kind,
+        emergency_diagnostics_path=(
+            bundle_result.emergency_diagnostics_path
+        ),
+        emergency_diagnostics_failed=(
+            bundle_result.status is ResultBundleStatus.FAILED
+            and bundle_result.emergency_diagnostics_path is None
+        ),
+        run_report=report,
+    )
+
+
+def _dry_run_bundle_error(report: RunReport) -> PatchHarborError:
+    bundle_result = report.result_bundle
+    return PatchHarborError(
+        bundle_result.error or "cannot create the Result Bundle",
+        ExitCode.RESULT_BUNDLE_ERROR,
+        error_kind=ErrorKind.RESULT_BUNDLE_ERROR,
+        emergency_diagnostics_path=(
+            bundle_result.emergency_diagnostics_path
+        ),
+        emergency_diagnostics_failed=(
+            bundle_result.emergency_diagnostics_path is None
+        ),
+        run_report=report,
+    )
+
+
+def dry_run_patch_package(
+    package: ValidatedPatchPackage,
+    *,
+    output_directory: Path | None = None,
+) -> RunReport:
+    """Complete one safe dry-run and publish its unchanged Result Bundle."""
+    session = RunSession.start()
+    manifest = package.manifest
+    with safely_resolved_repository(
+        manifest,
+        session=session,
+        output_directory=output_directory,
+    ) as resolved:
+        context = resolved.context
+        if not resolved.matches_manifest_state(manifest):
+            report = create_state_mismatch_result_bundle(
+                resolved.repository,
+                resolved.repo_id,
+                resolved.registry_snapshot,
+                context,
+                manifest,
+                target=resolved.result_target,
+                publication=resolved.result_publication,
+                warnings=package.warnings,
+                session=session,
+            )
+            bundle_result = report.result_bundle
+            raise state_mismatch_error(
+                "patch package does not match the resolved repository state",
+                emergency_diagnostics_path=(
+                    bundle_result.emergency_diagnostics_path
+                ),
+                emergency_diagnostics_failed=(
+                    bundle_result.status is ResultBundleStatus.FAILED
+                    and bundle_result.emergency_diagnostics_path is None
+                ),
+                run_report=report,
+            )
+
+        try:
+            with prepare_patch_package(
+                package,
+                repository=resolved.repository.value,
+            ) as prepared_package:
+                warnings = (*package.warnings, *prepared_package.warnings)
+        except PatchHarborError as error:
+            report = create_dry_run_failure_result_bundle(
+                resolved.repository,
+                resolved.repo_id,
+                resolved.registry_snapshot,
+                context,
+                manifest,
+                error,
+                target=resolved.result_target,
+                publication=resolved.result_publication,
+                warnings=package.warnings,
+                session=session,
+            )
+            raise _reported_apply_error(error, report) from error
+
+        report = create_dry_run_success_result_bundle(
+            resolved.repository,
+            resolved.repo_id,
+            resolved.registry_snapshot,
+            context,
+            manifest,
+            target=resolved.result_target,
+            publication=resolved.result_publication,
+            warnings=warnings,
+            session=session,
+        )
+        if report.result_bundle.status is ResultBundleStatus.FAILED:
+            raise _dry_run_bundle_error(report)
+        return report
 
 
 def validate_patch_package_repository(

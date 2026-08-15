@@ -170,6 +170,7 @@ def _manifest_document(
         "fingerprint_algorithm": context.fingerprint_algorithm,
         "dirty": context.dirty,
         "dry_run": report.dry_run,
+        "entrypoint_started": report.primary_result.entrypoint_started,
         "execution_present": report.execution_present,
         "primary_result": report.primary_result.kind_text,
         "result_bundle_status": report.result_bundle.status_text,
@@ -288,6 +289,22 @@ def _state_mismatch_primary_result() -> PrimaryResult:
     )
 
 
+def _apply_primary_result_for_error(error: PatchHarborError) -> PrimaryResult:
+    if error.exit_code in {
+        ExitCode.NO_VALID_SCRIPT,
+        ExitCode.INTERPRETER_ERROR,
+        ExitCode.PAYLOAD_PREPARATION_ERROR,
+        ExitCode.PATCH_PACKAGE_ERROR,
+    }:
+        kind = PrimaryResultKind.VALIDATION_ERROR
+    else:
+        kind = _primary_kind_for_error(error)
+    return PrimaryResult.tool_failure(
+        kind=kind,
+        patchharbor_error_code=int(error.exit_code),
+    )
+
+
 def _failed_apply_bundle_report(
     *,
     session: RunSession,
@@ -295,8 +312,15 @@ def _failed_apply_bundle_report(
     repo_id: RepositoryId,
     context: RepositoryContext,
     warnings: tuple[str, ...],
+    primary_result: PrimaryResult,
+    primary_exit_code: int,
     error: str,
 ) -> RunReport:
+    process_exit_code = (
+        int(ExitCode.RESULT_BUNDLE_ERROR)
+        if primary_result.success
+        else primary_exit_code
+    )
     return RunReport(
         timing=session.finish(),
         operation=RunOperation.APPLY,
@@ -305,13 +329,13 @@ def _failed_apply_bundle_report(
         repository=repository,
         repo_id=repo_id,
         warnings=warnings,
-        primary_result=_state_mismatch_primary_result(),
+        primary_result=primary_result,
         result_bundle=ResultBundleResult.failed(error),
-        process_exit_code=int(ExitCode.STATE_MISMATCH),
+        process_exit_code=process_exit_code,
     )
 
 
-def create_state_mismatch_result_bundle(
+def _create_apply_result_bundle(
     repository: RepositoryPath,
     repo_id: RepositoryId,
     registry_snapshot: RegistrySnapshot,
@@ -322,8 +346,10 @@ def create_state_mismatch_result_bundle(
     publication: ResultBundlePublication,
     warnings: tuple[str, ...],
     session: RunSession,
+    primary_result: PrimaryResult,
+    primary_exit_code: int,
 ) -> RunReport:
-    """Attempt one dry-run Result Bundle while the repository lock is held."""
+    """Attempt one apply Result Bundle while the repository lock is held."""
     try:
         run_directory = _create_private_run_directory(session.run_id)
     except (OSError, RuntimeError):
@@ -333,6 +359,8 @@ def create_state_mismatch_result_bundle(
             repo_id=repo_id,
             context=actual_context,
             warnings=warnings,
+            primary_result=primary_result,
+            primary_exit_code=primary_exit_code,
             error="cannot create emergency diagnostics for the Result Bundle",
         )
 
@@ -347,9 +375,9 @@ def create_state_mismatch_result_bundle(
             repository=repository,
             repo_id=repo_id,
             warnings=warnings,
-            primary_result=_state_mismatch_primary_result(),
+            primary_result=primary_result,
             result_bundle=ResultBundleResult.created(target.final_path),
-            process_exit_code=int(ExitCode.STATE_MISMATCH),
+            process_exit_code=primary_exit_code,
         )
         _write_run_document(run_directory, report)
         publish_result_bundle(
@@ -370,6 +398,8 @@ def create_state_mismatch_result_bundle(
             repo_id=repo_id,
             context=actual_context,
             warnings=warnings,
+            primary_result=primary_result,
+            primary_exit_code=primary_exit_code,
             error=str(exc),
         )
         emergency_path, rescue_failed = _preserve_emergency_diagnostics(
@@ -388,6 +418,8 @@ def create_state_mismatch_result_bundle(
             repo_id=repo_id,
             context=actual_context,
             warnings=warnings,
+            primary_result=primary_result,
+            primary_exit_code=primary_exit_code,
             error="cannot create the Result Bundle",
         )
         emergency_path, rescue_failed = _preserve_emergency_diagnostics(
@@ -403,6 +435,90 @@ def create_state_mismatch_result_bundle(
     _remove_private_run_directory(run_directory)
     return report
 
+
+def create_state_mismatch_result_bundle(
+    repository: RepositoryPath,
+    repo_id: RepositoryId,
+    registry_snapshot: RegistrySnapshot,
+    actual_context: RepositoryContext,
+    expected_manifest: PatchManifest,
+    *,
+    target: ResultBundleTarget,
+    publication: ResultBundlePublication,
+    warnings: tuple[str, ...],
+    session: RunSession,
+) -> RunReport:
+    """Attempt one state-mismatch Result Bundle while the lock is held."""
+    return _create_apply_result_bundle(
+        repository,
+        repo_id,
+        registry_snapshot,
+        actual_context,
+        expected_manifest,
+        target=target,
+        publication=publication,
+        warnings=warnings,
+        session=session,
+        primary_result=_state_mismatch_primary_result(),
+        primary_exit_code=int(ExitCode.STATE_MISMATCH),
+    )
+
+
+def create_dry_run_success_result_bundle(
+    repository: RepositoryPath,
+    repo_id: RepositoryId,
+    registry_snapshot: RegistrySnapshot,
+    actual_context: RepositoryContext,
+    expected_manifest: PatchManifest,
+    *,
+    target: ResultBundleTarget,
+    publication: ResultBundlePublication,
+    warnings: tuple[str, ...],
+    session: RunSession,
+) -> RunReport:
+    """Create one successful dry-run Result Bundle without execution."""
+    return _create_apply_result_bundle(
+        repository,
+        repo_id,
+        registry_snapshot,
+        actual_context,
+        expected_manifest,
+        target=target,
+        publication=publication,
+        warnings=warnings,
+        session=session,
+        primary_result=PrimaryResult.dry_run_success_result(),
+        primary_exit_code=0,
+    )
+
+
+def create_dry_run_failure_result_bundle(
+    repository: RepositoryPath,
+    repo_id: RepositoryId,
+    registry_snapshot: RegistrySnapshot,
+    actual_context: RepositoryContext,
+    expected_manifest: PatchManifest,
+    error: PatchHarborError,
+    *,
+    target: ResultBundleTarget,
+    publication: ResultBundlePublication,
+    warnings: tuple[str, ...],
+    session: RunSession,
+) -> RunReport:
+    """Attempt a Result Bundle for a post-resolution dry-run failure."""
+    return _create_apply_result_bundle(
+        repository,
+        repo_id,
+        registry_snapshot,
+        actual_context,
+        expected_manifest,
+        target=target,
+        publication=publication,
+        warnings=warnings,
+        session=session,
+        primary_result=_apply_primary_result_for_error(error),
+        primary_exit_code=int(error.exit_code),
+    )
 
 def create_manual_result_bundle(
     path: Path,

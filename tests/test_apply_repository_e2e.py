@@ -89,13 +89,20 @@ def _run_dry_run(
     package: Path,
     caller: Path,
     environment: dict[str, str],
+    *,
+    json_output: bool = False,
+    output_directory: Path | None = None,
 ):
     caller.mkdir(exist_ok=True)
+    arguments = ["apply", "--dry-run"]
+    if json_output:
+        arguments.append("--json")
+    if output_directory is not None:
+        arguments.extend(("--output-dir", str(output_directory)))
+    arguments.append(str(package))
     return run_cli(
         caller,
-        "apply",
-        "--dry-run",
-        str(package),
+        *arguments,
         environment_overrides=environment,
     )
 
@@ -121,6 +128,106 @@ def _different_hex(value: str) -> str:
 def _assert_repository_unmodified(repository: Path) -> None:
     assert not (repository / "executed.txt").exists()
     assert not (repository / "files" / "payload.bin").exists()
+
+
+def _repository_files(repository: Path) -> dict[str, bytes]:
+    files: dict[str, bytes] = {}
+    for path in repository.rglob("*"):
+        relative = path.relative_to(repository)
+        if relative.parts[0] == ".git" or not path.is_file():
+            continue
+        files[relative.as_posix()] = path.read_bytes()
+    return files
+
+
+def test_dry_run_json_publishes_unchanged_snapshot_without_execution(
+    tmp_path: Path,
+) -> None:
+    repository = create_repository(tmp_path / "repository")
+    environment, context = _register_context(repository, tmp_path / "user")
+    package = tmp_path / "patch.zip"
+    _write_package(package, _manifest(context))
+    output_directory = tmp_path / "results"
+    before = _repository_files(repository)
+
+    completed = _run_dry_run(
+        package,
+        tmp_path / "caller",
+        environment,
+        json_output=True,
+        output_directory=output_directory,
+    )
+
+    assert completed.returncode == 0
+    envelope = json.loads(completed.stdout)
+    assert set(envelope) == {
+        "output_version",
+        "command",
+        "success",
+        "result",
+        "error",
+        "process_exit_code",
+    }
+    assert envelope["command"] == "apply"
+    assert envelope["success"] is True
+    assert envelope["error"] is None
+    assert envelope["process_exit_code"] == 0
+    result = envelope["result"]
+    assert isinstance(result, dict)
+    assert result["repository_resolved"] is True
+    assert result["repo_id"] == context["repo_id"]
+    assert result["repository_path"] == str(repository.resolve())
+    assert result["primary_result"] == {
+        "kind": "dry_run_success",
+        "entrypoint_started": False,
+        "entrypoint_exit_code": None,
+        "timed_out": False,
+        "interrupted": False,
+        "patchharbor_error_code": None,
+    }
+    bundle_result = result["result_bundle"]
+    assert bundle_result["attempted"] is True
+    assert bundle_result["status"] == "created"
+    assert bundle_result["emergency_diagnostics_path"] is None
+    bundle_path = Path(bundle_result["path"])
+    assert bundle_path.parent == output_directory.resolve()
+    assert bundle_path.is_file()
+    assert not tuple(output_directory.glob(".*.tmp"))
+
+    with zipfile.ZipFile(bundle_path) as archive:
+        names = set(archive.namelist())
+        result_manifest = json.loads(archive.read("manifest.json"))
+        actual_context = json.loads(archive.read("context.json"))
+        run_report = json.loads(archive.read("logs/run.json"))
+
+    assert "logs/execution.log" not in names
+    assert result_manifest["dry_run"] is True
+    assert result_manifest["entrypoint_started"] is False
+    assert result_manifest["execution_present"] is False
+    assert result_manifest["primary_result"] == "dry_run_success"
+    assert result_manifest["result_bundle_status"] == "created"
+    assert actual_context["repo_id"] == context["repo_id"]
+    assert actual_context["base_commit"] == context["base_commit"]
+    assert actual_context["state_fingerprint"] == context["state_fingerprint"]
+    assert run_report["dry_run"] is True
+    assert run_report["execution_present"] is False
+    assert run_report["primary_result"] == {
+        "kind": "dry_run_success",
+        "success": True,
+        "patchharbor_error_code": None,
+        "entrypoint_started": False,
+        "entrypoint_exit_code": None,
+        "timed_out": False,
+        "interrupted": False,
+    }
+    assert run_report["result_bundle"] == {
+        "attempted": True,
+        "status": "created",
+        "error": None,
+    }
+    assert run_report["process_exit_code"] == 0
+    assert _repository_files(repository) == before
+    _assert_repository_unmodified(repository)
 
 
 def test_matching_manifest_resolves_exact_registered_repository_without_mutation(
@@ -214,9 +321,23 @@ def test_state_mismatch_returns_nine_and_bundles_actual_repository_state(
     package = tmp_path / f"{mismatch}.zip"
     _write_package(package, manifest)
 
-    completed = _run_dry_run(package, tmp_path / "caller", environment)
+    completed = _run_dry_run(
+        package,
+        tmp_path / "caller",
+        environment,
+        json_output=True,
+    )
 
     assert completed.returncode == int(ExitCode.STATE_MISMATCH)
+    envelope = json.loads(completed.stdout)
+    assert envelope["command"] == "apply"
+    assert envelope["success"] is False
+    assert envelope["process_exit_code"] == int(ExitCode.STATE_MISMATCH)
+    assert envelope["result"]["primary_result"]["kind"] == "state_mismatch"
+    assert envelope["result"]["result_bundle"]["status"] == "created"
+    assert envelope["error"]["patchharbor_error_code"] == int(
+        ExitCode.STATE_MISMATCH
+    )
     _assert_repository_unmodified(repository)
     bundles = _result_bundles(environment)
     assert len(bundles) == 1
