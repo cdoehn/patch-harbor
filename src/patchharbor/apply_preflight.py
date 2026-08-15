@@ -68,7 +68,7 @@ def _verified_private_resource(
     content: bytes,
     *,
     failure_exit: ExitCode,
-) -> tuple[Path, bytes]:
+) -> tuple[Path, int, str]:
     target = _private_resource_path(root, relative_path)
     expected_hash = sha256(content).digest()
     try:
@@ -79,39 +79,45 @@ def _verified_private_resource(
             f"cannot prepare private package resource: {describe_os_error(exc)}",
             failure_exit,
         ) from exc
-    if len(observed) != len(content) or sha256(observed).digest() != expected_hash:
+    observed_hash = sha256(observed).digest()
+    if len(observed) != len(content) or observed_hash != expected_hash:
         raise _preflight_error(
             "private package resource does not match the validated ZIP entry",
             failure_exit,
         )
-    return target, observed
+    return target, len(observed), observed_hash.hex()
+
+
+def _validated_entrypoint(
+    package: ValidatedPatchPackage,
+) -> tuple[ParsedScript, ResolvedInterpreter]:
+    try:
+        script = parse_script(package.entrypoint.content.decode("utf-8"))
+    except (UnicodeError, ScriptFormatError) as exc:
+        raise _preflight_error(
+            "patch package entrypoint is not a valid PatchHarbor script",
+            ExitCode.NO_VALID_SCRIPT,
+        ) from exc
+    return script, resolve_script_interpreter(script.text)
 
 
 def _prepare_entrypoint(
     package: ValidatedPatchPackage,
     private_root: Path,
 ) -> PreparedEntrypoint:
-    path, observed = _verified_private_resource(
+    script, interpreter = _validated_entrypoint(package)
+    path, size_bytes, sha256_hex = _verified_private_resource(
         private_root / "entrypoint",
         package.entrypoint.relative_path,
         package.entrypoint.content,
         failure_exit=ExitCode.EXECUTION_ERROR,
     )
-    try:
-        script = parse_script(observed.decode("utf-8"))
-    except (UnicodeError, ScriptFormatError) as exc:
-        raise _preflight_error(
-            "patch package entrypoint is not a valid PatchHarbor script",
-            ExitCode.NO_VALID_SCRIPT,
-        ) from exc
-
-    interpreter = resolve_script_interpreter(script.text)
     return PreparedEntrypoint(
         path=path,
         script=script,
         interpreter=interpreter,
-        size_bytes=len(observed),
-        sha256_hex=sha256(observed).hexdigest(),
+        size_bytes=size_bytes,
+        sha256_hex=sha256_hex,
     )
 
 
@@ -122,7 +128,7 @@ def _prepare_payloads(
     prepared: list[PreparedPayload] = []
     payload_root = private_root / "payloads"
     for payload in package.payloads:
-        path, observed = _verified_private_resource(
+        path, size_bytes, sha256_hex = _verified_private_resource(
             payload_root,
             payload.relative_path,
             payload.content,
@@ -132,8 +138,8 @@ def _prepare_payloads(
             PreparedPayload(
                 relative_path=payload.relative_path,
                 path=path,
-                size_bytes=len(observed),
-                sha256_hex=sha256(observed).hexdigest(),
+                size_bytes=size_bytes,
+                sha256_hex=sha256_hex,
             )
         )
     return tuple(prepared)

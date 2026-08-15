@@ -368,6 +368,6 @@ def test_interpreter_availability_is_checked_before_payload_preparation(
         )
 
     assert captured.value.exit_code is ExitCode.INTERPRETER_ERROR
-    assert staged_roles == ["entrypoint"]
+    assert staged_roles == []
     assert tuple(private_temp.iterdir()) == ()
     assert not (repository / "files" / "payload.bin").exists()
