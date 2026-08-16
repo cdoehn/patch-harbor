@@ -5,12 +5,14 @@ from __future__ import annotations
 import argparse
 from collections.abc import Sequence
 from contextlib import nullcontext
+from io import StringIO
 from pathlib import Path
 import sys
 from typing import Any, TextIO
 
 from patchharbor import __version__
 from patchharbor.application import (
+    apply_patch_package,
     bundle_repository,
     dry_run_patch_package,
     register_repository,
@@ -187,8 +189,17 @@ def _build_parser() -> argparse.ArgumentParser:
     apply_parser.add_argument(
         "--dry-run",
         action="store_true",
-        required=True,
         help="validate the patch package without changing a repository",
+    )
+    apply_parser.add_argument(
+        "--timeout",
+        type=_positive_seconds,
+        default=DEFAULT_TIMEOUT_SECONDS,
+        metavar="SECONDS",
+        help=(
+            "stop the entrypoint after this many seconds "
+            f"(default: {DEFAULT_TIMEOUT_SECONDS:g})"
+        ),
     )
     apply_parser.add_argument(
         "--output-dir",
@@ -514,6 +525,8 @@ def _bundle_command(
 def _apply_command(
     path: Path,
     *,
+    dry_run: bool,
+    timeout_seconds: float,
     output_directory: Path | None,
     json_output: bool,
     stdout: TextIO,
@@ -541,10 +554,22 @@ def _apply_command(
         print(format_tool_warning(warning), file=stderr)
 
     try:
-        report = dry_run_patch_package(
-            package,
-            output_directory=output_directory,
-        )
+        if dry_run:
+            report = dry_run_patch_package(
+                package,
+                output_directory=output_directory,
+            )
+        else:
+            visible_output = StringIO() if json_output else stdout
+            report = apply_patch_package(
+                package,
+                output_directory=output_directory,
+                timeout_seconds=timeout_seconds,
+                output=OutputTargets(
+                    visible_text_stream=visible_output,
+                    live_text_stream=(None if json_output else stdout),
+                ),
+            )
     except PatchHarborError as exc:
         report = exc.run_report if isinstance(exc.run_report, RunReport) else None
         exit_code = (
@@ -827,6 +852,8 @@ def main(
     if args.command == "apply":
         return _apply_command(
             args.patch_zip,
+            dry_run=args.dry_run,
+            timeout_seconds=args.timeout,
             output_directory=args.output_dir,
             json_output=args.json_output,
             stdout=actual_stdout,

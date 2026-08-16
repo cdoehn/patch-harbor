@@ -11,7 +11,13 @@ import pytest
 from patchharbor.errors import ExitCode
 from patchharbor.patch_manifest import PATCH_FORMAT_VERSION, PATCH_MARKER
 from patchharbor.state_fingerprint import FINGERPRINT_ALGORITHM
-from tests.platform_support import project_environment, run_cli
+from tests.platform_support import (
+    native_script,
+    native_value,
+    normalized_path,
+    project_environment,
+    run_cli,
+)
 from tests.registration_support import (
     create_repository,
     git,
@@ -85,6 +91,49 @@ def _write_package(
         archive.writestr("files/payload.bin", b"\x00payload\xff")
 
 
+def _write_apply_package(
+    path: Path,
+    context: dict[str, object],
+) -> str:
+    entrypoint_name = native_value("run.sh", "run.ps1")
+    manifest = _manifest(context)
+    manifest["entrypoint"] = entrypoint_name
+    entrypoint = native_script(
+        "if IFS= read -r _value; then exit 41; fi\n"
+        "pwd > entrypoint-cwd.txt\n"
+        "printf '%s' executed > executed.txt\n"
+        "printf 'stdout-line\n'\n"
+        "printf 'stderr-line\n' >&2",
+        "$inputLine = [Console]::In.ReadLine()\n"
+        "if ($null -ne $inputLine) { exit 41 }\n"
+        "[System.IO.File]::WriteAllText("
+        "'entrypoint-cwd.txt', (Get-Location).Path)\n"
+        "[System.IO.File]::WriteAllText('executed.txt', 'executed')\n"
+        "$stdout = [Console]::OpenStandardOutput()\n"
+        "$stdoutBytes = [System.Text.Encoding]::UTF8.GetBytes("
+        '"stdout-line`n")\n'
+        "$stdout.Write($stdoutBytes, 0, $stdoutBytes.Length)\n"
+        "$stderr = [Console]::OpenStandardError()\n"
+        "$stderrBytes = [System.Text.Encoding]::UTF8.GetBytes("
+        '"stderr-line`n")\n'
+        "$stderr.Write($stderrBytes, 0, $stderrBytes.Length)",
+    )
+    with zipfile.ZipFile(path, "w") as archive:
+        archive.writestr(
+            "patch.json",
+            json.dumps(
+                manifest,
+                ensure_ascii=False,
+                allow_nan=False,
+                separators=(",", ":"),
+            ).encode("utf-8"),
+        )
+        archive.writestr(entrypoint_name, entrypoint.encode("utf-8"))
+        archive.writestr("files/payload.bin", b"\x00new\xff")
+        archive.writestr("nested/new.bin", b"\x10nested\x00")
+    return entrypoint_name
+
+
 def _run_dry_run(
     package: Path,
     caller: Path,
@@ -138,6 +187,100 @@ def _repository_files(repository: Path) -> dict[str, bytes]:
             continue
         files[relative.as_posix()] = path.read_bytes()
     return files
+
+
+def test_apply_writes_payloads_runs_private_entrypoint_and_bundles_result(
+    tmp_path: Path,
+) -> None:
+    repository = create_repository(tmp_path / "repository")
+    tracked_payload = repository / "files" / "payload.bin"
+    tracked_payload.parent.mkdir()
+    tracked_payload.write_bytes(b"old")
+    git(repository, "add", "files/payload.bin")
+    git(repository, "commit", "--quiet", "-m", "add payload")
+
+    environment, context = _register_context(repository, tmp_path / "user")
+    package = tmp_path / "patch.zip"
+    entrypoint_name = _write_apply_package(package, context)
+    output_directory = tmp_path / "results"
+    caller = tmp_path / "caller"
+    caller.mkdir()
+
+    completed = run_cli(
+        caller,
+        "apply",
+        "--json",
+        "--output-dir",
+        str(output_directory),
+        str(package),
+        environment_overrides=environment,
+        timeout_seconds=120,
+    )
+
+    assert completed.returncode == 0
+    envelope = json.loads(completed.stdout)
+    assert envelope["success"] is True
+    assert envelope["process_exit_code"] == 0
+    result = envelope["result"]
+    assert isinstance(result, dict)
+    assert result["primary_result"] == {
+        "kind": "success",
+        "entrypoint_started": True,
+        "entrypoint_exit_code": 0,
+        "timed_out": False,
+        "interrupted": False,
+        "patchharbor_error_code": None,
+    }
+
+    assert tracked_payload.read_bytes() == b"\x00new\xff"
+    assert (repository / "nested" / "new.bin").read_bytes() == (
+        b"\x10nested\x00"
+    )
+    assert (repository / "executed.txt").read_bytes() == b"executed"
+    assert normalized_path(
+        (repository / "entrypoint-cwd.txt").read_text(encoding="utf-8").strip()
+    ) == normalized_path(repository)
+    assert not (repository / entrypoint_name).exists()
+
+    bundle_result = result["result_bundle"]
+    assert bundle_result["status"] == "created"
+    bundle_path = Path(bundle_result["path"])
+    assert bundle_path.parent == output_directory.resolve()
+    with zipfile.ZipFile(bundle_path) as archive:
+        names = set(archive.namelist())
+        result_manifest = json.loads(archive.read("manifest.json"))
+        result_context = json.loads(archive.read("context.json"))
+        run_report = json.loads(archive.read("logs/run.json"))
+        execution_log = archive.read("logs/execution.log")
+        committed_payload = archive.read("base/files/payload.bin")
+        unstaged_patch = archive.read("changes/unstaged.patch")
+        bundled_new_file = archive.read("untracked/nested/new.bin")
+
+    assert committed_payload == b"old"
+    assert unstaged_patch
+    assert b"stdout-line\n" in execution_log
+    assert b"stderr-line\n" in execution_log
+    assert bundled_new_file == b"\x10nested\x00"
+    assert result_manifest["dry_run"] is False
+    assert result_manifest["entrypoint_started"] is True
+    assert result_manifest["execution_present"] is True
+    assert result_manifest["primary_result"] == "success"
+    assert result_context["dirty"] is True
+    assert run_report["dry_run"] is False
+    assert run_report["execution_present"] is True
+    assert run_report["primary_result"] == {
+        "kind": "success",
+        "success": True,
+        "patchharbor_error_code": None,
+        "entrypoint_started": True,
+        "entrypoint_exit_code": 0,
+        "timed_out": False,
+        "interrupted": False,
+    }
+    assert run_report["process_exit_code"] == 0
+    assert "untracked/executed.txt" in names
+    assert "untracked/entrypoint-cwd.txt" in names
+    assert f"untracked/{entrypoint_name}" not in names
 
 
 def test_dry_run_json_publishes_unchanged_snapshot_without_execution(

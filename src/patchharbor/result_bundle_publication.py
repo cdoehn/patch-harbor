@@ -196,7 +196,7 @@ def release_result_bundle_publication(
     )
 
 
-def _verify_result_bundle(path: Path) -> None:
+def _verify_result_bundle(path: Path, *, execution_present: bool) -> None:
     try:
         with zipfile.ZipFile(path, mode="r") as archive:
             names = archive.namelist()
@@ -206,6 +206,10 @@ def _verify_result_bundle(path: Path) -> None:
             ):
                 raise result_bundle_error(
                     "Result Bundle is missing a required entry"
+                )
+            if (names.count("logs/execution.log") == 1) != execution_present:
+                raise result_bundle_error(
+                    "Result Bundle execution log does not match the run report"
                 )
             if archive.testzip() is not None:
                 raise result_bundle_error("Result Bundle failed its CRC check")
@@ -267,6 +271,7 @@ def publish_result_bundle(
     context_document: dict[str, object],
     run_report: RunReport,
     snapshot: ResultBundleSnapshot,
+    execution_log: bytes | None = None,
 ) -> PublishedResultBundle:
     """Write, verify, best-effort sync, and atomically publish one bundle."""
     owned_stat = publication.reservation_stat
@@ -287,13 +292,17 @@ def publish_result_bundle(
                 context_document=context_document,
                 run_report=run_report,
                 snapshot=snapshot,
+                execution_log=execution_log,
             )
 
         _require_owned_temporary_file(
             publication.temporary_path,
             owned_stat,
         )
-        _verify_result_bundle(publication.temporary_path)
+        _verify_result_bundle(
+            publication.temporary_path,
+            execution_present=run_report.execution_present,
+        )
         _require_owned_temporary_file(
             publication.temporary_path,
             owned_stat,

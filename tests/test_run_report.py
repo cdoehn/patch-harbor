@@ -248,6 +248,7 @@ def test_apply_primary_outcome_maps_tool_errors_once(
 
 def test_apply_primary_outcome_keeps_primary_and_bundle_results_separate() -> None:
     dry_run = ApplyPrimaryOutcome.dry_run_success()
+    success = ApplyPrimaryOutcome.entrypoint_success()
     failure = ApplyPrimaryOutcome.from_tool_error(
         PatchHarborError("missing interpreter", ExitCode.INTERPRETER_ERROR)
     )
@@ -255,6 +256,13 @@ def test_apply_primary_outcome_keeps_primary_and_bundle_results_separate() -> No
     assert dry_run.result.kind is PrimaryResultKind.DRY_RUN_SUCCESS
     assert dry_run.process_exit_code_for(ResultBundleStatus.CREATED) == 0
     assert dry_run.process_exit_code_for(ResultBundleStatus.FAILED) == int(
+        ExitCode.RESULT_BUNDLE_ERROR
+    )
+    assert success.result.kind is PrimaryResultKind.SUCCESS
+    assert success.result.entrypoint_started is True
+    assert success.result.entrypoint_exit_code == 0
+    assert success.process_exit_code_for(ResultBundleStatus.CREATED) == 0
+    assert success.process_exit_code_for(ResultBundleStatus.FAILED) == int(
         ExitCode.RESULT_BUNDLE_ERROR
     )
     assert failure.result.kind is PrimaryResultKind.VALIDATION_ERROR

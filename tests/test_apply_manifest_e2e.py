@@ -9,6 +9,7 @@ import zipfile
 
 import pytest
 
+from patchharbor.errors import ExitCode
 from patchharbor.patch_manifest import PATCH_FORMAT_VERSION, PATCH_MARKER
 from patchharbor.state_fingerprint import FINGERPRINT_ALGORITHM
 from tests.platform_support import run_cli
@@ -335,10 +336,10 @@ def test_dry_run_propagates_closed_manifest_violations(tmp_path: Path) -> None:
     assert completed.returncode == 10
 
 
-def test_apply_without_dry_run_is_not_available_yet(tmp_path: Path) -> None:
+def test_apply_without_dry_run_reaches_repository_resolution(tmp_path: Path) -> None:
     package = tmp_path / "patch.zip"
     _write_package(package)
 
     completed = run_cli(tmp_path, "apply", str(package))
 
-    assert completed.returncode == 2
+    assert completed.returncode == int(ExitCode.REPOSITORY_ERROR)

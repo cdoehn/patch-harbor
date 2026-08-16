@@ -48,6 +48,7 @@ class PreparedPatchPackage:
 
     entrypoint: PreparedEntrypoint
     payloads: tuple[PreparedPayload, ...]
+    execution_log_path: Path
 
     @property
     def warnings(self) -> tuple[str, ...]:
@@ -178,6 +179,7 @@ def prepare_patch_package(
             yield PreparedPatchPackage(
                 entrypoint=entrypoint,
                 payloads=payloads,
+                execution_log_path=private_root / "execution.log",
             )
     except PatchHarborError:
         raise

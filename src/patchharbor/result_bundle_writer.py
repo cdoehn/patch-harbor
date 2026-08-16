@@ -41,8 +41,13 @@ def write_result_bundle(
     context_document: dict[str, object],
     run_report: RunReport,
     snapshot: ResultBundleSnapshot,
+    execution_log: bytes | None = None,
 ) -> None:
     """Write one captured Result Bundle to a caller-owned binary stream."""
+    if run_report.execution_present != (execution_log is not None):
+        raise result_bundle_error(
+            "Result Bundle execution state and execution log disagree"
+        )
     try:
         with zipfile.ZipFile(
             destination,
@@ -59,6 +64,12 @@ def write_result_bundle(
                     archive,
                     name,
                     serialize_json_document(document).encode("utf-8"),
+                )
+            if execution_log is not None:
+                _write_entry(
+                    archive,
+                    "logs/execution.log",
+                    execution_log,
                 )
             for entry in snapshot.base_entries:
                 _write_entry(

@@ -110,6 +110,22 @@ def _write_run_document(
             pass
 
 
+def _write_execution_log(run_directory: Path, content: bytes) -> None:
+    """Atomically store the byte-exact merged entrypoint output."""
+    destination = run_directory / "execution.log"
+    temporary = run_directory / ".execution.log.tmp"
+    try:
+        with temporary.open("xb") as stream:
+            stream.write(content)
+            stream.flush()
+        os.replace(temporary, destination)
+    finally:
+        try:
+            temporary.unlink(missing_ok=True)
+        except OSError:
+            pass
+
+
 def _remove_private_run_directory(run_directory: Path) -> None:
     remove_private_request_directory(run_directory)
 
@@ -308,6 +324,7 @@ def create_apply_result_bundle(
     session: RunSession,
     dry_run: bool,
     primary_outcome: ApplyPrimaryOutcome,
+    execution_log: bytes | None = None,
 ) -> RunReport:
     """Attempt one apply Result Bundle while the repository lock is held."""
     try:
@@ -327,6 +344,8 @@ def create_apply_result_bundle(
         )
 
     try:
+        if execution_log is not None:
+            _write_execution_log(run_directory, execution_log)
         captured = capture_result_bundle(repository, repo_id)
         revalidate_result_bundle_target(target, registry_snapshot)
         report = _apply_report(
@@ -350,6 +369,7 @@ def create_apply_result_bundle(
             context_document=_context_document(report),
             run_report=report,
             snapshot=captured.bundle_snapshot,
+            execution_log=execution_log,
         )
     except PatchHarborError as exc:
         report = _apply_report(

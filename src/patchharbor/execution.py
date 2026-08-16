@@ -10,6 +10,7 @@ import sys
 from patchharbor.errors import ExitCode, PatchHarborError
 from patchharbor.interpreters import (
     InterpreterSpec,
+    ResolvedInterpreter,
     build_interpreter_command,
     resolve_script_interpreter,
 )
@@ -64,6 +65,25 @@ def execute_script_text(
             f"cannot prepare temporary script: {describe_os_error(exc)}",
             ExitCode.EXECUTION_ERROR,
         ) from exc
+
+
+def execute_prepared_script(
+    script_path: Path,
+    *,
+    interpreter: ResolvedInterpreter,
+    cwd: Path,
+    timeout_seconds: float,
+    output: OutputTargets | None = None,
+) -> int:
+    """Execute one already private, parsed, and interpreter-resolved script."""
+    return _execute_staged_script(
+        script_path,
+        interpreter=interpreter.spec,
+        executable_path=interpreter.executable_path,
+        cwd=cwd,
+        timeout_seconds=timeout_seconds,
+        output=output,
+    )
 
 
 def _finish_capture_after_process_error(capture: ProcessOutputCapture) -> None:

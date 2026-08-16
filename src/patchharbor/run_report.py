@@ -248,6 +248,16 @@ class PrimaryResult:
         )
 
     @classmethod
+    def entrypoint_success_result(cls) -> PrimaryResult:
+        return cls(
+            kind=PrimaryResultKind.SUCCESS,
+            success=True,
+            patchharbor_error_code=None,
+            entrypoint_started=True,
+            entrypoint_exit_code=0,
+        )
+
+    @classmethod
     def tool_failure(
         cls,
         *,
@@ -319,6 +329,13 @@ class ApplyPrimaryOutcome:
     def dry_run_success(cls) -> ApplyPrimaryOutcome:
         return cls(
             result=PrimaryResult.dry_run_success_result(),
+            exit_code=0,
+        )
+
+    @classmethod
+    def entrypoint_success(cls) -> ApplyPrimaryOutcome:
+        return cls(
+            result=PrimaryResult.entrypoint_success_result(),
             exit_code=0,
         )
 
