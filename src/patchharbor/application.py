@@ -10,7 +10,6 @@ from typing import TextIO
 
 from patchharbor.apply_preflight import (
     PreparedPatchPackage,
-    load_prepared_payloads,
     prepare_patch_package,
 )
 from patchharbor.apply_repository import (
@@ -242,6 +241,21 @@ def dry_run_patch_package(
         return report
 
 
+def _write_mutation_payloads(mutation_gate: ApplyMutationGate) -> None:
+    """Write checked payloads or raise their already bundled primary failure."""
+    try:
+        write_bundle_payloads(
+            mutation_gate.prepared_package.payloads,
+            cwd=mutation_gate.resolved.repository.value,
+        )
+    except PatchHarborError as error:
+        report = _complete_mutation_result_bundle(
+            mutation_gate,
+            primary_outcome=ApplyPrimaryOutcome.from_tool_error(error),
+        )
+        raise report.reported_error(error) from error
+
+
 def apply_patch_package(
     package: ValidatedPatchPackage,
     *,
@@ -257,19 +271,8 @@ def apply_patch_package(
         session=session,
         dry_run=False,
     ) as mutation_gate:
+        _write_mutation_payloads(mutation_gate)
         prepared_package = mutation_gate.prepared_package
-        try:
-            write_bundle_payloads(
-                load_prepared_payloads(prepared_package.payloads),
-                cwd=mutation_gate.resolved.repository.value,
-            )
-        except PatchHarborError as error:
-            report = _complete_mutation_result_bundle(
-                mutation_gate,
-                primary_outcome=ApplyPrimaryOutcome.from_tool_error(error),
-            )
-            raise report.reported_error(error) from error
-
         execution = execute_prepared_script_with_log(
             prepared_package.entrypoint.path,
             interpreter=prepared_package.entrypoint.interpreter,

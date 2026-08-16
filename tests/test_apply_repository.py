@@ -418,7 +418,7 @@ def test_payload_write_failure_keeps_partial_files_without_starting_entrypoint(
     assert probe_repository_lock(str(context.repo_id), project_environment()) == 0
 
 
-def test_matching_package_preflights_private_resources_and_cleans_them(
+def test_matching_package_preflights_private_entrypoint_and_payload_bytes(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -440,7 +440,6 @@ def test_matching_package_preflights_private_resources_and_cleans_them(
     )
 
     entrypoint_path: Path
-    payload_path: Path
     environment = project_environment()
     package = _package(
         _manifest(context),
@@ -450,18 +449,12 @@ def test_matching_package_preflights_private_resources_and_cleans_them(
     with preflight_patch_package_repository(package) as mutation_gate:
         prepared = mutation_gate.prepared_package
         entrypoint_path = prepared.entrypoint.path
-        payload_path = prepared.payloads[0].path
 
         assert mutation_gate.context == context
         assert mutation_gate.warnings
         assert entrypoint_path.read_bytes() == entrypoint
-        assert prepared.entrypoint.size_bytes == len(entrypoint)
-        assert len(prepared.entrypoint.sha256_hex) == 64
         assert prepared.entrypoint.interpreter.executable_path
-        assert prepared.payloads[0].relative_path == "files/payload.bin"
-        assert payload_path.read_bytes() == payload.content
-        assert prepared.payloads[0].size_bytes == len(payload.content)
-        assert len(prepared.payloads[0].sha256_hex) == 64
+        assert prepared.payloads == (payload,)
         assert not (repository / "run.sh").exists()
         assert not (repository / "files" / "payload.bin").exists()
         assert probe_repository_lock(str(context.repo_id), environment) == int(
@@ -470,7 +463,6 @@ def test_matching_package_preflights_private_resources_and_cleans_them(
 
     assert probe_repository_lock(str(context.repo_id), environment) == 0
     assert not entrypoint_path.exists()
-    assert not payload_path.exists()
     assert tuple(private_temp.iterdir()) == ()
 
 
@@ -517,7 +509,7 @@ def test_entrypoint_preflight_rejects_invalid_scripts_without_repository_files(
     assert not (repository / "files" / "payload.bin").exists()
 
 
-def test_payload_preflight_detects_staged_content_mismatch(
+def test_interpreter_availability_is_checked_before_private_writes(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -526,54 +518,11 @@ def test_payload_preflight_detects_staged_content_mismatch(
     _set_private_temp(monkeypatch, private_temp)
     repository = create_repository(tmp_path / "repository")
     context = register_repository(repository)
-    original_write = apply_preflight_module.write_private_bytes
-
-    def write_corrupted_payload(path: Path, content: bytes) -> None:
-        if "payloads" in path.parts:
-            original_write(path, content + b"corruption")
-        else:
-            original_write(path, content)
-
-    monkeypatch.setattr(
-        apply_preflight_module,
-        "write_private_bytes",
-        write_corrupted_payload,
-    )
-
-    with pytest.raises(PatchHarborError) as captured:
-        _complete_preflight(
-            _package(
-                _manifest(context),
-                payloads=(
-                    BundlePayload(
-                        relative_path="files/payload.bin",
-                        content=b"payload",
-                    ),
-                ),
-            )
-        )
-
-    assert captured.value.exit_code is ExitCode.PAYLOAD_PREPARATION_ERROR
-    assert tuple(private_temp.iterdir()) == ()
-    assert not (repository / "files" / "payload.bin").exists()
-
-
-def test_interpreter_availability_is_checked_before_payload_preparation(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    set_isolated_user_environment(monkeypatch, tmp_path / "user")
-    private_temp = tmp_path / "private-temp"
-    _set_private_temp(monkeypatch, private_temp)
-    repository = create_repository(tmp_path / "repository")
-    context = register_repository(repository)
-    staged_roles: list[str] = []
+    private_writes: list[Path] = []
     original_write = apply_preflight_module.write_private_bytes
 
     def record_private_write(path: Path, content: bytes) -> None:
-        staged_roles.append(
-            "payload" if "payloads" in path.parts else "entrypoint"
-        )
+        private_writes.append(path)
         original_write(path, content)
 
     def missing_interpreter(_script_text: str) -> object:
@@ -607,6 +556,6 @@ def test_interpreter_availability_is_checked_before_payload_preparation(
         )
 
     assert captured.value.exit_code is ExitCode.INTERPRETER_ERROR
-    assert staged_roles == []
+    assert private_writes == []
     assert tuple(private_temp.iterdir()) == ()
     assert not (repository / "files" / "payload.bin").exists()

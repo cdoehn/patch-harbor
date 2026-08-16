@@ -29,18 +29,6 @@ class PreparedEntrypoint:
     path: Path
     script: ParsedScript
     interpreter: ResolvedInterpreter
-    size_bytes: int
-    sha256_hex: str
-
-
-@dataclass(frozen=True, slots=True)
-class PreparedPayload:
-    """One byte-verified payload staged outside the target repository."""
-
-    relative_path: str
-    path: Path
-    size_bytes: int
-    sha256_hex: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -48,7 +36,7 @@ class PreparedPatchPackage:
     """Immutable checked inputs ready for a later mutation boundary."""
 
     entrypoint: PreparedEntrypoint
-    payloads: tuple[PreparedPayload, ...]
+    payloads: tuple[BundlePayload, ...]
     execution_log_path: Path
 
     @property
@@ -70,7 +58,7 @@ def _verified_private_resource(
     content: bytes,
     *,
     failure_exit: ExitCode,
-) -> tuple[Path, int, str]:
+) -> Path:
     target = _private_resource_path(root, relative_path)
     expected_hash = sha256(content).digest()
     try:
@@ -87,7 +75,7 @@ def _verified_private_resource(
             "private package resource does not match the validated ZIP entry",
             failure_exit,
         )
-    return target, len(observed), observed_hash.hex()
+    return target
 
 
 def _validated_entrypoint(
@@ -108,7 +96,7 @@ def _prepare_entrypoint(
     private_root: Path,
 ) -> PreparedEntrypoint:
     script, interpreter = _validated_entrypoint(package)
-    path, size_bytes, sha256_hex = _verified_private_resource(
+    path = _verified_private_resource(
         private_root / "entrypoint",
         package.entrypoint.relative_path,
         package.entrypoint.content,
@@ -118,64 +106,7 @@ def _prepare_entrypoint(
         path=path,
         script=script,
         interpreter=interpreter,
-        size_bytes=size_bytes,
-        sha256_hex=sha256_hex,
     )
-
-
-def _prepare_payloads(
-    package: ValidatedPatchPackage,
-    private_root: Path,
-) -> tuple[PreparedPayload, ...]:
-    prepared: list[PreparedPayload] = []
-    payload_root = private_root / "payloads"
-    for payload in package.payloads:
-        path, size_bytes, sha256_hex = _verified_private_resource(
-            payload_root,
-            payload.relative_path,
-            payload.content,
-            failure_exit=ExitCode.PAYLOAD_PREPARATION_ERROR,
-        )
-        prepared.append(
-            PreparedPayload(
-                relative_path=payload.relative_path,
-                path=path,
-                size_bytes=size_bytes,
-                sha256_hex=sha256_hex,
-            )
-        )
-    return tuple(prepared)
-
-
-def load_prepared_payloads(
-    payloads: tuple[PreparedPayload, ...],
-) -> tuple[BundlePayload, ...]:
-    """Reload and verify private payload bytes for the mutation service."""
-    loaded: list[BundlePayload] = []
-    for prepared in payloads:
-        try:
-            content = prepared.path.read_bytes()
-        except OSError as exc:
-            raise _preflight_error(
-                "cannot read prepared patch payload: "
-                f"{describe_os_error(exc)}",
-                ExitCode.PAYLOAD_PREPARATION_ERROR,
-            ) from exc
-        if (
-            len(content) != prepared.size_bytes
-            or sha256(content).hexdigest() != prepared.sha256_hex
-        ):
-            raise _preflight_error(
-                "prepared patch payload changed before repository writing",
-                ExitCode.PAYLOAD_PREPARATION_ERROR,
-            )
-        loaded.append(
-            BundlePayload(
-                relative_path=prepared.relative_path,
-                content=content,
-            )
-        )
-    return tuple(loaded)
 
 
 @contextmanager
@@ -207,10 +138,9 @@ def prepare_patch_package(
     try:
         with private_request_directory(prefix="patchharbor-apply-") as private_root:
             entrypoint = _prepare_entrypoint(package, private_root)
-            payloads = _prepare_payloads(package, private_root)
             yield PreparedPatchPackage(
                 entrypoint=entrypoint,
-                payloads=payloads,
+                payloads=package.payloads,
                 execution_log_path=private_root / "execution.log",
             )
     except PatchHarborError:
