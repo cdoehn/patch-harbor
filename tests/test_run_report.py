@@ -7,6 +7,7 @@ from uuid import UUID
 
 import pytest
 
+from patchharbor.errors import ErrorKind, ExitCode, PatchHarborError
 from patchharbor.models import (
     GitObjectFormat,
     GitObjectId,
@@ -190,33 +191,92 @@ def test_run_report_redacts_secret_environment_values(
     )
 
 
-def test_apply_primary_outcome_is_independent_from_bundle_publication() -> None:
+@pytest.mark.parametrize(
+    ("error", "expected_kind"),
+    (
+        (
+            PatchHarborError(
+                "mismatch",
+                ExitCode.STATE_MISMATCH,
+                error_kind=ErrorKind.STATE_MISMATCH,
+            ),
+            PrimaryResultKind.STATE_MISMATCH,
+        ),
+        (
+            PatchHarborError(
+                "busy",
+                ExitCode.REPOSITORY_BUSY,
+                error_kind=ErrorKind.REPOSITORY_BUSY,
+            ),
+            PrimaryResultKind.REPOSITORY_BUSY,
+        ),
+        (
+            PatchHarborError(
+                "repository",
+                ExitCode.REPOSITORY_ERROR,
+                error_kind=ErrorKind.REPOSITORY_RESOLUTION_ERROR,
+            ),
+            PrimaryResultKind.REPOSITORY_ERROR,
+        ),
+        (
+            PatchHarborError(
+                "invalid entrypoint",
+                ExitCode.NO_VALID_SCRIPT,
+            ),
+            PrimaryResultKind.VALIDATION_ERROR,
+        ),
+        (
+            PatchHarborError(
+                "execution",
+                ExitCode.EXECUTION_ERROR,
+            ),
+            PrimaryResultKind.EXECUTION_ERROR,
+        ),
+    ),
+)
+def test_apply_primary_outcome_maps_tool_errors_once(
+    error: PatchHarborError,
+    expected_kind: PrimaryResultKind,
+) -> None:
+    outcome = ApplyPrimaryOutcome.from_tool_error(error)
+
+    assert outcome.result.kind is expected_kind
+    assert outcome.result.success is False
+    assert outcome.result.patchharbor_error_code == int(error.exit_code)
+    assert outcome.exit_code == int(error.exit_code)
+
+
+def test_apply_primary_outcome_keeps_primary_and_bundle_results_separate() -> None:
     dry_run = ApplyPrimaryOutcome.dry_run_success()
-    failure = ApplyPrimaryOutcome.tool_failure(
-        kind=PrimaryResultKind.VALIDATION_ERROR,
-        exit_code=3,
+    failure = ApplyPrimaryOutcome.from_tool_error(
+        PatchHarborError("missing interpreter", ExitCode.INTERPRETER_ERROR)
     )
 
     assert dry_run.result.kind is PrimaryResultKind.DRY_RUN_SUCCESS
-    assert dry_run.result.success is True
-    assert dry_run.exit_code == 0
+    assert dry_run.process_exit_code_for(ResultBundleStatus.CREATED) == 0
+    assert dry_run.process_exit_code_for(ResultBundleStatus.FAILED) == int(
+        ExitCode.RESULT_BUNDLE_ERROR
+    )
     assert failure.result.kind is PrimaryResultKind.VALIDATION_ERROR
-    assert failure.result.success is False
-    assert failure.result.patchharbor_error_code == 3
-    assert failure.exit_code == 3
+    assert failure.process_exit_code_for(ResultBundleStatus.CREATED) == int(
+        ExitCode.INTERPRETER_ERROR
+    )
+    assert failure.process_exit_code_for(ResultBundleStatus.FAILED) == int(
+        ExitCode.INTERPRETER_ERROR
+    )
 
     with pytest.raises(ValueError):
         ApplyPrimaryOutcome(
             result=PrimaryResult.dry_run_success_result(),
-            exit_code=11,
+            exit_code=int(ExitCode.RESULT_BUNDLE_ERROR),
         )
     with pytest.raises(ValueError):
         ApplyPrimaryOutcome(
             result=PrimaryResult.tool_failure(
                 kind=PrimaryResultKind.VALIDATION_ERROR,
-                patchharbor_error_code=3,
+                patchharbor_error_code=int(ExitCode.NO_VALID_SCRIPT),
             ),
-            exit_code=5,
+            exit_code=int(ExitCode.INTERPRETER_ERROR),
         )
 
 

@@ -960,11 +960,14 @@ Ein selbstbeschreibendes ZIP-Paket kann streng validiert, genau einem registrier
 
 ## Review nach Meilenstein 4
 
-- Definition of Done gegen das reale Verhalten prüfen.
-- falsche Annahmen und unnötig gewordene spätere Schritte dokumentieren.
-- verbleibenden Plan nur minimal anpassen.
-- sicherstellen, dass PatchHarbor weiterhin ein kontrollierter Runner bleibt.
-- Review im letzten Clean-Commit des Meilensteins abschließen; kein separater Review-Commit.
+**Ergebnis nach 4.e.C:**
+
+- Die Definition of Done ist durch echte ZIP-, Manifest-, Ressourcen-, Repository-, Lock-, Mismatch-, Preflight- und Dry-Run-Tests abgedeckt.
+- Paketauflösung und Preflight verwenden jeweils genau eine gemeinsame Pipeline; ein zweiter Repository-Validator und ein Dry-Run-Sonderparser sind nicht erforderlich.
+- Toolfehler werden einmal in das primäre Apply-Ergebnis überführt; die Priorität zwischen primärem Ergebnis und Result-Bundle-Fehler ist zentral festgelegt.
+- Tests behandeln Exit-Codes, Repository- und Prozesswirkungen sowie geschlossene JSON-Daten als Vertrag, nicht Text- oder TUI-Formulierungen.
+- Das `ApplyMutationGate` ist als Grenze vor der ersten Repository-Mutation eingefroren; Meilenstein 5 setzt dort an, ohne den manuellen Runner oder den verbleibenden Plan fachlich zu ändern.
+- Es wurde keine Mutation, Execution- oder Watcher-Funktion vorweggenommen; PatchHarbor bleibt ein kontrollierter Runner.
 
 ---
 

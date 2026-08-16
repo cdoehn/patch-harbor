@@ -394,7 +394,7 @@ def test_registration_layers_have_one_directional_dependency_flow() -> None:
         "temporary_resources",
         "user_paths",
     }
-    assert _local_imports("run_report") == {"models"}
+    assert _local_imports("run_report") == {"errors", "models"}
     assert _local_imports("locks") == {
         "errors",
         "models",

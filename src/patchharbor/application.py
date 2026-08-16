@@ -18,7 +18,6 @@ from patchharbor.apply_repository import (
 )
 from patchharbor.bundles import resolve_patch_bundle
 from patchharbor.errors import (
-    ErrorKind,
     ExitCode,
     PatchHarborError,
     state_mismatch_error,
@@ -59,8 +58,6 @@ from patchharbor.result_bundle import (
 )
 from patchharbor.run_report import (
     ApplyPrimaryOutcome,
-    PrimaryResultKind,
-    ResultBundleStatus,
     RunReport,
     RunSession,
 )
@@ -113,38 +110,6 @@ def validate_patch_package(
     return _validate_patch_package(path, resource_policy=resource_policy)
 
 
-def _primary_kind_for_apply_error(
-    error: PatchHarborError,
-) -> PrimaryResultKind:
-    if error.error_kind is ErrorKind.STATE_MISMATCH:
-        return PrimaryResultKind.STATE_MISMATCH
-    if error.error_kind is ErrorKind.REPOSITORY_BUSY:
-        return PrimaryResultKind.REPOSITORY_BUSY
-    if error.error_kind in {
-        ErrorKind.REGISTRY_ERROR,
-        ErrorKind.REPOSITORY_RESOLUTION_ERROR,
-        ErrorKind.UNSUPPORTED_REPOSITORY_STATE,
-    }:
-        return PrimaryResultKind.REPOSITORY_ERROR
-    if error.exit_code in {
-        ExitCode.NO_VALID_SCRIPT,
-        ExitCode.INTERPRETER_ERROR,
-        ExitCode.PAYLOAD_PREPARATION_ERROR,
-        ExitCode.PATCH_PACKAGE_ERROR,
-    }:
-        return PrimaryResultKind.VALIDATION_ERROR
-    return PrimaryResultKind.EXECUTION_ERROR
-
-
-def _primary_outcome_for_error(
-    error: PatchHarborError,
-) -> ApplyPrimaryOutcome:
-    return ApplyPrimaryOutcome.tool_failure(
-        kind=_primary_kind_for_apply_error(error),
-        exit_code=int(error.exit_code),
-    )
-
-
 def _complete_apply_result_bundle(
     resolved: SafeResolvedRepository,
     package: ValidatedPatchPackage,
@@ -166,38 +131,6 @@ def _complete_apply_result_bundle(
         session=session,
         dry_run=dry_run,
         primary_outcome=primary_outcome,
-    )
-
-
-def _reported_apply_error(
-    error: PatchHarborError,
-    report: RunReport,
-) -> PatchHarborError:
-    bundle_result = report.result_bundle
-    return PatchHarborError(
-        str(error),
-        error.exit_code,
-        error_kind=error.error_kind,
-        emergency_diagnostics_path=bundle_result.emergency_diagnostics_path,
-        emergency_diagnostics_failed=(
-            bundle_result.status is ResultBundleStatus.FAILED
-            and bundle_result.emergency_diagnostics_path is None
-        ),
-        run_report=report,
-    )
-
-
-def _result_bundle_error(report: RunReport) -> PatchHarborError:
-    bundle_result = report.result_bundle
-    return PatchHarborError(
-        bundle_result.error or "cannot create the Result Bundle",
-        ExitCode.RESULT_BUNDLE_ERROR,
-        error_kind=ErrorKind.RESULT_BUNDLE_ERROR,
-        emergency_diagnostics_path=bundle_result.emergency_diagnostics_path,
-        emergency_diagnostics_failed=(
-            bundle_result.emergency_diagnostics_path is None
-        ),
-        run_report=report,
     )
 
 
@@ -227,9 +160,9 @@ def preflight_patch_package_repository(
                 session=actual_session,
                 dry_run=dry_run,
                 warnings=package.warnings,
-                primary_outcome=_primary_outcome_for_error(error),
+                primary_outcome=ApplyPrimaryOutcome.from_tool_error(error),
             )
-            raise _reported_apply_error(error, report)
+            raise report.reported_error(error)
 
         with ExitStack() as private_resources:
             try:
@@ -246,9 +179,9 @@ def preflight_patch_package_repository(
                     session=actual_session,
                     dry_run=dry_run,
                     warnings=package.warnings,
-                    primary_outcome=_primary_outcome_for_error(error),
+                    primary_outcome=ApplyPrimaryOutcome.from_tool_error(error),
                 )
-                raise _reported_apply_error(error, report) from error
+                raise report.reported_error(error) from error
 
             yield ApplyMutationGate(
                 session=actual_session,
@@ -279,22 +212,9 @@ def dry_run_patch_package(
             warnings=mutation_gate.warnings,
             primary_outcome=ApplyPrimaryOutcome.dry_run_success(),
         )
-        if report.result_bundle.status is ResultBundleStatus.FAILED:
-            raise _result_bundle_error(report)
+        if report.process_exit_code != 0:
+            raise report.reported_error()
         return report
-
-
-def validate_patch_package_repository(
-    package: ValidatedPatchPackage,
-    *,
-    output_directory: Path | None = None,
-) -> RepositoryContext:
-    """Validate one package through the shared pre-mutation pipeline."""
-    with preflight_patch_package_repository(
-        package,
-        output_directory=output_directory,
-    ) as mutation_gate:
-        return mutation_gate.context
 
 
 def register_repository(

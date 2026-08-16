@@ -9,7 +9,6 @@ from pathlib import Path
 from uuid import UUID
 
 from patchharbor.errors import (
-    ErrorKind,
     ExitCode,
     PatchHarborError,
     repository_resolution_error,
@@ -43,7 +42,6 @@ from patchharbor.result_bundle_target import (
 from patchharbor.run_report import (
     ApplyPrimaryOutcome,
     PrimaryResult,
-    PrimaryResultKind,
     ResultBundleResult,
     ResultBundleStatus,
     RunOperation,
@@ -212,18 +210,6 @@ def _context_document(report: RunReport) -> dict[str, object]:
     }
 
 
-def _primary_kind_for_error(error: PatchHarborError) -> PrimaryResultKind:
-    if error.error_kind is ErrorKind.REPOSITORY_BUSY:
-        return PrimaryResultKind.REPOSITORY_BUSY
-    if error.error_kind in {
-        ErrorKind.REGISTRY_ERROR,
-        ErrorKind.REPOSITORY_RESOLUTION_ERROR,
-        ErrorKind.UNSUPPORTED_REPOSITORY_STATE,
-    }:
-        return PrimaryResultKind.REPOSITORY_ERROR
-    return PrimaryResultKind.EXECUTION_ERROR
-
-
 def _preserve_emergency_diagnostics(
     run_directory: Path,
     report: RunReport,
@@ -260,10 +246,7 @@ def _manual_bundle_failure(
         repository=repository,
         repo_id=repo_id,
         warnings=(),
-        primary_result=PrimaryResult.tool_failure(
-            kind=_primary_kind_for_error(error),
-            patchharbor_error_code=int(error.exit_code),
-        ),
+        primary_result=PrimaryResult.from_tool_error(error),
         result_bundle=bundle_result,
         process_exit_code=int(ExitCode.RESULT_BUNDLE_ERROR),
     )
@@ -295,12 +278,9 @@ def _apply_report(
     primary_outcome: ApplyPrimaryOutcome,
     result_bundle: ResultBundleResult,
 ) -> RunReport:
-    process_exit_code = primary_outcome.exit_code
-    if (
-        primary_outcome.result.success
-        and result_bundle.status is ResultBundleStatus.FAILED
-    ):
-        process_exit_code = int(ExitCode.RESULT_BUNDLE_ERROR)
+    process_exit_code = primary_outcome.process_exit_code_for(
+        result_bundle.status
+    )
     return RunReport(
         timing=session.finish(),
         operation=RunOperation.APPLY,

@@ -12,6 +12,7 @@ from time import monotonic
 from typing import Mapping
 from uuid import UUID, uuid4
 
+from patchharbor.errors import ErrorKind, ExitCode, PatchHarborError
 from patchharbor.models import RepositoryContext, RepositoryId, RepositoryPath
 
 
@@ -47,6 +48,28 @@ class PrimaryResultKind(str, Enum):
     TIMEOUT = "timeout"
     INTERRUPTED = "interrupted"
     EXECUTION_ERROR = "execution_error"
+
+    @classmethod
+    def for_tool_error(cls, error: PatchHarborError) -> PrimaryResultKind:
+        """Map one tool failure to its stable primary-result category."""
+        if error.error_kind is ErrorKind.STATE_MISMATCH:
+            return cls.STATE_MISMATCH
+        if error.error_kind is ErrorKind.REPOSITORY_BUSY:
+            return cls.REPOSITORY_BUSY
+        if error.error_kind in {
+            ErrorKind.REGISTRY_ERROR,
+            ErrorKind.REPOSITORY_RESOLUTION_ERROR,
+            ErrorKind.UNSUPPORTED_REPOSITORY_STATE,
+        }:
+            return cls.REPOSITORY_ERROR
+        if error.exit_code in {
+            ExitCode.NO_VALID_SCRIPT,
+            ExitCode.INTERPRETER_ERROR,
+            ExitCode.PAYLOAD_PREPARATION_ERROR,
+            ExitCode.PATCH_PACKAGE_ERROR,
+        }:
+            return cls.VALIDATION_ERROR
+        return cls.EXECUTION_ERROR
 
 
 class ResultBundleStatus(str, Enum):
@@ -237,6 +260,14 @@ class PrimaryResult:
             patchharbor_error_code=patchharbor_error_code,
         )
 
+    @classmethod
+    def from_tool_error(cls, error: PatchHarborError) -> PrimaryResult:
+        """Create the structured primary result for one tool failure."""
+        return cls.tool_failure(
+            kind=PrimaryResultKind.for_tool_error(error),
+            patchharbor_error_code=int(error.exit_code),
+        )
+
     def as_document(self) -> dict[str, object]:
         return {
             "kind": self.kind_text,
@@ -305,6 +336,26 @@ class ApplyPrimaryOutcome:
             ),
             exit_code=exit_code,
         )
+
+    @classmethod
+    def from_tool_error(cls, error: PatchHarborError) -> ApplyPrimaryOutcome:
+        """Create one primary outcome without duplicating error mappings."""
+        return cls(
+            result=PrimaryResult.from_tool_error(error),
+            exit_code=int(error.exit_code),
+        )
+
+    def process_exit_code_for(
+        self,
+        result_bundle_status: ResultBundleStatus,
+    ) -> int:
+        """Apply the specified Result-Bundle precedence to the process exit."""
+        if (
+            self.result.success
+            and result_bundle_status is ResultBundleStatus.FAILED
+        ):
+            return int(ExitCode.RESULT_BUNDLE_ERROR)
+        return self.exit_code
 
 
 @dataclass(frozen=True)
@@ -493,6 +544,34 @@ class RunReport:
 
     def with_result_bundle(self, result: ResultBundleResult) -> RunReport:
         return replace(self, result_bundle=result)
+
+    def reported_error(
+        self,
+        primary_error: PatchHarborError | None = None,
+    ) -> PatchHarborError:
+        """Attach this completed report to the effective Apply failure."""
+        bundle_result = self.result_bundle
+        if primary_error is None:
+            message = bundle_result.error or "cannot create the Result Bundle"
+            exit_code = ExitCode.RESULT_BUNDLE_ERROR
+            error_kind = ErrorKind.RESULT_BUNDLE_ERROR
+        else:
+            message = str(primary_error)
+            exit_code = primary_error.exit_code
+            error_kind = primary_error.error_kind
+        return PatchHarborError(
+            message,
+            exit_code,
+            error_kind=error_kind,
+            emergency_diagnostics_path=(
+                bundle_result.emergency_diagnostics_path
+            ),
+            emergency_diagnostics_failed=(
+                bundle_result.status is ResultBundleStatus.FAILED
+                and bundle_result.emergency_diagnostics_path is None
+            ),
+            run_report=self,
+        )
 
     def as_run_document(self) -> dict[str, object]:
         context = self.context

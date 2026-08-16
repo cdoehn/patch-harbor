@@ -9,11 +9,9 @@ import pytest
 import patchharbor.apply_preflight as apply_preflight_module
 import patchharbor.result_bundle_publication as publication_module
 from patchharbor.application import (
-    ApplyMutationGate,
     dry_run_patch_package,
     preflight_patch_package_repository,
     register_repository,
-    validate_patch_package_repository,
 )
 from patchharbor.apply_repository import safely_resolved_repository
 from patchharbor.errors import ExitCode, PatchHarborError
@@ -77,6 +75,18 @@ def _set_private_temp(
     for name in ("TMPDIR", "TEMP", "TMP"):
         monkeypatch.setenv(name, str(path))
     monkeypatch.setattr(tempfile, "tempdir", None)
+
+
+def _complete_preflight(
+    package: ValidatedPatchPackage,
+    *,
+    output_directory: Path | None = None,
+) -> None:
+    with preflight_patch_package_repository(
+        package,
+        output_directory=output_directory,
+    ):
+        pass
 
 
 def test_safe_resolution_owns_output_reservation_and_repository_lock(
@@ -170,7 +180,7 @@ def test_state_mismatch_publishes_while_repository_lock_is_held(
     output_directory = tmp_path / "results"
 
     with pytest.raises(PatchHarborError) as captured:
-        validate_patch_package_repository(
+        _complete_preflight(
             _package(manifest),
             output_directory=output_directory,
         )
@@ -350,16 +360,13 @@ def test_matching_package_preflights_private_resources_and_cleans_them(
         entrypoint=entrypoint,
         payloads=(payload,),
     )
-    with preflight_patch_package_repository(package) as preflight:
-        assert isinstance(preflight, ApplyMutationGate)
-        assert preflight.package is package
-        assert preflight.resolved.context == context
-        prepared = preflight.prepared_package
+    with preflight_patch_package_repository(package) as mutation_gate:
+        prepared = mutation_gate.prepared_package
         entrypoint_path = prepared.entrypoint.path
         payload_path = prepared.payloads[0].path
 
-        assert preflight.context == context
-        assert preflight.warnings
+        assert mutation_gate.context == context
+        assert mutation_gate.warnings
         assert entrypoint_path.read_bytes() == entrypoint
         assert prepared.entrypoint.size_bytes == len(entrypoint)
         assert len(prepared.entrypoint.sha256_hex) == 64
@@ -404,7 +411,7 @@ def test_entrypoint_preflight_rejects_invalid_scripts_without_repository_files(
     context = register_repository(repository)
 
     with pytest.raises(PatchHarborError) as captured:
-        validate_patch_package_repository(
+        _complete_preflight(
             _package(
                 _manifest(context),
                 entrypoint=entrypoint,
@@ -447,7 +454,7 @@ def test_payload_preflight_detects_staged_content_mismatch(
     )
 
     with pytest.raises(PatchHarborError) as captured:
-        validate_patch_package_repository(
+        _complete_preflight(
             _package(
                 _manifest(context),
                 payloads=(
@@ -500,7 +507,7 @@ def test_interpreter_availability_is_checked_before_payload_preparation(
     )
 
     with pytest.raises(PatchHarborError) as captured:
-        validate_patch_package_repository(
+        _complete_preflight(
             _package(
                 _manifest(context),
                 payloads=(
