@@ -4,14 +4,13 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from contextlib import ExitStack, contextmanager
-from dataclasses import dataclass, replace
-from hashlib import sha256
+from dataclasses import dataclass
 from pathlib import Path
-import sys
 from typing import TextIO
 
 from patchharbor.apply_preflight import (
     PreparedPatchPackage,
+    load_prepared_payloads,
     prepare_patch_package,
 )
 from patchharbor.apply_repository import (
@@ -26,11 +25,10 @@ from patchharbor.errors import (
 )
 from patchharbor.execution import (
     DEFAULT_TIMEOUT_SECONDS,
-    execute_prepared_script,
+    execute_prepared_script_with_log,
     execute_script_text,
 )
 from patchharbor.models import (
-    BundlePayload,
     BundleScript,
     InputArtifact,
     RegistryListResult,
@@ -47,7 +45,6 @@ from patchharbor.patch_package import (
     validate_patch_package as _validate_patch_package,
 )
 from patchharbor.payload_files import write_bundle_payloads
-from patchharbor.platform.errors import describe_os_error
 from patchharbor.presentation import DashboardPresentation, PresentedFile
 from patchharbor.registration import (
     list_registered_repositories,
@@ -86,8 +83,11 @@ class ApplyMutationGate:
     resolved: SafeResolvedRepository
     package: ValidatedPatchPackage
     prepared_package: PreparedPatchPackage
+    dry_run: bool
 
     def __post_init__(self) -> None:
+        if not isinstance(self.dry_run, bool):
+            raise ValueError("mutation gate dry-run flag must be boolean")
         if not self.resolved.matches_manifest_state(self.package.manifest):
             raise ValueError("mutation gate requires the exact manifest state")
 
@@ -139,6 +139,24 @@ def _complete_apply_result_bundle(
         warnings=warnings,
         session=session,
         dry_run=dry_run,
+        primary_outcome=primary_outcome,
+        execution_log=execution_log,
+    )
+
+
+def _complete_mutation_result_bundle(
+    mutation_gate: ApplyMutationGate,
+    *,
+    primary_outcome: ApplyPrimaryOutcome,
+    execution_log: bytes | None = None,
+) -> RunReport:
+    """Complete one apply result from the single checked mutation gate."""
+    return _complete_apply_result_bundle(
+        mutation_gate.resolved,
+        mutation_gate.package,
+        session=mutation_gate.session,
+        dry_run=mutation_gate.dry_run,
+        warnings=mutation_gate.warnings,
         primary_outcome=primary_outcome,
         execution_log=execution_log,
     )
@@ -198,6 +216,7 @@ def preflight_patch_package_repository(
                 resolved=resolved,
                 package=package,
                 prepared_package=prepared_package,
+                dry_run=dry_run,
             )
 
 
@@ -214,47 +233,13 @@ def dry_run_patch_package(
         session=session,
         dry_run=True,
     ) as mutation_gate:
-        report = _complete_apply_result_bundle(
-            mutation_gate.resolved,
-            package,
-            session=session,
-            dry_run=True,
-            warnings=mutation_gate.warnings,
+        report = _complete_mutation_result_bundle(
+            mutation_gate,
             primary_outcome=ApplyPrimaryOutcome.dry_run_success(),
         )
         if report.process_exit_code != 0:
             raise report.reported_error()
         return report
-
-
-def _prepared_payloads_for_write(
-    prepared_package: PreparedPatchPackage,
-) -> tuple[BundlePayload, ...]:
-    payloads: list[BundlePayload] = []
-    for prepared in prepared_package.payloads:
-        try:
-            content = prepared.path.read_bytes()
-        except OSError as exc:
-            raise PatchHarborError(
-                "cannot read prepared patch payload: "
-                f"{describe_os_error(exc)}",
-                ExitCode.PAYLOAD_PREPARATION_ERROR,
-            ) from exc
-        if (
-            len(content) != prepared.size_bytes
-            or sha256(content).hexdigest() != prepared.sha256_hex
-        ):
-            raise PatchHarborError(
-                "prepared patch payload changed before repository writing",
-                ExitCode.PAYLOAD_PREPARATION_ERROR,
-            )
-        payloads.append(
-            BundlePayload(
-                relative_path=prepared.relative_path,
-                content=content,
-            )
-        )
-    return tuple(payloads)
 
 
 def apply_patch_package(
@@ -273,50 +258,36 @@ def apply_patch_package(
         dry_run=False,
     ) as mutation_gate:
         prepared_package = mutation_gate.prepared_package
-        write_bundle_payloads(
-            _prepared_payloads_for_write(prepared_package),
-            cwd=mutation_gate.resolved.repository.value,
-        )
-
-        actual_output = output or OutputTargets(visible_text_stream=sys.stdout)
         try:
-            with prepared_package.execution_log_path.open("w+b") as execution_log:
-                exit_code = execute_prepared_script(
-                    prepared_package.entrypoint.path,
-                    interpreter=prepared_package.entrypoint.interpreter,
-                    cwd=mutation_gate.resolved.repository.value,
-                    timeout_seconds=timeout_seconds,
-                    output=replace(
-                        actual_output,
-                        raw_output_stream=execution_log,
-                    ),
-                )
-                execution_log.flush()
-                execution_log.seek(0)
-                execution_log_bytes = execution_log.read()
-        except PatchHarborError:
-            raise
-        except OSError as exc:
-            raise PatchHarborError(
-                "cannot capture entrypoint output: "
-                f"{describe_os_error(exc)}",
-                ExitCode.EXECUTION_ERROR,
-            ) from exc
+            write_bundle_payloads(
+                load_prepared_payloads(prepared_package.payloads),
+                cwd=mutation_gate.resolved.repository.value,
+            )
+        except PatchHarborError as error:
+            report = _complete_mutation_result_bundle(
+                mutation_gate,
+                primary_outcome=ApplyPrimaryOutcome.from_tool_error(error),
+            )
+            raise report.reported_error(error) from error
 
-        if exit_code != 0:
+        execution = execute_prepared_script_with_log(
+            prepared_package.entrypoint.path,
+            interpreter=prepared_package.entrypoint.interpreter,
+            cwd=mutation_gate.resolved.repository.value,
+            timeout_seconds=timeout_seconds,
+            execution_log_path=prepared_package.execution_log_path,
+            output=output,
+        )
+        if execution.exit_code != 0:
             raise PatchHarborError(
-                f"entrypoint exited with code {exit_code}",
+                f"entrypoint exited with code {execution.exit_code}",
                 ExitCode.EXECUTION_ERROR,
             )
 
-        report = _complete_apply_result_bundle(
-            mutation_gate.resolved,
-            package,
-            session=session,
-            dry_run=False,
-            warnings=mutation_gate.warnings,
+        report = _complete_mutation_result_bundle(
+            mutation_gate,
             primary_outcome=ApplyPrimaryOutcome.entrypoint_success(),
-            execution_log=execution_log_bytes,
+            execution_log=execution.output,
         )
         if report.process_exit_code != 0:
             raise report.reported_error()

@@ -10,6 +10,7 @@ from pathlib import Path
 
 from patchharbor.errors import ExitCode, PatchHarborError
 from patchharbor.interpreters import ResolvedInterpreter, resolve_script_interpreter
+from patchharbor.models import BundlePayload
 from patchharbor.parser import ParsedScript, ScriptFormatError, parse_script
 from patchharbor.patch_package import ValidatedPatchPackage
 from patchharbor.physical_paths import is_physically_within
@@ -144,6 +145,37 @@ def _prepare_payloads(
             )
         )
     return tuple(prepared)
+
+
+def load_prepared_payloads(
+    payloads: tuple[PreparedPayload, ...],
+) -> tuple[BundlePayload, ...]:
+    """Reload and verify private payload bytes for the mutation service."""
+    loaded: list[BundlePayload] = []
+    for prepared in payloads:
+        try:
+            content = prepared.path.read_bytes()
+        except OSError as exc:
+            raise _preflight_error(
+                "cannot read prepared patch payload: "
+                f"{describe_os_error(exc)}",
+                ExitCode.PAYLOAD_PREPARATION_ERROR,
+            ) from exc
+        if (
+            len(content) != prepared.size_bytes
+            or sha256(content).hexdigest() != prepared.sha256_hex
+        ):
+            raise _preflight_error(
+                "prepared patch payload changed before repository writing",
+                ExitCode.PAYLOAD_PREPARATION_ERROR,
+            )
+        loaded.append(
+            BundlePayload(
+                relative_path=prepared.relative_path,
+                content=content,
+            )
+        )
+    return tuple(loaded)
 
 
 @contextmanager

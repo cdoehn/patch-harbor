@@ -304,6 +304,7 @@ def test_registration_layers_have_one_directional_dependency_flow() -> None:
     assert _local_imports("apply_preflight") == {
         "errors",
         "interpreters",
+        "models",
         "parser",
         "patch_package",
         "physical_paths",
@@ -564,6 +565,20 @@ def test_apply_resolution_is_not_duplicated_in_application() -> None:
             "user_paths",
         }
     )
+
+
+def test_apply_orchestrator_delegates_mutation_execution_and_result_services() -> None:
+    imports = _local_imports("application")
+    source = (PACKAGE_ROOT / "application.py").read_text(encoding="utf-8")
+
+    assert {
+        "apply_preflight",
+        "execution",
+        "payload_files",
+        "result_bundle",
+    }.issubset(imports)
+    assert "execution_log_path.open" not in source
+    assert "sha256(" not in source
 
 
 def test_runtime_module_dependencies_are_acyclic() -> None:

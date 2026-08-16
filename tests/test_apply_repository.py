@@ -1,14 +1,19 @@
 from __future__ import annotations
 
 from dataclasses import replace
+import errno
+import json
 from pathlib import Path
 import tempfile
+import zipfile
 
 import pytest
 
 import patchharbor.apply_preflight as apply_preflight_module
+import patchharbor.payload_files as payload_files_module
 import patchharbor.result_bundle_publication as publication_module
 from patchharbor.application import (
+    apply_patch_package,
     dry_run_patch_package,
     preflight_patch_package_repository,
     register_repository,
@@ -16,6 +21,7 @@ from patchharbor.application import (
 from patchharbor.apply_repository import safely_resolved_repository
 from patchharbor.errors import ExitCode, PatchHarborError
 from patchharbor.models import BundlePayload, RepositoryContext
+from patchharbor.platform.filesystem import FileSystemOperationError
 from patchharbor.patch_manifest import (
     PATCH_FORMAT_VERSION,
     PATCH_MARKER,
@@ -27,7 +33,7 @@ from patchharbor.run_report import (
     ResultBundleStatus,
     RunSession,
 )
-from tests.platform_support import project_environment
+from tests.platform_support import native_script, project_environment
 from tests.registration_support import (
     create_repository,
     probe_registry_lock,
@@ -329,6 +335,87 @@ def test_preflight_failure_bundles_before_releasing_repository_lock(
     assert report.result_bundle.path is not None
     assert observed_lock_codes == [int(ExitCode.REPOSITORY_BUSY)]
     assert probe_repository_lock(str(context.repo_id), environment) == 0
+
+
+def test_payload_write_failure_keeps_partial_files_without_starting_entrypoint(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    set_isolated_user_environment(monkeypatch, tmp_path / "user")
+    repository = create_repository(tmp_path / "repository")
+    context = register_repository(repository)
+    output_directory = tmp_path / "results"
+    entrypoint = native_script(
+        "# PATCHHARBOR META invalid\nprintf executed > executed.txt",
+        "# PATCHHARBOR META invalid\n"
+        "[System.IO.File]::WriteAllText('executed.txt', 'executed')",
+    ).encode("utf-8")
+    package = _package(
+        _manifest(context),
+        entrypoint=entrypoint,
+        payloads=(
+            BundlePayload(
+                relative_path="files/first.bin",
+                content=b"first",
+            ),
+            BundlePayload(
+                relative_path="files/second.bin",
+                content=b"second",
+            ),
+        ),
+    )
+    original_replace = payload_files_module.atomic_replace_bytes
+
+    def fail_second_write(target: Path, content: bytes) -> None:
+        if target.name == "second.bin":
+            raise FileSystemOperationError(
+                "cannot replace target",
+                OSError(errno.EACCES, "simulated write failure"),
+            )
+        original_replace(target, content)
+
+    monkeypatch.setattr(
+        payload_files_module,
+        "atomic_replace_bytes",
+        fail_second_write,
+    )
+
+    with pytest.raises(PatchHarborError) as captured:
+        apply_patch_package(
+            package,
+            output_directory=output_directory,
+        )
+
+    report = captured.value.run_report
+    assert captured.value.exit_code is ExitCode.PAYLOAD_PREPARATION_ERROR
+    assert report is not None
+    assert report.process_exit_code == int(ExitCode.PAYLOAD_PREPARATION_ERROR)
+    assert report.primary_result.kind is PrimaryResultKind.VALIDATION_ERROR
+    assert report.primary_result.entrypoint_started is False
+    assert report.result_bundle.status is ResultBundleStatus.CREATED
+    assert report.warnings
+    assert (repository / "files" / "first.bin").read_bytes() == b"first"
+    assert not (repository / "files" / "second.bin").exists()
+    assert not (repository / "executed.txt").exists()
+
+    bundle_path = report.result_bundle.path
+    assert bundle_path is not None
+    with zipfile.ZipFile(bundle_path) as archive:
+        names = set(archive.namelist())
+        manifest = json.loads(archive.read("manifest.json"))
+        run = json.loads(archive.read("logs/run.json"))
+        bundled_first = archive.read("untracked/files/first.bin")
+
+    assert bundled_first == b"first"
+    assert "logs/execution.log" not in names
+    assert manifest["run_id"] == report.run_id_text
+    assert manifest["expected_base_commit"] == str(context.base_commit)
+    assert manifest["actual_base_commit"] == str(context.base_commit)
+    assert manifest["expected_state_fingerprint"] == context.state_fingerprint
+    assert manifest["actual_state_fingerprint"] != context.state_fingerprint
+    assert run["warnings"] == list(report.warnings)
+    assert run["primary_result"]["entrypoint_started"] is False
+    assert probe_repository_lock(str(context.repo_id), project_environment()) == 0
 
 
 def test_matching_package_preflights_private_resources_and_cleans_them(
