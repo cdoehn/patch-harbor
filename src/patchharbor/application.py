@@ -43,7 +43,10 @@ from patchharbor.patch_package import (
     resolve_patch_package as _resolve_patch_package,
     validate_patch_package as _validate_patch_package,
 )
-from patchharbor.payload_files import write_bundle_payloads
+from patchharbor.payload_files import (
+    validate_bundle_payload_targets,
+    write_bundle_payloads,
+)
 from patchharbor.presentation import DashboardPresentation, PresentedFile
 from patchharbor.registration import (
     list_registered_repositories,
@@ -51,7 +54,9 @@ from patchharbor.registration import (
     unregister_local_repository,
 )
 from patchharbor.repository_state import (
+    capture_consistent_repository_snapshot,
     capture_repository_context,
+    repository_context_from_snapshot,
     require_clean_repository,
 )
 from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY, ResourcePolicy
@@ -126,12 +131,13 @@ def _complete_apply_result_bundle(
     warnings: tuple[str, ...],
     primary_outcome: ApplyPrimaryOutcome,
     execution_log: bytes | None = None,
+    actual_context: RepositoryContext | None = None,
 ) -> RunReport:
     return create_apply_result_bundle(
         resolved.repository,
         resolved.repo_id,
         resolved.registry_snapshot,
-        resolved.context,
+        actual_context if actual_context is not None else resolved.context,
         package.manifest,
         target=resolved.result_target,
         publication=resolved.result_publication,
@@ -148,6 +154,7 @@ def _complete_mutation_result_bundle(
     *,
     primary_outcome: ApplyPrimaryOutcome,
     execution_log: bytes | None = None,
+    actual_context: RepositoryContext | None = None,
 ) -> RunReport:
     """Complete one apply result from the single checked mutation gate."""
     return _complete_apply_result_bundle(
@@ -158,6 +165,7 @@ def _complete_mutation_result_bundle(
         warnings=mutation_gate.warnings,
         primary_outcome=primary_outcome,
         execution_log=execution_log,
+        actual_context=actual_context,
     )
 
 
@@ -198,6 +206,10 @@ def preflight_patch_package_repository(
                         package,
                         repository=resolved.repository.value,
                     )
+                )
+                validate_bundle_payload_targets(
+                    prepared_package.payloads,
+                    cwd=resolved.repository.value,
                 )
             except PatchHarborError as error:
                 report = _complete_apply_result_bundle(
@@ -241,14 +253,62 @@ def dry_run_patch_package(
         return report
 
 
+def _capture_mutation_context(
+    mutation_gate: ApplyMutationGate,
+) -> RepositoryContext:
+    """Capture the repository again immediately before its first mutation."""
+    resolved = mutation_gate.resolved
+    snapshot = capture_consistent_repository_snapshot(resolved.repository)
+    return repository_context_from_snapshot(
+        resolved.repository,
+        resolved.repo_id,
+        snapshot,
+    )
+
+
+def _matches_initial_and_manifest_context(
+    mutation_gate: ApplyMutationGate,
+    current: RepositoryContext,
+) -> bool:
+    manifest = mutation_gate.package.manifest
+    return (
+        current == mutation_gate.resolved.context
+        and manifest.repo_id == current.repo_id
+        and manifest.base_commit == current.base_commit
+        and manifest.fingerprint_algorithm == current.fingerprint_algorithm
+        and manifest.state_fingerprint == current.state_fingerprint
+    )
+
+
 def _write_mutation_payloads(mutation_gate: ApplyMutationGate) -> None:
-    """Write checked payloads or raise their already bundled primary failure."""
+    """Revalidate the mutation boundary, then write checked payloads."""
     try:
+        current_context = _capture_mutation_context(mutation_gate)
+        if not _matches_initial_and_manifest_context(
+            mutation_gate,
+            current_context,
+        ):
+            error = state_mismatch_error(
+                "repository changed after apply preflight"
+            )
+            report = _complete_mutation_result_bundle(
+                mutation_gate,
+                primary_outcome=ApplyPrimaryOutcome.from_tool_error(error),
+                actual_context=current_context,
+            )
+            raise report.reported_error(error)
+
+        validate_bundle_payload_targets(
+            mutation_gate.prepared_package.payloads,
+            cwd=mutation_gate.resolved.repository.value,
+        )
         write_bundle_payloads(
             mutation_gate.prepared_package.payloads,
             cwd=mutation_gate.resolved.repository.value,
         )
     except PatchHarborError as error:
+        if error.run_report is not None:
+            raise
         report = _complete_mutation_result_bundle(
             mutation_gate,
             primary_outcome=ApplyPrimaryOutcome.from_tool_error(error),

@@ -82,15 +82,15 @@ def _bundle_target(
     return final_target
 
 
-def write_bundle_payloads(
+def validate_bundle_payload_targets(
     payloads: Iterable[BundlePayload],
     *,
     cwd: Path,
-) -> None:
-    """Validate all ZIP payloads, then atomically write their byte content."""
+) -> tuple[BundlePayload, ...]:
+    """Validate current parents and targets without creating repository files."""
     payload_items = tuple(payloads)
     if not payload_items:
-        return
+        return payload_items
 
     try:
         validate_bundle_member_paths(
@@ -105,6 +105,18 @@ def write_bundle_payloads(
             payload.relative_path,
             create_parents=False,
         )
+    return payload_items
+
+
+def write_bundle_payloads(
+    payloads: Iterable[BundlePayload],
+    *,
+    cwd: Path,
+) -> None:
+    """Validate all ZIP payloads, then atomically write their byte content."""
+    payload_items = validate_bundle_payload_targets(payloads, cwd=cwd)
+    if not payload_items:
+        return
 
     for payload in payload_items:
         target = _bundle_target(

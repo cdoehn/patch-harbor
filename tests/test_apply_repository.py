@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import replace
 import errno
 import json
@@ -9,10 +10,12 @@ import zipfile
 
 import pytest
 
+import patchharbor.application as application_module
 import patchharbor.apply_preflight as apply_preflight_module
 import patchharbor.payload_files as payload_files_module
 import patchharbor.result_bundle_publication as publication_module
 from patchharbor.application import (
+    ApplyMutationGate,
     apply_patch_package,
     dry_run_patch_package,
     preflight_patch_package_repository,
@@ -36,6 +39,7 @@ from patchharbor.run_report import (
 from tests.platform_support import native_script, project_environment
 from tests.registration_support import (
     create_repository,
+    git,
     probe_registry_lock,
     probe_repository_lock,
     set_isolated_user_environment,
@@ -335,6 +339,155 @@ def test_preflight_failure_bundles_before_releasing_repository_lock(
     assert report.result_bundle.path is not None
     assert observed_lock_codes == [int(ExitCode.REPOSITORY_BUSY)]
     assert probe_repository_lock(str(context.repo_id), environment) == 0
+
+
+@pytest.mark.parametrize("change_kind", ("base_commit", "fingerprint"))
+def test_repository_change_after_preflight_is_bundled_without_payload_write(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    change_kind: str,
+) -> None:
+    set_isolated_user_environment(monkeypatch, tmp_path / "user")
+    repository = create_repository(tmp_path / "repository")
+    context = register_repository(repository)
+    output_directory = tmp_path / "results"
+    package = _package(
+        _manifest(context),
+        entrypoint=native_script(
+            "printf executed > executed.txt",
+            "[System.IO.File]::WriteAllText('executed.txt', 'executed')",
+        ).encode("utf-8"),
+        payloads=(
+            BundlePayload(
+                relative_path="files/payload.bin",
+                content=b"payload",
+            ),
+        ),
+    )
+    original_validate = application_module.validate_bundle_payload_targets
+    validation_count = 0
+
+    def change_repository_after_first_validation(
+        payloads: Iterable[BundlePayload],
+        *,
+        cwd: Path,
+    ) -> tuple[BundlePayload, ...]:
+        nonlocal validation_count
+        validated = original_validate(payloads, cwd=cwd)
+        validation_count += 1
+        if validation_count == 1:
+            (repository / "external.txt").write_bytes(b"external change")
+            if change_kind == "base_commit":
+                git(repository, "add", "external.txt")
+                git(repository, "commit", "--quiet", "-m", "external change")
+        return validated
+
+    monkeypatch.setattr(
+        application_module,
+        "validate_bundle_payload_targets",
+        change_repository_after_first_validation,
+    )
+
+    with pytest.raises(PatchHarborError) as captured:
+        apply_patch_package(package, output_directory=output_directory)
+
+    report = captured.value.run_report
+    assert captured.value.exit_code is ExitCode.STATE_MISMATCH
+    assert report is not None
+    assert report.context is not None
+    if change_kind == "base_commit":
+        assert report.context.base_commit != context.base_commit
+        assert report.context.state_fingerprint == context.state_fingerprint
+    else:
+        assert report.context.base_commit == context.base_commit
+        assert report.context.state_fingerprint != context.state_fingerprint
+    assert report.primary_result.entrypoint_started is False
+    assert report.result_bundle.status is ResultBundleStatus.CREATED
+    assert validation_count == 1
+    assert (repository / "external.txt").read_bytes() == b"external change"
+    assert not (repository / "files" / "payload.bin").exists()
+    assert not (repository / "executed.txt").exists()
+    assert not tuple(repository.rglob(".patchharbor-*.tmp"))
+
+    bundle_path = report.result_bundle.path
+    assert bundle_path is not None
+    with zipfile.ZipFile(bundle_path) as archive:
+        names = set(archive.namelist())
+        actual_context = json.loads(archive.read("context.json"))
+        bundled_external = archive.read(
+            "base/external.txt"
+            if change_kind == "base_commit"
+            else "untracked/external.txt"
+        )
+
+    assert bundled_external == b"external change"
+    assert actual_context["base_commit"] == str(report.context.base_commit)
+    assert actual_context["state_fingerprint"] == report.context.state_fingerprint
+    assert "untracked/files/payload.bin" not in names
+    assert "logs/execution.log" not in names
+
+
+def test_parent_replaced_after_second_context_is_rejected_before_staging(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    set_isolated_user_environment(monkeypatch, tmp_path / "user")
+    repository = create_repository(tmp_path / "repository")
+    parent = repository / "assets"
+    parent.mkdir()
+    context = register_repository(repository)
+    output_directory = tmp_path / "results"
+    package = _package(
+        _manifest(context),
+        entrypoint=native_script(
+            "printf executed > executed.txt",
+            "[System.IO.File]::WriteAllText('executed.txt', 'executed')",
+        ).encode("utf-8"),
+        payloads=(
+            BundlePayload(
+                relative_path="assets/payload.bin",
+                content=b"payload",
+            ),
+        ),
+    )
+    original_capture = application_module._capture_mutation_context
+
+    def replace_parent_after_context(
+        mutation_gate: ApplyMutationGate,
+    ) -> RepositoryContext:
+        current = original_capture(mutation_gate)
+        parent.rmdir()
+        parent.write_bytes(b"not a directory")
+        return current
+
+    monkeypatch.setattr(
+        application_module,
+        "_capture_mutation_context",
+        replace_parent_after_context,
+    )
+
+    with pytest.raises(PatchHarborError) as captured:
+        apply_patch_package(package, output_directory=output_directory)
+
+    report = captured.value.run_report
+    assert captured.value.exit_code is ExitCode.PAYLOAD_PREPARATION_ERROR
+    assert report is not None
+    assert report.primary_result.entrypoint_started is False
+    assert report.result_bundle.status is ResultBundleStatus.CREATED
+    assert parent.read_bytes() == b"not a directory"
+    assert not (repository / "assets" / "payload.bin").exists()
+    assert not (repository / "executed.txt").exists()
+    assert not tuple(repository.rglob(".patchharbor-*.tmp"))
+
+    bundle_path = report.result_bundle.path
+    assert bundle_path is not None
+    with zipfile.ZipFile(bundle_path) as archive:
+        names = set(archive.namelist())
+        blocker = archive.read("untracked/assets")
+
+    assert blocker == b"not a directory"
+    assert "untracked/assets/payload.bin" not in names
+    assert "logs/execution.log" not in names
 
 
 def test_payload_write_failure_keeps_partial_files_without_starting_entrypoint(
