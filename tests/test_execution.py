@@ -7,8 +7,13 @@ import pytest
 
 from patchharbor.errors import ExitCode, PatchHarborError
 import patchharbor.execution as execution
-from patchharbor.execution import execute_script_text
+from patchharbor.execution import (
+    LoggedScriptExecutionError,
+    execute_prepared_script_with_log,
+    execute_script_text,
+)
 import patchharbor.interpreters as interpreters
+from patchharbor.interpreters import InterpreterSpec, ResolvedInterpreter
 from patchharbor.output import OutputTargets
 from patchharbor.platform import ProcessResult, ProcessState
 
@@ -264,6 +269,70 @@ def test_keyboard_interrupt_stops_the_process_tree_and_returns_130(
     assert str(raised.value) == "script aborted by user"
     assert process_tree.closed == 1
     assert process_tree.exit_exception is PatchHarborError
+
+
+def test_prepared_timeout_preserves_output_for_result_bundle(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    process_tree = _FakeProcessTree(
+        result=ProcessResult(ProcessState.TIMED_OUT),
+        output_bytes=b"before-timeout\n",
+    )
+    monkeypatch.setattr(
+        execution,
+        "create_process_tree",
+        lambda command, cwd: process_tree,
+    )
+    script_path = tmp_path / "run.sh"
+    script_path.write_text("# PATCHHARBOR\n", encoding="utf-8")
+    interpreter = ResolvedInterpreter(
+        spec=InterpreterSpec("bash", ".sh", ()),
+        executable_path="/interpreters/bash",
+    )
+
+    with pytest.raises(LoggedScriptExecutionError) as raised:
+        execute_prepared_script_with_log(
+            script_path,
+            interpreter=interpreter,
+            cwd=tmp_path,
+            timeout_seconds=0.25,
+            execution_log_path=tmp_path / "execution.log",
+        )
+
+    assert raised.value.exit_code is ExitCode.TIMEOUT
+    assert raised.value.entrypoint_started is True
+    assert raised.value.output == b"before-timeout\n"
+
+
+def test_prepared_process_start_failure_reports_no_entrypoint_start(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        execution,
+        "create_process_tree",
+        lambda command, cwd: (_ for _ in ()).throw(OSError("start failed")),
+    )
+    script_path = tmp_path / "run.sh"
+    script_path.write_text("# PATCHHARBOR\n", encoding="utf-8")
+    interpreter = ResolvedInterpreter(
+        spec=InterpreterSpec("bash", ".sh", ()),
+        executable_path="/interpreters/bash",
+    )
+
+    with pytest.raises(LoggedScriptExecutionError) as raised:
+        execute_prepared_script_with_log(
+            script_path,
+            interpreter=interpreter,
+            cwd=tmp_path,
+            timeout_seconds=7,
+            execution_log_path=tmp_path / "execution.log",
+        )
+
+    assert raised.value.exit_code is ExitCode.INTERPRETER_ERROR
+    assert raised.value.entrypoint_started is False
+    assert raised.value.output == b""
 
 
 def test_process_tree_is_closed_when_waiting_raises_an_os_error(

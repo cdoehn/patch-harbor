@@ -24,6 +24,7 @@ from patchharbor.errors import (
 )
 from patchharbor.execution import (
     DEFAULT_TIMEOUT_SECONDS,
+    LoggedScriptExecutionError,
     execute_prepared_script_with_log,
     execute_script_text,
 )
@@ -267,26 +268,47 @@ def apply_patch_package(
     ) as mutation_gate:
         _require_payload_mutation(mutation_gate)
         prepared_package = mutation_gate.prepared_package
-        execution = execute_prepared_script_with_log(
-            prepared_package.entrypoint.path,
-            interpreter=prepared_package.entrypoint.interpreter,
-            cwd=mutation_gate.resolved.repository.value,
-            timeout_seconds=timeout_seconds,
-            execution_log_path=prepared_package.execution_log_path,
-            output=output,
-        )
-        if execution.exit_code != 0:
-            raise PatchHarborError(
-                f"entrypoint exited with code {execution.exit_code}",
-                ExitCode.EXECUTION_ERROR,
+        try:
+            execution = execute_prepared_script_with_log(
+                prepared_package.entrypoint.path,
+                interpreter=prepared_package.entrypoint.interpreter,
+                cwd=mutation_gate.resolved.repository.value,
+                timeout_seconds=timeout_seconds,
+                execution_log_path=prepared_package.execution_log_path,
+                output=output,
             )
+        except LoggedScriptExecutionError as error:
+            report = _complete_mutation_result_bundle(
+                mutation_gate,
+                primary_outcome=ApplyPrimaryOutcome.from_execution_error(
+                    error,
+                    entrypoint_started=error.entrypoint_started,
+                ),
+                execution_log=(error.output if error.entrypoint_started else None),
+            )
+            raise report.reported_error(error) from error
+        except PatchHarborError as error:
+            report = _complete_mutation_result_bundle(
+                mutation_gate,
+                primary_outcome=ApplyPrimaryOutcome.from_execution_error(
+                    error,
+                    entrypoint_started=False,
+                ),
+            )
+            raise report.reported_error(error) from error
+
+        primary_outcome = (
+            ApplyPrimaryOutcome.entrypoint_success()
+            if execution.exit_code == 0
+            else ApplyPrimaryOutcome.entrypoint_exit(execution.exit_code)
+        )
 
         report = _complete_mutation_result_bundle(
             mutation_gate,
-            primary_outcome=ApplyPrimaryOutcome.entrypoint_success(),
+            primary_outcome=primary_outcome,
             execution_log=execution.output,
         )
-        if report.process_exit_code != 0:
+        if execution.exit_code == 0 and report.process_exit_code != 0:
             raise report.reported_error()
         return report
 

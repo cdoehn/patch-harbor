@@ -10,6 +10,7 @@ import zipfile
 
 import pytest
 
+import patchharbor.application as application_module
 import patchharbor.apply_mutation as apply_mutation_module
 import patchharbor.apply_preflight as apply_preflight_module
 import patchharbor.payload_files as payload_files_module
@@ -27,6 +28,7 @@ from patchharbor.errors import (
     PatchHarborError,
     unsupported_repository_state_error,
 )
+from patchharbor.execution import LoggedScriptExecutionError
 from patchharbor.models import (
     BundlePayload,
     RepositoryContext,
@@ -623,6 +625,51 @@ def test_payload_write_failure_keeps_partial_files_without_starting_entrypoint(
     assert manifest["actual_state_fingerprint"] != context.state_fingerprint
     assert run["warnings"] == list(report.warnings)
     assert run["primary_result"]["entrypoint_started"] is False
+    assert probe_repository_lock(str(context.repo_id), project_environment()) == 0
+
+
+def test_process_start_failure_bundles_without_claiming_entrypoint_start(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    set_isolated_user_environment(monkeypatch, tmp_path / "user")
+    repository = create_repository(tmp_path / "repository")
+    context = register_repository(repository)
+    output_directory = tmp_path / "results"
+
+    def fail_process_start(*args: object, **kwargs: object) -> object:
+        raise LoggedScriptExecutionError(
+            PatchHarborError(
+                "cannot start script interpreter",
+                ExitCode.INTERPRETER_ERROR,
+            ),
+            output=b"",
+            entrypoint_started=False,
+        )
+
+    monkeypatch.setattr(
+        application_module,
+        "execute_prepared_script_with_log",
+        fail_process_start,
+    )
+
+    with pytest.raises(PatchHarborError) as captured:
+        apply_patch_package(
+            _package(_manifest(context)),
+            output_directory=output_directory,
+        )
+
+    report = captured.value.run_report
+    assert captured.value.exit_code is ExitCode.INTERPRETER_ERROR
+    assert report is not None
+    assert report.process_exit_code == int(ExitCode.INTERPRETER_ERROR)
+    assert report.primary_result.kind is PrimaryResultKind.VALIDATION_ERROR
+    assert report.primary_result.entrypoint_started is False
+    assert report.result_bundle.status is ResultBundleStatus.CREATED
+    bundle_path = report.result_bundle.path
+    assert bundle_path is not None
+    with zipfile.ZipFile(bundle_path) as archive:
+        assert "logs/execution.log" not in archive.namelist()
     assert probe_repository_lock(str(context.repo_id), project_environment()) == 0
 
 

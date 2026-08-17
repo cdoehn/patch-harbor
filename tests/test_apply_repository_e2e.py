@@ -3,6 +3,9 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
+import subprocess
+import sys
+import time
 from uuid import uuid4
 import zipfile
 
@@ -134,6 +137,200 @@ def _write_apply_package(
     return entrypoint_name
 
 
+def _write_process_tree_package(
+    path: Path,
+    context: dict[str, object],
+    *,
+    exit_code: int | None = None,
+) -> None:
+    entrypoint_name = native_value("run.sh", "run.ps1")
+    child_name = native_value("child.sh", "child.ps1")
+    manifest = _manifest(context)
+    manifest["entrypoint"] = entrypoint_name
+
+    if os.name == "nt":
+        child_script = (
+            "$grandchild = Start-Process "
+            "-FilePath (Join-Path $PSHOME 'powershell.exe') "
+            "-ArgumentList '-NoLogo','-NoProfile','-NonInteractive',"
+            "'-Command','Start-Sleep -Seconds 60' -PassThru\n"
+            "[System.IO.File]::WriteAllText("
+            "'grandchild.pid', [string]$grandchild.Id)\n"
+            "Wait-Process -Id $grandchild.Id\n"
+        )
+        entrypoint_tail = (
+            f"exit {exit_code}\n"
+            if exit_code is not None
+            else "Wait-Process -Id $child.Id\n"
+        )
+        entrypoint = (
+            "# PATCHHARBOR\n"
+            "$child = Start-Process "
+            "-FilePath (Join-Path $PSHOME 'powershell.exe') "
+            "-ArgumentList '-NoLogo','-NoProfile','-NonInteractive',"
+            f"'-File','{child_name}' -PassThru\n"
+            "[System.IO.File]::WriteAllText('child.pid', [string]$child.Id)\n"
+            "$deadline = [DateTime]::UtcNow.AddSeconds(5)\n"
+            "while ((-not (Test-Path -LiteralPath 'grandchild.pid')) -and "
+            "([DateTime]::UtcNow -lt $deadline)) { "
+            "Start-Sleep -Milliseconds 20 }\n"
+            "if (-not (Test-Path -LiteralPath 'grandchild.pid')) { exit 91 }\n"
+            "[Console]::Out.WriteLine('entrypoint-output')\n"
+            f"{entrypoint_tail}"
+        )
+    else:
+        child_script = (
+            "sleep 60 &\n"
+            "grandchild_pid=$!\n"
+            "printf '%s' \"$grandchild_pid\" > grandchild.pid\n"
+            "wait \"$grandchild_pid\"\n"
+        )
+        entrypoint_tail = (
+            f"exit {exit_code}\n"
+            if exit_code is not None
+            else 'wait "$child_pid"\n'
+        )
+        entrypoint = (
+            "# PATCHHARBOR\n"
+            f"bash {child_name} &\n"
+            "child_pid=$!\n"
+            "printf '%s' \"$child_pid\" > child.pid\n"
+            "counter=0\n"
+            "while [ ! -s grandchild.pid ] && [ \"$counter\" -lt 250 ]; do\n"
+            "    sleep 0.02\n"
+            "    counter=$((counter + 1))\n"
+            "done\n"
+            "[ -s grandchild.pid ] || exit 91\n"
+            "printf 'entrypoint-output\\n'\n"
+            f"{entrypoint_tail}"
+        )
+
+    with zipfile.ZipFile(path, "w") as archive:
+        archive.writestr(
+            "patch.json",
+            json.dumps(
+                manifest,
+                ensure_ascii=False,
+                allow_nan=False,
+                separators=(",", ":"),
+            ).encode("utf-8"),
+        )
+        archive.writestr(entrypoint_name, entrypoint.encode("utf-8"))
+        archive.writestr(child_name, child_script.encode("utf-8"))
+
+
+def _wait_for_process_id(path: Path, *, timeout: float = 10.0) -> int:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if path.exists():
+            value = path.read_text(encoding="utf-8").strip()
+            if value:
+                return int(value)
+        time.sleep(0.02)
+    raise AssertionError(f"process PID was not written to {path}")
+
+
+def _pid_is_running(pid: int) -> bool:
+    if os.name != "nt":
+        stat_path = Path(f"/proc/{pid}/stat")
+        try:
+            fields = stat_path.read_text(encoding="utf-8").split()
+        except FileNotFoundError:
+            return False
+        if len(fields) > 2 and fields[2] == "Z":
+            return False
+        try:
+            os.kill(pid, 0)
+        except ProcessLookupError:
+            return False
+        except PermissionError:
+            return True
+        return True
+
+    import ctypes
+    from ctypes import wintypes
+
+    process_query_limited_information = 0x1000
+    still_active = 259
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.OpenProcess.argtypes = (
+        wintypes.DWORD,
+        wintypes.BOOL,
+        wintypes.DWORD,
+    )
+    kernel32.OpenProcess.restype = wintypes.HANDLE
+    kernel32.GetExitCodeProcess.argtypes = (
+        wintypes.HANDLE,
+        ctypes.POINTER(wintypes.DWORD),
+    )
+    kernel32.GetExitCodeProcess.restype = wintypes.BOOL
+    kernel32.CloseHandle.argtypes = (wintypes.HANDLE,)
+    kernel32.CloseHandle.restype = wintypes.BOOL
+    handle = kernel32.OpenProcess(
+        process_query_limited_information,
+        False,
+        pid,
+    )
+    if not handle:
+        return False
+    try:
+        exit_code = wintypes.DWORD()
+        if not kernel32.GetExitCodeProcess(handle, ctypes.byref(exit_code)):
+            return False
+        return exit_code.value == still_active
+    finally:
+        kernel32.CloseHandle(handle)
+
+
+def _kill_process(pid: int) -> None:
+    if not _pid_is_running(pid):
+        return
+    if os.name != "nt":
+        try:
+            os.kill(pid, 9)
+        except ProcessLookupError:
+            pass
+        return
+
+    import ctypes
+    from ctypes import wintypes
+
+    process_terminate = 0x0001
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.OpenProcess.argtypes = (
+        wintypes.DWORD,
+        wintypes.BOOL,
+        wintypes.DWORD,
+    )
+    kernel32.OpenProcess.restype = wintypes.HANDLE
+    kernel32.TerminateProcess.argtypes = (wintypes.HANDLE, wintypes.UINT)
+    kernel32.TerminateProcess.restype = wintypes.BOOL
+    kernel32.CloseHandle.argtypes = (wintypes.HANDLE,)
+    kernel32.CloseHandle.restype = wintypes.BOOL
+    handle = kernel32.OpenProcess(process_terminate, False, pid)
+    if handle:
+        try:
+            kernel32.TerminateProcess(handle, 1)
+        finally:
+            kernel32.CloseHandle(handle)
+
+
+def _assert_process_stopped(pid: int, *, timeout: float = 5.0) -> None:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if not _pid_is_running(pid):
+            return
+        time.sleep(0.05)
+    _kill_process(pid)
+    raise AssertionError(f"process {pid} survived PatchHarbor")
+
+
+def _cleanup_test_processes(*process_ids: int | None) -> None:
+    for process_id in reversed(process_ids):
+        if process_id is not None:
+            _kill_process(process_id)
+
+
 def _run_dry_run(
     package: Path,
     caller: Path,
@@ -255,6 +452,251 @@ def test_apply_writes_expected_bytes_runs_once_and_bundles_state(
     assert bundled_starts.decode("utf-8").splitlines() == ["1"]
     assert "untracked/entrypoint-cwd.txt" in names
     assert f"untracked/{entrypoint_name}" not in names
+
+
+def test_apply_returns_exact_nonzero_exit_and_bundles_execution_log(
+    tmp_path: Path,
+) -> None:
+    repository = create_repository(tmp_path / "repository")
+    environment, context = _register_context(repository, tmp_path / "user")
+    package = tmp_path / "nonzero.zip"
+    _write_process_tree_package(package, context, exit_code=23)
+    output_directory = tmp_path / "results"
+    caller = tmp_path / "caller"
+    caller.mkdir()
+
+    completed = run_cli(
+        caller,
+        "apply",
+        "--json",
+        "--output-dir",
+        str(output_directory),
+        str(package),
+        environment_overrides=environment,
+        timeout_seconds=120,
+    )
+    child_pid: int | None = None
+    grandchild_pid: int | None = None
+    try:
+        child_pid = _wait_for_process_id(repository / "child.pid")
+        grandchild_pid = _wait_for_process_id(repository / "grandchild.pid")
+
+        assert completed.returncode == 23
+        envelope = json.loads(completed.stdout)
+        assert envelope["success"] is False
+        assert envelope["error"] is None
+        assert envelope["process_exit_code"] == 23
+        result = envelope["result"]
+        assert result["primary_result"] == {
+            "kind": "entrypoint_exit",
+            "entrypoint_started": True,
+            "entrypoint_exit_code": 23,
+            "timed_out": False,
+            "interrupted": False,
+            "patchharbor_error_code": None,
+        }
+        bundle_path = Path(result["result_bundle"]["path"])
+        with zipfile.ZipFile(bundle_path) as archive:
+            execution_log = archive.read("logs/execution.log")
+            run_report = json.loads(archive.read("logs/run.json"))
+
+        assert b"entrypoint-output" in execution_log
+        assert run_report["primary_result"]["kind"] == "entrypoint_exit"
+        assert run_report["primary_result"]["entrypoint_exit_code"] == 23
+        assert run_report["process_exit_code"] == 23
+        _assert_process_stopped(child_pid)
+        _assert_process_stopped(grandchild_pid)
+    finally:
+        _cleanup_test_processes(child_pid, grandchild_pid)
+
+
+def test_apply_timeout_stops_child_and_grandchild_and_bundles_output(
+    tmp_path: Path,
+) -> None:
+    repository = create_repository(tmp_path / "repository")
+    environment, context = _register_context(repository, tmp_path / "user")
+    package = tmp_path / "timeout.zip"
+    _write_process_tree_package(package, context)
+    output_directory = tmp_path / "results"
+    caller = tmp_path / "caller"
+    caller.mkdir()
+
+    completed = run_cli(
+        caller,
+        "apply",
+        "--json",
+        "--timeout",
+        "1.0",
+        "--output-dir",
+        str(output_directory),
+        str(package),
+        environment_overrides=environment,
+        timeout_seconds=120,
+    )
+    child_pid: int | None = None
+    grandchild_pid: int | None = None
+    try:
+        child_pid = _wait_for_process_id(repository / "child.pid")
+        grandchild_pid = _wait_for_process_id(repository / "grandchild.pid")
+
+        assert completed.returncode == int(ExitCode.TIMEOUT)
+        envelope = json.loads(completed.stdout)
+        assert envelope["process_exit_code"] == int(ExitCode.TIMEOUT)
+        result = envelope["result"]
+        assert result["primary_result"] == {
+            "kind": "timeout",
+            "entrypoint_started": True,
+            "entrypoint_exit_code": None,
+            "timed_out": True,
+            "interrupted": False,
+            "patchharbor_error_code": int(ExitCode.TIMEOUT),
+        }
+        bundle_path = Path(result["result_bundle"]["path"])
+        with zipfile.ZipFile(bundle_path) as archive:
+            execution_log = archive.read("logs/execution.log")
+            run_report = json.loads(archive.read("logs/run.json"))
+
+        assert b"entrypoint-output" in execution_log
+        assert run_report["primary_result"]["kind"] == "timeout"
+        assert run_report["primary_result"]["timed_out"] is True
+        assert run_report["process_exit_code"] == int(ExitCode.TIMEOUT)
+        _assert_process_stopped(child_pid)
+        _assert_process_stopped(grandchild_pid)
+    finally:
+        _cleanup_test_processes(child_pid, grandchild_pid)
+
+
+def test_apply_interrupt_stops_child_and_grandchild_and_bundles_output(
+    tmp_path: Path,
+) -> None:
+    repository = create_repository(tmp_path / "repository")
+    environment, context = _register_context(repository, tmp_path / "user")
+    package = tmp_path / "interrupt.zip"
+    _write_process_tree_package(package, context)
+    output_directory = tmp_path / "results"
+    report_path = tmp_path / "interrupt-report.json"
+    runner_path = tmp_path / "interrupt-apply.py"
+    runner_path.write_text(
+        """\
+from __future__ import annotations
+import _thread
+import io
+import json
+from pathlib import Path
+import sys
+import threading
+import time
+
+from patchharbor.application import apply_patch_package, resolve_patch_package
+from patchharbor.errors import PatchHarborError
+from patchharbor.output import OutputTargets
+from patchharbor.run_report import RunReport
+
+package = Path(sys.argv[1])
+repository = Path(sys.argv[2])
+output_directory = Path(sys.argv[3])
+report_path = Path(sys.argv[4])
+
+
+def interrupt_when_tree_is_ready() -> None:
+    deadline = time.monotonic() + 10
+    child = repository / "child.pid"
+    grandchild = repository / "grandchild.pid"
+    while time.monotonic() < deadline:
+        if child.exists() and grandchild.exists():
+            if child.read_text(encoding="utf-8").strip() and grandchild.read_text(
+                encoding="utf-8"
+            ).strip():
+                _thread.interrupt_main()
+                return
+        time.sleep(0.02)
+    _thread.interrupt_main()
+
+
+threading.Thread(target=interrupt_when_tree_is_ready, daemon=True).start()
+try:
+    report = apply_patch_package(
+        resolve_patch_package(package),
+        output_directory=output_directory,
+        timeout_seconds=30,
+        output=OutputTargets(visible_text_stream=io.StringIO()),
+    )
+except PatchHarborError as error:
+    report = error.run_report
+    if not isinstance(report, RunReport):
+        raise
+    report_path.write_text(
+        json.dumps(
+            {
+                "process_exit_code": report.process_exit_code,
+                "result": report.apply_result(),
+            }
+        ),
+        encoding="utf-8",
+    )
+    raise SystemExit(report.process_exit_code)
+report_path.write_text(
+    json.dumps(
+        {
+            "process_exit_code": report.process_exit_code,
+            "result": report.apply_result(),
+        }
+    ),
+    encoding="utf-8",
+)
+raise SystemExit(report.process_exit_code)
+""",
+        encoding="utf-8",
+    )
+
+    completed = subprocess.run(
+        [
+            sys.executable,
+            str(runner_path),
+            str(package),
+            str(repository),
+            str(output_directory),
+            str(report_path),
+        ],
+        cwd=tmp_path,
+        env=project_environment(environment),
+        stdin=subprocess.DEVNULL,
+        capture_output=True,
+        text=True,
+        timeout=120,
+        check=False,
+    )
+    child_pid: int | None = None
+    grandchild_pid: int | None = None
+    try:
+        child_pid = _wait_for_process_id(repository / "child.pid")
+        grandchild_pid = _wait_for_process_id(repository / "grandchild.pid")
+
+        assert completed.returncode == int(ExitCode.INTERRUPTED)
+        completion = json.loads(report_path.read_text(encoding="utf-8"))
+        assert completion["process_exit_code"] == int(ExitCode.INTERRUPTED)
+        result = completion["result"]
+        assert result["primary_result"] == {
+            "kind": "interrupted",
+            "entrypoint_started": True,
+            "entrypoint_exit_code": None,
+            "timed_out": False,
+            "interrupted": True,
+            "patchharbor_error_code": int(ExitCode.INTERRUPTED),
+        }
+        bundle_path = Path(result["result_bundle"]["path"])
+        with zipfile.ZipFile(bundle_path) as archive:
+            execution_log = archive.read("logs/execution.log")
+            run_report = json.loads(archive.read("logs/run.json"))
+
+        assert b"entrypoint-output" in execution_log
+        assert run_report["primary_result"]["kind"] == "interrupted"
+        assert run_report["primary_result"]["interrupted"] is True
+        assert run_report["process_exit_code"] == int(ExitCode.INTERRUPTED)
+        _assert_process_stopped(child_pid)
+        _assert_process_stopped(grandchild_pid)
+    finally:
+        _cleanup_test_processes(child_pid, grandchild_pid)
 
 
 def test_dry_run_json_publishes_unchanged_snapshot_without_execution(

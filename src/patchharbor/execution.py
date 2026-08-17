@@ -99,6 +99,25 @@ class CompletedScriptExecution:
             raise ValueError("script exit code must be an integer")
 
 
+class LoggedScriptExecutionError(PatchHarborError):
+    """A process-control failure together with output captured before cleanup."""
+
+    def __init__(
+        self,
+        error: PatchHarborError,
+        *,
+        output: bytes,
+        entrypoint_started: bool,
+    ) -> None:
+        super().__init__(
+            str(error),
+            error.exit_code,
+            error_kind=error.error_kind,
+        )
+        self.output = bytes(output)
+        self.entrypoint_started = entrypoint_started
+
+
 def execute_prepared_script_with_log(
     script_path: Path,
     *,
@@ -112,16 +131,28 @@ def execute_prepared_script_with_log(
     targets = output or OutputTargets(visible_text_stream=sys.stdout)
     try:
         with execution_log_path.open("w+b") as execution_log:
-            exit_code = execute_prepared_script(
-                script_path,
-                interpreter=interpreter,
-                cwd=cwd,
-                timeout_seconds=timeout_seconds,
-                output=replace(
-                    targets,
-                    raw_output_stream=execution_log,
-                ),
-            )
+            try:
+                exit_code = execute_prepared_script(
+                    script_path,
+                    interpreter=interpreter,
+                    cwd=cwd,
+                    timeout_seconds=timeout_seconds,
+                    output=replace(
+                        targets,
+                        raw_output_stream=execution_log,
+                    ),
+                )
+            except PatchHarborError as error:
+                execution_log.flush()
+                execution_log.seek(0)
+                execution_output = execution_log.read()
+                raise LoggedScriptExecutionError(
+                    error,
+                    output=execution_output,
+                    entrypoint_started=(
+                        error.exit_code is not ExitCode.INTERPRETER_ERROR
+                    ),
+                ) from error
             execution_log.flush()
             execution_log.seek(0)
             execution_output = execution_log.read()

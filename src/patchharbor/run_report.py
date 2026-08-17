@@ -258,6 +258,40 @@ class PrimaryResult:
         )
 
     @classmethod
+    def entrypoint_exit_result(cls, exit_code: int) -> PrimaryResult:
+        if isinstance(exit_code, bool) or not isinstance(exit_code, int):
+            raise ValueError("entrypoint exit code must be an integer")
+        if exit_code == 0:
+            raise ValueError("entrypoint failure requires a nonzero exit code")
+        return cls(
+            kind=PrimaryResultKind.ENTRYPOINT_EXIT,
+            success=False,
+            patchharbor_error_code=None,
+            entrypoint_started=True,
+            entrypoint_exit_code=exit_code,
+        )
+
+    @classmethod
+    def timeout_result(cls) -> PrimaryResult:
+        return cls(
+            kind=PrimaryResultKind.TIMEOUT,
+            success=False,
+            patchharbor_error_code=int(ExitCode.TIMEOUT),
+            entrypoint_started=True,
+            timed_out=True,
+        )
+
+    @classmethod
+    def interrupted_result(cls) -> PrimaryResult:
+        return cls(
+            kind=PrimaryResultKind.INTERRUPTED,
+            success=False,
+            patchharbor_error_code=int(ExitCode.INTERRUPTED),
+            entrypoint_started=True,
+            interrupted=True,
+        )
+
+    @classmethod
     def tool_failure(
         cls,
         *,
@@ -340,6 +374,27 @@ class ApplyPrimaryOutcome:
         )
 
     @classmethod
+    def entrypoint_exit(cls, exit_code: int) -> ApplyPrimaryOutcome:
+        return cls(
+            result=PrimaryResult.entrypoint_exit_result(exit_code),
+            exit_code=exit_code,
+        )
+
+    @classmethod
+    def timeout(cls) -> ApplyPrimaryOutcome:
+        return cls(
+            result=PrimaryResult.timeout_result(),
+            exit_code=int(ExitCode.TIMEOUT),
+        )
+
+    @classmethod
+    def interrupted(cls) -> ApplyPrimaryOutcome:
+        return cls(
+            result=PrimaryResult.interrupted_result(),
+            exit_code=int(ExitCode.INTERRUPTED),
+        )
+
+    @classmethod
     def tool_failure(
         cls,
         *,
@@ -359,6 +414,28 @@ class ApplyPrimaryOutcome:
         """Create one primary outcome without duplicating error mappings."""
         return cls(
             result=PrimaryResult.from_tool_error(error),
+            exit_code=int(error.exit_code),
+        )
+
+    @classmethod
+    def from_execution_error(
+        cls,
+        error: PatchHarborError,
+        *,
+        entrypoint_started: bool,
+    ) -> ApplyPrimaryOutcome:
+        """Map one process-control failure while preserving execution state."""
+        if error.exit_code is ExitCode.TIMEOUT:
+            return cls.timeout()
+        if error.exit_code is ExitCode.INTERRUPTED:
+            return cls.interrupted()
+        return cls(
+            result=PrimaryResult(
+                kind=PrimaryResultKind.for_tool_error(error),
+                success=False,
+                patchharbor_error_code=int(error.exit_code),
+                entrypoint_started=entrypoint_started,
+            ),
             exit_code=int(error.exit_code),
         )
 

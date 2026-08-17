@@ -288,6 +288,53 @@ def test_apply_primary_outcome_keeps_primary_and_bundle_results_separate() -> No
         )
 
 
+def test_apply_primary_outcome_models_entrypoint_exit_timeout_and_interrupt() -> None:
+    entrypoint_exit = ApplyPrimaryOutcome.entrypoint_exit(23)
+    timeout = ApplyPrimaryOutcome.from_execution_error(
+        PatchHarborError("timed out", ExitCode.TIMEOUT),
+        entrypoint_started=True,
+    )
+    interrupted = ApplyPrimaryOutcome.from_execution_error(
+        PatchHarborError("interrupted", ExitCode.INTERRUPTED),
+        entrypoint_started=True,
+    )
+
+    assert entrypoint_exit.result.as_apply_document() == {
+        "kind": "entrypoint_exit",
+        "entrypoint_started": True,
+        "entrypoint_exit_code": 23,
+        "timed_out": False,
+        "interrupted": False,
+        "patchharbor_error_code": None,
+    }
+    assert entrypoint_exit.process_exit_code_for(ResultBundleStatus.CREATED) == 23
+    assert entrypoint_exit.process_exit_code_for(ResultBundleStatus.FAILED) == 23
+
+    assert timeout.result.as_apply_document() == {
+        "kind": "timeout",
+        "entrypoint_started": True,
+        "entrypoint_exit_code": None,
+        "timed_out": True,
+        "interrupted": False,
+        "patchharbor_error_code": int(ExitCode.TIMEOUT),
+    }
+    assert timeout.process_exit_code_for(ResultBundleStatus.FAILED) == int(
+        ExitCode.TIMEOUT
+    )
+
+    assert interrupted.result.as_apply_document() == {
+        "kind": "interrupted",
+        "entrypoint_started": True,
+        "entrypoint_exit_code": None,
+        "timed_out": False,
+        "interrupted": True,
+        "patchharbor_error_code": int(ExitCode.INTERRUPTED),
+    }
+    assert interrupted.process_exit_code_for(ResultBundleStatus.FAILED) == int(
+        ExitCode.INTERRUPTED
+    )
+
+
 def test_result_bundle_outcome_rejects_inconsistent_state(tmp_path: Path) -> None:
     with pytest.raises(ValueError):
         ResultBundleResult(
