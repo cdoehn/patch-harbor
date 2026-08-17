@@ -264,7 +264,6 @@ def _manual_bundle_failure(
         warnings=(),
         primary_result=PrimaryResult.from_tool_error(error),
         result_bundle=bundle_result,
-        process_exit_code=int(ExitCode.RESULT_BUNDLE_ERROR),
     )
     emergency_path, rescue_failed = _preserve_emergency_diagnostics(
         run_directory,
@@ -476,7 +475,6 @@ def create_manual_result_bundle(
                 warnings=(),
                 primary_result=PrimaryResult.success_result(),
                 result_bundle=ResultBundleResult.created(target.final_path),
-                process_exit_code=0,
             )
             _write_run_document(run_directory, report)
             publication = prepare_result_bundle_publication(

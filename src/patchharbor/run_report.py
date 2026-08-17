@@ -376,6 +376,15 @@ class PrimaryResult:
         """Return the stable public primary-result kind."""
         return self.kind.value
 
+    @property
+    def process_exit_code(self) -> int:
+        """Return the primary process exit implied by this result."""
+        if self.entrypoint_exit_code is not None:
+            return self.entrypoint_exit_code
+        if self.patchharbor_error_code is not None:
+            return self.patchharbor_error_code
+        return 0
+
     @classmethod
     def success_result(cls) -> PrimaryResult:
         return cls(
@@ -483,72 +492,68 @@ class PrimaryResult:
         }
 
 
+def completed_process_exit_code(
+    *,
+    operation: RunOperation,
+    primary_result: PrimaryResult,
+    result_bundle_status: ResultBundleStatus,
+) -> int:
+    """Apply the public completion priority without storing a duplicate code."""
+    if operation is RunOperation.BUNDLE:
+        return (
+            0
+            if primary_result.success
+            and result_bundle_status is ResultBundleStatus.CREATED
+            else int(ExitCode.RESULT_BUNDLE_ERROR)
+        )
+    if (
+        primary_result.success
+        and result_bundle_status is ResultBundleStatus.FAILED
+    ):
+        return int(ExitCode.RESULT_BUNDLE_ERROR)
+    return primary_result.process_exit_code
+
+
 @dataclass(frozen=True, slots=True)
 class ApplyPrimaryOutcome:
     """One primary apply outcome before Result-Bundle publication."""
 
     result: PrimaryResult
-    primary_process_exit_code: int
     tool_error: RunToolError | None = None
 
     def __post_init__(self) -> None:
-        exit_code = self.primary_process_exit_code
-        if isinstance(exit_code, bool) or not isinstance(exit_code, int):
-            raise ValueError("primary process exit code must be an integer")
-        if self.result.success != (exit_code == 0):
-            raise ValueError("primary success and process exit code disagree")
-        if (
-            self.result.patchharbor_error_code is not None
-            and self.result.patchharbor_error_code != exit_code
-        ):
-            raise ValueError("primary tool error and process exit codes disagree")
-        if (
-            self.result.entrypoint_exit_code is not None
-            and self.result.entrypoint_exit_code != exit_code
-        ):
-            raise ValueError("entrypoint and process exit codes disagree")
         if self.result.patchharbor_error_code is None:
             if self.tool_error is not None:
                 raise ValueError("non-tool primary result cannot carry a tool error")
         else:
             if self.tool_error is None:
                 raise ValueError("tool primary result requires immutable error data")
-            if self.tool_error.patchharbor_error_code != exit_code:
+            if (
+                self.tool_error.patchharbor_error_code
+                != self.result.patchharbor_error_code
+            ):
                 raise ValueError("primary tool error and process exit codes disagree")
 
     @classmethod
     def success(cls) -> ApplyPrimaryOutcome:
-        return cls(
-            result=PrimaryResult.success_result(),
-            primary_process_exit_code=0,
-        )
+        return cls(result=PrimaryResult.success_result())
 
     @classmethod
     def dry_run_success(cls) -> ApplyPrimaryOutcome:
-        return cls(
-            result=PrimaryResult.dry_run_success_result(),
-            primary_process_exit_code=0,
-        )
+        return cls(result=PrimaryResult.dry_run_success_result())
 
     @classmethod
     def entrypoint_success(cls) -> ApplyPrimaryOutcome:
-        return cls(
-            result=PrimaryResult.entrypoint_success_result(),
-            primary_process_exit_code=0,
-        )
+        return cls(result=PrimaryResult.entrypoint_success_result())
 
     @classmethod
     def entrypoint_exit(cls, exit_code: int) -> ApplyPrimaryOutcome:
-        return cls(
-            result=PrimaryResult.entrypoint_exit_result(exit_code),
-            primary_process_exit_code=exit_code,
-        )
+        return cls(result=PrimaryResult.entrypoint_exit_result(exit_code))
 
     @classmethod
     def timeout(cls) -> ApplyPrimaryOutcome:
         return cls(
             result=PrimaryResult.timeout_result(),
-            primary_process_exit_code=int(ExitCode.TIMEOUT),
             tool_error=RunToolError.from_error(
                 PatchHarborError("entrypoint timed out", ExitCode.TIMEOUT)
             ),
@@ -558,7 +563,6 @@ class ApplyPrimaryOutcome:
     def interrupted(cls) -> ApplyPrimaryOutcome:
         return cls(
             result=PrimaryResult.interrupted_result(),
-            primary_process_exit_code=int(ExitCode.INTERRUPTED),
             tool_error=RunToolError.from_error(
                 PatchHarborError("entrypoint interrupted", ExitCode.INTERRUPTED)
             ),
@@ -578,7 +582,6 @@ class ApplyPrimaryOutcome:
                 kind=kind,
                 patchharbor_error_code=exit_code,
             ),
-            primary_process_exit_code=exit_code,
             tool_error=RunToolError(
                 kind=error_kind,
                 message=message,
@@ -591,7 +594,6 @@ class ApplyPrimaryOutcome:
         """Create one primary outcome without duplicating error mappings."""
         return cls(
             result=PrimaryResult.from_tool_error(error),
-            primary_process_exit_code=int(error.exit_code),
             tool_error=RunToolError.from_error(error),
         )
 
@@ -614,7 +616,6 @@ class ApplyPrimaryOutcome:
                     raise ValueError("interruption requires a started entrypoint")
                 return cls(
                     result=PrimaryResult.interrupted_result(),
-                    primary_process_exit_code=int(ExitCode.INTERRUPTED),
                     tool_error=RunToolError.from_error(patchharbor_error),
                 )
             if patchharbor_error.exit_code is ExitCode.TIMEOUT:
@@ -622,7 +623,6 @@ class ApplyPrimaryOutcome:
                     raise ValueError("timeout requires a started entrypoint")
                 return cls(
                     result=PrimaryResult.timeout_result(),
-                    primary_process_exit_code=int(ExitCode.TIMEOUT),
                     tool_error=RunToolError.from_error(patchharbor_error),
                 )
             return cls(
@@ -632,7 +632,6 @@ class ApplyPrimaryOutcome:
                     patchharbor_error_code=int(patchharbor_error.exit_code),
                     entrypoint_started=entrypoint_started,
                 ),
-                primary_process_exit_code=int(patchharbor_error.exit_code),
                 tool_error=RunToolError.from_error(patchharbor_error),
             )
 
@@ -641,19 +640,6 @@ class ApplyPrimaryOutcome:
         if entrypoint_exit_code == 0:
             return cls.entrypoint_success()
         return cls.entrypoint_exit(entrypoint_exit_code)
-
-    def process_exit_code_for(
-        self,
-        result_bundle_status: ResultBundleStatus,
-    ) -> int:
-        """Apply the specified Result-Bundle precedence to the process exit."""
-        if (
-            self.result.success
-            and result_bundle_status is ResultBundleStatus.FAILED
-        ):
-            return int(ExitCode.RESULT_BUNDLE_ERROR)
-        return self.primary_process_exit_code
-
 
 @dataclass(frozen=True)
 class ResultBundleResult:
@@ -768,14 +754,9 @@ class RunReport:
     warnings: tuple[str, ...]
     primary_result: PrimaryResult
     result_bundle: ResultBundleResult
-    process_exit_code: int
     primary_tool_error: RunToolError | None = None
 
     def __post_init__(self) -> None:
-        if isinstance(self.process_exit_code, bool) or not isinstance(
-            self.process_exit_code, int
-        ):
-            raise ValueError("process exit code must be an integer")
         object.__setattr__(
             self,
             "warnings",
@@ -819,22 +800,6 @@ class RunReport:
                     raise ValueError(
                         "Apply primary-result kind and tool-error category disagree"
                     )
-            primary_exit_code = 0
-            if self.primary_result.entrypoint_exit_code is not None:
-                primary_exit_code = self.primary_result.entrypoint_exit_code
-            elif self.primary_result.patchharbor_error_code is not None:
-                primary_exit_code = self.primary_result.patchharbor_error_code
-            expected_process_exit_code = (
-                int(ExitCode.RESULT_BUNDLE_ERROR)
-                if self.primary_result.success
-                and self.result_bundle.status is ResultBundleStatus.FAILED
-                else primary_exit_code
-            )
-            if self.process_exit_code != expected_process_exit_code:
-                raise ValueError(
-                    "Apply process exit code conflicts with its primary "
-                    "and bundle results"
-                )
         if self.result_bundle.status is ResultBundleStatus.NOT_ATTEMPTED:
             if self.repository_resolved:
                 raise ValueError(
@@ -845,17 +810,11 @@ class RunReport:
             if self.dry_run or self.execution_present:
                 raise ValueError("manual bundle runs cannot execute or be dry-runs")
             if self.primary_result.success:
-                if (
-                    self.result_bundle.status is not ResultBundleStatus.CREATED
-                    or self.process_exit_code != 0
-                ):
+                if self.result_bundle.status is not ResultBundleStatus.CREATED:
                     raise ValueError(
                         "successful manual bundle requires a created bundle and exit 0"
                     )
-            elif (
-                self.result_bundle.status is ResultBundleStatus.CREATED
-                or self.process_exit_code != 11
-            ):
+            elif self.result_bundle.status is ResultBundleStatus.CREATED:
                 raise ValueError(
                     "failed manual bundle requires failure status and exit 11"
                 )
@@ -884,9 +843,6 @@ class RunReport:
             warnings=warnings,
             primary_result=primary_outcome.result,
             result_bundle=result_bundle,
-            process_exit_code=primary_outcome.process_exit_code_for(
-                result_bundle.status
-            ),
             primary_tool_error=primary_outcome.tool_error,
         )
 
@@ -922,6 +878,15 @@ class RunReport:
     def execution_present(self) -> bool:
         """An execution log exists only after an entrypoint actually started."""
         return self.primary_result.entrypoint_started
+
+    @property
+    def process_exit_code(self) -> int:
+        """Return the completion code derived from the two run outcomes."""
+        return completed_process_exit_code(
+            operation=self.operation,
+            primary_result=self.primary_result,
+            result_bundle_status=self.result_bundle.status,
+        )
 
     @property
     def completion_tool_error(self) -> RunToolError | None:

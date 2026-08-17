@@ -48,5 +48,4 @@ def successful_bundle_run_report(
         warnings=(),
         primary_result=PrimaryResult.success_result(),
         result_bundle=ResultBundleResult.created(final_path),
-        process_exit_code=0,
     )

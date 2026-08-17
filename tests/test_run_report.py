@@ -25,6 +25,7 @@ from patchharbor.run_report import (
     RunReport,
     RunSession,
     RunTiming,
+    completed_process_exit_code,
     physical_absolute_path_text,
 )
 
@@ -68,7 +69,6 @@ def test_run_report_drives_persisted_and_bundle_json_results(tmp_path: Path) -> 
         warnings=(),
         primary_result=PrimaryResult.success_result(),
         result_bundle=ResultBundleResult.created(bundle_path),
-        process_exit_code=0,
     )
 
     persisted = report.as_run_document()
@@ -175,7 +175,6 @@ def test_run_report_redacts_secret_environment_values(
         result_bundle=ResultBundleResult.failed(
             f"bundle error contains {secret}"
         ),
-        process_exit_code=11,
     )
 
     serialized = json.dumps(report.as_run_document(), allow_nan=False)
@@ -250,49 +249,91 @@ def test_apply_primary_outcome_maps_tool_errors_once(
     assert outcome.result.kind is expected_kind
     assert outcome.result.success is False
     assert outcome.result.patchharbor_error_code == int(error.exit_code)
-    assert outcome.primary_process_exit_code == int(error.exit_code)
+    assert outcome.result.process_exit_code == int(error.exit_code)
 
 
-def test_apply_primary_outcome_keeps_primary_and_bundle_results_separate() -> None:
-    dry_run = ApplyPrimaryOutcome.dry_run_success()
-    success = ApplyPrimaryOutcome.entrypoint_success()
-    failure = ApplyPrimaryOutcome.from_tool_error(
-        PatchHarborError("missing interpreter", ExitCode.INTERPRETER_ERROR)
-    )
-
-    assert dry_run.result.kind is PrimaryResultKind.DRY_RUN_SUCCESS
-    assert dry_run.process_exit_code_for(ResultBundleStatus.CREATED) == 0
-    assert dry_run.process_exit_code_for(ResultBundleStatus.FAILED) == int(
-        ExitCode.RESULT_BUNDLE_ERROR
-    )
-    assert success.result.kind is PrimaryResultKind.SUCCESS
-    assert success.result.entrypoint_started is True
-    assert success.result.entrypoint_exit_code == 0
-    assert success.process_exit_code_for(ResultBundleStatus.CREATED) == 0
-    assert success.process_exit_code_for(ResultBundleStatus.FAILED) == int(
-        ExitCode.RESULT_BUNDLE_ERROR
-    )
-    assert failure.result.kind is PrimaryResultKind.VALIDATION_ERROR
-    assert failure.process_exit_code_for(ResultBundleStatus.CREATED) == int(
-        ExitCode.INTERPRETER_ERROR
-    )
-    assert failure.process_exit_code_for(ResultBundleStatus.FAILED) == int(
-        ExitCode.INTERPRETER_ERROR
-    )
-
-    with pytest.raises(ValueError):
-        ApplyPrimaryOutcome(
-            result=PrimaryResult.dry_run_success_result(),
-            primary_process_exit_code=int(ExitCode.RESULT_BUNDLE_ERROR),
-        )
-    with pytest.raises(ValueError):
-        ApplyPrimaryOutcome(
-            result=PrimaryResult.tool_failure(
-                kind=PrimaryResultKind.VALIDATION_ERROR,
-                patchharbor_error_code=int(ExitCode.NO_VALID_SCRIPT),
+@pytest.mark.parametrize(
+    ("operation", "primary_result", "bundle_status", "expected_exit"),
+    (
+        (
+            RunOperation.BUNDLE,
+            PrimaryResult.success_result(),
+            ResultBundleStatus.CREATED,
+            0,
+        ),
+        (
+            RunOperation.BUNDLE,
+            PrimaryResult.tool_failure(
+                kind=PrimaryResultKind.REPOSITORY_ERROR,
+                patchharbor_error_code=int(ExitCode.REPOSITORY_ERROR),
             ),
-            primary_process_exit_code=int(ExitCode.INTERPRETER_ERROR),
-        )
+            ResultBundleStatus.FAILED,
+            int(ExitCode.RESULT_BUNDLE_ERROR),
+        ),
+        (
+            RunOperation.APPLY,
+            PrimaryResult.dry_run_success_result(),
+            ResultBundleStatus.CREATED,
+            0,
+        ),
+        (
+            RunOperation.APPLY,
+            PrimaryResult.dry_run_success_result(),
+            ResultBundleStatus.FAILED,
+            int(ExitCode.RESULT_BUNDLE_ERROR),
+        ),
+        (
+            RunOperation.APPLY,
+            PrimaryResult.entrypoint_success_result(),
+            ResultBundleStatus.CREATED,
+            0,
+        ),
+        (
+            RunOperation.APPLY,
+            PrimaryResult.entrypoint_success_result(),
+            ResultBundleStatus.FAILED,
+            int(ExitCode.RESULT_BUNDLE_ERROR),
+        ),
+        (
+            RunOperation.APPLY,
+            PrimaryResult.entrypoint_exit_result(23),
+            ResultBundleStatus.FAILED,
+            23,
+        ),
+        (
+            RunOperation.APPLY,
+            PrimaryResult.timeout_result(),
+            ResultBundleStatus.FAILED,
+            124,
+        ),
+        (
+            RunOperation.APPLY,
+            PrimaryResult.interrupted_result(),
+            ResultBundleStatus.FAILED,
+            130,
+        ),
+        (
+            RunOperation.APPLY,
+            PrimaryResult.tool_failure(
+                kind=PrimaryResultKind.VALIDATION_ERROR,
+                patchharbor_error_code=int(ExitCode.INTERPRETER_ERROR),
+            ),
+            ResultBundleStatus.FAILED,
+            int(ExitCode.INTERPRETER_ERROR),
+        ),
+    ),
+)
+def test_completed_process_exit_code_preserves_primary_result_priority(
+    operation: RunOperation,
+    primary_result: PrimaryResult,
+    bundle_status: ResultBundleStatus,
+    expected_exit: int,
+) -> None:
+    assert completed_process_exit_code(
+        operation=operation,
+        primary_result=primary_result,
+        result_bundle_status=bundle_status,
+    ) == expected_exit
 
 
 def test_apply_primary_outcome_models_entrypoint_exit_timeout_and_interrupt() -> None:
@@ -318,9 +359,6 @@ def test_apply_primary_outcome_models_entrypoint_exit_timeout_and_interrupt() ->
         "interrupted": False,
         "patchharbor_error_code": None,
     }
-    assert entrypoint_exit.process_exit_code_for(ResultBundleStatus.CREATED) == 23
-    assert entrypoint_exit.process_exit_code_for(ResultBundleStatus.FAILED) == 23
-
     assert timeout.result.as_apply_document() == {
         "kind": "timeout",
         "entrypoint_started": True,
@@ -329,10 +367,6 @@ def test_apply_primary_outcome_models_entrypoint_exit_timeout_and_interrupt() ->
         "interrupted": False,
         "patchharbor_error_code": int(ExitCode.TIMEOUT),
     }
-    assert timeout.process_exit_code_for(ResultBundleStatus.FAILED) == int(
-        ExitCode.TIMEOUT
-    )
-
     assert interrupted.result.as_apply_document() == {
         "kind": "interrupted",
         "entrypoint_started": True,
@@ -341,9 +375,6 @@ def test_apply_primary_outcome_models_entrypoint_exit_timeout_and_interrupt() ->
         "interrupted": True,
         "patchharbor_error_code": int(ExitCode.INTERRUPTED),
     }
-    assert interrupted.process_exit_code_for(ResultBundleStatus.FAILED) == int(
-        ExitCode.INTERRUPTED
-    )
 
 
 def test_execution_result_keeps_entrypoint_tool_and_process_codes_separate() -> None:
@@ -364,14 +395,14 @@ def test_execution_result_keeps_entrypoint_tool_and_process_codes_separate() -> 
         ExitCode.INTERPRETER_ERROR
     )
     assert entrypoint_exit.result.patchharbor_error_code is None
-    assert entrypoint_exit.primary_process_exit_code == int(
+    assert entrypoint_exit.result.process_exit_code == int(
         ExitCode.INTERPRETER_ERROR
     )
     assert tool_failure.result.entrypoint_exit_code is None
     assert tool_failure.result.patchharbor_error_code == int(
         ExitCode.INTERPRETER_ERROR
     )
-    assert tool_failure.primary_process_exit_code == int(
+    assert tool_failure.result.process_exit_code == int(
         ExitCode.INTERPRETER_ERROR
     )
 
@@ -419,7 +450,7 @@ def test_result_bundle_outcome_rejects_inconsistent_state(tmp_path: Path) -> Non
         )
 
 
-def test_manual_bundle_report_rejects_execution_or_wrong_exit_code(
+def test_manual_bundle_report_rejects_execution_or_created_failure(
     tmp_path: Path,
 ) -> None:
     repository = tmp_path / "repository"
@@ -442,7 +473,6 @@ def test_manual_bundle_report_rejects_execution_or_wrong_exit_code(
                 entrypoint_exit_code=0,
             ),
             result_bundle=ResultBundleResult.created(tmp_path / "bundle.zip"),
-            process_exit_code=0,
         )
     with pytest.raises(ValueError):
         RunReport(
@@ -457,8 +487,7 @@ def test_manual_bundle_report_rejects_execution_or_wrong_exit_code(
                 kind=PrimaryResultKind.REPOSITORY_ERROR,
                 patchharbor_error_code=8,
             ),
-            result_bundle=ResultBundleResult.failed("repository failed"),
-            process_exit_code=8,
+            result_bundle=ResultBundleResult.created(tmp_path / "invalid.zip"),
         )
 
 def test_run_timestamps_uuid_and_paths_are_canonical(tmp_path: Path) -> None:
@@ -515,7 +544,6 @@ def test_resolved_apply_report_cannot_leave_bundle_unattempted(
             result_bundle=ResultBundleResult.not_attempted(
                 "repository has already been resolved"
             ),
-            process_exit_code=9,
         )
 
 
@@ -546,7 +574,6 @@ def test_apply_report_is_single_source_for_completion_representations(
         warnings=(),
         primary_result=outcome.result,
         result_bundle=bundle_result,
-        process_exit_code=outcome.process_exit_code_for(bundle_result.status),
         primary_tool_error=outcome.tool_error,
     )
 
@@ -588,7 +615,6 @@ def test_entrypoint_exit_does_not_become_a_tool_error_when_bundle_fails(
         warnings=(),
         primary_result=outcome.result,
         result_bundle=bundle_result,
-        process_exit_code=outcome.process_exit_code_for(bundle_result.status),
         primary_tool_error=outcome.tool_error,
     )
 
@@ -621,7 +647,6 @@ def test_bundle_failure_becomes_effective_error_only_after_primary_success(
         warnings=(),
         primary_result=outcome.result,
         result_bundle=bundle_result,
-        process_exit_code=outcome.process_exit_code_for(bundle_result.status),
         primary_tool_error=outcome.tool_error,
     )
 
@@ -635,22 +660,6 @@ def test_bundle_failure_becomes_effective_error_only_after_primary_success(
     assert envelope["process_exit_code"] == int(ExitCode.RESULT_BUNDLE_ERROR)
     assert error.exit_code is ExitCode.RESULT_BUNDLE_ERROR
     assert error.error_kind is ErrorKind.RESULT_BUNDLE_ERROR
-
-    with pytest.raises(ValueError):
-        RunReport(
-            timing=_timing(),
-            operation=RunOperation.APPLY,
-            dry_run=False,
-            context=context,
-            repository=context.repository_path,
-            repo_id=context.repo_id,
-            warnings=(),
-            primary_result=outcome.result,
-            result_bundle=bundle_result,
-            process_exit_code=0,
-            primary_tool_error=outcome.tool_error,
-        )
-
 
 @pytest.mark.parametrize(
     ("repository_present", "repo_id_present"),
@@ -688,7 +697,6 @@ def test_apply_report_rejects_partial_repository_resolution(
             result_bundle=ResultBundleResult.not_attempted(
                 "repository was not safely resolved"
             ),
-            process_exit_code=outcome.primary_process_exit_code,
             primary_tool_error=outcome.tool_error,
         )
 
@@ -707,7 +715,6 @@ def test_apply_result_reports_dry_run_without_execution(tmp_path: Path) -> None:
         warnings=(),
         primary_result=PrimaryResult.dry_run_success_result(),
         result_bundle=ResultBundleResult.created(bundle_path),
-        process_exit_code=0,
     )
 
     result = report.apply_result()

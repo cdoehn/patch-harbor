@@ -389,7 +389,6 @@ def test_manual_bundle_failure_returns_exit_11_and_emergency_run_report(
     emergency_path = Path(error["emergency_diagnostics_path"])
     assert emergency_path.is_absolute()
     assert emergency_path.is_dir()
-    assert str(emergency_path) in completed.stderr
     assert not forbidden_output.exists()
     assert not tuple(repository.rglob(".patchharbor_result_*.tmp"))
     assert not tuple(repository.rglob("patchharbor_result_*.zip"))
@@ -469,7 +468,6 @@ def test_manual_bundle_surfaces_failed_emergency_rescue(
     )
 
     stdout = StringIO()
-    stderr = StringIO()
     exit_code = cli_main(
         [
             "bundle",
@@ -480,7 +478,7 @@ def test_manual_bundle_surfaces_failed_emergency_rescue(
         ],
         stdin=StringIO(),
         stdout=stdout,
-        stderr=stderr,
+        stderr=StringIO(),
     )
 
     assert exit_code == int(ExitCode.RESULT_BUNDLE_ERROR)
@@ -488,7 +486,6 @@ def test_manual_bundle_surfaces_failed_emergency_rescue(
     assert envelope["success"] is False
     assert envelope["process_exit_code"] == int(ExitCode.RESULT_BUNDLE_ERROR)
     assert envelope["error"]["emergency_diagnostics_path"] is None
-    assert stderr.getvalue().strip()
     assert not controlled_run_directory.exists()
     assert not tuple(repository.rglob("patchharbor_result_*.zip"))
 

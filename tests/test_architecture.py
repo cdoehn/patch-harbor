@@ -902,7 +902,8 @@ def test_apply_execution_has_one_structured_outcome_and_cleanup_path() -> None:
     assert "def _complete_entrypoint_execution(" in application_source
     assert "except LoggedScriptExecutionError" not in application_source
     assert "ApplyPrimaryOutcome.from_execution_result(" in application_source
-    assert "primary_process_exit_code" in run_report_source
+    assert "primary_process_exit_code" not in run_report_source
+    assert "def completed_process_exit_code(" in run_report_source
     assert "from_execution_error" not in run_report_source
     assert "poll_process_until_exit(" in windows_source
     assert "CTRL_BREAK_EVENT" not in windows_source

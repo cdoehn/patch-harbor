@@ -436,7 +436,7 @@ def test_apply_result_matrix_preserves_emergency_execution_diagnostics(
     assert not tuple(output_directory.glob(".*.tmp"))
 
 
-def test_apply_json_keeps_raw_output_only_in_emergency_execution_log(
+def test_apply_json_is_closed_and_preserves_emergency_execution_files(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -461,8 +461,6 @@ def test_apply_json_keeps_raw_output_only_in_emergency_execution_log(
 
     monkeypatch.setattr(publication_module, "replace_path", fail_publication)
     stdout = StringIO()
-    stderr = StringIO()
-
     exit_code = cli_main(
         [
             "apply",
@@ -473,12 +471,20 @@ def test_apply_json_keeps_raw_output_only_in_emergency_execution_log(
         ],
         stdin=StringIO(),
         stdout=stdout,
-        stderr=stderr,
+        stderr=StringIO(),
     )
 
     assert exit_code == 23
     assert raw_marker not in stdout.getvalue()
     envelope = json.loads(stdout.getvalue())
+    assert set(envelope) == {
+        "output_version",
+        "command",
+        "success",
+        "result",
+        "error",
+        "process_exit_code",
+    }
     assert envelope["error"] is None
     assert envelope["process_exit_code"] == 23
     result = envelope["result"]
@@ -490,13 +496,26 @@ def test_apply_json_keeps_raw_output_only_in_emergency_execution_log(
         "primary_result",
         "result_bundle",
     }
+    assert set(result["primary_result"]) == {
+        "kind",
+        "entrypoint_started",
+        "entrypoint_exit_code",
+        "timed_out",
+        "interrupted",
+        "patchharbor_error_code",
+    }
     assert result["primary_result"]["kind"] == "entrypoint_exit"
+    assert set(result["result_bundle"]) == {
+        "attempted",
+        "status",
+        "path",
+        "emergency_diagnostics_path",
+    }
     assert result["result_bundle"]["status"] == "failed"
     assert result["result_bundle"]["path"] is None
     emergency_path = Path(
         result["result_bundle"]["emergency_diagnostics_path"]
     )
-    assert str(emergency_path) in stderr.getvalue()
     assert raw_marker.encode("utf-8") in (
         emergency_path / "execution.log"
     ).read_bytes()
