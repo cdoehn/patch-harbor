@@ -227,6 +227,13 @@ def test_run_report_redacts_secret_environment_values(
         ),
         (
             PatchHarborError(
+                "cannot read package",
+                ExitCode.SOURCE_ERROR,
+            ),
+            PrimaryResultKind.VALIDATION_ERROR,
+        ),
+        (
+            PatchHarborError(
                 "execution",
                 ExitCode.EXECUTION_ERROR,
             ),
@@ -509,6 +516,180 @@ def test_resolved_apply_report_cannot_leave_bundle_unattempted(
                 "repository has already been resolved"
             ),
             process_exit_code=9,
+        )
+
+
+def test_apply_report_is_single_source_for_completion_representations(
+    tmp_path: Path,
+) -> None:
+    repository = tmp_path / "repository"
+    repository.mkdir()
+    context = _context(repository)
+    emergency_path = tmp_path / "emergency"
+    emergency_path.mkdir()
+    primary_error = PatchHarborError(
+        "repository state changed",
+        ExitCode.STATE_MISMATCH,
+        error_kind=ErrorKind.STATE_MISMATCH,
+    )
+    outcome = ApplyPrimaryOutcome.from_tool_error(primary_error)
+    bundle_result = ResultBundleResult.failed(
+        "secondary bundle failure"
+    ).with_emergency_diagnostics(emergency_path)
+    report = RunReport(
+        timing=_timing(),
+        operation=RunOperation.APPLY,
+        dry_run=False,
+        context=context,
+        repository=context.repository_path,
+        repo_id=context.repo_id,
+        warnings=(),
+        primary_result=outcome.result,
+        result_bundle=bundle_result,
+        process_exit_code=outcome.process_exit_code_for(bundle_result.status),
+        primary_tool_error=outcome.tool_error,
+    )
+
+    run_document = report.as_run_document()
+    envelope = report.apply_json_envelope()
+    reported_error = report.reported_error()
+
+    assert run_document["primary_result"]["kind"] == "state_mismatch"
+    assert run_document["result_bundle"]["status"] == "failed"
+    assert run_document["process_exit_code"] == int(ExitCode.STATE_MISMATCH)
+    assert envelope["result"] == report.apply_result()
+    assert envelope["error"] == {
+        "kind": "state_mismatch",
+        "message": "repository state changed",
+        "patchharbor_error_code": int(ExitCode.STATE_MISMATCH),
+        "emergency_diagnostics_path": str(emergency_path.resolve()),
+    }
+    assert envelope["process_exit_code"] == int(ExitCode.STATE_MISMATCH)
+    assert reported_error.exit_code is ExitCode.STATE_MISMATCH
+    assert reported_error.error_kind is ErrorKind.STATE_MISMATCH
+    assert reported_error.run_report is report
+
+
+def test_entrypoint_exit_does_not_become_a_tool_error_when_bundle_fails(
+    tmp_path: Path,
+) -> None:
+    repository = tmp_path / "repository"
+    repository.mkdir()
+    context = _context(repository)
+    outcome = ApplyPrimaryOutcome.entrypoint_exit(23)
+    bundle_result = ResultBundleResult.failed("bundle failed")
+    report = RunReport(
+        timing=_timing(),
+        operation=RunOperation.APPLY,
+        dry_run=False,
+        context=context,
+        repository=context.repository_path,
+        repo_id=context.repo_id,
+        warnings=(),
+        primary_result=outcome.result,
+        result_bundle=bundle_result,
+        process_exit_code=outcome.process_exit_code_for(bundle_result.status),
+        primary_tool_error=outcome.tool_error,
+    )
+
+    envelope = report.apply_json_envelope()
+
+    assert report.completion_tool_error is None
+    assert envelope["error"] is None
+    assert envelope["process_exit_code"] == 23
+    assert envelope["result"]["primary_result"]["kind"] == "entrypoint_exit"
+    assert envelope["result"]["result_bundle"]["status"] == "failed"
+    with pytest.raises(ValueError):
+        report.reported_error()
+
+
+def test_bundle_failure_becomes_effective_error_only_after_primary_success(
+    tmp_path: Path,
+) -> None:
+    repository = tmp_path / "repository"
+    repository.mkdir()
+    context = _context(repository)
+    outcome = ApplyPrimaryOutcome.entrypoint_success()
+    bundle_result = ResultBundleResult.failed("bundle publication failed")
+    report = RunReport(
+        timing=_timing(),
+        operation=RunOperation.APPLY,
+        dry_run=False,
+        context=context,
+        repository=context.repository_path,
+        repo_id=context.repo_id,
+        warnings=(),
+        primary_result=outcome.result,
+        result_bundle=bundle_result,
+        process_exit_code=outcome.process_exit_code_for(bundle_result.status),
+        primary_tool_error=outcome.tool_error,
+    )
+
+    envelope = report.apply_json_envelope()
+    error = report.reported_error()
+
+    assert envelope["error"]["kind"] == "result_bundle_error"
+    assert envelope["error"]["patchharbor_error_code"] == int(
+        ExitCode.RESULT_BUNDLE_ERROR
+    )
+    assert envelope["process_exit_code"] == int(ExitCode.RESULT_BUNDLE_ERROR)
+    assert error.exit_code is ExitCode.RESULT_BUNDLE_ERROR
+    assert error.error_kind is ErrorKind.RESULT_BUNDLE_ERROR
+
+    with pytest.raises(ValueError):
+        RunReport(
+            timing=_timing(),
+            operation=RunOperation.APPLY,
+            dry_run=False,
+            context=context,
+            repository=context.repository_path,
+            repo_id=context.repo_id,
+            warnings=(),
+            primary_result=outcome.result,
+            result_bundle=bundle_result,
+            process_exit_code=0,
+            primary_tool_error=outcome.tool_error,
+        )
+
+
+@pytest.mark.parametrize(
+    ("repository_present", "repo_id_present"),
+    ((True, False), (False, True)),
+)
+def test_apply_report_rejects_partial_repository_resolution(
+    tmp_path: Path,
+    repository_present: bool,
+    repo_id_present: bool,
+) -> None:
+    repository = tmp_path / "repository"
+    repository.mkdir()
+    outcome = ApplyPrimaryOutcome.from_tool_error(
+        PatchHarborError(
+            "repository resolution failed",
+            ExitCode.REPOSITORY_ERROR,
+            error_kind=ErrorKind.REPOSITORY_RESOLUTION_ERROR,
+        )
+    )
+
+    with pytest.raises(ValueError):
+        RunReport(
+            timing=_timing(),
+            operation=RunOperation.APPLY,
+            dry_run=False,
+            context=None,
+            repository=(
+                RepositoryPath(repository.resolve())
+                if repository_present
+                else None
+            ),
+            repo_id=_REPO_ID if repo_id_present else None,
+            warnings=(),
+            primary_result=outcome.result,
+            result_bundle=ResultBundleResult.not_attempted(
+                "repository was not safely resolved"
+            ),
+            process_exit_code=outcome.primary_process_exit_code,
+            primary_tool_error=outcome.tool_error,
         )
 
 def test_apply_result_reports_dry_run_without_execution(tmp_path: Path) -> None:

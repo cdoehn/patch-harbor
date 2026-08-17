@@ -171,7 +171,7 @@ def preflight_patch_package_repository(
                 warnings=package.warnings,
                 error=error,
             )
-            raise report.reported_error(error) from error
+            raise report.reported_error() from error
 
         if not resolved.matches_manifest_state(manifest):
             error = state_mismatch_error(
@@ -185,7 +185,7 @@ def preflight_patch_package_repository(
                 warnings=package.warnings,
                 primary_outcome=ApplyPrimaryOutcome.from_tool_error(error),
             )
-            raise report.reported_error(error)
+            raise report.reported_error()
 
         with ExitStack() as private_resources:
             try:
@@ -208,7 +208,7 @@ def preflight_patch_package_repository(
                     warnings=package.warnings,
                     primary_outcome=ApplyPrimaryOutcome.from_tool_error(error),
                 )
-                raise report.reported_error(error) from error
+                raise report.reported_error() from error
 
             yield ApplyMutationGate(
                 session=actual_session,
@@ -251,7 +251,7 @@ def _require_payload_mutation(mutation_gate: ApplyMutationGate) -> None:
             mutation_gate,
             primary_outcome=ApplyPrimaryOutcome.from_tool_error(error),
         )
-        raise report.reported_error(error) from error
+        raise report.reported_error() from error
 
     if result.success:
         return
@@ -263,7 +263,7 @@ def _require_payload_mutation(mutation_gate: ApplyMutationGate) -> None:
         primary_outcome=ApplyPrimaryOutcome.from_tool_error(error),
         actual_context=result.context,
     )
-    raise report.reported_error(error)
+    raise report.reported_error()
 
 
 def _complete_entrypoint_execution(
@@ -283,7 +283,7 @@ def _complete_entrypoint_execution(
     )
 
     if execution.patchharbor_error is not None:
-        raise report.reported_error(execution.patchharbor_error)
+        raise report.reported_error()
     if primary_outcome.result.success and report.process_exit_code != 0:
         raise report.reported_error()
     return report

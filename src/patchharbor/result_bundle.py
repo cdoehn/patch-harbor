@@ -294,20 +294,15 @@ def _apply_report(
     primary_outcome: ApplyPrimaryOutcome,
     result_bundle: ResultBundleResult,
 ) -> RunReport:
-    process_exit_code = primary_outcome.process_exit_code_for(
-        result_bundle.status
-    )
-    return RunReport(
+    return RunReport.completed_apply(
         timing=session.finish(),
-        operation=RunOperation.APPLY,
         dry_run=dry_run,
         context=context,
         repository=repository,
         repo_id=repo_id,
         warnings=warnings,
-        primary_result=primary_outcome.result,
+        primary_outcome=primary_outcome,
         result_bundle=result_bundle,
-        process_exit_code=process_exit_code,
     )
 
 

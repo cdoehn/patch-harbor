@@ -52,6 +52,10 @@ class PrimaryResultKind(str, Enum):
     @classmethod
     def for_tool_error(cls, error: PatchHarborError) -> PrimaryResultKind:
         """Map one tool failure to its stable primary-result category."""
+        if error.exit_code is ExitCode.TIMEOUT:
+            return cls.TIMEOUT
+        if error.exit_code is ExitCode.INTERRUPTED:
+            return cls.INTERRUPTED
         if error.error_kind is ErrorKind.STATE_MISMATCH:
             return cls.STATE_MISMATCH
         if error.error_kind is ErrorKind.REPOSITORY_BUSY:
@@ -63,6 +67,7 @@ class PrimaryResultKind(str, Enum):
         }:
             return cls.REPOSITORY_ERROR
         if error.exit_code in {
+            ExitCode.SOURCE_ERROR,
             ExitCode.NO_VALID_SCRIPT,
             ExitCode.INTERPRETER_ERROR,
             ExitCode.PAYLOAD_PREPARATION_ERROR,
@@ -78,6 +83,75 @@ class ResultBundleStatus(str, Enum):
     CREATED = "created"
     FAILED = "failed"
     NOT_ATTEMPTED = "not_attempted"
+
+
+@dataclass(frozen=True, slots=True)
+class RunToolError:
+    """Immutable PatchHarbor tool-error data kept with one completed run."""
+
+    kind: ErrorKind
+    message: str
+    patchharbor_error_code: int
+
+    def __post_init__(self) -> None:
+        code = self.patchharbor_error_code
+        if isinstance(code, bool) or not isinstance(code, int):
+            raise ValueError("PatchHarbor error code must be an integer")
+        try:
+            ExitCode(code)
+        except ValueError as exc:
+            raise ValueError(
+                "PatchHarbor error code is not owned by PatchHarbor"
+            ) from exc
+        object.__setattr__(self, "message", sanitize_structured_text(self.message))
+
+    @classmethod
+    def from_error(cls, error: PatchHarborError) -> RunToolError:
+        return cls(
+            kind=error.error_kind,
+            message=str(error),
+            patchharbor_error_code=int(error.exit_code),
+        )
+
+    @classmethod
+    def result_bundle_failure(cls, message: str) -> RunToolError:
+        return cls(
+            kind=ErrorKind.RESULT_BUNDLE_ERROR,
+            message=message,
+            patchharbor_error_code=int(ExitCode.RESULT_BUNDLE_ERROR),
+        )
+
+    def as_document(
+        self,
+        *,
+        emergency_diagnostics_path: Path | None,
+    ) -> dict[str, object]:
+        return {
+            "kind": self.kind.value,
+            "message": self.message,
+            "patchharbor_error_code": self.patchharbor_error_code,
+            "emergency_diagnostics_path": physical_absolute_path_text(
+                emergency_diagnostics_path
+            ),
+        }
+
+    def as_exception(
+        self,
+        *,
+        report: RunReport,
+    ) -> PatchHarborError:
+        bundle = report.result_bundle
+        return PatchHarborError(
+            self.message,
+            ExitCode(self.patchharbor_error_code),
+            error_kind=self.kind,
+            emergency_diagnostics_path=bundle.emergency_diagnostics_path,
+            emergency_diagnostics_failed=(
+                bundle.status is ResultBundleStatus.FAILED
+                and bundle.emergency_diagnostics_path is None
+            ),
+            run_report=report,
+        )
 
 
 def canonical_uuid_text(value: UUID) -> str:
@@ -378,6 +452,10 @@ class PrimaryResult:
     @classmethod
     def from_tool_error(cls, error: PatchHarborError) -> PrimaryResult:
         """Create the structured primary result for one tool failure."""
+        if error.exit_code is ExitCode.TIMEOUT:
+            return cls.timeout_result()
+        if error.exit_code is ExitCode.INTERRUPTED:
+            return cls.interrupted_result()
         return cls.tool_failure(
             kind=PrimaryResultKind.for_tool_error(error),
             patchharbor_error_code=int(error.exit_code),
@@ -411,6 +489,7 @@ class ApplyPrimaryOutcome:
 
     result: PrimaryResult
     primary_process_exit_code: int
+    tool_error: RunToolError | None = None
 
     def __post_init__(self) -> None:
         exit_code = self.primary_process_exit_code
@@ -428,6 +507,14 @@ class ApplyPrimaryOutcome:
             and self.result.entrypoint_exit_code != exit_code
         ):
             raise ValueError("entrypoint and process exit codes disagree")
+        if self.result.patchharbor_error_code is None:
+            if self.tool_error is not None:
+                raise ValueError("non-tool primary result cannot carry a tool error")
+        else:
+            if self.tool_error is None:
+                raise ValueError("tool primary result requires immutable error data")
+            if self.tool_error.patchharbor_error_code != exit_code:
+                raise ValueError("primary tool error and process exit codes disagree")
 
     @classmethod
     def success(cls) -> ApplyPrimaryOutcome:
@@ -462,6 +549,9 @@ class ApplyPrimaryOutcome:
         return cls(
             result=PrimaryResult.timeout_result(),
             primary_process_exit_code=int(ExitCode.TIMEOUT),
+            tool_error=RunToolError.from_error(
+                PatchHarborError("entrypoint timed out", ExitCode.TIMEOUT)
+            ),
         )
 
     @classmethod
@@ -469,6 +559,9 @@ class ApplyPrimaryOutcome:
         return cls(
             result=PrimaryResult.interrupted_result(),
             primary_process_exit_code=int(ExitCode.INTERRUPTED),
+            tool_error=RunToolError.from_error(
+                PatchHarborError("entrypoint interrupted", ExitCode.INTERRUPTED)
+            ),
         )
 
     @classmethod
@@ -477,6 +570,8 @@ class ApplyPrimaryOutcome:
         *,
         kind: PrimaryResultKind,
         exit_code: int,
+        message: str = "PatchHarbor tool failure",
+        error_kind: ErrorKind = ErrorKind.TOOL_ERROR,
     ) -> ApplyPrimaryOutcome:
         return cls(
             result=PrimaryResult.tool_failure(
@@ -484,6 +579,11 @@ class ApplyPrimaryOutcome:
                 patchharbor_error_code=exit_code,
             ),
             primary_process_exit_code=exit_code,
+            tool_error=RunToolError(
+                kind=error_kind,
+                message=message,
+                patchharbor_error_code=exit_code,
+            ),
         )
 
     @classmethod
@@ -492,6 +592,7 @@ class ApplyPrimaryOutcome:
         return cls(
             result=PrimaryResult.from_tool_error(error),
             primary_process_exit_code=int(error.exit_code),
+            tool_error=RunToolError.from_error(error),
         )
 
     @classmethod
@@ -511,11 +612,19 @@ class ApplyPrimaryOutcome:
             if patchharbor_error.exit_code is ExitCode.INTERRUPTED:
                 if not entrypoint_started:
                     raise ValueError("interruption requires a started entrypoint")
-                return cls.interrupted()
+                return cls(
+                    result=PrimaryResult.interrupted_result(),
+                    primary_process_exit_code=int(ExitCode.INTERRUPTED),
+                    tool_error=RunToolError.from_error(patchharbor_error),
+                )
             if patchharbor_error.exit_code is ExitCode.TIMEOUT:
                 if not entrypoint_started:
                     raise ValueError("timeout requires a started entrypoint")
-                return cls.timeout()
+                return cls(
+                    result=PrimaryResult.timeout_result(),
+                    primary_process_exit_code=int(ExitCode.TIMEOUT),
+                    tool_error=RunToolError.from_error(patchharbor_error),
+                )
             return cls(
                 result=PrimaryResult(
                     kind=PrimaryResultKind.for_tool_error(patchharbor_error),
@@ -524,6 +633,7 @@ class ApplyPrimaryOutcome:
                     entrypoint_started=entrypoint_started,
                 ),
                 primary_process_exit_code=int(patchharbor_error.exit_code),
+                tool_error=RunToolError.from_error(patchharbor_error),
             )
 
         if not entrypoint_started or entrypoint_exit_code is None:
@@ -659,6 +769,7 @@ class RunReport:
     primary_result: PrimaryResult
     result_bundle: ResultBundleResult
     process_exit_code: int
+    primary_tool_error: RunToolError | None = None
 
     def __post_init__(self) -> None:
         if isinstance(self.process_exit_code, bool) or not isinstance(
@@ -670,15 +781,65 @@ class RunReport:
             "warnings",
             tuple(sanitize_structured_text(warning) for warning in self.warnings),
         )
+        if (self.repository is None) != (self.repo_id is None):
+            raise ValueError("run repository path and ID must resolve together")
         if self.context is not None:
             if self.repository not in (None, self.context.repository_path):
                 raise ValueError("run repository conflicts with its context")
             if self.repo_id not in (None, self.context.repo_id):
                 raise ValueError("run repository ID conflicts with its context")
+        if self.operation is RunOperation.APPLY:
+            if self.repository_resolved != (self.context is not None):
+                raise ValueError(
+                    "safe Apply repository resolution requires one complete context"
+                )
+            error_code = self.primary_result.patchharbor_error_code
+            if error_code is None:
+                if self.primary_tool_error is not None:
+                    raise ValueError(
+                        "non-tool Apply primary result cannot carry a tool error"
+                    )
+            else:
+                if self.primary_tool_error is None:
+                    raise ValueError(
+                        "Apply tool failure requires immutable primary error data"
+                    )
+                if self.primary_tool_error.patchharbor_error_code != error_code:
+                    raise ValueError(
+                        "Apply primary result and tool-error code disagree"
+                    )
+                expected_kind = PrimaryResultKind.for_tool_error(
+                    PatchHarborError(
+                        self.primary_tool_error.message,
+                        ExitCode(error_code),
+                        error_kind=self.primary_tool_error.kind,
+                    )
+                )
+                if expected_kind is not self.primary_result.kind:
+                    raise ValueError(
+                        "Apply primary-result kind and tool-error category disagree"
+                    )
+            primary_exit_code = 0
+            if self.primary_result.entrypoint_exit_code is not None:
+                primary_exit_code = self.primary_result.entrypoint_exit_code
+            elif self.primary_result.patchharbor_error_code is not None:
+                primary_exit_code = self.primary_result.patchharbor_error_code
+            expected_process_exit_code = (
+                int(ExitCode.RESULT_BUNDLE_ERROR)
+                if self.primary_result.success
+                and self.result_bundle.status is ResultBundleStatus.FAILED
+                else primary_exit_code
+            )
+            if self.process_exit_code != expected_process_exit_code:
+                raise ValueError(
+                    "Apply process exit code conflicts with its primary "
+                    "and bundle results"
+                )
         if self.result_bundle.status is ResultBundleStatus.NOT_ATTEMPTED:
             if self.repository_resolved:
                 raise ValueError(
-                    "Result Bundle may be not_attempted only before repository resolution"
+                    "Result Bundle may be not_attempted only before "
+                    "repository resolution"
                 )
         if self.operation is RunOperation.BUNDLE:
             if self.dry_run or self.execution_present:
@@ -698,6 +859,36 @@ class RunReport:
                 raise ValueError(
                     "failed manual bundle requires failure status and exit 11"
                 )
+
+    @classmethod
+    def completed_apply(
+        cls,
+        *,
+        timing: RunTiming,
+        dry_run: bool,
+        context: RepositoryContext | None,
+        repository: RepositoryPath | None,
+        repo_id: RepositoryId | None,
+        warnings: tuple[str, ...],
+        primary_outcome: ApplyPrimaryOutcome,
+        result_bundle: ResultBundleResult,
+    ) -> RunReport:
+        """Build one complete Apply report from its two independent outcomes."""
+        return cls(
+            timing=timing,
+            operation=RunOperation.APPLY,
+            dry_run=dry_run,
+            context=context,
+            repository=repository,
+            repo_id=repo_id,
+            warnings=warnings,
+            primary_result=primary_outcome.result,
+            result_bundle=result_bundle,
+            process_exit_code=primary_outcome.process_exit_code_for(
+                result_bundle.status
+            ),
+            primary_tool_error=primary_outcome.tool_error,
+        )
 
     @property
     def run_id(self) -> UUID:
@@ -722,42 +913,49 @@ class RunReport:
 
     @property
     def repository_resolved(self) -> bool:
-        return self.resolved_repository is not None and self.resolved_repo_id is not None
+        return (
+            self.resolved_repository is not None
+            and self.resolved_repo_id is not None
+        )
 
     @property
     def execution_present(self) -> bool:
         """An execution log exists only after an entrypoint actually started."""
         return self.primary_result.entrypoint_started
 
+    @property
+    def completion_tool_error(self) -> RunToolError | None:
+        """Return the effective tool error without replacing a primary failure."""
+        if self.primary_tool_error is not None:
+            return self.primary_tool_error
+        if (
+            self.primary_result.success
+            and self.result_bundle.status is ResultBundleStatus.FAILED
+        ):
+            return RunToolError.result_bundle_failure(
+                self.result_bundle.error or "cannot create the Result Bundle"
+            )
+        return None
+
     def with_result_bundle(self, result: ResultBundleResult) -> RunReport:
         return replace(self, result_bundle=result)
 
-    def reported_error(
-        self,
-        primary_error: PatchHarborError | None = None,
-    ) -> PatchHarborError:
-        """Attach this completed report to the effective Apply failure."""
-        bundle_result = self.result_bundle
-        if primary_error is None:
-            message = bundle_result.error or "cannot create the Result Bundle"
-            exit_code = ExitCode.RESULT_BUNDLE_ERROR
-            error_kind = ErrorKind.RESULT_BUNDLE_ERROR
-        else:
-            message = str(primary_error)
-            exit_code = primary_error.exit_code
-            error_kind = primary_error.error_kind
-        return PatchHarborError(
-            message,
-            exit_code,
-            error_kind=error_kind,
+    def reported_error(self) -> PatchHarborError:
+        """Create the effective Apply exception solely from this run report."""
+        error = self.completion_tool_error
+        if error is None:
+            raise ValueError("completed run has no PatchHarbor tool error")
+        return error.as_exception(report=self)
+
+    def error_document(self) -> dict[str, object] | None:
+        """Return the common top-level JSON error from this completed run."""
+        error = self.completion_tool_error
+        if error is None:
+            return None
+        return error.as_document(
             emergency_diagnostics_path=(
-                bundle_result.emergency_diagnostics_path
-            ),
-            emergency_diagnostics_failed=(
-                bundle_result.status is ResultBundleStatus.FAILED
-                and bundle_result.emergency_diagnostics_path is None
-            ),
-            run_report=self,
+                self.result_bundle.emergency_diagnostics_path
+            )
         )
 
     def as_run_document(self) -> dict[str, object]:
@@ -811,6 +1009,19 @@ class RunReport:
             "result_bundle": self.result_bundle.as_apply_document(),
         }
 
+    def apply_json_envelope(self) -> dict[str, object]:
+        """Return the complete shared JSON completion for one Apply run."""
+        if self.operation is not RunOperation.APPLY:
+            raise ValueError("run report is not an apply result")
+        return {
+            "output_version": 1,
+            "command": "apply",
+            "success": self.process_exit_code == 0,
+            "result": self.apply_result(),
+            "error": self.error_document(),
+            "process_exit_code": self.process_exit_code,
+        }
+
     def manual_bundle_result(self) -> dict[str, object]:
         """Return the closed successful ``bundle --json`` result object."""
         if (
@@ -849,15 +1060,13 @@ def unresolved_apply_report(
 ) -> RunReport:
     """Complete one Apply failure before a repository is safely resolved."""
     primary_outcome = ApplyPrimaryOutcome.from_tool_error(error)
-    return RunReport(
+    return RunReport.completed_apply(
         timing=session.finish(),
-        operation=RunOperation.APPLY,
         dry_run=dry_run,
         context=None,
         repository=None,
         repo_id=None,
         warnings=warnings,
-        primary_result=primary_outcome.result,
+        primary_outcome=primary_outcome,
         result_bundle=ResultBundleResult.not_attempted(str(error)),
-        process_exit_code=primary_outcome.primary_process_exit_code,
     )

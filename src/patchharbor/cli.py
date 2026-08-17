@@ -499,6 +499,35 @@ def _write_report_emergency_diagnostics_notice(
         )
 
 
+def _write_apply_completion(
+    report: RunReport,
+    *,
+    json_output: bool,
+    stdout: TextIO,
+    stderr: TextIO,
+) -> int:
+    """Render one completed Apply run solely from its immutable report."""
+    if json_output:
+        _write_json_document(report.apply_json_envelope(), stdout)
+    else:
+        tool_error = report.completion_tool_error
+        if tool_error is not None:
+            print(format_tool_message(tool_error.message), file=stderr)
+            if report.result_bundle.path is not None:
+                print(
+                    format_tool_message(
+                        f"result bundle: {report.result_bundle.path}"
+                    ),
+                    file=stderr,
+                )
+        else:
+            print(f"run_id: {report.run_id_text}", file=stdout)
+            print(f"repository_path: {report.resolved_repository}", file=stdout)
+            print(f"result_bundle_path: {report.result_bundle.path}", file=stdout)
+    _write_report_emergency_diagnostics_notice(report, stderr)
+    return report.process_exit_code
+
+
 def _bundle_command(
     path: Path | None,
     *,
@@ -564,21 +593,12 @@ def _apply_command(
             dry_run=dry_run,
             error=exc,
         )
-        reported_error = report.reported_error(exc)
-        exit_code = report.process_exit_code
-        if json_output:
-            _write_json_document(
-                _json_envelope(
-                    "apply",
-                    result=report.apply_result(),
-                    error=reported_error,
-                    process_exit_code=exit_code,
-                ),
-                stdout,
-            )
-        else:
-            print(format_tool_message(str(exc)), file=stderr)
-        return exit_code
+        return _write_apply_completion(
+            report,
+            json_output=json_output,
+            stdout=stdout,
+            stderr=stderr,
+        )
 
     for warning in package.warnings:
         print(format_tool_warning(warning), file=stderr)
@@ -604,52 +624,30 @@ def _apply_command(
             )
     except PatchHarborError as exc:
         report = exc.run_report if isinstance(exc.run_report, RunReport) else None
-        exit_code = (
-            int(exc.exit_code)
-            if report is None
-            else report.process_exit_code
-        )
-        if json_output:
-            _write_json_document(
-                _json_envelope(
-                    "apply",
-                    result=(None if report is None else report.apply_result()),
-                    error=exc,
-                    process_exit_code=exit_code,
-                ),
-                stdout,
+        if report is None:
+            report = unresolved_apply_report(
+                session=session,
+                dry_run=dry_run,
+                warnings=package.warnings,
+                error=exc,
             )
-        else:
-            print(format_tool_message(str(exc)), file=stderr)
-            if report is not None and report.result_bundle.path is not None:
-                print(
-                    format_tool_message(
-                        f"result bundle: {report.result_bundle.path}"
-                    ),
-                    file=stderr,
-                )
-        _write_emergency_diagnostics_notice(exc, stderr)
-        return exit_code
+        for warning in report.warnings[len(package.warnings) :]:
+            print(format_tool_warning(warning), file=stderr)
+        return _write_apply_completion(
+            report,
+            json_output=json_output,
+            stdout=stdout,
+            stderr=stderr,
+        )
 
     for warning in report.warnings[len(package.warnings) :]:
         print(format_tool_warning(warning), file=stderr)
-    _write_report_emergency_diagnostics_notice(report, stderr)
-
-    if json_output:
-        _write_json_document(
-            _json_envelope(
-                "apply",
-                result=report.apply_result(),
-                error=None,
-                process_exit_code=report.process_exit_code,
-            ),
-            stdout,
-        )
-    else:
-        print(f"run_id: {report.run_id_text}", file=stdout)
-        print(f"repository_path: {report.resolved_repository}", file=stdout)
-        print(f"result_bundle_path: {report.result_bundle.path}", file=stdout)
-    return report.process_exit_code
+    return _write_apply_completion(
+        report,
+        json_output=json_output,
+        stdout=stdout,
+        stderr=stderr,
+    )
 
 
 def _unregister_command(
