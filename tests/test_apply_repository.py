@@ -28,7 +28,7 @@ from patchharbor.errors import (
     PatchHarborError,
     unsupported_repository_state_error,
 )
-from patchharbor.execution import LoggedScriptExecutionError
+from patchharbor.execution import ScriptExecutionResult
 from patchharbor.models import (
     BundlePayload,
     RepositoryContext,
@@ -637,8 +637,16 @@ def test_process_start_failure_bundles_without_claiming_entrypoint_start(
     context = register_repository(repository)
     output_directory = tmp_path / "results"
 
-    def fail_process_start(*args: object, **kwargs: object) -> object:
-        raise LoggedScriptExecutionError(
+    private_entrypoint: Path | None = None
+
+    def fail_process_start(
+        script_path: Path,
+        *args: object,
+        **kwargs: object,
+    ) -> ScriptExecutionResult:
+        nonlocal private_entrypoint
+        private_entrypoint = script_path
+        return ScriptExecutionResult.failed(
             PatchHarborError(
                 "cannot start script interpreter",
                 ExitCode.INTERPRETER_ERROR,
@@ -670,6 +678,8 @@ def test_process_start_failure_bundles_without_claiming_entrypoint_start(
     assert bundle_path is not None
     with zipfile.ZipFile(bundle_path) as archive:
         assert "logs/execution.log" not in archive.namelist()
+    assert private_entrypoint is not None
+    assert not private_entrypoint.exists()
     assert probe_repository_lock(str(context.repo_id), project_environment()) == 0
 
 

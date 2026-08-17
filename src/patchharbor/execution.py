@@ -7,6 +7,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass, replace
 from pathlib import Path
 import sys
+from typing import BinaryIO
 
 from patchharbor.errors import ExitCode, PatchHarborError
 from patchharbor.interpreters import (
@@ -88,34 +89,94 @@ def execute_prepared_script(
 
 
 @dataclass(frozen=True, slots=True)
-class CompletedScriptExecution:
-    """One normally exited script together with its byte-exact output."""
+class ScriptExecutionResult:
+    """One fully cleaned-up script execution and its byte-exact output."""
 
-    exit_code: int
+    entrypoint_started: bool
+    entrypoint_exit_code: int | None
+    patchharbor_error: PatchHarborError | None
     output: bytes
 
     def __post_init__(self) -> None:
-        if isinstance(self.exit_code, bool) or not isinstance(self.exit_code, int):
-            raise ValueError("script exit code must be an integer")
+        if not isinstance(self.entrypoint_started, bool):
+            raise ValueError("entrypoint-started flag must be boolean")
+        if self.entrypoint_exit_code is not None and (
+            isinstance(self.entrypoint_exit_code, bool)
+            or not isinstance(self.entrypoint_exit_code, int)
+        ):
+            raise ValueError("entrypoint exit code must be an integer")
+        if (self.entrypoint_exit_code is None) == (self.patchharbor_error is None):
+            raise ValueError(
+                "script execution requires either an exit code or a PatchHarbor error"
+            )
+        if self.entrypoint_exit_code is not None and not self.entrypoint_started:
+            raise ValueError("an exited entrypoint must have started")
+        if self.patchharbor_error is not None:
+            if not isinstance(self.patchharbor_error, PatchHarborError):
+                raise ValueError("script execution error must be a PatchHarbor error")
+            if self.patchharbor_error.exit_code in {
+                ExitCode.TIMEOUT,
+                ExitCode.INTERRUPTED,
+            } and not self.entrypoint_started:
+                raise ValueError("timeout and interruption require a started entrypoint")
+        object.__setattr__(self, "output", bytes(self.output))
 
+    @classmethod
+    def exited(cls, exit_code: int, output: bytes) -> ScriptExecutionResult:
+        return cls(
+            entrypoint_started=True,
+            entrypoint_exit_code=exit_code,
+            patchharbor_error=None,
+            output=output,
+        )
 
-class LoggedScriptExecutionError(PatchHarborError):
-    """A process-control failure together with output captured before cleanup."""
-
-    def __init__(
-        self,
+    @classmethod
+    def failed(
+        cls,
         error: PatchHarborError,
         *,
-        output: bytes,
         entrypoint_started: bool,
-    ) -> None:
-        super().__init__(
-            str(error),
-            error.exit_code,
-            error_kind=error.error_kind,
+        output: bytes,
+    ) -> ScriptExecutionResult:
+        return cls(
+            entrypoint_started=entrypoint_started,
+            entrypoint_exit_code=None,
+            patchharbor_error=error,
+            output=output,
         )
-        self.output = bytes(output)
-        self.entrypoint_started = entrypoint_started
+
+    def with_output(self, output: bytes) -> ScriptExecutionResult:
+        return replace(self, output=output)
+
+    def with_cleanup_error(
+        self,
+        error: PatchHarborError,
+    ) -> ScriptExecutionResult:
+        """Keep interruption, timeout, exit, or an earlier tool failure first."""
+        if self.patchharbor_error is not None:
+            return self
+        if self.entrypoint_exit_code not in (None, 0):
+            return self
+        return ScriptExecutionResult.failed(
+            error,
+            entrypoint_started=self.entrypoint_started,
+            output=self.output,
+        )
+
+
+def _read_execution_log(execution_log: BinaryIO) -> bytes:
+    """Read one binary execution log after the process lifecycle has ended."""
+    execution_log.flush()
+    execution_log.seek(0)
+    return bytes(execution_log.read())
+
+
+def _execution_log_error(exc: OSError) -> PatchHarborError:
+    return PatchHarborError(
+        "cannot capture script output: "
+        f"{describe_os_error(exc)}",
+        ExitCode.EXECUTION_ERROR,
+    )
 
 
 def execute_prepared_script_with_log(
@@ -126,49 +187,63 @@ def execute_prepared_script_with_log(
     timeout_seconds: float,
     execution_log_path: Path,
     output: OutputTargets | None = None,
-) -> CompletedScriptExecution:
-    """Execute one private script and return its complete raw output bytes."""
+) -> ScriptExecutionResult:
+    """Execute one private script and return after every owned resource closed."""
     targets = output or OutputTargets(visible_text_stream=sys.stdout)
     try:
-        with execution_log_path.open("w+b") as execution_log:
-            try:
-                exit_code = execute_prepared_script(
-                    script_path,
-                    interpreter=interpreter,
-                    cwd=cwd,
-                    timeout_seconds=timeout_seconds,
-                    output=replace(
-                        targets,
-                        raw_output_stream=execution_log,
-                    ),
-                )
-            except PatchHarborError as error:
-                execution_log.flush()
-                execution_log.seek(0)
-                execution_output = execution_log.read()
-                raise LoggedScriptExecutionError(
-                    error,
-                    output=execution_output,
-                    entrypoint_started=(
-                        error.exit_code is not ExitCode.INTERPRETER_ERROR
-                    ),
-                ) from error
-            execution_log.flush()
-            execution_log.seek(0)
-            execution_output = execution_log.read()
-    except PatchHarborError:
-        raise
+        execution_log = execution_log_path.open("w+b")
     except OSError as exc:
-        raise PatchHarborError(
-            "cannot capture script output: "
-            f"{describe_os_error(exc)}",
-            ExitCode.EXECUTION_ERROR,
-        ) from exc
+        return ScriptExecutionResult.failed(
+            _execution_log_error(exc),
+            output=b"",
+            entrypoint_started=False,
+        )
 
-    return CompletedScriptExecution(
-        exit_code=exit_code,
-        output=execution_output,
-    )
+    result: ScriptExecutionResult | None = None
+    try:
+        try:
+            exit_code = execute_prepared_script(
+                script_path,
+                interpreter=interpreter,
+                cwd=cwd,
+                timeout_seconds=timeout_seconds,
+                output=replace(
+                    targets,
+                    raw_output_stream=execution_log,
+                ),
+            )
+        except PatchHarborError as error:
+            result = ScriptExecutionResult.failed(
+                error,
+                output=b"",
+                entrypoint_started=(
+                    error.exit_code is not ExitCode.INTERPRETER_ERROR
+                ),
+            )
+        else:
+            result = ScriptExecutionResult.exited(exit_code, b"")
+
+        try:
+            result = result.with_output(_read_execution_log(execution_log))
+        except OSError as exc:
+            result = result.with_cleanup_error(_execution_log_error(exc))
+    finally:
+        try:
+            execution_log.close()
+        except OSError as exc:
+            cleanup_error = _execution_log_error(exc)
+            if result is None:
+                result = ScriptExecutionResult.failed(
+                    cleanup_error,
+                    output=b"",
+                    entrypoint_started=False,
+                )
+            else:
+                result = result.with_cleanup_error(cleanup_error)
+
+    if result is None:
+        raise RuntimeError("script execution produced no result")
+    return result
 
 
 def _finish_capture_after_process_error(capture: ProcessOutputCapture) -> None:

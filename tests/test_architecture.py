@@ -875,3 +875,30 @@ def test_complete_runtime_dependency_graph_is_acyclic() -> None:
 
     for module_name in sorted(graph):
         visit(module_name)
+
+
+def test_apply_execution_has_one_structured_outcome_and_cleanup_path() -> None:
+    application_source = (PACKAGE_ROOT / "application.py").read_text(
+        encoding="utf-8"
+    )
+    execution_source = (PACKAGE_ROOT / "execution.py").read_text(
+        encoding="utf-8"
+    )
+    run_report_source = (PACKAGE_ROOT / "run_report.py").read_text(
+        encoding="utf-8"
+    )
+    windows_source = (PACKAGE_ROOT / "platform" / "windows.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert "class ScriptExecutionResult" in execution_source
+    assert "LoggedScriptExecutionError" not in execution_source
+    assert "return ScriptExecutionResult.failed" in execution_source
+    assert "ScriptExecutionResult.exited(" in execution_source
+    assert "def _complete_entrypoint_execution(" in application_source
+    assert "except LoggedScriptExecutionError" not in application_source
+    assert "ApplyPrimaryOutcome.from_execution_result(" in application_source
+    assert "primary_process_exit_code" in run_report_source
+    assert "from_execution_error" not in run_report_source
+    assert "poll_process_until_exit(" in windows_source
+    assert "CTRL_BREAK_EVENT" not in windows_source

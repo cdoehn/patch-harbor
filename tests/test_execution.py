@@ -8,7 +8,7 @@ import pytest
 from patchharbor.errors import ExitCode, PatchHarborError
 import patchharbor.execution as execution
 from patchharbor.execution import (
-    LoggedScriptExecutionError,
+    ScriptExecutionResult,
     execute_prepared_script_with_log,
     execute_script_text,
 )
@@ -291,18 +291,20 @@ def test_prepared_timeout_preserves_output_for_result_bundle(
         executable_path="/interpreters/bash",
     )
 
-    with pytest.raises(LoggedScriptExecutionError) as raised:
-        execute_prepared_script_with_log(
-            script_path,
-            interpreter=interpreter,
-            cwd=tmp_path,
-            timeout_seconds=0.25,
-            execution_log_path=tmp_path / "execution.log",
-        )
+    result = execute_prepared_script_with_log(
+        script_path,
+        interpreter=interpreter,
+        cwd=tmp_path,
+        timeout_seconds=0.25,
+        execution_log_path=tmp_path / "execution.log",
+    )
 
-    assert raised.value.exit_code is ExitCode.TIMEOUT
-    assert raised.value.entrypoint_started is True
-    assert raised.value.output == b"before-timeout\n"
+    assert result.entrypoint_started is True
+    assert result.entrypoint_exit_code is None
+    assert result.patchharbor_error is not None
+    assert result.patchharbor_error.exit_code is ExitCode.TIMEOUT
+    assert result.output == b"before-timeout\n"
+    assert process_tree.closed == 1
 
 
 def test_prepared_process_start_failure_reports_no_entrypoint_start(
@@ -321,18 +323,164 @@ def test_prepared_process_start_failure_reports_no_entrypoint_start(
         executable_path="/interpreters/bash",
     )
 
-    with pytest.raises(LoggedScriptExecutionError) as raised:
-        execute_prepared_script_with_log(
-            script_path,
-            interpreter=interpreter,
-            cwd=tmp_path,
-            timeout_seconds=7,
-            execution_log_path=tmp_path / "execution.log",
+    result = execute_prepared_script_with_log(
+        script_path,
+        interpreter=interpreter,
+        cwd=tmp_path,
+        timeout_seconds=7,
+        execution_log_path=tmp_path / "execution.log",
+    )
+
+    assert result.entrypoint_started is False
+    assert result.entrypoint_exit_code is None
+    assert result.patchharbor_error is not None
+    assert result.patchharbor_error.exit_code is ExitCode.INTERPRETER_ERROR
+    assert result.output == b""
+
+
+def test_script_execution_result_keeps_exit_and_tool_error_distinct() -> None:
+    exited = ScriptExecutionResult.exited(5, b"entrypoint output")
+    failed = ScriptExecutionResult.failed(
+        PatchHarborError("tool failure", ExitCode.INTERPRETER_ERROR),
+        entrypoint_started=False,
+        output=b"",
+    )
+
+    assert exited.entrypoint_exit_code == 5
+    assert exited.patchharbor_error is None
+    assert failed.entrypoint_exit_code is None
+    assert failed.patchharbor_error is not None
+    assert failed.patchharbor_error.exit_code is ExitCode.INTERPRETER_ERROR
+
+    with pytest.raises(ValueError):
+        ScriptExecutionResult(
+            entrypoint_started=True,
+            entrypoint_exit_code=5,
+            patchharbor_error=PatchHarborError(
+                "tool failure", ExitCode.EXECUTION_ERROR
+            ),
+            output=b"",
         )
 
-    assert raised.value.exit_code is ExitCode.INTERPRETER_ERROR
-    assert raised.value.entrypoint_started is False
-    assert raised.value.output == b""
+
+def test_script_execution_cleanup_error_never_replaces_stronger_result() -> None:
+    cleanup_error = PatchHarborError(
+        "cannot close output", ExitCode.EXECUTION_ERROR
+    )
+    entrypoint_exit = ScriptExecutionResult.exited(23, b"output")
+    timeout = ScriptExecutionResult.failed(
+        PatchHarborError("timed out", ExitCode.TIMEOUT),
+        entrypoint_started=True,
+        output=b"partial",
+    )
+    success = ScriptExecutionResult.exited(0, b"output")
+
+    assert entrypoint_exit.with_cleanup_error(cleanup_error) is entrypoint_exit
+    assert timeout.with_cleanup_error(cleanup_error) is timeout
+    cleaned_success = success.with_cleanup_error(cleanup_error)
+    assert cleaned_success.entrypoint_exit_code is None
+    assert cleaned_success.patchharbor_error is cleanup_error
+    assert cleaned_success.output == b"output"
+
+
+class _CloseFailingLog(io.BytesIO):
+    def close(self) -> None:
+        super().close()
+        raise OSError("close failed")
+
+
+def test_output_cleanup_failure_does_not_replace_entrypoint_exit(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    process_tree = _FakeProcessTree(
+        result=ProcessResult(ProcessState.EXITED, 23),
+        output_bytes=b"entrypoint output\n",
+    )
+    monkeypatch.setattr(
+        execution,
+        "create_process_tree",
+        lambda command, cwd: process_tree,
+    )
+    log_path = tmp_path / "execution.log"
+    original_open = Path.open
+
+    def open_with_failing_close(
+        path: Path,
+        *args: object,
+        **kwargs: object,
+    ) -> object:
+        if path == log_path:
+            return _CloseFailingLog()
+        return original_open(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", open_with_failing_close)
+    script_path = tmp_path / "run.sh"
+    script_path.write_text("# PATCHHARBOR\n", encoding="utf-8")
+    interpreter = ResolvedInterpreter(
+        spec=InterpreterSpec("bash", ".sh", ()),
+        executable_path="/interpreters/bash",
+    )
+
+    result = execute_prepared_script_with_log(
+        script_path,
+        interpreter=interpreter,
+        cwd=tmp_path,
+        timeout_seconds=7,
+        execution_log_path=log_path,
+    )
+
+    assert result.entrypoint_exit_code == 23
+    assert result.patchharbor_error is None
+    assert result.output == b"entrypoint output\n"
+    assert process_tree.closed == 1
+
+
+def test_output_cleanup_failure_after_success_becomes_tool_error(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    process_tree = _FakeProcessTree(
+        result=ProcessResult(ProcessState.EXITED, 0),
+    )
+    monkeypatch.setattr(
+        execution,
+        "create_process_tree",
+        lambda command, cwd: process_tree,
+    )
+    log_path = tmp_path / "execution.log"
+    original_open = Path.open
+
+    def open_with_failing_close(
+        path: Path,
+        *args: object,
+        **kwargs: object,
+    ) -> object:
+        if path == log_path:
+            return _CloseFailingLog()
+        return original_open(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", open_with_failing_close)
+    script_path = tmp_path / "run.sh"
+    script_path.write_text("# PATCHHARBOR\n", encoding="utf-8")
+    interpreter = ResolvedInterpreter(
+        spec=InterpreterSpec("bash", ".sh", ()),
+        executable_path="/interpreters/bash",
+    )
+
+    result = execute_prepared_script_with_log(
+        script_path,
+        interpreter=interpreter,
+        cwd=tmp_path,
+        timeout_seconds=7,
+        execution_log_path=log_path,
+    )
+
+    assert result.entrypoint_exit_code is None
+    assert result.patchharbor_error is not None
+    assert result.patchharbor_error.exit_code is ExitCode.EXECUTION_ERROR
+    assert result.entrypoint_started is True
+    assert process_tree.closed == 1
 
 
 def test_process_tree_is_closed_when_waiting_raises_an_os_error(

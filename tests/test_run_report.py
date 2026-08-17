@@ -243,7 +243,7 @@ def test_apply_primary_outcome_maps_tool_errors_once(
     assert outcome.result.kind is expected_kind
     assert outcome.result.success is False
     assert outcome.result.patchharbor_error_code == int(error.exit_code)
-    assert outcome.exit_code == int(error.exit_code)
+    assert outcome.primary_process_exit_code == int(error.exit_code)
 
 
 def test_apply_primary_outcome_keeps_primary_and_bundle_results_separate() -> None:
@@ -276,7 +276,7 @@ def test_apply_primary_outcome_keeps_primary_and_bundle_results_separate() -> No
     with pytest.raises(ValueError):
         ApplyPrimaryOutcome(
             result=PrimaryResult.dry_run_success_result(),
-            exit_code=int(ExitCode.RESULT_BUNDLE_ERROR),
+            primary_process_exit_code=int(ExitCode.RESULT_BUNDLE_ERROR),
         )
     with pytest.raises(ValueError):
         ApplyPrimaryOutcome(
@@ -284,19 +284,23 @@ def test_apply_primary_outcome_keeps_primary_and_bundle_results_separate() -> No
                 kind=PrimaryResultKind.VALIDATION_ERROR,
                 patchharbor_error_code=int(ExitCode.NO_VALID_SCRIPT),
             ),
-            exit_code=int(ExitCode.INTERPRETER_ERROR),
+            primary_process_exit_code=int(ExitCode.INTERPRETER_ERROR),
         )
 
 
 def test_apply_primary_outcome_models_entrypoint_exit_timeout_and_interrupt() -> None:
     entrypoint_exit = ApplyPrimaryOutcome.entrypoint_exit(23)
-    timeout = ApplyPrimaryOutcome.from_execution_error(
-        PatchHarborError("timed out", ExitCode.TIMEOUT),
+    timeout = ApplyPrimaryOutcome.from_execution_result(
         entrypoint_started=True,
+        entrypoint_exit_code=None,
+        patchharbor_error=PatchHarborError("timed out", ExitCode.TIMEOUT),
     )
-    interrupted = ApplyPrimaryOutcome.from_execution_error(
-        PatchHarborError("interrupted", ExitCode.INTERRUPTED),
+    interrupted = ApplyPrimaryOutcome.from_execution_result(
         entrypoint_started=True,
+        entrypoint_exit_code=None,
+        patchharbor_error=PatchHarborError(
+            "interrupted", ExitCode.INTERRUPTED
+        ),
     )
 
     assert entrypoint_exit.result.as_apply_document() == {
@@ -333,6 +337,64 @@ def test_apply_primary_outcome_models_entrypoint_exit_timeout_and_interrupt() ->
     assert interrupted.process_exit_code_for(ResultBundleStatus.FAILED) == int(
         ExitCode.INTERRUPTED
     )
+
+
+def test_execution_result_keeps_entrypoint_tool_and_process_codes_separate() -> None:
+    entrypoint_exit = ApplyPrimaryOutcome.from_execution_result(
+        entrypoint_started=True,
+        entrypoint_exit_code=int(ExitCode.INTERPRETER_ERROR),
+        patchharbor_error=None,
+    )
+    tool_failure = ApplyPrimaryOutcome.from_execution_result(
+        entrypoint_started=False,
+        entrypoint_exit_code=None,
+        patchharbor_error=PatchHarborError(
+            "cannot start interpreter", ExitCode.INTERPRETER_ERROR
+        ),
+    )
+
+    assert entrypoint_exit.result.entrypoint_exit_code == int(
+        ExitCode.INTERPRETER_ERROR
+    )
+    assert entrypoint_exit.result.patchharbor_error_code is None
+    assert entrypoint_exit.primary_process_exit_code == int(
+        ExitCode.INTERPRETER_ERROR
+    )
+    assert tool_failure.result.entrypoint_exit_code is None
+    assert tool_failure.result.patchharbor_error_code == int(
+        ExitCode.INTERPRETER_ERROR
+    )
+    assert tool_failure.primary_process_exit_code == int(
+        ExitCode.INTERPRETER_ERROR
+    )
+
+    with pytest.raises(ValueError):
+        ApplyPrimaryOutcome.from_execution_result(
+            entrypoint_started=True,
+            entrypoint_exit_code=23,
+            patchharbor_error=PatchHarborError(
+                "tool failure", ExitCode.EXECUTION_ERROR
+            ),
+        )
+
+
+def test_primary_result_rejects_conflated_process_codes() -> None:
+    with pytest.raises(ValueError):
+        PrimaryResult(
+            kind=PrimaryResultKind.ENTRYPOINT_EXIT,
+            success=False,
+            patchharbor_error_code=int(ExitCode.INTERPRETER_ERROR),
+            entrypoint_started=True,
+            entrypoint_exit_code=int(ExitCode.INTERPRETER_ERROR),
+        )
+    with pytest.raises(ValueError):
+        PrimaryResult(
+            kind=PrimaryResultKind.TIMEOUT,
+            success=False,
+            patchharbor_error_code=int(ExitCode.TIMEOUT),
+            entrypoint_started=False,
+            timed_out=True,
+        )
 
 
 def test_result_bundle_outcome_rejects_inconsistent_state(tmp_path: Path) -> None:

@@ -24,7 +24,7 @@ from patchharbor.errors import (
 )
 from patchharbor.execution import (
     DEFAULT_TIMEOUT_SECONDS,
-    LoggedScriptExecutionError,
+    ScriptExecutionResult,
     execute_prepared_script_with_log,
     execute_script_text,
 )
@@ -251,6 +251,29 @@ def _require_payload_mutation(mutation_gate: ApplyMutationGate) -> None:
     raise report.reported_error(error)
 
 
+def _complete_entrypoint_execution(
+    mutation_gate: ApplyMutationGate,
+    execution: ScriptExecutionResult,
+) -> RunReport:
+    """Publish one execution result before unwinding the shared apply scope."""
+    primary_outcome = ApplyPrimaryOutcome.from_execution_result(
+        entrypoint_started=execution.entrypoint_started,
+        entrypoint_exit_code=execution.entrypoint_exit_code,
+        patchharbor_error=execution.patchharbor_error,
+    )
+    report = _complete_mutation_result_bundle(
+        mutation_gate,
+        primary_outcome=primary_outcome,
+        execution_log=(execution.output if execution.entrypoint_started else None),
+    )
+
+    if execution.patchharbor_error is not None:
+        raise report.reported_error(execution.patchharbor_error)
+    if primary_outcome.result.success and report.process_exit_code != 0:
+        raise report.reported_error()
+    return report
+
+
 def apply_patch_package(
     package: ValidatedPatchPackage,
     *,
@@ -268,49 +291,15 @@ def apply_patch_package(
     ) as mutation_gate:
         _require_payload_mutation(mutation_gate)
         prepared_package = mutation_gate.prepared_package
-        try:
-            execution = execute_prepared_script_with_log(
-                prepared_package.entrypoint.path,
-                interpreter=prepared_package.entrypoint.interpreter,
-                cwd=mutation_gate.resolved.repository.value,
-                timeout_seconds=timeout_seconds,
-                execution_log_path=prepared_package.execution_log_path,
-                output=output,
-            )
-        except LoggedScriptExecutionError as error:
-            report = _complete_mutation_result_bundle(
-                mutation_gate,
-                primary_outcome=ApplyPrimaryOutcome.from_execution_error(
-                    error,
-                    entrypoint_started=error.entrypoint_started,
-                ),
-                execution_log=(error.output if error.entrypoint_started else None),
-            )
-            raise report.reported_error(error) from error
-        except PatchHarborError as error:
-            report = _complete_mutation_result_bundle(
-                mutation_gate,
-                primary_outcome=ApplyPrimaryOutcome.from_execution_error(
-                    error,
-                    entrypoint_started=False,
-                ),
-            )
-            raise report.reported_error(error) from error
-
-        primary_outcome = (
-            ApplyPrimaryOutcome.entrypoint_success()
-            if execution.exit_code == 0
-            else ApplyPrimaryOutcome.entrypoint_exit(execution.exit_code)
+        execution = execute_prepared_script_with_log(
+            prepared_package.entrypoint.path,
+            interpreter=prepared_package.entrypoint.interpreter,
+            cwd=mutation_gate.resolved.repository.value,
+            timeout_seconds=timeout_seconds,
+            execution_log_path=prepared_package.execution_log_path,
+            output=output,
         )
-
-        report = _complete_mutation_result_bundle(
-            mutation_gate,
-            primary_outcome=primary_outcome,
-            execution_log=execution.output,
-        )
-        if execution.exit_code == 0 and report.process_exit_code != 0:
-            raise report.reported_error()
-        return report
+        return _complete_entrypoint_execution(mutation_gate, execution)
 
 
 def register_repository(

@@ -226,6 +226,77 @@ class PrimaryResult:
     timed_out: bool = False
     interrupted: bool = False
 
+    def __post_init__(self) -> None:
+        if not isinstance(self.success, bool):
+            raise ValueError("primary success flag must be boolean")
+        if not isinstance(self.entrypoint_started, bool):
+            raise ValueError("entrypoint-started flag must be boolean")
+        if not isinstance(self.timed_out, bool) or not isinstance(
+            self.interrupted, bool
+        ):
+            raise ValueError("process terminal flags must be boolean")
+        for name, value in (
+            ("PatchHarbor error code", self.patchharbor_error_code),
+            ("entrypoint exit code", self.entrypoint_exit_code),
+        ):
+            if value is not None and (
+                isinstance(value, bool) or not isinstance(value, int)
+            ):
+                raise ValueError(f"{name} must be an integer")
+
+        if self.success:
+            if self.patchharbor_error_code is not None:
+                raise ValueError("successful primary result cannot have a tool error")
+            if self.timed_out or self.interrupted:
+                raise ValueError("successful primary result cannot be terminated")
+            if self.entrypoint_started:
+                if self.entrypoint_exit_code != 0:
+                    raise ValueError("successful entrypoint requires exit code zero")
+            elif self.entrypoint_exit_code is not None:
+                raise ValueError("unstarted entrypoint cannot have an exit code")
+            return
+
+        if self.kind is PrimaryResultKind.ENTRYPOINT_EXIT:
+            if (
+                not self.entrypoint_started
+                or self.entrypoint_exit_code in (None, 0)
+                or self.patchharbor_error_code is not None
+                or self.timed_out
+                or self.interrupted
+            ):
+                raise ValueError("entrypoint exit result is inconsistent")
+            return
+
+        if self.kind is PrimaryResultKind.TIMEOUT:
+            if (
+                not self.entrypoint_started
+                or self.entrypoint_exit_code is not None
+                or self.patchharbor_error_code != int(ExitCode.TIMEOUT)
+                or not self.timed_out
+                or self.interrupted
+            ):
+                raise ValueError("timeout result is inconsistent")
+            return
+
+        if self.kind is PrimaryResultKind.INTERRUPTED:
+            if (
+                not self.entrypoint_started
+                or self.entrypoint_exit_code is not None
+                or self.patchharbor_error_code != int(ExitCode.INTERRUPTED)
+                or self.timed_out
+                or not self.interrupted
+            ):
+                raise ValueError("interrupted result is inconsistent")
+            return
+
+        if (
+            self.entrypoint_exit_code is not None
+            or self.patchharbor_error_code is None
+            or self.timed_out
+            or self.interrupted
+        ):
+            raise ValueError("PatchHarbor tool failure result is inconsistent")
+
     @property
     def kind_text(self) -> str:
         """Return the stable public primary-result kind."""
@@ -339,59 +410,65 @@ class ApplyPrimaryOutcome:
     """One primary apply outcome before Result-Bundle publication."""
 
     result: PrimaryResult
-    exit_code: int
+    primary_process_exit_code: int
 
     def __post_init__(self) -> None:
-        if isinstance(self.exit_code, bool) or not isinstance(self.exit_code, int):
-            raise ValueError("primary exit code must be an integer")
-        if self.result.success != (self.exit_code == 0):
-            raise ValueError("primary success and exit code disagree")
+        exit_code = self.primary_process_exit_code
+        if isinstance(exit_code, bool) or not isinstance(exit_code, int):
+            raise ValueError("primary process exit code must be an integer")
+        if self.result.success != (exit_code == 0):
+            raise ValueError("primary success and process exit code disagree")
         if (
             self.result.patchharbor_error_code is not None
-            and self.result.patchharbor_error_code != self.exit_code
+            and self.result.patchharbor_error_code != exit_code
         ):
-            raise ValueError("primary tool error code and exit code disagree")
+            raise ValueError("primary tool error and process exit codes disagree")
+        if (
+            self.result.entrypoint_exit_code is not None
+            and self.result.entrypoint_exit_code != exit_code
+        ):
+            raise ValueError("entrypoint and process exit codes disagree")
 
     @classmethod
     def success(cls) -> ApplyPrimaryOutcome:
         return cls(
             result=PrimaryResult.success_result(),
-            exit_code=0,
+            primary_process_exit_code=0,
         )
 
     @classmethod
     def dry_run_success(cls) -> ApplyPrimaryOutcome:
         return cls(
             result=PrimaryResult.dry_run_success_result(),
-            exit_code=0,
+            primary_process_exit_code=0,
         )
 
     @classmethod
     def entrypoint_success(cls) -> ApplyPrimaryOutcome:
         return cls(
             result=PrimaryResult.entrypoint_success_result(),
-            exit_code=0,
+            primary_process_exit_code=0,
         )
 
     @classmethod
     def entrypoint_exit(cls, exit_code: int) -> ApplyPrimaryOutcome:
         return cls(
             result=PrimaryResult.entrypoint_exit_result(exit_code),
-            exit_code=exit_code,
+            primary_process_exit_code=exit_code,
         )
 
     @classmethod
     def timeout(cls) -> ApplyPrimaryOutcome:
         return cls(
             result=PrimaryResult.timeout_result(),
-            exit_code=int(ExitCode.TIMEOUT),
+            primary_process_exit_code=int(ExitCode.TIMEOUT),
         )
 
     @classmethod
     def interrupted(cls) -> ApplyPrimaryOutcome:
         return cls(
             result=PrimaryResult.interrupted_result(),
-            exit_code=int(ExitCode.INTERRUPTED),
+            primary_process_exit_code=int(ExitCode.INTERRUPTED),
         )
 
     @classmethod
@@ -406,7 +483,7 @@ class ApplyPrimaryOutcome:
                 kind=kind,
                 patchharbor_error_code=exit_code,
             ),
-            exit_code=exit_code,
+            primary_process_exit_code=exit_code,
         )
 
     @classmethod
@@ -414,30 +491,46 @@ class ApplyPrimaryOutcome:
         """Create one primary outcome without duplicating error mappings."""
         return cls(
             result=PrimaryResult.from_tool_error(error),
-            exit_code=int(error.exit_code),
+            primary_process_exit_code=int(error.exit_code),
         )
 
     @classmethod
-    def from_execution_error(
+    def from_execution_result(
         cls,
-        error: PatchHarborError,
         *,
         entrypoint_started: bool,
+        entrypoint_exit_code: int | None,
+        patchharbor_error: PatchHarborError | None,
     ) -> ApplyPrimaryOutcome:
-        """Map one process-control failure while preserving execution state."""
-        if error.exit_code is ExitCode.TIMEOUT:
-            return cls.timeout()
-        if error.exit_code is ExitCode.INTERRUPTED:
-            return cls.interrupted()
-        return cls(
-            result=PrimaryResult(
-                kind=PrimaryResultKind.for_tool_error(error),
-                success=False,
-                patchharbor_error_code=int(error.exit_code),
-                entrypoint_started=entrypoint_started,
-            ),
-            exit_code=int(error.exit_code),
-        )
+        """Apply process-result priority without conflating its three codes."""
+        if patchharbor_error is not None:
+            if entrypoint_exit_code is not None:
+                raise ValueError(
+                    "tool failure cannot also carry an entrypoint exit code"
+                )
+            if patchharbor_error.exit_code is ExitCode.INTERRUPTED:
+                if not entrypoint_started:
+                    raise ValueError("interruption requires a started entrypoint")
+                return cls.interrupted()
+            if patchharbor_error.exit_code is ExitCode.TIMEOUT:
+                if not entrypoint_started:
+                    raise ValueError("timeout requires a started entrypoint")
+                return cls.timeout()
+            return cls(
+                result=PrimaryResult(
+                    kind=PrimaryResultKind.for_tool_error(patchharbor_error),
+                    success=False,
+                    patchharbor_error_code=int(patchharbor_error.exit_code),
+                    entrypoint_started=entrypoint_started,
+                ),
+                primary_process_exit_code=int(patchharbor_error.exit_code),
+            )
+
+        if not entrypoint_started or entrypoint_exit_code is None:
+            raise ValueError("completed execution requires a started entrypoint")
+        if entrypoint_exit_code == 0:
+            return cls.entrypoint_success()
+        return cls.entrypoint_exit(entrypoint_exit_code)
 
     def process_exit_code_for(
         self,
@@ -449,7 +542,7 @@ class ApplyPrimaryOutcome:
             and result_bundle_status is ResultBundleStatus.FAILED
         ):
             return int(ExitCode.RESULT_BUNDLE_ERROR)
-        return self.exit_code
+        return self.primary_process_exit_code
 
 
 @dataclass(frozen=True)
