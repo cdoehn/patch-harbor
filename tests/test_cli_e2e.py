@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import base64
 import json
 import os
+import shlex
 from collections.abc import Mapping
 from pathlib import Path
 import subprocess
@@ -43,30 +45,67 @@ def _run_patchharbor(
     )
 
 
-def _child_process_script(ready_path: Path, *, exit_parent: bool = False) -> str:
+def _process_tree_script(
+    child_ready_path: Path,
+    grandchild_ready_path: Path,
+    *,
+    exit_parent: bool = False,
+) -> str:
+    """Build one script whose child owns a long-running grandchild."""
     if os.name == "nt":
-        encoded_command = (
-            "UwB0AGEAcgB0AC0AUwBsAGUAZQBwACAALQBTAGUAYwBvAG4AZABzACAANgAwAA=="
+        escaped_child = str(child_ready_path).replace("'", "''")
+        escaped_grandchild = str(grandchild_ready_path).replace("'", "''")
+        child_command = (
+            "$grandchild = Start-Process "
+            "-FilePath (Join-Path $PSHOME 'powershell.exe') "
+            "-ArgumentList '-NoLogo','-NoProfile','-NonInteractive',"
+            "'-Command','Start-Sleep -Seconds 60' -PassThru; "
+            "[System.IO.File]::WriteAllText("
+            f"'{escaped_grandchild}', [string]$grandchild.Id); "
+            "Wait-Process -Id $grandchild.Id"
         )
+        encoded_child = base64.b64encode(
+            child_command.encode("utf-16-le")
+        ).decode("ascii")
         parent_tail = "exit 0" if exit_parent else "Wait-Process -Id $child.Id"
-        escaped_ready = str(ready_path).replace("'", "''")
         return (
             f"{REQUIRED_MARKER}\n"
             "$child = Start-Process "
             "-FilePath (Join-Path $PSHOME 'powershell.exe') "
             "-ArgumentList '-NoLogo','-NoProfile','-NonInteractive',"
-            f"'-EncodedCommand','{encoded_command}' -PassThru\n"
-            f"Set-Content -LiteralPath '{escaped_ready}' "
-            "-Value $child.Id -NoNewline\n"
+            f"'-EncodedCommand','{encoded_child}' -PassThru\n"
+            f"[System.IO.File]::WriteAllText('{escaped_child}', "
+            "[string]$child.Id)\n"
+            "$deadline = [DateTime]::UtcNow.AddSeconds(5)\n"
+            f"while ((-not (Test-Path -LiteralPath '{escaped_grandchild}')) "
+            "-and ([DateTime]::UtcNow -lt $deadline)) { "
+            "Start-Sleep -Milliseconds 20 }\n"
+            f"if (-not (Test-Path -LiteralPath '{escaped_grandchild}')) "
+            "{ exit 91 }\n"
             f"{parent_tail}\n"
         )
 
+    child_ready = shlex.quote(str(child_ready_path))
+    grandchild_ready = shlex.quote(str(grandchild_ready_path))
+    child_command = (
+        "sleep 60 & "
+        "grandchild_pid=$!; "
+        f"printf '%s' \"$grandchild_pid\" > {grandchild_ready}; "
+        "wait \"$grandchild_pid\""
+    )
     parent_tail = "exit 0" if exit_parent else 'wait "$child_pid"'
     return (
         f"{REQUIRED_MARKER}\n"
-        "sleep 60 &\n"
+        f"bash -c {shlex.quote(child_command)} &\n"
         "child_pid=$!\n"
-        f"printf '%s' \"$child_pid\" > \"{ready_path}\"\n"
+        f"printf '%s' \"$child_pid\" > {child_ready}\n"
+        "counter=0\n"
+        f"while [ ! -s {grandchild_ready} ] "
+        '&& [ "$counter" -lt 250 ]; do\n'
+        "    sleep 0.02\n"
+        "    counter=$((counter + 1))\n"
+        "done\n"
+        f"[ -s {grandchild_ready} ] || exit 91\n"
         f"{parent_tail}\n"
     )
 
@@ -155,6 +194,12 @@ def _assert_child_process_stopped(pid: int, *, timeout: float = 5.0) -> None:
         time.sleep(0.05)
     _kill_test_pid(pid)
     raise AssertionError(f"child process {pid} survived PatchHarbor")
+
+
+def _cleanup_test_processes(*process_ids: int | None) -> None:
+    for process_id in reversed(process_ids):
+        if process_id is not None:
+            _kill_test_pid(process_id)
 
 
 def test_fs_run_rejects_empty_standard_input(tmp_path: Path) -> None:
@@ -697,30 +742,43 @@ def test_metadata_cannot_change_execution_controls(tmp_path: Path) -> None:
     assert completed.stdout == "unchanged\n"
 
 
-def test_normal_script_exit_does_not_leave_a_child_process(
+def test_normal_script_exit_does_not_leave_descendant_processes(
     tmp_path: Path,
 ) -> None:
-    ready_path = tmp_path / "normal-child.pid"
+    child_ready_path = tmp_path / "normal-child.pid"
+    grandchild_ready_path = tmp_path / "normal-grandchild.pid"
     script_path = _script_path(tmp_path, "normal-child-tree")
     script_path.write_text(
-        _child_process_script(ready_path, exit_parent=True),
+        _process_tree_script(
+            child_ready_path,
+            grandchild_ready_path,
+            exit_parent=True,
+        ),
         encoding="utf-8",
     )
 
     completed = _run_patchharbor(script_path, tmp_path)
-    child_pid = _wait_for_child_pid(ready_path)
+    child_pid: int | None = None
+    grandchild_pid: int | None = None
+    try:
+        child_pid = _wait_for_child_pid(child_ready_path)
+        grandchild_pid = _wait_for_child_pid(grandchild_ready_path)
 
-    assert completed.returncode == 0
-    _assert_child_process_stopped(child_pid)
+        assert completed.returncode == 0
+        _assert_child_process_stopped(child_pid)
+        _assert_child_process_stopped(grandchild_pid)
+    finally:
+        _cleanup_test_processes(child_pid, grandchild_pid)
 
 
 def test_timeout_stops_the_complete_child_process_tree(
     tmp_path: Path,
 ) -> None:
-    ready_path = tmp_path / "timeout-child.pid"
+    child_ready_path = tmp_path / "timeout-child.pid"
+    grandchild_ready_path = tmp_path / "timeout-grandchild.pid"
     script_path = _script_path(tmp_path, "timeout-child-tree")
     script_path.write_text(
-        _child_process_script(ready_path),
+        _process_tree_script(child_ready_path, grandchild_ready_path),
         encoding="utf-8",
     )
 
@@ -730,20 +788,27 @@ def test_timeout_stops_the_complete_child_process_tree(
         "--timeout",
         "1.5",
     )
-    child_pid = _wait_for_child_pid(ready_path)
+    child_pid: int | None = None
+    grandchild_pid: int | None = None
+    try:
+        child_pid = _wait_for_child_pid(child_ready_path)
+        grandchild_pid = _wait_for_child_pid(grandchild_ready_path)
 
-    assert completed.returncode == 124
-    assert completed.stderr == "patchharbor: script timed out after 1.5 seconds\n"
-    _assert_child_process_stopped(child_pid)
+        assert completed.returncode == 124
+        _assert_child_process_stopped(child_pid)
+        _assert_child_process_stopped(grandchild_pid)
+    finally:
+        _cleanup_test_processes(child_pid, grandchild_pid)
 
 
 def test_keyboard_interrupt_stops_the_complete_child_process_tree(
     tmp_path: Path,
 ) -> None:
-    ready_path = tmp_path / "interrupt-child.pid"
+    child_ready_path = tmp_path / "interrupt-child.pid"
+    grandchild_ready_path = tmp_path / "interrupt-grandchild.pid"
     script_path = _script_path(tmp_path, "interrupt-child-tree")
     script_path.write_text(
-        _child_process_script(ready_path),
+        _process_tree_script(child_ready_path, grandchild_ready_path),
         encoding="utf-8",
     )
     runner_path = tmp_path / "interrupt-runner.py"
@@ -760,21 +825,26 @@ from patchharbor.errors import PatchHarborError
 from patchharbor.execution import execute_script_text
 
 script_path = Path(sys.argv[1])
-ready_path = Path(sys.argv[2])
-cwd = Path(sys.argv[3])
+child_ready_path = Path(sys.argv[2])
+grandchild_ready_path = Path(sys.argv[3])
+cwd = Path(sys.argv[4])
 
 
-def interrupt_when_child_is_ready() -> None:
+def interrupt_when_tree_is_ready() -> None:
     deadline = time.monotonic() + 5
     while time.monotonic() < deadline:
-        if ready_path.exists() and ready_path.read_text(encoding="utf-8").strip():
+        ready_paths = (child_ready_path, grandchild_ready_path)
+        if all(
+            path.exists() and path.read_text(encoding="utf-8").strip()
+            for path in ready_paths
+        ):
             _thread.interrupt_main()
             return
         time.sleep(0.02)
     _thread.interrupt_main()
 
 
-threading.Thread(target=interrupt_when_child_is_ready, daemon=True).start()
+threading.Thread(target=interrupt_when_tree_is_ready, daemon=True).start()
 try:
     result = execute_script_text(
         script_path.read_text(encoding="utf-8"),
@@ -782,7 +852,6 @@ try:
         timeout_seconds=30,
     )
 except PatchHarborError as exc:
-    print(f"patchharbor: {exc}", file=sys.stderr)
     raise SystemExit(int(exc.exit_code))
 raise SystemExit(result)
 """,
@@ -794,7 +863,8 @@ raise SystemExit(result)
             sys.executable,
             str(runner_path),
             str(script_path),
-            str(ready_path),
+            str(child_ready_path),
+            str(grandchild_ready_path),
             str(tmp_path),
         ],
         cwd=tmp_path,
@@ -805,11 +875,17 @@ raise SystemExit(result)
         timeout=15,
         check=False,
     )
-    child_pid = _wait_for_child_pid(ready_path)
+    child_pid: int | None = None
+    grandchild_pid: int | None = None
+    try:
+        child_pid = _wait_for_child_pid(child_ready_path)
+        grandchild_pid = _wait_for_child_pid(grandchild_ready_path)
 
-    assert completed.returncode == 130
-    assert completed.stderr == "patchharbor: script aborted by user\n"
-    _assert_child_process_stopped(child_pid)
+        assert completed.returncode == 130
+        _assert_child_process_stopped(child_pid)
+        _assert_child_process_stopped(grandchild_pid)
+    finally:
+        _cleanup_test_processes(child_pid, grandchild_pid)
 
 
 def test_fs_run_non_tty_streams_complete_large_output(

@@ -895,6 +895,10 @@ def test_apply_execution_has_one_structured_outcome_and_cleanup_path() -> None:
     assert "LoggedScriptExecutionError" not in execution_source
     assert "return ScriptExecutionResult.failed" in execution_source
     assert "ScriptExecutionResult.exited(" in execution_source
+    assert "def execute_prepared_script(" not in execution_source
+    assert execution_source.count("create_process_tree(") == 1
+    assert "create_process_tree" not in application_source
+    assert "execute_prepared_script_with_log(" in application_source
     assert "def _complete_entrypoint_execution(" in application_source
     assert "except LoggedScriptExecutionError" not in application_source
     assert "ApplyPrimaryOutcome.from_execution_result(" in application_source

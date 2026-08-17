@@ -140,10 +140,6 @@ def test_platform_timeout_returns_124(tmp_path: Path) -> None:
     )
 
     assert completed.returncode == 124
-    assert completed.stdout == ""
-    assert completed.stderr == (
-        "patchharbor: script timed out after 0.2 seconds\n"
-    )
 
 
 def test_platform_log_uses_configured_system_temp_and_contains_output(

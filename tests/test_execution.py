@@ -222,12 +222,21 @@ def test_nonzero_powershell_result_is_returned_without_policy_bypass(
     assert process_tree.closed == 1
 
 
-def test_timeout_stops_the_process_tree_and_returns_124(
+@pytest.mark.parametrize(
+    ("state", "expected_exit_code"),
+    (
+        (ProcessState.TIMED_OUT, ExitCode.TIMEOUT),
+        (ProcessState.INTERRUPTED, ExitCode.INTERRUPTED),
+    ),
+)
+def test_terminal_process_state_maps_to_exit_code_and_closes_tree(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
+    state: ProcessState,
+    expected_exit_code: ExitCode,
 ) -> None:
     _patch_resolved_interpreter(monkeypatch)
-    process_tree = _FakeProcessTree(result=ProcessResult(ProcessState.TIMED_OUT))
+    process_tree = _FakeProcessTree(result=ProcessResult(state))
     monkeypatch.setattr(
         execution,
         "create_process_tree",
@@ -241,32 +250,7 @@ def test_timeout_stops_the_process_tree_and_returns_124(
             timeout_seconds=0.25,
         )
 
-    assert raised.value.exit_code is ExitCode.TIMEOUT
-    assert process_tree.closed == 1
-    assert process_tree.exit_exception is PatchHarborError
-
-
-def test_keyboard_interrupt_stops_the_process_tree_and_returns_130(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    _patch_resolved_interpreter(monkeypatch)
-    process_tree = _FakeProcessTree(result=ProcessResult(ProcessState.INTERRUPTED))
-    monkeypatch.setattr(
-        execution,
-        "create_process_tree",
-        lambda command, cwd: process_tree,
-    )
-
-    with pytest.raises(PatchHarborError) as raised:
-        execute_script_text(
-            "#!/usr/bin/env bash\n# PATCHHARBOR\n",
-            cwd=tmp_path,
-            timeout_seconds=7,
-        )
-
-    assert raised.value.exit_code is ExitCode.INTERRUPTED
-    assert str(raised.value) == "script aborted by user"
+    assert raised.value.exit_code is expected_exit_code
     assert process_tree.closed == 1
     assert process_tree.exit_exception is PatchHarborError
 

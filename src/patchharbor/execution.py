@@ -69,25 +69,6 @@ def execute_script_text(
         ) from exc
 
 
-def execute_prepared_script(
-    script_path: Path,
-    *,
-    interpreter: ResolvedInterpreter,
-    cwd: Path,
-    timeout_seconds: float,
-    output: OutputTargets | None = None,
-) -> int:
-    """Execute one already private, parsed, and interpreter-resolved script."""
-    return _execute_staged_script(
-        script_path,
-        interpreter=interpreter.spec,
-        executable_path=interpreter.executable_path,
-        cwd=cwd,
-        timeout_seconds=timeout_seconds,
-        output=output,
-    )
-
-
 @dataclass(frozen=True, slots=True)
 class ScriptExecutionResult:
     """One fully cleaned-up script execution and its byte-exact output."""
@@ -188,7 +169,7 @@ def execute_prepared_script_with_log(
     execution_log_path: Path,
     output: OutputTargets | None = None,
 ) -> ScriptExecutionResult:
-    """Execute one private script and return after every owned resource closed."""
+    """Run one private script through the shared process lifecycle and log it."""
     targets = output or OutputTargets(visible_text_stream=sys.stdout)
     try:
         execution_log = execution_log_path.open("w+b")
@@ -202,9 +183,10 @@ def execute_prepared_script_with_log(
     result: ScriptExecutionResult | None = None
     try:
         try:
-            exit_code = execute_prepared_script(
+            exit_code = _execute_staged_script(
                 script_path,
-                interpreter=interpreter,
+                interpreter=interpreter.spec,
+                executable_path=interpreter.executable_path,
                 cwd=cwd,
                 timeout_seconds=timeout_seconds,
                 output=replace(
