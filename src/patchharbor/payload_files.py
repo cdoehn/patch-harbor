@@ -20,29 +20,44 @@ from patchharbor.platform.filesystem import (
 )
 
 
-def _write_error(label: str, detail: object) -> PatchHarborError:
-    return PatchHarborError(
+class PayloadTargetError(PatchHarborError):
+    """A bundle target is unsafe before its replacement is staged."""
+
+
+class PayloadWriteError(PatchHarborError):
+    """A checked bundle target could not be created or replaced."""
+
+
+def _target_error(label: str, detail: object) -> PayloadTargetError:
+    return PayloadTargetError(
         f"cannot write {label}: {detail}",
         ExitCode.PAYLOAD_PREPARATION_ERROR,
     )
 
 
-def _bundle_file_error(relative_path: str, detail: object) -> PatchHarborError:
-    return _write_error(f"bundle file {relative_path!r}", detail)
+def _write_error(label: str, detail: object) -> PayloadWriteError:
+    return PayloadWriteError(
+        f"cannot write {label}: {detail}",
+        ExitCode.PAYLOAD_PREPARATION_ERROR,
+    )
+
+
+def _bundle_file_error(relative_path: str, detail: object) -> PayloadTargetError:
+    return _target_error(f"bundle file {relative_path!r}", detail)
 
 
 def _kind_or_error(target: Path, *, label: str) -> PathKind:
     try:
         return path_kind(target)
     except FileSystemOperationError as exc:
-        raise _write_error(label, exc.operation) from exc
+        raise _target_error(label, exc.operation) from exc
 
 
 def _validate_regular_target(target: Path, *, label: str) -> None:
     kind = _kind_or_error(target, label=label)
     if kind in {PathKind.MISSING, PathKind.REGULAR_FILE}:
         return
-    raise _write_error(label, "target is not a regular file")
+    raise _target_error(label, "target is not a regular file")
 
 
 def _replace_bytes(target: Path, content: bytes, *, label: str) -> None:
@@ -75,7 +90,7 @@ def _bundle_target(
             continue
         if kind is PathKind.DIRECTORY:
             continue
-        raise _write_error(label, "parent is not a directory")
+        raise _target_error(label, "parent is not a directory")
 
     final_target = target / segments[-1]
     _validate_regular_target(final_target, label=label)

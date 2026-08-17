@@ -11,18 +11,23 @@ import zipfile
 import pytest
 
 import patchharbor.application as application_module
+import patchharbor.apply_mutation as apply_mutation_module
 import patchharbor.apply_preflight as apply_preflight_module
 import patchharbor.payload_files as payload_files_module
 import patchharbor.result_bundle_publication as publication_module
 from patchharbor.application import (
-    ApplyMutationGate,
     apply_patch_package,
     dry_run_patch_package,
     preflight_patch_package_repository,
     register_repository,
 )
+from patchharbor.apply_mutation import ApplyMutationGate
 from patchharbor.apply_repository import safely_resolved_repository
-from patchharbor.errors import ExitCode, PatchHarborError
+from patchharbor.errors import (
+    ExitCode,
+    PatchHarborError,
+    unsupported_repository_state_error,
+)
 from patchharbor.models import BundlePayload, RepositoryContext
 from patchharbor.platform.filesystem import FileSystemOperationError
 from patchharbor.patch_manifest import (
@@ -427,6 +432,52 @@ def test_repository_change_after_preflight_is_bundled_without_payload_write(
     assert "logs/execution.log" not in names
 
 
+def test_second_capture_failure_is_bundled_before_releasing_repository_lock(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    set_isolated_user_environment(monkeypatch, tmp_path / "user")
+    repository = create_repository(tmp_path / "repository")
+    context = register_repository(repository)
+    environment = project_environment()
+    observed_lock_codes: list[int] = []
+    original_replace = publication_module.replace_path
+
+    def fail_second_capture(_repository: object) -> object:
+        raise unsupported_repository_state_error("simulated unsupported state")
+
+    def replace_while_observing_lock(source: Path, target: Path) -> None:
+        observed_lock_codes.append(
+            probe_repository_lock(str(context.repo_id), environment)
+        )
+        original_replace(source, target)
+
+    monkeypatch.setattr(
+        apply_mutation_module,
+        "capture_consistent_repository_snapshot",
+        fail_second_capture,
+    )
+    monkeypatch.setattr(
+        publication_module,
+        "replace_path",
+        replace_while_observing_lock,
+    )
+
+    with pytest.raises(PatchHarborError) as captured:
+        apply_patch_package(
+            _package(_manifest(context)),
+            output_directory=tmp_path / "results",
+        )
+
+    report = captured.value.run_report
+    assert captured.value.exit_code is ExitCode.UNSUPPORTED_REPOSITORY_STATE
+    assert report is not None
+    assert report.result_bundle.status is ResultBundleStatus.CREATED
+    assert report.primary_result.entrypoint_started is False
+    assert observed_lock_codes == [int(ExitCode.REPOSITORY_BUSY)]
+    assert probe_repository_lock(str(context.repo_id), environment) == 0
+
+
 def test_parent_replaced_after_second_context_is_rejected_before_staging(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -450,20 +501,21 @@ def test_parent_replaced_after_second_context_is_rejected_before_staging(
             ),
         ),
     )
-    original_capture = application_module._capture_mutation_context
+    original_write = apply_mutation_module.write_bundle_payloads
 
-    def replace_parent_after_context(
-        mutation_gate: ApplyMutationGate,
-    ) -> RepositoryContext:
-        current = original_capture(mutation_gate)
+    def replace_parent_before_first_stage(
+        payloads: Iterable[BundlePayload],
+        *,
+        cwd: Path,
+    ) -> None:
         parent.rmdir()
         parent.write_bytes(b"not a directory")
-        return current
+        original_write(payloads, cwd=cwd)
 
     monkeypatch.setattr(
-        application_module,
-        "_capture_mutation_context",
-        replace_parent_after_context,
+        apply_mutation_module,
+        "write_bundle_payloads",
+        replace_parent_before_first_stage,
     )
 
     with pytest.raises(PatchHarborError) as captured:

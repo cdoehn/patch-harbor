@@ -155,6 +155,15 @@ def test_lower_layers_do_not_import_orchestration_or_unrelated_layers() -> None:
             "result_bundle",
             "sources",
         },
+        "apply_mutation": {
+            "application",
+            "bundles",
+            "execution",
+            "presentation",
+            "registration",
+            "result_bundle",
+            "sources",
+        },
         "sources": {
             "application",
             "bundles",
@@ -395,6 +404,16 @@ def test_registration_layers_have_one_directional_dependency_flow() -> None:
         "temporary_resources",
         "user_paths",
     }
+    assert _local_imports("apply_mutation") == {
+        "apply_preflight",
+        "apply_repository",
+        "errors",
+        "models",
+        "patch_package",
+        "payload_files",
+        "repository_state",
+        "run_report",
+    }
     assert _local_imports("run_report") == {"errors", "models"}
     assert _local_imports("locks") == {
         "errors",
@@ -572,6 +591,7 @@ def test_apply_orchestrator_delegates_mutation_execution_and_result_services() -
     source = (PACKAGE_ROOT / "application.py").read_text(encoding="utf-8")
 
     assert {
+        "apply_mutation",
         "apply_preflight",
         "execution",
         "payload_files",
@@ -579,6 +599,9 @@ def test_apply_orchestrator_delegates_mutation_execution_and_result_services() -
     }.issubset(imports)
     assert "execution_log_path.open" not in source
     assert "sha256(" not in source
+    assert "capture_consistent_repository_snapshot" not in source
+    assert "apply_payload_mutation(" in source
+    assert "def _capture_mutation_context(" not in source
 
 
 def test_runtime_module_dependencies_are_acyclic() -> None:

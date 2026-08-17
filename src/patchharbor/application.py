@@ -4,14 +4,14 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from contextlib import ExitStack, contextmanager
-from dataclasses import dataclass
 from pathlib import Path
 from typing import TextIO
 
-from patchharbor.apply_preflight import (
-    PreparedPatchPackage,
-    prepare_patch_package,
+from patchharbor.apply_mutation import (
+    ApplyMutationGate,
+    apply_payload_mutation,
 )
+from patchharbor.apply_preflight import prepare_patch_package
 from patchharbor.apply_repository import (
     SafeResolvedRepository,
     safely_resolved_repository,
@@ -54,9 +54,7 @@ from patchharbor.registration import (
     unregister_local_repository,
 )
 from patchharbor.repository_state import (
-    capture_consistent_repository_snapshot,
     capture_repository_context,
-    repository_context_from_snapshot,
     require_clean_repository,
 )
 from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY, ResourcePolicy
@@ -77,31 +75,6 @@ from patchharbor.sources import (
     select_directory_candidate,
     stdin_input_artifact,
 )
-
-
-@dataclass(frozen=True, slots=True)
-class ApplyMutationGate:
-    """All checked inputs required before the first repository mutation."""
-
-    session: RunSession
-    resolved: SafeResolvedRepository
-    package: ValidatedPatchPackage
-    prepared_package: PreparedPatchPackage
-    dry_run: bool
-
-    def __post_init__(self) -> None:
-        if not isinstance(self.dry_run, bool):
-            raise ValueError("mutation gate dry-run flag must be boolean")
-        if not self.resolved.matches_manifest_state(self.package.manifest):
-            raise ValueError("mutation gate requires the exact manifest state")
-
-    @property
-    def context(self) -> RepositoryContext:
-        return self.resolved.context
-
-    @property
-    def warnings(self) -> tuple[str, ...]:
-        return (*self.package.warnings, *self.prepared_package.warnings)
 
 
 def resolve_patch_package(
@@ -253,67 +226,28 @@ def dry_run_patch_package(
         return report
 
 
-def _capture_mutation_context(
-    mutation_gate: ApplyMutationGate,
-) -> RepositoryContext:
-    """Capture the repository again immediately before its first mutation."""
-    resolved = mutation_gate.resolved
-    snapshot = capture_consistent_repository_snapshot(resolved.repository)
-    return repository_context_from_snapshot(
-        resolved.repository,
-        resolved.repo_id,
-        snapshot,
-    )
-
-
-def _matches_initial_and_manifest_context(
-    mutation_gate: ApplyMutationGate,
-    current: RepositoryContext,
-) -> bool:
-    manifest = mutation_gate.package.manifest
-    return (
-        current == mutation_gate.resolved.context
-        and manifest.repo_id == current.repo_id
-        and manifest.base_commit == current.base_commit
-        and manifest.fingerprint_algorithm == current.fingerprint_algorithm
-        and manifest.state_fingerprint == current.state_fingerprint
-    )
-
-
-def _write_mutation_payloads(mutation_gate: ApplyMutationGate) -> None:
-    """Revalidate the mutation boundary, then write checked payloads."""
+def _require_payload_mutation(mutation_gate: ApplyMutationGate) -> None:
+    """Complete a failed mutation as the primary apply result."""
     try:
-        current_context = _capture_mutation_context(mutation_gate)
-        if not _matches_initial_and_manifest_context(
-            mutation_gate,
-            current_context,
-        ):
-            error = state_mismatch_error(
-                "repository changed after apply preflight"
-            )
-            report = _complete_mutation_result_bundle(
-                mutation_gate,
-                primary_outcome=ApplyPrimaryOutcome.from_tool_error(error),
-                actual_context=current_context,
-            )
-            raise report.reported_error(error)
-
-        validate_bundle_payload_targets(
-            mutation_gate.prepared_package.payloads,
-            cwd=mutation_gate.resolved.repository.value,
-        )
-        write_bundle_payloads(
-            mutation_gate.prepared_package.payloads,
-            cwd=mutation_gate.resolved.repository.value,
-        )
+        result = apply_payload_mutation(mutation_gate)
     except PatchHarborError as error:
-        if error.run_report is not None:
-            raise
         report = _complete_mutation_result_bundle(
             mutation_gate,
             primary_outcome=ApplyPrimaryOutcome.from_tool_error(error),
         )
         raise report.reported_error(error) from error
+
+    if result.success:
+        return
+    error = result.error
+    if error is None:
+        raise RuntimeError("failed mutation result has no error")
+    report = _complete_mutation_result_bundle(
+        mutation_gate,
+        primary_outcome=ApplyPrimaryOutcome.from_tool_error(error),
+        actual_context=result.context,
+    )
+    raise report.reported_error(error)
 
 
 def apply_patch_package(
@@ -331,7 +265,7 @@ def apply_patch_package(
         session=session,
         dry_run=False,
     ) as mutation_gate:
-        _write_mutation_payloads(mutation_gate)
+        _require_payload_mutation(mutation_gate)
         prepared_package = mutation_gate.prepared_package
         execution = execute_prepared_script_with_log(
             prepared_package.entrypoint.path,
