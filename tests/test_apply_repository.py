@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from dataclasses import replace
 import errno
+from io import StringIO
 import json
 from pathlib import Path
 import tempfile
@@ -15,6 +16,7 @@ import patchharbor.apply_mutation as apply_mutation_module
 import patchharbor.apply_preflight as apply_preflight_module
 import patchharbor.payload_files as payload_files_module
 import patchharbor.result_bundle_publication as publication_module
+from patchharbor.cli import main as cli_main
 from patchharbor.application import (
     apply_patch_package,
     dry_run_patch_package,
@@ -86,6 +88,35 @@ def _package(
         ),
         payloads=payloads,
     )
+
+
+def _write_package_zip(
+    path: Path,
+    context: RepositoryContext,
+    *,
+    entrypoint: bytes,
+) -> None:
+    manifest = _manifest(context)
+    document = {
+        "marker": manifest.marker,
+        "format_version": manifest.format_version,
+        "repo_id": str(manifest.repo_id),
+        "base_commit": str(manifest.base_commit),
+        "state_fingerprint": manifest.state_fingerprint,
+        "fingerprint_algorithm": manifest.fingerprint_algorithm,
+        "entrypoint": manifest.entrypoint,
+    }
+    with zipfile.ZipFile(path, "w") as archive:
+        archive.writestr(
+            "patch.json",
+            json.dumps(
+                document,
+                ensure_ascii=False,
+                allow_nan=False,
+                separators=(",", ":"),
+            ).encode("utf-8"),
+        )
+        archive.writestr(manifest.entrypoint, entrypoint)
 
 
 def _set_private_temp(
@@ -310,6 +341,167 @@ def test_primary_failure_keeps_its_exit_code_when_bundle_also_fails(
     assert report.primary_result.kind is PrimaryResultKind.VALIDATION_ERROR
     assert report.result_bundle.status is ResultBundleStatus.FAILED
     assert report.process_exit_code == int(ExitCode.INTERPRETER_ERROR)
+
+
+@pytest.mark.parametrize(
+    ("scenario", "expected_exit", "expected_kind", "raises_error"),
+    (
+        (
+            "success",
+            int(ExitCode.RESULT_BUNDLE_ERROR),
+            PrimaryResultKind.SUCCESS,
+            True,
+        ),
+        ("entrypoint-exit", 23, PrimaryResultKind.ENTRYPOINT_EXIT, False),
+        ("timeout", int(ExitCode.TIMEOUT), PrimaryResultKind.TIMEOUT, True),
+        (
+            "interrupted",
+            int(ExitCode.INTERRUPTED),
+            PrimaryResultKind.INTERRUPTED,
+            True,
+        ),
+    ),
+)
+def test_apply_result_matrix_preserves_emergency_execution_diagnostics(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    scenario: str,
+    expected_exit: int,
+    expected_kind: PrimaryResultKind,
+    raises_error: bool,
+) -> None:
+    set_isolated_user_environment(monkeypatch, tmp_path / "user")
+    _set_private_temp(monkeypatch, tmp_path / "system-temp")
+    repository = create_repository(tmp_path / "repository")
+    context = register_repository(repository)
+    output_directory = tmp_path / "results"
+    execution_output = f"matrix-{scenario}\n".encode("ascii")
+
+    if scenario == "success":
+        execution = ScriptExecutionResult.exited(0, execution_output)
+    elif scenario == "entrypoint-exit":
+        execution = ScriptExecutionResult.exited(23, execution_output)
+    elif scenario == "timeout":
+        execution = ScriptExecutionResult.failed(
+            PatchHarborError("timed out", ExitCode.TIMEOUT),
+            entrypoint_started=True,
+            output=execution_output,
+        )
+    else:
+        execution = ScriptExecutionResult.failed(
+            PatchHarborError("interrupted", ExitCode.INTERRUPTED),
+            entrypoint_started=True,
+            output=execution_output,
+        )
+
+    monkeypatch.setattr(
+        application_module,
+        "execute_prepared_script_with_log",
+        lambda *_args, **_kwargs: execution,
+    )
+
+    def fail_publication(_source: Path, _target: Path) -> None:
+        raise OSError("publication failed")
+
+    monkeypatch.setattr(publication_module, "replace_path", fail_publication)
+
+    captured_error: PatchHarborError | None = None
+    try:
+        report = apply_patch_package(
+            _package(_manifest(context)),
+            output_directory=output_directory,
+        )
+    except PatchHarborError as error:
+        captured_error = error
+        report = error.run_report
+        assert report is not None
+
+    assert (captured_error is not None) is raises_error
+    if captured_error is not None:
+        assert int(captured_error.exit_code) == expected_exit
+    assert report.primary_result.kind is expected_kind
+    assert report.process_exit_code == expected_exit
+    assert report.result_bundle.status is ResultBundleStatus.FAILED
+    emergency_path = report.result_bundle.emergency_diagnostics_path
+    assert emergency_path is not None
+    assert emergency_path.is_dir()
+    assert (emergency_path / "execution.log").read_bytes() == execution_output
+    run_document = json.loads(
+        (emergency_path / "run.json").read_text(encoding="utf-8")
+    )
+    assert run_document["primary_result"]["kind"] == expected_kind.value
+    assert run_document["result_bundle"]["status"] == "failed"
+    assert run_document["process_exit_code"] == expected_exit
+    assert not tuple(output_directory.glob("patchharbor_result_*.zip"))
+    assert not tuple(output_directory.glob(".*.tmp"))
+
+
+def test_apply_json_keeps_raw_output_only_in_emergency_execution_log(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    set_isolated_user_environment(monkeypatch, tmp_path / "user")
+    _set_private_temp(monkeypatch, tmp_path / "system-temp")
+    repository = create_repository(tmp_path / "repository")
+    context = register_repository(repository)
+    package = tmp_path / "failure.zip"
+    raw_marker = "raw-entrypoint-output-for-json"
+    _write_package_zip(
+        package,
+        context,
+        entrypoint=native_script(
+            f"printf '{raw_marker}\n'\nexit 23",
+            f"[Console]::Out.WriteLine('{raw_marker}')\nexit 23",
+        ).encode("utf-8"),
+    )
+    output_directory = tmp_path / "results"
+
+    def fail_publication(_source: Path, _target: Path) -> None:
+        raise OSError("publication failed")
+
+    monkeypatch.setattr(publication_module, "replace_path", fail_publication)
+    stdout = StringIO()
+    stderr = StringIO()
+
+    exit_code = cli_main(
+        [
+            "apply",
+            "--json",
+            "--output-dir",
+            str(output_directory),
+            str(package),
+        ],
+        stdin=StringIO(),
+        stdout=stdout,
+        stderr=stderr,
+    )
+
+    assert exit_code == 23
+    assert raw_marker not in stdout.getvalue()
+    envelope = json.loads(stdout.getvalue())
+    assert envelope["error"] is None
+    assert envelope["process_exit_code"] == 23
+    result = envelope["result"]
+    assert set(result) == {
+        "run_id",
+        "repository_resolved",
+        "repo_id",
+        "repository_path",
+        "primary_result",
+        "result_bundle",
+    }
+    assert result["primary_result"]["kind"] == "entrypoint_exit"
+    assert result["result_bundle"]["status"] == "failed"
+    assert result["result_bundle"]["path"] is None
+    emergency_path = Path(
+        result["result_bundle"]["emergency_diagnostics_path"]
+    )
+    assert str(emergency_path) in stderr.getvalue()
+    assert raw_marker.encode("utf-8") in (
+        emergency_path / "execution.log"
+    ).read_bytes()
+    assert not tuple(output_directory.glob("patchharbor_result_*.zip"))
+    assert not tuple(output_directory.glob(".*.tmp"))
 
 
 def test_preflight_failure_bundles_before_releasing_repository_lock(

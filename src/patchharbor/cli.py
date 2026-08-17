@@ -40,9 +40,12 @@ from patchharbor.presentation import (
 )
 from patchharbor.run_log import temporary_run_log
 from patchharbor.run_report import (
+    ResultBundleStatus,
     RunReport,
+    RunSession,
     physical_absolute_path_text,
     sanitize_structured_text,
+    unresolved_apply_report,
 )
 
 
@@ -476,6 +479,26 @@ def _write_emergency_diagnostics_notice(
         )
 
 
+def _write_report_emergency_diagnostics_notice(
+    report: RunReport,
+    stderr: TextIO,
+) -> None:
+    """Expose failed bundle rescue for a normal nonzero entrypoint exit."""
+    if report.result_bundle.status is not ResultBundleStatus.FAILED:
+        return
+    emergency_path = report.result_bundle.emergency_diagnostics_path
+    if emergency_path is not None:
+        print(
+            format_tool_message(f"emergency diagnostics: {emergency_path}"),
+            file=stderr,
+        )
+    else:
+        print(
+            format_tool_message("emergency diagnostics could not be saved"),
+            file=stderr,
+        )
+
+
 def _bundle_command(
     path: Path | None,
     *,
@@ -532,16 +555,23 @@ def _apply_command(
     stdout: TextIO,
     stderr: TextIO,
 ) -> int:
+    session = RunSession.start()
     try:
         package = resolve_patch_package(path)
     except PatchHarborError as exc:
-        exit_code = int(exc.exit_code)
+        report = unresolved_apply_report(
+            session=session,
+            dry_run=dry_run,
+            error=exc,
+        )
+        reported_error = report.reported_error(exc)
+        exit_code = report.process_exit_code
         if json_output:
             _write_json_document(
                 _json_envelope(
                     "apply",
-                    result=None,
-                    error=exc,
+                    result=report.apply_result(),
+                    error=reported_error,
                     process_exit_code=exit_code,
                 ),
                 stdout,
@@ -558,6 +588,7 @@ def _apply_command(
             report = dry_run_patch_package(
                 package,
                 output_directory=output_directory,
+                session=session,
             )
         else:
             visible_output = StringIO() if json_output else stdout
@@ -569,6 +600,7 @@ def _apply_command(
                     visible_text_stream=visible_output,
                     live_text_stream=(None if json_output else stdout),
                 ),
+                session=session,
             )
     except PatchHarborError as exc:
         report = exc.run_report if isinstance(exc.run_report, RunReport) else None
@@ -601,6 +633,7 @@ def _apply_command(
 
     for warning in report.warnings[len(package.warnings) :]:
         print(format_tool_warning(warning), file=stderr)
+    _write_report_emergency_diagnostics_notice(report, stderr)
 
     if json_output:
         _write_json_document(

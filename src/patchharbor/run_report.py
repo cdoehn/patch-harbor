@@ -838,3 +838,26 @@ class RunReport:
                 self.result_bundle.emergency_diagnostics_path
             ),
         }
+
+
+def unresolved_apply_report(
+    *,
+    session: RunSession,
+    dry_run: bool,
+    error: PatchHarborError,
+    warnings: tuple[str, ...] = (),
+) -> RunReport:
+    """Complete one Apply failure before a repository is safely resolved."""
+    primary_outcome = ApplyPrimaryOutcome.from_tool_error(error)
+    return RunReport(
+        timing=session.finish(),
+        operation=RunOperation.APPLY,
+        dry_run=dry_run,
+        context=None,
+        repository=None,
+        repo_id=None,
+        warnings=warnings,
+        primary_result=primary_outcome.result,
+        result_bundle=ResultBundleResult.not_attempted(str(error)),
+        process_exit_code=primary_outcome.primary_process_exit_code,
+    )

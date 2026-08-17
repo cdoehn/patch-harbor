@@ -260,13 +260,60 @@ def test_dry_run_accepts_a_full_sha256_object_id(tmp_path: Path) -> None:
     assert completed.returncode == 0
 
 
-def test_dry_run_rejects_a_non_zip_despite_zip_extension(tmp_path: Path) -> None:
+def test_dry_run_rejects_a_non_zip_with_closed_apply_result(
+    tmp_path: Path,
+) -> None:
     package = tmp_path / "patch.zip"
     package.write_bytes(b"not a zip archive")
 
-    completed = _run_dry_run(package, tmp_path)
+    completed = _run_dry_run(
+        package,
+        tmp_path,
+        json_output=True,
+    )
 
-    assert completed.returncode == 10
+    assert completed.returncode == int(ExitCode.PATCH_PACKAGE_ERROR)
+    envelope = json.loads(completed.stdout)
+    assert set(envelope) == {
+        "output_version",
+        "command",
+        "success",
+        "result",
+        "error",
+        "process_exit_code",
+    }
+    assert envelope["command"] == "apply"
+    assert envelope["success"] is False
+    assert envelope["process_exit_code"] == int(ExitCode.PATCH_PACKAGE_ERROR)
+    result = envelope["result"]
+    assert set(result) == {
+        "run_id",
+        "repository_resolved",
+        "repo_id",
+        "repository_path",
+        "primary_result",
+        "result_bundle",
+    }
+    assert result["repository_resolved"] is False
+    assert result["repo_id"] is None
+    assert result["repository_path"] is None
+    assert result["primary_result"] == {
+        "kind": "validation_error",
+        "entrypoint_started": False,
+        "entrypoint_exit_code": None,
+        "timed_out": False,
+        "interrupted": False,
+        "patchharbor_error_code": int(ExitCode.PATCH_PACKAGE_ERROR),
+    }
+    assert result["result_bundle"] == {
+        "attempted": False,
+        "status": "not_attempted",
+        "path": None,
+        "emergency_diagnostics_path": None,
+    }
+    assert envelope["error"]["patchharbor_error_code"] == int(
+        ExitCode.PATCH_PACKAGE_ERROR
+    )
 
 
 @pytest.mark.parametrize(

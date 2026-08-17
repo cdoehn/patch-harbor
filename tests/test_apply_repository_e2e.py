@@ -645,9 +645,36 @@ def test_unknown_repository_id_is_rejected_before_snapshot(
     package = tmp_path / "unknown.zip"
     _write_package(package, manifest)
 
-    completed = _run_dry_run(package, tmp_path / "caller", environment)
+    completed = _run_dry_run(
+        package,
+        tmp_path / "caller",
+        environment,
+        json_output=True,
+    )
 
     assert completed.returncode == int(ExitCode.REPOSITORY_ERROR)
+    envelope = json.loads(completed.stdout)
+    result = envelope["result"]
+    assert result["repository_resolved"] is False
+    assert result["repo_id"] is None
+    assert result["repository_path"] is None
+    assert result["primary_result"] == {
+        "kind": "repository_error",
+        "entrypoint_started": False,
+        "entrypoint_exit_code": None,
+        "timed_out": False,
+        "interrupted": False,
+        "patchharbor_error_code": int(ExitCode.REPOSITORY_ERROR),
+    }
+    assert result["result_bundle"] == {
+        "attempted": False,
+        "status": "not_attempted",
+        "path": None,
+        "emergency_diagnostics_path": None,
+    }
+    assert envelope["error"]["patchharbor_error_code"] == int(
+        ExitCode.REPOSITORY_ERROR
+    )
     assert _result_bundles(environment) == ()
     _assert_repository_unmodified(repository)
 

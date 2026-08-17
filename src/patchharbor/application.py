@@ -68,6 +68,7 @@ from patchharbor.run_report import (
     ApplyPrimaryOutcome,
     RunReport,
     RunSession,
+    unresolved_apply_report,
 )
 from patchharbor.sources import (
     DirectoryCandidate,
@@ -154,11 +155,24 @@ def preflight_patch_package_repository(
     """Yield the explicit mutation gate while private inputs and locks live."""
     actual_session = session or RunSession.start()
     manifest = package.manifest
-    with safely_resolved_repository(
-        manifest,
-        session=actual_session,
-        output_directory=output_directory,
-    ) as resolved:
+    with ExitStack() as repository_scope:
+        try:
+            resolved = repository_scope.enter_context(
+                safely_resolved_repository(
+                    manifest,
+                    session=actual_session,
+                    output_directory=output_directory,
+                )
+            )
+        except PatchHarborError as error:
+            report = unresolved_apply_report(
+                session=actual_session,
+                dry_run=dry_run,
+                warnings=package.warnings,
+                error=error,
+            )
+            raise report.reported_error(error) from error
+
         if not resolved.matches_manifest_state(manifest):
             error = state_mismatch_error(
                 "patch package does not match the resolved repository state"
@@ -209,13 +223,14 @@ def dry_run_patch_package(
     package: ValidatedPatchPackage,
     *,
     output_directory: Path | None = None,
+    session: RunSession | None = None,
 ) -> RunReport:
     """Complete one safe dry-run and publish its unchanged Result Bundle."""
-    session = RunSession.start()
+    actual_session = session or RunSession.start()
     with preflight_patch_package_repository(
         package,
         output_directory=output_directory,
-        session=session,
+        session=actual_session,
         dry_run=True,
     ) as mutation_gate:
         report = _complete_mutation_result_bundle(
@@ -280,13 +295,14 @@ def apply_patch_package(
     output_directory: Path | None = None,
     timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
     output: OutputTargets | None = None,
+    session: RunSession | None = None,
 ) -> RunReport:
     """Write one validated package, run its private entrypoint, and bundle it."""
-    session = RunSession.start()
+    actual_session = session or RunSession.start()
     with preflight_patch_package_repository(
         package,
         output_directory=output_directory,
-        session=session,
+        session=actual_session,
         dry_run=False,
     ) as mutation_gate:
         _require_payload_mutation(mutation_gate)
