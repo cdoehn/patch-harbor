@@ -53,13 +53,6 @@ def _kind_or_error(target: Path, *, label: str) -> PathKind:
         raise _target_error(label, exc.operation) from exc
 
 
-def _validate_regular_target(target: Path, *, label: str) -> None:
-    kind = _kind_or_error(target, label=label)
-    if kind in {PathKind.MISSING, PathKind.REGULAR_FILE}:
-        return
-    raise _target_error(label, "target is not a regular file")
-
-
 def _replace_bytes(target: Path, content: bytes, *, label: str) -> None:
     try:
         atomic_replace_bytes(target, content)
@@ -67,7 +60,7 @@ def _replace_bytes(target: Path, content: bytes, *, label: str) -> None:
         raise _write_error(label, exc.operation) from exc
 
 
-def _bundle_target(
+def _resolve_payload_target(
     cwd: Path,
     relative_path: str,
     *,
@@ -93,7 +86,9 @@ def _bundle_target(
         raise _target_error(label, "parent is not a directory")
 
     final_target = target / segments[-1]
-    _validate_regular_target(final_target, label=label)
+    final_kind = _kind_or_error(final_target, label=label)
+    if final_kind not in {PathKind.MISSING, PathKind.REGULAR_FILE}:
+        raise _target_error(label, "target is not a regular file")
     return final_target
 
 
@@ -115,7 +110,7 @@ def validate_bundle_payload_targets(
         raise _bundle_file_error("<bundle>", exc) from exc
 
     for payload in payload_items:
-        _bundle_target(
+        _resolve_payload_target(
             cwd,
             payload.relative_path,
             create_parents=False,
@@ -128,13 +123,16 @@ def write_bundle_payloads(
     *,
     cwd: Path,
 ) -> None:
-    """Validate all ZIP payloads, then atomically write their byte content."""
+    """Validate every target, then atomically replace each file in order.
+
+    Successful earlier replacements remain when a later payload fails.
+    """
     payload_items = validate_bundle_payload_targets(payloads, cwd=cwd)
     if not payload_items:
         return
 
     for payload in payload_items:
-        target = _bundle_target(
+        target = _resolve_payload_target(
             cwd,
             payload.relative_path,
             create_parents=True,

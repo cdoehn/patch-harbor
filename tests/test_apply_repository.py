@@ -10,7 +10,6 @@ import zipfile
 
 import pytest
 
-import patchharbor.application as application_module
 import patchharbor.apply_mutation as apply_mutation_module
 import patchharbor.apply_preflight as apply_preflight_module
 import patchharbor.payload_files as payload_files_module
@@ -28,7 +27,12 @@ from patchharbor.errors import (
     PatchHarborError,
     unsupported_repository_state_error,
 )
-from patchharbor.models import BundlePayload, RepositoryContext
+from patchharbor.models import (
+    BundlePayload,
+    RepositoryContext,
+    RepositoryPath,
+    RepositorySnapshot,
+)
 from patchharbor.platform.filesystem import FileSystemOperationError
 from patchharbor.patch_manifest import (
     PATCH_FORMAT_VERSION,
@@ -369,28 +373,27 @@ def test_repository_change_after_preflight_is_bundled_without_payload_write(
             ),
         ),
     )
-    original_validate = application_module.validate_bundle_payload_targets
-    validation_count = 0
+    original_capture = (
+        apply_mutation_module.capture_consistent_repository_snapshot
+    )
+    capture_count = 0
 
-    def change_repository_after_first_validation(
-        payloads: Iterable[BundlePayload],
-        *,
-        cwd: Path,
-    ) -> tuple[BundlePayload, ...]:
-        nonlocal validation_count
-        validated = original_validate(payloads, cwd=cwd)
-        validation_count += 1
-        if validation_count == 1:
+    def change_repository_before_second_capture(
+        captured_repository: RepositoryPath,
+    ) -> RepositorySnapshot:
+        nonlocal capture_count
+        capture_count += 1
+        if capture_count == 1:
             (repository / "external.txt").write_bytes(b"external change")
             if change_kind == "base_commit":
                 git(repository, "add", "external.txt")
                 git(repository, "commit", "--quiet", "-m", "external change")
-        return validated
+        return original_capture(captured_repository)
 
     monkeypatch.setattr(
-        application_module,
-        "validate_bundle_payload_targets",
-        change_repository_after_first_validation,
+        apply_mutation_module,
+        "capture_consistent_repository_snapshot",
+        change_repository_before_second_capture,
     )
 
     with pytest.raises(PatchHarborError) as captured:
@@ -408,7 +411,7 @@ def test_repository_change_after_preflight_is_bundled_without_payload_write(
         assert report.context.state_fingerprint != context.state_fingerprint
     assert report.primary_result.entrypoint_started is False
     assert report.result_bundle.status is ResultBundleStatus.CREATED
-    assert validation_count == 1
+    assert capture_count == 1
     assert (repository / "external.txt").read_bytes() == b"external change"
     assert not (repository / "files" / "payload.bin").exists()
     assert not (repository / "executed.txt").exists()

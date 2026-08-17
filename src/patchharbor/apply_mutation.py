@@ -123,29 +123,12 @@ def _capture_mutation_context(
     )
 
 
-def _matches_initial_and_manifest_context(
-    mutation_gate: ApplyMutationGate,
-    current: RepositoryContext,
-) -> bool:
-    manifest = mutation_gate.package.manifest
-    return (
-        current == mutation_gate.resolved.context
-        and manifest.repo_id == current.repo_id
-        and manifest.base_commit == current.base_commit
-        and manifest.fingerprint_algorithm == current.fingerprint_algorithm
-        and manifest.state_fingerprint == current.state_fingerprint
-    )
-
-
 def apply_payload_mutation(
     mutation_gate: ApplyMutationGate,
 ) -> ApplyMutationResult:
     """Recheck repository state, resolve targets afresh, and write payloads."""
     current_context = _capture_mutation_context(mutation_gate)
-    if not _matches_initial_and_manifest_context(
-        mutation_gate,
-        current_context,
-    ):
+    if current_context != mutation_gate.context:
         return ApplyMutationResult.failed(
             current_context,
             kind=MutationFailureKind.STATE_MISMATCH,
