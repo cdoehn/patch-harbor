@@ -1,16 +1,15 @@
-"""Thin polling watcher that delegates stable files to PatchHarbor Core."""
+"""Thin polling watcher that delegates stable files through a public boundary."""
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 import json
 import os
 from pathlib import Path
 import stat
-import subprocess
 import time
-from typing import NoReturn, TextIO
+from typing import TextIO
 
 
 _BROWSER_TEMP_SUFFIXES = (
@@ -21,11 +20,6 @@ _BROWSER_TEMP_SUFFIXES = (
     ".partial",
     ".tmp",
 )
-_DEFAULT_APPLY_COMMAND = ("patchharbor",)
-
-
-def _reject_nonfinite_json(value: str) -> NoReturn:
-    raise ValueError(f"non-finite JSON value: {value}")
 
 
 @dataclass(frozen=True)
@@ -39,12 +33,16 @@ class FileObservation:
 
 @dataclass(frozen=True)
 class ApplyCompletion:
-    """Observed completion of one delegated public apply subprocess."""
+    """Opaque completion returned by the public apply subprocess boundary."""
 
     process_exit_code: int
     apply_result: dict[str, object] | None
-    response_is_json_object: bool
+    invalid_response_text: str | None
     stderr_text: str
+
+    @property
+    def response_is_json_object(self) -> bool:
+        return self.apply_result is not None
 
 
 @dataclass
@@ -81,8 +79,7 @@ class WatcherState:
 
 def is_browser_temporary_name(name: str) -> bool:
     """Recognize common browser download-temporary suffixes."""
-    lowered = name.casefold()
-    return lowered.endswith(_BROWSER_TEMP_SUFFIXES)
+    return name.casefold().endswith(_BROWSER_TEMP_SUFFIXES)
 
 
 def observe_input_directory(directory: Path) -> tuple[FileObservation, ...]:
@@ -109,41 +106,8 @@ def observe_input_directory(directory: Path) -> tuple[FileObservation, ...]:
     return tuple(observations)
 
 
-def delegate_to_apply(
-    path: Path,
-    *,
-    apply_command: Sequence[str] = _DEFAULT_APPLY_COMMAND,
-    environment: Mapping[str, str] | None = None,
-) -> ApplyCompletion:
-    """Pass one stable file unchanged to the public apply JSON command."""
-    completed = subprocess.run(
-        [*apply_command, "apply", "--json", os.fspath(path)],
-        check=False,
-        stdin=subprocess.DEVNULL,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        env=environment,
-    )
-
-    parsed: dict[str, object] | None = None
-    response_is_json_object = False
-    try:
-        candidate = json.loads(
-            completed.stdout.decode("utf-8"),
-            parse_constant=_reject_nonfinite_json,
-        )
-    except (UnicodeDecodeError, ValueError):
-        candidate = None
-    if isinstance(candidate, dict):
-        parsed = candidate
-        response_is_json_object = True
-
-    return ApplyCompletion(
-        process_exit_code=completed.returncode,
-        apply_result=parsed,
-        response_is_json_object=response_is_json_object,
-        stderr_text=completed.stderr.decode("utf-8", errors="replace"),
-    )
+def _never_stop() -> bool:
+    return False
 
 
 def _write_operational_record(
@@ -157,6 +121,7 @@ def _write_operational_record(
         "process_exit_code": completion.process_exit_code,
         "apply_response_is_json_object": completion.response_is_json_object,
         "apply_result": completion.apply_result,
+        "invalid_apply_response": completion.invalid_response_text,
     }
     stream.write(
         json.dumps(
@@ -175,25 +140,18 @@ def poll_input_directory_once(
     directory: Path,
     state: WatcherState,
     *,
-    apply_command: Sequence[str] = _DEFAULT_APPLY_COMMAND,
-    environment: Mapping[str, str] | None = None,
+    delegate: Callable[[Path], ApplyCompletion],
     log_stream: TextIO,
     error_stream: TextIO,
-    delegate: Callable[[Path], ApplyCompletion] | None = None,
+    stop_requested: Callable[[], bool] = _never_stop,
 ) -> int:
-    """Observe once and delegate every newly stable top-level file."""
+    """Observe once and delegate newly stable files until stop is requested."""
     stable = state.observe(observe_input_directory(directory))
     delegated = 0
     for observation in stable:
-        completion = (
-            delegate(observation.path)
-            if delegate is not None
-            else delegate_to_apply(
-                observation.path,
-                apply_command=apply_command,
-                environment=environment,
-            )
-        )
+        if stop_requested():
+            break
+        completion = delegate(observation.path)
         _write_operational_record(observation, completion, log_stream)
         if completion.stderr_text:
             error_stream.write(completion.stderr_text)
@@ -205,20 +163,20 @@ def poll_input_directory_once(
     return delegated
 
 
-def _never_stop() -> bool:
+def _sleep_until_next_poll(seconds: float) -> bool:
+    time.sleep(seconds)
     return False
 
 
 def run_watcher(
     input_directory: Path,
     *,
+    delegate: Callable[[Path], ApplyCompletion],
     poll_interval_seconds: float = 1.0,
-    apply_command: Sequence[str] = _DEFAULT_APPLY_COMMAND,
-    environment: Mapping[str, str] | None = None,
     log_stream: TextIO,
     error_stream: TextIO,
     stop_requested: Callable[[], bool] = _never_stop,
-    sleeper: Callable[[float], None] = time.sleep,
+    wait_for_stop: Callable[[float], bool] = _sleep_until_next_poll,
 ) -> None:
     """Periodically scan one non-recursive input directory until stopped."""
     if poll_interval_seconds <= 0:
@@ -232,11 +190,10 @@ def run_watcher(
         poll_input_directory_once(
             directory,
             state,
-            apply_command=apply_command,
-            environment=environment,
+            delegate=delegate,
             log_stream=log_stream,
             error_stream=error_stream,
+            stop_requested=stop_requested,
         )
-        if stop_requested():
+        if stop_requested() or wait_for_stop(poll_interval_seconds):
             break
-        sleeper(poll_interval_seconds)

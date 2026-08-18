@@ -606,10 +606,38 @@ def test_apply_orchestrator_delegates_mutation_execution_and_result_services() -
 
 def test_watcher_remains_separate_from_patchharbor_core() -> None:
     assert _local_imports("watcher") == set()
-    assert _local_imports("watcher_cli") == {"watcher"}
+    assert _local_imports("watcher_lifecycle") == set()
+    assert _local_imports("watcher_subprocess") == {"watcher"}
+    assert _local_imports("watcher_cli") == {
+        "watcher",
+        "watcher_lifecycle",
+        "watcher_subprocess",
+    }
+
+    watcher_modules = (
+        "watcher",
+        "watcher_cli",
+        "watcher_lifecycle",
+        "watcher_subprocess",
+    )
+    forbidden_core_dependencies = {
+        "application",
+        "apply_preflight",
+        "apply_repository",
+        "execution",
+        "patch_manifest",
+        "patch_package",
+        "registry",
+        "repository_state",
+        "result_bundle",
+    }
+    for module_name in watcher_modules:
+        assert _local_imports(module_name).isdisjoint(forbidden_core_dependencies)
 
     for module_name in ("application", "cli", "execution", "patch_package"):
-        assert "watcher" not in _local_imports(module_name)
+        assert _local_imports(module_name).isdisjoint(
+            {"watcher", "watcher_lifecycle", "watcher_subprocess"}
+        )
 
 
 def test_runtime_module_dependencies_are_acyclic() -> None:

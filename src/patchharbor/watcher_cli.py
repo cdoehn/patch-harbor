@@ -9,6 +9,11 @@ import sys
 from typing import TextIO
 
 from patchharbor.watcher import run_watcher
+from patchharbor.watcher_lifecycle import (
+    WatcherStopController,
+    installed_stop_signals,
+)
+from patchharbor.watcher_subprocess import delegate_to_apply
 
 
 def _positive_seconds(value: str) -> float:
@@ -55,20 +60,25 @@ def main(
     arguments = parser.parse_args(argv)
     actual_stdout = sys.stdout if stdout is None else stdout
     actual_stderr = sys.stderr if stderr is None else stderr
+    stop_controller = WatcherStopController()
 
     try:
-        run_watcher(
-            arguments.input_directory,
-            poll_interval_seconds=arguments.poll_interval,
-            log_stream=actual_stdout,
-            error_stream=actual_stderr,
-        )
+        with installed_stop_signals(stop_controller):
+            run_watcher(
+                arguments.input_directory,
+                delegate=delegate_to_apply,
+                poll_interval_seconds=arguments.poll_interval,
+                log_stream=actual_stdout,
+                error_stream=actual_stderr,
+                stop_requested=stop_controller.stop_requested,
+                wait_for_stop=stop_controller.wait,
+            )
     except KeyboardInterrupt:
         return 130
     except (OSError, RuntimeError, ValueError) as exc:
         print(f"patchharbor-watcher: {exc}", file=actual_stderr)
         return 1
-    return 0
+    return 130 if stop_controller.was_interrupted() else 0
 
 
 if __name__ == "__main__":

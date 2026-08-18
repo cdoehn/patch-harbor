@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from io import StringIO
+import json
 from pathlib import Path
 
 import pytest
@@ -13,12 +14,18 @@ from patchharbor.watcher import (
 )
 
 
-def _successful_completion(_path: Path) -> ApplyCompletion:
+def _completion(
+    *,
+    exit_code: int = 0,
+    result: dict[str, object] | None = None,
+    invalid_response: str | None = None,
+    stderr: str = "",
+) -> ApplyCompletion:
     return ApplyCompletion(
-        process_exit_code=0,
-        apply_result={"success": True},
-        response_is_json_object=True,
-        stderr_text="",
+        process_exit_code=exit_code,
+        apply_result={"success": True} if result is None else result,
+        invalid_response_text=invalid_response,
+        stderr_text=stderr,
     )
 
 
@@ -52,44 +59,44 @@ def test_file_requires_two_matching_observations_and_changed_file_restabilizes(
 
     def delegate(path: Path) -> ApplyCompletion:
         calls.append(path)
-        return _successful_completion(path)
+        return _completion()
 
     first = poll_input_directory_once(
         tmp_path,
         state,
+        delegate=delegate,
         log_stream=log,
         error_stream=StringIO(),
-        delegate=delegate,
     )
     second = poll_input_directory_once(
         tmp_path,
         state,
+        delegate=delegate,
         log_stream=log,
         error_stream=StringIO(),
-        delegate=delegate,
     )
     unchanged = poll_input_directory_once(
         tmp_path,
         state,
+        delegate=delegate,
         log_stream=log,
         error_stream=StringIO(),
-        delegate=delegate,
     )
 
     watched.write_bytes(b"second-version")
     changed_first = poll_input_directory_once(
         tmp_path,
         state,
+        delegate=delegate,
         log_stream=log,
         error_stream=StringIO(),
-        delegate=delegate,
     )
     changed_second = poll_input_directory_once(
         tmp_path,
         state,
+        delegate=delegate,
         log_stream=log,
         error_stream=StringIO(),
-        delegate=delegate,
     )
 
     assert (first, second, unchanged, changed_first, changed_second) == (
@@ -100,6 +107,88 @@ def test_file_requires_two_matching_observations_and_changed_file_restabilizes(
         1,
     )
     assert calls == [watched, watched]
+
+
+def test_invalid_apply_response_is_recorded_once_without_semantic_retry(
+    tmp_path: Path,
+) -> None:
+    watched = tmp_path / "patch.zip"
+    watched.write_bytes(b"stable")
+    state = WatcherState()
+    calls: list[Path] = []
+    log = StringIO()
+    errors = StringIO()
+
+    def delegate(path: Path) -> ApplyCompletion:
+        calls.append(path)
+        return ApplyCompletion(
+            process_exit_code=7,
+            apply_result=None,
+            invalid_response_text="not-json",
+            stderr_text="apply stderr",
+        )
+
+    poll_input_directory_once(
+        tmp_path,
+        state,
+        delegate=delegate,
+        log_stream=log,
+        error_stream=errors,
+    )
+    delegated = poll_input_directory_once(
+        tmp_path,
+        state,
+        delegate=delegate,
+        log_stream=log,
+        error_stream=errors,
+    )
+    repeated = poll_input_directory_once(
+        tmp_path,
+        state,
+        delegate=delegate,
+        log_stream=log,
+        error_stream=errors,
+    )
+
+    assert (delegated, repeated) == (1, 0)
+    assert calls == [watched]
+    record = json.loads(log.getvalue())
+    assert record["process_exit_code"] == 7
+    assert record["apply_response_is_json_object"] is False
+    assert record["apply_result"] is None
+    assert record["invalid_apply_response"] == "not-json"
+    assert errors.getvalue().splitlines() == ["apply stderr"]
+
+
+def test_poll_stops_before_delegating_additional_stable_files(
+    tmp_path: Path,
+) -> None:
+    first = tmp_path / "a.zip"
+    second = tmp_path / "b.zip"
+    first.write_bytes(b"a")
+    second.write_bytes(b"b")
+    state = WatcherState()
+    state.observe(observe_input_directory(tmp_path))
+    calls: list[Path] = []
+    stopping = False
+
+    def delegate(path: Path) -> ApplyCompletion:
+        nonlocal stopping
+        calls.append(path)
+        stopping = True
+        return _completion()
+
+    delegated = poll_input_directory_once(
+        tmp_path,
+        state,
+        delegate=delegate,
+        log_stream=StringIO(),
+        error_stream=StringIO(),
+        stop_requested=lambda: stopping,
+    )
+
+    assert delegated == 1
+    assert calls == [first]
 
 
 def test_watcher_console_entry_point_configures_the_polling_loop(
@@ -127,5 +216,8 @@ def test_watcher_console_entry_point_configures_the_polling_loop(
     assert result == 0
     assert observed["input_directory"] == tmp_path
     assert observed["poll_interval_seconds"] == 0.25
+    assert observed["delegate"] is watcher_cli.delegate_to_apply
+    assert callable(observed["stop_requested"])
+    assert callable(observed["wait_for_stop"])
     assert observed["log_stream"] is stdout
     assert observed["error_stream"] is stderr

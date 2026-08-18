@@ -55,6 +55,8 @@ EXPECTED_RUNTIME_FILES = {
     "user_paths.py",
     "watcher.py",
     "watcher_cli.py",
+    "watcher_lifecycle.py",
+    "watcher_subprocess.py",
     "zip_payloads.py",
     "platform/__init__.py",
     "platform/errors.py",
