@@ -29,6 +29,7 @@ dependencies = []
 
 [project.scripts]
 patchharbor = "patchharbor.cli:main"
+patchharbor-watcher = "patchharbor.watcher_cli:main"
 
 [project.optional-dependencies]
 dev = [

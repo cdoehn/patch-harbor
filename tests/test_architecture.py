@@ -604,6 +604,14 @@ def test_apply_orchestrator_delegates_mutation_execution_and_result_services() -
     assert "def _capture_mutation_context(" not in source
 
 
+def test_watcher_remains_separate_from_patchharbor_core() -> None:
+    assert _local_imports("watcher") == set()
+    assert _local_imports("watcher_cli") == {"watcher"}
+
+    for module_name in ("application", "cli", "execution", "patch_package"):
+        assert "watcher" not in _local_imports(module_name)
+
+
 def test_runtime_module_dependencies_are_acyclic() -> None:
     modules = {
         path.stem

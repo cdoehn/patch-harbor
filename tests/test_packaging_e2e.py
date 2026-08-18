@@ -64,6 +64,8 @@ EXPECTED_RUNTIME_FILES = {
     "patchharbor/state_fingerprint.py",
     "patchharbor/temporary_resources.py",
     "patchharbor/user_paths.py",
+    "patchharbor/watcher.py",
+    "patchharbor/watcher_cli.py",
     "patchharbor/zip_payloads.py",
     "patchharbor/platform/__init__.py",
     "patchharbor/platform/errors.py",
@@ -142,7 +144,10 @@ def test_release_metadata_is_complete_and_runtime_has_no_dependencies() -> None:
     assert project["license"] == "MIT"
     assert project["license-files"] == ["LICENSE"]
     assert project["dependencies"] == []
-    assert project["scripts"] == {"patchharbor": "patchharbor.cli:main"}
+    assert project["scripts"] == {
+        "patchharbor": "patchharbor.cli:main",
+        "patchharbor-watcher": "patchharbor.watcher_cli:main",
+    }
     assert "Development Status :: 5 - Production/Stable" in project["classifiers"]
     assert (PROJECT_ROOT / "LICENSE").is_file()
 
@@ -201,6 +206,7 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
         assert wheel.read(entry_points_name).decode("utf-8").splitlines() == [
             "[console_scripts]",
             "patchharbor = patchharbor.cli:main",
+            "patchharbor-watcher = patchharbor.watcher_cli:main",
         ]
 
     with tarfile.open(source_distributions[0], "r:gz") as source_distribution:
@@ -211,6 +217,8 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
             f"{root}/README.md",
             f"{root}/pyproject.toml",
             f"{root}/src/patchharbor/cli.py",
+            f"{root}/src/patchharbor/watcher.py",
+            f"{root}/src/patchharbor/watcher_cli.py",
         ):
             assert required in names
         for forbidden in (
@@ -264,9 +272,16 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
 
     executable_name = native_value("patchharbor", "patchharbor.exe")
     executable = pipx_bin / executable_name
+    watcher_executable_name = native_value(
+        "patchharbor-watcher",
+        "patchharbor-watcher.exe",
+    )
+    watcher_executable = pipx_bin / watcher_executable_name
     empty_workdir = tmp_path / "empty-workdir"
     empty_workdir.mkdir()
     assert list(empty_workdir.iterdir()) == []
+
+    assert watcher_executable.is_file()
 
     version_result = _run(
         [str(executable), "--version"],

@@ -53,6 +53,8 @@ EXPECTED_RUNTIME_FILES = {
     "state_fingerprint.py",
     "temporary_resources.py",
     "user_paths.py",
+    "watcher.py",
+    "watcher_cli.py",
     "zip_payloads.py",
     "platform/__init__.py",
     "platform/errors.py",
@@ -79,7 +81,10 @@ def test_release_entry_point_and_runtime_dependency_contract_are_exact() -> None
         (PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8")
     )["project"]
 
-    assert project["scripts"] == {"patchharbor": "patchharbor.cli:main"}
+    assert project["scripts"] == {
+        "patchharbor": "patchharbor.cli:main",
+        "patchharbor-watcher": "patchharbor.watcher_cli:main",
+    }
     assert project["dependencies"] == []
 
 
