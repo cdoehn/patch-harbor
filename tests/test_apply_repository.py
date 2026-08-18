@@ -141,6 +141,18 @@ def _complete_preflight(
         pass
 
 
+class _RecordingApplyPresentation:
+    def __init__(self) -> None:
+        self.repository: dict[str, object] | None = None
+        self.script: dict[str, object] | None = None
+
+    def update_repository(self, **values: object) -> None:
+        self.repository = values
+
+    def begin_script(self, **values: object) -> None:
+        self.script = values
+
+
 def test_safe_resolution_owns_output_reservation_and_repository_lock(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -434,6 +446,56 @@ def test_apply_result_matrix_preserves_emergency_execution_diagnostics(
     assert run_document["process_exit_code"] == expected_exit
     assert not tuple(output_directory.glob("patchharbor_result_*.zip"))
     assert not tuple(output_directory.glob(".*.tmp"))
+
+
+@pytest.mark.parametrize(
+    "scenario",
+    ("success", "entrypoint-exit", "timeout", "interrupted"),
+)
+def test_apply_removes_private_resources_after_every_process_outcome(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    scenario: str,
+) -> None:
+    set_isolated_user_environment(monkeypatch, tmp_path / "user")
+    private_temp = tmp_path / "system-temp"
+    _set_private_temp(monkeypatch, private_temp)
+    repository = create_repository(tmp_path / "repository")
+    context = register_repository(repository)
+
+    if scenario == "success":
+        execution = ScriptExecutionResult.exited(0, b"success\n")
+    elif scenario == "entrypoint-exit":
+        execution = ScriptExecutionResult.exited(23, b"failed\n")
+    elif scenario == "timeout":
+        execution = ScriptExecutionResult.failed(
+            PatchHarborError("timed out", ExitCode.TIMEOUT),
+            entrypoint_started=True,
+            output=b"timeout\n",
+        )
+    else:
+        execution = ScriptExecutionResult.failed(
+            PatchHarborError("interrupted", ExitCode.INTERRUPTED),
+            entrypoint_started=True,
+            output=b"interrupted\n",
+        )
+
+    monkeypatch.setattr(
+        application_module,
+        "execute_prepared_script_with_log",
+        lambda *_args, **_kwargs: execution,
+    )
+
+    try:
+        apply_patch_package(
+            _package(_manifest(context)),
+            output_directory=tmp_path / "results",
+        )
+    except PatchHarborError as error:
+        assert scenario in {"timeout", "interrupted"}
+        assert error.exit_code in {ExitCode.TIMEOUT, ExitCode.INTERRUPTED}
+
+    assert tuple(private_temp.iterdir()) == ()
 
 
 def test_apply_json_is_closed_and_preserves_emergency_execution_files(
@@ -940,6 +1002,43 @@ def test_matching_package_preflights_private_entrypoint_and_payload_bytes(
     assert probe_repository_lock(str(context.repo_id), environment) == 0
     assert not entrypoint_path.exists()
     assert tuple(private_temp.iterdir()) == ()
+
+
+def test_apply_preflight_presents_resolved_repository_and_entrypoint_messages(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    set_isolated_user_environment(monkeypatch, tmp_path / "user")
+    repository = create_repository(tmp_path / "repository")
+    context = register_repository(repository)
+    presentation = _RecordingApplyPresentation()
+    entrypoint = (
+        b"# PATCHHARBOR\n"
+        b"# PATCHHARBOR MESSAGE commit.last START\n"
+        b"# Apply presentation connected\n"
+        b"# PATCHHARBOR MESSAGE commit.last END\n"
+    )
+
+    with preflight_patch_package_repository(
+        _package(_manifest(context), entrypoint=entrypoint),
+        presentation=presentation,
+    ):
+        pass
+
+    assert presentation.repository is not None
+    assert presentation.repository["repository_name"] == str(repository.resolve())
+    repository_context = presentation.repository["repository_context"]
+    assert isinstance(repository_context, str)
+    assert str(context.repo_id) in repository_context
+    assert str(context.base_commit)[:12] in repository_context
+    assert context.state_fingerprint in repository_context
+    assert presentation.script == {
+        "script_name": "run.sh",
+        "script_index": 1,
+        "script_total": 1,
+        "messages": (("commit.last", "Apply presentation connected"),),
+        "warnings": (),
+    }
 
 
 @pytest.mark.parametrize(

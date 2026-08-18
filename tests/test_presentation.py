@@ -11,6 +11,7 @@ from patchharbor.presentation import (
     DASHBOARD_MIN_WIDTH,
     DashboardSnapshot,
     PresentedFile,
+    SanitizedTextStream,
     TerminalDashboard,
     render_dashboard,
     terminal_supports_dashboard,
@@ -141,6 +142,30 @@ def test_dashboard_renderer_exposes_sections_and_overflow_without_wrapping() -> 
     assert "status: running" in frame
 
 
+def test_apply_dashboard_includes_repository_context_and_result_path() -> None:
+    snapshot = DashboardSnapshot(
+        source_name="downloads/patch.zip",
+        repository_name="/work/repository",
+        repository_context="repo_id: 1234 · base: abcdef · state: 0123456789abcdef",
+        script_name="run.sh",
+        script_index=1,
+        script_total=1,
+        status="success",
+        exit_code=0,
+        result_path="/results/result.zip",
+    )
+
+    frame = render_dashboard(snapshot, width=72)
+
+    _assert_frame_fits(frame, 72)
+    sections = ("SOURCE", "REPOSITORY", "MESSAGES", "FILES", "EXECUTION", "RESULT")
+    positions = [frame.index(section) for section in sections]
+    assert positions == sorted(positions)
+    assert "/work/repository" in frame
+    assert "0123456789abcdef" in frame
+    assert "/results/result.zip" in frame
+
+
 def test_dashboard_renderer_respects_requested_width() -> None:
     frame = render_dashboard(
         DashboardSnapshot(source_name="source", status="success", exit_code=0),
@@ -174,6 +199,20 @@ def test_dashboard_strips_terminal_controls_from_all_untrusted_visible_text() ->
     assert "helloworld" in frame
     assert "beforeafter" in frame
     assert "baddetail" in frame
+
+
+def test_plain_visible_stream_strips_terminal_effects_but_preserves_lines() -> None:
+    destination = StringIO()
+    stream = SanitizedTextStream(destination)
+
+    written = stream.write(
+        "before\x1b[31mred\x1b[0m\x08\n"
+        "next\x1b]0;owned\x07-line\n"
+    )
+    stream.flush()
+
+    assert written > len(destination.getvalue())
+    assert destination.getvalue() == "beforered\nnext-line\n"
 
 
 def test_dashboard_clips_wide_unicode_by_terminal_cells_without_wrapping() -> None:

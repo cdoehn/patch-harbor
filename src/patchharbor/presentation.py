@@ -49,6 +49,8 @@ class DashboardSnapshot:
     """Immutable presentation-only information for one dashboard frame."""
 
     source_name: str = "—"
+    repository_name: str | None = None
+    repository_context: str | None = None
     script_name: str = "—"
     script_index: int = 0
     script_total: int = 0
@@ -61,6 +63,7 @@ class DashboardSnapshot:
     exit_code: int | None = None
     tool_error: str | None = None
     log_path: str | None = None
+    result_path: str | None = None
 
 
 class DashboardPresentation(Protocol):
@@ -77,8 +80,18 @@ class DashboardPresentation(Protocol):
         bundle_files: tuple[PresentedFile, ...],
         script_total: int,
         warnings: tuple[str, ...] = (),
+        repository_name: str | None = None,
+        repository_context: str | None = None,
     ) -> None:
         """Start the fixed dashboard for one validated request."""
+
+    def update_repository(
+        self,
+        *,
+        repository_name: str,
+        repository_context: str | None,
+    ) -> None:
+        """Show the safely resolved repository and its checked context."""
 
     def begin_script(
         self,
@@ -104,6 +117,7 @@ class DashboardPresentation(Protocol):
         exit_code: int,
         tool_error: str | None,
         log_path: Path | None,
+        result_path: Path | None = None,
     ) -> None:
         """Stop periodic redraw, render the final state, and restore the terminal."""
 
@@ -180,6 +194,46 @@ def _sanitize_lines(text: str) -> tuple[str, ...]:
     stripped = _strip_terminal_sequences(text)
     normalized = stripped.replace("\r\n", "\n").replace("\r", "\n")
     return tuple(_sanitize_line(line) for line in normalized.split("\n"))
+
+
+def sanitize_visible_text(text: str) -> str:
+    """Remove terminal effects while preserving ordinary visible line breaks."""
+    stripped = _strip_terminal_sequences(text)
+    result: list[str] = []
+    for character in stripped:
+        if character == "\n":
+            result.append(character)
+            continue
+        if character == "\t":
+            result.append("    ")
+            continue
+        if character == "\r":
+            continue
+        if unicodedata.category(character) in {"Cc", "Cf", "Cs"}:
+            continue
+        result.append(character)
+    return "".join(result)
+
+
+class SanitizedTextStream:
+    """Small text sink that protects a visible terminal from child output."""
+
+    def __init__(self, stream: TextIO) -> None:
+        self._stream = stream
+
+    @property
+    def encoding(self) -> str | None:
+        return getattr(self._stream, "encoding", None)
+
+    def isatty(self) -> bool:
+        return _stream_is_terminal(self._stream)
+
+    def write(self, text: str) -> int:
+        self._stream.write(sanitize_visible_text(text))
+        return len(text)
+
+    def flush(self) -> None:
+        self._stream.flush()
 
 
 def _character_width(character: str) -> int:
@@ -353,13 +407,19 @@ def _result_rows(snapshot: DashboardSnapshot) -> tuple[str, str]:
     if snapshot.log_path is not None:
         log_text = f"log: {snapshot.log_path}"
         second = f"{second} · {log_text}" if second else log_text
+    if snapshot.result_path is not None:
+        result_text = f"result: {snapshot.result_path}"
+        second = f"{second} · {result_text}" if second else result_text
     return first, second
 
 
 def _line_color(line: str, snapshot: DashboardSnapshot) -> str:
     if "PATCHHARBOR" in line:
         return _CYAN
-    if any(label in line for label in ("SOURCE", "MESSAGES", "FILES", "EXECUTION")):
+    if any(
+        label in line
+        for label in ("SOURCE", "REPOSITORY", "MESSAGES", "FILES", "EXECUTION")
+    ):
         return _BLUE
     if "RESULT" in line:
         if snapshot.status == "success":
@@ -401,8 +461,16 @@ def render_dashboard(
         _section("SOURCE", width),
         _content(f"source: {snapshot.source_name}", width),
         _content(f"script: {script_text}", width),
-        _section("MESSAGES", width),
     ]
+    if snapshot.repository_name is not None:
+        rows.append(_section("REPOSITORY", width))
+        rows.extend(
+            (
+                _content(f"repository: {snapshot.repository_name}", width),
+                _content(snapshot.repository_context or "—", width),
+            )
+        )
+    rows.append(_section("MESSAGES", width))
     rows.extend(_content(row, width) for row in _message_rows(snapshot.messages, MESSAGE_ROWS))
     rows.append(_section("FILES", width))
     rows.extend(_content(row, width) for row in _file_rows(snapshot.files, FILE_ROWS))
@@ -509,6 +577,8 @@ class TerminalDashboard:
         bundle_files: tuple[PresentedFile, ...],
         script_total: int,
         warnings: tuple[str, ...] = (),
+        repository_name: str | None = None,
+        repository_context: str | None = None,
     ) -> None:
         with self._state_lock:
             self._bundle_files = bundle_files
@@ -516,6 +586,8 @@ class TerminalDashboard:
             self._state = replace(
                 self._state,
                 source_name=source_name,
+                repository_name=repository_name,
+                repository_context=repository_context,
                 script_total=script_total,
                 files=bundle_files,
                 warnings=warnings,
@@ -532,6 +604,19 @@ class TerminalDashboard:
                 raise OSError(f"cannot render dashboard: {error}")
             self._thread.start()
             self._thread_started = True
+
+    def update_repository(
+        self,
+        *,
+        repository_name: str,
+        repository_context: str | None,
+    ) -> None:
+        with self._state_lock:
+            self._state = replace(
+                self._state,
+                repository_name=repository_name,
+                repository_context=repository_context,
+            )
 
     def begin_script(
         self,
@@ -576,6 +661,7 @@ class TerminalDashboard:
         exit_code: int,
         tool_error: str | None,
         log_path: Path | None,
+        result_path: Path | None = None,
     ) -> None:
         if not self._started or self._closed:
             return
@@ -589,6 +675,7 @@ class TerminalDashboard:
                 exit_code=exit_code,
                 tool_error=tool_error,
                 log_path=None if log_path is None else str(log_path),
+                result_path=None if result_path is None else str(result_path),
             )
         self._stop_loop()
         self._render_now(force=True)

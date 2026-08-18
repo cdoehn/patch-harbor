@@ -281,6 +281,64 @@ def test_apply_writes_expected_bytes_runs_once_and_bundles_state(
     assert f"untracked/{entrypoint_name}" not in names
 
 
+@pytest.mark.parametrize("force_plain", (False, True))
+def test_apply_noninteractive_output_is_sanitized_while_log_remains_raw(
+    tmp_path: Path,
+    force_plain: bool,
+) -> None:
+    repository = create_repository(tmp_path / "repository")
+    environment, context = _register_context(repository, tmp_path / "user")
+    package = tmp_path / "visible-output.zip"
+    raw_output = b"visible-\x1b[31mred\x1b[0m-\x08safe\n"
+    entrypoint_name = native_value("run.sh", "run.ps1")
+    manifest = _manifest(context)
+    manifest["entrypoint"] = entrypoint_name
+    entrypoint = native_script(
+        "printf 'visible-\\033[31mred\\033[0m-\\010safe\\n'",
+        "$bytes = [byte[]]("
+        "0x76,0x69,0x73,0x69,0x62,0x6C,0x65,0x2D,"
+        "0x1B,0x5B,0x33,0x31,0x6D,0x72,0x65,0x64,"
+        "0x1B,0x5B,0x30,0x6D,0x2D,0x08,0x73,0x61,0x66,0x65,0x0A)\n"
+        "$stream = [Console]::OpenStandardOutput()\n"
+        "$stream.Write($bytes, 0, $bytes.Length)\n"
+        "$stream.Flush()",
+    )
+    with zipfile.ZipFile(package, "w") as archive:
+        archive.writestr(
+            "patch.json",
+            json.dumps(
+                manifest,
+                ensure_ascii=False,
+                allow_nan=False,
+                separators=(",", ":"),
+            ).encode("utf-8"),
+        )
+        archive.writestr(entrypoint_name, entrypoint.encode("utf-8"))
+
+    output_directory = tmp_path / "results"
+    arguments = ["apply"]
+    if force_plain:
+        arguments.append("--plain")
+    arguments.extend(("--output-dir", str(output_directory), str(package)))
+
+    completed = run_cli(
+        tmp_path,
+        *arguments,
+        environment_overrides=environment,
+        timeout_seconds=120,
+    )
+
+    assert completed.returncode == 0
+    assert "visible-red-safe\n" in completed.stdout
+    assert "\x1b" not in completed.stdout
+    assert "\x08" not in completed.stdout
+    assert completed.stderr == ""
+    bundles = tuple(output_directory.glob("patchharbor_result_*.zip"))
+    assert len(bundles) == 1
+    with zipfile.ZipFile(bundles[0]) as archive:
+        assert archive.read("logs/execution.log") == raw_output
+
+
 def test_apply_returns_exact_nonzero_exit_and_bundles_execution_log(
     tmp_path: Path,
 ) -> None:

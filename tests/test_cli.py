@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from io import StringIO
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -9,6 +10,7 @@ import patchharbor.cli as cli
 from patchharbor.cli import main
 from patchharbor.output import OutputTargets
 from patchharbor.presentation import PresentedFile
+from patchharbor.run_report import ResultBundleStatus
 
 
 class _TerminalInput(StringIO):
@@ -19,6 +21,20 @@ class _TerminalInput(StringIO):
 class _TerminalOutput(StringIO):
     def isatty(self) -> bool:
         return True
+
+
+def _fake_apply_package() -> SimpleNamespace:
+    return SimpleNamespace(
+        manifest=SimpleNamespace(repo_id="11111111-1111-4111-8111-111111111111"),
+        warnings=(),
+        entrypoint=SimpleNamespace(
+            relative_path="run.sh",
+            content=b"# PATCHHARBOR\n",
+        ),
+        payloads=(
+            SimpleNamespace(relative_path="files/data.bin", content=b"data"),
+        ),
+    )
 
 
 def test_version_flag_reports_release_version(
@@ -91,6 +107,161 @@ def test_plain_flag_streams_to_an_interactive_terminal(
 
     assert result == 0
     assert stdout.getvalue() == "plain-output\n"
+    assert stderr.getvalue() == ""
+
+
+def test_apply_plain_sanitizes_child_output_without_dashboard(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    stdout = _TerminalOutput()
+    stderr = StringIO()
+    report = SimpleNamespace(warnings=())
+
+    monkeypatch.setattr(cli, "resolve_patch_package", lambda _path: _fake_apply_package())
+
+    def fake_apply_patch_package(_package: object, **options: object) -> object:
+        assert options["presentation"] is None
+        output = options["output"]
+        assert isinstance(output, OutputTargets)
+        assert output.line_observer is None
+        assert output.live_text_stream is not stdout
+        output.live_text_stream.write("safe\x1b[31m-red\x1b[0m\x08\n")
+        return report
+
+    monkeypatch.setattr(cli, "apply_patch_package", fake_apply_patch_package)
+    monkeypatch.setattr(
+        cli,
+        "_write_apply_completion",
+        lambda _report, **_options: 0,
+    )
+
+    result = main(
+        ["apply", "--plain", str(tmp_path / "patch.zip")],
+        stdout=stdout,
+        stderr=stderr,
+    )
+
+    assert result == 0
+    assert stdout.getvalue() == "safe-red\n"
+    assert "\x1b" not in stdout.getvalue()
+    assert stderr.getvalue() == ""
+
+
+def test_apply_returns_tool_error_when_dashboard_cannot_start(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    stdout = _TerminalOutput()
+    stderr = StringIO()
+    apply_called = False
+
+    class BrokenDashboard:
+        def __init__(self, *_args: object, **_kwargs: object) -> None:
+            pass
+
+        def begin_request(self, **_values: object) -> None:
+            raise OSError("dashboard unavailable")
+
+        def close(self) -> None:
+            pass
+
+    def unexpected_apply(*_args: object, **_kwargs: object) -> object:
+        nonlocal apply_called
+        apply_called = True
+        raise AssertionError("apply must not start")
+
+    monkeypatch.setattr(cli, "terminal_supports_dashboard", lambda _stream: True)
+    monkeypatch.setattr(cli, "TerminalDashboard", BrokenDashboard)
+    monkeypatch.setattr(cli, "resolve_patch_package", lambda _path: _fake_apply_package())
+    monkeypatch.setattr(cli, "apply_patch_package", unexpected_apply)
+
+    result = main(
+        ["apply", str(tmp_path / "patch.zip")],
+        stdout=stdout,
+        stderr=stderr,
+    )
+
+    assert result == 7
+    assert not apply_called
+    assert "\x1b" not in stdout.getvalue()
+
+
+def test_apply_tty_uses_repository_dashboard_without_color(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    stdout = _TerminalOutput()
+    stderr = StringIO()
+    report = SimpleNamespace(
+        warnings=(),
+        completion_tool_error=None,
+        process_exit_code=0,
+        result_bundle=SimpleNamespace(
+            path=Path("/results/result.zip"),
+            status=ResultBundleStatus.CREATED,
+            emergency_diagnostics_path=None,
+        ),
+    )
+
+    monkeypatch.setattr(cli, "terminal_supports_dashboard", lambda _stream: True)
+    monkeypatch.setattr(cli, "resolve_patch_package", lambda _path: _fake_apply_package())
+
+    def fake_apply_patch_package(_package: object, **options: object) -> object:
+        presentation = options["presentation"]
+        output = options["output"]
+        assert presentation is not None
+        assert isinstance(output, OutputTargets)
+        assert output.live_text_stream is None
+        assert output.line_observer is not None
+        presentation.update_repository(
+            repository_name="/work/repository",
+            repository_context="repo_id: 1111 · base: abcdef · state: 0123",
+        )
+        presentation.begin_script(
+            script_name="run.sh",
+            script_index=1,
+            script_total=1,
+            messages=(("commit.last", "Apply integrated"),),
+            warnings=(),
+        )
+        output.line_observer(("visible\x1b[31m-red\x1b[0m\n",), 0)
+        return report
+
+    monkeypatch.setattr(cli, "apply_patch_package", fake_apply_patch_package)
+
+    result = main(
+        ["apply", "--no-color", str(tmp_path / "patch.zip")],
+        stdout=stdout,
+        stderr=stderr,
+    )
+
+    rendered = stdout.getvalue()
+    assert result == 0
+    assert rendered.count("\x1b[?25l") == 1
+    assert rendered.count("\x1b[?25h") == 1
+    for section in (
+        "SOURCE",
+        "REPOSITORY",
+        "MESSAGES",
+        "FILES",
+        "EXECUTION",
+        "RESULT",
+    ):
+        assert section in rendered
+    assert "/work/repository" in rendered
+    assert "Apply integrated" in rendered
+    assert "visible-red" in rendered
+    assert "/results/result.zip" in rendered
+    for color_sequence in (
+        "\x1b[1;36m",
+        "\x1b[1;34m",
+        "\x1b[1;32m",
+        "\x1b[1;33m",
+        "\x1b[1;31m",
+        "\x1b[2m",
+    ):
+        assert color_sequence not in rendered
     assert stderr.getvalue() == ""
 
 

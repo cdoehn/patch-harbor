@@ -151,6 +151,7 @@ def preflight_patch_package_repository(
     output_directory: Path | None = None,
     session: RunSession | None = None,
     dry_run: bool = True,
+    presentation: DashboardPresentation | None = None,
 ) -> Iterator[ApplyMutationGate]:
     """Yield the explicit mutation gate while private inputs and locks live."""
     actual_session = session or RunSession.start()
@@ -172,6 +173,16 @@ def preflight_patch_package_repository(
                 error=error,
             )
             raise report.reported_error() from error
+
+        if presentation is not None:
+            presentation.update_repository(
+                repository_name=str(resolved.repository),
+                repository_context=(
+                    f"repo_id: {resolved.repo_id} · "
+                    f"base: {str(resolved.context.base_commit)[:12]} · "
+                    f"state: {resolved.context.state_fingerprint}"
+                ),
+            )
 
         if not resolved.matches_manifest_state(manifest):
             error = state_mismatch_error(
@@ -210,6 +221,18 @@ def preflight_patch_package_repository(
                 )
                 raise report.reported_error() from error
 
+            if presentation is not None:
+                presentation.begin_script(
+                    script_name=package.entrypoint.relative_path,
+                    script_index=1,
+                    script_total=1,
+                    messages=tuple(
+                        (message.name, message.text)
+                        for message in prepared_package.entrypoint.script.messages
+                    ),
+                    warnings=prepared_package.warnings,
+                )
+
             yield ApplyMutationGate(
                 session=actual_session,
                 resolved=resolved,
@@ -224,6 +247,7 @@ def dry_run_patch_package(
     *,
     output_directory: Path | None = None,
     session: RunSession | None = None,
+    presentation: DashboardPresentation | None = None,
 ) -> RunReport:
     """Complete one safe dry-run and publish its unchanged Result Bundle."""
     actual_session = session or RunSession.start()
@@ -232,6 +256,7 @@ def dry_run_patch_package(
         output_directory=output_directory,
         session=actual_session,
         dry_run=True,
+        presentation=presentation,
     ) as mutation_gate:
         report = _complete_mutation_result_bundle(
             mutation_gate,
@@ -296,6 +321,7 @@ def apply_patch_package(
     timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
     output: OutputTargets | None = None,
     session: RunSession | None = None,
+    presentation: DashboardPresentation | None = None,
 ) -> RunReport:
     """Write one validated package, run its private entrypoint, and bundle it."""
     actual_session = session or RunSession.start()
@@ -304,6 +330,7 @@ def apply_patch_package(
         output_directory=output_directory,
         session=actual_session,
         dry_run=False,
+        presentation=presentation,
     ) as mutation_gate:
         _require_payload_mutation(mutation_gate)
         prepared_package = mutation_gate.prepared_package
