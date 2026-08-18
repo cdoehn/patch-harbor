@@ -12,15 +12,13 @@ from typing import Any, TextIO
 
 from patchharbor import __version__
 from patchharbor.application import (
-    apply_patch_package,
     bundle_repository,
-    dry_run_patch_package,
     register_repository,
     registered_repositories,
     repository_context,
+    run_apply_path,
     run_script_path,
     run_standard_input,
-    resolve_patch_package,
     unregister_repository,
 )
 from patchharbor.context_output import context_json_result, write_context_block
@@ -28,14 +26,14 @@ from patchharbor.errors import (
     ExitCode,
     PatchHarborError,
     format_tool_message,
-    format_tool_warning,
 )
 from patchharbor.execution import DEFAULT_TIMEOUT_SECONDS
 from patchharbor.json_document import serialize_json_document
 from patchharbor.output import OutputTargets
 from patchharbor.platform.errors import describe_os_error
 from patchharbor.presentation import (
-    PresentedFile,
+    PresentedCompletion,
+    PresentedStatus,
     SanitizedTextStream,
     TerminalDashboard,
     terminal_supports_dashboard,
@@ -44,10 +42,8 @@ from patchharbor.run_log import temporary_run_log
 from patchharbor.run_report import (
     ResultBundleStatus,
     RunReport,
-    RunSession,
     physical_absolute_path_text,
     sanitize_structured_text,
-    unresolved_apply_report,
 )
 
 
@@ -586,6 +582,29 @@ def _bundle_command(
     return 0
 
 
+def _presented_completion(
+    *,
+    exit_code: int,
+    tool_error: str | None,
+    log_path: Path | None = None,
+    result_path: Path | None = None,
+) -> PresentedCompletion:
+    """Choose one completion state before crossing into presentation."""
+    if tool_error is not None:
+        status = PresentedStatus.ERROR
+    elif exit_code == 0:
+        status = PresentedStatus.SUCCESS
+    else:
+        status = PresentedStatus.FAILED
+    return PresentedCompletion(
+        status=status,
+        exit_code=exit_code,
+        detail=tool_error,
+        log_path=log_path,
+        result_path=result_path,
+    )
+
+
 def _apply_command(
     path: Path,
     *,
@@ -598,111 +617,57 @@ def _apply_command(
     stdout: TextIO,
     stderr: TextIO,
 ) -> int:
-    session = RunSession.start()
     visible_stdout = stdout if json_output else SanitizedTextStream(stdout)
     visible_stderr = SanitizedTextStream(stderr)
-    try:
-        package = resolve_patch_package(path)
-    except PatchHarborError as exc:
-        report = unresolved_apply_report(
-            session=session,
-            dry_run=dry_run,
-            error=exc,
+    dashboard = (
+        TerminalDashboard(stdout, color_enabled=not no_color)
+        if (
+            not json_output
+            and not force_plain
+            and terminal_supports_dashboard(stdout)
         )
-        return _write_apply_completion(
-            report,
-            json_output=json_output,
-            stdout=visible_stdout,
-            stderr=visible_stderr,
+        else None
+    )
+
+    if json_output:
+        output = OutputTargets(visible_text_stream=StringIO())
+    elif dashboard is not None:
+        output = OutputTargets(
+            visible_text_stream=stdout,
+            line_observer=dashboard.update_output,
+        )
+    else:
+        output = OutputTargets(
+            visible_text_stream=visible_stdout,
+            live_text_stream=visible_stdout,
+            warning_text_stream=visible_stderr,
         )
 
-    dashboard: TerminalDashboard | None = None
-    if (
-        not json_output
-        and not force_plain
-        and terminal_supports_dashboard(stdout)
-    ):
-        dashboard = TerminalDashboard(stdout, color_enabled=not no_color)
+    try:
         try:
-            dashboard.begin_request(
-                source_name=str(path),
-                repository_name="resolving…",
-                repository_context=f"repo_id: {package.manifest.repo_id}",
-                bundle_files=(
-                    PresentedFile(
-                        name=package.entrypoint.relative_path,
-                        size_bytes=len(package.entrypoint.content),
-                        kind="entrypoint",
-                    ),
-                    *(
-                        PresentedFile(
-                            name=payload.relative_path,
-                            size_bytes=len(payload.content),
-                            kind="payload",
-                        )
-                        for payload in package.payloads
-                    ),
-                ),
-                script_total=1,
-                warnings=package.warnings,
+            report = run_apply_path(
+                path,
+                dry_run=dry_run,
+                timeout_seconds=timeout_seconds,
+                output_directory=output_directory,
+                output=output,
+                presentation=dashboard,
             )
         except OSError as exc:
+            operation = (
+                "cannot render terminal dashboard"
+                if dashboard is not None
+                else "cannot write PatchHarbor output"
+            )
             print(
                 format_tool_message(
-                    "cannot render terminal dashboard: "
-                    f"{describe_os_error(exc)}"
+                    f"{operation}: {describe_os_error(exc)}"
                 ),
                 file=visible_stderr,
             )
             return int(ExitCode.EXECUTION_ERROR)
 
-    if dashboard is None:
-        for warning in package.warnings:
-            print(format_tool_warning(warning), file=visible_stderr)
-
-    try:
-        try:
-            if dry_run:
-                report = dry_run_patch_package(
-                    package,
-                    output_directory=output_directory,
-                    session=session,
-                    presentation=dashboard,
-                )
-            else:
-                if json_output:
-                    output = OutputTargets(visible_text_stream=StringIO())
-                elif dashboard is not None:
-                    output = OutputTargets(
-                        visible_text_stream=stdout,
-                        line_observer=dashboard.update_output,
-                    )
-                else:
-                    output = OutputTargets(
-                        visible_text_stream=visible_stdout,
-                        live_text_stream=visible_stdout,
-                    )
-                report = apply_patch_package(
-                    package,
-                    output_directory=output_directory,
-                    timeout_seconds=timeout_seconds,
-                    output=output,
-                    session=session,
-                    presentation=dashboard,
-                )
-        except PatchHarborError as exc:
-            report = exc.run_report if isinstance(exc.run_report, RunReport) else None
-            if report is None:
-                report = unresolved_apply_report(
-                    session=session,
-                    dry_run=dry_run,
-                    warnings=package.warnings,
-                    error=exc,
-                )
-
-        if dashboard is None:
-            for warning in report.warnings[len(package.warnings) :]:
-                print(format_tool_warning(warning), file=visible_stderr)
+        if dashboard is None or not dashboard.started:
             return _write_apply_completion(
                 report,
                 json_output=json_output,
@@ -713,10 +678,13 @@ def _apply_command(
         tool_error = report.completion_tool_error
         try:
             dashboard.finish(
-                exit_code=report.process_exit_code,
-                tool_error=None if tool_error is None else tool_error.message,
-                log_path=None,
-                result_path=report.result_bundle.path,
+                _presented_completion(
+                    exit_code=report.process_exit_code,
+                    tool_error=(
+                        None if tool_error is None else tool_error.message
+                    ),
+                    result_path=report.result_bundle.path,
+                )
             )
         except OSError as exc:
             print(
@@ -878,9 +846,11 @@ def _run_command(
         if dashboard_active:
             try:
                 dashboard.finish(
-                    exit_code=exit_code,
-                    tool_error=tool_error,
-                    log_path=log_path,
+                    _presented_completion(
+                        exit_code=exit_code,
+                        tool_error=tool_error,
+                        log_path=log_path,
+                    )
                 )
             except OSError as exc:
                 print(

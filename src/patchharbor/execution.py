@@ -52,7 +52,7 @@ def execute_script_text(
             script_text,
             suffix=resolved.spec.script_suffix,
         ) as script_path:
-            return _execute_staged_script(
+            result = _run_staged_script(
                 script_path,
                 interpreter=resolved.spec,
                 executable_path=resolved.executable_path,
@@ -60,6 +60,7 @@ def execute_script_text(
                 timeout_seconds=timeout_seconds,
                 output=output,
             )
+            return result.exit_code_or_raise()
     except PatchHarborError:
         raise
     except OSError as exc:
@@ -144,6 +145,14 @@ class ScriptExecutionResult:
             output=self.output,
         )
 
+    def exit_code_or_raise(self) -> int:
+        """Expose the legacy manual-runner contract from the shared outcome."""
+        if self.patchharbor_error is not None:
+            raise self.patchharbor_error
+        if self.entrypoint_exit_code is None:
+            raise RuntimeError("completed script execution has no exit code")
+        return self.entrypoint_exit_code
+
 
 def _read_execution_log(execution_log: BinaryIO) -> bytes:
     """Read one binary execution log after the process lifecycle has ended."""
@@ -182,28 +191,17 @@ def execute_prepared_script_with_log(
 
     result: ScriptExecutionResult | None = None
     try:
-        try:
-            exit_code = _execute_staged_script(
-                script_path,
-                interpreter=interpreter.spec,
-                executable_path=interpreter.executable_path,
-                cwd=cwd,
-                timeout_seconds=timeout_seconds,
-                output=replace(
-                    targets,
-                    raw_output_stream=execution_log,
-                ),
-            )
-        except PatchHarborError as error:
-            result = ScriptExecutionResult.failed(
-                error,
-                output=b"",
-                entrypoint_started=(
-                    error.exit_code is not ExitCode.INTERPRETER_ERROR
-                ),
-            )
-        else:
-            result = ScriptExecutionResult.exited(exit_code, b"")
+        result = _run_staged_script(
+            script_path,
+            interpreter=interpreter.spec,
+            executable_path=interpreter.executable_path,
+            cwd=cwd,
+            timeout_seconds=timeout_seconds,
+            output=replace(
+                targets,
+                raw_output_stream=execution_log,
+            ),
+        )
 
         try:
             result = result.with_output(_read_execution_log(execution_log))
@@ -238,7 +236,37 @@ def _finish_capture_after_process_error(capture: ProcessOutputCapture) -> None:
         pass
 
 
-def _execute_staged_script(
+def _run_staged_script(
+    script_path: Path,
+    *,
+    interpreter: InterpreterSpec,
+    executable_path: str,
+    cwd: Path,
+    timeout_seconds: float,
+    output: OutputTargets | None = None,
+) -> ScriptExecutionResult:
+    """Return one shared outcome for manual and repository-bound execution."""
+    try:
+        exit_code = _control_process(
+            script_path,
+            interpreter=interpreter,
+            executable_path=executable_path,
+            cwd=cwd,
+            timeout_seconds=timeout_seconds,
+            output=output,
+        )
+    except PatchHarborError as error:
+        return ScriptExecutionResult.failed(
+            error,
+            entrypoint_started=(
+                error.exit_code is not ExitCode.INTERPRETER_ERROR
+            ),
+            output=b"",
+        )
+    return ScriptExecutionResult.exited(exit_code, b"")
+
+
+def _control_process(
     script_path: Path,
     *,
     interpreter: InterpreterSpec,

@@ -5,12 +5,16 @@ from pathlib import Path
 import time
 import unicodedata
 
+import pytest
+
 from patchharbor.application import run_script_path
 from patchharbor.output import OutputTargets
 from patchharbor.presentation import (
     DASHBOARD_MIN_WIDTH,
     DashboardSnapshot,
+    PresentedCompletion,
     PresentedFile,
+    PresentedStatus,
     SanitizedTextStream,
     TerminalDashboard,
     render_dashboard,
@@ -38,13 +42,7 @@ class _RecordingPresentation:
     ) -> None:
         return None
 
-    def finish(
-        self,
-        *,
-        exit_code: int,
-        tool_error: str | None,
-        log_path: Path | None,
-    ) -> None:
+    def finish(self, completion: PresentedCompletion) -> None:
         return None
 
     def close(self) -> None:
@@ -72,6 +70,25 @@ class _CountingTerminal(_EncodedTerminal):
     def flush(self) -> None:
         self.flush_count += 1
         super().flush()
+
+
+def test_presented_completion_requires_a_consistent_decided_state() -> None:
+    PresentedCompletion(status=PresentedStatus.SUCCESS, exit_code=0)
+    PresentedCompletion(status=PresentedStatus.FAILED, exit_code=3)
+    PresentedCompletion(
+        status=PresentedStatus.ERROR,
+        exit_code=7,
+        detail="tool failure",
+    )
+
+    with pytest.raises(ValueError):
+        PresentedCompletion(status="success", exit_code=0)  # type: ignore[arg-type]
+    with pytest.raises(ValueError):
+        PresentedCompletion(status=PresentedStatus.SUCCESS, exit_code=1)
+    with pytest.raises(ValueError):
+        PresentedCompletion(status=PresentedStatus.FAILED, exit_code=0)
+    with pytest.raises(ValueError):
+        PresentedCompletion(status=PresentedStatus.ERROR, exit_code=7)
 
 
 def _wait_until(predicate, *, timeout_seconds: float = 1.0) -> None:
@@ -281,7 +298,9 @@ def test_dashboard_restores_cursor_and_color_after_final_frame() -> None:
         bundle_files=(),
         script_total=1,
     )
-    dashboard.finish(exit_code=0, tool_error=None, log_path=None)
+    dashboard.finish(
+        PresentedCompletion(status=PresentedStatus.SUCCESS, exit_code=0)
+    )
     dashboard.close()
 
     rendered = stream.getvalue()

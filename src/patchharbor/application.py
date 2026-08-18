@@ -151,6 +151,7 @@ def preflight_patch_package_repository(
     output_directory: Path | None = None,
     session: RunSession | None = None,
     dry_run: bool = True,
+    output: OutputTargets | None = None,
     presentation: DashboardPresentation | None = None,
 ) -> Iterator[ApplyMutationGate]:
     """Yield the explicit mutation gate while private inputs and locks live."""
@@ -221,6 +222,9 @@ def preflight_patch_package_repository(
                 )
                 raise report.reported_error() from error
 
+            if output is not None:
+                output.write_warnings(prepared_package.warnings)
+
             if presentation is not None:
                 presentation.begin_script(
                     script_name=package.entrypoint.relative_path,
@@ -246,6 +250,7 @@ def dry_run_patch_package(
     package: ValidatedPatchPackage,
     *,
     output_directory: Path | None = None,
+    output: OutputTargets | None = None,
     session: RunSession | None = None,
     presentation: DashboardPresentation | None = None,
 ) -> RunReport:
@@ -256,6 +261,7 @@ def dry_run_patch_package(
         output_directory=output_directory,
         session=actual_session,
         dry_run=True,
+        output=output,
         presentation=presentation,
     ) as mutation_gate:
         report = _complete_mutation_result_bundle(
@@ -330,6 +336,7 @@ def apply_patch_package(
         output_directory=output_directory,
         session=actual_session,
         dry_run=False,
+        output=output,
         presentation=presentation,
     ) as mutation_gate:
         _require_payload_mutation(mutation_gate)
@@ -343,6 +350,82 @@ def apply_patch_package(
             output=output,
         )
         return _complete_entrypoint_execution(mutation_gate, execution)
+
+
+def run_apply_path(
+    path: Path,
+    *,
+    dry_run: bool,
+    output_directory: Path | None = None,
+    timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
+    output: OutputTargets | None = None,
+    session: RunSession | None = None,
+    presentation: DashboardPresentation | None = None,
+) -> RunReport:
+    """Run one Apply request through a single public application boundary."""
+    actual_session = session or RunSession.start()
+    try:
+        package = resolve_patch_package(path)
+    except PatchHarborError as error:
+        return unresolved_apply_report(
+            session=actual_session,
+            dry_run=dry_run,
+            error=error,
+        )
+
+    if presentation is not None:
+        presentation.begin_request(
+            source_name=str(path),
+            repository_name="resolving…",
+            repository_context=f"repo_id: {package.manifest.repo_id}",
+            bundle_files=(
+                PresentedFile(
+                    name=package.entrypoint.relative_path,
+                    size_bytes=len(package.entrypoint.content),
+                    kind="entrypoint",
+                ),
+                *(
+                    PresentedFile(
+                        name=payload.relative_path,
+                        size_bytes=len(payload.content),
+                        kind="payload",
+                    )
+                    for payload in package.payloads
+                ),
+            ),
+            script_total=1,
+            warnings=package.warnings,
+        )
+    if output is not None:
+        output.write_warnings(package.warnings)
+
+    try:
+        if dry_run:
+            return dry_run_patch_package(
+                package,
+                output_directory=output_directory,
+                output=output,
+                session=actual_session,
+                presentation=presentation,
+            )
+        return apply_patch_package(
+            package,
+            output_directory=output_directory,
+            timeout_seconds=timeout_seconds,
+            output=output,
+            session=actual_session,
+            presentation=presentation,
+        )
+    except PatchHarborError as error:
+        report = error.run_report
+        if isinstance(report, RunReport):
+            return report
+        return unresolved_apply_report(
+            session=actual_session,
+            dry_run=dry_run,
+            warnings=package.warnings,
+            error=error,
+        )
 
 
 def register_repository(

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
+from enum import Enum
 from pathlib import Path
 import os
 import shutil
@@ -33,6 +34,39 @@ _YELLOW = "\x1b[1;33m"
 _RED = "\x1b[1;31m"
 _DIM = "\x1b[2m"
 _DASHBOARD_GLYPHS = "┌─┐│├┤└┘…"
+
+
+class PresentedStatus(str, Enum):
+    """Presentation-only completion state chosen by the application boundary."""
+
+    SUCCESS = "success"
+    FAILED = "failed"
+    ERROR = "error"
+
+
+@dataclass(frozen=True, slots=True)
+class PresentedCompletion:
+    """Fully decided completion data rendered without business decisions."""
+
+    status: PresentedStatus
+    exit_code: int
+    detail: str | None = None
+    log_path: Path | None = None
+    result_path: Path | None = None
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.status, PresentedStatus):
+            raise ValueError("presented status must be a PresentedStatus")
+        if isinstance(self.exit_code, bool) or not isinstance(self.exit_code, int):
+            raise ValueError("presented exit code must be an integer")
+        if self.status is PresentedStatus.SUCCESS and self.exit_code != 0:
+            raise ValueError("presented success requires exit code zero")
+        if self.status is not PresentedStatus.SUCCESS and self.exit_code == 0:
+            raise ValueError("presented failure requires a nonzero exit code")
+        if self.status is PresentedStatus.ERROR and self.detail is None:
+            raise ValueError("presented error requires a detail")
+        if self.status is not PresentedStatus.ERROR and self.detail is not None:
+            raise ValueError("only a presented error may carry a detail")
 
 
 @dataclass(frozen=True, slots=True)
@@ -111,15 +145,8 @@ class DashboardPresentation(Protocol):
     ) -> None:
         """Update the bounded execution output without rendering immediately."""
 
-    def finish(
-        self,
-        *,
-        exit_code: int,
-        tool_error: str | None,
-        log_path: Path | None,
-        result_path: Path | None = None,
-    ) -> None:
-        """Stop periodic redraw, render the final state, and restore the terminal."""
+    def finish(self, completion: PresentedCompletion) -> None:
+        """Render one already-decided completion and restore the terminal."""
 
     def close(self) -> None:
         """Restore terminal state without masking an active application error."""
@@ -655,27 +682,25 @@ class TerminalDashboard:
                 discarded_output_lines=discarded_line_count,
             )
 
-    def finish(
-        self,
-        *,
-        exit_code: int,
-        tool_error: str | None,
-        log_path: Path | None,
-        result_path: Path | None = None,
-    ) -> None:
+    def finish(self, completion: PresentedCompletion) -> None:
         if not self._started or self._closed:
             return
-        status = "error" if tool_error is not None else (
-            "success" if exit_code == 0 else "failed"
-        )
         with self._state_lock:
             self._state = replace(
                 self._state,
-                status=status,
-                exit_code=exit_code,
-                tool_error=tool_error,
-                log_path=None if log_path is None else str(log_path),
-                result_path=None if result_path is None else str(result_path),
+                status=completion.status.value,
+                exit_code=completion.exit_code,
+                tool_error=completion.detail,
+                log_path=(
+                    None
+                    if completion.log_path is None
+                    else str(completion.log_path)
+                ),
+                result_path=(
+                    None
+                    if completion.result_path is None
+                    else str(completion.result_path)
+                ),
             )
         self._stop_loop()
         self._render_now(force=True)

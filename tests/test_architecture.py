@@ -907,3 +907,33 @@ def test_apply_execution_has_one_structured_outcome_and_cleanup_path() -> None:
     assert "from_execution_error" not in run_report_source
     assert "poll_process_until_exit(" in windows_source
     assert "CTRL_BREAK_EVENT" not in windows_source
+
+
+def test_apply_cli_uses_one_public_application_boundary() -> None:
+    source = (PACKAGE_ROOT / "cli.py").read_text(encoding="utf-8")
+
+    assert "run_apply_path(" in source
+    assert "resolve_patch_package(" not in source
+    assert "dry_run_patch_package(" not in source
+    assert "apply_patch_package(" not in source
+    assert "package.manifest" not in source
+    assert "package.payloads" not in source
+
+
+def test_manual_and_apply_execution_share_one_structured_process_outcome() -> None:
+    source = (PACKAGE_ROOT / "execution.py").read_text(encoding="utf-8")
+
+    assert source.count("ProcessOutputCapture(") == 1
+    assert source.count("_run_staged_script(") == 3
+    assert "return result.exit_code_or_raise()" in source
+    assert "result = _run_staged_script(" in source
+    assert source.count("create_process_tree(") == 1
+
+
+def test_presentation_receives_an_already_decided_completion() -> None:
+    source = (PACKAGE_ROOT / "presentation.py").read_text(encoding="utf-8")
+
+    assert "class PresentedCompletion" in source
+    assert "def finish(self, completion: PresentedCompletion)" in source
+    assert "status=completion.status.value" in source
+    assert 'status = "error" if tool_error is not None' not in source

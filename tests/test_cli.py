@@ -23,20 +23,6 @@ class _TerminalOutput(StringIO):
         return True
 
 
-def _fake_apply_package() -> SimpleNamespace:
-    return SimpleNamespace(
-        manifest=SimpleNamespace(repo_id="11111111-1111-4111-8111-111111111111"),
-        warnings=(),
-        entrypoint=SimpleNamespace(
-            relative_path="run.sh",
-            content=b"# PATCHHARBOR\n",
-        ),
-        payloads=(
-            SimpleNamespace(relative_path="files/data.bin", content=b"data"),
-        ),
-    )
-
-
 def test_version_flag_reports_release_version(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
@@ -118,9 +104,7 @@ def test_apply_plain_sanitizes_child_output_without_dashboard(
     stderr = StringIO()
     report = SimpleNamespace(warnings=())
 
-    monkeypatch.setattr(cli, "resolve_patch_package", lambda _path: _fake_apply_package())
-
-    def fake_apply_patch_package(_package: object, **options: object) -> object:
+    def fake_run_apply_path(_path: Path, **options: object) -> object:
         assert options["presentation"] is None
         output = options["output"]
         assert isinstance(output, OutputTargets)
@@ -129,7 +113,7 @@ def test_apply_plain_sanitizes_child_output_without_dashboard(
         output.live_text_stream.write("safe\x1b[31m-red\x1b[0m\x08\n")
         return report
 
-    monkeypatch.setattr(cli, "apply_patch_package", fake_apply_patch_package)
+    monkeypatch.setattr(cli, "run_apply_path", fake_run_apply_path)
     monkeypatch.setattr(
         cli,
         "_write_apply_completion",
@@ -154,7 +138,7 @@ def test_apply_returns_tool_error_when_dashboard_cannot_start(
 ) -> None:
     stdout = _TerminalOutput()
     stderr = StringIO()
-    apply_called = False
+    application_continued = False
 
     class BrokenDashboard:
         def __init__(self, *_args: object, **_kwargs: object) -> None:
@@ -163,18 +147,26 @@ def test_apply_returns_tool_error_when_dashboard_cannot_start(
         def begin_request(self, **_values: object) -> None:
             raise OSError("dashboard unavailable")
 
+        def update_output(self, *_values: object) -> None:
+            raise AssertionError("output must not be observed before begin_request")
+
         def close(self) -> None:
             pass
 
-    def unexpected_apply(*_args: object, **_kwargs: object) -> object:
-        nonlocal apply_called
-        apply_called = True
-        raise AssertionError("apply must not start")
+    def fake_run_apply_path(_path: Path, **options: object) -> object:
+        nonlocal application_continued
+        presentation = options["presentation"]
+        presentation.begin_request(
+            source_name="patch.zip",
+            bundle_files=(),
+            script_total=1,
+        )
+        application_continued = True
+        raise AssertionError("application continued after presentation failure")
 
     monkeypatch.setattr(cli, "terminal_supports_dashboard", lambda _stream: True)
     monkeypatch.setattr(cli, "TerminalDashboard", BrokenDashboard)
-    monkeypatch.setattr(cli, "resolve_patch_package", lambda _path: _fake_apply_package())
-    monkeypatch.setattr(cli, "apply_patch_package", unexpected_apply)
+    monkeypatch.setattr(cli, "run_apply_path", fake_run_apply_path)
 
     result = main(
         ["apply", str(tmp_path / "patch.zip")],
@@ -183,7 +175,7 @@ def test_apply_returns_tool_error_when_dashboard_cannot_start(
     )
 
     assert result == 7
-    assert not apply_called
+    assert not application_continued
     assert "\x1b" not in stdout.getvalue()
 
 
@@ -205,15 +197,21 @@ def test_apply_tty_uses_repository_dashboard_without_color(
     )
 
     monkeypatch.setattr(cli, "terminal_supports_dashboard", lambda _stream: True)
-    monkeypatch.setattr(cli, "resolve_patch_package", lambda _path: _fake_apply_package())
 
-    def fake_apply_patch_package(_package: object, **options: object) -> object:
+    def fake_run_apply_path(_path: Path, **options: object) -> object:
         presentation = options["presentation"]
         output = options["output"]
         assert presentation is not None
         assert isinstance(output, OutputTargets)
         assert output.live_text_stream is None
         assert output.line_observer is not None
+        presentation.begin_request(
+            source_name="patch.zip",
+            repository_name="resolving…",
+            repository_context="repo_id: 1111",
+            bundle_files=(),
+            script_total=1,
+        )
         presentation.update_repository(
             repository_name="/work/repository",
             repository_context="repo_id: 1111 · base: abcdef · state: 0123",
@@ -228,7 +226,7 @@ def test_apply_tty_uses_repository_dashboard_without_color(
         output.line_observer(("visible\x1b[31m-red\x1b[0m\n",), 0)
         return report
 
-    monkeypatch.setattr(cli, "apply_patch_package", fake_apply_patch_package)
+    monkeypatch.setattr(cli, "run_apply_path", fake_run_apply_path)
 
     result = main(
         ["apply", "--no-color", str(tmp_path / "patch.zip")],
