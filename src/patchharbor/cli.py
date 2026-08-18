@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 import argparse
-from collections.abc import Sequence
-from contextlib import nullcontext
+from collections.abc import Callable, Iterator, Sequence
+from contextlib import contextmanager, nullcontext
 from io import StringIO
 from pathlib import Path
 import sys
-from typing import Any, TextIO
+from typing import Any, BinaryIO, TextIO
 
 from patchharbor import __version__
 from patchharbor.application import (
@@ -470,37 +470,18 @@ def _context_command(
 
 
 def _write_emergency_diagnostics_notice(
-    error: PatchHarborError,
+    path: Path | None,
+    *,
+    failed: bool,
     stderr: TextIO,
 ) -> None:
-    if error.emergency_diagnostics_path is not None:
+    """Expose one best-effort diagnostics outcome without duplicating wording."""
+    if path is not None:
         print(
-            format_tool_message(
-                f"emergency diagnostics: {error.emergency_diagnostics_path}"
-            ),
+            format_tool_message(f"emergency diagnostics: {path}"),
             file=stderr,
         )
-    elif error.emergency_diagnostics_failed:
-        print(
-            format_tool_message("emergency diagnostics could not be saved"),
-            file=stderr,
-        )
-
-
-def _write_report_emergency_diagnostics_notice(
-    report: RunReport,
-    stderr: TextIO,
-) -> None:
-    """Expose failed bundle rescue for a normal nonzero entrypoint exit."""
-    if report.result_bundle.status is not ResultBundleStatus.FAILED:
-        return
-    emergency_path = report.result_bundle.emergency_diagnostics_path
-    if emergency_path is not None:
-        print(
-            format_tool_message(f"emergency diagnostics: {emergency_path}"),
-            file=stderr,
-        )
-    else:
+    elif failed:
         print(
             format_tool_message("emergency diagnostics could not be saved"),
             file=stderr,
@@ -532,7 +513,11 @@ def _write_apply_completion(
             print(f"run_id: {report.run_id_text}", file=stdout)
             print(f"repository_path: {report.resolved_repository}", file=stdout)
             print(f"result_bundle_path: {report.result_bundle.path}", file=stdout)
-    _write_report_emergency_diagnostics_notice(report, stderr)
+    _write_emergency_diagnostics_notice(
+        report.result_bundle.emergency_diagnostics_path,
+        failed=report.result_bundle.status is ResultBundleStatus.FAILED,
+        stderr=stderr,
+    )
     return report.process_exit_code
 
 
@@ -563,7 +548,11 @@ def _bundle_command(
             )
         else:
             print(format_tool_message(str(exc)), file=stderr)
-        _write_emergency_diagnostics_notice(exc, stderr)
+        _write_emergency_diagnostics_notice(
+            exc.emergency_diagnostics_path,
+            failed=exc.emergency_diagnostics_failed,
+            stderr=stderr,
+        )
         return exit_code
 
     if json_output:
@@ -605,6 +594,54 @@ def _presented_completion(
     )
 
 
+@contextmanager
+def _dashboard_scope(
+    stdout: TextIO,
+    *,
+    enabled: bool,
+    color_enabled: bool,
+) -> Iterator[TerminalDashboard | None]:
+    """Own one optional dashboard and its single terminal-cleanup path."""
+    dashboard = (
+        TerminalDashboard(stdout, color_enabled=color_enabled)
+        if enabled and terminal_supports_dashboard(stdout)
+        else None
+    )
+    try:
+        yield dashboard
+    finally:
+        if dashboard is not None:
+            dashboard.close()
+
+
+def _output_targets_for_presentation(
+    *,
+    visible_stdout: TextIO,
+    visible_stderr: TextIO,
+    dashboard: TerminalDashboard | None,
+    suppress_visible_output: bool = False,
+    raw_output_stream: BinaryIO | None = None,
+    warning_observer: Callable[[str], None] | None = None,
+) -> OutputTargets:
+    """Route output once for JSON, dashboard, or plain presentation."""
+    if suppress_visible_output:
+        return OutputTargets(
+            visible_text_stream=StringIO(),
+            raw_output_stream=raw_output_stream,
+            warning_observer=warning_observer,
+        )
+    return OutputTargets(
+        visible_text_stream=visible_stdout,
+        live_text_stream=(None if dashboard is not None else visible_stdout),
+        raw_output_stream=raw_output_stream,
+        warning_text_stream=(None if dashboard is not None else visible_stderr),
+        warning_observer=warning_observer,
+        line_observer=(
+            None if dashboard is None else dashboard.update_output
+        ),
+    )
+
+
 def _apply_command(
     path: Path,
     *,
@@ -619,31 +656,17 @@ def _apply_command(
 ) -> int:
     visible_stdout = stdout if json_output else SanitizedTextStream(stdout)
     visible_stderr = SanitizedTextStream(stderr)
-    dashboard = (
-        TerminalDashboard(stdout, color_enabled=not no_color)
-        if (
-            not json_output
-            and not force_plain
-            and terminal_supports_dashboard(stdout)
+    with _dashboard_scope(
+        stdout,
+        enabled=not json_output and not force_plain,
+        color_enabled=not no_color,
+    ) as dashboard:
+        output = _output_targets_for_presentation(
+            visible_stdout=visible_stdout,
+            visible_stderr=visible_stderr,
+            dashboard=dashboard,
+            suppress_visible_output=json_output,
         )
-        else None
-    )
-
-    if json_output:
-        output = OutputTargets(visible_text_stream=StringIO())
-    elif dashboard is not None:
-        output = OutputTargets(
-            visible_text_stream=stdout,
-            line_observer=dashboard.update_output,
-        )
-    else:
-        output = OutputTargets(
-            visible_text_stream=visible_stdout,
-            live_text_stream=visible_stdout,
-            warning_text_stream=visible_stderr,
-        )
-
-    try:
         try:
             report = run_apply_path(
                 path,
@@ -694,11 +717,12 @@ def _apply_command(
                 file=visible_stderr,
             )
             return int(ExitCode.EXECUTION_ERROR)
-        _write_report_emergency_diagnostics_notice(report, visible_stderr)
+        _write_emergency_diagnostics_notice(
+            report.result_bundle.emergency_diagnostics_path,
+            failed=report.result_bundle.status is ResultBundleStatus.FAILED,
+            stderr=visible_stderr,
+        )
         return report.process_exit_code
-    finally:
-        if dashboard is not None:
-            dashboard.close()
 
 
 def _unregister_command(
@@ -775,18 +799,16 @@ def _run_command(
         parser.error("PATH is required when standard input is a terminal")
 
     cwd = Path.cwd()
-    plain_output = force_plain or not terminal_supports_dashboard(stdout)
-    dashboard = (
-        None
-        if plain_output
-        else TerminalDashboard(stdout, color_enabled=not no_color)
-    )
     log_context = temporary_run_log() if log_enabled else nullcontext(None)
     log_path: Path | None = None
     exit_code = 0
     tool_error: str | None = None
 
-    try:
+    with _dashboard_scope(
+        stdout,
+        enabled=not force_plain,
+        color_enabled=not no_color,
+    ) as dashboard:
         try:
             with log_context as run_log:
                 if run_log is not None:
@@ -799,18 +821,15 @@ def _run_command(
                         timeout_seconds=timeout_seconds,
                     )
 
-                output = OutputTargets(
-                    visible_text_stream=stdout,
-                    live_text_stream=(stdout if plain_output else None),
+                output = _output_targets_for_presentation(
+                    visible_stdout=stdout,
+                    visible_stderr=stderr,
+                    dashboard=dashboard,
                     raw_output_stream=(
                         None if run_log is None else run_log.raw_output_stream
                     ),
-                    warning_text_stream=(stderr if plain_output else None),
                     warning_observer=(
                         None if run_log is None else run_log.write_warning
-                    ),
-                    line_observer=(
-                        None if dashboard is None else dashboard.update_output
                     ),
                 )
                 try:
@@ -842,8 +861,7 @@ def _run_command(
             )
             exit_code = int(ExitCode.EXECUTION_ERROR)
 
-        dashboard_active = dashboard is not None and dashboard.started
-        if dashboard_active:
+        if dashboard is not None and dashboard.started:
             try:
                 dashboard.finish(
                     _presented_completion(
@@ -868,9 +886,6 @@ def _run_command(
                 print(format_tool_message(f"log: {log_path}"), file=stderr)
 
         return exit_code
-    finally:
-        if dashboard is not None:
-            dashboard.close()
 
 
 def main(

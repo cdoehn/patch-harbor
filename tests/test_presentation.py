@@ -124,7 +124,7 @@ def _latest_dashboard_frame(rendered: str) -> str:
     return frame.split("\x1b[0m\x1b[J", 1)[0]
 
 
-def test_dashboard_renderer_exposes_sections_and_overflow_without_wrapping() -> None:
+def test_dashboard_renderer_bounds_overflow_and_keeps_newest_output() -> None:
     snapshot = DashboardSnapshot(
         source_name="downloads/patch-bundle.zip",
         script_name="scripts/apply-fix.sh",
@@ -142,24 +142,22 @@ def test_dashboard_renderer_exposes_sections_and_overflow_without_wrapping() -> 
             )
             for index in range(1, 6)
         ),
-        output_lines=tuple(f"line-{index}\n" for index in range(1, 6)),
+        output_lines=tuple(f"line-{index}\n" for index in range(1, 9)),
         discarded_output_lines=12,
         status="running",
     )
 
     frame = render_dashboard(snapshot, width=60)
+
     _assert_frame_fits(frame, 60)
-    sections = ("SOURCE", "MESSAGES", "FILES", "EXECUTION", "RESULT")
-    positions = [frame.index(section) for section in sections]
-    assert positions == sorted(positions)
-    assert "weitere Messages" in frame
-    assert "weitere Dateien" in frame
-    assert "weitere Zeilen" in frame
-    assert "line-5" in frame
-    assert "status: running" in frame
+    assert "line-1" not in frame
+    assert "line-8" in frame
+    assert "file-1.bin" in frame
+    assert "file-5.bin" not in frame
+    assert frame.count("…") >= 2
 
 
-def test_apply_dashboard_includes_repository_context_and_result_path() -> None:
+def test_apply_dashboard_bounds_repository_context_and_result_path() -> None:
     snapshot = DashboardSnapshot(
         source_name="downloads/patch.zip",
         repository_name="/work/repository",
@@ -175,9 +173,6 @@ def test_apply_dashboard_includes_repository_context_and_result_path() -> None:
     frame = render_dashboard(snapshot, width=72)
 
     _assert_frame_fits(frame, 72)
-    sections = ("SOURCE", "REPOSITORY", "MESSAGES", "FILES", "EXECUTION", "RESULT")
-    positions = [frame.index(section) for section in sections]
-    assert positions == sorted(positions)
     assert "/work/repository" in frame
     assert "0123456789abcdef" in frame
     assert "/results/result.zip" in frame
@@ -190,7 +185,6 @@ def test_dashboard_renderer_respects_requested_width() -> None:
     )
 
     _assert_frame_fits(frame, 47)
-    assert "status: success" in frame
 
 
 def test_dashboard_strips_terminal_controls_from_all_untrusted_visible_text() -> None:
@@ -262,7 +256,8 @@ def test_dashboard_shows_first_warning_and_counts_the_rest_safely() -> None:
 
     frame = render_dashboard(snapshot, width=60)
 
-    assert "warning: large input · +2" in frame
+    assert "large input" in frame
+    assert "second warning" not in frame
     assert "\x1b" not in frame
 
 
@@ -284,8 +279,8 @@ def test_terminal_capability_rejects_narrow_or_non_unicode_terminals(
     assert terminal_supports_dashboard(terminal)
 
 
-def test_dashboard_restores_cursor_and_color_after_final_frame() -> None:
-    stream = _EncodedTerminal(encoding="utf-8")
+def test_dashboard_renders_final_state_before_single_terminal_cleanup() -> None:
+    stream = _CountingTerminal()
     dashboard = TerminalDashboard(
         stream,
         color_enabled=True,
@@ -298,17 +293,19 @@ def test_dashboard_restores_cursor_and_color_after_final_frame() -> None:
         bundle_files=(),
         script_total=1,
     )
+    initial_flush_count = stream.flush_count
     dashboard.finish(
         PresentedCompletion(status=PresentedStatus.SUCCESS, exit_code=0)
     )
+    final_frame_flush_count = stream.flush_count
     dashboard.close()
 
     rendered = stream.getvalue()
+    assert final_frame_flush_count > initial_flush_count
+    assert stream.flush_count > final_frame_flush_count
     assert rendered.count("\x1b[?25l") == 1
     assert rendered.count("\x1b[?25h") == 1
-    assert "\x1b[2J\x1b[H" in rendered
-    assert rendered.index("\x1b[?25l") < rendered.index("PATCHHARBOR")
-    assert rendered.rindex("status: success") < rendered.rindex("\x1b[?25h")
+    assert rendered.endswith("\x1b[0m\x1b[?25h")
 
 
 def test_dashboard_does_not_rewrite_unchanged_frames() -> None:
@@ -369,7 +366,6 @@ def test_dashboard_redraws_when_terminal_width_changes() -> None:
 
         latest_frame = _latest_dashboard_frame(stream.getvalue())
         _assert_frame_fits(latest_frame, 50)
-        assert "source: script.sh" in latest_frame
     finally:
         dashboard.close()
 

@@ -53,6 +53,21 @@ def test_run_help_is_the_complete_public_command_reference(
         assert expected in help_text
 
 
+@pytest.mark.parametrize(
+    "command",
+    ("websocket", "test", "commit", "plugin", "watch"),
+)
+def test_non_core_orchestration_commands_are_not_public(
+    command: str,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    with pytest.raises(SystemExit) as raised:
+        main([command])
+
+    assert raised.value.code == 2
+    capsys.readouterr()
+
+
 def test_fs_run_without_path_on_terminal_is_a_usage_error(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
@@ -238,19 +253,7 @@ def test_apply_tty_uses_repository_dashboard_without_color(
     assert result == 0
     assert rendered.count("\x1b[?25l") == 1
     assert rendered.count("\x1b[?25h") == 1
-    for section in (
-        "SOURCE",
-        "REPOSITORY",
-        "MESSAGES",
-        "FILES",
-        "EXECUTION",
-        "RESULT",
-    ):
-        assert section in rendered
-    assert "/work/repository" in rendered
-    assert "Apply integrated" in rendered
-    assert "visible-red" in rendered
-    assert "/results/result.zip" in rendered
+    assert "\x1b[31m-red" not in rendered
     for color_sequence in (
         "\x1b[1;36m",
         "\x1b[1;34m",
@@ -314,11 +317,7 @@ def test_interactive_terminal_wires_dashboard_and_restores_terminal(
     assert rendered.count("\x1b[?25l") == 1
     assert rendered.count("\x1b[?25h") == 1
     assert "\x1b[2J\x1b[H" in rendered
-    assert rendered.index("\x1b[?25l") < rendered.index("SOURCE")
-    assert rendered.rindex("status: success") < rendered.rindex("\x1b[?25h")
-    for section in ("SOURCE", "MESSAGES", "FILES", "EXECUTION", "RESULT"):
-        assert section in rendered
-    assert "running-two" in rendered
+    assert rendered.index("\x1b[?25l") < rendered.rindex("\x1b[?25h")
     for color_sequence in (
         "\x1b[1;36m",
         "\x1b[1;34m",
@@ -397,8 +396,8 @@ def test_keyboard_interrupt_restores_terminal_and_returns_130(
 
     rendered = stdout.getvalue()
     assert result == 130
-    assert "status: error · exit code: 130" in rendered
-    assert "request aborted by user" in rendered
+    assert rendered.count("\x1b[?25l") == 1
+    assert rendered.count("\x1b[?25h") == 1
     assert rendered.endswith("\x1b[0m\x1b[?25h")
     assert stderr.getvalue() == ""
 

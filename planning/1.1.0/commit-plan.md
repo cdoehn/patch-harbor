@@ -1185,6 +1185,13 @@ Ein selbstbeschreibendes ZIP-Paket kann streng validiert, genau einem registrier
 - sicherstellen, dass PatchHarbor weiterhin ein kontrollierter Runner bleibt.
 - Review im letzten Clean-Commit des Meilensteins abschließen; kein separater Review-Commit.
 
+**Review-Ergebnis nach 5.e.C:**
+
+- Die Definition of Done ist durch Dry-Run, mutierenden Apply, Prozessfehler, Result Bundle sowie Plain-, JSON- und TUI-Betrieb erfüllt.
+- `ApplyMutationGate`, `RunReport` und die gemeinsame Execution-Grenze sind als Core-Vertrag für 1.1.0 eingefroren.
+- PatchHarbor übernimmt weiterhin weder Netzwerktransport noch Zielprojekttests, Git-Commits, Testmanagement oder Plugin-Orchestrierung.
+- Meilenstein 6 ergänzt ausschließlich den separaten Watcher und verändert den endenden Core-Auftrag nicht.
+
 ---
 
 # Meilenstein 6 – Separater PatchHarbor Watcher

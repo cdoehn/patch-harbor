@@ -146,7 +146,7 @@ class DashboardPresentation(Protocol):
         """Update the bounded execution output without rendering immediately."""
 
     def finish(self, completion: PresentedCompletion) -> None:
-        """Render one already-decided completion and restore the terminal."""
+        """Render one already-decided final frame before caller cleanup."""
 
     def close(self) -> None:
         """Restore terminal state without masking an active application error."""
@@ -704,10 +704,8 @@ class TerminalDashboard:
             )
         self._stop_loop()
         self._render_now(force=True)
-        render_error = self._render_error
-        self.close()
-        if render_error is not None:
-            raise OSError(f"cannot render dashboard: {render_error}")
+        if self._render_error is not None:
+            raise OSError(f"cannot render dashboard: {self._render_error}")
 
     def close(self) -> None:
         """Stop redraw and restore terminal controls; safe to call repeatedly."""
