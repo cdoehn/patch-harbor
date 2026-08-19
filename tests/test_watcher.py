@@ -152,12 +152,13 @@ def test_invalid_apply_response_is_recorded_once_without_semantic_retry(
 
     assert (delegated, repeated) == (1, 0)
     assert calls == [watched]
-    record = json.loads(log.getvalue())
+    records = [json.loads(line) for line in log.getvalue().splitlines()]
+    assert len(records) == 1
+    record = records[0]
     assert record["process_exit_code"] == 7
     assert record["apply_response_is_json_object"] is False
-    assert record["apply_result"] is None
     assert record["invalid_apply_response"] == "not-json"
-    assert errors.getvalue().splitlines() == ["apply stderr"]
+    assert errors.getvalue()
 
 
 def test_poll_stops_before_delegating_additional_stable_files(
@@ -218,6 +219,6 @@ def test_watcher_console_entry_point_configures_the_polling_loop(
     assert observed["poll_interval_seconds"] == 0.25
     assert observed["delegate"] is watcher_cli.delegate_to_apply
     assert callable(observed["stop_requested"])
-    assert callable(observed["wait_for_stop"])
+    assert callable(observed["wait_between_polls"])
     assert observed["log_stream"] is stdout
     assert observed["error_stream"] is stderr

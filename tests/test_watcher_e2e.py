@@ -1,13 +1,11 @@
 from __future__ import annotations
 
-from collections.abc import Callable
 from io import StringIO
 import json
 import os
 from pathlib import Path
 import sys
 from threading import Event, Thread
-import time
 
 import pytest
 
@@ -16,19 +14,6 @@ from patchharbor.watcher_subprocess import delegate_to_apply
 
 
 pytestmark = pytest.mark.e2e
-
-
-def _wait_until(
-    predicate: Callable[[], bool],
-    *,
-    timeout_seconds: float = 5.0,
-) -> None:
-    deadline = time.monotonic() + timeout_seconds
-    while time.monotonic() < deadline:
-        if predicate():
-            return
-        time.sleep(0.01)
-    raise AssertionError("condition was not reached before timeout")
 
 
 def test_watcher_delegates_stable_file_to_real_apply_stub_process(
@@ -60,6 +45,7 @@ print(json.dumps({"stub": "applied", "input_path": sys.argv[-1]}))
     environment["PATCHHARBOR_WATCHER_TEST_CALLS"] = str(calls_path)
 
     stop = Event()
+    completed_poll_cycles = 0
     watcher_stdout = StringIO()
     watcher_stderr = StringIO()
 
@@ -70,6 +56,13 @@ print(json.dumps({"stub": "applied", "input_path": sys.argv[-1]}))
             environment=environment,
         )
 
+    def wait_between_polls(timeout_seconds: float) -> bool:
+        nonlocal completed_poll_cycles
+        completed_poll_cycles += 1
+        if calls_path.exists() and completed_poll_cycles >= 4:
+            stop.set()
+        return stop.wait(timeout_seconds)
+
     thread = Thread(
         target=run_watcher,
         kwargs={
@@ -79,20 +72,19 @@ print(json.dumps({"stub": "applied", "input_path": sys.argv[-1]}))
             "log_stream": watcher_stdout,
             "error_stream": watcher_stderr,
             "stop_requested": stop.is_set,
-            "wait_for_stop": stop.wait,
+            "wait_between_polls": wait_between_polls,
         },
         daemon=True,
     )
     thread.start()
     try:
-        _wait_until(calls_path.exists)
-        _wait_until(lambda: bool(watcher_stdout.getvalue().strip()))
-        time.sleep(0.08)
+        thread.join(timeout=5.0)
     finally:
         stop.set()
         thread.join(timeout=2.0)
 
     assert not thread.is_alive()
+    assert completed_poll_cycles >= 4
     calls = [
         json.loads(line)
         for line in calls_path.read_text(encoding="utf-8").splitlines()

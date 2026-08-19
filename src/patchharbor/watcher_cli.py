@@ -71,7 +71,7 @@ def main(
                 log_stream=actual_stdout,
                 error_stream=actual_stderr,
                 stop_requested=stop_controller.stop_requested,
-                wait_for_stop=stop_controller.wait,
+                wait_between_polls=stop_controller.wait,
             )
     except KeyboardInterrupt:
         return 130

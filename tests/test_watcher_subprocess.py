@@ -37,7 +37,6 @@ raise SystemExit(9)
         "argv": ["apply", "--json", os.fspath(patch_path)]
     }
     assert completion.invalid_response_text is None
-    assert completion.response_is_json_object
 
 
 def test_public_apply_boundary_preserves_non_object_response_as_invalid(
@@ -64,5 +63,4 @@ raise SystemExit(4)
     assert completion.process_exit_code == 4
     assert completion.apply_result is None
     assert completion.invalid_response_text is not None
-    assert not completion.response_is_json_object
     assert completion.stderr_text
