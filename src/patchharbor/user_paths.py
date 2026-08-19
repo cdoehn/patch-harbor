@@ -45,6 +45,11 @@ class RegistrationUserPaths:
         """Return the atomically persisted configured-path document."""
         return self.configuration_directory / "paths.json"
 
+    @property
+    def watcher_configuration_path(self) -> Path:
+        """Return the default watcher operating configuration document."""
+        return self.configuration_directory / "watcher.json"
+
 
 def _error(message: str) -> PatchHarborError:
     return registry_error(message)

@@ -624,20 +624,33 @@ def test_watcher_remains_separate_from_patchharbor_core() -> None:
     assert _local_imports("watcher_state") == {"platform"}
     assert _local_imports("watcher_lifecycle") == set()
     assert _local_imports("watcher_subprocess") == {"watcher"}
+    assert _local_imports("watcher_configuration") == {
+        "path_configuration",
+        "platform",
+        "user_paths",
+    }
+    assert _local_imports("watcher_systemd") == {
+        "physical_paths",
+        "platform",
+    }
     assert _local_imports("watcher_cli") == {
         "path_configuration",
         "watcher",
+        "watcher_configuration",
         "watcher_lifecycle",
         "watcher_subprocess",
+        "watcher_systemd",
     }
 
     watcher_modules = (
         "watcher",
         "watcher_cli",
+        "watcher_configuration",
         "watcher_lifecycle",
         "watcher_loop_guard",
         "watcher_state",
         "watcher_subprocess",
+        "watcher_systemd",
     )
     forbidden_core_dependencies = {
         "application",
@@ -655,10 +668,12 @@ def test_watcher_remains_separate_from_patchharbor_core() -> None:
 
     watcher_boundaries = {
         "watcher",
+        "watcher_configuration",
         "watcher_lifecycle",
         "watcher_loop_guard",
         "watcher_state",
         "watcher_subprocess",
+        "watcher_systemd",
     }
     for module_name in ("application", "cli", "execution", "patch_package"):
         assert _local_imports(module_name).isdisjoint(watcher_boundaries)

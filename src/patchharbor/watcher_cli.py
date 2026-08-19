@@ -13,11 +13,16 @@ from patchharbor.path_configuration import (
     prepare_watcher_input_directory,
 )
 from patchharbor.watcher import run_watcher
+from patchharbor.watcher_configuration import (
+    configure_watcher_input_directory,
+    load_configured_watcher_input_directory,
+)
 from patchharbor.watcher_lifecycle import (
     WatcherStopController,
     installed_stop_signals,
 )
 from patchharbor.watcher_subprocess import delegate_to_apply
+from patchharbor.watcher_systemd import install_systemd_user_unit
 
 
 def _positive_seconds(value: str) -> float:
@@ -40,8 +45,21 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "input_directory",
+        nargs="?",
         type=Path,
         metavar="INPUT_DIRECTORY",
+    )
+    action = parser.add_mutually_exclusive_group()
+    action.add_argument(
+        "--configure",
+        type=Path,
+        metavar="INPUT_DIRECTORY",
+        help="persist the default input directory and exit",
+    )
+    action.add_argument(
+        "--install-systemd-user-unit",
+        action="store_true",
+        help="install the Linux systemd user unit without enabling it",
     )
     parser.add_argument(
         "--poll-interval",
@@ -53,23 +71,52 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _require_action_without_positional_input(
+    parser: argparse.ArgumentParser,
+    input_directory: Path | None,
+    action_requested: bool,
+) -> None:
+    if action_requested and input_directory is not None:
+        parser.error(
+            "INPUT_DIRECTORY cannot be combined with a configuration action"
+        )
+
+
 def main(
     argv: Sequence[str] | None = None,
     *,
     stdout: TextIO | None = None,
     stderr: TextIO | None = None,
 ) -> int:
-    """Run the separate polling watcher."""
+    """Configure, install, or run the separate polling watcher."""
     parser = _build_parser()
     arguments = parser.parse_args(argv)
     actual_stdout = sys.stdout if stdout is None else stdout
     actual_stderr = sys.stderr if stderr is None else stderr
-    stop_controller = WatcherStopController()
+    _require_action_without_positional_input(
+        parser,
+        arguments.input_directory,
+        arguments.configure is not None
+        or arguments.install_systemd_user_unit,
+    )
 
     try:
-        prepared_input = prepare_watcher_input_directory(
-            arguments.input_directory
+        if arguments.configure is not None:
+            prepared = configure_watcher_input_directory(arguments.configure)
+            print(prepared.directory, file=actual_stdout)
+            return 0
+        if arguments.install_systemd_user_unit:
+            load_configured_watcher_input_directory()
+            unit_path = install_systemd_user_unit()
+            print(unit_path, file=actual_stdout)
+            return 0
+
+        prepared_input = (
+            prepare_watcher_input_directory(arguments.input_directory)
+            if arguments.input_directory is not None
+            else load_configured_watcher_input_directory()
         )
+        stop_controller = WatcherStopController()
         with installed_stop_signals(stop_controller):
             run_watcher(
                 prepared_input.directory,
