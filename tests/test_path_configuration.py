@@ -12,6 +12,10 @@ from patchharbor.path_configuration import (
     load_configured_paths,
     prepare_watcher_input_directory,
 )
+from patchharbor.physical_paths import (
+    is_physically_within,
+    physical_paths_overlap,
+)
 from patchharbor.registration import register_local_repository
 from patchharbor.result_bundle_target import prepare_result_bundle_target
 from patchharbor.user_paths import registration_user_paths
@@ -215,16 +219,32 @@ def test_watcher_boundary_uses_physical_target_of_directory_alias(
         prepare_watcher_input_directory(alias)
 
 
-def test_path_prefix_siblings_do_not_overlap_physically(
+@pytest.mark.parametrize(
+    ("candidate_parts", "expected"),
+    [
+        (("project", "incoming"), True),
+        (("project-downloads",), False),
+    ],
+)
+def test_physical_path_relations_use_path_components(
     tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
+    candidate_parts: tuple[str, ...],
+    expected: bool,
 ) -> None:
-    set_isolated_user_environment(monkeypatch, tmp_path / "user")
-    repository = create_repository(tmp_path / "project")
-    register_local_repository(repository)
-    watcher = tmp_path / "project-downloads"
-    watcher.mkdir()
+    root = tmp_path / "project"
+    root.mkdir()
+    candidate = tmp_path.joinpath(*candidate_parts)
+    candidate.mkdir(parents=True, exist_ok=True)
 
-    prepared = prepare_watcher_input_directory(watcher)
-
-    assert prepared.directory == watcher.resolve()
+    assert is_physically_within(
+        candidate,
+        root,
+        candidate_must_exist=True,
+        root_must_exist=True,
+    ) is expected
+    assert physical_paths_overlap(
+        candidate,
+        root,
+        first_must_exist=True,
+        second_must_exist=True,
+    ) is expected

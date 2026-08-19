@@ -155,7 +155,9 @@ def poll_input_directory_once(
     stop_requested: Callable[[], bool] = _never_stop,
 ) -> int:
     """Observe once and delegate newly stable file identities until stopped."""
-    stable = stability.observe(observe_input_directory(directory))
+    observations = observe_input_directory(directory)
+    processed.forget_absent(tuple(item.path for item in observations))
+    stable = stability.observe(observations)
     delegated = 0
     for observation in stable:
         if stop_requested():

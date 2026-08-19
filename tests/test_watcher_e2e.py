@@ -5,7 +5,6 @@ import json
 import os
 from pathlib import Path
 import sys
-from threading import Event, Thread
 
 import pytest
 
@@ -44,7 +43,7 @@ print(json.dumps({"stub": "applied", "input_path": sys.argv[-1]}))
     environment = os.environ.copy()
     environment["PATCHHARBOR_WATCHER_TEST_CALLS"] = str(calls_path)
 
-    stop = Event()
+    stop_requested = False
     completed_poll_cycles = 0
     watcher_stdout = StringIO()
     watcher_stderr = StringIO()
@@ -56,35 +55,22 @@ print(json.dumps({"stub": "applied", "input_path": sys.argv[-1]}))
             environment=environment,
         )
 
-    def wait_between_polls(timeout_seconds: float) -> bool:
-        nonlocal completed_poll_cycles
+    def complete_poll_cycle(_timeout_seconds: float) -> None:
+        nonlocal completed_poll_cycles, stop_requested
         completed_poll_cycles += 1
-        if calls_path.exists() and completed_poll_cycles >= 4:
-            stop.set()
-        return stop.wait(timeout_seconds)
+        stop_requested = completed_poll_cycles == 2
 
-    thread = Thread(
-        target=run_watcher,
-        kwargs={
-            "input_directory": input_directory,
-            "delegate": delegate,
-            "poll_interval_seconds": 0.02,
-            "log_stream": watcher_stdout,
-            "error_stream": watcher_stderr,
-            "stop_requested": stop.is_set,
-            "wait_between_polls": wait_between_polls,
-        },
-        daemon=True,
+    run_watcher(
+        input_directory,
+        delegate=delegate,
+        poll_interval_seconds=1.0,
+        log_stream=watcher_stdout,
+        error_stream=watcher_stderr,
+        stop_requested=lambda: stop_requested,
+        wait_between_polls=complete_poll_cycle,
     )
-    thread.start()
-    try:
-        thread.join(timeout=5.0)
-    finally:
-        stop.set()
-        thread.join(timeout=2.0)
 
-    assert not thread.is_alive()
-    assert completed_poll_cycles >= 4
+    assert completed_poll_cycles == 2
     calls = [
         json.loads(line)
         for line in calls_path.read_text(encoding="utf-8").splitlines()

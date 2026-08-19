@@ -265,6 +265,19 @@ def test_processed_identity_persists_across_restart_and_changed_content_retries(
     assert document["input_directory"] == str(tmp_path.resolve())
     assert set(document["processed"]) == {str(watched.resolve())}
     assert len(document["processed"][str(watched.resolve())]) == 64
+
+    watched.unlink()
+    poll_input_directory_once(
+        tmp_path.resolve(),
+        restarted_stability,
+        restarted_processed,
+        delegate=delegate,
+        log_stream=StringIO(),
+        error_stream=StringIO(),
+    )
+
+    pruned = json.loads(state_path.read_text(encoding="utf-8"))
+    assert pruned["processed"] == {}
     assert not tuple(state_path.parent.glob(".patchharbor-watcher-*.tmp"))
 
 

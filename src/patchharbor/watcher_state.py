@@ -129,9 +129,25 @@ class ProcessedFileStore:
         """Atomically persist one new status before publishing it in memory."""
         next_hashes = dict(self._processed_hashes)
         next_hashes[identity.path] = identity.content_sha256
+        self._replace(next_hashes)
+
+    def forget_absent(self, present_paths: tuple[Path, ...]) -> None:
+        """Forget entries for files no longer present in the flat input."""
+        present = set(present_paths)
+        self._replace(
+            {
+                path: content_hash
+                for path, content_hash in self._processed_hashes.items()
+                if path in present
+            }
+        )
+
+    def _replace(self, processed_hashes: dict[Path, str]) -> None:
+        if processed_hashes == self._processed_hashes:
+            return
         if self.state_path is not None:
-            self._persist(next_hashes)
-        self._processed_hashes = next_hashes
+            self._persist(processed_hashes)
+        self._processed_hashes = processed_hashes
 
     def _persist(self, processed_hashes: dict[Path, str]) -> None:
         if self.state_path is None:

@@ -11,11 +11,7 @@ def physically_canonicalize(path: Path, *, must_exist: bool) -> Path:
 
 
 def _canonical_path_is_within(candidate: Path, root: Path) -> bool:
-    try:
-        candidate.relative_to(root)
-    except ValueError:
-        return False
-    return True
+    return candidate.is_relative_to(root)
 
 
 def is_physically_within(
