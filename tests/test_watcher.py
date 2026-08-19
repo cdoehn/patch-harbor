@@ -7,11 +7,18 @@ import zipfile
 
 import pytest
 
+from patchharbor import watcher_state
+from patchharbor.platform.filesystem import FileSystemOperationError
 from patchharbor.watcher import (
     ApplyCompletion,
-    WatcherState,
     observe_input_directory,
     poll_input_directory_once,
+)
+from patchharbor.watcher_loop_guard import is_result_bundle_for_loop_prevention
+from patchharbor.watcher_state import (
+    FileIdentity,
+    ProcessedFileStore,
+    StabilityTracker,
 )
 
 
@@ -54,7 +61,8 @@ def test_file_requires_two_matching_observations_and_changed_file_restabilizes(
 ) -> None:
     watched = tmp_path / "patch.zip"
     watched.write_bytes(b"first")
-    state = WatcherState()
+    stability = StabilityTracker()
+    processed = ProcessedFileStore.in_memory(tmp_path.resolve())
     calls: list[Path] = []
     log = StringIO()
 
@@ -64,21 +72,24 @@ def test_file_requires_two_matching_observations_and_changed_file_restabilizes(
 
     first = poll_input_directory_once(
         tmp_path,
-        state,
+        stability,
+        processed,
         delegate=delegate,
         log_stream=log,
         error_stream=StringIO(),
     )
     second = poll_input_directory_once(
         tmp_path,
-        state,
+        stability,
+        processed,
         delegate=delegate,
         log_stream=log,
         error_stream=StringIO(),
     )
     unchanged = poll_input_directory_once(
         tmp_path,
-        state,
+        stability,
+        processed,
         delegate=delegate,
         log_stream=log,
         error_stream=StringIO(),
@@ -87,14 +98,16 @@ def test_file_requires_two_matching_observations_and_changed_file_restabilizes(
     watched.write_bytes(b"second-version")
     changed_first = poll_input_directory_once(
         tmp_path,
-        state,
+        stability,
+        processed,
         delegate=delegate,
         log_stream=log,
         error_stream=StringIO(),
     )
     changed_second = poll_input_directory_once(
         tmp_path,
-        state,
+        stability,
+        processed,
         delegate=delegate,
         log_stream=log,
         error_stream=StringIO(),
@@ -115,7 +128,8 @@ def test_invalid_apply_response_is_recorded_once_without_semantic_retry(
 ) -> None:
     watched = tmp_path / "patch.zip"
     watched.write_bytes(b"stable")
-    state = WatcherState()
+    stability = StabilityTracker()
+    processed = ProcessedFileStore.in_memory(tmp_path.resolve())
     calls: list[Path] = []
     log = StringIO()
     errors = StringIO()
@@ -131,21 +145,24 @@ def test_invalid_apply_response_is_recorded_once_without_semantic_retry(
 
     poll_input_directory_once(
         tmp_path,
-        state,
+        stability,
+        processed,
         delegate=delegate,
         log_stream=log,
         error_stream=errors,
     )
     delegated = poll_input_directory_once(
         tmp_path,
-        state,
+        stability,
+        processed,
         delegate=delegate,
         log_stream=log,
         error_stream=errors,
     )
     repeated = poll_input_directory_once(
         tmp_path,
-        state,
+        stability,
+        processed,
         delegate=delegate,
         log_stream=log,
         error_stream=errors,
@@ -169,8 +186,9 @@ def test_poll_stops_before_delegating_additional_stable_files(
     second = tmp_path / "b.zip"
     first.write_bytes(b"a")
     second.write_bytes(b"b")
-    state = WatcherState()
-    state.observe(observe_input_directory(tmp_path))
+    stability = StabilityTracker()
+    processed = ProcessedFileStore.in_memory(tmp_path.resolve())
+    stability.observe(observe_input_directory(tmp_path))
     calls: list[Path] = []
     stopping = False
 
@@ -182,7 +200,8 @@ def test_poll_stops_before_delegating_additional_stable_files(
 
     delegated = poll_input_directory_once(
         tmp_path,
-        state,
+        stability,
+        processed,
         delegate=delegate,
         log_stream=StringIO(),
         error_stream=StringIO(),
@@ -206,21 +225,25 @@ def test_processed_identity_persists_across_restart_and_changed_content_retries(
         calls.append(path.read_bytes())
         return _completion()
 
-    first_state = WatcherState.load(tmp_path.resolve(), state_path)
+    first_stability = StabilityTracker()
+    first_processed = ProcessedFileStore.load(tmp_path.resolve(), state_path)
     for _ in range(3):
         poll_input_directory_once(
             tmp_path.resolve(),
-            first_state,
+            first_stability,
+            first_processed,
             delegate=delegate,
             log_stream=StringIO(),
             error_stream=StringIO(),
         )
 
-    restarted_state = WatcherState.load(tmp_path.resolve(), state_path)
+    restarted_stability = StabilityTracker()
+    restarted_processed = ProcessedFileStore.load(tmp_path.resolve(), state_path)
     for _ in range(2):
         poll_input_directory_once(
             tmp_path.resolve(),
-            restarted_state,
+            restarted_stability,
+            restarted_processed,
             delegate=delegate,
             log_stream=StringIO(),
             error_stream=StringIO(),
@@ -230,7 +253,8 @@ def test_processed_identity_persists_across_restart_and_changed_content_retries(
     for _ in range(2):
         poll_input_directory_once(
             tmp_path.resolve(),
-            restarted_state,
+            restarted_stability,
+            restarted_processed,
             delegate=delegate,
             log_stream=StringIO(),
             error_stream=StringIO(),
@@ -261,21 +285,25 @@ def test_result_bundle_marker_is_persistently_skipped_without_apply(
         calls.append(path)
         return _completion()
 
-    state = WatcherState.load(tmp_path.resolve(), state_path)
+    stability = StabilityTracker()
+    processed = ProcessedFileStore.load(tmp_path.resolve(), state_path)
     for _ in range(3):
         poll_input_directory_once(
             tmp_path.resolve(),
-            state,
+            stability,
+            processed,
             delegate=delegate,
             log_stream=StringIO(),
             error_stream=StringIO(),
         )
 
-    restarted = WatcherState.load(tmp_path.resolve(), state_path)
+    restarted_stability = StabilityTracker()
+    restarted_processed = ProcessedFileStore.load(tmp_path.resolve(), state_path)
     for _ in range(2):
         poll_input_directory_once(
             tmp_path.resolve(),
-            restarted,
+            restarted_stability,
+            restarted_processed,
             delegate=delegate,
             log_stream=StringIO(),
             error_stream=StringIO(),
@@ -284,6 +312,53 @@ def test_result_bundle_marker_is_persistently_skipped_without_apply(
     assert calls == []
     document = json.loads(state_path.read_text(encoding="utf-8"))
     assert set(document["processed"]) == {str(result_bundle.resolve())}
+
+
+def test_processed_status_changes_only_after_atomic_state_publication(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    state_path = tmp_path / "state" / "watcher.json"
+    store = ProcessedFileStore.load(tmp_path.resolve(), state_path)
+    identity = FileIdentity(
+        path=(tmp_path / "patch.zip").resolve(),
+        content_sha256="a" * 64,
+    )
+
+    def fail_atomic_replace(_target: Path, _payload: bytes) -> None:
+        raise FileSystemOperationError("cannot replace target", OSError("failed"))
+
+    monkeypatch.setattr(watcher_state, "atomic_replace_bytes", fail_atomic_replace)
+
+    with pytest.raises(RuntimeError):
+        store.mark_processed(identity)
+
+    assert not store.was_processed(identity)
+    assert not state_path.exists()
+
+
+def test_result_bundle_loop_guard_uses_only_the_reserved_marker(
+    tmp_path: Path,
+) -> None:
+    result_bundle = tmp_path / "result.zip"
+    with zipfile.ZipFile(result_bundle, mode="w") as archive:
+        archive.writestr(
+            "manifest.json",
+            json.dumps(
+                {
+                    "marker": "patch-harbor-result-bundle",
+                    "not_a_result_bundle_schema": True,
+                }
+            ),
+        )
+
+    ordinary_zip = tmp_path / "ordinary.zip"
+    with zipfile.ZipFile(ordinary_zip, mode="w") as archive:
+        archive.writestr("manifest.json", json.dumps({"marker": "other"}))
+        archive.writestr("patch.json", b"not parsed by the loop guard")
+
+    assert is_result_bundle_for_loop_prevention(result_bundle)
+    assert not is_result_bundle_for_loop_prevention(ordinary_zip)
 
 def test_watcher_console_entry_point_configures_the_polling_loop(
     tmp_path: Path,

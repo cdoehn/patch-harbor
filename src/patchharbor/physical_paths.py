@@ -10,6 +10,14 @@ def physically_canonicalize(path: Path, *, must_exist: bool) -> Path:
     return path.expanduser().resolve(strict=must_exist)
 
 
+def _canonical_path_is_within(candidate: Path, root: Path) -> bool:
+    try:
+        candidate.relative_to(root)
+    except ValueError:
+        return False
+    return True
+
+
 def is_physically_within(
     candidate: Path,
     root: Path,
@@ -26,8 +34,29 @@ def is_physically_within(
         root,
         must_exist=root_must_exist,
     )
-    try:
-        physical_candidate.relative_to(physical_root)
-    except ValueError:
-        return False
-    return True
+    return _canonical_path_is_within(physical_candidate, physical_root)
+
+
+def physical_paths_overlap(
+    first: Path,
+    second: Path,
+    *,
+    first_must_exist: bool,
+    second_must_exist: bool,
+) -> bool:
+    """Whether two physical paths contain one another in either direction."""
+    physical_first = physically_canonicalize(
+        first,
+        must_exist=first_must_exist,
+    )
+    physical_second = physically_canonicalize(
+        second,
+        must_exist=second_must_exist,
+    )
+    return _canonical_path_is_within(
+        physical_first,
+        physical_second,
+    ) or _canonical_path_is_within(
+        physical_second,
+        physical_first,
+    )

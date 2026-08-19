@@ -72,7 +72,11 @@ def prepare_result_bundle_target(
             snapshot,
             directory_must_exist=False,
         )
-        require_result_directory_allowed(candidate, configured)
+        require_result_directory_allowed(
+            candidate,
+            configured,
+            directory_must_exist=False,
+        )
         candidate.mkdir(parents=True, exist_ok=True)
         directory = physically_canonicalize(candidate, must_exist=True)
         _require_directory(directory)
@@ -81,7 +85,11 @@ def prepare_result_bundle_target(
             snapshot,
             directory_must_exist=True,
         )
-        require_result_directory_allowed(directory, configured)
+        require_result_directory_allowed(
+            directory,
+            configured,
+            directory_must_exist=True,
+        )
         write_configured_paths(
             paths,
             remember_result_directory(configured, directory),
@@ -121,6 +129,7 @@ def revalidate_result_bundle_target(
         require_result_directory_allowed(
             current,
             load_configured_paths(paths),
+            directory_must_exist=True,
         )
         if target.final_path.parent != current:
             raise result_bundle_error("Result Bundle destination changed")

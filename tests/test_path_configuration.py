@@ -190,3 +190,41 @@ def test_watcher_and_result_directories_are_persisted_canonically(
     }
     assert prepared.directory == incoming.resolve()
     assert prepared.state_path.parent == registration_user_paths().watcher_state_directory
+
+
+def _directory_symlink_or_skip(link: Path, target: Path) -> None:
+    try:
+        link.symlink_to(target, target_is_directory=True)
+    except OSError as exc:
+        pytest.skip(f"directory symlinks are unavailable: {exc}")
+
+
+def test_watcher_boundary_uses_physical_target_of_directory_alias(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    set_isolated_user_environment(monkeypatch, tmp_path / "user")
+    repository = create_repository(tmp_path / "repository")
+    register_local_repository(repository)
+    incoming = repository / "incoming"
+    incoming.mkdir()
+    alias = tmp_path / "incoming-alias"
+    _directory_symlink_or_skip(alias, incoming)
+
+    with pytest.raises(PathConfigurationError):
+        prepare_watcher_input_directory(alias)
+
+
+def test_path_prefix_siblings_do_not_overlap_physically(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    set_isolated_user_environment(monkeypatch, tmp_path / "user")
+    repository = create_repository(tmp_path / "project")
+    register_local_repository(repository)
+    watcher = tmp_path / "project-downloads"
+    watcher.mkdir()
+
+    prepared = prepare_watcher_input_directory(watcher)
+
+    assert prepared.directory == watcher.resolve()

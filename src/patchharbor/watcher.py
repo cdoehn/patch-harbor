@@ -2,18 +2,24 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Sequence
-from dataclasses import dataclass, field
+from collections.abc import Callable
+from dataclasses import dataclass
 from hashlib import sha256
 from io import BufferedReader
 import json
 import os
 from pathlib import Path
 import stat
-import tempfile
 import time
 from typing import TextIO
-import zipfile
+
+from patchharbor.watcher_loop_guard import is_result_bundle_for_loop_prevention
+from patchharbor.watcher_state import (
+    FileIdentity,
+    FileObservation,
+    ProcessedFileStore,
+    StabilityTracker,
+)
 
 
 _BROWSER_TEMP_SUFFIXES = (
@@ -24,26 +30,6 @@ _BROWSER_TEMP_SUFFIXES = (
     ".partial",
     ".tmp",
 )
-_RESULT_BUNDLE_MARKER = "patch-harbor-result-bundle"
-_WATCHER_STATE_VERSION = 1
-_MAX_RESULT_MANIFEST_BYTES = 1024 * 1024
-
-
-@dataclass(frozen=True)
-class FileObservation:
-    """One top-level regular file observation used for stability checks."""
-
-    path: Path
-    size: int
-    mtime_ns: int
-
-
-@dataclass(frozen=True)
-class FileIdentity:
-    """One physically stable file identified by canonical path and SHA-256."""
-
-    path: Path
-    content_sha256: str
 
 
 @dataclass(frozen=True)
@@ -54,138 +40,6 @@ class ApplyCompletion:
     apply_result: dict[str, object] | None
     invalid_response_text: str | None
     stderr_text: str
-
-
-@dataclass
-class WatcherState:
-    """Consecutive observations and persistent processed file identities."""
-
-    previous: set[FileObservation] = field(default_factory=set)
-    processed_hashes: dict[Path, str] = field(default_factory=dict)
-    state_path: Path | None = None
-    input_directory: Path | None = None
-
-    @classmethod
-    def load(cls, input_directory: Path, state_path: Path) -> WatcherState:
-        """Load one persistent watcher state or start with an empty state."""
-        if not state_path.exists():
-            return cls(
-                state_path=state_path,
-                input_directory=input_directory,
-            )
-        if not state_path.is_file() or state_path.is_symlink():
-            raise RuntimeError("watcher state is not a regular file")
-        try:
-            document = json.loads(state_path.read_text(encoding="utf-8"))
-        except (OSError, UnicodeDecodeError, ValueError) as exc:
-            raise RuntimeError("cannot read watcher state") from exc
-        if not isinstance(document, dict) or set(document) != {
-            "format_version",
-            "input_directory",
-            "processed",
-        }:
-            raise RuntimeError("watcher state has an invalid schema")
-        if document["format_version"] != _WATCHER_STATE_VERSION:
-            raise RuntimeError("watcher state has an unsupported version")
-        if document["input_directory"] != os.fspath(input_directory):
-            raise RuntimeError("watcher state belongs to another input directory")
-        processed = document["processed"]
-        if not isinstance(processed, dict):
-            raise RuntimeError("watcher state processed entries are invalid")
-        processed_hashes: dict[Path, str] = {}
-        for path_text, content_hash in processed.items():
-            if not isinstance(path_text, str) or not isinstance(content_hash, str):
-                raise RuntimeError("watcher state processed entries are invalid")
-            path = Path(path_text)
-            if not path.is_absolute() or path.parent != input_directory:
-                raise RuntimeError("watcher state contains an invalid input path")
-            if len(content_hash) != 64 or content_hash != content_hash.lower() or any(
-                character not in "0123456789abcdef"
-                for character in content_hash
-            ):
-                raise RuntimeError("watcher state contains an invalid content hash")
-            processed_hashes[path] = content_hash
-        return cls(
-            processed_hashes=processed_hashes,
-            state_path=state_path,
-            input_directory=input_directory,
-        )
-
-    def observe(
-        self,
-        current: Sequence[FileObservation],
-    ) -> tuple[FileObservation, ...]:
-        """Return files unchanged across two consecutive observations."""
-        current_set = set(current)
-        stable = tuple(
-            observation
-            for observation in current
-            if observation in self.previous
-        )
-        self.previous = current_set
-        return stable
-
-    def was_processed(self, identity: FileIdentity) -> bool:
-        """Whether the same canonical path and content were already delegated."""
-        return self.processed_hashes.get(identity.path) == identity.content_sha256
-
-    def mark_processed(self, identity: FileIdentity) -> None:
-        """Persist the newest processed content hash for one canonical path."""
-        self.processed_hashes[identity.path] = identity.content_sha256
-        self._persist()
-
-    def _persist(self) -> None:
-        if self.state_path is None or self.input_directory is None:
-            return
-        document = {
-            "format_version": _WATCHER_STATE_VERSION,
-            "input_directory": os.fspath(self.input_directory),
-            "processed": {
-                os.fspath(path): content_hash
-                for path, content_hash in sorted(
-                    self.processed_hashes.items(),
-                    key=lambda item: os.fsencode(os.fspath(item[0])),
-                )
-            },
-        }
-        payload = (
-            json.dumps(
-                document,
-                ensure_ascii=True,
-                allow_nan=False,
-                sort_keys=True,
-                separators=(",", ":"),
-            )
-            + "\n"
-        ).encode("utf-8")
-        self.state_path.parent.mkdir(parents=True, exist_ok=True)
-        staged_path: Path | None = None
-        try:
-            with tempfile.NamedTemporaryFile(
-                mode="wb",
-                dir=self.state_path.parent,
-                prefix=".patchharbor-watcher-",
-                suffix=".tmp",
-                delete=False,
-            ) as stream:
-                staged_path = Path(stream.name)
-                try:
-                    os.chmod(staged_path, 0o600)
-                except OSError:
-                    pass
-                stream.write(payload)
-                stream.flush()
-                os.fsync(stream.fileno())
-            os.replace(staged_path, self.state_path)
-            staged_path = None
-        except OSError as exc:
-            raise RuntimeError("cannot persist watcher state") from exc
-        finally:
-            if staged_path is not None:
-                try:
-                    staged_path.unlink(missing_ok=True)
-                except OSError:
-                    pass
 
 
 def is_browser_temporary_name(name: str) -> bool:
@@ -259,27 +113,6 @@ def identify_stable_file(observation: FileObservation) -> FileIdentity | None:
     )
 
 
-def is_patchharbor_result_bundle(path: Path) -> bool:
-    """Recognize only the Result Bundle marker needed to prevent watcher loops."""
-    try:
-        with zipfile.ZipFile(path, mode="r") as archive:
-            matching = [
-                info
-                for info in archive.infolist()
-                if info.filename == "manifest.json" and not info.is_dir()
-            ]
-            if len(matching) != 1 or matching[0].file_size > _MAX_RESULT_MANIFEST_BYTES:
-                return False
-            payload = archive.read(matching[0])
-        document = json.loads(payload.decode("utf-8"))
-    except (OSError, UnicodeDecodeError, ValueError, zipfile.BadZipFile):
-        return False
-    return (
-        isinstance(document, dict)
-        and document.get("marker") == _RESULT_BUNDLE_MARKER
-    )
-
-
 def _never_stop() -> bool:
     return False
 
@@ -313,7 +146,8 @@ def _write_operational_record(
 
 def poll_input_directory_once(
     directory: Path,
-    state: WatcherState,
+    stability: StabilityTracker,
+    processed: ProcessedFileStore,
     *,
     delegate: Callable[[Path], ApplyCompletion],
     log_stream: TextIO,
@@ -321,16 +155,16 @@ def poll_input_directory_once(
     stop_requested: Callable[[], bool] = _never_stop,
 ) -> int:
     """Observe once and delegate newly stable file identities until stopped."""
-    stable = state.observe(observe_input_directory(directory))
+    stable = stability.observe(observe_input_directory(directory))
     delegated = 0
     for observation in stable:
         if stop_requested():
             break
         identity = identify_stable_file(observation)
-        if identity is None or state.was_processed(identity):
+        if identity is None or processed.was_processed(identity):
             continue
-        if is_patchharbor_result_bundle(identity.path):
-            state.mark_processed(identity)
+        if is_result_bundle_for_loop_prevention(identity.path):
+            processed.mark_processed(identity)
             continue
         completion = delegate(identity.path)
         _write_operational_record(identity, completion, log_stream)
@@ -339,7 +173,7 @@ def poll_input_directory_once(
             if not completion.stderr_text.endswith("\n"):
                 error_stream.write("\n")
             error_stream.flush()
-        state.mark_processed(identity)
+        processed.mark_processed(identity)
         delegated += 1
     return delegated
 
@@ -362,15 +196,17 @@ def run_watcher(
     if not directory.is_dir():
         raise NotADirectoryError(os.fspath(directory))
 
-    state = (
-        WatcherState.load(directory, state_path)
+    stability = StabilityTracker()
+    processed = (
+        ProcessedFileStore.load(directory, state_path)
         if state_path is not None
-        else WatcherState(input_directory=directory)
+        else ProcessedFileStore.in_memory(directory)
     )
     while not stop_requested():
         poll_input_directory_once(
             directory,
-            state,
+            stability,
+            processed,
             delegate=delegate,
             log_stream=log_stream,
             error_stream=error_stream,

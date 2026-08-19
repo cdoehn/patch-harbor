@@ -10,7 +10,11 @@ from pathlib import Path
 
 from patchharbor.locks import registry_lock
 from patchharbor.models import RegistrySnapshot, RepositoryPath
-from patchharbor.physical_paths import physically_canonicalize
+from patchharbor.physical_paths import (
+    is_physically_within,
+    physical_paths_overlap,
+    physically_canonicalize,
+)
 from patchharbor.platform.filesystem import (
     FileSystemOperationError,
     PathKind,
@@ -152,17 +156,6 @@ def write_configured_paths(
         raise PathConfigurationError("cannot persist configured path state") from exc
 
 
-def _is_same_or_below(candidate: Path, root: Path) -> bool:
-    try:
-        candidate.relative_to(root)
-    except ValueError:
-        return False
-    return True
-
-
-def _paths_overlap(first: Path, second: Path) -> bool:
-    return _is_same_or_below(first, second) or _is_same_or_below(second, first)
-
 
 def _require_directory(path: Path, *, description: str) -> None:
     try:
@@ -180,12 +173,22 @@ def require_watcher_input_allowed(
 ) -> None:
     """Reject one watcher input overlapping repositories or Result directories."""
     for mapping in registry_snapshot.repositories:
-        if _is_same_or_below(directory, mapping.repository_path.value):
+        if is_physically_within(
+            directory,
+            mapping.repository_path.value,
+            candidate_must_exist=True,
+            root_must_exist=False,
+        ):
             raise PathConfigurationError(
                 "watcher input is inside a registered repository"
             )
     for result_directory in configured.result_directories:
-        if _paths_overlap(directory, result_directory):
+        if physical_paths_overlap(
+            directory,
+            result_directory,
+            first_must_exist=True,
+            second_must_exist=False,
+        ):
             raise PathConfigurationError(
                 "watcher input overlaps a Result Bundle directory"
             )
@@ -194,10 +197,17 @@ def require_watcher_input_allowed(
 def require_result_directory_allowed(
     directory: Path,
     configured: ConfiguredPaths,
+    *,
+    directory_must_exist: bool,
 ) -> None:
     """Reject Result and watcher directories overlapping in either direction."""
     for watcher_directory in configured.watcher_input_directories:
-        if _paths_overlap(directory, watcher_directory):
+        if physical_paths_overlap(
+            directory,
+            watcher_directory,
+            first_must_exist=directory_must_exist,
+            second_must_exist=False,
+        ):
             raise PathConfigurationError(
                 "Result Bundle directory overlaps a watcher input"
             )
@@ -210,12 +220,22 @@ def require_repository_registration_allowed(
     """Reject a repository that would invalidate configured path boundaries."""
     root = repository.value
     for watcher_directory in configured.watcher_input_directories:
-        if _is_same_or_below(watcher_directory, root):
+        if is_physically_within(
+            watcher_directory,
+            root,
+            candidate_must_exist=False,
+            root_must_exist=True,
+        ):
             raise PathConfigurationError(
                 "repository contains a configured watcher input"
             )
     for result_directory in configured.result_directories:
-        if _is_same_or_below(result_directory, root):
+        if is_physically_within(
+            result_directory,
+            root,
+            candidate_must_exist=False,
+            root_must_exist=True,
+        ):
             raise PathConfigurationError(
                 "repository contains a configured Result Bundle directory"
             )

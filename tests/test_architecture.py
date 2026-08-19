@@ -616,7 +616,12 @@ def test_apply_orchestrator_delegates_mutation_execution_and_result_services() -
 
 
 def test_watcher_remains_separate_from_patchharbor_core() -> None:
-    assert _local_imports("watcher") == set()
+    assert _local_imports("watcher") == {
+        "watcher_loop_guard",
+        "watcher_state",
+    }
+    assert _local_imports("watcher_loop_guard") == set()
+    assert _local_imports("watcher_state") == {"platform"}
     assert _local_imports("watcher_lifecycle") == set()
     assert _local_imports("watcher_subprocess") == {"watcher"}
     assert _local_imports("watcher_cli") == {
@@ -630,6 +635,8 @@ def test_watcher_remains_separate_from_patchharbor_core() -> None:
         "watcher",
         "watcher_cli",
         "watcher_lifecycle",
+        "watcher_loop_guard",
+        "watcher_state",
         "watcher_subprocess",
     )
     forbidden_core_dependencies = {
@@ -646,10 +653,20 @@ def test_watcher_remains_separate_from_patchharbor_core() -> None:
     for module_name in watcher_modules:
         assert _local_imports(module_name).isdisjoint(forbidden_core_dependencies)
 
+    watcher_boundaries = {
+        "watcher",
+        "watcher_lifecycle",
+        "watcher_loop_guard",
+        "watcher_state",
+        "watcher_subprocess",
+    }
     for module_name in ("application", "cli", "execution", "patch_package"):
-        assert _local_imports(module_name).isdisjoint(
-            {"watcher", "watcher_lifecycle", "watcher_subprocess"}
-        )
+        assert _local_imports(module_name).isdisjoint(watcher_boundaries)
+
+    path_policy_source = (PACKAGE_ROOT / "path_configuration.py").read_text(
+        encoding="utf-8"
+    )
+    assert ".relative_to(" not in path_policy_source
 
 
 def test_runtime_module_dependencies_are_acyclic() -> None:
