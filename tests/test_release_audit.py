@@ -32,6 +32,7 @@ EXPECTED_RUNTIME_FILES = {
     "patch_manifest.py",
     "patch_package.py",
     "payload_files.py",
+    "path_configuration.py",
     "physical_paths.py",
     "presentation.py",
     "registration.py",

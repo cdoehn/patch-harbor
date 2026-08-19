@@ -140,6 +140,7 @@ def safely_resolved_repository(
             target = prepare_result_bundle_target(
                 output_directory or paths.result_directory,
                 initial_registry,
+                paths,
                 filename=result_bundle_filename(session),
             )
             publication = reserve_result_bundle_publication(
@@ -174,7 +175,7 @@ def safely_resolved_repository(
                 locked_path,
                 manifest.repo_id,
             )
-            revalidate_result_bundle_target(target, locked_registry)
+            revalidate_result_bundle_target(target, locked_registry, paths)
 
         snapshot = capture_consistent_repository_snapshot(locked_repository)
         context = repository_context_from_snapshot(

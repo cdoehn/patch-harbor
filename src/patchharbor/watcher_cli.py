@@ -8,6 +8,10 @@ from pathlib import Path
 import sys
 from typing import TextIO
 
+from patchharbor.path_configuration import (
+    PreparedWatcherInput,
+    prepare_watcher_input_directory,
+)
 from patchharbor.watcher import run_watcher
 from patchharbor.watcher_lifecycle import (
     WatcherStopController,
@@ -63,10 +67,14 @@ def main(
     stop_controller = WatcherStopController()
 
     try:
+        prepared_input = prepare_watcher_input_directory(
+            arguments.input_directory
+        )
         with installed_stop_signals(stop_controller):
             run_watcher(
-                arguments.input_directory,
+                prepared_input.directory,
                 delegate=delegate_to_apply,
+                state_path=prepared_input.state_path,
                 poll_interval_seconds=arguments.poll_interval,
                 log_stream=actual_stdout,
                 error_stream=actual_stderr,

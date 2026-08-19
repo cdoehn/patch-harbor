@@ -12,6 +12,11 @@ from patchharbor.errors import (
     registry_error,
     repository_resolution_error,
 )
+from patchharbor.path_configuration import (
+    PathConfigurationError,
+    load_configured_paths,
+    require_repository_registration_allowed,
+)
 from patchharbor.models import (
     RegistryListResult,
     RegistryMapping,
@@ -169,6 +174,13 @@ def _observe_registration(
     path: Path,
 ) -> _RegistrationObservation:
     repository = inspect_repository(path)
+    try:
+        require_repository_registration_allowed(
+            repository,
+            load_configured_paths(paths),
+        )
+    except PathConfigurationError as exc:
+        raise repository_resolution_error(str(exc)) from exc
     registry_state = load_registry_state(paths)
     local_id, local_state = inspect_local_registration(repository)
     return _RegistrationObservation(

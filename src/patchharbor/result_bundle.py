@@ -321,6 +321,7 @@ def create_apply_result_bundle(
     execution_log: bytes | None = None,
 ) -> RunReport:
     """Attempt one apply Result Bundle while the repository lock is held."""
+    paths = registration_user_paths()
     try:
         run_directory = _create_private_run_directory(session.run_id)
     except (OSError, RuntimeError):
@@ -341,7 +342,7 @@ def create_apply_result_bundle(
         if execution_log is not None:
             _write_execution_log(run_directory, execution_log)
         captured = capture_result_bundle(repository, repo_id)
-        revalidate_result_bundle_target(target, registry_snapshot)
+        revalidate_result_bundle_target(target, registry_snapshot, paths)
         report = _apply_report(
             session=session,
             dry_run=dry_run,
@@ -444,6 +445,7 @@ def create_manual_result_bundle(
                 target = prepare_result_bundle_target(
                     output_directory or paths.result_directory,
                     registry_snapshot,
+                    paths,
                     filename=filename,
                 )
                 repository_scope.enter_context(repository_lock(paths, repo_id))
@@ -459,10 +461,10 @@ def create_manual_result_bundle(
                     raise repository_resolution_error(
                         "repository identity changed while acquiring its lock"
                     )
-                revalidate_result_bundle_target(target, locked_registry)
+                revalidate_result_bundle_target(target, locked_registry, paths)
 
             captured = capture_result_bundle(locked_repository, locked_id)
-            revalidate_result_bundle_target(target, locked_registry)
+            revalidate_result_bundle_target(target, locked_registry, paths)
             context = captured.context
             bundle_snapshot = captured.bundle_snapshot
             report = RunReport(

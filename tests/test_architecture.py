@@ -260,6 +260,7 @@ def test_lower_layers_do_not_import_orchestration_or_unrelated_layers() -> None:
 def test_registration_layers_have_one_directional_dependency_flow() -> None:
     assert _local_imports("registration") == {
         "errors",
+        "path_configuration",
         "models",
         "locks",
         "registry",
@@ -378,8 +379,10 @@ def test_registration_layers_have_one_directional_dependency_flow() -> None:
     assert _local_imports("result_bundle_target") == {
         "errors",
         "models",
+        "path_configuration",
         "physical_paths",
         "platform",
+        "user_paths",
     }
     assert _local_imports("result_bundle_publication") == {
         "errors",
@@ -426,6 +429,14 @@ def test_registration_layers_have_one_directional_dependency_flow() -> None:
         "physical_paths",
     }
     assert _local_imports("physical_paths") == set()
+    assert _local_imports("path_configuration") == {
+        "locks",
+        "models",
+        "physical_paths",
+        "platform",
+        "registry",
+        "user_paths",
+    }
 
 
 def test_manual_and_apply_zip_roles_share_one_archive_boundary() -> None:
@@ -609,6 +620,7 @@ def test_watcher_remains_separate_from_patchharbor_core() -> None:
     assert _local_imports("watcher_lifecycle") == set()
     assert _local_imports("watcher_subprocess") == {"watcher"}
     assert _local_imports("watcher_cli") == {
+        "path_configuration",
         "watcher",
         "watcher_lifecycle",
         "watcher_subprocess",

@@ -3,6 +3,7 @@ from __future__ import annotations
 from io import StringIO
 import json
 from pathlib import Path
+import zipfile
 
 import pytest
 
@@ -192,6 +193,98 @@ def test_poll_stops_before_delegating_additional_stable_files(
     assert calls == [first]
 
 
+
+def test_processed_identity_persists_across_restart_and_changed_content_retries(
+    tmp_path: Path,
+) -> None:
+    watched = tmp_path / "patch.zip"
+    watched.write_bytes(b"first-content")
+    state_path = tmp_path / "state" / "watcher.json"
+    calls: list[bytes] = []
+
+    def delegate(path: Path) -> ApplyCompletion:
+        calls.append(path.read_bytes())
+        return _completion()
+
+    first_state = WatcherState.load(tmp_path.resolve(), state_path)
+    for _ in range(3):
+        poll_input_directory_once(
+            tmp_path.resolve(),
+            first_state,
+            delegate=delegate,
+            log_stream=StringIO(),
+            error_stream=StringIO(),
+        )
+
+    restarted_state = WatcherState.load(tmp_path.resolve(), state_path)
+    for _ in range(2):
+        poll_input_directory_once(
+            tmp_path.resolve(),
+            restarted_state,
+            delegate=delegate,
+            log_stream=StringIO(),
+            error_stream=StringIO(),
+        )
+
+    watched.write_bytes(b"second-content-is-different")
+    for _ in range(2):
+        poll_input_directory_once(
+            tmp_path.resolve(),
+            restarted_state,
+            delegate=delegate,
+            log_stream=StringIO(),
+            error_stream=StringIO(),
+        )
+
+    assert calls == [b"first-content", b"second-content-is-different"]
+    document = json.loads(state_path.read_text(encoding="utf-8"))
+    assert document["input_directory"] == str(tmp_path.resolve())
+    assert set(document["processed"]) == {str(watched.resolve())}
+    assert len(document["processed"][str(watched.resolve())]) == 64
+    assert not tuple(state_path.parent.glob(".patchharbor-watcher-*.tmp"))
+
+
+def test_result_bundle_marker_is_persistently_skipped_without_apply(
+    tmp_path: Path,
+) -> None:
+    result_bundle = tmp_path / "patchharbor_result.zip"
+    with zipfile.ZipFile(result_bundle, mode="w") as archive:
+        archive.writestr(
+            "manifest.json",
+            json.dumps({"marker": "patch-harbor-result-bundle"}),
+        )
+        archive.writestr("base/tracked.txt", b"content")
+    state_path = tmp_path / "state" / "watcher.json"
+    calls: list[Path] = []
+
+    def delegate(path: Path) -> ApplyCompletion:
+        calls.append(path)
+        return _completion()
+
+    state = WatcherState.load(tmp_path.resolve(), state_path)
+    for _ in range(3):
+        poll_input_directory_once(
+            tmp_path.resolve(),
+            state,
+            delegate=delegate,
+            log_stream=StringIO(),
+            error_stream=StringIO(),
+        )
+
+    restarted = WatcherState.load(tmp_path.resolve(), state_path)
+    for _ in range(2):
+        poll_input_directory_once(
+            tmp_path.resolve(),
+            restarted,
+            delegate=delegate,
+            log_stream=StringIO(),
+            error_stream=StringIO(),
+        )
+
+    assert calls == []
+    document = json.loads(state_path.read_text(encoding="utf-8"))
+    assert set(document["processed"]) == {str(result_bundle.resolve())}
+
 def test_watcher_console_entry_point_configures_the_polling_loop(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -204,6 +297,15 @@ def test_watcher_console_entry_point_configures_the_polling_loop(
         observed["input_directory"] = input_directory
         observed.update(options)
 
+    state_path = tmp_path / "watcher-state.json"
+    monkeypatch.setattr(
+        watcher_cli,
+        "prepare_watcher_input_directory",
+        lambda _path: watcher_cli.PreparedWatcherInput(
+            directory=tmp_path.resolve(),
+            state_path=state_path,
+        ),
+    )
     monkeypatch.setattr(watcher_cli, "run_watcher", fake_run_watcher)
     stdout = StringIO()
     stderr = StringIO()
@@ -215,7 +317,8 @@ def test_watcher_console_entry_point_configures_the_polling_loop(
     )
 
     assert result == 0
-    assert observed["input_directory"] == tmp_path
+    assert observed["input_directory"] == tmp_path.resolve()
+    assert observed["state_path"] == state_path
     assert observed["poll_interval_seconds"] == 0.25
     assert observed["delegate"] is watcher_cli.delegate_to_apply
     assert callable(observed["stop_requested"])

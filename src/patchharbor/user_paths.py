@@ -26,9 +26,24 @@ class RegistrationUserPaths:
         return self.lock_directory / "registry.lock"
 
     @property
+    def state_directory(self) -> Path:
+        """Return the user-specific PatchHarbor state directory."""
+        return self.lock_directory.parent
+
+    @property
     def result_directory(self) -> Path:
         """Return the default user-specific Result Bundle directory."""
-        return self.lock_directory.parent / "results"
+        return self.state_directory / "results"
+
+    @property
+    def watcher_state_directory(self) -> Path:
+        """Return the directory containing persistent watcher state."""
+        return self.state_directory / "watcher"
+
+    @property
+    def path_configuration_path(self) -> Path:
+        """Return the atomically persisted configured-path document."""
+        return self.configuration_directory / "paths.json"
 
 
 def _error(message: str) -> PatchHarborError:
