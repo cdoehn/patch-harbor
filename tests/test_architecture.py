@@ -641,53 +641,8 @@ def test_apply_orchestrator_delegates_mutation_execution_and_result_services() -
     assert "def _capture_mutation_context(" not in source
 
 
-def test_watcher_remains_separate_from_patchharbor_core() -> None:
-    assert {
-        path.name for path in WATCHER_PACKAGE_ROOT.glob("*.py")
-    } == {
-        "__init__.py",
-        "apply_boundary.py",
-        "cli.py",
-        "configuration.py",
-        "lifecycle.py",
-        "loop.py",
-        "loop_guard.py",
-        "state.py",
-        "systemd_linux.py",
-    }
+def test_watcher_uses_only_the_public_apply_process_boundary() -> None:
     assert not tuple(PACKAGE_ROOT.glob("watcher*.py"))
-
-    expected_watcher_imports = {
-        "apply_boundary": {"patchharbor_watcher.loop"},
-        "cli": {
-            "patchharbor.path_configuration",
-            "patchharbor_watcher.apply_boundary",
-            "patchharbor_watcher.configuration",
-            "patchharbor_watcher.lifecycle",
-            "patchharbor_watcher.loop",
-            "patchharbor_watcher.systemd_linux",
-        },
-        "configuration": {
-            "patchharbor.path_configuration",
-            "patchharbor.platform.filesystem",
-            "patchharbor.user_paths",
-        },
-        "lifecycle": set(),
-        "loop": {
-            "patchharbor_watcher.loop_guard",
-            "patchharbor_watcher.state",
-        },
-        "loop_guard": set(),
-        "state": {"patchharbor.platform.filesystem"},
-        "systemd_linux": {
-            "patchharbor.physical_paths",
-            "patchharbor.platform.filesystem",
-        },
-    }
-    for module_name, expected in expected_watcher_imports.items():
-        assert _project_imports(
-            WATCHER_PACKAGE_ROOT / f"{module_name}.py"
-        ) == expected
 
     for core_module in PACKAGE_ROOT.rglob("*.py"):
         assert not any(
@@ -695,17 +650,17 @@ def test_watcher_remains_separate_from_patchharbor_core() -> None:
             for dependency in _project_imports(core_module)
         )
 
-    forbidden_core_dependencies = {
-        "patchharbor.application",
-        "patchharbor.apply_preflight",
-        "patchharbor.apply_repository",
-        "patchharbor.cli",
-        "patchharbor.execution",
-        "patchharbor.patch_manifest",
-        "patchharbor.patch_package",
-        "patchharbor.registry",
-        "patchharbor.repository_state",
-        "patchharbor.result_bundle",
+    apply_boundary = WATCHER_PACKAGE_ROOT / "apply_boundary.py"
+    assert not any(
+        dependency.startswith("patchharbor.")
+        for dependency in _project_imports(apply_boundary)
+    )
+
+    allowed_shared_core_boundaries = {
+        "patchharbor.path_configuration",
+        "patchharbor.physical_paths",
+        "patchharbor.platform.filesystem",
+        "patchharbor.user_paths",
     }
     forbidden_network_roots = {
         "asyncio",
@@ -717,12 +672,19 @@ def test_watcher_remains_separate_from_patchharbor_core() -> None:
         "websockets",
     }
     for watcher_module in WATCHER_PACKAGE_ROOT.glob("*.py"):
-        assert _project_imports(watcher_module).isdisjoint(
-            forbidden_core_dependencies
-        )
+        core_dependencies = {
+            dependency
+            for dependency in _project_imports(watcher_module)
+            if dependency.startswith("patchharbor.")
+        }
+        assert core_dependencies <= allowed_shared_core_boundaries
         assert _imported_roots(watcher_module).isdisjoint(
             forbidden_network_roots
         )
+
+    for watcher_module in WATCHER_PACKAGE_ROOT.glob("*.py"):
+        if watcher_module.name != "apply_boundary.py":
+            assert "subprocess" not in _imported_roots(watcher_module)
 
     for forbidden_component in ("repo_assist", "promptbridge"):
         forbidden_path = Path(__file__).parents[1] / "src" / forbidden_component

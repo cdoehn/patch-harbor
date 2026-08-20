@@ -35,19 +35,29 @@ general secret detection.
 
 ## Linux watcher
 
-Configure one non-recursive input directory and install the optional systemd
-user unit with:
+The optional watcher is installed with PatchHarbor. Configure one
+non-recursive input directory and install its systemd user unit with:
 
 ```bash
 patchharbor-watcher --configure ~/Downloads
 patchharbor-watcher --install-systemd-user-unit
 systemctl --user daemon-reload
-systemctl --user enable --now patchharbor-watcher.service
 ```
 
-The installer writes the unit but never enables or starts it. Operational
-records go to stdout and stderr and can be read with `journalctl --user -u
-patchharbor-watcher.service`. Do not run the autonomous watcher and Repo Assist
-for the same repositories at the same time. The repository lock still rejects
-simultaneous PatchHarbor Core jobs, but it does not coordinate two workflow
-orchestrators.
+Activate or deactivate the service explicitly:
+
+```bash
+systemctl --user enable --now patchharbor-watcher.service
+systemctl --user disable --now patchharbor-watcher.service
+```
+
+The installer never enables or starts the service. Operational records go to
+stdout and stderr and can be read with:
+
+```bash
+journalctl --user -u patchharbor-watcher.service
+```
+
+Do not run the autonomous watcher and Repo Assist for the same repositories at
+the same time. The repository lock rejects simultaneous PatchHarbor Core jobs,
+but it does not coordinate two workflow orchestrators.

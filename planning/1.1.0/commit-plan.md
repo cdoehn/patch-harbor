@@ -1329,11 +1329,13 @@ Eine dünne Linux-Komponente erkennt abgeschlossene Download-Dateien und delegie
 
 ## Review nach Meilenstein 6
 
-- Definition of Done gegen das reale Verhalten prüfen.
-- falsche Annahmen und unnötig gewordene spätere Schritte dokumentieren.
-- verbleibenden Plan nur minimal anpassen.
-- sicherstellen, dass PatchHarbor weiterhin ein kontrollierter Runner bleibt.
-- Review im letzten Clean-Commit des Meilensteins abschließen; kein separater Review-Commit.
+**Review-Ergebnis nach 6.c.C:**
+
+- Die Definition of Done ist durch Stabilitäts-, Neustart-, Deduplizierungs-, Pfadgrenzen-, Schleifenvermeidungs-, Signal-, systemd- und echte Delegationstests abgedeckt.
+- Der Watcher ist als separates Paket und eigener Konsoleneinstieg abgegrenzt; seine einzige fachliche Core-Verbindung bleibt der öffentliche Subprozessaufruf `patchharbor apply --json`.
+- Gemeinsame Core-Nutzung ist auf bereits vorhandene Pfad- und Dateisystemgrenzen begrenzt; Manifest-, Registry-, Git-, Fingerprint-, Lock-, Execution- und Result-Bundle-Logik bleiben vollständig im Core.
+- Die Betriebsdokumentation bleibt auf Installation, Konfiguration, Aktivierung, Deaktivierung und journald beschränkt; eine allgemeine Daemon-Verwaltung oder Service-Orchestrierung ist nicht erforderlich.
+- Repo Assist und PromptBridge bleiben externe Komponenten, und der verbleibende Release-Plan benötigt keine fachliche Änderung. PatchHarbor Core bleibt ein endender kontrollierter Einzelauftrag.
 
 ---
 
