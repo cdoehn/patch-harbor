@@ -65,14 +65,15 @@ EXPECTED_RUNTIME_FILES = {
     "patchharbor/state_fingerprint.py",
     "patchharbor/temporary_resources.py",
     "patchharbor/user_paths.py",
-    "patchharbor/watcher.py",
-    "patchharbor/watcher_cli.py",
-    "patchharbor/watcher_configuration.py",
-    "patchharbor/watcher_lifecycle.py",
-    "patchharbor/watcher_loop_guard.py",
-    "patchharbor/watcher_state.py",
-    "patchharbor/watcher_subprocess.py",
-    "patchharbor/watcher_systemd.py",
+    "patchharbor_watcher/__init__.py",
+    "patchharbor_watcher/loop.py",
+    "patchharbor_watcher/cli.py",
+    "patchharbor_watcher/configuration.py",
+    "patchharbor_watcher/lifecycle.py",
+    "patchharbor_watcher/loop_guard.py",
+    "patchharbor_watcher/state.py",
+    "patchharbor_watcher/apply_boundary.py",
+    "patchharbor_watcher/systemd_linux.py",
     "patchharbor/zip_payloads.py",
     "patchharbor/platform/__init__.py",
     "patchharbor/platform/errors.py",
@@ -153,7 +154,7 @@ def test_release_metadata_is_complete_and_runtime_has_no_dependencies() -> None:
     assert project["dependencies"] == []
     assert project["scripts"] == {
         "patchharbor": "patchharbor.cli:main",
-        "patchharbor-watcher": "patchharbor.watcher_cli:main",
+        "patchharbor-watcher": "patchharbor_watcher.cli:main",
     }
     assert "Development Status :: 5 - Production/Stable" in project["classifiers"]
     assert (PROJECT_ROOT / "LICENSE").is_file()
@@ -186,7 +187,9 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
     with zipfile.ZipFile(wheels[0]) as wheel:
         names = set(wheel.namelist())
         runtime_files = {
-            name for name in names if name.startswith("patchharbor/")
+            name
+            for name in names
+            if name.startswith(("patchharbor/", "patchharbor_watcher/"))
         }
         assert runtime_files == EXPECTED_RUNTIME_FILES
         assert "patchharbor/input.py" not in names
@@ -213,7 +216,7 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
         assert wheel.read(entry_points_name).decode("utf-8").splitlines() == [
             "[console_scripts]",
             "patchharbor = patchharbor.cli:main",
-            "patchharbor-watcher = patchharbor.watcher_cli:main",
+            "patchharbor-watcher = patchharbor_watcher.cli:main",
         ]
 
     with tarfile.open(source_distributions[0], "r:gz") as source_distribution:
@@ -224,14 +227,15 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
             f"{root}/README.md",
             f"{root}/pyproject.toml",
             f"{root}/src/patchharbor/cli.py",
-            f"{root}/src/patchharbor/watcher.py",
-            f"{root}/src/patchharbor/watcher_cli.py",
-            f"{root}/src/patchharbor/watcher_configuration.py",
-            f"{root}/src/patchharbor/watcher_lifecycle.py",
-            f"{root}/src/patchharbor/watcher_loop_guard.py",
-            f"{root}/src/patchharbor/watcher_state.py",
-            f"{root}/src/patchharbor/watcher_subprocess.py",
-            f"{root}/src/patchharbor/watcher_systemd.py",
+            f"{root}/src/patchharbor_watcher/__init__.py",
+            f"{root}/src/patchharbor_watcher/loop.py",
+            f"{root}/src/patchharbor_watcher/cli.py",
+            f"{root}/src/patchharbor_watcher/configuration.py",
+            f"{root}/src/patchharbor_watcher/lifecycle.py",
+            f"{root}/src/patchharbor_watcher/loop_guard.py",
+            f"{root}/src/patchharbor_watcher/state.py",
+            f"{root}/src/patchharbor_watcher/apply_boundary.py",
+            f"{root}/src/patchharbor_watcher/systemd_linux.py",
         ):
             assert required in names
         for forbidden in (
@@ -295,6 +299,14 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
     assert list(empty_workdir.iterdir()) == []
 
     assert watcher_executable.is_file()
+
+    watcher_help = _run(
+        [str(watcher_executable), "--help"],
+        cwd=empty_workdir,
+        environment=environment,
+    )
+    assert watcher_help.returncode == 0
+    assert "usage: patchharbor-watcher" in watcher_help.stdout
 
     version_result = _run(
         [str(executable), "--version"],

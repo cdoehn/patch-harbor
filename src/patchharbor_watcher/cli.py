@@ -12,17 +12,27 @@ from patchharbor.path_configuration import (
     PreparedWatcherInput,
     prepare_watcher_input_directory,
 )
-from patchharbor.watcher import run_watcher
-from patchharbor.watcher_configuration import (
+from patchharbor_watcher.loop import run_watcher
+from patchharbor_watcher.configuration import (
     configure_watcher_input_directory,
     load_configured_watcher_input_directory,
 )
-from patchharbor.watcher_lifecycle import (
+from patchharbor_watcher.lifecycle import (
     WatcherStopController,
     installed_stop_signals,
 )
-from patchharbor.watcher_subprocess import delegate_to_apply
-from patchharbor.watcher_systemd import install_systemd_user_unit
+from patchharbor_watcher.apply_boundary import delegate_to_apply
+
+
+def _install_systemd_user_unit() -> Path:
+    """Load the Linux-only systemd boundary only for that explicit action."""
+    if not sys.platform.startswith("linux"):
+        raise RuntimeError(
+            "systemd user-unit installation is supported only on Linux"
+        )
+    from patchharbor_watcher.systemd_linux import install_systemd_user_unit
+
+    return install_systemd_user_unit()
 
 
 def _positive_seconds(value: str) -> float:
@@ -107,7 +117,7 @@ def main(
             return 0
         if arguments.install_systemd_user_unit:
             load_configured_watcher_input_directory()
-            unit_path = install_systemd_user_unit()
+            unit_path = _install_systemd_user_unit()
             print(unit_path, file=actual_stdout)
             return 0
 

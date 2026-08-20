@@ -9,7 +9,7 @@ from pathlib import Path
 import subprocess
 from typing import NoReturn
 
-from patchharbor.watcher import ApplyCompletion
+from patchharbor_watcher.loop import ApplyCompletion
 
 
 DEFAULT_APPLY_COMMAND = ("patchharbor",)

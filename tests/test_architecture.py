@@ -6,6 +6,7 @@ import sys
 
 
 PACKAGE_ROOT = Path(__file__).parents[1] / "src" / "patchharbor"
+WATCHER_PACKAGE_ROOT = Path(__file__).parents[1] / "src" / "patchharbor_watcher"
 
 
 def _local_imports(module_name: str) -> set[str]:
@@ -22,6 +23,31 @@ def _local_imports(module_name: str) -> set[str]:
                 if alias.name.startswith("patchharbor."):
                     imports.add(alias.name.split(".", 1)[1].split(".", 1)[0])
     return imports
+
+
+def _project_imports(path: Path) -> set[str]:
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    imports: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom) and node.module:
+            if node.module.startswith(("patchharbor.", "patchharbor_watcher.")):
+                imports.add(node.module)
+        elif isinstance(node, ast.Import):
+            for alias in node.names:
+                if alias.name.startswith(("patchharbor.", "patchharbor_watcher.")):
+                    imports.add(alias.name)
+    return imports
+
+
+def _imported_roots(path: Path) -> set[str]:
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    roots: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            roots.update(alias.name.split(".", 1)[0] for alias in node.names)
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            roots.add(node.module.split(".", 1)[0])
+    return roots
 
 
 def _called_name(expression: ast.expr) -> str | None:
@@ -616,67 +642,91 @@ def test_apply_orchestrator_delegates_mutation_execution_and_result_services() -
 
 
 def test_watcher_remains_separate_from_patchharbor_core() -> None:
-    assert _local_imports("watcher") == {
-        "watcher_loop_guard",
-        "watcher_state",
+    assert {
+        path.name for path in WATCHER_PACKAGE_ROOT.glob("*.py")
+    } == {
+        "__init__.py",
+        "apply_boundary.py",
+        "cli.py",
+        "configuration.py",
+        "lifecycle.py",
+        "loop.py",
+        "loop_guard.py",
+        "state.py",
+        "systemd_linux.py",
     }
-    assert _local_imports("watcher_loop_guard") == set()
-    assert _local_imports("watcher_state") == {"platform"}
-    assert _local_imports("watcher_lifecycle") == set()
-    assert _local_imports("watcher_subprocess") == {"watcher"}
-    assert _local_imports("watcher_configuration") == {
-        "path_configuration",
-        "platform",
-        "user_paths",
-    }
-    assert _local_imports("watcher_systemd") == {
-        "physical_paths",
-        "platform",
-    }
-    assert _local_imports("watcher_cli") == {
-        "path_configuration",
-        "watcher",
-        "watcher_configuration",
-        "watcher_lifecycle",
-        "watcher_subprocess",
-        "watcher_systemd",
-    }
+    assert not tuple(PACKAGE_ROOT.glob("watcher*.py"))
 
-    watcher_modules = (
-        "watcher",
-        "watcher_cli",
-        "watcher_configuration",
-        "watcher_lifecycle",
-        "watcher_loop_guard",
-        "watcher_state",
-        "watcher_subprocess",
-        "watcher_systemd",
-    )
+    expected_watcher_imports = {
+        "apply_boundary": {"patchharbor_watcher.loop"},
+        "cli": {
+            "patchharbor.path_configuration",
+            "patchharbor_watcher.apply_boundary",
+            "patchharbor_watcher.configuration",
+            "patchharbor_watcher.lifecycle",
+            "patchharbor_watcher.loop",
+            "patchharbor_watcher.systemd_linux",
+        },
+        "configuration": {
+            "patchharbor.path_configuration",
+            "patchharbor.platform.filesystem",
+            "patchharbor.user_paths",
+        },
+        "lifecycle": set(),
+        "loop": {
+            "patchharbor_watcher.loop_guard",
+            "patchharbor_watcher.state",
+        },
+        "loop_guard": set(),
+        "state": {"patchharbor.platform.filesystem"},
+        "systemd_linux": {
+            "patchharbor.physical_paths",
+            "patchharbor.platform.filesystem",
+        },
+    }
+    for module_name, expected in expected_watcher_imports.items():
+        assert _project_imports(
+            WATCHER_PACKAGE_ROOT / f"{module_name}.py"
+        ) == expected
+
+    for core_module in PACKAGE_ROOT.rglob("*.py"):
+        assert not any(
+            dependency.startswith("patchharbor_watcher.")
+            for dependency in _project_imports(core_module)
+        )
+
     forbidden_core_dependencies = {
-        "application",
-        "apply_preflight",
-        "apply_repository",
-        "execution",
-        "patch_manifest",
-        "patch_package",
-        "registry",
-        "repository_state",
-        "result_bundle",
+        "patchharbor.application",
+        "patchharbor.apply_preflight",
+        "patchharbor.apply_repository",
+        "patchharbor.cli",
+        "patchharbor.execution",
+        "patchharbor.patch_manifest",
+        "patchharbor.patch_package",
+        "patchharbor.registry",
+        "patchharbor.repository_state",
+        "patchharbor.result_bundle",
     }
-    for module_name in watcher_modules:
-        assert _local_imports(module_name).isdisjoint(forbidden_core_dependencies)
+    forbidden_network_roots = {
+        "asyncio",
+        "http",
+        "requests",
+        "socket",
+        "ssl",
+        "urllib",
+        "websockets",
+    }
+    for watcher_module in WATCHER_PACKAGE_ROOT.glob("*.py"):
+        assert _project_imports(watcher_module).isdisjoint(
+            forbidden_core_dependencies
+        )
+        assert _imported_roots(watcher_module).isdisjoint(
+            forbidden_network_roots
+        )
 
-    watcher_boundaries = {
-        "watcher",
-        "watcher_configuration",
-        "watcher_lifecycle",
-        "watcher_loop_guard",
-        "watcher_state",
-        "watcher_subprocess",
-        "watcher_systemd",
-    }
-    for module_name in ("application", "cli", "execution", "patch_package"):
-        assert _local_imports(module_name).isdisjoint(watcher_boundaries)
+    for forbidden_component in ("repo_assist", "promptbridge"):
+        forbidden_path = Path(__file__).parents[1] / "src" / forbidden_component
+        assert not forbidden_path.exists()
 
     path_policy_source = (PACKAGE_ROOT / "path_configuration.py").read_text(
         encoding="utf-8"
@@ -700,6 +750,41 @@ def test_runtime_module_dependencies_are_acyclic() -> None:
     def visit(module: str) -> None:
         if module in visiting:
             raise AssertionError(f"cyclic PatchHarbor import at {module}")
+        if module in visited:
+            return
+        visiting.add(module)
+        for dependency in graph[module]:
+            visit(dependency)
+        visiting.remove(module)
+        visited.add(module)
+
+    for module in sorted(modules):
+        visit(module)
+
+
+def test_watcher_module_dependencies_are_acyclic() -> None:
+    modules = {
+        path.stem
+        for path in WATCHER_PACKAGE_ROOT.glob("*.py")
+        if path.stem != "__init__"
+    }
+    graph = {
+        module: {
+            dependency.rsplit(".", 1)[-1]
+            for dependency in _project_imports(
+                WATCHER_PACKAGE_ROOT / f"{module}.py"
+            )
+            if dependency.startswith("patchharbor_watcher.")
+            and dependency.rsplit(".", 1)[-1] in modules
+        }
+        for module in modules
+    }
+    visiting: set[str] = set()
+    visited: set[str] = set()
+
+    def visit(module: str) -> None:
+        if module in visiting:
+            raise AssertionError(f"cyclic watcher import at {module}")
         if module in visited:
             return
         visiting.add(module)
@@ -857,7 +942,11 @@ def test_platform_error_text_is_normalized_outside_platform_modules() -> None:
 
 def test_runtime_package_imports_only_itself_and_the_standard_library() -> None:
     imported_roots: set[str] = set()
-    for module_path in PACKAGE_ROOT.rglob("*.py"):
+    runtime_modules = (
+        *PACKAGE_ROOT.rglob("*.py"),
+        *WATCHER_PACKAGE_ROOT.rglob("*.py"),
+    )
+    for module_path in runtime_modules:
         tree = ast.parse(module_path.read_text(encoding="utf-8"))
         for node in ast.walk(tree):
             if isinstance(node, ast.Import):
@@ -867,7 +956,11 @@ def test_runtime_package_imports_only_itself_and_the_standard_library() -> None:
             elif isinstance(node, ast.ImportFrom) and node.module:
                 imported_roots.add(node.module.split(".", 1)[0])
 
-    allowed = set(sys.stdlib_module_names) | {"__future__", "patchharbor"}
+    allowed = set(sys.stdlib_module_names) | {
+        "__future__",
+        "patchharbor",
+        "patchharbor_watcher",
+    }
     assert imported_roots <= allowed
 
 

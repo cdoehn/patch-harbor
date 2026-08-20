@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 import sys
 
-from patchharbor.watcher_subprocess import delegate_to_apply
+from patchharbor_watcher.apply_boundary import delegate_to_apply
 
 
 def _write_stub(path: Path, body: str) -> None:

@@ -29,7 +29,7 @@ dependencies = []
 
 [project.scripts]
 patchharbor = "patchharbor.cli:main"
-patchharbor-watcher = "patchharbor.watcher_cli:main"
+patchharbor-watcher = "patchharbor_watcher.cli:main"
 
 [project.optional-dependencies]
 dev = [
@@ -55,4 +55,4 @@ version = { attr = "patchharbor.__version__" }
 
 [tool.setuptools.packages.find]
 where = ["src"]
-include = ["patchharbor*"]
+include = ["patchharbor", "patchharbor.*", "patchharbor_watcher", "patchharbor_watcher.*"]

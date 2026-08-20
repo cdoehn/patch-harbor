@@ -8,15 +8,11 @@ import sys
 
 import pytest
 
-from patchharbor import watcher_cli
-from patchharbor.watcher_systemd import SYSTEMD_USER_UNIT_NAME
+from patchharbor_watcher import cli as watcher_cli
 from tests.registration_support import set_isolated_user_environment
 
 
-pytestmark = pytest.mark.skipif(
-    os.name != "posix" or not sys.platform.startswith("linux"),
-    reason="systemd user units are Linux-specific",
-)
+IS_LINUX = os.name == "posix" and sys.platform.startswith("linux")
 
 
 def _read_unit(path: Path) -> configparser.ConfigParser:
@@ -26,10 +22,37 @@ def _read_unit(path: Path) -> configparser.ConfigParser:
     return parser
 
 
+def test_non_linux_action_rejects_systemd_without_loading_linux_module(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    set_isolated_user_environment(monkeypatch, tmp_path / "user")
+    incoming = tmp_path / "incoming"
+    incoming.mkdir()
+    assert watcher_cli.main(
+        ["--configure", str(incoming)],
+        stdout=StringIO(),
+        stderr=StringIO(),
+    ) == 0
+
+    sys.modules.pop("patchharbor_watcher.systemd_linux", None)
+    monkeypatch.setattr(watcher_cli.sys, "platform", "win32")
+
+    assert watcher_cli.main(
+        ["--install-systemd-user-unit"],
+        stdout=StringIO(),
+        stderr=StringIO(),
+    ) == 1
+    assert "patchharbor_watcher.systemd_linux" not in sys.modules
+
+
+@pytest.mark.skipif(not IS_LINUX, reason="systemd user units are Linux-specific")
 def test_cli_installs_disabled_journald_service_only_after_configuration(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    from patchharbor_watcher.systemd_linux import SYSTEMD_USER_UNIT_NAME
+
     set_isolated_user_environment(monkeypatch, tmp_path / "user")
     unit_path = (
         Path(os.environ["XDG_CONFIG_HOME"])
@@ -61,7 +84,7 @@ def test_cli_installs_disabled_journald_service_only_after_configuration(
     unit = _read_unit(unit_path)
     assert unit["Service"]["Type"] == "simple"
     assert os.path.abspath(sys.executable) in unit["Service"]["ExecStart"]
-    assert "-m patchharbor.watcher_cli" in unit["Service"]["ExecStart"]
+    assert "-m patchharbor_watcher.cli" in unit["Service"]["ExecStart"]
     assert unit["Service"]["Restart"] == "on-failure"
     assert unit["Service"]["StandardOutput"] == "journal"
     assert unit["Service"]["StandardError"] == "journal"

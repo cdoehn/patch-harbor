@@ -7,8 +7,9 @@ import tomllib
 from tests.platform_support import PROJECT_ROOT
 
 
-PACKAGE_ROOT = PROJECT_ROOT / "src" / "patchharbor"
-EXPECTED_RUNTIME_FILES = {
+CORE_PACKAGE_ROOT = PROJECT_ROOT / "src" / "patchharbor"
+WATCHER_PACKAGE_ROOT = PROJECT_ROOT / "src" / "patchharbor_watcher"
+EXPECTED_CORE_RUNTIME_FILES = {
     "__init__.py",
     "application.py",
     "apply_mutation.py",
@@ -54,14 +55,6 @@ EXPECTED_RUNTIME_FILES = {
     "state_fingerprint.py",
     "temporary_resources.py",
     "user_paths.py",
-    "watcher.py",
-    "watcher_cli.py",
-    "watcher_configuration.py",
-    "watcher_lifecycle.py",
-    "watcher_loop_guard.py",
-    "watcher_state.py",
-    "watcher_subprocess.py",
-    "watcher_systemd.py",
     "zip_payloads.py",
     "platform/__init__.py",
     "platform/errors.py",
@@ -72,15 +65,31 @@ EXPECTED_RUNTIME_FILES = {
     "platform/runtime.py",
     "platform/windows.py",
 }
+EXPECTED_WATCHER_RUNTIME_FILES = {
+    "__init__.py",
+    "apply_boundary.py",
+    "cli.py",
+    "configuration.py",
+    "lifecycle.py",
+    "loop.py",
+    "loop_guard.py",
+    "state.py",
+    "systemd_linux.py",
+}
+
+
+def _runtime_files(root: Path) -> set[str]:
+    return {
+        path.relative_to(root).as_posix()
+        for path in root.rglob("*.py")
+    }
 
 
 def test_runtime_module_inventory_matches_the_release_architecture() -> None:
-    observed = {
-        path.relative_to(PACKAGE_ROOT).as_posix()
-        for path in PACKAGE_ROOT.rglob("*.py")
-    }
-
-    assert observed == EXPECTED_RUNTIME_FILES
+    assert _runtime_files(CORE_PACKAGE_ROOT) == EXPECTED_CORE_RUNTIME_FILES
+    assert _runtime_files(WATCHER_PACKAGE_ROOT) == EXPECTED_WATCHER_RUNTIME_FILES
+    assert not (PROJECT_ROOT / "src" / "repo_assist").exists()
+    assert not (PROJECT_ROOT / "src" / "promptbridge").exists()
 
 
 def test_release_entry_point_and_runtime_dependency_contract_are_exact() -> None:
@@ -90,7 +99,7 @@ def test_release_entry_point_and_runtime_dependency_contract_are_exact() -> None
 
     assert project["scripts"] == {
         "patchharbor": "patchharbor.cli:main",
-        "patchharbor-watcher": "patchharbor.watcher_cli:main",
+        "patchharbor-watcher": "patchharbor_watcher.cli:main",
     }
     assert project["dependencies"] == []
 

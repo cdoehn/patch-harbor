@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import signal
 
-from patchharbor.watcher_lifecycle import (
+from patchharbor_watcher.lifecycle import (
     WatcherStopController,
     installed_stop_signals,
 )

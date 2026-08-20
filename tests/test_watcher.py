@@ -7,15 +7,15 @@ import zipfile
 
 import pytest
 
-from patchharbor import watcher_state
+from patchharbor_watcher import state as watcher_state
 from patchharbor.platform.filesystem import FileSystemOperationError
-from patchharbor.watcher import (
+from patchharbor_watcher.loop import (
     ApplyCompletion,
     observe_input_directory,
     poll_input_directory_once,
 )
-from patchharbor.watcher_loop_guard import is_result_bundle_for_loop_prevention
-from patchharbor.watcher_state import (
+from patchharbor_watcher.loop_guard import is_result_bundle_for_loop_prevention
+from patchharbor_watcher.state import (
     FileIdentity,
     ProcessedFileStore,
     StabilityTracker,
@@ -377,7 +377,7 @@ def test_watcher_console_entry_point_configures_the_polling_loop(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from patchharbor import watcher_cli
+    from patchharbor_watcher import cli as watcher_cli
 
     observed: dict[str, object] = {}
 

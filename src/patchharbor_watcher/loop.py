@@ -13,8 +13,8 @@ import stat
 import time
 from typing import TextIO
 
-from patchharbor.watcher_loop_guard import is_result_bundle_for_loop_prevention
-from patchharbor.watcher_state import (
+from patchharbor_watcher.loop_guard import is_result_bundle_for_loop_prevention
+from patchharbor_watcher.state import (
     FileIdentity,
     FileObservation,
     ProcessedFileStore,

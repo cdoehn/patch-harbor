@@ -12,12 +12,12 @@ import pytest
 from patchharbor.errors import ExitCode
 from patchharbor.patch_manifest import PATCH_FORMAT_VERSION, PATCH_MARKER
 from patchharbor.state_fingerprint import FINGERPRINT_ALGORITHM
-from patchharbor.watcher import (
+from patchharbor_watcher.loop import (
     poll_input_directory_once,
     run_watcher,
 )
-from patchharbor.watcher_state import ProcessedFileStore, StabilityTracker
-from patchharbor.watcher_subprocess import delegate_to_apply
+from patchharbor_watcher.state import ProcessedFileStore, StabilityTracker
+from patchharbor_watcher.apply_boundary import delegate_to_apply
 from tests.platform_support import (
     native_script,
     native_value,

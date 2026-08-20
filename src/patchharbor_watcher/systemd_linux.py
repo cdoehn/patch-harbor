@@ -55,7 +55,7 @@ def render_systemd_user_unit(python_executable: Path) -> bytes:
         "\n"
         "[Service]\n"
         "Type=simple\n"
-        f"ExecStart={executable} -m patchharbor.watcher_cli\n"
+        f"ExecStart={executable} -m patchharbor_watcher.cli\n"
         "Environment=PYTHONUNBUFFERED=1\n"
         "Restart=on-failure\n"
         "RestartSec=2\n"

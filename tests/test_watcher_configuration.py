@@ -7,8 +7,8 @@ from pathlib import Path
 import pytest
 
 from patchharbor.user_paths import registration_user_paths
-from patchharbor.watcher import ApplyCompletion, run_watcher
-from patchharbor.watcher_configuration import (
+from patchharbor_watcher.loop import ApplyCompletion, run_watcher
+from patchharbor_watcher.configuration import (
     WatcherConfigurationError,
     configure_watcher_input_directory,
     load_configured_watcher_input_directory,
@@ -102,7 +102,7 @@ def test_cli_configures_then_runs_the_persisted_input_without_a_positional_path(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from patchharbor import watcher_cli
+    from patchharbor_watcher import cli as watcher_cli
 
     set_isolated_user_environment(monkeypatch, tmp_path / "user")
     incoming = tmp_path / "incoming"
