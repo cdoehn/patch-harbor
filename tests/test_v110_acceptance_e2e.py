@@ -4,16 +4,12 @@ from __future__ import annotations
 
 from io import StringIO
 import json
-import os
 from pathlib import Path
 import sys
-import tempfile
 import zipfile
 
 import pytest
 
-import patchharbor.result_bundle_publication as publication_module
-from patchharbor.cli import main as cli_main
 from patchharbor.errors import ExitCode
 from patchharbor.patch_manifest import PATCH_FORMAT_VERSION, PATCH_MARKER
 from patchharbor.state_fingerprint import FINGERPRINT_ALGORITHM
@@ -29,7 +25,6 @@ from tests.platform_support import (
 from tests.registration_support import (
     create_repository,
     isolated_user_environment,
-    set_isolated_user_environment,
 )
 
 
@@ -305,60 +300,57 @@ def test_v110_acceptance_entrypoint_failure_preserves_exit_and_result_bundle(
 
 def test_v110_acceptance_bundle_failure_after_success_returns_eleven(
     tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    set_isolated_user_environment(monkeypatch, tmp_path / "user")
-    private_temp = tmp_path / "system-temp"
-    private_temp.mkdir()
-    for name in ("TMPDIR", "TEMP", "TMP"):
-        monkeypatch.setenv(name, str(private_temp))
-    monkeypatch.setattr(tempfile, "tempdir", None)
-
     repository = create_repository(tmp_path / "repository")
     environment = isolated_user_environment(tmp_path / "user")
+    private_temp = tmp_path / "system-temp"
+    private_temp.mkdir()
+    environment.update(
+        {name: str(private_temp) for name in ("TMPDIR", "TEMP", "TMP")}
+    )
     context = _register_and_context(repository, environment)
     package = tmp_path / "bundle-failure.zip"
+    output_directory = tmp_path / "results"
+    posix_result_path = str(output_directory).replace("'", "'\"'\"'")
+    powershell_result_path = str(output_directory).replace("'", "''")
     _write_patch_package(
         package,
         context,
         entrypoint=native_script(
-            "printf 'bundle-failure-diagnostics\\n'\n"
-            "printf completed > completed.txt",
+            "printf 'bundle-failure-diagnostics\n'\n"
+            "printf completed > completed.txt\n"
+            f"rm -rf -- '{posix_result_path}'\n"
+            f"printf blocked > '{posix_result_path}'",
             "[Console]::Out.WriteLine('bundle-failure-diagnostics')\n"
-            "[System.IO.File]::WriteAllText('completed.txt', 'completed')",
+            "[System.IO.File]::WriteAllText('completed.txt', 'completed')\n"
+            f"Remove-Item -LiteralPath '{powershell_result_path}' "
+            "-Recurse -Force\n"
+            f"[System.IO.File]::WriteAllText("
+            f"'{powershell_result_path}', 'blocked')",
         ),
         payloads={"payload.bin": b"primary-success"},
     )
-    output_directory = tmp_path / "results"
 
-    def reject_publication(_source: Path, _target: Path) -> None:
-        raise OSError("simulated publication failure")
-
-    monkeypatch.setattr(publication_module, "replace_path", reject_publication)
-    stdout = StringIO()
-    exit_code = cli_main(
-        [
-            "apply",
-            "--json",
-            "--output-dir",
-            str(output_directory),
-            str(package),
-        ],
-        stdin=StringIO(),
-        stdout=stdout,
-        stderr=StringIO(),
+    completed = run_cli(
+        tmp_path,
+        "apply",
+        "--json",
+        "--output-dir",
+        str(output_directory),
+        str(package),
+        environment_overrides=environment,
+        timeout_seconds=120,
     )
 
-    assert exit_code == int(ExitCode.RESULT_BUNDLE_ERROR)
-    envelope = json.loads(stdout.getvalue())
+    assert completed.returncode == int(ExitCode.RESULT_BUNDLE_ERROR)
+    envelope = json.loads(completed.stdout)
     result = envelope["result"]
     assert result["primary_result"]["kind"] == "success"
     assert result["result_bundle"]["status"] == "failed"
     assert result["result_bundle"]["path"] is None
     assert (repository / "payload.bin").read_bytes() == b"primary-success"
     assert (repository / "completed.txt").read_text(encoding="utf-8") == "completed"
-    assert not tuple(output_directory.glob("patchharbor_result_*.zip"))
-    assert not tuple(output_directory.glob(".*.tmp"))
+    assert output_directory.is_file()
 
     emergency_path = Path(result["result_bundle"]["emergency_diagnostics_path"])
     assert emergency_path.is_dir()
@@ -371,7 +363,6 @@ def test_v110_acceptance_bundle_failure_after_success_returns_eleven(
     assert emergency_run["primary_result"]["kind"] == "success"
     assert emergency_run["result_bundle"]["status"] == "failed"
     assert emergency_run["process_exit_code"] == int(ExitCode.RESULT_BUNDLE_ERROR)
-
 
 def test_v110_acceptance_watcher_delegates_to_real_apply_once(
     tmp_path: Path,

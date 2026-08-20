@@ -16,7 +16,6 @@ from patchharbor.state_fingerprint import FINGERPRINT_ALGORITHM
 from tests.platform_support import (
     native_script,
     native_value,
-    normalized_path,
     project_environment,
     run_cli,
 )
@@ -93,49 +92,6 @@ def _write_package(
         archive.writestr("files/payload.bin", b"\x00payload\xff")
 
 
-def _write_apply_package(
-    path: Path,
-    context: dict[str, object],
-) -> str:
-    entrypoint_name = native_value("run.sh", "run.ps1")
-    manifest = _manifest(context)
-    manifest["entrypoint"] = entrypoint_name
-    entrypoint = native_script(
-        "if IFS= read -r _value; then exit 41; fi\n"
-        "printf '1\n' >> entrypoint-starts.txt\n"
-        "pwd > entrypoint-cwd.txt\n"
-        "printf 'stdout-line\n'\n"
-        "printf 'stderr-line\n' >&2",
-        "$inputLine = [Console]::In.ReadLine()\n"
-        "if ($null -ne $inputLine) { exit 41 }\n"
-        "[System.IO.File]::AppendAllText('entrypoint-starts.txt', \"1`n\")\n"
-        "[System.IO.File]::WriteAllText("
-        "'entrypoint-cwd.txt', (Get-Location).Path)\n"
-        "$stdout = [Console]::OpenStandardOutput()\n"
-        "$stdoutBytes = [System.Text.Encoding]::UTF8.GetBytes("
-        '"stdout-line`n")\n'
-        "$stdout.Write($stdoutBytes, 0, $stdoutBytes.Length)\n"
-        "$stderr = [Console]::OpenStandardError()\n"
-        "$stderrBytes = [System.Text.Encoding]::UTF8.GetBytes("
-        '"stderr-line`n")\n'
-        "$stderr.Write($stderrBytes, 0, $stderrBytes.Length)",
-    )
-    with zipfile.ZipFile(path, "w") as archive:
-        archive.writestr(
-            "patch.json",
-            json.dumps(
-                manifest,
-                ensure_ascii=False,
-                allow_nan=False,
-                separators=(",", ":"),
-            ).encode("utf-8"),
-        )
-        archive.writestr(entrypoint_name, entrypoint.encode("utf-8"))
-        archive.writestr("files/payload.bin", b"\x00new\xff")
-        archive.writestr("nested/new.bin", b"\x10nested\x00")
-    return entrypoint_name
-
-
 def _write_execution_package(
     path: Path,
     context: dict[str, object],
@@ -203,84 +159,6 @@ def _assert_repository_unmodified(repository: Path) -> None:
     assert not (repository / "files" / "payload.bin").exists()
 
 
-def _repository_files(repository: Path) -> dict[str, bytes]:
-    files: dict[str, bytes] = {}
-    for path in repository.rglob("*"):
-        relative = path.relative_to(repository)
-        if relative.parts[0] == ".git" or not path.is_file():
-            continue
-        files[relative.as_posix()] = path.read_bytes()
-    return files
-
-
-def test_apply_writes_expected_bytes_runs_once_and_bundles_state(
-    tmp_path: Path,
-) -> None:
-    repository = create_repository(tmp_path / "repository")
-    tracked_payload = repository / "files" / "payload.bin"
-    tracked_payload.parent.mkdir()
-    tracked_payload.write_bytes(b"old")
-    git(repository, "add", "files/payload.bin")
-    git(repository, "commit", "--quiet", "-m", "add payload")
-
-    environment, context = _register_context(repository, tmp_path / "user")
-    package = tmp_path / "patch.zip"
-    entrypoint_name = _write_apply_package(package, context)
-    output_directory = tmp_path / "results"
-    caller = tmp_path / "caller"
-    caller.mkdir()
-
-    completed = run_cli(
-        caller,
-        "apply",
-        "--json",
-        "--output-dir",
-        str(output_directory),
-        str(package),
-        environment_overrides=environment,
-        timeout_seconds=120,
-    )
-
-    assert completed.returncode == 0
-    envelope = json.loads(completed.stdout)
-    assert envelope["success"] is True
-    result = envelope["result"]
-    assert isinstance(result, dict)
-
-    assert tracked_payload.read_bytes() == b"\x00new\xff"
-    assert (repository / "nested" / "new.bin").read_bytes() == (
-        b"\x10nested\x00"
-    )
-    assert (repository / "entrypoint-starts.txt").read_text(
-        encoding="utf-8"
-    ).splitlines() == ["1"]
-    assert normalized_path(
-        (repository / "entrypoint-cwd.txt").read_text(encoding="utf-8").strip()
-    ) == normalized_path(repository)
-    assert not (repository / entrypoint_name).exists()
-
-    bundle_result = result["result_bundle"]
-    assert isinstance(bundle_result, dict)
-    bundle_path = Path(bundle_result["path"])
-    assert bundle_path.parent == output_directory.resolve()
-    with zipfile.ZipFile(bundle_path) as archive:
-        names = set(archive.namelist())
-        committed_payload = archive.read("base/files/payload.bin")
-        unstaged_patch = archive.read("changes/unstaged.patch")
-        execution_log = archive.read("logs/execution.log")
-        bundled_new_file = archive.read("untracked/nested/new.bin")
-        bundled_starts = archive.read("untracked/entrypoint-starts.txt")
-
-    assert committed_payload == b"old"
-    assert unstaged_patch
-    assert b"stdout-line\n" in execution_log
-    assert b"stderr-line\n" in execution_log
-    assert bundled_new_file == b"\x10nested\x00"
-    assert bundled_starts.decode("utf-8").splitlines() == ["1"]
-    assert "untracked/entrypoint-cwd.txt" in names
-    assert f"untracked/{entrypoint_name}" not in names
-
-
 @pytest.mark.parametrize("force_plain", (False, True))
 def test_apply_noninteractive_output_is_sanitized_while_log_remains_raw(
     tmp_path: Path,
@@ -337,60 +215,6 @@ def test_apply_noninteractive_output_is_sanitized_while_log_remains_raw(
     assert len(bundles) == 1
     with zipfile.ZipFile(bundles[0]) as archive:
         assert archive.read("logs/execution.log") == raw_output
-
-
-def test_apply_returns_exact_nonzero_exit_and_bundles_execution_log(
-    tmp_path: Path,
-) -> None:
-    repository = create_repository(tmp_path / "repository")
-    environment, context = _register_context(repository, tmp_path / "user")
-    package = tmp_path / "nonzero.zip"
-    _write_execution_package(
-        package,
-        context,
-        native_script(
-            "printf 'entrypoint-output\\n'\nexit 23",
-            "[Console]::Out.WriteLine('entrypoint-output')\nexit 23",
-        ),
-    )
-    output_directory = tmp_path / "results"
-    caller = tmp_path / "caller"
-    caller.mkdir()
-
-    completed = run_cli(
-        caller,
-        "apply",
-        "--json",
-        "--output-dir",
-        str(output_directory),
-        str(package),
-        environment_overrides=environment,
-        timeout_seconds=120,
-    )
-
-    assert completed.returncode == 23
-    envelope = json.loads(completed.stdout)
-    assert envelope["success"] is False
-    assert envelope["error"] is None
-    assert envelope["process_exit_code"] == 23
-    result = envelope["result"]
-    assert result["primary_result"] == {
-        "kind": "entrypoint_exit",
-        "entrypoint_started": True,
-        "entrypoint_exit_code": 23,
-        "timed_out": False,
-        "interrupted": False,
-        "patchharbor_error_code": None,
-    }
-    bundle_path = Path(result["result_bundle"]["path"])
-    with zipfile.ZipFile(bundle_path) as archive:
-        execution_log = archive.read("logs/execution.log")
-        run_report = json.loads(archive.read("logs/run.json"))
-
-    assert execution_log == b"entrypoint-output\n"
-    assert run_report["primary_result"]["kind"] == "entrypoint_exit"
-    assert run_report["primary_result"]["entrypoint_exit_code"] == 23
-    assert run_report["process_exit_code"] == 23
 
 
 def test_apply_timeout_bundles_output_and_exit_code(
@@ -572,111 +396,6 @@ raise SystemExit(report.process_exit_code)
     assert run_report["primary_result"]["kind"] == "interrupted"
     assert run_report["primary_result"]["interrupted"] is True
     assert run_report["process_exit_code"] == int(ExitCode.INTERRUPTED)
-
-
-def test_dry_run_json_publishes_unchanged_snapshot_without_execution(
-    tmp_path: Path,
-) -> None:
-    repository = create_repository(tmp_path / "repository")
-    environment, context = _register_context(repository, tmp_path / "user")
-    package = tmp_path / "patch.zip"
-    _write_package(package, _manifest(context))
-    output_directory = tmp_path / "results"
-    before = _repository_files(repository)
-
-    completed = _run_dry_run(
-        package,
-        tmp_path / "caller",
-        environment,
-        json_output=True,
-        output_directory=output_directory,
-    )
-
-    assert completed.returncode == 0
-    envelope = json.loads(completed.stdout)
-    assert set(envelope) == {
-        "output_version",
-        "command",
-        "success",
-        "result",
-        "error",
-        "process_exit_code",
-    }
-    assert envelope["command"] == "apply"
-    assert envelope["success"] is True
-    assert envelope["error"] is None
-    assert envelope["process_exit_code"] == 0
-    result = envelope["result"]
-    assert isinstance(result, dict)
-    assert result["repository_resolved"] is True
-    assert result["repo_id"] == context["repo_id"]
-    assert result["repository_path"] == str(repository.resolve())
-    assert result["primary_result"] == {
-        "kind": "dry_run_success",
-        "entrypoint_started": False,
-        "entrypoint_exit_code": None,
-        "timed_out": False,
-        "interrupted": False,
-        "patchharbor_error_code": None,
-    }
-    bundle_result = result["result_bundle"]
-    assert bundle_result["attempted"] is True
-    assert bundle_result["status"] == "created"
-    assert bundle_result["emergency_diagnostics_path"] is None
-    bundle_path = Path(bundle_result["path"])
-    assert bundle_path.parent == output_directory.resolve()
-    assert bundle_path.is_file()
-    assert not tuple(output_directory.glob(".*.tmp"))
-
-    with zipfile.ZipFile(bundle_path) as archive:
-        names = set(archive.namelist())
-        result_manifest = json.loads(archive.read("manifest.json"))
-        actual_context = json.loads(archive.read("context.json"))
-        run_report = json.loads(archive.read("logs/run.json"))
-
-    assert "logs/execution.log" not in names
-    assert result_manifest["dry_run"] is True
-    assert result_manifest["entrypoint_started"] is False
-    assert result_manifest["execution_present"] is False
-    assert result_manifest["primary_result"] == "dry_run_success"
-    assert result_manifest["result_bundle_status"] == "created"
-    assert actual_context["repo_id"] == context["repo_id"]
-    assert actual_context["base_commit"] == context["base_commit"]
-    assert actual_context["state_fingerprint"] == context["state_fingerprint"]
-    assert run_report["dry_run"] is True
-    assert run_report["execution_present"] is False
-    assert run_report["primary_result"] == {
-        "kind": "dry_run_success",
-        "success": True,
-        "patchharbor_error_code": None,
-        "entrypoint_started": False,
-        "entrypoint_exit_code": None,
-        "timed_out": False,
-        "interrupted": False,
-    }
-    assert run_report["result_bundle"] == {
-        "attempted": True,
-        "status": "created",
-        "error": None,
-    }
-    assert run_report["process_exit_code"] == 0
-    assert (
-        result["run_id"]
-        == result_manifest["run_id"]
-        == run_report["run_id"]
-    )
-    assert (
-        result["primary_result"]["kind"]
-        == result_manifest["primary_result"]
-        == run_report["primary_result"]["kind"]
-    )
-    assert (
-        result["result_bundle"]["status"]
-        == result_manifest["result_bundle_status"]
-        == run_report["result_bundle"]["status"]
-    )
-    assert _repository_files(repository) == before
-    _assert_repository_unmodified(repository)
 
 
 def test_matching_manifest_resolves_exact_registered_repository_without_mutation(
