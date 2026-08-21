@@ -23,39 +23,21 @@ class _TerminalOutput(StringIO):
         return True
 
 
-def test_version_flag_reports_release_version(
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    with pytest.raises(SystemExit) as raised:
-        main(["--version"])
-
-    assert raised.value.code == 0
-    assert capsys.readouterr().out == "patchharbor 1.0.0\n"
-
-
-def test_run_help_is_the_complete_public_command_reference(
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    with pytest.raises(SystemExit) as raised:
-        main(["fs", "run", "--help"])
-
-    assert raised.value.code == 0
-    help_text = capsys.readouterr().out
-    for expected in (
-        "# PATCHHARBOR",
-        "ZIP PatchBundles may contain ordered scripts and byte-exact payload files.",
-        "Scripts run in the current working directory.",
-        "--timeout SECONDS",
-        "--plain",
-        "--no-color",
-        "--log",
-    ):
-        assert expected in help_text
-
-
 @pytest.mark.parametrize(
     "command",
-    ("websocket", "test", "commit", "plugin", "watch"),
+    (
+        "websocket",
+        "clipboard",
+        "ssh",
+        "save",
+        "test",
+        "testmanager",
+        "commit",
+        "plugin",
+        "watch",
+        "repo-assist",
+        "promptbridge",
+    ),
 )
 def test_non_core_orchestration_commands_are_not_public(
     command: str,

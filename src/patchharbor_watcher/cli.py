@@ -8,10 +8,7 @@ from pathlib import Path
 import sys
 from typing import TextIO
 
-from patchharbor.path_configuration import (
-    PreparedWatcherInput,
-    prepare_watcher_input_directory,
-)
+from patchharbor.path_configuration import prepare_watcher_input_directory
 from patchharbor_watcher.loop import run_watcher
 from patchharbor_watcher.configuration import (
     configure_watcher_input_directory,

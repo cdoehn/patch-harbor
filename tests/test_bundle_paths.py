@@ -4,7 +4,6 @@ import pytest
 
 from patchharbor.bundle_paths import (
     BundlePathError,
-    is_safe_bundle_path,
     normalize_bundle_path,
     validate_bundle_member_paths,
 )
@@ -19,7 +18,6 @@ from patchharbor.bundle_paths import (
     ),
 )
 def test_safe_bundle_paths_are_portable(path: str) -> None:
-    assert is_safe_bundle_path(path)
     assert normalize_bundle_path(path) == path
 
 
@@ -43,7 +41,6 @@ def test_safe_bundle_paths_are_portable(path: str) -> None:
     ),
 )
 def test_unsafe_bundle_paths_are_rejected(path: str) -> None:
-    assert not is_safe_bundle_path(path)
     with pytest.raises(BundlePathError):
         normalize_bundle_path(path)
 
@@ -94,7 +91,6 @@ def test_windows_reserved_names_are_rejected_in_every_path_segment(
     reserved_name: str,
 ) -> None:
     for candidate in (reserved_name, f"assets/{reserved_name}"):
-        assert not is_safe_bundle_path(candidate)
         with pytest.raises(BundlePathError):
             normalize_bundle_path(candidate)
 
@@ -110,6 +106,5 @@ def test_windows_reserved_names_are_rejected_in_every_path_segment(
     ),
 )
 def test_windows_drive_unc_and_stream_path_forms_are_rejected(path: str) -> None:
-    assert not is_safe_bundle_path(path)
     with pytest.raises(BundlePathError):
         normalize_bundle_path(path)

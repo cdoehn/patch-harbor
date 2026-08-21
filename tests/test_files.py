@@ -5,7 +5,6 @@ from pathlib import Path
 
 import pytest
 
-from patchharbor.bundle_paths import is_safe_bundle_path
 from patchharbor.errors import ExitCode, PatchHarborError
 from patchharbor.models import BundlePayload
 import patchharbor.platform.filesystem as platform_filesystem
@@ -22,7 +21,6 @@ def test_bundle_payload_is_written_byte_exactly_in_relative_directory(
 ) -> None:
     content = bytes((0, 1, 2, 255)) + b"PATCH"
 
-    assert is_safe_bundle_path("assets/blob.bin")
     write_bundle_payloads(
         (BundlePayload("assets/blob.bin", content),),
         cwd=tmp_path,

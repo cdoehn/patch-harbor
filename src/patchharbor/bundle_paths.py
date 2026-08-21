@@ -34,7 +34,7 @@ class _PathNode:
     explicit: bool
 
 
-def is_safe_path_segment(segment: str) -> bool:
+def _is_safe_path_segment(segment: str) -> bool:
     """Return whether one path segment is portable across Linux and Windows."""
     if _SEGMENT_PATTERN.fullmatch(segment) is None:
         return False
@@ -72,7 +72,7 @@ def normalize_bundle_path(raw_path: str, *, is_directory: bool = False) -> str:
 
     segments = candidate.split("/")
     for segment in segments:
-        if not is_safe_path_segment(segment):
+        if not _is_safe_path_segment(segment):
             raise BundlePathError(
                 f"unsafe path segment {segment!r} in {raw_path!r}"
             )
@@ -81,15 +81,6 @@ def normalize_bundle_path(raw_path: str, *, is_directory: bool = False) -> str:
                 f"reserved internal path segment {segment!r} in {raw_path!r}"
             )
     return "/".join(segments)
-
-
-def is_safe_bundle_path(relative_path: str) -> bool:
-    """Return whether a file path is a safe normalized bundle target."""
-    try:
-        normalize_bundle_path(relative_path)
-    except BundlePathError:
-        return False
-    return True
 
 
 def validate_bundle_member_paths(

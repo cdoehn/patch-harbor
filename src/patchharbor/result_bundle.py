@@ -43,7 +43,6 @@ from patchharbor.run_report import (
     ApplyPrimaryOutcome,
     PrimaryResult,
     ResultBundleResult,
-    ResultBundleStatus,
     RunOperation,
     RunReport,
     RunSession,

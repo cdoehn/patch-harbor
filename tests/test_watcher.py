@@ -7,6 +7,7 @@ import zipfile
 
 import pytest
 
+from patchharbor.path_configuration import PreparedWatcherInput
 from patchharbor_watcher import state as watcher_state
 from patchharbor.platform.filesystem import FileSystemOperationError
 from patchharbor_watcher.loop import (
@@ -373,6 +374,7 @@ def test_result_bundle_loop_guard_uses_only_the_reserved_marker(
     assert is_result_bundle_for_loop_prevention(result_bundle)
     assert not is_result_bundle_for_loop_prevention(ordinary_zip)
 
+
 def test_watcher_console_entry_point_configures_the_polling_loop(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -389,7 +391,7 @@ def test_watcher_console_entry_point_configures_the_polling_loop(
     monkeypatch.setattr(
         watcher_cli,
         "prepare_watcher_input_directory",
-        lambda _path: watcher_cli.PreparedWatcherInput(
+        lambda _path: PreparedWatcherInput(
             directory=tmp_path.resolve(),
             state_path=state_path,
         ),

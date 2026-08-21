@@ -14,6 +14,37 @@ PACKAGE_ROOTS = {
     "patchharbor_watcher": WATCHER_PACKAGE_ROOT,
 }
 
+ENTRYPOINT_MODULES = {
+    "patchharbor.cli",
+    "patchharbor_watcher",
+    "patchharbor_watcher.cli",
+}
+FORBIDDEN_SCOPE_MODULE_PARTS = {
+    "clipboard",
+    "common",
+    "helpers",
+    "plugin",
+    "plugins",
+    "promptbridge",
+    "repo_assist",
+    "save_mode",
+    "ssh",
+    "test_manager",
+    "testmanager",
+    "utils",
+    "websocket",
+    "websockets",
+}
+FORBIDDEN_ASYNC_OR_TRANSPORT_ROOTS = {
+    "asyncio",
+    "http",
+    "requests",
+    "socket",
+    "ssl",
+    "urllib",
+    "websockets",
+}
+
 
 def _module_name(package: str, root: Path, path: Path) -> str:
     relative = path.relative_to(root)
@@ -115,6 +146,39 @@ def _assert_acyclic(graph: dict[str, frozenset[str]]) -> None:
 
 def test_runtime_import_graph_is_acyclic() -> None:
     _assert_acyclic(_dependency_graph())
+
+
+def test_runtime_has_no_dead_or_generic_scope_modules() -> None:
+    graph = _dependency_graph()
+    inbound: dict[str, set[str]] = {module: set() for module in graph}
+    for module, dependencies in graph.items():
+        for dependency in dependencies:
+            inbound[dependency].add(module)
+
+    assert {module for module, users in inbound.items() if not users} == (
+        ENTRYPOINT_MODULES
+    )
+    for module in graph:
+        assert set(module.split(".")).isdisjoint(
+            FORBIDDEN_SCOPE_MODULE_PARTS
+        ), module
+
+
+def test_runtime_has_no_async_core_or_transport_framework() -> None:
+    async_nodes = (
+        ast.AsyncFor,
+        ast.AsyncFunctionDef,
+        ast.AsyncWith,
+        ast.Await,
+    )
+    for module, path in _runtime_modules().items():
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        assert not any(isinstance(node, async_nodes) for node in ast.walk(tree)), (
+            module
+        )
+        assert _import_roots(path).isdisjoint(
+            FORBIDDEN_ASYNC_OR_TRANSPORT_ROOTS
+        ), module
 
 
 def test_application_is_the_only_core_workflow_orchestrator() -> None:
@@ -325,18 +389,11 @@ def test_watcher_is_separate_and_uses_only_the_public_apply_process_boundary() -
         if dependency.startswith("patchharbor.")
     }
 
-    forbidden_network_roots = {
-        "asyncio",
-        "http",
-        "requests",
-        "socket",
-        "ssl",
-        "urllib",
-        "websockets",
-    }
     for module in watcher_modules:
         path = _runtime_modules()[module]
-        assert _import_roots(path).isdisjoint(forbidden_network_roots), module
+        assert _import_roots(path).isdisjoint(
+            FORBIDDEN_ASYNC_OR_TRANSPORT_ROOTS
+        ), module
         if module != "patchharbor_watcher.apply_boundary":
             assert "subprocess" not in _import_roots(path), module
 
