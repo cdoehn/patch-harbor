@@ -39,6 +39,21 @@ def _manifest_bytes(
     ).encode("utf-8")
 
 
+def _write_exact_member(
+    archive: zipfile.ZipFile,
+    member: str | zipfile.ZipInfo,
+    content: bytes,
+) -> None:
+    if isinstance(member, zipfile.ZipInfo):
+        archive.writestr(member, content)
+        return
+
+    entry = zipfile.ZipInfo("placeholder")
+    entry.filename = member
+    entry.orig_filename = member
+    archive.writestr(entry, content)
+
+
 def _write_package(
     path: Path,
     *,
@@ -52,7 +67,7 @@ def _write_package(
         )
         archive.writestr("run.sh", _ENTRYPOINT)
         for name, content in entries:
-            archive.writestr(name, content)
+            _write_exact_member(archive, name, content)
 
 
 def _assert_source_error(path: Path, policy: ResourcePolicy | None = None) -> None:
@@ -128,6 +143,21 @@ def test_package_rejects_unsafe_and_internal_paths(
 ) -> None:
     package_path = tmp_path / "unsafe.zip"
     _write_package(package_path, entries=((unsafe_path, b"payload"),))
+
+    _assert_source_error(package_path)
+
+
+def test_package_rejects_raw_backslash_after_host_normalization(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    package_path = tmp_path / "windows-normalized.zip"
+    monkeypatch.setattr(zipfile.os, "sep", "\\")
+    monkeypatch.setattr(zipfile.os, "altsep", "/")
+    _write_package(
+        package_path,
+        entries=((r"files\payload.bin", b"payload"),),
+    )
 
     _assert_source_error(package_path)
 
