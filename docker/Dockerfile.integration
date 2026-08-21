@@ -3,6 +3,9 @@
 ARG UBUNTU_VERSION=24.04
 FROM ubuntu:${UBUNTU_VERSION}
 
+ARG PYTHON_VERSION=3.12.14
+ARG PYTHON_SOURCE_SHA256=5c8462af5790baf43a321a1559dbe0db06d1be4300fb85fb53c40060668e548a
+
 ENV DEBIAN_FRONTEND=noninteractive \
     LANG=C.UTF-8 \
     LC_ALL=C.UTF-8 \
@@ -10,22 +13,42 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     VIRTUAL_ENV=/opt/venv
-ENV PATH="${VIRTUAL_ENV}/bin:${PATH}"
+ENV PATH="${VIRTUAL_ENV}/bin:/opt/python/bin:${PATH}"
 
 RUN apt-get update \
     && apt-get install --yes --no-install-recommends \
         bash \
         build-essential \
         ca-certificates \
+        curl \
         git \
-        python3 \
-        python3-pip \
-        python3-venv \
-        unzip \
-        zip \
+        libbz2-dev \
+        libffi-dev \
+        libgdbm-dev \
+        liblzma-dev \
+        libncurses-dev \
+        libreadline-dev \
+        libsqlite3-dev \
+        libssl-dev \
+        pkg-config \
+        tk-dev \
+        uuid-dev \
+        xz-utils \
+        zlib1g-dev \
+    && curl --fail --location --show-error --silent \
+        "https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tar.xz" \
+        --output /tmp/Python.tar.xz \
+    && printf '%s  %s\n' "${PYTHON_SOURCE_SHA256}" /tmp/Python.tar.xz \
+        | sha256sum --check --strict \
+    && tar --extract --file /tmp/Python.tar.xz --directory /tmp \
+    && cd "/tmp/Python-${PYTHON_VERSION}" \
+    && ./configure --prefix=/opt/python --with-ensurepip=install \
+    && make --jobs="$(nproc)" \
+    && make install \
+    && rm -rf /tmp/Python.tar.xz "/tmp/Python-${PYTHON_VERSION}" \
     && rm -rf /var/lib/apt/lists/*
 
-RUN python3 -m venv "${VIRTUAL_ENV}" \
+RUN python3.12 -m venv "${VIRTUAL_ENV}" \
     && python -m pip install --upgrade pip setuptools wheel
 
 WORKDIR /workspace
@@ -33,11 +56,11 @@ COPY . .
 
 RUN python -c 'from pathlib import Path; import tomllib; project = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8")); requirements = project["project"]["optional-dependencies"]["dev"]; Path("/tmp/patchharbor-test-requirements.txt").write_text("".join(f"{item}\n" for item in requirements), encoding="utf-8")' \
     && python -m pip install --requirement /tmp/patchharbor-test-requirements.txt \
-    && python -m pip show pytest-timeout pipx >/dev/null
+    && python scripts/check_docker_integration_environment.py
 
 RUN rm -rf /tmp/patchharbor-dist \
     && python scripts/build_release.py --outdir /tmp/patchharbor-dist \
     && python -m pip install --force-reinstall /tmp/patchharbor-dist/*.whl \
     && python -m pip check
 
-CMD ["python", "-m", "pytest", "-q", "tests"]
+CMD ["python", "-m", "pytest", "-q", "--timeout=120", "tests"]

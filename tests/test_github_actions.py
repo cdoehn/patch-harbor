@@ -14,7 +14,7 @@ def _workflow_text() -> str:
     return WORKFLOW_PATH.read_text(encoding="utf-8")
 
 
-def test_acceptance_workflow_has_three_blocking_release_gates() -> None:
+def test_acceptance_workflow_has_blocking_native_and_docker_release_gates() -> None:
     text = _workflow_text()
 
     for name, runner in (
@@ -25,6 +25,12 @@ def test_acceptance_workflow_has_three_blocking_release_gates() -> None:
         assert f"name: {name}" in text
         assert f"runner: {runner}" in text
 
+    assert "ubuntu-docker-integration:" in text
+    assert "name: Docker release gate - Ubuntu ${{ matrix.ubuntu }}" in text
+    assert '          - "24.04"' in text
+    assert '          - "26.04"' in text
+    assert './scripts/run_docker_integration_tests.sh "${{ matrix.ubuntu }}"' in text
+    assert "timeout-minutes: 90" in text
     assert "preview:" not in text
     assert "continue-on-error" not in text
     assert "docker run" not in text
