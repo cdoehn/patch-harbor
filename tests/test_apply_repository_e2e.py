@@ -266,7 +266,10 @@ def test_apply_timeout_bundles_output_and_exit_code(
         execution_log = archive.read("logs/execution.log")
         run_report = json.loads(archive.read("logs/run.json"))
 
-    assert execution_log == b"entrypoint-output\n"
+    assert execution_log == native_value(
+        b"entrypoint-output\n",
+        b"entrypoint-output\r\n",
+    )
     assert run_report["primary_result"]["kind"] == "timeout"
     assert run_report["primary_result"]["timed_out"] is True
     assert run_report["process_exit_code"] == int(ExitCode.TIMEOUT)
@@ -392,7 +395,10 @@ raise SystemExit(report.process_exit_code)
         execution_log = archive.read("logs/execution.log")
         run_report = json.loads(archive.read("logs/run.json"))
 
-    assert execution_log == b"entrypoint-output\nentrypoint-ready\n"
+    assert execution_log == native_value(
+        b"entrypoint-output\nentrypoint-ready\n",
+        b"entrypoint-output\r\nentrypoint-ready\r\n",
+    )
     assert run_report["primary_result"]["kind"] == "interrupted"
     assert run_report["primary_result"]["interrupted"] is True
     assert run_report["process_exit_code"] == int(ExitCode.INTERRUPTED)

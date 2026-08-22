@@ -48,7 +48,7 @@ def create_repository(
     git(path, "config", "user.name", "PatchHarbor Test")
     git(path, "config", "user.email", "patchharbor@example.invalid")
     if with_commit:
-        (path / "tracked.txt").write_text("base\n", encoding="utf-8")
+        (path / "tracked.txt").write_bytes(b"base\n")
         git(path, "add", "tracked.txt")
         git(path, "commit", "--quiet", "-m", "base")
     return path

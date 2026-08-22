@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
-import shutil
 import subprocess
 from uuid import UUID, uuid4
 
@@ -457,7 +456,7 @@ def test_registry_list_json_reports_sorted_real_repository_statuses(
         conflict_repository: _registered_id(conflict_repository),
     }
     missing_path = str(missing_repository.resolve())
-    shutil.rmtree(missing_repository)
+    missing_repository.rename(tmp_path / "moved-missing-repository")
     (conflict_repository / ".patchharbor" / "id").write_text(
         f"{uuid4()}\n",
         encoding="ascii",
@@ -527,7 +526,7 @@ def test_unregister_by_path_can_remove_a_missing_repository_mapping(
     registered = run_cli(repository, "register")
     assert registered.returncode == 0
     repository_path = repository.resolve()
-    shutil.rmtree(repository)
+    repository.rename(tmp_path / "moved-repository")
 
     completed = run_cli(tmp_path, "unregister", str(repository_path))
 

@@ -216,6 +216,11 @@ def test_context_rejects_a_nonportable_tracked_path(tmp_path: Path) -> None:
     target = repository / "nested" / ".PatchHarbor" / "payload.txt"
     target.parent.mkdir(parents=True)
     target.write_text("payload\n", encoding="utf-8")
-    git(repository, "add", target.relative_to(repository).as_posix())
+    git(
+        repository,
+        "add",
+        "--force",
+        target.relative_to(repository).as_posix(),
+    )
 
     _assert_context_rejects_unsupported_state(repository)

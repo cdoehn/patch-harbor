@@ -31,6 +31,7 @@ from patchharbor.errors import (
     unsupported_repository_state_error,
 )
 from patchharbor.execution import ScriptExecutionResult
+from patchharbor.interpreters import InterpreterSpec, ResolvedInterpreter
 from patchharbor.models import (
     BundlePayload,
     RepositoryContext,
@@ -991,6 +992,9 @@ def test_matching_package_preflights_private_entrypoint_and_payload_bytes(
         assert mutation_gate.context == context
         assert mutation_gate.warnings
         assert entrypoint_path.read_bytes() == entrypoint
+        assert entrypoint_path.suffix == (
+            prepared.entrypoint.interpreter.spec.script_suffix
+        )
         assert prepared.entrypoint.interpreter.executable_path
         assert prepared.payloads == (payload,)
         assert not (repository / "run.sh").exists()
@@ -1001,6 +1005,40 @@ def test_matching_package_preflights_private_entrypoint_and_payload_bytes(
 
     assert probe_repository_lock(str(context.repo_id), environment) == 0
     assert not entrypoint_path.exists()
+    assert tuple(private_temp.iterdir()) == ()
+
+
+def test_private_entrypoint_uses_the_resolved_interpreter_suffix(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    set_isolated_user_environment(monkeypatch, tmp_path / "user")
+    private_temp = tmp_path / "private-temp"
+    _set_private_temp(monkeypatch, private_temp)
+    repository = create_repository(tmp_path / "repository")
+    context = register_repository(repository)
+    resolved = ResolvedInterpreter(
+        spec=InterpreterSpec(
+            executable="powershell.exe",
+            script_suffix=".ps1",
+            arguments=("-File",),
+        ),
+        executable_path="powershell.exe",
+    )
+    monkeypatch.setattr(
+        apply_preflight_module,
+        "resolve_script_interpreter",
+        lambda _script_text: resolved,
+    )
+
+    with preflight_patch_package_repository(
+        _package(_manifest(context)),
+    ) as mutation_gate:
+        entrypoint_path = mutation_gate.prepared_package.entrypoint.path
+        assert entrypoint_path.name == "script.ps1"
+        assert entrypoint_path.read_bytes() == b"# PATCHHARBOR\n"
+        assert not (repository / "run.sh").exists()
+
     assert tuple(private_temp.iterdir()) == ()
 
 

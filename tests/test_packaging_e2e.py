@@ -270,13 +270,28 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
             "PIP_NO_INDEX": "1",
         }
     )
+    shared_environment = pipx_home / "shared"
+    environment["PIPX_SHARED_LIBS"] = str(shared_environment)
+    seed_shared_environment = _run(
+        [
+            sys.executable,
+            "-m",
+            "venv",
+            str(shared_environment),
+        ],
+        cwd=tmp_path,
+        environment=environment,
+    )
+    assert seed_shared_environment.returncode == 0, (
+        seed_shared_environment.stdout + seed_shared_environment.stderr
+    )
+
     install = _run(
         [
             sys.executable,
             "-m",
             "pipx",
             "install",
-            "--skip-maintenance",
             "--python",
             sys.executable,
             str(wheels[0]),

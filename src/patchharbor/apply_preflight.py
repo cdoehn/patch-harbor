@@ -98,7 +98,7 @@ def _prepare_entrypoint(
     script, interpreter = _validated_entrypoint(package)
     path = _verified_private_resource(
         private_root / "entrypoint",
-        package.entrypoint.relative_path,
+        f"script{interpreter.spec.script_suffix}",
         package.entrypoint.content,
         failure_exit=ExitCode.EXECUTION_ERROR,
     )

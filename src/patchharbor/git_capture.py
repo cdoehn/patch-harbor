@@ -563,24 +563,44 @@ class _RegularFileSnapshot:
     content: bytes
 
 
-def _metadata_signature(metadata: os.stat_result) -> tuple[int, ...]:
-    return (
-        metadata.st_dev,
-        metadata.st_ino,
+def _path_and_descriptor_signature(
+    metadata: os.stat_result,
+) -> tuple[int, ...]:
+    common = (
         stat.S_IFMT(metadata.st_mode),
-        stat.S_IMODE(metadata.st_mode),
         metadata.st_size,
         metadata.st_mtime_ns,
-        metadata.st_ctime_ns,
+    )
+    if os.name == "nt":
+        # Windows path stat and descriptor fstat expose different ctime
+        # semantics; birth time is stable across both views of one file.
+        return (*common, metadata.st_birthtime_ns)
+    return (*common, stat.S_IMODE(metadata.st_mode), metadata.st_ctime_ns)
+
+
+def _descriptor_signature(metadata: os.stat_result) -> tuple[int, ...]:
+    common = _path_and_descriptor_signature(metadata)
+    if os.name == "nt":
+        return (*common, metadata.st_ctime_ns)
+    return common
+
+
+def _same_path_and_open_file_state(
+    path_metadata: os.stat_result,
+    opened_metadata: os.stat_result,
+) -> bool:
+    return os.path.samestat(path_metadata, opened_metadata) and (
+        _path_and_descriptor_signature(path_metadata)
+        == _path_and_descriptor_signature(opened_metadata)
     )
 
 
-def _same_file_state(
+def _same_open_file_state(
     first: os.stat_result,
     second: os.stat_result,
 ) -> bool:
     return os.path.samestat(first, second) and (
-        _metadata_signature(first) == _metadata_signature(second)
+        _descriptor_signature(first) == _descriptor_signature(second)
     )
 
 
@@ -618,14 +638,14 @@ def _read_regular_file(
         descriptor = os.open(target, flags)
         opened_metadata = os.fstat(descriptor)
         _require_regular_file(opened_metadata)
-        if not _same_file_state(initial_metadata, opened_metadata):
+        if not _same_path_and_open_file_state(initial_metadata, opened_metadata):
             raise _error("working-tree file changed while being read")
 
         current_metadata = _inspect_worktree_path(target)
         if current_metadata is None:
             raise _error("working-tree file changed while being read")
         _require_regular_file(current_metadata)
-        if not _same_file_state(opened_metadata, current_metadata):
+        if not _same_path_and_open_file_state(current_metadata, opened_metadata):
             raise _error("working-tree file changed while being read")
 
         with os.fdopen(descriptor, "rb", closefd=True) as handle:
@@ -648,8 +668,8 @@ def _read_regular_file(
         raise _error("working-tree file changed while being read")
     _require_regular_file(final_metadata)
     if (
-        not _same_file_state(opened_metadata, finished_metadata)
-        or not _same_file_state(finished_metadata, final_metadata)
+        not _same_open_file_state(opened_metadata, finished_metadata)
+        or not _same_path_and_open_file_state(final_metadata, finished_metadata)
         or len(content) != finished_metadata.st_size
     ):
         raise _error("working-tree file changed while being read")

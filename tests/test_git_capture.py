@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+import stat
+from types import SimpleNamespace
 
 import pytest
 
@@ -13,6 +15,47 @@ from tests.registration_support import create_repository, git
 
 
 pytestmark = pytest.mark.e2e
+
+
+def test_windows_path_and_descriptor_metadata_share_birth_time_semantics(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    path_metadata = SimpleNamespace(
+        st_mode=stat.S_IFREG | 0o644,
+        st_size=7,
+        st_mtime_ns=100,
+        st_birthtime_ns=50,
+        st_ctime_ns=50,
+    )
+    opened_metadata = SimpleNamespace(
+        st_mode=stat.S_IFREG | 0o666,
+        st_size=7,
+        st_mtime_ns=100,
+        st_birthtime_ns=50,
+        st_ctime_ns=75,
+    )
+    changed_descriptor = SimpleNamespace(
+        st_mode=stat.S_IFREG | 0o666,
+        st_size=7,
+        st_mtime_ns=100,
+        st_birthtime_ns=50,
+        st_ctime_ns=80,
+    )
+    monkeypatch.setattr(git_capture.os, "name", "nt")
+    monkeypatch.setattr(
+        git_capture.os.path,
+        "samestat",
+        lambda _first, _second: True,
+    )
+
+    assert git_capture._same_path_and_open_file_state(
+        path_metadata,
+        opened_metadata,
+    )
+    assert not git_capture._same_open_file_state(
+        opened_metadata,
+        changed_descriptor,
+    )
 
 
 def _repository_state(repository: Path) -> RepositoryState:

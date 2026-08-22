@@ -191,7 +191,7 @@ def test_v110_acceptance_complete_repository_workflow(tmp_path: Path) -> None:
         assert archive.read("changes/unstaged.patch")
         assert archive.read("untracked/nested/payload.bin") == b"\x00v110\xff"
         assert archive.read("untracked/applied.txt") == b"entrypoint-ran\n"
-        assert b"accepted\n" in archive.read("logs/execution.log")
+        assert b"accepted" in archive.read("logs/execution.log").splitlines()
     assert "logs/run.json" in names
     assert final_context["dirty"] is True
     assert final_context["state_fingerprint"] != context["state_fingerprint"]
@@ -293,7 +293,7 @@ def test_v110_acceptance_entrypoint_failure_preserves_exit_and_result_bundle(
         run_report = json.loads(archive.read("logs/run.json"))
         assert archive.read("untracked/payload.bin") == b"written-before-entrypoint"
         assert archive.read("untracked/started.txt") == b"started"
-    assert b"acceptance-failure\n" in execution_log
+    assert b"acceptance-failure" in execution_log.splitlines()
     assert run_report["primary_result"]["kind"] == "entrypoint_exit"
     assert run_report["process_exit_code"] == 23
 
@@ -354,9 +354,9 @@ def test_v110_acceptance_bundle_failure_after_success_returns_eleven(
 
     emergency_path = Path(result["result_bundle"]["emergency_diagnostics_path"])
     assert emergency_path.is_dir()
-    assert b"bundle-failure-diagnostics\n" in (
+    assert b"bundle-failure-diagnostics" in (
         emergency_path / "execution.log"
-    ).read_bytes()
+    ).read_bytes().splitlines()
     emergency_run = json.loads(
         (emergency_path / "run.json").read_text(encoding="utf-8")
     )
