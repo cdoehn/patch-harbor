@@ -96,6 +96,8 @@ def _materialize_base_repository(
     git(destination, "init", "--quiet")
     git(destination, "config", "user.name", "PatchHarbor Test")
     git(destination, "config", "user.email", "patchharbor@example.invalid")
+    # Reconstruction must not inherit host checkout conversion.
+    git(destination, "config", "core.autocrlf", "false")
 
     base_entries = tuple(
         info for info in archive.infolist() if info.filename.startswith("base/")
@@ -574,6 +576,11 @@ def test_manual_bundle_patches_reconstruct_staged_and_unstaged_state(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    global_git_config = tmp_path / "global.gitconfig"
+    global_git_config.write_bytes(b"[core]\n\tautocrlf = true\n")
+    monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(global_git_config))
+    monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
+
     repository = create_repository(tmp_path / "repository", with_commit=False)
     base_files = {
         ".gitattributes": b"*.bin diff=patchharbor-unsafe\n",
