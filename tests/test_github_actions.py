@@ -30,6 +30,10 @@ def test_acceptance_workflow_has_blocking_native_and_docker_release_gates() -> N
     assert '          - "24.04"' in text
     assert '          - "26.04"' in text
     assert './scripts/run_docker_integration_tests.sh "${{ matrix.ubuntu }}"' in text
+    assert "PATCHHARBOR_DOCKER_LOG_DIR" in text
+    assert "if: always()" in text
+    assert "uses: actions/upload-artifact@v7" in text
+    assert "if-no-files-found: error" in text
     assert "timeout-minutes: 90" in text
     assert "preview:" not in text
     assert "continue-on-error" not in text

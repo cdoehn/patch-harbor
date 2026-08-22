@@ -9,9 +9,18 @@ ARG PYTHON_SOURCE_SHA256=5c8462af5790baf43a321a1559dbe0db06d1be4300fb85fb53c4006
 ENV DEBIAN_FRONTEND=noninteractive \
     LANG=C.UTF-8 \
     LC_ALL=C.UTF-8 \
+    TZ=UTC \
     PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONHASHSEED=0 \
     PYTHONUNBUFFERED=1 \
+    PYTHONUTF8=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_NO_INPUT=1 \
+    GIT_CONFIG_NOSYSTEM=1 \
+    GIT_CONFIG_GLOBAL=/dev/null \
+    GIT_TERMINAL_PROMPT=0 \
+    HOME=/home/patchharbor \
+    XDG_CONFIG_HOME=/home/patchharbor/.config \
     VIRTUAL_ENV=/opt/venv
 ENV PATH="${VIRTUAL_ENV}/bin:/opt/python/bin:${PATH}"
 
@@ -48,19 +57,20 @@ RUN apt-get update \
     && rm -rf /tmp/Python.tar.xz "/tmp/Python-${PYTHON_VERSION}" \
     && rm -rf /var/lib/apt/lists/*
 
-RUN python3.12 -m venv "${VIRTUAL_ENV}" \
-    && python -m pip install --upgrade pip setuptools wheel
+RUN mkdir -p "${HOME}" "${XDG_CONFIG_HOME}" \
+    && python3.12 -m venv "${VIRTUAL_ENV}"
 
 WORKDIR /workspace
 COPY . .
 
 RUN python -c 'from pathlib import Path; import tomllib; project = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8")); requirements = project["project"]["optional-dependencies"]["dev"]; Path("/tmp/patchharbor-test-requirements.txt").write_text("".join(f"{item}\n" for item in requirements), encoding="utf-8")' \
-    && python -m pip install --requirement /tmp/patchharbor-test-requirements.txt \
+    && python -m pip install --no-cache-dir --requirement /tmp/patchharbor-test-requirements.txt \
+    && python -m pip check \
     && python scripts/check_docker_integration_environment.py
 
 RUN rm -rf /tmp/patchharbor-dist \
     && python scripts/build_release.py --outdir /tmp/patchharbor-dist \
-    && python -m pip install --force-reinstall /tmp/patchharbor-dist/*.whl \
+    && python -m pip install --no-cache-dir --force-reinstall /tmp/patchharbor-dist/*.whl \
     && python -m pip check
 
 CMD ["python", "-m", "pytest", "-q", "--timeout=120", "tests"]
