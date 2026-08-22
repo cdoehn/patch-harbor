@@ -5,7 +5,8 @@ from __future__ import annotations
 from tests.platform_support import PROJECT_ROOT
 
 
-WORKFLOW_PATH = PROJECT_ROOT / ".github" / "workflows" / "acceptance-tests.yml"
+WORKFLOW_DIRECTORY = PROJECT_ROOT / ".github" / "workflows"
+WORKFLOW_PATH = WORKFLOW_DIRECTORY / "acceptance-tests.yml"
 PYPROJECT_PATH = PROJECT_ROOT / "pyproject.toml"
 TEST_SCRIPT_PATH = PROJECT_ROOT / "scripts" / "test.sh"
 
@@ -39,6 +40,18 @@ def test_acceptance_workflow_has_blocking_native_and_docker_release_gates() -> N
     assert "continue-on-error" not in text
     assert "docker run" not in text
     assert "container:" not in text
+
+
+def test_acceptance_workflow_is_the_only_docker_integration_entrypoint() -> None:
+    runner_reference = "scripts/run_docker_integration_tests.sh"
+    workflow_references = {
+        path.name
+        for path in WORKFLOW_DIRECTORY.glob("*.yml")
+        if runner_reference in path.read_text(encoding="utf-8")
+    }
+
+    assert workflow_references == {"acceptance-tests.yml"}
+    assert not (WORKFLOW_DIRECTORY / "docker-integration-tests.yml").exists()
 
 
 def test_acceptance_workflow_uses_current_python_actions_and_grouped_suites() -> None:

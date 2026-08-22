@@ -14,7 +14,7 @@ from tests.platform_support import PROJECT_ROOT, REQUIRES_BASH_DOCKER_RUNNER
 RUNNER = PROJECT_ROOT / "scripts" / "run_docker_integration_tests.sh"
 ENVIRONMENT_CHECK = PROJECT_ROOT / "scripts" / "check_docker_integration_environment.py"
 DOCKERFILE = PROJECT_ROOT / "docker" / "Dockerfile.integration"
-DOCKER_WORKFLOW = PROJECT_ROOT / ".github" / "workflows" / "docker-integration-tests.yml"
+ACCEPTANCE_WORKFLOW = PROJECT_ROOT / ".github" / "workflows" / "acceptance-tests.yml"
 
 
 def _environment_check_module():
@@ -195,6 +195,33 @@ def test_docker_runner_preserves_complete_failed_gate_diagnostics(
     assert Path(summary["log"]) == diagnostic_directory / "40-platform.log"
 
 
+@REQUIRES_BASH_DOCKER_RUNNER
+def test_docker_runner_preserves_gate_status_when_summary_publication_fails(
+    tmp_path: Path,
+) -> None:
+    environment, _call_log, diagnostic_directory = _runner_environment(tmp_path)
+    fake_bin = Path(environment["PATH"].split(os.pathsep, 1)[0])
+    fake_mv = fake_bin / "mv"
+    fake_mv.write_text("#!/bin/sh\nexit 19\n", encoding="utf-8")
+    fake_mv.chmod(0o755)
+    environment["PATCHHARBOR_FAKE_DOCKER_FAIL_ARGUMENT"] = "platform"
+    environment["PATCHHARBOR_FAKE_DOCKER_FAIL_CODE"] = "17"
+
+    completed = subprocess.run(
+        ["bash", str(RUNNER), "26.04"],
+        cwd=tmp_path,
+        env=environment,
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=20,
+    )
+
+    assert completed.returncode == 17
+    assert not (diagnostic_directory / "summary.txt").exists()
+    assert not tuple(diagnostic_directory.glob("summary.txt.tmp.*"))
+
+
 def test_environment_check_covers_every_declared_development_distribution() -> None:
     module = _environment_check_module()
     project = tomllib.loads(
@@ -231,7 +258,7 @@ def test_docker_integration_image_provides_a_deterministic_release_gate() -> Non
     dockerfile = DOCKERFILE.read_text(encoding="utf-8")
     runner = RUNNER.read_text(encoding="utf-8")
     environment_check = ENVIRONMENT_CHECK.read_text(encoding="utf-8")
-    workflow = DOCKER_WORKFLOW.read_text(encoding="utf-8")
+    workflow = ACCEPTANCE_WORKFLOW.read_text(encoding="utf-8")
 
     assert "ARG UBUNTU_VERSION=24.04" in dockerfile
     assert "ARG PYTHON_VERSION=3.12.14" in dockerfile

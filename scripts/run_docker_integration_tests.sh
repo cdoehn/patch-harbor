@@ -52,19 +52,27 @@ summary_path="$log_directory/summary.txt"
 write_summary() {
     local status="$1"
     local temporary_summary="$summary_path.tmp.$$"
-    {
+    if ! {
         printf 'ubuntu_version=%s\n' "$ubuntu_version"
         printf 'status=%s\n' "$status"
         printf 'stage=%s\n' "$current_stage"
         printf 'log=%s\n' "$current_log"
-    } >"$temporary_summary"
-    mv -f -- "$temporary_summary" "$summary_path"
+    } >"$temporary_summary"; then
+        rm -f -- "$temporary_summary"
+        return 1
+    fi
+    if ! mv -f -- "$temporary_summary" "$summary_path"; then
+        rm -f -- "$temporary_summary"
+        return 1
+    fi
 }
 
 finish() {
     local status="$?"
     trap - EXIT
-    write_summary "$status"
+    if ! write_summary "$status"; then
+        printf 'PatchHarbor Docker integration summary could not be written.\n' >&2
+    fi
     if (( status != 0 )); then
         printf 'PatchHarbor Docker integration failed during %s.\n' "$current_stage" >&2
         printf 'Complete diagnostics: %s\n' "$log_directory" >&2
@@ -84,9 +92,10 @@ run_logged() {
     : >"$current_log"
     printf 'Running %s on Ubuntu %s ...\n' "$label" "$ubuntu_version"
 
+    local -a pipeline_status
     set +e
     timeout --foreground "${timeout_seconds}s" "$@" 2>&1 | tee "$current_log"
-    local pipeline_status=("${PIPESTATUS[@]}")
+    pipeline_status=("${PIPESTATUS[@]}")
     set -e
     if (( pipeline_status[0] != 0 )); then
         return "${pipeline_status[0]}"
