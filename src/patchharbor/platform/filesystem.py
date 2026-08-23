@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from enum import Enum, auto
 import errno
 import os
 from pathlib import Path
 import stat
 import tempfile
+
+from patchharbor.platform.runtime import is_windows
 
 
 class PathKind(Enum):
@@ -27,6 +30,22 @@ class MetadataSyncStatus(Enum):
     SYNCED = auto()
     UNSUPPORTED = auto()
     FAILED = auto()
+
+
+class FileChangedDuringRead(RuntimeError):
+    """A path no longer identifies the same regular file during one read."""
+
+
+class UnsupportedFileTypeError(RuntimeError):
+    """A path at a regular-file boundary has an unsupported type."""
+
+
+@dataclass(frozen=True, slots=True)
+class StableRegularFile:
+    """Byte-exact content and portable executable state of one stable file."""
+
+    content: bytes
+    executable: bool
 
 
 class FileSystemOperationError(OSError):
@@ -110,6 +129,120 @@ def atomic_replace_bytes(target: Path, content: bytes) -> None:
                 pass
 
 
+def _path_and_descriptor_signature(metadata: os.stat_result) -> tuple[int, ...]:
+    common = (
+        stat.S_IFMT(metadata.st_mode),
+        metadata.st_size,
+        metadata.st_mtime_ns,
+    )
+    if is_windows():
+        # Windows path stat and descriptor fstat expose different ctime
+        # semantics; birth time is stable across both views of one file.
+        return (*common, metadata.st_birthtime_ns)
+    return (*common, stat.S_IMODE(metadata.st_mode), metadata.st_ctime_ns)
+
+
+def _descriptor_signature(metadata: os.stat_result) -> tuple[int, ...]:
+    common = _path_and_descriptor_signature(metadata)
+    if is_windows():
+        # Descriptor ctime is the Windows change time and catches mutation
+        # while the file remains open.
+        return (*common, metadata.st_ctime_ns)
+    return common
+
+
+def _same_path_and_open_file_state(
+    path_metadata: os.stat_result,
+    opened_metadata: os.stat_result,
+) -> bool:
+    return os.path.samestat(path_metadata, opened_metadata) and (
+        _path_and_descriptor_signature(path_metadata)
+        == _path_and_descriptor_signature(opened_metadata)
+    )
+
+
+def _same_open_file_state(
+    first: os.stat_result,
+    second: os.stat_result,
+) -> bool:
+    return os.path.samestat(first, second) and (
+        _descriptor_signature(first) == _descriptor_signature(second)
+    )
+
+
+def _inspect_path_without_following(path: Path) -> os.stat_result | None:
+    try:
+        return path.lstat()
+    except FileNotFoundError:
+        return None
+    except OSError as exc:
+        raise FileSystemOperationError("cannot inspect target", exc) from exc
+
+
+def _require_regular_file(metadata: os.stat_result) -> None:
+    if not stat.S_ISREG(metadata.st_mode):
+        raise UnsupportedFileTypeError
+
+
+def read_stable_regular_file(path: Path) -> StableRegularFile:
+    """Read one regular file without following links and reject path races."""
+    initial_metadata = _inspect_path_without_following(path)
+    if initial_metadata is None:
+        raise FileChangedDuringRead
+    _require_regular_file(initial_metadata)
+
+    flags = os.O_RDONLY
+    flags |= getattr(os, "O_BINARY", 0)
+    flags |= getattr(os, "O_CLOEXEC", 0)
+    flags |= getattr(os, "O_NOFOLLOW", 0)
+
+    descriptor: int | None = None
+    try:
+        descriptor = os.open(path, flags)
+        opened_metadata = os.fstat(descriptor)
+        _require_regular_file(opened_metadata)
+        if not _same_path_and_open_file_state(initial_metadata, opened_metadata):
+            raise FileChangedDuringRead
+
+        current_metadata = _inspect_path_without_following(path)
+        if current_metadata is None:
+            raise FileChangedDuringRead
+        _require_regular_file(current_metadata)
+        if not _same_path_and_open_file_state(current_metadata, opened_metadata):
+            raise FileChangedDuringRead
+
+        with os.fdopen(descriptor, "rb", closefd=True) as handle:
+            descriptor = None
+            content = handle.read()
+            finished_metadata = os.fstat(handle.fileno())
+    except (FileChangedDuringRead, UnsupportedFileTypeError):
+        raise
+    except OSError as exc:
+        raise FileSystemOperationError("cannot read target", exc) from exc
+    finally:
+        if descriptor is not None:
+            try:
+                os.close(descriptor)
+            except OSError:
+                pass
+
+    final_metadata = _inspect_path_without_following(path)
+    if final_metadata is None:
+        raise FileChangedDuringRead
+    _require_regular_file(final_metadata)
+    if (
+        not _same_open_file_state(opened_metadata, finished_metadata)
+        or not _same_path_and_open_file_state(final_metadata, finished_metadata)
+        or len(content) != finished_metadata.st_size
+    ):
+        raise FileChangedDuringRead
+
+    return StableRegularFile(
+        content=content,
+        executable=bool(finished_metadata.st_mode & 0o111),
+    )
+
+
 _UNSUPPORTED_SYNC_ERRNOS = frozenset(
     error_number
     for error_number in (
@@ -122,8 +255,12 @@ _UNSUPPORTED_SYNC_ERRNOS = frozenset(
 )
 
 
-def _sync_descriptor_best_effort(path: Path, *, directory: bool) -> MetadataSyncStatus:
-    if directory and os.name == "nt":
+def _sync_descriptor_best_effort(
+    path: Path,
+    *,
+    directory: bool,
+) -> MetadataSyncStatus:
+    if directory and is_windows():
         return MetadataSyncStatus.UNSUPPORTED
 
     flags = os.O_RDONLY | getattr(os, "O_BINARY", 0)

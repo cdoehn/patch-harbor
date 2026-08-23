@@ -17,7 +17,7 @@ from patchharbor.interpreters import (
 from patchharbor.models import BundlePayload
 from patchharbor.parser import ParsedScript, ScriptFormatError, parse_script
 from patchharbor.patch_package import ValidatedPatchPackage
-from patchharbor.physical_paths import is_physically_within
+from patchharbor.platform.paths import is_physically_within
 from patchharbor.platform.errors import describe_os_error
 from patchharbor.temporary_resources import (
     private_request_directory,

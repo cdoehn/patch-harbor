@@ -1,4 +1,4 @@
-"""Platform adapters for process, filesystem, runtime, and error semantics."""
+"""Platform adapters for process, filesystem, paths, runtime, and errors."""
 
 from __future__ import annotations
 

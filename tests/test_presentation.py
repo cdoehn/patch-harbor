@@ -158,24 +158,26 @@ def test_dashboard_renderer_bounds_overflow_and_keeps_newest_output() -> None:
 
 
 def test_apply_dashboard_bounds_repository_context_and_result_path() -> None:
+    repository_name = str(Path("work") / "repository")
+    result_path = str(Path("results") / "result.zip")
     snapshot = DashboardSnapshot(
         source_name="downloads/patch.zip",
-        repository_name="/work/repository",
+        repository_name=repository_name,
         repository_context="repo_id: 1234 · base: abcdef · state: 0123456789abcdef",
         script_name="run.sh",
         script_index=1,
         script_total=1,
         status="success",
         exit_code=0,
-        result_path="/results/result.zip",
+        result_path=result_path,
     )
 
     frame = render_dashboard(snapshot, width=72)
 
     _assert_frame_fits(frame, 72)
-    assert "/work/repository" in frame
+    assert repository_name in frame
     assert "0123456789abcdef" in frame
-    assert "/results/result.zip" in frame
+    assert result_path in frame
 
 
 def test_dashboard_renderer_respects_requested_width() -> None:

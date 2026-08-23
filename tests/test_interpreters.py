@@ -112,32 +112,37 @@ def test_private_script_encoding_matches_interpreter_utf8_contract(
     assert encoded == expected_prefix + script.encode("utf-8")
 
 
-def test_bash_command_contains_only_executable_and_script() -> None:
+def test_bash_command_contains_only_executable_and_script(
+    tmp_path: Path,
+) -> None:
     selected = select_interpreter("#!/usr/bin/env bash\n# PATCHHARBOR\n")
-    script_path = Path("/tmp/script.sh")
+    script_path = tmp_path / "private" / "script.sh"
+    executable_path = str(tmp_path / "bin" / "bash")
     command = build_interpreter_command(
         selected,
-        "/resolved/bash",
+        executable_path,
         script_path,
     )
 
-    assert command == ["/resolved/bash", str(script_path)]
+    assert command == [executable_path, str(script_path)]
 
 
 @pytest.mark.parametrize("shebang", ("#!powershell.exe", "#!pwsh"))
 def test_powershell_command_has_fixed_noninteractive_arguments_without_bypass(
     shebang: str,
+    tmp_path: Path,
 ) -> None:
     selected = select_interpreter(f"{shebang}\n# PATCHHARBOR\n")
-    script_path = Path("/tmp/script.ps1")
+    script_path = tmp_path / "private" / "script.ps1"
+    executable_path = str(tmp_path / "bin" / selected.executable)
     command = build_interpreter_command(
         selected,
-        f"/resolved/{selected.executable}",
+        executable_path,
         script_path,
     )
 
     assert command == [
-        f"/resolved/{selected.executable}",
+        executable_path,
         "-NoLogo",
         "-NoProfile",
         "-NonInteractive",

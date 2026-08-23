@@ -12,7 +12,7 @@ from patchharbor.models import (
     RepositoryId,
     RepositoryPath,
 )
-from patchharbor.physical_paths import physically_canonicalize
+from patchharbor.platform.paths import physically_canonicalize
 from patchharbor.platform.filesystem import (
     FileSystemOperationError,
     PathKind,

@@ -12,7 +12,7 @@ from patchharbor.path_configuration import (
     load_configured_paths,
     prepare_watcher_input_directory,
 )
-from patchharbor.physical_paths import (
+from patchharbor.platform.paths import (
     is_physically_within,
     physical_paths_overlap,
 )

@@ -16,6 +16,15 @@ FORCE_STOP_SECONDS = 1.0
 PROCESS_TREE_POLL_SECONDS = 0.05
 
 
+def _sleep_until_next_poll(deadline: float) -> bool:
+    """Sleep no longer than the remaining polling deadline."""
+    remaining = deadline - time.monotonic()
+    if remaining <= 0:
+        return False
+    time.sleep(min(PROCESS_TREE_POLL_SECONDS, remaining))
+    return True
+
+
 def poll_process_until_exit(
     process: subprocess.Popen[bytes],
     *,
@@ -27,10 +36,8 @@ def poll_process_until_exit(
         return_code = process.poll()
         if return_code is not None:
             return return_code
-        remaining = deadline - time.monotonic()
-        if remaining <= 0:
+        if not _sleep_until_next_poll(deadline):
             raise subprocess.TimeoutExpired(process.args, timeout_seconds)
-        time.sleep(min(PROCESS_TREE_POLL_SECONDS, remaining))
 
 
 class ProcessState(Enum):
@@ -153,19 +160,27 @@ class ProcessTree(ABC):
     def _wait_for_tree_exit(self, *, timeout_seconds: float) -> bool:
         deadline = time.monotonic() + timeout_seconds
         while self._tree_has_processes():
-            if time.monotonic() >= deadline:
+            if not _sleep_until_next_poll(deadline):
                 return False
-            time.sleep(PROCESS_TREE_POLL_SECONDS)
         return True
 
     def _reap_root(self) -> None:
         if self._process.poll() is not None:
             return
         try:
-            self._process.wait(timeout=FORCE_STOP_SECONDS)
+            poll_process_until_exit(
+                self._process,
+                timeout_seconds=FORCE_STOP_SECONDS,
+            )
         except subprocess.TimeoutExpired:
             self._process.kill()
-            self._process.wait()
+            try:
+                poll_process_until_exit(
+                    self._process,
+                    timeout_seconds=FORCE_STOP_SECONDS,
+                )
+            except subprocess.TimeoutExpired as exc:
+                raise OSError("script root process did not terminate") from exc
 
     def _wait_root(self, *, timeout_seconds: float) -> int:
         return self._process.wait(timeout=timeout_seconds)

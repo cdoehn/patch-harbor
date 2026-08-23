@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from enum import Enum
 import hashlib
 import os
-import stat
+from pathlib import Path
 
 from patchharbor.errors import (
     PatchHarborError,
@@ -18,6 +18,14 @@ from patchharbor.git_commands import (
     nul_records as _nul_records,
     read_boolean_config,
     run_git_bytes as _run_git_bytes,
+)
+from patchharbor.platform.filesystem import (
+    FileChangedDuringRead,
+    FileSystemOperationError,
+    PathKind,
+    UnsupportedFileTypeError,
+    path_kind,
+    read_stable_regular_file,
 )
 from patchharbor.models import (
     GitObjectFormat,
@@ -156,11 +164,11 @@ def _validated_file_mode(raw: bytes) -> bytes:
 
 
 def _canonical_regular_file_mode(
-    metadata: os.stat_result,
+    executable: bool,
     *,
     core_file_mode: bool,
 ) -> bytes:
-    if core_file_mode and metadata.st_mode & 0o111:
+    if core_file_mode and executable:
         return _EXECUTABLE_FILE_MODE
     return _REGULAR_FILE_MODE
 
@@ -486,14 +494,11 @@ def _special_worktree_paths(
             if _is_ignored_directory(relative, ignored_prefixes):
                 continue
             try:
-                metadata = os.lstat(target)
-            except OSError as exc:
+                kind = path_kind(Path(target))
+            except FileSystemOperationError as exc:
                 raise _error("cannot inspect a working-tree path") from exc
-            is_junction = bool(
-                getattr(os.path, "isjunction", lambda _path: False)(target)
-            )
-            if is_junction or not stat.S_ISDIR(metadata.st_mode):
-                if not stat.S_ISREG(metadata.st_mode):
+            if kind is not PathKind.DIRECTORY:
+                if kind is not PathKind.REGULAR_FILE:
                     special_paths.append(relative)
                 continue
             retained_directories.append(name)
@@ -508,10 +513,10 @@ def _special_worktree_paths(
             target = os.path.join(current_path, name)
             relative = _relative_path_bytes(repository, target)
             try:
-                metadata = os.lstat(target)
-            except OSError as exc:
+                kind = path_kind(Path(target))
+            except FileSystemOperationError as exc:
                 raise _error("cannot inspect a working-tree path") from exc
-            if not stat.S_ISREG(metadata.st_mode):
+            if kind is not PathKind.REGULAR_FILE:
                 special_paths.append(relative)
 
     return tuple(sorted(set(special_paths)))
@@ -563,123 +568,26 @@ class _RegularFileSnapshot:
     content: bytes
 
 
-def _path_and_descriptor_signature(
-    metadata: os.stat_result,
-) -> tuple[int, ...]:
-    common = (
-        stat.S_IFMT(metadata.st_mode),
-        metadata.st_size,
-        metadata.st_mtime_ns,
-    )
-    if os.name == "nt":
-        # Windows path stat and descriptor fstat expose different ctime
-        # semantics; birth time is stable across both views of one file.
-        return (*common, metadata.st_birthtime_ns)
-    return (*common, stat.S_IMODE(metadata.st_mode), metadata.st_ctime_ns)
-
-
-def _descriptor_signature(metadata: os.stat_result) -> tuple[int, ...]:
-    common = _path_and_descriptor_signature(metadata)
-    if os.name == "nt":
-        return (*common, metadata.st_ctime_ns)
-    return common
-
-
-def _same_path_and_open_file_state(
-    path_metadata: os.stat_result,
-    opened_metadata: os.stat_result,
-) -> bool:
-    return os.path.samestat(path_metadata, opened_metadata) and (
-        _path_and_descriptor_signature(path_metadata)
-        == _path_and_descriptor_signature(opened_metadata)
-    )
-
-
-def _same_open_file_state(
-    first: os.stat_result,
-    second: os.stat_result,
-) -> bool:
-    return os.path.samestat(first, second) and (
-        _descriptor_signature(first) == _descriptor_signature(second)
-    )
-
-
-def _inspect_worktree_path(target: os.PathLike[str]) -> os.stat_result | None:
-    try:
-        return os.lstat(target)
-    except FileNotFoundError:
-        return None
-    except OSError as exc:
-        raise _error("cannot inspect a working-tree path") from exc
-
-
-def _require_regular_file(metadata: os.stat_result) -> None:
-    if not stat.S_ISREG(metadata.st_mode):
-        raise _unsupported(_UnsupportedState.ENTRY_TYPE)
-
-
 def _read_regular_file(
     target: os.PathLike[str],
     *,
     core_file_mode: bool,
 ) -> _RegularFileSnapshot:
-    initial_metadata = _inspect_worktree_path(target)
-    if initial_metadata is None:
-        raise _error("working-tree path disappeared while being read")
-    _require_regular_file(initial_metadata)
-
-    flags = os.O_RDONLY
-    flags |= getattr(os, "O_BINARY", 0)
-    flags |= getattr(os, "O_CLOEXEC", 0)
-    flags |= getattr(os, "O_NOFOLLOW", 0)
-
-    descriptor: int | None = None
     try:
-        descriptor = os.open(target, flags)
-        opened_metadata = os.fstat(descriptor)
-        _require_regular_file(opened_metadata)
-        if not _same_path_and_open_file_state(initial_metadata, opened_metadata):
-            raise _error("working-tree file changed while being read")
-
-        current_metadata = _inspect_worktree_path(target)
-        if current_metadata is None:
-            raise _error("working-tree file changed while being read")
-        _require_regular_file(current_metadata)
-        if not _same_path_and_open_file_state(current_metadata, opened_metadata):
-            raise _error("working-tree file changed while being read")
-
-        with os.fdopen(descriptor, "rb", closefd=True) as handle:
-            descriptor = None
-            content = handle.read()
-            finished_metadata = os.fstat(handle.fileno())
-    except PatchHarborError:
-        raise
-    except OSError as exc:
+        snapshot = read_stable_regular_file(Path(target))
+    except UnsupportedFileTypeError as exc:
+        raise _unsupported(_UnsupportedState.ENTRY_TYPE) from exc
+    except FileChangedDuringRead as exc:
+        raise _error("working-tree file changed while being read") from exc
+    except FileSystemOperationError as exc:
         raise _error("cannot read a working-tree file") from exc
-    finally:
-        if descriptor is not None:
-            try:
-                os.close(descriptor)
-            except OSError:
-                pass
-
-    final_metadata = _inspect_worktree_path(target)
-    if final_metadata is None:
-        raise _error("working-tree file changed while being read")
-    _require_regular_file(final_metadata)
-    if (
-        not _same_open_file_state(opened_metadata, finished_metadata)
-        or not _same_path_and_open_file_state(final_metadata, finished_metadata)
-        or len(content) != finished_metadata.st_size
-    ):
-        raise _error("working-tree file changed while being read")
 
     return _RegularFileSnapshot(
         mode=_canonical_regular_file_mode(
-            finished_metadata,
+            snapshot.executable,
             core_file_mode=core_file_mode,
         ),
-        content=content,
+        content=snapshot.content,
     )
 
 
@@ -703,9 +611,13 @@ def _read_worktree_record(
     target = repository.value / os.fsdecode(entry.path)
 
     if entry.status == b"D":
-        existing = _inspect_worktree_path(target)
-        if existing is not None:
-            _require_regular_file(existing)
+        try:
+            kind = path_kind(target)
+        except FileSystemOperationError as exc:
+            raise _error("cannot inspect a working-tree path") from exc
+        if kind is not PathKind.MISSING:
+            if kind is not PathKind.REGULAR_FILE:
+                raise _unsupported(_UnsupportedState.ENTRY_TYPE)
             raise _error("deleted working-tree path still exists")
         return UnstagedRecord(
             path=entry.path,

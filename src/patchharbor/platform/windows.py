@@ -11,7 +11,11 @@ import signal
 import subprocess
 import threading
 
-from patchharbor.platform.lifecycle import ProcessTree, poll_process_until_exit
+from patchharbor.platform.lifecycle import (
+    FORCE_STOP_SECONDS,
+    ProcessTree,
+    poll_process_until_exit,
+)
 
 
 _JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE = 0x00002000
@@ -175,7 +179,13 @@ class WindowsProcessTree(ProcessTree):
                 raise _windows_error()
         except BaseException:
             process.kill()
-            process.wait()
+            try:
+                poll_process_until_exit(
+                    process,
+                    timeout_seconds=FORCE_STOP_SECONDS,
+                )
+            except subprocess.TimeoutExpired:
+                pass
             if job_handle is not None:
                 _KERNEL32.CloseHandle(job_handle)
             raise

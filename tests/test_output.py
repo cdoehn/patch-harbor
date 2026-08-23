@@ -4,6 +4,7 @@ import io
 
 import pytest
 
+import patchharbor.output as output_module
 from patchharbor.output import OutputTargets, ProcessOutputCapture
 
 
@@ -74,6 +75,36 @@ def test_output_capture_reports_binary_stream_read_errors() -> None:
 
     assert capture.finished
 
+
+
+def test_output_capture_finish_polls_the_reader_thread() -> None:
+    class PollingThread:
+        def __init__(self) -> None:
+            self.join_timeouts: list[float | None] = []
+
+        def start(self) -> None:
+            pass
+
+        def is_alive(self) -> bool:
+            return len(self.join_timeouts) < 2
+
+        def join(self, timeout: float | None = None) -> None:
+            self.join_timeouts.append(timeout)
+
+    capture = ProcessOutputCapture(io.BytesIO(b""))
+    polling_thread = PollingThread()
+    capture._thread = polling_thread  # type: ignore[assignment]
+
+    capture.start()
+    capture.finish(timeout_seconds=1.0)
+
+    assert capture.finished
+    assert polling_thread.join_timeouts
+    assert all(
+        timeout is not None
+        and 0 < timeout <= output_module.OUTPUT_READER_POLL_SECONDS
+        for timeout in polling_thread.join_timeouts
+    )
 
 def test_output_capture_streams_decoded_lines_to_plain_destination() -> None:
     destination = io.StringIO()

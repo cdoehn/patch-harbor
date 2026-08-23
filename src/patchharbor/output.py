@@ -6,6 +6,7 @@ from collections import deque
 from dataclasses import dataclass
 from io import BufferedReader, RawIOBase, TextIOWrapper
 from threading import Lock, Thread
+import time
 from typing import BinaryIO, Callable, TextIO
 
 from patchharbor.errors import format_tool_warning
@@ -14,6 +15,7 @@ from patchharbor.errors import format_tool_warning
 RETAINED_OUTPUT_LINES = 10
 VISIBLE_OUTPUT_LINES = 5
 OUTPUT_READER_JOIN_SECONDS = 2.0
+OUTPUT_READER_POLL_SECONDS = 0.05
 
 
 @dataclass(frozen=True)
@@ -193,9 +195,14 @@ class ProcessOutputCapture:
         if not self._started:
             raise RuntimeError("script output capture has not started")
         if not self._finished:
-            self._thread.join(timeout=timeout_seconds)
-            if self._thread.is_alive():
-                raise OSError("script output reader did not finish")
+            deadline = time.monotonic() + timeout_seconds
+            while self._thread.is_alive():
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise OSError("script output reader did not finish")
+                self._thread.join(
+                    timeout=min(OUTPUT_READER_POLL_SECONDS, remaining)
+                )
             self._finished = True
         if self._error is not None:
             context, error = self._error

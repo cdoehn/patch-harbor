@@ -136,7 +136,7 @@ def test_platform_timeout_returns_124(tmp_path: Path) -> None:
     completed = run_patchharbor(
         source_path,
         cwd=tmp_path,
-        arguments=("--timeout", "0.2"),
+        arguments=("--timeout", native_value("0.2", "3.0")),
     )
 
     assert completed.returncode == 124

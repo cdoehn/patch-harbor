@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import errno
 from pathlib import Path
+import stat
+from types import SimpleNamespace
 
 import pytest
 
@@ -11,7 +13,9 @@ from patchharbor.platform.filesystem import (
     FileSystemOperationError,
     MetadataSyncStatus,
     PathKind,
+    UnsupportedFileTypeError,
     path_kind,
+    read_stable_regular_file,
     replace_path,
     sync_directory_best_effort,
     sync_regular_file_best_effort,
@@ -59,6 +63,70 @@ def test_os_error_descriptions_are_platform_neutral(
     expected: str,
 ) -> None:
     assert describe_os_error(error) == expected
+
+
+def test_windows_path_and_descriptor_metadata_share_birth_time_semantics(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    path_metadata = SimpleNamespace(
+        st_mode=stat.S_IFREG | 0o644,
+        st_size=7,
+        st_mtime_ns=100,
+        st_birthtime_ns=50,
+        st_ctime_ns=50,
+    )
+    opened_metadata = SimpleNamespace(
+        st_mode=stat.S_IFREG | 0o666,
+        st_size=7,
+        st_mtime_ns=100,
+        st_birthtime_ns=50,
+        st_ctime_ns=75,
+    )
+    changed_descriptor = SimpleNamespace(
+        st_mode=stat.S_IFREG | 0o666,
+        st_size=7,
+        st_mtime_ns=100,
+        st_birthtime_ns=50,
+        st_ctime_ns=80,
+    )
+    monkeypatch.setattr(filesystem_module, "is_windows", lambda: True)
+    monkeypatch.setattr(
+        filesystem_module.os.path,
+        "samestat",
+        lambda _first, _second: True,
+    )
+
+    assert filesystem_module._same_path_and_open_file_state(
+        path_metadata,
+        opened_metadata,
+    )
+    assert not filesystem_module._same_open_file_state(
+        opened_metadata,
+        changed_descriptor,
+    )
+
+
+def test_stable_regular_file_reader_preserves_bytes_and_final_metadata(
+    tmp_path: Path,
+) -> None:
+    target = tmp_path / "payload.bin"
+    content = b"binary\x00payload\xff\r\n"
+    target.write_bytes(content)
+
+    snapshot = read_stable_regular_file(target)
+
+    assert snapshot.content == content
+    assert snapshot.executable is False
+
+
+def test_stable_regular_file_reader_rejects_non_regular_targets(
+    tmp_path: Path,
+) -> None:
+    directory = tmp_path / "directory"
+    directory.mkdir()
+
+    with pytest.raises(UnsupportedFileTypeError):
+        read_stable_regular_file(directory)
 
 
 def test_path_kind_does_not_follow_symbolic_links(tmp_path: Path) -> None:

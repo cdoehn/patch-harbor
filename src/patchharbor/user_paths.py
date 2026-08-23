@@ -7,7 +7,8 @@ import os
 from pathlib import Path
 
 from patchharbor.errors import PatchHarborError, registry_error
-from patchharbor.physical_paths import physically_canonicalize
+from patchharbor.platform.paths import physically_canonicalize
+from patchharbor.platform.runtime import is_windows
 
 
 @dataclass(frozen=True)
@@ -57,7 +58,7 @@ def _error(message: str) -> PatchHarborError:
 
 def registration_user_paths() -> RegistrationUserPaths:
     """Create and physically canonicalize registration-owned user paths."""
-    if os.name == "nt":
+    if is_windows():
         app_data = os.environ.get("APPDATA")
         local_app_data = os.environ.get("LOCALAPPDATA")
         if not app_data or not local_app_data:

@@ -2,12 +2,10 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-import stat
-from types import SimpleNamespace
-
 import pytest
 
 from patchharbor import git_capture
+import patchharbor.platform.filesystem as filesystem_module
 from patchharbor.errors import ErrorKind, ExitCode, PatchHarborError
 from patchharbor.models import RepositoryPath, RepositoryState
 from patchharbor.repository_state import capture_repository_state
@@ -15,47 +13,6 @@ from tests.registration_support import create_repository, git
 
 
 pytestmark = pytest.mark.e2e
-
-
-def test_windows_path_and_descriptor_metadata_share_birth_time_semantics(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    path_metadata = SimpleNamespace(
-        st_mode=stat.S_IFREG | 0o644,
-        st_size=7,
-        st_mtime_ns=100,
-        st_birthtime_ns=50,
-        st_ctime_ns=50,
-    )
-    opened_metadata = SimpleNamespace(
-        st_mode=stat.S_IFREG | 0o666,
-        st_size=7,
-        st_mtime_ns=100,
-        st_birthtime_ns=50,
-        st_ctime_ns=75,
-    )
-    changed_descriptor = SimpleNamespace(
-        st_mode=stat.S_IFREG | 0o666,
-        st_size=7,
-        st_mtime_ns=100,
-        st_birthtime_ns=50,
-        st_ctime_ns=80,
-    )
-    monkeypatch.setattr(git_capture.os, "name", "nt")
-    monkeypatch.setattr(
-        git_capture.os.path,
-        "samestat",
-        lambda _first, _second: True,
-    )
-
-    assert git_capture._same_path_and_open_file_state(
-        path_metadata,
-        opened_metadata,
-    )
-    assert not git_capture._same_open_file_state(
-        opened_metadata,
-        changed_descriptor,
-    )
 
 
 def _repository_state(repository: Path) -> RepositoryState:
@@ -359,7 +316,7 @@ def test_unstaged_read_failure_is_categorized(
             raise PermissionError("injected read denial")
         return real_open(path, flags, *args)
 
-    monkeypatch.setattr(git_capture.os, "open", denied_open)
+    monkeypatch.setattr(filesystem_module.os, "open", denied_open)
 
     with pytest.raises(PatchHarborError) as captured:
         _repository_state(repository)
@@ -385,7 +342,7 @@ def test_unstaged_file_replacement_during_capture_is_rejected(
             tracked.write_bytes(b"replacement content\n")
         return real_open(path, flags, *args)
 
-    monkeypatch.setattr(git_capture.os, "open", replacing_open)
+    monkeypatch.setattr(filesystem_module.os, "open", replacing_open)
 
     with pytest.raises(PatchHarborError) as captured:
         _repository_state(repository)
@@ -473,7 +430,7 @@ def test_untracked_file_replacement_during_capture_is_rejected(
             target.write_bytes(b"replacement")
         return real_open(path, flags, *args)
 
-    monkeypatch.setattr(git_capture.os, "open", replacing_open)
+    monkeypatch.setattr(filesystem_module.os, "open", replacing_open)
 
     with pytest.raises(PatchHarborError) as captured:
         _repository_state(repository)

@@ -351,7 +351,22 @@ def test_platform_specific_mechanics_stay_inside_platform_package() -> None:
     assert "patchharbor.platform.windows" not in execution_dependencies
     assert "patchharbor.platform.runtime" in graph["patchharbor.interpreters"]
     assert "patchharbor.platform.filesystem" in graph["patchharbor.payload_files"]
+    assert "patchharbor.platform.filesystem" in graph["patchharbor.git_capture"]
     assert "patchharbor.platform.locking" in graph["patchharbor.locks"]
+    assert "patchharbor.platform.paths" in graph["patchharbor.path_configuration"]
+    assert "patchharbor.platform.runtime" in graph["patchharbor.user_paths"]
+    assert "patchharbor.physical_paths" not in graph
+
+    git_capture_source = modules["patchharbor.git_capture"].read_text(
+        encoding="utf-8"
+    )
+    for platform_detail in (
+        "os.name",
+        "isjunction",
+        "is_junction",
+        "st_birthtime_ns",
+    ):
+        assert platform_detail not in git_capture_source
 
 
 def test_watcher_is_separate_and_uses_only_the_public_apply_process_boundary() -> None:
@@ -371,7 +386,7 @@ def test_watcher_is_separate_and_uses_only_the_public_apply_process_boundary() -
 
     allowed_shared_core_boundaries = {
         "patchharbor.path_configuration",
-        "patchharbor.physical_paths",
+        "patchharbor.platform.paths",
         "patchharbor.platform.filesystem",
         "patchharbor.user_paths",
     }

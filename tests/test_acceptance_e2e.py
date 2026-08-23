@@ -174,7 +174,7 @@ def test_acceptance_timeout_returns_124(tmp_path: Path) -> None:
         "fs",
         "run",
         "--timeout",
-        "0.05",
+        native_value("0.2", "3.0"),
         str(script_path),
     )
 

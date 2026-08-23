@@ -10,7 +10,7 @@ from pathlib import Path
 
 from patchharbor.locks import registry_lock
 from patchharbor.models import RegistrySnapshot, RepositoryPath
-from patchharbor.physical_paths import (
+from patchharbor.platform.paths import (
     is_physically_within,
     physical_paths_overlap,
     physically_canonicalize,

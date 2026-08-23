@@ -182,12 +182,13 @@ def test_apply_tty_uses_repository_dashboard_without_color(
 ) -> None:
     stdout = _TerminalOutput()
     stderr = StringIO()
+    result_path = tmp_path / "results" / "result.zip"
     report = SimpleNamespace(
         warnings=(),
         completion_tool_error=None,
         process_exit_code=0,
         result_bundle=SimpleNamespace(
-            path=Path("/results/result.zip"),
+            path=result_path,
             status=ResultBundleStatus.CREATED,
             emergency_diagnostics_path=None,
         ),
@@ -210,7 +211,7 @@ def test_apply_tty_uses_repository_dashboard_without_color(
             script_total=1,
         )
         presentation.update_repository(
-            repository_name="/work/repository",
+            repository_name=str(tmp_path / "work" / "repository"),
             repository_context="repo_id: 1111 · base: abcdef · state: 0123",
         )
         presentation.begin_script(

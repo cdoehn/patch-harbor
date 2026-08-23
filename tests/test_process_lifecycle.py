@@ -170,6 +170,22 @@ class _PollingProcess:
         raise AssertionError("polling helper must not block in wait()")
 
 
+def test_root_reaping_uses_polling_instead_of_a_blocking_wait(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    process = _PollingProcess([None, 0])
+    tree = _TestProcessTree(  # type: ignore[arg-type]
+        process,
+        tree_alive=False,
+    )
+    monkeypatch.setattr(lifecycle.time, "sleep", lambda _seconds: None)
+
+    tree.close()
+
+    assert process.wait_calls == 0
+    assert tree.resources_closed == 1
+
+
 def test_polling_wait_observes_process_exit_without_blocking_wait(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -200,3 +216,21 @@ def test_polling_wait_raises_timeout_without_blocking_wait(
         )
 
     assert process.wait_calls == 0
+
+
+def test_tree_exit_poll_does_not_sleep_past_its_deadline(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    process = _FakeRootProcess(returncode=None)
+    tree = _TestProcessTree(
+        process,
+        tree_alive=True,
+        graceful_stop_works=False,
+    )
+    times = iter((0.0, 0.98, 1.0))
+    sleeps: list[float] = []
+    monkeypatch.setattr(lifecycle.time, "monotonic", lambda: next(times))
+    monkeypatch.setattr(lifecycle.time, "sleep", sleeps.append)
+
+    assert tree._wait_for_tree_exit(timeout_seconds=1.0) is False
+    assert sleeps == [pytest.approx(0.02)]

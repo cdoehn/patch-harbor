@@ -14,7 +14,7 @@ from patchharbor.path_configuration import (
     require_result_directory_allowed,
     write_configured_paths,
 )
-from patchharbor.physical_paths import (
+from patchharbor.platform.paths import (
     is_physically_within,
     physically_canonicalize,
 )
