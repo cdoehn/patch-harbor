@@ -13,6 +13,8 @@ jobs:
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
+    env:
+      PATCHHARBOR_WINDOWS_ACCEPTANCE_ENGINE: ${{ matrix.windows_engine }}
 
     strategy:
       fail-fast: false
@@ -20,10 +22,13 @@ jobs:
         include:
           - name: Release gate - Ubuntu 24.04
             runner: ubuntu-24.04
+            windows_engine: ""
           - name: Release gate - Windows 2025
             runner: windows-2025
+            windows_engine: powershell.exe
           - name: Release gate - Ubuntu 26.04
             runner: ubuntu-26.04
+            windows_engine: ""
 
     steps:
       - name: Check out repository
@@ -69,6 +74,35 @@ jobs:
           python -m pytest -q --timeout=120 --durations=10
           -m "packaging"
           tests
+
+  windows-powershell7-acceptance:
+    name: Release gate - Windows 2025 - PowerShell 7
+    runs-on: windows-2025
+    timeout-minutes: 30
+    env:
+      PATCHHARBOR_WINDOWS_ACCEPTANCE_ENGINE: pwsh
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Install development dependencies
+        run: python -m pip install --disable-pip-version-check -e ".[dev]"
+
+      - name: Verify PowerShell 7
+        shell: pwsh
+        run: Get-Command pwsh -ErrorAction Stop
+
+      - name: Run native Windows PowerShell 7 acceptance
+        shell: pwsh
+        run: >-
+          python -m pytest -q --timeout=120 --durations=10
+          tests/test_windows_acceptance_e2e.py
 
   ubuntu-docker-integration:
     name: Docker release gate - Ubuntu ${{ matrix.ubuntu }}

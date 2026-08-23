@@ -69,7 +69,7 @@ def test_acceptance_workflow_uses_current_python_actions_and_grouped_suites() ->
     assert '-m "platform"' in text
     assert "Run packaging tests" in text
     assert '-m "packaging"' in text
-    assert text.count("--durations=10") == 4
+    assert text.count("--durations=10") == 5
 
 
 def test_acceptance_workflow_requires_both_windows_powershell_variants() -> None:
@@ -79,6 +79,14 @@ def test_acceptance_workflow_requires_both_windows_powershell_variants() -> None
     assert "Get-Command pwsh -ErrorAction Stop" in text
     assert "powershell.exe -NoLogo -NoProfile -NonInteractive" in text
     assert "pwsh -NoLogo -NoProfile -NonInteractive" in text
+    assert "windows_engine: powershell.exe" in text
+    assert "PATCHHARBOR_WINDOWS_ACCEPTANCE_ENGINE: ${{ matrix.windows_engine }}" in text
+    assert "windows-powershell7-acceptance:" in text
+    assert "name: Release gate - Windows 2025 - PowerShell 7" in text
+    assert "runs-on: windows-2025" in text
+    assert "PATCHHARBOR_WINDOWS_ACCEPTANCE_ENGINE: pwsh" in text
+    assert "tests/test_windows_acceptance_e2e.py" in text
+    assert "continue-on-error" not in text
 
 
 def test_acceptance_workflow_is_automatic_manual_and_has_no_retries() -> None:
@@ -105,6 +113,7 @@ def test_pytest_groups_are_registered_and_assigned_to_public_suites() -> None:
         "test_acceptance_e2e.py": "acceptance",
         "test_cli_e2e.py": "e2e",
         "test_platform_e2e.py": "platform",
+        "test_windows_acceptance_e2e.py": "platform",
         "test_packaging_e2e.py": "packaging",
     }
     for filename, marker in expected.items():
