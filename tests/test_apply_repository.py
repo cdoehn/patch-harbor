@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from codecs import BOM_UTF8
 from collections.abc import Iterable
 from dataclasses import replace
 import errno
@@ -991,7 +992,14 @@ def test_matching_package_preflights_private_entrypoint_and_payload_bytes(
 
         assert mutation_gate.context == context
         assert mutation_gate.warnings
-        assert entrypoint_path.read_bytes() == entrypoint
+        staged_entrypoint = entrypoint_path.read_bytes()
+        if (
+            prepared.entrypoint.interpreter.spec.executable.casefold()
+            == "powershell.exe"
+        ):
+            assert staged_entrypoint == BOM_UTF8 + entrypoint
+        else:
+            assert staged_entrypoint == entrypoint
         assert entrypoint_path.suffix == (
             prepared.entrypoint.interpreter.spec.script_suffix
         )
