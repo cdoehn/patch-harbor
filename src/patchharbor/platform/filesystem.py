@@ -184,12 +184,17 @@ def _require_regular_file(metadata: os.stat_result) -> None:
         raise UnsupportedFileTypeError
 
 
+def _regular_path_metadata(path: Path) -> os.stat_result:
+    metadata = _inspect_path_without_following(path)
+    if metadata is None:
+        raise FileChangedDuringRead
+    _require_regular_file(metadata)
+    return metadata
+
+
 def read_stable_regular_file(path: Path) -> StableRegularFile:
     """Read one regular file without following links and reject path races."""
-    initial_metadata = _inspect_path_without_following(path)
-    if initial_metadata is None:
-        raise FileChangedDuringRead
-    _require_regular_file(initial_metadata)
+    initial_metadata = _regular_path_metadata(path)
 
     flags = os.O_RDONLY
     flags |= getattr(os, "O_BINARY", 0)
@@ -204,10 +209,7 @@ def read_stable_regular_file(path: Path) -> StableRegularFile:
         if not _same_path_and_open_file_state(initial_metadata, opened_metadata):
             raise FileChangedDuringRead
 
-        current_metadata = _inspect_path_without_following(path)
-        if current_metadata is None:
-            raise FileChangedDuringRead
-        _require_regular_file(current_metadata)
+        current_metadata = _regular_path_metadata(path)
         if not _same_path_and_open_file_state(current_metadata, opened_metadata):
             raise FileChangedDuringRead
 
@@ -226,10 +228,7 @@ def read_stable_regular_file(path: Path) -> StableRegularFile:
             except OSError:
                 pass
 
-    final_metadata = _inspect_path_without_following(path)
-    if final_metadata is None:
-        raise FileChangedDuringRead
-    _require_regular_file(final_metadata)
+    final_metadata = _regular_path_metadata(path)
     if (
         not _same_open_file_state(opened_metadata, finished_metadata)
         or not _same_path_and_open_file_state(final_metadata, finished_metadata)

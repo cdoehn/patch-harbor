@@ -8,6 +8,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
+import time
 from typing import TypeVar
 
 import pytest
@@ -137,6 +138,108 @@ def log_path_from_stderr(stderr: str) -> Path:
     matching = [line for line in stderr.splitlines() if line.startswith(prefix)]
     assert matching, stderr
     return Path(matching[-1].removeprefix(prefix))
+
+
+def wait_for_child_pid(ready_path: Path, *, timeout: float = 5.0) -> int:
+    """Wait until one test process publishes its PID."""
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if ready_path.exists():
+            value = ready_path.read_text(encoding="utf-8").strip()
+            if value:
+                return int(value)
+        time.sleep(0.02)
+    raise AssertionError(f"child PID was not written to {ready_path}")
+
+
+def _pid_is_running(pid: int) -> bool:
+    if not IS_WINDOWS:
+        stat_path = Path(f"/proc/{pid}/stat")
+        try:
+            fields = stat_path.read_text(encoding="utf-8").split()
+        except FileNotFoundError:
+            return False
+        if len(fields) > 2 and fields[2] == "Z":
+            return False
+        try:
+            os.kill(pid, 0)
+        except ProcessLookupError:
+            return False
+        except PermissionError:
+            return True
+        return True
+
+    import ctypes
+    from ctypes import wintypes
+
+    process_query_limited_information = 0x1000
+    still_active = 259
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.OpenProcess.argtypes = (
+        wintypes.DWORD,
+        wintypes.BOOL,
+        wintypes.DWORD,
+    )
+    kernel32.OpenProcess.restype = wintypes.HANDLE
+    kernel32.GetExitCodeProcess.argtypes = (
+        wintypes.HANDLE,
+        ctypes.POINTER(wintypes.DWORD),
+    )
+    kernel32.GetExitCodeProcess.restype = wintypes.BOOL
+    kernel32.CloseHandle.argtypes = (wintypes.HANDLE,)
+    kernel32.CloseHandle.restype = wintypes.BOOL
+
+    handle = kernel32.OpenProcess(process_query_limited_information, False, pid)
+    if not handle:
+        return False
+    try:
+        exit_code = wintypes.DWORD()
+        if not kernel32.GetExitCodeProcess(handle, ctypes.byref(exit_code)):
+            return False
+        return exit_code.value == still_active
+    finally:
+        kernel32.CloseHandle(handle)
+
+
+def _kill_test_pid(pid: int) -> None:
+    if not _pid_is_running(pid):
+        return
+    if not IS_WINDOWS:
+        try:
+            os.kill(pid, 9)
+        except ProcessLookupError:
+            pass
+        return
+
+    import ctypes
+    from ctypes import wintypes
+
+    process_terminate = 0x0001
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    handle = kernel32.OpenProcess(process_terminate, False, pid)
+    if handle:
+        try:
+            kernel32.TerminateProcess(handle, 1)
+        finally:
+            kernel32.CloseHandle(handle)
+
+
+def assert_child_process_stopped(pid: int, *, timeout: float = 5.0) -> None:
+    """Assert that one test child exits, cleaning it up on failure."""
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if not _pid_is_running(pid):
+            return
+        time.sleep(0.05)
+    _kill_test_pid(pid)
+    raise AssertionError(f"child process {pid} survived PatchHarbor")
+
+
+def cleanup_test_processes(*process_ids: int | None) -> None:
+    """Best-effort cleanup for child processes created by lifecycle tests."""
+    for process_id in reversed(process_ids):
+        if process_id is not None:
+            _kill_test_pid(process_id)
 
 
 def create_symlink_or_skip(

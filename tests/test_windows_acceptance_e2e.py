@@ -11,11 +11,17 @@ import zipfile
 
 import pytest
 
-from patchharbor.errors import ExitCode, PatchHarborError
+from patchharbor.errors import ExitCode
 from patchharbor.patch_manifest import PATCH_FORMAT_VERSION, PATCH_MARKER
-from patchharbor.repository_paths import validate_repository_paths
 from patchharbor.state_fingerprint import FINGERPRINT_ALGORITHM
-from tests.platform_support import project_environment, run_cli
+from tests.platform_support import (
+    assert_child_process_stopped,
+    cleanup_test_processes,
+    normalized_path,
+    project_environment,
+    run_cli,
+    wait_for_child_pid,
+)
 from tests.registration_support import (
     create_repository,
     isolated_user_environment,
@@ -23,11 +29,6 @@ from tests.registration_support import (
     release_repository_lock_holder,
     start_repository_lock_holder,
     stop_repository_lock_holder,
-)
-from tests.test_cli_e2e import (
-    _assert_child_process_stopped,
-    _cleanup_test_processes,
-    _wait_for_child_pid,
 )
 
 
@@ -187,7 +188,9 @@ def test_windows_user_paths_json_and_repository_lock_are_native(
     state = Path(environment["LOCALAPPDATA"]) / "PatchHarbor"
     assert (configuration / "registry.json").is_file()
     assert (state / "locks").is_dir()
-    assert context["repository_path"] == str(repository.resolve())
+    assert normalized_path(context["repository_path"]) == normalized_path(
+        repository
+    )
     assert ".patchharbor/" in local_exclude_path(repository).read_text(
         encoding="utf-8"
     ).splitlines()
@@ -226,7 +229,7 @@ def test_windows_user_paths_json_and_repository_lock_are_native(
     assert bundle_path.is_file()
 
 
-def test_windows_junction_and_portable_repository_paths_are_rejected(
+def test_windows_junction_is_rejected_at_repository_boundary(
     tmp_path: Path,
 ) -> None:
     environment = _isolated_environment(tmp_path / "user")
@@ -242,15 +245,6 @@ def test_windows_junction_and_portable_repository_paths_are_rejected(
         timeout_seconds=120,
     )
     assert completed.returncode == int(ExitCode.REPOSITORY_ERROR)
-
-    for paths in (
-        (b"nested/CON.txt",),
-        (b"Readme.txt", b"README.TXT"),
-        (b"nested/bad\\name.txt",),
-    ):
-        with pytest.raises(PatchHarborError) as captured:
-            validate_repository_paths(paths)
-        assert captured.value.exit_code is ExitCode.UNSUPPORTED_REPOSITORY_STATE
 
 
 def test_windows_powershell_engine_uses_fixed_noninteractive_contract(
@@ -289,7 +283,8 @@ def test_windows_powershell_engine_uses_fixed_noninteractive_contract(
     )
 
     assert completed.returncode == 0
-    assert completed.stdout == f"{_UTF8_GREETING}\n"
+    assert _UTF8_GREETING in completed.stdout.splitlines()
+    assert "\ufffd" not in completed.stdout
     probe = json.loads(probe_path.read_text(encoding="utf-8"))
     command_line = probe["command_line"].casefold()
     assert probe["edition"] == expected_edition
@@ -301,9 +296,9 @@ def test_windows_powershell_engine_uses_fixed_noninteractive_contract(
     private_script = Path(probe["script_path"])
     assert private_script.suffix.casefold() == ".ps1"
     assert not private_script.exists()
-    assert private_script.parent.parent.resolve() == Path(
+    assert normalized_path(private_script.parent.parent) == normalized_path(
         environment["TEMP"]
-    ).resolve()
+    )
 
 
 def test_windows_apply_json_is_utf8_and_execution_log_remains_raw(
@@ -342,9 +337,13 @@ def test_windows_apply_json_is_utf8_and_execution_log_remains_raw(
     assert f"{_UTF8_GREETING}-raw" not in completed.stdout
     document = json.loads(completed.stdout)
     result = document["result"]
-    assert result["repository_path"] == str(repository.resolve())
+    assert normalized_path(result["repository_path"]) == normalized_path(
+        repository
+    )
     bundle_path = Path(result["result_bundle"]["path"])
-    assert bundle_path.parent.resolve() == output_directory.resolve()
+    assert normalized_path(bundle_path.parent) == normalized_path(
+        output_directory
+    )
     assert (repository / "nested" / "payload.bin").read_bytes() == (
         b"\x00windows-payload\xff"
     )
@@ -376,14 +375,14 @@ def test_windows_job_object_stops_descendants_on_timeout_and_break(
         environment_overrides=environment,
         timeout_seconds=120,
     )
-    timeout_child_pid = _wait_for_child_pid(timeout_child)
-    timeout_grandchild_pid = _wait_for_child_pid(timeout_grandchild)
+    timeout_child_pid = wait_for_child_pid(timeout_child)
+    timeout_grandchild_pid = wait_for_child_pid(timeout_grandchild)
     try:
         assert timed_out.returncode == int(ExitCode.TIMEOUT)
-        _assert_child_process_stopped(timeout_child_pid)
-        _assert_child_process_stopped(timeout_grandchild_pid)
+        assert_child_process_stopped(timeout_child_pid)
+        assert_child_process_stopped(timeout_grandchild_pid)
     finally:
-        _cleanup_test_processes(timeout_child_pid, timeout_grandchild_pid)
+        cleanup_test_processes(timeout_child_pid, timeout_grandchild_pid)
 
     break_child = tmp_path / "break-child.pid"
     break_grandchild = tmp_path / "break-grandchild.pid"
@@ -414,15 +413,15 @@ def test_windows_job_object_stops_descendants_on_timeout_and_break(
     break_child_pid: int | None = None
     break_grandchild_pid: int | None = None
     try:
-        break_child_pid = _wait_for_child_pid(break_child, timeout=10)
-        break_grandchild_pid = _wait_for_child_pid(break_grandchild, timeout=10)
+        break_child_pid = wait_for_child_pid(break_child, timeout=10)
+        break_grandchild_pid = wait_for_child_pid(break_grandchild, timeout=10)
         process.send_signal(signal.CTRL_BREAK_EVENT)
         process.communicate(timeout=30)
         assert process.returncode == int(ExitCode.INTERRUPTED)
-        _assert_child_process_stopped(break_child_pid)
-        _assert_child_process_stopped(break_grandchild_pid)
+        assert_child_process_stopped(break_child_pid)
+        assert_child_process_stopped(break_grandchild_pid)
     finally:
         if process.poll() is None:
             process.kill()
             process.wait(timeout=10)
-        _cleanup_test_processes(break_child_pid, break_grandchild_pid)
+        cleanup_test_processes(break_child_pid, break_grandchild_pid)

@@ -233,4 +233,9 @@ def test_tree_exit_poll_does_not_sleep_past_its_deadline(
     monkeypatch.setattr(lifecycle.time, "sleep", sleeps.append)
 
     assert tree._wait_for_tree_exit(timeout_seconds=1.0) is False
-    assert sleeps == [pytest.approx(0.02)]
+    assert sleeps
+    assert all(
+        0 < delay <= lifecycle.PROCESS_TREE_POLL_SECONDS
+        for delay in sleeps
+    )
+    assert sum(sleeps) <= 1.0

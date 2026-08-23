@@ -9,18 +9,20 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
-import time
 import zipfile
 
 import pytest
 
 from tests.platform_support import (
     REQUIRED_MARKER,
+    assert_child_process_stopped,
+    cleanup_test_processes,
     log_path_from_stderr as _log_path_from_stderr,
     normalized_path,
     project_environment,
     run_cli as _run_cli,
     run_cli_bytes as _run_cli_bytes,
+    wait_for_child_pid,
 )
 
 
@@ -109,97 +111,6 @@ def _process_tree_script(
         f"{parent_tail}\n"
     )
 
-
-def _wait_for_child_pid(ready_path: Path, *, timeout: float = 5.0) -> int:
-    deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
-        if ready_path.exists():
-            value = ready_path.read_text(encoding="utf-8").strip()
-            if value:
-                return int(value)
-        time.sleep(0.02)
-    raise AssertionError(f"child PID was not written to {ready_path}")
-
-
-def _pid_is_running(pid: int) -> bool:
-    if os.name != "nt":
-        stat_path = Path(f"/proc/{pid}/stat")
-        try:
-            fields = stat_path.read_text(encoding="utf-8").split()
-        except FileNotFoundError:
-            return False
-        if len(fields) > 2 and fields[2] == "Z":
-            return False
-        try:
-            os.kill(pid, 0)
-        except ProcessLookupError:
-            return False
-        except PermissionError:
-            return True
-        return True
-
-    import ctypes
-    from ctypes import wintypes
-
-    process_query_limited_information = 0x1000
-    still_active = 259
-    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
-    kernel32.OpenProcess.argtypes = (wintypes.DWORD, wintypes.BOOL, wintypes.DWORD)
-    kernel32.OpenProcess.restype = wintypes.HANDLE
-    kernel32.GetExitCodeProcess.argtypes = (wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD))
-    kernel32.GetExitCodeProcess.restype = wintypes.BOOL
-    kernel32.CloseHandle.argtypes = (wintypes.HANDLE,)
-    kernel32.CloseHandle.restype = wintypes.BOOL
-
-    handle = kernel32.OpenProcess(process_query_limited_information, False, pid)
-    if not handle:
-        return False
-    try:
-        exit_code = wintypes.DWORD()
-        if not kernel32.GetExitCodeProcess(handle, ctypes.byref(exit_code)):
-            return False
-        return exit_code.value == still_active
-    finally:
-        kernel32.CloseHandle(handle)
-
-
-def _kill_test_pid(pid: int) -> None:
-    if not _pid_is_running(pid):
-        return
-    if os.name != "nt":
-        try:
-            os.kill(pid, 9)
-        except ProcessLookupError:
-            pass
-        return
-
-    import ctypes
-    from ctypes import wintypes
-
-    process_terminate = 0x0001
-    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
-    handle = kernel32.OpenProcess(process_terminate, False, pid)
-    if handle:
-        try:
-            kernel32.TerminateProcess(handle, 1)
-        finally:
-            kernel32.CloseHandle(handle)
-
-
-def _assert_child_process_stopped(pid: int, *, timeout: float = 5.0) -> None:
-    deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
-        if not _pid_is_running(pid):
-            return
-        time.sleep(0.05)
-    _kill_test_pid(pid)
-    raise AssertionError(f"child process {pid} survived PatchHarbor")
-
-
-def _cleanup_test_processes(*process_ids: int | None) -> None:
-    for process_id in reversed(process_ids):
-        if process_id is not None:
-            _kill_test_pid(process_id)
 
 
 def test_fs_run_rejects_empty_standard_input(tmp_path: Path) -> None:
@@ -761,14 +672,14 @@ def test_normal_script_exit_does_not_leave_descendant_processes(
     child_pid: int | None = None
     grandchild_pid: int | None = None
     try:
-        child_pid = _wait_for_child_pid(child_ready_path)
-        grandchild_pid = _wait_for_child_pid(grandchild_ready_path)
+        child_pid = wait_for_child_pid(child_ready_path)
+        grandchild_pid = wait_for_child_pid(grandchild_ready_path)
 
         assert completed.returncode == 0
-        _assert_child_process_stopped(child_pid)
-        _assert_child_process_stopped(grandchild_pid)
+        assert_child_process_stopped(child_pid)
+        assert_child_process_stopped(grandchild_pid)
     finally:
-        _cleanup_test_processes(child_pid, grandchild_pid)
+        cleanup_test_processes(child_pid, grandchild_pid)
 
 
 def test_timeout_stops_the_complete_child_process_tree(
@@ -791,14 +702,14 @@ def test_timeout_stops_the_complete_child_process_tree(
     child_pid: int | None = None
     grandchild_pid: int | None = None
     try:
-        child_pid = _wait_for_child_pid(child_ready_path)
-        grandchild_pid = _wait_for_child_pid(grandchild_ready_path)
+        child_pid = wait_for_child_pid(child_ready_path)
+        grandchild_pid = wait_for_child_pid(grandchild_ready_path)
 
         assert completed.returncode == 124
-        _assert_child_process_stopped(child_pid)
-        _assert_child_process_stopped(grandchild_pid)
+        assert_child_process_stopped(child_pid)
+        assert_child_process_stopped(grandchild_pid)
     finally:
-        _cleanup_test_processes(child_pid, grandchild_pid)
+        cleanup_test_processes(child_pid, grandchild_pid)
 
 
 def test_keyboard_interrupt_stops_the_complete_child_process_tree(
@@ -878,14 +789,14 @@ raise SystemExit(result)
     child_pid: int | None = None
     grandchild_pid: int | None = None
     try:
-        child_pid = _wait_for_child_pid(child_ready_path)
-        grandchild_pid = _wait_for_child_pid(grandchild_ready_path)
+        child_pid = wait_for_child_pid(child_ready_path)
+        grandchild_pid = wait_for_child_pid(grandchild_ready_path)
 
         assert completed.returncode == 130
-        _assert_child_process_stopped(child_pid)
-        _assert_child_process_stopped(grandchild_pid)
+        assert_child_process_stopped(child_pid)
+        assert_child_process_stopped(grandchild_pid)
     finally:
-        _cleanup_test_processes(child_pid, grandchild_pid)
+        cleanup_test_processes(child_pid, grandchild_pid)
 
 
 def test_fs_run_non_tty_streams_complete_large_output(
