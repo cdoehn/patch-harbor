@@ -1036,7 +1036,7 @@ def test_private_entrypoint_uses_the_resolved_interpreter_suffix(
     ) as mutation_gate:
         entrypoint_path = mutation_gate.prepared_package.entrypoint.path
         assert entrypoint_path.name == "script.ps1"
-        assert entrypoint_path.read_bytes() == b"# PATCHHARBOR\n"
+        assert entrypoint_path.read_text(encoding="utf-8-sig") == "# PATCHHARBOR\n"
         assert not (repository / "run.sh").exists()
 
     assert tuple(private_temp.iterdir()) == ()

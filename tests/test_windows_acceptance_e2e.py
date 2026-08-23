@@ -40,6 +40,7 @@ if os.name != "nt":
     )
 
 _ENGINE_ENVIRONMENT = "PATCHHARBOR_WINDOWS_ACCEPTANCE_ENGINE"
+_UTF8_GREETING = "Gr\u00fc\u00dfe"
 
 
 def _selected_engine() -> tuple[str, str]:
@@ -273,7 +274,7 @@ def test_windows_powershell_engine_uses_fixed_noninteractive_contract(
             "$json = $probe | ConvertTo-Json -Compress\n"
             "[System.IO.File]::WriteAllText("
             f"'{escaped_probe}', $json, [Text.UTF8Encoding]::new($false))\n"
-            "[Console]::Out.WriteLine('Grüße')\n"
+            f"[Console]::Out.WriteLine('{_UTF8_GREETING}')\n"
         ).encode("utf-8")
     )
 
@@ -288,7 +289,7 @@ def test_windows_powershell_engine_uses_fixed_noninteractive_contract(
     )
 
     assert completed.returncode == 0
-    assert completed.stdout == "Grüße\n"
+    assert completed.stdout == f"{_UTF8_GREETING}\n"
     probe = json.loads(probe_path.read_text(encoding="utf-8"))
     command_line = probe["command_line"].casefold()
     assert probe["edition"] == expected_edition
@@ -319,7 +320,7 @@ def test_windows_apply_json_is_utf8_and_execution_log_remains_raw(
         (
             f"{shebang}\n"
             "# PATCHHARBOR\n"
-            "[Console]::Out.WriteLine('Grüße-raw')\n"
+            f"[Console]::Out.WriteLine('{_UTF8_GREETING}-raw')\n"
             "[System.IO.File]::WriteAllText("
             "'applied.txt', 'applied', [Text.UTF8Encoding]::new($false))\n"
         ),
@@ -338,7 +339,7 @@ def test_windows_apply_json_is_utf8_and_execution_log_remains_raw(
     )
 
     assert completed.returncode == 0
-    assert "Grüße-raw" not in completed.stdout
+    assert f"{_UTF8_GREETING}-raw" not in completed.stdout
     document = json.loads(completed.stdout)
     result = document["result"]
     assert result["repository_path"] == str(repository.resolve())
@@ -349,8 +350,8 @@ def test_windows_apply_json_is_utf8_and_execution_log_remains_raw(
     )
     assert (repository / "applied.txt").read_text(encoding="utf-8") == "applied"
     with zipfile.ZipFile(bundle_path) as archive:
-        assert archive.read("logs/execution.log") == "Grüße-raw\r\n".encode(
-            "utf-8"
+        assert archive.read("logs/execution.log") == (
+            f"{_UTF8_GREETING}-raw\r\n".encode("utf-8")
         )
 
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from codecs import BOM_UTF8
 from pathlib import Path
 
 import pytest
@@ -8,6 +9,7 @@ from patchharbor.errors import ExitCode, PatchHarborError
 import patchharbor.interpreters as interpreters
 from patchharbor.interpreters import (
     build_interpreter_command,
+    encode_script_file,
     resolve_interpreter,
     select_interpreter,
 )
@@ -88,6 +90,26 @@ def test_missing_interpreter_is_reported_during_resolution(
 
     assert raised.value.exit_code is ExitCode.INTERPRETER_ERROR
     assert str(raised.value) == "script interpreter not found: bash"
+
+
+@pytest.mark.parametrize(
+    ("shebang", "expected_prefix"),
+    (
+        ("#!powershell.exe", BOM_UTF8),
+        ("#!pwsh", b""),
+        ("#!/usr/bin/env bash", b""),
+    ),
+)
+def test_private_script_encoding_matches_interpreter_utf8_contract(
+    shebang: str,
+    expected_prefix: bytes,
+) -> None:
+    script = f"{shebang}\n# PATCHHARBOR\nWrite-Output 'Gr\u00fc\u00dfe'\n"
+    selected = select_interpreter(script)
+
+    encoded = encode_script_file(script, selected)
+
+    assert encoded == expected_prefix + script.encode("utf-8")
 
 
 def test_bash_command_contains_only_executable_and_script() -> None:

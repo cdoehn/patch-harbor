@@ -9,7 +9,11 @@ from hashlib import sha256
 from pathlib import Path
 
 from patchharbor.errors import ExitCode, PatchHarborError
-from patchharbor.interpreters import ResolvedInterpreter, resolve_script_interpreter
+from patchharbor.interpreters import (
+    ResolvedInterpreter,
+    encode_script_file,
+    resolve_script_interpreter,
+)
 from patchharbor.models import BundlePayload
 from patchharbor.parser import ParsedScript, ScriptFormatError, parse_script
 from patchharbor.patch_package import ValidatedPatchPackage
@@ -99,7 +103,7 @@ def _prepare_entrypoint(
     path = _verified_private_resource(
         private_root / "entrypoint",
         f"script{interpreter.spec.script_suffix}",
-        package.entrypoint.content,
+        encode_script_file(script.text, interpreter.spec),
         failure_exit=ExitCode.EXECUTION_ERROR,
     )
     return PreparedEntrypoint(

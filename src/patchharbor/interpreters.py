@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from codecs import BOM_UTF8
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -102,6 +103,14 @@ def resolve_script_interpreter(
         spec=spec,
         executable_path=resolve_interpreter(spec),
     )
+
+
+def encode_script_file(script_text: str, spec: InterpreterSpec) -> bytes:
+    """Encode one private script for the selected interpreter."""
+    encoded = script_text.encode("utf-8")
+    if spec.executable.casefold() == "powershell.exe":
+        return BOM_UTF8 + encoded
+    return encoded
 
 
 def build_interpreter_command(

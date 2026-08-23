@@ -14,6 +14,7 @@ from patchharbor.interpreters import (
     InterpreterSpec,
     ResolvedInterpreter,
     build_interpreter_command,
+    encode_script_file,
     resolve_script_interpreter,
 )
 from patchharbor.output import OutputTargets, ProcessOutputCapture
@@ -29,11 +30,11 @@ DEFAULT_TIMEOUT_SECONDS = 300.0
 
 
 @contextmanager
-def _temporary_script_file(script_text: str, *, suffix: str) -> Iterator[Path]:
+def _temporary_script_file(script_content: bytes, *, suffix: str) -> Iterator[Path]:
     """Write one script inside the shared private request lifecycle."""
     with private_request_directory(prefix="patchharbor-script-") as directory:
         script_path = directory / f"script{suffix}"
-        write_private_bytes(script_path, script_text.encode("utf-8"))
+        write_private_bytes(script_path, script_content)
         yield script_path
 
 
@@ -49,7 +50,7 @@ def execute_script_text(
 
     try:
         with _temporary_script_file(
-            script_text,
+            encode_script_file(script_text, resolved.spec),
             suffix=resolved.spec.script_suffix,
         ) as script_path:
             result = _run_staged_script(
