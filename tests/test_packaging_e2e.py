@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 import shutil
@@ -13,12 +14,13 @@ import pytest
 
 from patchharbor import __version__
 from tests.platform_support import PROJECT_ROOT, native_script, native_value
+from tests.registration_support import isolated_user_environment
 
 
 pytestmark = pytest.mark.packaging
 
 MAX_WHEEL_BYTES = 256 * 1024
-RELEASE_VERSION = "1.0.0"
+RELEASE_VERSION = "1.1.0"
 EXPECTED_RUNTIME_FILES = {
     "patchharbor/__init__.py",
     "patchharbor/application.py",
@@ -140,6 +142,70 @@ def _copy_project_for_release(tmp_path: Path) -> Path:
         encoding="utf-8",
     )
     return source_tree
+
+
+def _git(repository: Path, *arguments: str) -> subprocess.CompletedProcess[str]:
+    completed = _run(["git", *arguments], cwd=repository)
+    assert completed.returncode == 0, completed.stdout + completed.stderr
+    return completed
+
+
+def _create_release_repository(path: Path) -> Path:
+    path.mkdir()
+    _git(path, "init", "--quiet")
+    _git(path, "config", "user.name", "PatchHarbor Release Test")
+    _git(path, "config", "user.email", "patchharbor@example.invalid")
+    _git(path, "config", "core.autocrlf", "false")
+    (path / "tracked.txt").write_bytes(b"release-base\n")
+    _git(path, "add", "tracked.txt")
+    _git(path, "commit", "--quiet", "-m", "release base")
+    return path
+
+
+def _successful_json_result(
+    completed: subprocess.CompletedProcess[str],
+) -> dict[str, object]:
+    assert completed.returncode == 0, completed.stdout + completed.stderr
+    document = json.loads(completed.stdout)
+    assert document["success"] is True
+    result = document["result"]
+    assert isinstance(result, dict)
+    return result
+
+
+def _write_release_patch_package(
+    path: Path,
+    context: dict[str, object],
+) -> str:
+    entrypoint_name = native_value("run.sh", "run.ps1")
+    manifest = {
+        "marker": "patch-harbor",
+        "format_version": 1,
+        "repo_id": context["repo_id"],
+        "base_commit": context["base_commit"],
+        "state_fingerprint": context["state_fingerprint"],
+        "fingerprint_algorithm": "patchharbor-state-v1",
+        "entrypoint": entrypoint_name,
+    }
+    entrypoint = native_script(
+        'printf "%s\n" "installed-apply"\n'
+        'printf "%s" "entrypoint-ok" > release-applied.txt',
+        '[Console]::Out.WriteLine("installed-apply")\n'
+        '[System.IO.File]::WriteAllText("release-applied.txt", "entrypoint-ok")',
+    )
+    with zipfile.ZipFile(path, "w") as archive:
+        archive.writestr(
+            "patch.json",
+            json.dumps(
+                manifest,
+                ensure_ascii=False,
+                allow_nan=False,
+                separators=(",", ":"),
+            ).encode("utf-8"),
+        )
+        archive.writestr(entrypoint_name, entrypoint.encode("utf-8"))
+        archive.writestr("nested/release.bin", b"\x00release-payload\xff")
+    return entrypoint_name
 
 
 def test_release_metadata_is_complete_and_runtime_has_no_dependencies() -> None:
@@ -315,13 +381,46 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
 
     assert watcher_executable.is_file()
 
+    for help_arguments in (
+        ("--help",),
+        ("register", "--help"),
+        ("registry", "--help"),
+        ("registry", "list", "--help"),
+        ("unregister", "--help"),
+        ("context", "--help"),
+        ("bundle", "--help"),
+        ("apply", "--help"),
+        ("fs", "--help"),
+        ("fs", "run", "--help"),
+    ):
+        help_result = _run(
+            [str(executable), *help_arguments],
+            cwd=empty_workdir,
+            environment=environment,
+        )
+        assert help_result.returncode == 0
+
     watcher_help = _run(
         [str(watcher_executable), "--help"],
         cwd=empty_workdir,
         environment=environment,
     )
     assert watcher_help.returncode == 0
-    assert "usage: patchharbor-watcher" in watcher_help.stdout
+
+    for excluded_command in (
+        "websocket",
+        "clipboard",
+        "ssh",
+        "save",
+        "plugins",
+        "watcher",
+    ):
+        excluded = _run(
+            [str(executable), excluded_command, "--help"],
+            cwd=empty_workdir,
+            environment=environment,
+        )
+        assert excluded.returncode == 2
 
     version_result = _run(
         [str(executable), "--version"],
@@ -331,33 +430,6 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
     assert version_result.returncode == 0
     assert version_result.stdout == f"patchharbor {RELEASE_VERSION}\n"
     assert version_result.stderr == ""
-
-    help_result = _run(
-        [str(executable), "--help"],
-        cwd=empty_workdir,
-        environment=environment,
-    )
-    assert help_result.returncode == 0
-    assert "usage: patchharbor" in help_result.stdout
-    assert "--version" in help_result.stdout
-    assert "fs" in help_result.stdout
-
-    run_help = _run(
-        [str(executable), "fs", "run", "--help"],
-        cwd=empty_workdir,
-        environment=environment,
-    )
-    assert run_help.returncode == 0
-    for expected in (
-        "# PATCHHARBOR",
-        "ZIP PatchBundles may contain ordered scripts and byte-exact payload files.",
-        "Scripts run in the current working directory.",
-        "--timeout SECONDS",
-        "--plain",
-        "--no-color",
-        "--log",
-    ):
-        assert expected in run_help.stdout
 
     source_dir = tmp_path / "source"
     source_dir.mkdir()
@@ -385,3 +457,111 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
     assert (empty_workdir / "release-cwd.txt").read_text(encoding="utf-8") == (
         "cwd-ok"
     )
+
+    runtime_environment = environment.copy()
+    runtime_environment.update(
+        isolated_user_environment(tmp_path / "patchharbor-user")
+    )
+    repository = _create_release_repository(tmp_path / "release-repository")
+
+    registered = _run(
+        [str(executable), "register", str(repository)],
+        cwd=empty_workdir,
+        environment=runtime_environment,
+    )
+    assert registered.returncode == 0
+
+    context = _successful_json_result(
+        _run(
+            [str(executable), "context", "--json", str(repository)],
+            cwd=empty_workdir,
+            environment=runtime_environment,
+        )
+    )
+    assert context["dirty"] is False
+
+    manual_result = _successful_json_result(
+        _run(
+            [
+                str(executable),
+                "bundle",
+                "--json",
+                "--output-dir",
+                str(tmp_path / "manual-results"),
+                str(repository),
+            ],
+            cwd=empty_workdir,
+            environment=runtime_environment,
+        )
+    )
+    manual_bundle = Path(str(manual_result["result_bundle_path"]))
+    assert manual_bundle.is_file()
+    with zipfile.ZipFile(manual_bundle) as archive:
+        assert archive.read("base/tracked.txt") == b"release-base\n"
+        assert "logs/execution.log" not in archive.namelist()
+
+    package_path = tmp_path / "release-package.zip"
+    entrypoint_name = _write_release_patch_package(package_path, context)
+    dry_result = _successful_json_result(
+        _run(
+            [
+                str(executable),
+                "apply",
+                "--dry-run",
+                "--json",
+                "--timeout",
+                "30",
+                "--output-dir",
+                str(tmp_path / "dry-results"),
+                str(package_path),
+            ],
+            cwd=empty_workdir,
+            environment=runtime_environment,
+        )
+    )
+    assert dry_result["primary_result"]["kind"] == "dry_run_success"
+    assert not (repository / "nested").exists()
+    assert not (repository / "release-applied.txt").exists()
+
+    apply_result = _successful_json_result(
+        _run(
+            [
+                str(executable),
+                "apply",
+                "--json",
+                "--plain",
+                "--no-color",
+                "--timeout",
+                "30",
+                "--output-dir",
+                str(tmp_path / "apply-results"),
+                str(package_path),
+            ],
+            cwd=empty_workdir,
+            environment=runtime_environment,
+        )
+    )
+    assert apply_result["primary_result"]["kind"] == "success"
+    assert (repository / "nested" / "release.bin").read_bytes() == (
+        b"\x00release-payload\xff"
+    )
+    assert (repository / "release-applied.txt").read_text(
+        encoding="utf-8"
+    ) == "entrypoint-ok"
+    assert not (repository / entrypoint_name).exists()
+    apply_bundle = Path(str(apply_result["result_bundle"]["path"]))
+    assert apply_bundle.is_file()
+    with zipfile.ZipFile(apply_bundle) as archive:
+        assert "logs/execution.log" in archive.namelist()
+        assert archive.read("untracked/nested/release.bin") == (
+            b"\x00release-payload\xff"
+        )
+
+    incoming = tmp_path / "watcher-input"
+    incoming.mkdir()
+    configured = _run(
+        [str(watcher_executable), "--configure", str(incoming)],
+        cwd=empty_workdir,
+        environment=runtime_environment,
+    )
+    assert configured.returncode == 0

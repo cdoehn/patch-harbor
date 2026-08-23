@@ -1,24 +1,59 @@
 # PatchHarbor
 
 PatchHarbor is a controlled cross-platform runner for generated Bash and
-PowerShell scripts and ZIP PatchBundles.
+PowerShell scripts and repository-bound ZIP patch packages.
 
 ## Installation
 
 PatchHarbor requires Python 3.12 or newer and [pipx](https://pipx.pypa.io/).
-After publication, install it with:
+Install the published release with:
 
 ```bash
 pipx install patchharbor
 ```
 
+## Core workflow
+
+Register one local Git repository, capture its exact state, and create a
+complete Result Bundle for a chat or another external workflow:
+
+```bash
+cd /path/to/repository
+patchharbor register
+patchharbor context
+patchharbor bundle
+```
+
+A repository-bound patch package can then be checked without mutation and
+applied only to the registered repository state named in its `patch.json`:
+
+```bash
+patchharbor apply --dry-run /path/to/patch.zip
+patchharbor apply /path/to/patch.zip
+```
+
+The original manual runner remains available for a script, directory, pipe,
+or ZIP PatchBundle that is intentionally executed in the current working
+directory:
+
+```bash
+patchharbor fs run /path/to/script-or-bundle
+```
+
 ## Command reference
 
-The complete user-facing command reference is built into the CLI:
+The complete user-facing reference is built into the installed commands:
 
 ```bash
 patchharbor --help
+patchharbor register --help
+patchharbor registry list --help
+patchharbor unregister --help
+patchharbor context --help
+patchharbor bundle --help
+patchharbor apply --help
 patchharbor fs run --help
+patchharbor-watcher --help
 patchharbor --version
 ```
 
