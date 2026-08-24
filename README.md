@@ -40,6 +40,19 @@ directory:
 patchharbor fs run /path/to/script-or-bundle
 ```
 
+## Security and responsibility boundaries
+
+PatchHarbor is not a sandbox. Entrypoints run with the rights of the current
+user. Repository ID, base commit, and fingerprint verify the selected local
+state; they do not authenticate who created a patch package. Run only trusted
+packages.
+
+Payload files are replaced atomically one by one, but a package is not a global
+transaction and earlier successful writes are not automatically rolled back.
+PatchHarbor does not run target-project tests or create Git commits. Repo Assist
+owns tests, commits, retries, and journals; PromptBridge owns chat, network,
+upload, and download transport.
+
 ## Command reference
 
 The complete user-facing reference is built into the installed commands:

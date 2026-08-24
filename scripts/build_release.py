@@ -4,11 +4,19 @@
 from __future__ import annotations
 
 import argparse
+from configparser import ConfigParser
+from email.message import Message
+from email.parser import BytesParser
+from email.policy import default as default_email_policy
 from pathlib import Path
 import shutil
 import subprocess
 import sys
+import tarfile
 import tempfile
+import tomllib
+import zipfile
+from typing import NamedTuple
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -18,6 +26,149 @@ _RELEASE_INPUT_FILES = (
     "pyproject.toml",
 )
 _RELEASE_INPUT_TREES = ("src",)
+_FORBIDDEN_STAGED_ROOTS = {"build", "dist"}
+_FORBIDDEN_STAGED_PARTS = {"__pycache__"}
+_FORBIDDEN_STAGED_SUFFIXES = {".pyc", ".pyo"}
+
+
+class _DistributionContract(NamedTuple):
+    metadata: tuple[tuple[str, tuple[str, ...]], ...]
+    description_lines: tuple[str, ...]
+    scripts: tuple[tuple[str, str], ...]
+
+    @property
+    def name(self) -> str:
+        return self._single_header("name")
+
+    @property
+    def version(self) -> str:
+        return self._single_header("version")
+
+    def _single_header(self, name: str) -> str:
+        values = dict(self.metadata).get(name, ())
+        if len(values) != 1:
+            raise RuntimeError(
+                f"release metadata must contain exactly one {name!r} header"
+            )
+        return values[0]
+
+
+def _assert_clean_release_stage(destination: Path) -> None:
+    for path in destination.rglob("*"):
+        relative = path.relative_to(destination)
+        if (
+            relative.parts[0] in _FORBIDDEN_STAGED_ROOTS
+            or any(
+                part in _FORBIDDEN_STAGED_PARTS
+                or part.endswith(".egg-info")
+                for part in relative.parts
+            )
+        ):
+            raise RuntimeError(f"forbidden release-stage path: {relative}")
+        if path.is_file() and path.suffix in _FORBIDDEN_STAGED_SUFFIXES:
+            raise RuntimeError(f"forbidden release-stage file: {relative}")
+
+
+def _metadata_contract(raw_metadata: bytes) -> tuple[
+    tuple[tuple[str, tuple[str, ...]], ...],
+    tuple[str, ...],
+]:
+    message = BytesParser(policy=default_email_policy).parsebytes(raw_metadata)
+    assert isinstance(message, Message)
+    names = sorted({name.lower() for name in message.keys()})
+    headers = tuple(
+        (
+            name,
+            tuple(str(value) for value in message.get_all(name, [])),
+        )
+        for name in names
+    )
+    payload = message.get_payload()
+    if not isinstance(payload, str):
+        raise RuntimeError("release metadata description must be text")
+    return headers, tuple(payload.splitlines())
+
+
+def _wheel_contract(wheel: Path) -> _DistributionContract:
+    with zipfile.ZipFile(wheel) as archive:
+        metadata_names = [
+            name
+            for name in archive.namelist()
+            if name.endswith(".dist-info/METADATA")
+        ]
+        entry_point_names = [
+            name
+            for name in archive.namelist()
+            if name.endswith(".dist-info/entry_points.txt")
+        ]
+        if len(metadata_names) != 1 or len(entry_point_names) != 1:
+            raise RuntimeError(
+                "wheel must contain exactly one METADATA and entry_points.txt"
+            )
+        metadata, description = _metadata_contract(
+            archive.read(metadata_names[0])
+        )
+        parser = ConfigParser(interpolation=None)
+        parser.optionxform = str
+        parser.read_string(
+            archive.read(entry_point_names[0]).decode("utf-8")
+        )
+        if parser.sections() != ["console_scripts"]:
+            raise RuntimeError("wheel contains unexpected entry-point groups")
+        scripts = tuple(sorted(parser.items("console_scripts")))
+    return _DistributionContract(metadata, description, scripts)
+
+
+def _source_distribution_contract(
+    source_distribution: Path,
+) -> _DistributionContract:
+    with tarfile.open(source_distribution, "r:gz") as archive:
+        members = archive.getmembers()
+        roots = {
+            member.name.split("/", 1)[0]
+            for member in members
+            if member.name
+        }
+        if len(roots) != 1:
+            raise RuntimeError("source distribution must contain one root directory")
+        root = next(iter(roots))
+        metadata_member = archive.getmember(f"{root}/PKG-INFO")
+        pyproject_member = archive.getmember(f"{root}/pyproject.toml")
+        metadata_file = archive.extractfile(metadata_member)
+        pyproject_file = archive.extractfile(pyproject_member)
+        if metadata_file is None or pyproject_file is None:
+            raise RuntimeError("source distribution metadata is unreadable")
+        metadata, description = _metadata_contract(metadata_file.read())
+        pyproject = tomllib.loads(pyproject_file.read().decode("utf-8"))
+        project = pyproject.get("project")
+        if not isinstance(project, dict):
+            raise RuntimeError("source distribution has no project metadata")
+        raw_scripts = project.get("scripts")
+        if not isinstance(raw_scripts, dict) or not all(
+            isinstance(name, str) and isinstance(target, str)
+            for name, target in raw_scripts.items()
+        ):
+            raise RuntimeError("source distribution scripts are invalid")
+        scripts = tuple(sorted(raw_scripts.items()))
+    return _DistributionContract(metadata, description, scripts)
+
+
+def _audit_release_artifacts(wheel: Path, source_distribution: Path) -> None:
+    wheel_contract = _wheel_contract(wheel)
+    source_contract = _source_distribution_contract(source_distribution)
+    if wheel_contract != source_contract:
+        raise RuntimeError(
+            "wheel and source distribution metadata or entry points differ"
+        )
+    if wheel_contract.name != "patchharbor":
+        raise RuntimeError("release artifact has an unexpected project name")
+    version = wheel_contract.version
+    if wheel.name != f"patchharbor-{version}-py3-none-any.whl":
+        raise RuntimeError("wheel filename does not match release metadata")
+    if source_distribution.name != f"patchharbor-{version}.tar.gz":
+        raise RuntimeError(
+            "source-distribution filename does not match release metadata"
+        )
 
 
 def _copy_release_inputs(destination: Path) -> None:
@@ -41,6 +192,8 @@ def _copy_release_inputs(destination: Path) -> None:
                 "*.egg-info",
             ),
         )
+
+    _assert_clean_release_stage(destination)
 
 
 def _remove_previous_project_artifacts(output_directory: Path) -> None:
@@ -82,7 +235,9 @@ def build_release(output_directory: Path) -> tuple[Path, Path]:
             "release build did not produce exactly one wheel and one "
             "source distribution"
         )
-    return wheels[0], source_distributions[0]
+    wheel, source_distribution = wheels[0], source_distributions[0]
+    _audit_release_artifacts(wheel, source_distribution)
+    return wheel, source_distribution
 
 
 def _parse_arguments() -> argparse.Namespace:

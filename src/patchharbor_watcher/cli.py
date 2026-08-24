@@ -45,6 +45,7 @@ def _positive_seconds(value: str) -> float:
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="patchharbor-watcher",
+        allow_abbrev=False,
         description=(
             "Watch one input directory and delegate stable files to "
             "'patchharbor apply --json'."

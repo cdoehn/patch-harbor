@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from configparser import ConfigParser
+from email.parser import BytesParser
+from email.policy import default as default_email_policy
 import json
 import os
 from pathlib import Path
@@ -88,6 +91,31 @@ EXPECTED_RUNTIME_FILES = {
 }
 
 
+def _distribution_metadata_contract(
+    raw_metadata: bytes,
+) -> tuple[tuple[tuple[str, tuple[str, ...]], ...], tuple[str, ...]]:
+    message = BytesParser(policy=default_email_policy).parsebytes(raw_metadata)
+    names = sorted({name.lower() for name in message.keys()})
+    headers = tuple(
+        (
+            name,
+            tuple(str(value) for value in message.get_all(name, [])),
+        )
+        for name in names
+    )
+    payload = message.get_payload()
+    assert isinstance(payload, str)
+    return headers, tuple(payload.splitlines())
+
+
+def _wheel_entry_points(raw_entry_points: bytes) -> tuple[tuple[str, str], ...]:
+    parser = ConfigParser(interpolation=None)
+    parser.optionxform = str
+    parser.read_string(raw_entry_points.decode("utf-8"))
+    assert parser.sections() == ["console_scripts"]
+    return tuple(sorted(parser.items("console_scripts")))
+
+
 def _run(
     command: list[str],
     *,
@@ -140,6 +168,17 @@ def _copy_project_for_release(tmp_path: Path) -> Path:
     (stale_package / "files.py").write_text(
         "raise RuntimeError('stale legacy module')\n",
         encoding="utf-8",
+    )
+    stale_egg_info = source_tree / "src" / "patchharbor.egg-info"
+    stale_egg_info.mkdir()
+    (stale_egg_info / "SOURCES.txt").write_text(
+        "src/patchharbor/removed_release_module.py\n",
+        encoding="utf-8",
+    )
+    stale_bytecode = source_tree / "src" / "patchharbor" / "__pycache__"
+    stale_bytecode.mkdir()
+    (stale_bytecode / "removed_release_module.pyc").write_bytes(
+        b"stale-bytecode"
     )
     return source_tree
 
@@ -250,6 +289,11 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
     ]
     assert wheels[0].stat().st_size <= MAX_WHEEL_BYTES
 
+    wheel_metadata_contract: tuple[
+        tuple[tuple[str, tuple[str, ...]], ...],
+        tuple[str, ...],
+    ]
+    wheel_scripts: tuple[tuple[str, str], ...]
     with zipfile.ZipFile(wheels[0]) as wheel:
         names = set(wheel.namelist())
         runtime_files = {
@@ -264,8 +308,9 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
         metadata_name = next(
             name for name in names if name.endswith(".dist-info/METADATA")
         )
-        metadata = wheel.read(metadata_name).decode("utf-8")
-        metadata_lines = metadata.splitlines()
+        raw_metadata = wheel.read(metadata_name)
+        wheel_metadata_contract = _distribution_metadata_contract(raw_metadata)
+        metadata_lines = raw_metadata.decode("utf-8").splitlines()
         assert f"Version: {RELEASE_VERSION}" in metadata_lines
         assert "License-Expression: MIT" in metadata_lines
         runtime_requirements = [
@@ -279,15 +324,33 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
         entry_points_name = next(
             name for name in names if name.endswith(".dist-info/entry_points.txt")
         )
-        assert wheel.read(entry_points_name).decode("utf-8").splitlines() == [
-            "[console_scripts]",
-            "patchharbor = patchharbor.cli:main",
-            "patchharbor-watcher = patchharbor_watcher.cli:main",
-        ]
+        raw_entry_points = wheel.read(entry_points_name)
+        wheel_scripts = _wheel_entry_points(raw_entry_points)
+        assert wheel_scripts == (
+            ("patchharbor", "patchharbor.cli:main"),
+            ("patchharbor-watcher", "patchharbor_watcher.cli:main"),
+        )
+        assert not any(
+            name.startswith(("repo_assist/", "promptbridge/"))
+            for name in names
+        )
 
     with tarfile.open(source_distributions[0], "r:gz") as source_distribution:
         names = set(source_distribution.getnames())
         root = f"patchharbor-{RELEASE_VERSION}"
+        pkg_info = source_distribution.extractfile(f"{root}/PKG-INFO")
+        pyproject_file = source_distribution.extractfile(
+            f"{root}/pyproject.toml"
+        )
+        assert pkg_info is not None and pyproject_file is not None
+        assert (
+            _distribution_metadata_contract(pkg_info.read())
+            == wheel_metadata_contract
+        )
+        source_project = tomllib.loads(
+            pyproject_file.read().decode("utf-8")
+        )["project"]
+        assert tuple(sorted(source_project["scripts"].items())) == wheel_scripts
         for required in (
             f"{root}/LICENSE",
             f"{root}/README.md",
@@ -318,6 +381,19 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
         assert not any(name.endswith(".log") for name in names)
         assert f"{root}/src/patchharbor/input.py" not in names
         assert f"{root}/src/patchharbor/files.py" not in names
+        generated_sources = source_distribution.extractfile(
+            f"{root}/src/patchharbor.egg-info/SOURCES.txt"
+        )
+        assert generated_sources is not None
+        assert "removed_release_module" not in generated_sources.read().decode(
+            "utf-8"
+        )
+        assert not any("__pycache__" in name for name in names)
+        assert not any(name.endswith((".pyc", ".pyo")) for name in names)
+        assert not any(
+            name.startswith((f"{root}/repo_assist/", f"{root}/promptbridge/"))
+            for name in names
+        )
 
     pipx_home = tmp_path / "pipx-home"
     pipx_bin = tmp_path / "pipx-bin"
@@ -462,6 +538,43 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
     runtime_environment.update(
         isolated_user_environment(tmp_path / "patchharbor-user")
     )
+
+    invalid_core_invocations = (
+        ("register", "--new", str(tmp_path / "missing-repository")),
+        ("registry", "list", "--js"),
+        ("context", "--js", str(tmp_path / "missing-repository")),
+        (
+            "bundle",
+            "--out",
+            str(tmp_path / "invalid-results"),
+            str(tmp_path / "missing-repository"),
+        ),
+        ("apply", "--dry", str(tmp_path / "missing-package.zip")),
+        ("fs", "run", "--pla", str(tmp_path / "missing-script.sh")),
+        ("register", "--json", str(tmp_path / "missing-repository")),
+        ("apply", "--log", str(tmp_path / "missing-package.zip")),
+    )
+    for arguments in invalid_core_invocations:
+        rejected = _run(
+            [str(executable), *arguments],
+            cwd=empty_workdir,
+            environment=runtime_environment,
+        )
+        assert rejected.returncode == 2
+
+    watcher_input = tmp_path / "watcher-abbreviation-input"
+    watcher_input.mkdir()
+    for arguments in (
+        ("--conf", str(watcher_input)),
+        ("--json",),
+    ):
+        rejected = _run(
+            [str(watcher_executable), *arguments],
+            cwd=empty_workdir,
+            environment=runtime_environment,
+        )
+        assert rejected.returncode == 2
+
     repository = _create_release_repository(tmp_path / "release-repository")
 
     registered = _run(

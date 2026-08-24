@@ -59,6 +59,14 @@ def _configure_utf8_standard_stream(stream: TextIO, *, errors: str) -> None:
         pass
 
 
+class _ExactArgumentParser(argparse.ArgumentParser):
+    """Disable argparse option abbreviations for the public CLI contract."""
+
+    def __init__(self, *args: object, **kwargs: object) -> None:
+        kwargs.setdefault("allow_abbrev", False)
+        super().__init__(*args, **kwargs)
+
+
 def _positive_seconds(value: str) -> float:
     try:
         seconds = float(value)
@@ -70,7 +78,7 @@ def _positive_seconds(value: str) -> float:
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
+    parser = _ExactArgumentParser(
         prog="patchharbor",
         description=(
             "Run generated Bash and PowerShell scripts or ZIP "

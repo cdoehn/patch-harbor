@@ -50,6 +50,28 @@ def test_non_core_orchestration_commands_are_not_public(
     capsys.readouterr()
 
 
+@pytest.mark.parametrize(
+    "arguments",
+    (
+        ("register", "--new", "missing-repository"),
+        ("registry", "list", "--js"),
+        ("context", "--js", "missing-repository"),
+        ("bundle", "--out", "results", "missing-repository"),
+        ("apply", "--dry", "missing-package.zip"),
+        ("fs", "run", "--pla", "missing-script.sh"),
+    ),
+)
+def test_public_cli_rejects_abbreviated_options(
+    arguments: tuple[str, ...],
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    with pytest.raises(SystemExit) as raised:
+        main(list(arguments))
+
+    assert raised.value.code == 2
+    capsys.readouterr()
+
+
 def test_fs_run_without_path_on_terminal_is_a_usage_error(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
