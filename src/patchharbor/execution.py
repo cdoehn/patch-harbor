@@ -321,6 +321,12 @@ def _control_process(
             if result.return_code is None:
                 raise OSError("script process tree returned no exit code")
             return result.return_code
+    except KeyboardInterrupt:
+        _finish_capture_after_process_error(capture)
+        raise PatchHarborError(
+            "script aborted by user",
+            ExitCode.INTERRUPTED,
+        ) from None
     except PatchHarborError:
         _finish_capture_after_process_error(capture)
         raise

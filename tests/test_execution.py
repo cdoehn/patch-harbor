@@ -255,6 +255,43 @@ def test_terminal_process_state_maps_to_exit_code_and_closes_tree(
     assert process_tree.exit_exception is PatchHarborError
 
 
+def test_interrupt_during_output_capture_start_is_reported_as_interrupted(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _patch_resolved_interpreter(monkeypatch)
+    process_tree = _FakeProcessTree(output_bytes=b"entrypoint-ready\n")
+    monkeypatch.setattr(
+        execution,
+        "create_process_tree",
+        lambda command, cwd: process_tree,
+    )
+    original_start = execution.ProcessOutputCapture.start
+
+    def interrupt_after_reader_start(
+        capture: execution.ProcessOutputCapture,
+    ) -> None:
+        original_start(capture)
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(
+        execution.ProcessOutputCapture,
+        "start",
+        interrupt_after_reader_start,
+    )
+
+    with pytest.raises(PatchHarborError) as raised:
+        execute_script_text(
+            "#!/usr/bin/env bash\n# PATCHHARBOR\n",
+            cwd=tmp_path,
+            timeout_seconds=7,
+        )
+
+    assert raised.value.exit_code is ExitCode.INTERRUPTED
+    assert process_tree.run_timeouts == []
+    assert process_tree.closed == 1
+
+
 def test_prepared_timeout_preserves_output_for_result_bundle(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
