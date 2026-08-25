@@ -4,7 +4,7 @@
 
 **Vorgesehener Repository-Pfad:** `planning/1.1.0/commit-plan.md`<br>
 **Separater bereits ausgeführter Rückbauplan:** `planning/1.1.0/commit-plan-cleanup.md`<br>
-**Planstatus:** Umsetzungsplan; dieses Dokument enthält noch keinen Codepatch.<br>
+**Planstatus:** Umsetzung abgeschlossen; 96 / 96 W-R-C-Commits. Eine Veröffentlichung ist nur nach grünen blockierenden Gates auf dem exakten finalen Commit zulässig.<br>
 **Umfang:** 7 Meilensteine, 32 Steps, 96 W-R-C-Commits.
 
 ---
@@ -1509,11 +1509,18 @@ Die vollständige 1.1.0-Spezifikation ist auf Linux und Windows verhaltensorient
 
 ## Review nach Meilenstein 7
 
-- Definition of Done gegen das reale Verhalten prüfen.
-- falsche Annahmen und unnötig gewordene spätere Schritte dokumentieren.
-- verbleibenden Plan nur minimal anpassen.
-- sicherstellen, dass PatchHarbor weiterhin ein kontrollierter Runner bleibt.
-- Review im letzten Clean-Commit des Meilensteins abschließen; kein separater Review-Commit.
+- Die Definition of Done ist durch den vollständigen manuellen Runner, Registry,
+  Context/Fingerprint, Result Bundle, Dry-Run, Apply, Watcher, Packaging und die
+  blockierenden Linux- und Windows-Gates abgedeckt.
+- Zusätzliche Windows- und Interrupt-Fixes blieben innerhalb der jeweils offenen
+  Plancommits; sie haben weder Scope noch öffentliche Produktgrenze erweitert.
+- Nach `7.d.C` sind keine weiteren 1.1.0-Implementierungscommits offen. Tag und
+  Veröffentlichung dürfen erst nach grünen blockierenden Gates auf genau diesem
+  finalen Commit erfolgen.
+- PatchHarbor bleibt ein kontrollierter Runner. Zielprojekttests, Git-Commits,
+  Netzwerktransport, Repo Assist und PromptBridge bleiben außerhalb des Core.
+- Für spätere 1.1.x-Funktionen ist ein neuer, ausdrücklich freigegebener Plan
+  erforderlich.
 
 ---
 

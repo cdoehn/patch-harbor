@@ -55,20 +55,9 @@ upload, and download transport.
 
 ## Command reference
 
-The complete user-facing reference is built into the installed commands:
-
-```bash
-patchharbor --help
-patchharbor register --help
-patchharbor registry list --help
-patchharbor unregister --help
-patchharbor context --help
-patchharbor bundle --help
-patchharbor apply --help
-patchharbor fs run --help
-patchharbor-watcher --help
-patchharbor --version
-```
+The installed `patchharbor --help` and `patchharbor-watcher --help` commands are
+the complete user-facing reference. Only implemented commands and options are
+shown there.
 
 ## Result Bundles
 
