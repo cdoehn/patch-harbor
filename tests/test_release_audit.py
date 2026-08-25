@@ -110,6 +110,7 @@ def test_release_documents_exist_at_their_canonical_paths() -> None:
         PROJECT_ROOT / "planning" / "1.0.0" / "commit-plan.md",
         PROJECT_ROOT / "planning" / "1.1.0" / "commit-plan-cleanup.md",
         PROJECT_ROOT / "planning" / "1.1.0" / "commit-plan.md",
+        PROJECT_ROOT / "planning" / "1.1.1" / "commit-plan.md",
     }
 
     assert all(path.is_file() for path in expected_documents)

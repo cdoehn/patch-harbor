@@ -1,9 +1,52 @@
 # PatchHarbor – Spezifikations-Changelog
 
 **Dateiname:** `SPECIFICATION_CHANGELOG.md`<br>
-**Stand:** 2026-08-04
+**Stand:** 2026-08-25
 
 Dieses Dokument protokolliert Änderungen am verbindlichen Produktziel. Es ist kein Git-Commit-Log und ersetzt nicht die getrennten Umsetzungspläne unter `planning/`.
+
+---
+
+## [1.1.1] – 2026-08-25
+
+**Status:** Verbindliches, implementierungsreifes Zielbild; die Umsetzung erfolgt über `planning/1.1.1/commit-plan.md`.
+
+### Added
+
+- Allgemeine benutzerspezifische `config.json` mit geschlossenem Format-1-Schema und `exchange_directory`.
+- Sichere CLI zum Setzen und Anzeigen des Exchange-Ordners.
+- Gemeinsamer Exchange-Ordner als Standardziel für manuelle und automatische PatchHarbor Result Bundles.
+- `patchharbor apply` ohne Dateipfad mit nicht rekursiver, inhaltsbasierter und repositoryzustandsgebundener Paketauswahl.
+- Persistente Dateidentität aus kanonischem Pfad und SHA-256 zur Verhinderung ungeplanter automatischer Wiederverarbeitung.
+- Gemeinsamer Konfigurations-, Klassifikations- und Dateidentitätsvertrag für Core und Watcher.
+- Root-Datei `CHAT_INSTRUCTIONS.md` zur Initialisierung eines neuen Entwicklungs-Chats.
+- Verbindliche Chat-Regeln für Plan- und Spezifikationssuche, Spec-vs.-Plan-Prüfung, Tests, Commit-Arten und Result-Bundle-Auswertung.
+- Schmale deterministische Chat-UI mit `PLAN`, `FIX`, `OFF-PLAN`, `WARNING`, `STOP` und doppelter `PATCH BEREIT`-Zeile.
+- README-Abläufe für neues und bestehendes Repository, neuen Chat, manuellen Modus und Watcher-Modus.
+
+### Changed
+
+- Der frühere Watcher-Eingangsordner und der frühere Standard-Result-Ordner werden durch eine gemeinsame Exchange-Grenze ersetzt.
+- `patchharbor bundle` und Apply-Result-Bundles veröffentlichen ohne `--output-dir` im Exchange-Ordner.
+- Der Watcher besitzt keine eigene Eingangsordner-Konfiguration mehr und liest ausschließlich `config.json`.
+- Result Bundles dürfen bewusst neben Patch-Paketen im Exchange-Ordner liegen und werden zuverlässig nicht als Patch ausgeführt.
+- PatchHarbor räumt Exchange-Dateien nicht auf; Archivierung, Sortierung und Journalisierung bleiben außerhalb des Core.
+- Repo Assist wird als Werkzeug für Commit-Plan, Journal, Reproduzierbarkeit, Tests und Commits beschrieben, nicht als zwingend oberster Orchestrator.
+- Exakte Chat-Statuszeilen sind als maschinenlesbarer UI-Vertrag von der sonstigen Regel gegen Human-Text-Snapshot-Tests ausgenommen.
+
+### Clarified
+
+- Der Chat benötigt weder den lokalen Repository-Pfad noch den Exchange-Pfad; `CHAT_INSTRUCTIONS.md` und ein aktuelles Result Bundle genügen zur Initialisierung.
+- `patchharbor apply` erzeugt nach sicherer Repository-Auflösung selbst das Result Bundle; der Patch-Entrypoint ruft `patchharbor bundle` nicht rekursiv auf.
+- Projekttests können und sollen durch den vertrauenswürdigen Patch-Entrypoint ausgeführt werden, bleiben aber außerhalb der fachlichen Verantwortung des Core.
+- Testfehler oder andere Entrypoint-Fehler führen nicht zu einer globalen PatchHarbor-Rückabwicklung; das Result Bundle enthält soweit möglich den tatsächlich zurückgebliebenen Zustand und die vollständigen Logs.
+- Fixes verwenden `<PLAN-ID>-FIX<n>` und erhöhen den Plan-Commit-Zähler nicht; Off-Plan-Kennungen und -Messages dürfen sinnvoll frei gewählt werden.
+
+### Removed / No migration
+
+- Keine 1.1.1-Laufzeitquelle `watcher.json`.
+- Keine 1.1.1-Laufzeitquelle `paths.json`.
+- Kein Migrations- oder Fallbackcode für frühere Entwicklungs-Konfigurationen, da keine produktiv verwalteten 1.1.0-Installationen übernommen werden müssen.
 
 ---
 

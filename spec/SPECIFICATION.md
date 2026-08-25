@@ -1,41 +1,39 @@
 # PatchHarbor – Spezifikation
 
 **Dateiname:** `SPECIFICATION.md`<br>
-**Produktversion:** `1.1.0`<br>
-**Spezifikationsstand:** 2026-08-04<br>
-**Status:** Verbindliches, implementierungsreifes Zielbild für PatchHarbor 1.1.0<br>
+**Produktversion:** `1.1.1`<br>
+**Spezifikationsstand:** 2026-08-25<br>
+**Status:** Verbindliches, implementierungsreifes Zielbild für PatchHarbor 1.1.1<br>
 **Projektname:** `PatchHarbor`<br>
 **Kommando:** `patchharbor`<br>
 **Skriptmarker:** `# PATCHHARBOR`<br>
 **Patch-Paketmarker:** `patch-harbor`
 
-Der aktuelle Umsetzungs- und Commit-Plan ist von dieser Produktspezifikation getrennt und liegt unter `planning/1.1.0/commit-plan.md`. Der abgeschlossene Cleanup-Plan bleibt unter `planning/1.1.0/commit-plan-cleanup.md` erhalten. Änderungen am Produktziel werden in `spec/SPECIFICATION_CHANGELOG.md` dokumentiert.
+Der aktuelle Umsetzungs- und Commit-Plan ist von dieser Produktspezifikation getrennt und liegt unter `planning/1.1.1/commit-plan.md`. Die abgeschlossenen Pläne für 1.0.0 und 1.1.0 bleiben als historische Umsetzungsgrundlage erhalten. Änderungen am Produktziel werden in `spec/SPECIFICATION_CHANGELOG.md` dokumentiert.
 
 ---
 
-## 1. Zweck, Gültigkeit und Verhältnis zu 1.0.0
+## 1. Zweck, Gültigkeit und Verhältnis zu 1.1.0
 
-Dieses Dokument beschreibt das vollständige verbindliche Produktziel von PatchHarbor 1.1.0.
+Dieses Dokument beschreibt das vollständige verbindliche Produktziel von PatchHarbor 1.1.1.
 
-Es übernimmt die weiterhin gültigen Produktverträge aus 1.0.0 vollständig und ergänzt sie um:
+Es übernimmt die in 1.1.0 implementierten Produktverträge vollständig und ergänzt sie um zwei zusammengehörige Bedienverbesserungen:
 
-- die Registrierung konkreter lokaler Git-Repository-Instanzen,
-- eine eindeutige Repository-ID,
-- einen reproduzierbaren Repository-Kontext,
-- einen kanonischen Zustands-Fingerprint,
-- ein selbstbeschreibendes sicheres ZIP-Patch-Paket,
-- strikte Repository- und Zustandsprüfung,
-- einen Dry-Run,
-- eine exklusive Repository-Sperre,
-- ein vollständiges Result Bundle mit Repository-Snapshot und Ausführungsprotokoll,
-- einen separaten PatchHarbor Watcher,
-- klar getrennte Verantwortlichkeiten gegenüber Repo Assist und PromptBridge.
+- eine allgemeine benutzerspezifische `config.json` mit genau einem gemeinsamen `exchange_directory`,
+- denselben Exchange-Ordner als standardisierte Übergabestelle für Patch-Pakete und PatchHarbor Result Bundles,
+- `patchharbor apply` ohne expliziten Dateipfad mit sicherer, nicht rekursiver und zustandsgebundener Paketauswahl,
+- `patchharbor bundle` und automatische Apply-Result-Bundles mit dem Exchange-Ordner als Standardziel,
+- eine gemeinsame Erkennungs- und Wiederverarbeitungsgrenze für Core und Watcher,
+- die versionierte Datei `CHAT_INSTRUCTIONS.md` zur Initialisierung eines neuen Entwicklungs-Chats,
+- eine verbindliche schmale Chat-Oberfläche für `PLAN`, `FIX`, `OFF-PLAN`, `WARNING`, `STOP` und fertige Patch-Pakete.
 
-Diese Datei ersetzt die frühere kombinierte Spezifikation mit Commit-Plan als Produktspezifikation. Der historische 1.0.0-Commit-Plan bleibt unter `planning/1.0.0/commit-plan.md` erhalten, ist aber kein normativer Teil dieses Dokuments.
+PatchHarbor 1.1.1 führt keine Netzwerk-, Chat-, Commit-Plan- oder Journalfunktion in den Core ein. `CHAT_INSTRUCTIONS.md` ist eine ausgelieferte Handlungsanweisung für einen externen Chat; der Exchange-Ordner ist eine lokale Dateisystemgrenze.
+
+Für nicht produktiv genutzte 1.1.0-Entwicklungsstände wird kein Migrationscode für `watcher.json`, `paths.json` oder andere frühere interne Pfaddokumente bereitgestellt. 1.1.1 verwendet ausschließlich den neuen Vertrag. Das ist eine bewusste Projektentscheidung und kein stiller Fallback.
+
+Die historischen Commit-Pläne bleiben unter `planning/1.0.0/` und `planning/1.1.0/` erhalten, sind aber kein normativer Teil dieses Dokuments.
 
 Bei einem Widerspruch zwischen diesem Dokument und einer älteren Produktspezifikation gilt dieses Dokument.
-
----
 
 ## 2. Produktzweck und Sicherheitsgrenze
 
@@ -80,7 +78,11 @@ PatchHarbor ist kein Testmanager, kein Commit-Manager, kein Build-System, kein C
 - stdout und stderr vollständig erfassen,
 - Exit-Code, Laufzeit, Warnings und Tool-Fehler dokumentieren,
 - ein vollständiges PatchHarbor Result Bundle erzeugen,
-- einen maschinenlesbaren Ergebnisvertrag für Watcher und Repo Assist anbieten.
+- die gemeinsame Benutzerkonfiguration aus `config.json` lesen und sicher schreiben,
+- einen konfigurierten Exchange-Ordner als Standardübergabe in beide Richtungen verwenden,
+- bei `patchharbor apply` ohne Dateipfad genau ein passendes, noch nicht automatisch verarbeitetes Patch-Paket auswählen,
+- Patch-Pakete, Result Bundles und sonstige Dateien im Exchange-Ordner sicher voneinander unterscheiden,
+- einen maschinenlesbaren Ergebnisvertrag für Watcher, Repo Assist und einen späteren Orchestrator anbieten.
 
 ### 2.2 PatchHarbor Core macht ausdrücklich nicht
 
@@ -91,6 +93,7 @@ PatchHarbor ist kein Testmanager, kein Commit-Manager, kein Build-System, kein C
 - keine Dateien selbst zu einem Chat hochladen oder von ihm abrufen,
 - keine Tests des Zielprojekts als fachlichen Workflow verwalten oder bewerten,
 - keine Git-Commits, Branches, Tags oder Releases erzeugen,
+- keinen Commit-Plan, kein Journal und keinen Entwicklungsfortschritt verwalten,
 - keine Builds oder Linter als eigene Produktfunktion verwalten,
 - keine Patches inhaltlich bewerten,
 - keine interaktiven Kindskripte unterstützen,
@@ -102,7 +105,10 @@ PatchHarbor ist kein Testmanager, kein Commit-Manager, kein Build-System, kein C
 - keine enthaltenen Archive rekursiv als weitere Patch-Pakete öffnen,
 - keine vollständige Pakettransaktion oder automatische globale Rückabwicklung versprechen,
 - keine dauerhafte zentrale Loghistorie oder Logrotation verwalten,
-- keine beliebigen Diagnose-, Test- oder Build-Artefakte automatisch einsammeln.
+- keine beliebigen Diagnose-, Test- oder Build-Artefakte automatisch einsammeln,
+- keine Dateien im Exchange-Ordner archivieren, sortieren, umbenennen, verschieben oder löschen.
+
+Ein vertrauenswürdiger, vom Chat erzeugter Entrypoint darf im Auftrag des Benutzers Projekttests und Git-Kommandos ausführen. PatchHarbor Core behandelt deren Output und Exit-Code jedoch nur als Entrypoint-Ergebnis und übernimmt weder fachliche Testbewertung noch Commit-Verwaltung.
 
 ### 2.3 Keine Sandbox
 
@@ -126,33 +132,34 @@ Der PatchHarbor Watcher ist eine separate dünne Komponente im PatchHarbor-Proje
 
 Er kann unter Linux als systemd-Service betrieben werden und:
 
-- einen konfigurierten Download- oder Eingangsordner überwachen,
+- den in der gemeinsamen `config.json` festgelegten Exchange-Ordner überwachen,
 - vollständig abgeschlossene Downloads erkennen,
 - offensichtliche temporäre Browserdateien ignorieren,
-- eine gefundene Datei an `patchharbor apply` übergeben,
+- stabile Dateien über die öffentliche PatchHarbor-Core-Grenze klassifizieren und anwenden lassen,
 - Rückgabecode und strukturiertes Ergebnis protokollieren,
 - die ungeplante erneute Verarbeitung derselben unveränderten Datei verhindern.
 
+Der Watcher besitzt keine eigene Eingangsordner-Konfiguration. Er verwendet dieselbe `exchange_directory`-Einstellung, dieselbe Paketklassifikation und denselben persistenten Dateidentitätsvertrag wie der manuelle Aufruf `patchharbor apply` ohne Pfad.
+
 Der Watcher implementiert keine eigene Repository-, Git-, Manifest-, Fingerprint-, Lock-, Ausführungs- oder Result-Bundle-Logik. Er darf Prüfungen des Core weder nachbauen noch umgehen.
 
-Der Watcher scannt den Eingangsordner nicht rekursiv.
-
-Der physisch kanonisierte Eingangsordner muss außerhalb aller registrierten Repository-Instanzen liegen. Er darf weder mit einer Repository-Wurzel identisch sein noch innerhalb einer registrierten Repository-Instanz liegen. Eingangsordner und Result-Ordner dürfen sich außerdem in keiner Richtung überlappen. Eine Watcher-Konfiguration oder spätere Repository-Registrierung, die diese Grenzen verletzen würde, wird abgelehnt.
+Der Watcher scannt den Exchange-Ordner nicht rekursiv. Er verschiebt, löscht, archiviert oder sortiert dort keine Datei. Result Bundles, alte Patches und sonstige Dateien dürfen dauerhaft neben neuen Patch-Paketen liegen; unveränderte Nichtkandidaten und bereits verarbeitete Dateien werden nicht fortlaufend neu delegiert.
 
 ### 3.3 Repo Assist
 
-Repo Assist ist ein optionaler übergeordneter Workflow-Orchestrator.
+Repo Assist ist ein separates Werkzeug für den nachvollziehbaren Entwicklungsprozess eines Repositorys. Es ist nicht zwingend der oberste Orchestrator; über Repo Assist, PatchHarbor, PromptBridge und weitere Werkzeuge kann später ein zusätzlicher Orchestrator liegen.
 
-Repo Assist kann:
+Repo Assist kann insbesondere:
 
-- PatchHarbor Core aufrufen,
-- PatchHarbor Result Bundles anfordern,
-- Aufgaben und Workflow-Zustände verwalten,
-- Tests mit Timeouts ausführen,
-- Testresultate bewerten,
+- Commit-Plan und Fortschritt verwalten,
+- ein Entwicklungsjournal führen,
+- Reproduzierbarkeit und Zuordnung von Aufgaben, Patches, Tests und Commits sichern,
+- PatchHarbor Core aufrufen und PatchHarbor Result Bundles anfordern,
+- Tests mit Timeouts ausführen und Testresultate bewerten,
 - nur bei erfolgreichem Workflow Commits erzeugen,
-- Retry, Abort und Journal verwalten,
-- eigene Repo-Assist-Journal-Bundles erzeugen.
+- Retry und Abort verwalten,
+- eigene Repo-Assist-Journal-Bundles erzeugen,
+- optional einen eigenen Automatikmodus anbieten.
 
 Repo Assist erzeugt den technischen PatchHarbor-Repository-Snapshot nicht selbst. Benötigt Repo Assist den vollständigen Repository-Zustand, ruft es PatchHarbor auf.
 
@@ -172,18 +179,15 @@ Dazu können gehören:
 
 PromptBridge ist kein internes PatchHarbor-Modul.
 
-### 3.5 Keine konkurrierenden Orchestratoren
+### 3.5 Keine konkurrierenden Automatikpfade
 
 Für dieselben registrierten Repository-Instanzen gilt:
 
-- Entweder verarbeitet der PatchHarbor Watcher neue Downloads autonom über PatchHarbor Core,
-- oder Repo Assist ist der aktive Orchestrator.
+- Der PatchHarbor Watcher darf neue Exchange-Dateien autonom über PatchHarbor Core verarbeiten.
+- Ein Repo-Assist-Automatikmodus oder ein späterer übergeordneter Orchestrator darf denselben Workflow alternativ steuern.
+- Zwei autonome Auslöser dürfen nicht gleichzeitig dieselben Repository-Instanzen bearbeiten.
 
-Wenn Repo Assist aktiv ist, darf für dieselben Repository-Instanzen kein autonomer PatchHarbor Watcher aktiv sein.
-
-Unabhängig von dieser Betriebsregel erzwingt PatchHarbor Core pro Repository eine technische exklusive Sperre. Dadurch können zwei PatchHarbor-Aufträge dieselbe lokale Instanz nicht gleichzeitig bearbeiten.
-
----
+Manuelle Core-Aufrufe bleiben möglich. Die exklusive Repository-Sperre verhindert parallele PatchHarbor-Aufträge auf derselben lokalen Instanz, ersetzt aber keine fachliche Koordination mehrerer Automatiksysteme.
 
 ## 4. Installation, Plattformen und lokale Verzeichnisse
 
@@ -207,7 +211,7 @@ patchharbor
 
 ### 4.2 Python und Zielplattformen
 
-PatchHarbor 1.1.0 verwendet die vorhandene 1.0.0-Basis und benötigt Python 3.12 oder neuer.
+PatchHarbor 1.1.1 verwendet die vollständig implementierte 1.1.0-Basis und benötigt Python 3.12 oder neuer.
 
 Verbindliche Zielplattformen:
 
@@ -223,76 +227,113 @@ Verbindliche CI-Plattformen:
 
 Ubuntu 24.04, Ubuntu 26.04 und der echte Windows-Runner sind normale blockierende Release-Gates. Eine Release-Freigabe ist nur zulässig, wenn alle verbindlichen Lanes grün sind. PowerShell 7 ist zusätzlich blockierend, sobald die entsprechende Lane im Release-Workflow aktiviert ist.
 
-### 4.3 Benutzerspezifische Verzeichnisse
+### 4.3 Benutzerspezifische Verzeichnisse und `config.json`
 
 Unter Linux gelten standardmäßig:
 
 ```text
-Konfiguration: ${XDG_CONFIG_HOME:-$HOME/.config}/patchharbor/
-Zustand:       ${XDG_STATE_HOME:-$HOME/.local/state}/patchharbor/
-Resultate:     ${XDG_STATE_HOME:-$HOME/.local/state}/patchharbor/results/
-Locks:         ${XDG_STATE_HOME:-$HOME/.local/state}/patchharbor/locks/
+Konfigurationsverzeichnis: ${XDG_CONFIG_HOME:-$HOME/.config}/patchharbor/
+Konfigurationsdatei:       ${XDG_CONFIG_HOME:-$HOME/.config}/patchharbor/config.json
+Zustand:                   ${XDG_STATE_HOME:-$HOME/.local/state}/patchharbor/
+Exchange-Dateistatus:      ${XDG_STATE_HOME:-$HOME/.local/state}/patchharbor/exchange/
+Locks:                     ${XDG_STATE_HOME:-$HOME/.local/state}/patchharbor/locks/
 ```
 
 Unter Windows gelten standardmäßig:
 
 ```text
-Konfiguration: %APPDATA%\PatchHarbor\
-Zustand:       %LOCALAPPDATA%\PatchHarbor\
-Resultate:     %LOCALAPPDATA%\PatchHarbor\results\
-Locks:         %LOCALAPPDATA%\PatchHarbor\locks\
+Konfigurationsverzeichnis: %APPDATA%\PatchHarbor\
+Konfigurationsdatei:       %APPDATA%\PatchHarbor\config.json
+Zustand:                   %LOCALAPPDATA%\PatchHarbor\
+Exchange-Dateistatus:      %LOCALAPPDATA%\PatchHarbor\exchange\
+Locks:                     %LOCALAPPDATA%\PatchHarbor\locks\
 ```
 
-Alle konfigurierten Pfade werden vor ihrer Verwendung physisch kanonisiert. Symbolische Verknüpfungen und Junctions werden bei der Grenzprüfung auf ihr tatsächliches Ziel aufgelöst.
+Die allgemeine Benutzerkonfiguration besitzt in Formatversion 1 exakt dieses geschlossene Schema:
 
-Für jeden Result-Ordner gelten verbindlich:
+```json
+{
+  "exchange_directory": "/absoluter/pfad/zum/austauschordner",
+  "format_version": 1
+}
+```
 
-- Er darf nicht identisch mit einem registrierten Repository-Wurzelpfad sein.
-- Er darf nicht innerhalb irgendeiner registrierten Repository-Instanz liegen.
-- Er darf keinen konfigurierten Watcher-Eingangsordner enthalten.
-- Er darf nicht identisch mit einem Watcher-Eingangsordner sein und nicht innerhalb eines solchen Eingangsordners liegen.
+Verbindliche Regeln:
+
+- unbekannte oder fehlende Felder werden abgelehnt,
+- `format_version` ist die Ganzzahl `1`,
+- `exchange_directory` ist ein absoluter Pfad,
+- der Pfad wird vor Speicherung und vor jeder Verwendung physisch kanonisiert,
+- der Pfad muss ein echtes Verzeichnis sein; Symlinks, Junctions und Elternpfade werden auf ihr tatsächliches Ziel aufgelöst,
+- die durch PatchHarbor geschriebene Datei ist UTF-8, endet mit LF und wird atomar ersetzt,
+- direkte Bearbeitung der Datei ist zulässig; ungültiger Inhalt führt zu einem klaren Konfigurationsfehler,
+- `watcher.json` und `paths.json` sind keine 1.1.1-Konfigurationsquellen und werden nicht migriert oder als Fallback gelesen.
+
+Die empfohlenen sicheren Benutzerbefehle lauten:
+
+```bash
+patchharbor configure exchange-directory VERZEICHNIS
+patchharbor configure show
+```
+
+`configure exchange-directory` legt das Zielverzeichnis bei Bedarf an, validiert es gegen die Registry und veröffentlicht anschließend die vollständige `config.json` atomar. `configure show` zeigt den Pfad der verwendeten Konfigurationsdatei und den kanonischen Exchange-Ordner. Die Datei bleibt die alleinige persistente Quelle.
+
+Der Exchange-Ordner ist benutzerspezifisch und nicht repositoryspezifisch. `patchharbor register` fragt ihn nicht ab. Die Befehle `register`, `registry`, `unregister`, `context` und `fs run` benötigen keine Exchange-Konfiguration.
+
+Ohne `--output-dir` benötigen `bundle` sowie jeder Apply-Auftrag, der ein Result Bundle versucht, eine gültige Exchange-Konfiguration. `patchharbor apply` ohne `PATCH_ZIP` und der Watcher benötigen sie ebenfalls. Ein explizites `PATCH_ZIP` zusammen mit einem expliziten `--output-dir` bleibt auch ohne Exchange-Konfiguration möglich.
+
+Für den Exchange-Ordner gelten verbindlich:
+
+- Er darf weder identisch mit einer registrierten Repository-Wurzel noch innerhalb einer registrierten Repository-Instanz liegen.
+- Keine registrierte Repository-Wurzel darf innerhalb des Exchange-Ordners liegen.
+- Eine neue Konfiguration oder spätere Registrierung, die diese Grenzen verletzt, wird abgelehnt.
+- Er ist zugleich zulässiger Standard-Result-Ordner; die frühere Verbotsregel zwischen Watcher-Eingang und Result-Ordner entfällt ausdrücklich.
+- Patch-Pakete, Result Bundles und sonstige reguläre Dateien dürfen im selben flachen Verzeichnis liegen.
+
+Für einen expliziten `--output-dir` gelten verbindlich:
+
+- Er darf weder identisch mit einer registrierten Repository-Wurzel noch innerhalb einer registrierten Repository-Instanz liegen.
+- Er darf dem Exchange-Ordner entsprechen oder außerhalb davon liegen.
 - Er muss vor der ersten Repository-Änderung sicher angelegt und auf Schreibbarkeit geprüft werden.
-- Die temporäre ZIP-Datei eines Result Bundles wird direkt in diesem endgültigen Result-Ordner erzeugt, damit die spätere Veröffentlichung über einen dateisystemgleichen atomaren Austausch möglich ist.
+- Die temporäre ZIP-Datei eines Result Bundles wird direkt in diesem endgültigen Ausgabeordner erzeugt, damit die Veröffentlichung über einen dateisystemgleichen atomaren Austausch möglich ist.
 
-Für jeden Watcher-Eingangsordner gelten verbindlich:
+Der persistente Exchange-Dateistatus speichert nur technische Dateidentitäten und Verarbeitungszustände. Er ist kein Archiv, kein Journal und keine Sortierung der Exchange-Dateien.
 
-- Er darf nicht identisch mit einem registrierten Repository-Wurzelpfad sein.
-- Er darf nicht innerhalb irgendeiner registrierten Repository-Instanz liegen.
-- Er darf keinen konfigurierten Result-Ordner enthalten.
-- Er darf nicht identisch mit einem Result-Ordner sein und nicht innerhalb eines Result-Ordners liegen.
+### 4.4 Dokumentation und Chat-Initialisierung
 
-Liegt ein expliziter `--output-dir` oder ein konfigurierter Watcher-Eingangsordner nach physischer Auflösung in einem verbotenen Bereich, wird die Konfiguration beziehungsweise der Auftrag abgelehnt. Wird später ein Repository registriert, dessen Wurzel einen bereits konfigurierten Watcher-Eingangsordner oder Result-Ordner enthalten würde, wird auch diese Registrierung abgelehnt.
+- Die Installations- und Betriebsanleitung steht kurz und handlungsorientiert im README.
+- Das README beschreibt neues und bestehendes Repository, neuen Chat, manuellen Modus und Watcher-Modus vollständig.
+- Die vollständige CLI-Bedienung steht in den argparse-Help-Screens.
+- Die Produktspezifikation beschreibt verbindliches Verhalten und die Verantwortungsgrenzen.
+- Die versionierte Root-Datei `CHAT_INSTRUCTIONS.md` beschreibt den vollständigen Vertrag für einen externen Entwicklungs-Chat.
+- Ein neuer Chat erhält `CHAT_INSTRUCTIONS.md` und das aktuelle PatchHarbor Result Bundle. Lokale Repository- oder Exchange-Pfade werden dem Chat nicht mitgeteilt und von ihm nicht benötigt.
+- Nicht implementierte Funktionen werden weder im README noch im Help-Screen oder in `CHAT_INSTRUCTIONS.md` als verfügbar dargestellt.
 
-Der Watcher darf Result Bundles niemals erneut als Eingabepakete behandeln.
-
-### 4.4 Dokumentation
-
-- Die Installationsanleitung steht kurz im README.
-- Die vollständige Bedienungsdokumentation steht in den argparse-Help-Screens.
-- Die Produktspezifikation beschreibt verbindliches Verhalten, nicht die tägliche Kurzanleitung.
-- Nicht implementierte Funktionen werden nicht im Help-Screen angeboten.
-
----
+Die standardisierten Chat-Statuszeilen aus `CHAT_INSTRUCTIONS.md` sind eine bewusst maschinenlesbare UI-Grenze und dürfen im Unterschied zu sonstigen Human-Texten exakt getestet werden.
 
 ## 5. Öffentliche CLI
 
-### 5.1 Sicherer Mehr-Repository-Pfad
+### 5.1 Sicherer Mehr-Repository-Pfad und Benutzerkonfiguration
 
 ```bash
+patchharbor configure exchange-directory VERZEICHNIS
+patchharbor configure show
 patchharbor register [REPOSITORY]
 patchharbor register --new-id [REPOSITORY]
 patchharbor registry list
 patchharbor unregister [REPOSITORY_OR_REPO_ID]
 patchharbor context [REPOSITORY]
 patchharbor bundle [REPOSITORY]
-patchharbor apply PATCH_ZIP
-patchharbor apply --dry-run PATCH_ZIP
+patchharbor apply [PATCH_ZIP]
+patchharbor apply --dry-run [PATCH_ZIP]
 ```
 
 Die Optionen sind pro Befehl verbindlich begrenzt:
 
 | Befehl | Unterstützte zusätzliche Optionen |
 |---|---|
+| `patchharbor configure exchange-directory` | keine fachliche Zusatzoption |
+| `patchharbor configure show` | keine fachliche Zusatzoption |
 | `patchharbor register` | `--new-id` |
 | `patchharbor registry list` | `--json` |
 | `patchharbor unregister` | keine fachliche Zusatzoption |
@@ -301,6 +342,20 @@ Die Optionen sind pro Befehl verbindlich begrenzt:
 | `patchharbor apply` | `--dry-run`, `--timeout SEKUNDEN`, `--plain`, `--no-color`, `--json`, `--output-dir VERZEICHNIS` |
 
 Für `patchharbor apply` beträgt der Standard-Timeout 300 Sekunden.
+
+Ist `PATCH_ZIP` angegeben, wird ausschließlich diese Datei verarbeitet. Ist `PATCH_ZIP` nicht angegeben, sucht PatchHarbor im konfigurierten Exchange-Ordner genau ein passendes Paket nach Abschnitt 16.2. Der aktuelle Arbeitsordner und ein lokaler Repository-Pfad sind dabei keine Auswahlinformation.
+
+Ohne `--output-dir` veröffentlicht `bundle` sein Result Bundle im Exchange-Ordner. Dasselbe gilt für den Result-Bundle-Versuch von `apply`. Ein explizites `--output-dir` überschreibt nur das Ausgabeziel, nicht die Paketauswahl.
+
+Der separate Watcher besitzt ab 1.1.1 keinen eigenen Eingangsordnerparameter und keine eigene `--configure`-Option. Seine öffentlichen Betriebsaufrufe lauten:
+
+```bash
+patchharbor-watcher
+patchharbor-watcher --install-systemd-user-unit
+patchharbor-watcher --poll-interval SEKUNDEN
+```
+
+Er liest den Exchange-Ordner ausschließlich aus `config.json`.
 
 `--json` und eine interaktive Terminaldarstellung schließen sich aus. Im JSON-Modus werden weder TUI-Sequenzen noch Farbcodes auf stdout ausgegeben. Nicht für einen Befehl aufgeführte Optionen werden von argparse abgelehnt.
 
@@ -425,7 +480,7 @@ Das erfolgreiche `result`-Objekt besitzt exakt:
     "state_fingerprint": "a1b2c3d4e5f67890",
     "fingerprint_algorithm": "patchharbor-state-v1",
     "result_bundle_status": "created",
-    "result_bundle_path": "/home/user/.local/state/patchharbor/results/patchharbor_result_20260804_093000_b592be12.zip",
+    "result_bundle_path": "/home/user/Downloads/patchharbor_result_20260825_093000_b592be12.zip",
     "emergency_diagnostics_path": null
   },
   "error": null,
@@ -485,7 +540,7 @@ Zulässige Bundle-Statuswerte sind `created`, `failed` und `not_attempted`. `not
     "result_bundle": {
       "attempted": true,
       "status": "created",
-      "path": "/home/user/.local/state/patchharbor/results/patchharbor_result_20260804_093000_b592be12.zip",
+      "path": "/home/user/Downloads/patchharbor_result_20260825_093000_b592be12.zip",
       "emergency_diagnostics_path": null
     }
   },
@@ -760,7 +815,7 @@ Beim sicheren Apply werden zusätzlich vor der ersten Repository-Änderung:
 - sein Pflichtmarker geprüft,
 - der angeforderte Interpreter eindeutig bestimmt,
 - die Verfügbarkeit des Interpreters geprüft,
-- der Result-Ordner validiert und ein temporärer Ausgabepfad im endgültigen Result-Ordner reserviert.
+- der endgültige Ausgabeordner aus `--output-dir` oder `exchange_directory` validiert und dort ein temporärer Ausgabepfad reserviert.
 
 Ein unsicherer, beschädigter oder mehrdeutiger Eintrag oder ein fehlender Interpreter macht das gesamte Paket ungültig. Kein Skript wird gestartet und keine endgültige Nutzdatei wird geschrieben.
 
@@ -772,7 +827,7 @@ Ein unsicherer, beschädigter oder mehrdeutiger Eintrag oder ein fehlender Inter
 - Benötigte sichere Unterverzeichnisse werden angelegt.
 - PatchHarbor legt keine dauerhaften Backups an.
 - Jeder einzelne Dateiaustausch ist atomar.
-- Das Gesamtpaket besitzt in 1.1.0 keine vollständige Transaktion und keine automatische globale Rückabwicklung.
+- Das Gesamtpaket besitzt in 1.1.1 keine vollständige Transaktion und keine automatische globale Rückabwicklung.
 - Scheitert die vollständige Vorbereitung oder ein tatsächlicher Schreibvorgang, startet kein Skript.
 
 ### 10.5 Ressourcenbudget
@@ -798,7 +853,7 @@ Eine Überschreitung eines harten Budgets führt vor der Ausführung zu einem To
 
 ### 11.1 Unterstützte Interpreter
 
-PatchHarbor 1.1.0 unterstützt bewusst Bash und PowerShell.
+PatchHarbor 1.1.1 unterstützt bewusst Bash und PowerShell.
 
 - Linux ohne Shebang: Bash.
 - Windows ohne Shebang: Windows PowerShell.
@@ -975,7 +1030,7 @@ PatchHarbor führt unter dem globalen Registry-Lock mindestens aus:
 1. kanonischen Repository-Wurzelpfad bestimmen,
 2. prüfen, dass `HEAD` auf einen Commit auflösbar ist,
 3. prüfen, dass weder der Base-Baum von `HEAD` noch der Index einen Pfad mit dem reservierten Segment `.patchharbor` in beliebiger Groß-/Kleinschreibung enthält,
-4. prüfen, dass die neue Repository-Wurzel keinen konfigurierten Watcher-Eingangsordner oder Result-Ordner enthält und mit keinem solchen Pfad identisch ist,
+4. prüfen, dass die neue Repository-Wurzel den konfigurierten Exchange-Ordner weder enthält noch in ihm liegt und mit ihm nicht identisch ist,
 5. prüfen, dass ein vorhandener Pfad `.patchharbor` ein echtes reguläres Verzeichnis und weder Symlink noch Junction noch Datei ist,
 6. das lokale interne Verzeichnis andernfalls sicher anlegen,
 7. eine vorhandene lokale ID validieren oder eine UUID v4 erzeugen,
@@ -1018,7 +1073,7 @@ Das vollständige Verzeichnis:
 
 ist für lokale PatchHarbor-Daten reserviert.
 
-Für Version 1.1.0 enthält es mindestens:
+Für Version 1.1.1 enthält es mindestens:
 
 ```text
 .patchharbor/id
@@ -1100,6 +1155,8 @@ fingerprint_algorithm: patchharbor-state-v1
 INSTRUCTIONS:
 - Verwende diese Werte unverändert in patch.json.
 - Erzeuge bei geändertem Repository-Zustand einen neuen Kontext.
+- Lokale Repository- und Exchange-Pfade gehören nicht in patch.json.
+- Verwende für einen vollständigen Entwicklungsauftrag zusätzlich CHAT_INSTRUCTIONS.md und ein aktuelles Result Bundle.
 ```
 
 Der Chat darf Repository-ID, Base-Commit oder Fingerprint nicht erraten.
@@ -1147,7 +1204,7 @@ SHA-256 über den kanonischen Eingabestrom
 
 ### 14.5 Unterstützte Repository-Grenzen
 
-Der sichere 1.1.0-Pfad unterstützt ausschließlich Repository-Zustände, die auf Linux und Windows eindeutig, sicher und vollständig darstellbar sind.
+Der sichere 1.1.1-Pfad unterstützt ausschließlich Repository-Zustände, die auf Linux und Windows eindeutig, sicher und vollständig darstellbar sind.
 
 Die Pfadprüfung umfasst die Vereinigungsmenge aus:
 
@@ -1336,7 +1393,7 @@ Für alle Payloads gelten verbindlich:
 | Repository-Pfad | Die ursprünglichen streng validierten UTF-8-Pfadbytes, ohne Normalisierung und ohne abschließendes NUL. |
 | Git-Modus | ASCII `100644` oder ASCII `100755`; ein fachlich fehlender Modus ist ein Payload der Länge null. |
 | Git-Objekt-ID | Vollständiger kleingeschriebener ASCII-Hex-String des Repository-Objektformats; 40 Zeichen bei SHA-1 und 64 Zeichen bei SHA-256. Keine Abkürzung und keine rohen Objekt-ID-Bytes. |
-| Unstaged-Status | Genau ein großgeschriebenes ASCII-Byte. Im unterstützten 1.1.0-Zustand sind ausschließlich `M` und `D` zulässig. |
+| Unstaged-Status | Genau ein großgeschriebenes ASCII-Byte. Im unterstützten 1.1.1-Zustand sind ausschließlich `M` und `D` zulässig. |
 | Working-Tree-Art | Exakt ASCII `regular` oder ASCII `missing`. |
 | Dateiinhalt | Unveränderte rohe Bytes, einschließlich vorhandener NUL-Bytes und Zeilenenden. |
 | Zähler und Dateigröße | Genau acht Bytes, unsigned big-endian. |
@@ -1546,7 +1603,7 @@ Ein enthaltenes ZIP oder anderes Archiv wird nicht als weiteres Patch-Paket geö
 
 ---
 
-## 16. Exklusive Repository-Sperre und Apply-Ablauf
+## 16. Exklusive Repository-Sperre, Exchange-Auswahl und Apply-Ablauf
 
 ### 16.1 Sperrmodell
 
@@ -1555,8 +1612,8 @@ Für jede `repo_id` existiert genau eine betriebssystemübergreifende exklusive 
 Die Sperre:
 
 - wird von `context`, `apply`, `apply --dry-run` und `bundle` verwendet,
-- gilt pro `repo_id`, nicht pro Download-Dateiname,
-- wird vor der ersten Zustandsaufnahme erworben,
+- gilt pro `repo_id`, nicht pro Exchange-Dateiname,
+- wird vor der ersten vollständigen Zustandsaufnahme des ausgewählten Repositorys erworben,
 - bleibt bei `apply`, Dry-Run und Bundle bis zum Abschluss oder Fehlschlag der Result-Bundle-Erzeugung gehalten,
 - wird bei `context` unmittelbar nach der konsistenten Zustandsaufnahme freigegeben,
 - wird über einen sicheren Cleanup-Pfad freigegeben,
@@ -1568,7 +1625,37 @@ Die Sperre koordiniert PatchHarbor-Aufträge. Fremde Editoren oder andere Git-Pr
 
 Bei einer Auflösung über die zentrale Registry gilt die Lock-Reihenfolge aus Abschnitt 13: zuerst globaler Registry-Lock, danach Repository-Lock. Nach erfolgreicher Revalidierung wird der Registry-Lock freigegeben, während der Repository-Lock bis zum Auftragsende gehalten bleibt.
 
-### 16.2 Sicher aufgelöstes Repository
+### 16.2 Automatische Paketauswahl im Exchange-Ordner
+
+Wird `patchharbor apply` ohne `PATCH_ZIP` aufgerufen, verwendet PatchHarbor ausschließlich den konfigurierten Exchange-Ordner.
+
+Die automatische Auswahl:
+
+1. lädt und validiert `config.json`,
+2. scannt genau die oberste Verzeichnisebene und niemals rekursiv,
+3. berücksichtigt nur reguläre Dateien und folgt keinen Symlinks oder Junctions,
+4. ignoriert bekannte temporäre Browser-Downloads,
+5. ermittelt eine stabile Dateidentität aus physisch kanonischem Pfad und vollständigem SHA-256-Inhalt,
+6. verwendet für eine unveränderte Identität eine bereits sicher gespeicherte Inhaltsklassifikation, statt dieselbe Nichtkandidaten-Datei fortlaufend neu zu analysieren,
+7. schließt eine Patch-Identität nur dann von der automatischen Ausführung aus, wenn sie bereits als tatsächlich versucht gespeichert wurde; eine bloße Klassifikation oder ein derzeitiger Zustands-Mismatch ist kein dauerhafter Ausschluss,
+8. unterscheidet anhand des tatsächlichen ZIP-Inhalts und nicht anhand von Dateiname oder Endung zwischen Patch-Paket, Result Bundle und sonstiger Datei,
+9. liest bei Patch-Kandidaten die Root-`patch.json` streng genug, um `repo_id`, Base-Commit und Fingerprint zu bestimmen,
+10. prüft für jeden Kandidaten unter der verbindlichen Registry-/Repository-Lock-Reihenfolge, ob die `repo_id` registriert ist und der aktuelle Repository-Zustand zu Base-Commit und Fingerprint passt,
+11. wählt nur dann aus, wenn genau ein noch nicht automatisch versuchtes Paket zum aktuellen Zustand genau einer registrierten Repository-Instanz passt.
+
+Der persistente Exchange-Dateistatus darf für unveränderte Dateien die Inhaltsklasse und bei Patch-Kandidaten die geprüften Manifest-Auswahldaten zwischenspeichern. Ein gültiger Patch-Kandidat, der lediglich zum derzeitigen Repository-Zustand nicht passt, wird bei einem späteren Scan erneut gegen den dann aktuellen Zustand geprüft. Dauerhaft inhaltsbedingt ungültige Pakete, Result Bundles und sonstige Nichtkandidaten müssen dagegen nicht erneut vollständig analysiert werden.
+
+Die Zustandsprüfung während der Auswahl verwendet dieselbe gesperrte und konsistente Kontextaufnahme wie `patchharbor context`. Auswahlprüfungen dürfen Repositorys nur lesend und nacheinander sperren. Nach der eindeutigen Kandidatenentscheidung wird für den eigentlichen Apply-Auftrag die vollständige Sperr-, Preflight- und Revalidierungsfolge erneut durchlaufen.
+
+Result Bundles werden an ihrem eigenen Marker erkannt und niemals als Patch ausgeführt. Andere ZIP-Dateien, direkte Skripte, alte Shell-Patch-ZIPs und beliebige sonstige Dateien sind keine Kandidaten für den sicheren Apply-Pfad.
+
+Gibt es keinen passenden Kandidaten, endet der Auftrag ohne Mutation mit einem klaren Fehler. Gibt es mehrere passende Kandidaten, wird nicht nach Name, Zeitstempel, Verzeichnisreihenfolge, Repository-Nähe oder sonstiger Heuristik geraten; der Auftrag endet als mehrdeutig und verlangt einen expliziten Pfad.
+
+Ein explizites `patchharbor apply PATCH_ZIP` übersteuert die automatische Auswahl und darf eine zuvor automatisch versuchte Datei bewusst erneut ausführen. Ein Dry-Run markiert eine Datei nicht als versucht. Bei einem automatischen Nicht-Dry-Run-Auftrag wird die Identität nach vollständigem Preflight und letzter Zustandsprüfung unmittelbar vor der ersten Repository-Mutation oder dem Start des Entrypoints atomar als versucht gespeichert. Scheitert diese Statuspublikation, beginnt keine Mutation und kein Entrypoint. Die Markierung bleibt unabhängig vom späteren Entrypoint-, Test- oder Result-Bundle-Ergebnis bestehen; ein expliziter Wiederholungsaufruf bleibt möglich.
+
+PatchHarbor verschiebt, löscht, archiviert, sortiert oder benennt die ausgewählte Datei nicht um. Wird unter demselben Pfad später anderer Inhalt abgelegt, entsteht wegen des neuen SHA-256 eine neue Dateidentität.
+
+### 16.3 Sicher aufgelöstes Repository
 
 Ein Repository gilt erst dann als sicher aufgelöst, wenn:
 
@@ -1586,74 +1673,67 @@ Ab diesem Zeitpunkt versucht PatchHarbor am Ende des Auftrags stets, ein Result 
 
 Kann das Repository vorher nicht sicher aufgelöst werden, entsteht kein Repository-Snapshot.
 
-### 16.3 Validierungs- und Ausführungsreihenfolge
+### 16.4 Validierungs- und Ausführungsreihenfolge
 
-`patchharbor apply PATCH_ZIP` führt mindestens aus:
+`patchharbor apply [PATCH_ZIP]` führt mindestens aus:
 
-1. Eingabedatei stabil und vollständig lesbar öffnen.
-2. Tatsächliches ZIP-Format prüfen.
-3. Archivstruktur, Eintragstypen, Pfade und Ressourcenlimits vollständig prüfen.
-4. `patch.json` im ZIP-Wurzelverzeichnis finden.
-5. Striktes JSON-Schema, Paketmarker, Fingerprint-Algorithmus und Formatversion prüfen.
-6. `repo_id` unter dem globalen Registry-Lock eindeutig auflösen.
-7. Kanonischen Result-Ordner bestimmen, gegen alle registrierten Repository-Pfade und den Watcher-Eingangsordner prüfen und dort einen temporären Ausgabepfad reservieren.
-8. Zielpfad, Git-Repository, reserviertes lokales Verzeichnis und ID-Datei prüfen.
-9. Exklusive Repository-Sperre erwerben, Zuordnung unter beiden Locks erneut validieren und danach den Registry-Lock freigeben.
-10. Unterstützte Repository- und Pfadgrenzen aus Abschnitt 14 prüfen.
-11. Aktuellen vollständigen Base-Commit bestimmen und mit dem Manifest vergleichen.
-12. Aktuellen Fingerprint bestimmen und mit dem Manifest vergleichen.
-13. Entrypoint und alle Nutzdateipfade vollständig prüfen.
-14. Entrypoint in einem privaten Temp-Verzeichnis bereitstellen und den Pflichtmarker prüfen.
-15. Interpreter bestimmen und seine Verfügbarkeit prüfen.
-16. Alle Nutzdateiinhalte vollständig in Speicher oder ein privates auftragsbezogenes Temp-Verzeichnis außerhalb des Repositorys lesen und deren Größen und Hashes gegen die bereits validierten ZIP-Einträge prüfen. Noch wird keine temporäre Datei in einem Repository-Zielverzeichnis erzeugt.
-17. Unmittelbar vor der ersten Repository-Schreiboperation Base-Commit und Fingerprint erneut bestimmen. Beide Werte müssen sowohl den Manifestwerten als auch den in den Schritten 11 und 12 ermittelten Werten exakt entsprechen.
-18. Nur bei unverändertem Zustand die Zielpfade und Elternverzeichnisse erneut gegen Austausch, Symlinks, Junctions und besondere Dateitypen prüfen und sichere temporäre Zieldateien in den jeweiligen Repository-Zielverzeichnissen erzeugen.
-19. Nutzdateien jeweils atomar in ihre endgültigen Repository-Pfade austauschen.
-20. Entrypoint im Repository-Wurzelverzeichnis ausführen.
-21. stdout, stderr, Exit-Code, Laufzeit und Warnings erfassen.
-22. Aktuellen Repository-Zustand konsistent aufnehmen.
-23. Result Bundle in der reservierten temporären Datei im endgültigen Result-Ordner erstellen, prüfen und atomar veröffentlichen.
-24. Repository-Sperre und temporäre Ressourcen freigeben.
+1. Bei fehlendem `PATCH_ZIP` genau einen Kandidaten nach Abschnitt 16.2 auswählen; andernfalls ausschließlich den expliziten Pfad verwenden.
+2. Eingabedatei stabil und vollständig lesbar öffnen.
+3. Tatsächliches ZIP-Format prüfen.
+4. Archivstruktur, Eintragstypen, Pfade und Ressourcenlimits vollständig prüfen.
+5. `patch.json` im ZIP-Wurzelverzeichnis finden.
+6. Striktes JSON-Schema, Paketmarker, Fingerprint-Algorithmus und Formatversion prüfen.
+7. `repo_id` unter dem globalen Registry-Lock eindeutig auflösen.
+8. Ausgabeordner bestimmen: explizites `--output-dir`, andernfalls den Exchange-Ordner; gegen alle registrierten Repository-Pfade prüfen und dort einen temporären Ausgabepfad reservieren.
+9. Zielpfad, Git-Repository, reserviertes lokales Verzeichnis und ID-Datei prüfen.
+10. Exklusive Repository-Sperre erwerben, Zuordnung unter beiden Locks erneut validieren und danach den Registry-Lock freigeben.
+11. Unterstützte Repository- und Pfadgrenzen aus Abschnitt 14 prüfen.
+12. Aktuellen vollständigen Base-Commit bestimmen und mit dem Manifest vergleichen.
+13. Aktuellen Fingerprint bestimmen und mit dem Manifest vergleichen.
+14. Entrypoint und alle Nutzdateipfade vollständig prüfen.
+15. Entrypoint in einem privaten Temp-Verzeichnis bereitstellen und den Pflichtmarker prüfen.
+16. Interpreter bestimmen und seine Verfügbarkeit prüfen.
+17. Alle Nutzdateiinhalte vollständig in Speicher oder ein privates auftragsbezogenes Temp-Verzeichnis außerhalb des Repositorys aufnehmen.
+18. Vor der ersten Repository-Schreiboperation Base-Commit, Fingerprint, Registry-Zuordnung, lokale ID, alle Zielpfade und deren relevante Eltern erneut prüfen.
+19. Beim Dry-Run keine Dateidentität konsumieren, keine Nutzdatei schreiben und keinen Entrypoint starten.
+20. Bei einem automatisch ausgewählten Nicht-Dry-Run-Auftrag die Dateidentität atomar als versucht speichern; bei Fehler ohne Mutation abbrechen.
+21. Beim echten Apply Nutzdateien einzeln atomar schreiben oder ersetzen.
+22. Entrypoint mit Repository-Wurzel als CWD ausführen.
+23. stdout und stderr vollständig in den Run-Log aufnehmen.
+24. Exit-Code, Timeout, Strg+C oder Tool-Fehler als primäres Ergebnis bestimmen.
+25. Konsistenten aktuellen Repository-Snapshot aufnehmen.
+26. Result Bundle in der reservierten temporären Datei im endgültigen Ausgabeordner erstellen, prüfen und atomar veröffentlichen.
+27. Primäres Ergebnis und Result-Bundle-Ergebnis nach Abschnitt 18 zusammenführen.
+28. Repository-Sperre und alle temporären Ressourcen freigeben.
 
-Scheitert eine rein lesende Vorprüfung einschließlich der zweiten Zustandsprüfung, Result-Ziel-, Marker- oder Interpreterprüfung, wird keine temporäre oder endgültige Datei in einem Repository-Zielverzeichnis erzeugt.
+### 16.5 Harte Ablehnung
 
-Die zweite Zustandsprüfung schützt das Zeitfenster zwischen der ersten Kontextprüfung und der ersten Schreiboperation gegen Änderungen durch fremde Editoren oder Git-Prozesse. Der Repository-Lock bleibt zusätzlich für die gesamte PatchHarbor-Ausführung bestehen.
+PatchHarbor lehnt vor der ersten Repository-Änderung unter anderem ab:
 
-### 16.4 Harte Ablehnung
-
-PatchHarbor nimmt keine Fuzzy-Zuordnung vor.
-
-Keine Ersatzschlüssel sind:
-
-- Repository-Name,
-- Remote-URL,
-- Branchname,
-- Download-Dateiname,
-- zuletzt verwendete Repository-Instanz.
-
-Harte Ablehnungsgründe sind insbesondere:
-
-- unbekannte oder mehrdeutige Repository-ID,
-- ungültige lokale ID-Datei,
-- getrackte oder besondere `.patchharbor`-Struktur,
+- fehlende oder ungültige Exchange-Konfiguration, soweit kein vollständiger expliziter Pfad- und Ausgabeauftrag vorliegt,
+- keinen passenden oder mehrere passende automatische Exchange-Kandidaten,
+- unbekannte oder widersprüchliche Repository-ID,
+- fehlende oder kopierte lokale ID,
+- ungültige Registry-Zuordnung,
 - Base-Commit-Mismatch,
-- Fingerprint- oder Algorithmus-Mismatch,
-- nicht unterstützter Git-Sonderzustand,
-- nicht als UTF-8 darstellbarer Repository-Pfad,
-- ungültiges Manifest,
-- unsicherer Paketpfad,
-- verbotener interner Pfad,
-- fehlender Entrypoint,
-- fehlender Interpreter,
-- ungültiger oder im Repository liegender Result-Ordner,
-- überschrittenes Ressourcenbudget,
-- bereits gesperrtes Repository.
+- Fingerprint-Mismatch,
+- geänderten Zustand zwischen erster Prüfung und Mutationsgrenze,
+- nicht unterstützten Git- oder Pfadzustand,
+- ungültige `patch.json`,
+- unsichere ZIP-Einträge,
+- ungültigen oder fehlenden Entrypoint,
+- fehlenden Pflichtmarker,
+- nicht unterstützten oder fehlenden Interpreter,
+- unzulässigen Exchange- oder Result-Bundle-Ausgabeordner,
+- nicht sicher vorbereitbare Nutzdatei.
 
-### 16.5 Konsistenter Snapshot trotz äußerer Änderungen
+Nach sicherer Repository-Auflösung versucht PatchHarbor auch bei einer solchen späteren Ablehnung ein Result Bundle des unveränderten Repository-Zustands zu erzeugen.
+
+### 16.6 Konsistenter Snapshot trotz äußerer Änderungen
 
 Vor der Snapshot-Aufnahme wird der aktuelle Kontext bestimmt. Während der Aufnahme werden genau die Daten gelesen, die in das Result Bundle geschrieben werden.
 
-Nach der Aufnahme bestimmt PatchHarbor Base-Commit und Fingerprint erneut.
+Nach der Aufnahme wird der aktuelle Kontext erneut bestimmt.
 
 Nur wenn Vorzustand, aufgenommene Daten und Nachzustand konsistent sind, wird das temporäre Result Bundle veröffentlicht.
 
@@ -1687,7 +1767,8 @@ patchharbor apply --dry-run PATCH_ZIP
 - kein Kindprozess wird erzeugt,
 - keine Repository-Datei wird verändert,
 - kein Test wird gestartet,
-- kein Commit wird erzeugt.
+- kein Commit wird erzeugt,
+- keine Exchange-Datei wird als verarbeitet markiert.
 
 Das Result Bundle kennzeichnet:
 
@@ -1817,46 +1898,35 @@ Insbesondere:
 
 ### 18.5 Atomare Bundle-Veröffentlichung und Notfallrettung
 
-Für jeden Auftrag entsteht ein privates temporäres Run-Verzeichnis:
+Ein Result Bundle wird in einem vorab reservierten endgültigen Ausgabeordner erzeugt. Ohne `--output-dir` ist das der konfigurierte Exchange-Ordner; mit `--output-dir` ist es der explizit validierte Zielordner.
+
+Die temporäre ZIP-Datei des Result Bundles wird ausdrücklich nicht im System-Temp-Verzeichnis erzeugt. Sie wird unter einem nicht endgültigen Namen direkt im kanonischen endgültigen Ausgabeordner angelegt, beispielsweise:
 
 ```text
-<system-temp>/patchharbor-<run_id>/
-├── execution.log
-└── run.json
+.<finaler-name>.tmp-<zufall>
 ```
 
-Die temporäre ZIP-Datei des Result Bundles wird ausdrücklich nicht im System-Temp-Verzeichnis erzeugt. Sie wird unter einem nicht endgültigen Namen direkt im kanonischen endgültigen Result-Ordner angelegt, beispielsweise:
+Verbindlicher Ablauf:
 
-```text
-<result-dir>/.patchharbor_result_<timestamp>_<run-id>.tmp
-```
-
-Verbindlicher Veröffentlichungsablauf:
-
-1. Result-Ordner vor der ersten Repository-Änderung validieren und anlegen.
-2. Temporäre ZIP-Datei im endgültigen Result-Ordner exklusiv erzeugen.
+1. Ausgabeordner physisch kanonisieren und gegen alle registrierten Repository-Pfade prüfen.
+2. Temporären Dateinamen im selben Ausgabeordner reservieren.
 3. Bundle vollständig schreiben und schließen.
-4. ZIP-Struktur, Pflichtdateien und CRCs erneut prüfen.
-5. Temporäre Datei und erforderliche Verzeichnismetadaten best effort synchronisieren.
-6. Über `os.replace()` beziehungsweise eine äquivalente dateisystemgleiche Operation auf den endgültigen Namen austauschen.
-
-Weil temporäre und endgültige Datei im selben Verzeichnis liegen, ist kein dateisystemübergreifender Rename erforderlich.
-
-Bei erfolgreicher Veröffentlichung wird das private Run-Verzeichnis entfernt.
+4. ZIP-Struktur und Pflichtdateien prüfen.
+5. Temporäre Datei flushen und, soweit plattformgerecht möglich, synchronisieren.
+6. Zielpfad unmittelbar vor Veröffentlichung revalidieren.
+7. Über `os.replace()` atomar auf den endgültigen Namen veröffentlichen.
 
 Bei fehlgeschlagener Bundle-Erzeugung:
 
-- wird die temporäre ZIP-Datei best effort entfernt,
+- wird die temporäre Bundle-Datei bestmöglich entfernt,
 - bleibt keine unvollständige Datei unter dem endgültigen Bundle-Namen liegen,
-- werden `execution.log` und `run.json` best effort im Notfallverzeichnis erhalten,
-- wird der Notfallpfad deutlich auf stderr und im strukturierten Abschlussobjekt ausgegeben,
-- entsteht daraus keine dauerhafte automatische Logverwaltung.
-
-Kann selbst die Notfallrettung wegen desselben Systemfehlers nicht geschrieben werden, meldet PatchHarbor dies auf stderr und behält den nach der Prioritätsregel bestimmten Exit-Code.
+- werden `execution.log` und `run.json` soweit möglich in einem privaten Notfallverzeichnis unter dem PatchHarbor-Zustandsverzeichnis gesichert,
+- wird der Notfallpfad auf stderr und im äußeren strukturierten Ergebnis ausgegeben,
+- wird dieser Rettungspfad niemals selbst als erfolgreiches Result Bundle bezeichnet.
 
 ### 18.6 Manueller Bundle-Auftrag
 
-Für:
+Bei:
 
 ```bash
 patchharbor bundle [REPOSITORY]
@@ -1864,12 +1934,9 @@ patchharbor bundle [REPOSITORY]
 
 ist die Bundle-Erzeugung selbst der primäre Auftrag.
 
-- erfolgreich: Exit `0`,
-- fehlgeschlagen: Exit `11`.
+Ohne `--output-dir` wird im konfigurierten Exchange-Ordner veröffentlicht. Fehlt oder ist die Exchange-Konfiguration ungültig, endet der Auftrag klar mit Exit `11`. Ein explizites `--output-dir` übersteuert das Standardziel und ermöglicht den Auftrag ohne konfigurierte Exchange-Ausgabe.
 
-Es wird kein erfundener Entrypoint-Log erzeugt. `execution_present` ist `false`; `logs/` enthält mindestens `run.json`.
-
----
+Ein Fehler führt zu Exit `11`. Es gibt keinen getrennten vorherigen Skript-Exit-Code.
 
 ## 19. PatchHarbor Result Bundle
 
@@ -1895,7 +1962,9 @@ Manuell:
 patchharbor bundle [REPOSITORY]
 ```
 
-Automatisch versucht `patchharbor apply` nach jedem Auftrag ein Result Bundle zu erzeugen, sobald das Ziel-Repository sicher aufgelöst und gesperrt wurde.
+Ohne `--output-dir` wird das Result Bundle in `exchange_directory` veröffentlicht.
+
+Automatisch versucht `patchharbor apply` nach jedem Auftrag ein Result Bundle zu erzeugen, sobald das Ziel-Repository sicher aufgelöst und gesperrt wurde. Ohne `--output-dir` verwendet auch dieser Versuch `exchange_directory`.
 
 Das gilt auch bei:
 
@@ -1903,9 +1972,12 @@ Das gilt auch bei:
 - Fingerprint-Mismatch,
 - ungültigem Entrypoint nach sicherer Auflösung,
 - Entrypoint-Fehler,
+- fehlgeschlagenen Projekttests im Entrypoint,
 - Timeout,
 - Strg+C,
 - internem Fehler nach sicherer Auflösung.
+
+PatchHarbor verarbeitet ein von ihm veröffentlichtes Result Bundle im selben Exchange-Ordner niemals als Patch-Paket.
 
 ### 19.3 Vollständigkeitsregel
 
@@ -1950,7 +2022,7 @@ Verkürztes Beispiel:
 {
   "marker": "patch-harbor-result-bundle",
   "format_version": 1,
-  "created_at": "2026-08-04T06:00:00Z",
+  "created_at": "2026-08-25T06:00:00Z",
   "run_id": "b592be12-55f2-49d7-9699-2435bbcd7935",
   "repo_id": "a3f9c2e1-7b4d-4a91-9d2e-5c6f8a1b2c3d",
   "base_commit": "f4e9c2a7b8c9d01234567890abcdef1234567890",
@@ -1984,7 +2056,7 @@ Bei `apply` enthält das Manifest außerdem die aus `patch.json` erwarteten und 
   "dirty": true,
   "state_fingerprint": "a1b2c3d4e5f67890",
   "fingerprint_algorithm": "patchharbor-state-v1",
-  "created_at": "2026-08-04T06:00:00Z"
+  "created_at": "2026-08-25T06:00:00Z"
 }
 ```
 
@@ -2116,7 +2188,7 @@ PatchHarbor:
 - schreibt bekannte sensible Umgebungswerte nicht unkontrolliert in strukturierte Logs,
 - weist im Help-Screen klar auf den vollständigen Snapshot-Inhalt hin.
 
-Eine allgemeine automatische Secret-Erkennung ist nicht Bestandteil von 1.1.0.
+Eine allgemeine automatische Secret-Erkennung ist nicht Bestandteil von 1.1.1.
 
 ---
 
@@ -2137,7 +2209,7 @@ Wenn ein Entrypoint oder manuelles Skript gestartet wurde, bestimmt grundsätzli
 | `10` | `patch.json` oder Paketformat ungültig |
 | `11` | Result Bundle ist der primäre oder einzige fehlgeschlagene Auftrag |
 | `12` | Repository ist bereits exklusiv gesperrt |
-| `13` | Repository-Zustand wird im sicheren 1.1.0-Pfad nicht unterstützt |
+| `13` | Repository-Zustand wird im sicheren 1.1.1-Pfad nicht unterstützt |
 | `124` | Timeout |
 | `130` | Abbruch durch Strg+C |
 
@@ -2193,13 +2265,15 @@ Abhängigkeitsregeln:
 - `payload_files` schreibt Dateien, steuert aber keine Execution.
 - `patch_manifest` kennt weder Git noch Execution.
 - `registry` kennt weder TUI noch ZIP-Inhalte.
+- `configuration` verwaltet ausschließlich `config.json` und kennt weder Git-Zustand noch Execution.
+- `exchange` klassifiziert flache Dateikandidaten und persistiert Dateidentitäten, führt aber keinen Entrypoint aus.
 - `repository_state` kennt weder TUI noch Watcher.
 - `locks` kennt keine Ausführungs- oder Bundle-Semantik.
 - `interpreters` kennt nur den kleinen Interpretervertrag.
 - `execution` kennt weder Registry, Git-Zustand, Result-Bundle-Struktur noch TUI.
 - `result_bundle` verwendet Repository-State- und Run-Log-Daten, führt aber keinen Patch aus.
 - `presentation` steuert keine fachliche Logik.
-- Der Watcher kennt nur die öffentliche PatchHarbor-Aufrufsgrenze.
+- Der Watcher kennt nur die öffentliche PatchHarbor-Aufrufsgrenze sowie den gemeinsamen Exchange-Dateivertrag.
 - Repo Assist und PromptBridge sind keine internen Module.
 - Es gibt keine Sammelpakete namens `utils`, `helpers` oder `common`.
 - Es gibt keine Plugin-Registry und keine asynchrone Kernarchitektur.
@@ -2217,7 +2291,9 @@ PatchHarbor wird pragmatisch verhaltensorientiert entwickelt.
 - echte Dateien, echte Git-Repositories und echte Prozesse,
 - Verhalten statt interner Implementierungsdetails,
 - keine dogmatische Forderung nach vollständiger Testabdeckung,
-- jeder Testlauf besitzt einen äußeren Timeout.
+- jeder Testlauf besitzt einen äußeren Timeout,
+- Human-readable Fließtexte und Help-Beschreibungen werden nicht vollständig als Snapshot getestet,
+- geschlossene JSON-Verträge und die exakt standardisierten Statuszeilen aus `CHAT_INSTRUCTIONS.md` dürfen und sollen byte- beziehungsweise textgenau getestet werden.
 
 ### 22.2 Beizubehaltende 1.0.0-Verträge
 
@@ -2254,7 +2330,7 @@ Mindestens zu erhalten und weiter zu testen sind:
 - Ressourcenlimits und ZIP-Bomben-Schutz,
 - Wheel- und pipx-Installation.
 
-### 22.3 Neue Pflichtszenarien für 1.1.0
+### 22.3 Fortgeltende Pflichtszenarien aus 1.1.0
 
 - Registrierung und UUID-v4-Format,
 - globaler Registry-Lock und atomarer Registry-Austausch,
@@ -2301,8 +2377,8 @@ Mindestens zu erhalten und weiter zu testen sind:
 - exklusive Sperre verhindert parallele Aufträge,
 - feste Lock-Reihenfolge verhindert Deadlocks zwischen Registry und Repository,
 - äußerer Zustandswechsel während Snapshot-Erzeugung verwirft das Bundle,
-- Result-Ordner innerhalb irgendeines registrierten Repositorys wird abgelehnt,
-- temporäre und endgültige Bundle-Datei liegen im selben Result-Ordner,
+- Result-Bundle-Ausgabeordner innerhalb irgendeines registrierten Repositorys wird abgelehnt,
+- temporäre und endgültige Bundle-Datei liegen im selben endgültigen Ausgabeordner,
 - dateisystemgleiche atomare Veröffentlichung über `os.replace()`,
 - vollständiges Result Bundle ohne `.git`,
 - Base-Commit wird vollständig über Baumabfrage und Blob-Lesen materialisiert,
@@ -2318,25 +2394,68 @@ Mindestens zu erhalten und weiter zu testen sind:
 - JSON-Modus mit genau einem Objekt auf stdout,
 - exakte JSON-Verträge für `registry list`, `context`, `bundle` und `apply` einschließlich Fehlerobjekten,
 - temporäre STDIN-Artefakte werden über den zentralen Cleanup-Pfad entfernt,
-- Watcher delegiert ohne duplizierte Core-Logik,
-- Watcher-Eingangsordner außerhalb aller registrierten Repositories und ohne Überlappung mit Result-Ordnern,
-- Repo Assist und Watcher werden nicht gleichzeitig für dieselben Repositories aktiviert.
+- Watcher delegiert stabile Exchange-Dateien ohne duplizierte Core-Logik,
+- konkurrierende autonome Watcher-, Repo-Assist- oder Orchestrator-Pfade werden für dieselben Repositories nicht gleichzeitig aktiviert.
 
-### 22.4 Release-Audit
+### 22.4 Neue Pflichtszenarien für 1.1.1
 
-Der Release-Audit prüft mindestens die Existenz und Konsistenz von:
+Mindestens zusätzlich zu prüfen sind:
+
+- exaktes geschlossenes `config.json`-Schema und atomare Veröffentlichung,
+- direkte gültige und ungültige Bearbeitung der Konfigurationsdatei,
+- Linux-, Termux-kompatible Linux- und Windows-Benutzerpfade,
+- `configure exchange-directory` und `configure show`,
+- Exchange-Ordner innerhalb, außerhalb und oberhalb registrierter Repositories,
+- spätere Registrierung mit Konflikt zum Exchange-Ordner,
+- fehlende Konfiguration bei Befehlen mit und ohne explizite Overrides,
+- `bundle` ohne `--output-dir` veröffentlicht im Exchange-Ordner,
+- automatisches Apply-Result-Bundle veröffentlicht im Exchange-Ordner,
+- explizites `--output-dir` übersteuert das Standardziel,
+- nicht rekursiver Exchange-Scan ohne Abhängigkeit von Dateiname oder Endung,
+- Result Bundles, direkte Skripte, alte Patch-ZIPs, Browser-Temporärdateien und sonstige Dateien werden nicht als sichere Patch-Kandidaten ausgeführt,
+- genau ein zustandsgebunden passendes Patch-Paket wird ausgewählt,
+- kein Treffer und mehrere Treffer werden ohne Mutation eindeutig abgelehnt,
+- explizites `PATCH_ZIP` übersteuert die Auswahl,
+- Dry-Run konsumiert keine Dateiidentität,
+- Nicht-Dry-Run-Aufträge werden nach einem Versuch unabhängig vom Entrypoint-Exit-Code nicht automatisch wiederholt,
+- geänderter Inhalt unter demselben Namen ist eine neue Identität,
+- Exchange-Dateien bleiben nach Verarbeitung unverändert am Ort,
+- Core und Watcher teilen Konfiguration, Klassifikation und Dateidentitätsvertrag,
+- Watcher-Neustart führt nicht zur erneuten Verarbeitung unveränderter Dateien,
+- Watcher verarbeitet ein neu erzeugtes Result Bundle im Exchange-Ordner nicht,
+- `CHAT_INSTRUCTIONS.md` ist vorhanden, versionsgebunden und widerspruchsfrei zu Spezifikation, README und CLI,
+- Chat-Initialisierung verwendet `CHAT_INSTRUCTIONS.md` plus aktuelles Result Bundle und keine lokalen Pfade,
+- Plan- und Spezifikationssuche folgt der festgelegten Priorität und stoppt bei Mehrdeutigkeit,
+- `PLAN`, `FIX` und `OFF-PLAN` besitzen die festgelegte Kennungs- und Zählersemantik,
+- Fix-Kennungen verwenden `<PLAN-ID>-FIX<n>` und erhöhen den Plan-Zähler nicht,
+- Off-Plan-Kennung und Commit-Message dürfen sinnvoll frei gewählt werden und sind sichtbar als `OFF-PLAN` markiert,
+- Spezifikation ist fachlicher Vertrag, Commit-Plan ist die geplante Zerlegung; Scope-Erweiterungen werden nicht stillschweigend vorgenommen,
+- blockierende Widersprüche erzeugen die standardisierte STOP-Ausgabe und kein Patch-Paket,
+- nicht blockierende Auffälligkeiten erzeugen die standardisierte WARNING-Ausgabe,
+- die schmale Patch-Bereit-UI beginnt und endet exakt mit `🟩🟩 PATCH BEREIT 🟩🟩`,
+- `PATCH BEREIT` erscheint erst, wenn genau ein herunterladbares Patch-Paket tatsächlich erzeugt wurde,
+- vor lokaler Ausführung werden geplante Tests nicht fälschlich als erfolgreich dargestellt,
+- zurückgegebene `logs/run.json` und `logs/execution.log` werden für Erfolg oder Reparatur ausgewertet,
+- README deckt neues und bestehendes Repository, neuen Chat, manuellen Betrieb und Watcher-Betrieb ab.
+
+### 22.5 Release-Audit
+
+Der finale 1.1.1-Release-Audit prüft mindestens die Existenz und Konsistenz von:
 
 ```text
+README.md
+CHAT_INSTRUCTIONS.md
 spec/SPECIFICATION.md
 spec/SPECIFICATION_CHANGELOG.md
 planning/1.0.0/commit-plan.md
 planning/1.1.0/commit-plan-cleanup.md
 planning/1.1.0/commit-plan.md
+planning/1.1.1/commit-plan.md
 ```
 
-Der erste 1.1.0-Dokumentationscommit aktualisiert den Audit-Test auf diese Struktur, ohne Produktionscode zu verändern.
+Der vorbereitende 1.1.1-Dokumentationscommit erweitert den bestehenden Audit zunächst um `planning/1.1.1/commit-plan.md`, ohne Produktionscode zu verändern. Der Implementierungscommit, der `CHAT_INSTRUCTIONS.md` einführt, erweitert den Audit anschließend um diese Datei. So bleibt jeder Zwischencommit grün, während der finale Vertrag vollständig erzwungen wird.
 
-### 22.5 Freigaberegel
+### 22.6 Freigaberegel
 
 - Jeder Implementierungscommit hat eine erkennbare Absicht.
 - Feature und zugehöriger Verhaltenstest gehören zusammen.
@@ -2349,7 +2468,7 @@ Der erste 1.1.0-Dokumentationscommit aktualisiert den Audit-Test auf diese Struk
 
 ## 23. Bewusst ausgeschlossene Funktionen
 
-Folgende Funktionen gehören nicht zu PatchHarbor 1.1.0:
+Folgende Funktionen gehören nicht zu PatchHarbor 1.1.1:
 
 - Netzwerk- oder Chatquelle im Core,
 - Clipboard- oder SSH-Quelle,
@@ -2366,9 +2485,11 @@ Folgende Funktionen gehören nicht zu PatchHarbor 1.1.0:
 - dauerhafte Logverwaltung und Logrotation im Core,
 - automatisches Einsammeln beliebiger zusätzlicher Diagnoseartefakte,
 - Netzwerk-, Chat-, Upload- oder Downloadlogik im Core,
-- Submodule im sicheren 1.1.0-Kontext und Result Bundle.
+- automatische Archivierung, Sortierung, Verschiebung oder Löschung von Exchange-Dateien,
+- automatische Migration früherer `watcher.json`- oder `paths.json`-Dateien,
+- Submodule im sicheren 1.1.1-Kontext und Result Bundle.
 
-Tests, Commits und Journal gehören zu Repo Assist. Dauerhafte Ordnerüberwachung gehört zum separaten PatchHarbor Watcher. Chat- und Transportfunktionen gehören zu PromptBridge.
+Commit-Plan, Journal, Reproduzierbarkeit sowie die fachliche Verwaltung von Tests und Commits gehören zu Repo Assist oder bis zu dessen Einsatz zum ausdrücklich angewiesenen externen Entwicklungs-Chat. Dauerhafte Ordnerüberwachung gehört zum separaten PatchHarbor Watcher. Chat- und Transportfunktionen gehören zu PromptBridge beziehungsweise einem späteren übergeordneten Orchestrator.
 
 ---
 
@@ -2403,90 +2524,293 @@ Repo Assist dupliziert nicht die technische Snapshot-Logik von PatchHarbor.
 
 ---
 
-## 25. Migration von 1.0.0 auf 1.1.0
+## 25. Fortschreibung von 1.1.0 auf 1.1.1
 
-### 25.1 Erster Commit
+### 25.1 Vorbereitender Initialisierungscommit
 
-Der erste 1.1.0-Commit ist ein Spezifikations-, Changelog- und Dokumentstruktur-Audit-Commit ohne Produktionscodeänderung.
+Der erste 1.1.1-Commit ist ein Spezifikations-, Changelog-, Commit-Plan- und Dokumentstruktur-Audit-Commit ohne Produktionscodeänderung.
 
 Er:
 
-- trennt Produktspezifikation und Commit-Plan,
-- setzt das vollständige Produktziel auf 1.1.0,
-- übernimmt alle fortgeltenden 1.0.0-Verträge,
-- ergänzt Registry, Kontext, Fingerprint, Apply, Dry-Run, Lock und Result Bundle,
-- aktualisiert den Release-Audit-Test auf die neue Dokumentstruktur,
-- befüllt `SPECIFICATION_CHANGELOG.md`.
+- setzt das vollständige Produktziel auf 1.1.1,
+- löst die frühere Trennung zwischen Watcher-Eingang und Result-Ordner zugunsten eines gemeinsamen Exchange-Ordners auf,
+- beschreibt `config.json`, automatische Paketauswahl und `CHAT_INSTRUCTIONS.md` vollständig,
+- korrigiert die Rolle von Repo Assist,
+- legt `planning/1.1.1/commit-plan.md` an,
+- aktualisiert `SPECIFICATION_CHANGELOG.md`,
+- erweitert den Release-Audit zunächst um die neue Planstruktur,
+- verändert weder Produktionscode noch Paketversion.
 
-### 25.2 Allererstes Code-Cleanup-TODO
+### 25.2 Keine Konfigurationsmigration
 
-Als allererste Produktionscodeänderung wird der alte zweite Dateiübertragungsweg vollständig entfernt.
+Es gibt keine von PatchHarbor 1.1.0 produktiv verwalteten Repositories oder Installationen, deren alte Watcher-Konfiguration erhalten werden muss.
 
-Betroffen sind insbesondere:
+Daher gilt verbindlich:
 
-- dessen Parser und Datenmodelle,
-- dessen Verarbeitung in der Anwendungsorchestrierung,
-- dessen Darstellung,
-- dessen Unit-, End-to-End- und Sicherheitstests,
-- dessen Dokumentation.
+- kein Migrationscode für `watcher.json`,
+- kein Migrationscode für `paths.json`,
+- kein duales Lesen alter und neuer Konfiguration,
+- kein stiller Fallback auf den früheren Standard-Result-Ordner,
+- die neue `config.json` ist ab ihrer Einführung die einzige persistente Benutzerkonfiguration für den Exchange-Ordner.
 
-`payload_files.py` wird nicht pauschal gelöscht. Das Modul oder seine Nachfolge bleibt für sichere ZIP-Nutzdateien und atomisches Schreiben erforderlich. Entfernt wird ausschließlich der nicht mehr vorgesehene Inline-Pfad.
+### 25.3 Umsetzungsblöcke
 
-Es existiert im aktuellen Stand kein automatischer Decoder für textuell codierte Binärdaten. Daher ist kein Decoder zu entfernen; alte Tests und Aussagen zu diesem früher vorgesehenen Transportweg werden entfernt oder auf den alleinigen ZIP-Nutzdateivertrag umgestellt.
+Die weitere Umsetzung folgt ausschließlich `planning/1.1.1/commit-plan.md` und umfasst:
 
-### 25.3 Danach folgende Zielblöcke
+1. gemeinsame `config.json` und Exchange-Pfadpolitik,
+2. Result-Bundle-Ausgabe in den Exchange-Ordner,
+3. automatische zustandsgebundene Paketauswahl bei `apply` ohne Pfad,
+4. gemeinsame persistente Dateidentität und Wiederverarbeitungssperre,
+5. Umstellung des Watchers auf denselben Vertrag,
+6. `CHAT_INSTRUCTIONS.md` mit Workflow-, Plan-, Spec-, Test-, Commit- und UI-Regeln,
+7. README, Help, Akzeptanztests, Packaging und Release 1.1.1.
 
-1. Registry-Minimum und UUID,
-2. kanonischer Kontext und Fingerprint,
-3. `patch.json` und sicherer Apply-Pfad,
-4. Repository-Lock,
-5. Dry-Run,
-6. vollständiger Run-Bericht und Fehlerpriorität,
-7. vollständiges Result Bundle,
-8. separater PatchHarbor Watcher,
-9. Integrationsgrenzen zu Repo Assist und PromptBridge,
-10. vollständige Regression-, Plattform- und Release-Prüfung.
+## 26. Verbindlicher Chat-Initialisierungsvertrag
+
+### 26.1 Initialisierung eines neuen Chats
+
+Die ausgelieferte Root-Datei `CHAT_INSTRUCTIONS.md` ist die versionsgebundene Handlungsanweisung für einen externen Entwicklungs-Chat.
+
+Ein neuer Chat erhält mindestens:
+
+1. `CHAT_INSTRUCTIONS.md`,
+2. das aktuelle PatchHarbor Result Bundle der zu bearbeitenden registrierten Repository-Instanz,
+3. die konkrete Benutzeraufgabe oder die Anweisung, den nächsten Plan-Commit vorzubereiten.
+
+Der Chat benötigt und erfragt weder den lokalen Repository-Pfad noch den lokalen Exchange-Pfad. Er verwendet `repo_id`, Base-Commit und Fingerprint aus dem Result Bundle und übernimmt diese Werte unverändert in die Root-`patch.json` des erzeugten Patch-Pakets.
+
+Der Chat darf nicht aus Gesprächserinnerung behaupten, den Repository-Zustand zu kennen, wenn kein aktuelles Result Bundle vorliegt. Reichen die hochgeladenen Daten nicht für einen sicheren Patch aus, verwendet er eine STOP-Ausgabe nach Abschnitt 26.7.
+
+### 26.2 Result-Bundle-Auswertung
+
+Vor jeder Änderung prüft der Chat mindestens:
+
+- `manifest.json` und `context.json`,
+- den vollständigen Base-Snapshot,
+- staged und unstaged Patches,
+- nicht ignorierte untracked Dateien,
+- bei einem vorherigen Apply zuerst `logs/run.json`,
+- bei Fehler, Warning oder unklarer Ausführung zusätzlich `logs/execution.log`.
+
+Ein fehlgeschlagener Patch kann Dateien verändert oder neu erzeugt haben. Der Chat arbeitet deshalb immer auf dem tatsächlich zurückgegebenen Snapshot weiter und unterstellt keine globale Rückabwicklung.
+
+Ignorierte Dateien sind nicht Teil des Result Bundles. Benötigt die Aufgabe zwingend einen solchen Inhalt, darf der Chat ihn nicht erfinden.
+
+### 26.3 Commit-Plan- und Spezifikationssuche
+
+Der Chat bestimmt zunächst die aktuelle Zielversion aus eindeutigen Repository-Quellen wie Paketmetadaten, Versionsdatei, aktiver Spezifikation und versionsbezogenem Planning-Verzeichnis. Widersprechen sich plausible aktuelle Versionsquellen, stoppt er.
+
+Für den Commit-Plan gilt diese Reihenfolge:
+
+1. `planning/<version>/commit-plan.md`,
+2. `planning/<version>/implementation-plan.md`,
+3. ein eindeutig als Commit- oder Implementation-Plan erkennbarer Markdown-Kandidat direkt unter `planning/<version>/`,
+4. genau ein eindeutig aktueller repositoryweiter Commit- oder Implementation-Plan.
+
+Historische Pläne anderer Versionen dürfen nicht allein wegen eines ähnlichen Namens ausgewählt werden. Gibt es mehrere plausible aktuelle Kandidaten, gilt `PLAN_AMBIGUOUS`. Gibt es keinen Plan und verlangt der Benutzer ausdrücklich den „nächsten“ Plan-Commit, gilt `PLAN_NOT_FOUND`. Für eine bewusst planlose Aufgabe darf der Chat stattdessen `OFF-PLAN` verwenden.
+
+Für die Spezifikation gilt diese Reihenfolge:
+
+1. ein vom ausgewählten Commit-Plan ausdrücklich referenziertes Dokument,
+2. `planning/<version>/specification.md` oder ein dort eindeutig als Spezifikation erkennbarer Markdown-Kandidat,
+3. `spec/SPECIFICATION.md`,
+4. genau eine eindeutig aktuelle repositoryweite Spezifikation.
+
+Ist keine Spezifikation vorhanden, zeigt die UI `Spec: nicht vorhanden` und arbeitet anhand von Plan, realem Repository und Benutzerauftrag. Gibt es mehrere plausible aktuelle Spezifikationen, gilt `SPEC_AMBIGUOUS`.
+
+Der verwendete Plan- und Spezifikationspfad wird in jeder Patch-Bereit-Ausgabe angezeigt. Kann die bereits erreichte Planposition nicht eindeutig bestimmt werden, gilt `PLAN_POSITION_UNKNOWN`; der Chat rät nicht.
+
+### 26.4 Verhältnis von Spezifikation, Plan und Repository
+
+Die Spezifikation ist der fachliche Vertrag. Der Commit-Plan ist die vorgesehene Zerlegung dieses Vertrags. Der reale Repository-Zustand entscheidet, welche Voraussetzungen bereits tatsächlich vorhanden sind.
+
+Vor der Patch-Erstellung gleicht der Chat die konkrete Commit-Beschreibung mit den zugehörigen Spezifikationsabschnitten und dem Code ab.
+
+- Eine kleine, eindeutig zum Commit gehörende und für dessen Korrektheit notwendige Lücke darf im selben Commit geschlossen werden. Sie wird als Warning sichtbar gemacht.
+- Eine merkliche Scope-Erweiterung, ein vorgezogener späterer Planpunkt, eine neue Architekturentscheidung oder ein fachlicher Widerspruch wird nicht stillschweigend umgesetzt.
+- Erscheint eine Vorgabe technisch falsch, unlogisch, unsicher oder unmöglich, stoppt der Chat mit einem passenden Code und einer kurzen konkreten Frage.
+
+### 26.5 Commit-Arten und Zähler
+
+Es gibt genau drei sichtbare Commit-Arten:
+
+`PLAN`
+
+- Kennung, Commitposition und Commit-Message werden exakt aus dem ausgewählten Plan übernommen.
+- Der Plan-Zähler zeigt `aktuelle Position / Gesamtzahl`.
+
+`FIX`
+
+- Ein Fix gehört zu genau einem Plan-Commit.
+- Seine Kennung lautet `<PLAN-ID>-FIX<n>`, beginnend mit `FIX1`.
+- Seine Commit-Message beginnt mit `Fix:` und beschreibt die konkrete Reparatur.
+- Ein Fix erhöht weder Gesamtzahl noch erreichte Position der Plan-Commits.
+
+`OFF-PLAN`
+
+- Der Chat darf eine kurze sinnvolle Kennung und Commit-Message frei wählen.
+- `OFF-PLAN` muss unübersehbar angezeigt werden.
+- Ein Off-Plan-Commit verändert den Plan-Zähler nicht.
+- Existiert ein Plan, zeigt die UI `-- / <Gesamtzahl>`; existiert keiner, zeigt sie `-- / --`.
+
+Ein Chat-Patch erzeugt nach grünen Tests genau einen Git-Commit der angezeigten Art, sofern der Benutzer nicht ausdrücklich einen nicht committenden Diagnoseauftrag verlangt. Bei roten Tests entsteht kein Commit.
+
+### 26.6 Patch-Paket- und Testvertrag des Chats
+
+Der Chat erzeugt genau eine herunterladbare ZIP-Datei im sicheren PatchHarbor-Paketformat. Er liefert keine parallele Shell-Datei, keinen zweiten Patch und keine alternative manuelle Änderungsanleitung.
+
+Das Paket:
+
+- enthält genau eine Root-`patch.json`,
+- verwendet unverändert `repo_id`, Base-Commit, Fingerprint und Algorithmus aus dem aktuellen Result Bundle,
+- enthält genau einen manifestierten Entrypoint mit dem Pflichtmarker `# PATCHHARBOR`,
+- enthält nur die für den Auftrag notwendigen sicheren Nutzdateien,
+- führt die zur Änderung passenden Tests mit harten Timeouts aus,
+- verwendet bei breitem oder riskantem Scope die vollständige Testsuite,
+- erzeugt den vorgesehenen Git-Commit erst nach grünen Tests,
+- ruft nicht selbst `patchharbor bundle` auf.
+
+Vor dem lokalen Apply darf die UI nur die im Patch vorgesehenen Tests nennen. Sie darf diese Tests nicht als erfolgreich darstellen. Erst ein zurückgegebenes Result Bundle mit erfolgreichem Run-Bericht erlaubt eine Erfolgsaussage.
+
+### 26.7 Standardisierte Warning- und Stop-Ausgaben
+
+Eine nicht blockierende Auffälligkeit beginnt exakt mit:
+
+```text
+🟨🟨 PATCHHARBOR WARNUNG 🟨🟨
+CODE: <WARNING_CODE>
+```
+
+Zulässige Warning-Codes sind mindestens:
+
+- `PLAN_SPEC_MINOR_DEVIATION` – eine kleine eindeutig commitbezogene Planlücke wird innerhalb des Scopes geschlossen,
+- `NON_BLOCKING_ASSUMPTION` – eine ausdrücklich benannte, sichere und nicht designprägende Annahme wird verwendet,
+- `REDUCED_TEST_SCOPE` – aus einem klar genannten Grund kann nur ein kleinerer als der normalerweise erforderliche Testumfang in den Patch aufgenommen werden.
+
+Eine blockierende Situation beginnt exakt mit:
+
+```text
+🟥🟥 PATCHHARBOR STOP 🟥🟥
+CODE: <STOP_CODE>
+```
+
+Zulässige Stop-Codes sind mindestens:
+
+- `PLAN_NOT_FOUND`,
+- `PLAN_AMBIGUOUS`,
+- `PLAN_POSITION_UNKNOWN`,
+- `SPEC_AMBIGUOUS`,
+- `PLAN_SPEC_CONFLICT`,
+- `REPOSITORY_STATE_INCOMPLETE`,
+- `REQUIREMENT_AMBIGUOUS`,
+- `UNSAFE_OR_IMPOSSIBLE`,
+- `PATCH_CREATION_FAILED`.
+
+Nach der Codezeile folgen höchstens eine kurze Erklärung und eine konkrete benötigte Entscheidung. Bei `STOP` wird kein Patch-Paket erzeugt und keine grüne `PATCH BEREIT`-Zeile ausgegeben.
+
+### 26.8 Verbindliche schmale Patch-Bereit-UI
+
+Die Patch-Bereit-Ausgabe ist smartphone-tauglich, verwendet keine Tabelle und folgt immer derselben Reihenfolge. Sie beginnt und endet exakt mit derselben grünen Zeile. Die letzte Zeile der gesamten Antwort ist die zweite `PATCH BEREIT`-Zeile.
+
+Verbindliches Beispiel für einen Plan-Commit:
+
+```text
+🟩🟩 PATCH BEREIT 🟩🟩
+
+🟩 PLAN
+🟩 1.a.W
+🟩 1 / 33
+
+Commit:
+feat(config): add shared exchange directory configuration
+
+Plan:
+planning/1.1.1/commit-plan.md
+
+Spec:
+spec/SPECIFICATION.md
+
+Änderungen:
+• config.json einführen
+• exchange_directory speichern
+• configure-Befehle ergänzen
+• Linux-Pfad verwenden
+• Windows-Pfad verwenden
+
+Tests:
+• Config- und CLI-Tests
+• vollständige Suite im Patch
+
+Noch offen:
+32 Plan-Commits
+
+[Patch herunterladen](sandbox:/pfad/zum/patch.zip)
+🟩🟩 PATCH BEREIT 🟩🟩
+```
+
+Verbindliche Variationen:
+
+- Bei `FIX` stehen in den drei grünen Detailzeilen `FIX`, `<PLAN-ID>-FIX<n>` und die unveränderte Planposition.
+- Bei `OFF-PLAN` stehen dort `OFF-PLAN`, die frei gewählte Kennung und `-- / <Gesamtzahl>` beziehungsweise `-- / --`.
+- Der Abschnitt `Änderungen` besitzt fünf bis zehn kurze Zeilen.
+- Der Abschnitt `Tests` nennt nur tatsächlich im Paket vorgesehene Prüfungen.
+- Es gibt genau einen Download-Link zu genau einer Patch-Datei.
+- Lange Commit-Messages oder Pfade dürfen umbrechen; keine Informationszeile wird künstlich zu einer breiten Einzeile gezwungen.
+- `PATCH BEREIT` erscheint erst, wenn die verlinkte Datei tatsächlich existiert.
+
+### 26.9 Auswertung nach lokalem Apply
+
+Nach Rückgabe eines Result Bundles unterscheidet der Chat mindestens:
+
+- erfolgreicher Apply und erfolgreicher Commit,
+- fehlgeschlagener Entrypoint oder Test,
+- PatchHarbor-Toolfehler,
+- erfolgreicher Primärauftrag mit fehlgeschlagenem Result Bundle,
+- Mismatch oder andere Ablehnung vor Mutation.
+
+Ein Erfolg darf erst nach Prüfung von `run.json`, Git-Zustand und erwartetem Commit bestätigt werden. Bei einem Fehler beschreibt der Chat knapp die Ursache, den tatsächlich zurückgebliebenen Zustand und den nächsten sinnvollen `FIX`- oder `OFF-PLAN`-Schritt.
 
 ---
 
-## 26. Zusammenfassung der verbindlichen Entscheidungen
+## 27. Zusammenfassung der verbindlichen Entscheidungen
 
-- PatchHarbor Core ist ein kontrollierter Runner ohne Hintergrunddienst, Netzwerk oder Betriebsmodi.
+- PatchHarbor Core ist ein kontrollierter Runner ohne Hintergrunddienst oder Netzwerk.
 - Der PatchHarbor Watcher ist eine separate dünne systemd-fähige Komponente.
-- Watcher-Eingangsordner liegen außerhalb registrierter Repositories und überlappen keine Result-Ordner.
-- Repo Assist ist der Workflow-Orchestrator für Tests, Commits und Journal.
+- Repo Assist verwaltet Commit-Plan, Journal, Reproduzierbarkeit sowie die fachliche Test- und Commit-Steuerung; ein weiterer Orchestrator kann darüber liegen.
 - PromptBridge besitzt Chat- und Transportfunktionen.
-- Jede lokale Repository-Instanz erhält eine eigene UUID v4.
-- Die UUID liegt lokal im vollständig reservierten Verzeichnis `.patchharbor/` und wird nicht committet.
-- Registry-Minimum: `register`, `register --new-id`, `registry list`, `unregister`.
-- Registry-Mutationen sind global gesperrt und werden atomar veröffentlicht.
-- Registry- und Repository-Locks besitzen eine feste Lock-Reihenfolge.
-- `patchharbor context` liefert Base-Commit und 16-stelligen Fingerprint unter Repository-Lock.
-- Der Fingerprint-Algorithmus ist normativ als `patchharbor-state-v1` definiert.
-- Jede Fingerprint-Payload besitzt eine exakt festgelegte Bytecodierung; vier Referenzvektoren decken clean, untracked, staged und unstaged ab.
-- Base-Commit und Fingerprint werden getrennt geprüft.
-- Der Fingerprint umfasst staged, unstaged und untracked Pfad, Modus und vollständigen Inhalt.
-- Nicht eindeutige Git-Sonderzustände, getrackte Symlinks, Submodule und nicht als UTF-8 darstellbare Pfade werden im sicheren Pfad abgelehnt.
-- Nicht portable Repository-Pfade, Windows-Gerätenamen, Groß-/Kleinschreibungs-Kollisionen sowie verbotene interne Segmente in Base-Baum oder Index werden abgelehnt.
-- Das sichere Patch-Paket ist ZIP-basiert und enthält genau eine Root-`patch.json` sowie weitere sichere Paketdateien.
-- Der Entrypoint wird privat temporär bereitgestellt und mit dem Repository als CWD ausgeführt.
-- Entrypoint-Marker und Interpreter werden vor der ersten Repository-Änderung geprüft.
-- Paketpfade mit `.git` oder `.patchharbor` als Segment sind verboten.
+- Jede lokale Repository-Instanz erhält eine eigene UUID v4 im reservierten, nicht committeten Verzeichnis `.patchharbor/`.
+- Registry-Mutationen sind global gesperrt, atomar und folgen vor Repository-Locks einer festen Lock-Reihenfolge.
+- `patchharbor context` liefert Base-Commit und Fingerprint; lokale Pfade sind kein Bestandteil des Patch-Vertrags.
+- Der Fingerprint `patchharbor-state-v1` umfasst staged, unstaged und untracked Pfad, Modus und vollständigen Inhalt.
+- Nicht eindeutige oder nicht portable Git-, Datei- und Pfadzustände werden im sicheren Pfad abgelehnt.
+- Das sichere Patch-Paket ist ZIP-basiert, besitzt genau eine Root-`patch.json` und startet genau einen privat temporär bereitgestellten Entrypoint.
+- Base-Commit und Fingerprint werden vor der ersten Repository-Mutation erneut geprüft.
 - Pro Repository-ID gilt eine exklusive Sperre.
-- Bei jeder Zustandsabweichung wird hart abgelehnt.
-- Base-Commit und Fingerprint werden unmittelbar vor der ersten Repository-Schreiboperation ein zweites Mal geprüft.
-- Dry-Run validiert vollständig, schreibt und startet aber nichts.
+- Dry-Run validiert vollständig, schreibt und startet aber nichts und konsumiert keine Exchange-Dateiidentität.
 - Primäres Auftragsergebnis und Result-Bundle-Ergebnis bleiben getrennt.
-- Alle öffentlichen `--json`-Befehle besitzen einen vollständigen versionierten und strikten Abschlussvertrag.
-- Ein Bundle-Fehler überschreibt nur einen ansonsten erfolgreichen Auftrag und liefert dann Exit `11`.
-- Result-Ordner dürfen nicht innerhalb registrierter Repositories liegen.
-- Temporäre Result-ZIP und endgültige Result-ZIP liegen im selben Ausgabeordner und werden dateisystemgleich atomar ausgetauscht.
-- Ein Result Bundle enthält immer Base-Commit-Dateien, staged Patch, unstaged Patch, untracked Dateien, Kontext und Run-Logs.
-- Der Base-Commit wird direkt aus Git-Baum und Git-Blobs materialisiert; Exportattribute verändern den Snapshot nicht.
-- Das Manifest dokumentiert Base- und untracked Dateimodi plattformunabhängig.
-- Das Result Bundle enthält keine Git-Historie.
-- Der fortgeführte manuelle Runner behält Datei, Ordner, Pipe, mehrere ZIP-Skripte, Interpreter-, Prozess-, TUI-, Logging- und Ressourcenverträge aus 1.0.0.
-- Temporäre Eingabe- und Skriptdateien werden über einen gemeinsamen Cleanup-Pfad entfernt.
-- PatchHarbor verwaltet keine Zielprojekt-Tests und keine Commits.
+- Result Bundles enthalten den vollständigen Base-Commit, staged und unstaged Patches, nicht ignorierte untracked Dateien, Kontext und Run-Logs, aber keine Git-Historie.
+- Result Bundles werden im endgültigen Ausgabeordner atomar veröffentlicht.
+- `config.json` ist die einzige Benutzerkonfiguration für `exchange_directory`.
+- Der Exchange-Ordner ist eine gemeinsame flache Übergabestelle für Patch-Pakete, Result Bundles und sonstige Dateien.
+- Exchange-Ordner und registrierte Repositorys dürfen sich in keiner Richtung überlappen.
+- `bundle` und Apply-Result-Bundles verwenden ohne explizites `--output-dir` den Exchange-Ordner.
+- `apply` ohne `PATCH_ZIP` wählt genau ein noch nicht automatisch verarbeitetes Paket anhand von `repo_id`, Base-Commit und Fingerprint aus.
+- Bei keinem oder mehreren passenden Kandidaten wird nicht geraten und nichts mutiert.
+- Result Bundles und sonstige Dateien werden nie als sichere Patch-Pakete ausgeführt.
+- Unveränderte bereits versuchte Dateien werden nicht automatisch erneut gestartet; ein expliziter Pfad erlaubt den bewussten Retry.
+- PatchHarbor verschiebt, löscht, archiviert oder sortiert Exchange-Dateien nicht; diese spätere Ablage gehört zu Repo Assist.
+- Der Watcher verwendet dieselbe `config.json`, Paketklassifikation und Dateidentität wie der Core.
+- `CHAT_INSTRUCTIONS.md` plus aktuelles Result Bundle initialisieren einen neuen Entwicklungs-Chat.
+- Der Chat benötigt weder Repository-Pfad noch Exchange-Pfad.
+- Die Spezifikation ist der fachliche Vertrag; der Commit-Plan ist die geplante Zerlegung.
+- Der Chat prüft Plan, Spezifikation und realen Repository-Zustand gegeneinander und fragt bei blockierenden Widersprüchen nach.
+- `PLAN`, `FIX` und `OFF-PLAN` sind feste Commit-Arten; Fixes verwenden `<ID>-FIX<n>` und verändern den Plan-Zähler nicht.
+- Blockierende Situationen verwenden eine standardisierte rote STOP-Ausgabe, nicht blockierende Auffälligkeiten eine gelbe WARNING-Ausgabe.
+- Ein fertiges Patch-Paket wird oben und als letzte Zeile mit `🟩🟩 PATCH BEREIT 🟩🟩` angezeigt.
+- `PATCH BEREIT` darf erst erscheinen, wenn genau eine herunterladbare Patch-Datei tatsächlich vorhanden ist.
+- Ein Chat-Patch soll die zur Änderung passenden Projekttests mit Timeouts ausführen und bei Testfehler ohne Commit enden; PatchHarbor selbst bewertet die Tests nicht und führt keinen Rollback durch.
+- Nach Erfolg oder Fehler erzeugt PatchHarbor soweit möglich ein Result Bundle mit realem Repository-Zustand sowie `run.json` und `execution.log`.
+- `watcher.json` und `paths.json` werden nicht migriert oder als Fallback gelesen.
+- Der fortgeführte manuelle Runner behält seine Datei-, Ordner-, Pipe-, ZIP-, Interpreter-, Prozess-, TUI-, Logging- und Ressourcenverträge.
 - PatchHarbor ist keine Sandbox; nur vertrauenswürdige Pakete dürfen ausgeführt werden.
-- Ubuntu 24.04, Ubuntu 26.04 und der echte Windows-Runner sind blockierende Release-Gates.
+- Ubuntu 24.04, Ubuntu 26.04 und echte Windows-Runner bleiben blockierende Release-Gates.
