@@ -13,12 +13,14 @@ from typing import Any, BinaryIO, TextIO
 from patchharbor import __version__
 from patchharbor.application import (
     bundle_repository,
+    configure_exchange_directory,
     register_repository,
     registered_repositories,
     repository_context,
     run_apply_path,
     run_script_path,
     run_standard_input,
+    shared_configuration,
     unregister_repository,
 )
 from patchharbor.context_output import context_json_result, write_context_block
@@ -99,6 +101,30 @@ def _build_parser() -> argparse.ArgumentParser:
         dest="command",
         required=True,
         metavar="COMMAND",
+    )
+
+    configure_parser = commands.add_parser(
+        "configure",
+        help="configure shared PatchHarbor user settings",
+    )
+    configure_commands = configure_parser.add_subparsers(
+        dest="configure_command",
+        required=True,
+        metavar="COMMAND",
+    )
+    exchange_directory_parser = configure_commands.add_parser(
+        "exchange-directory",
+        help="set the shared exchange directory",
+    )
+    exchange_directory_parser.add_argument(
+        "directory",
+        type=Path,
+        metavar="DIRECTORY",
+        help="exchange directory to persist in config.json",
+    )
+    configure_commands.add_parser(
+        "show",
+        help="show the shared PatchHarbor configuration",
     )
 
     register_parser = commands.add_parser(
@@ -319,6 +345,57 @@ def _build_parser() -> argparse.ArgumentParser:
     )
 
     return parser
+
+
+def _write_configuration(
+    configuration_path: Path,
+    exchange_directory: Path,
+    *,
+    stdout: TextIO,
+) -> None:
+    print(f"configuration_path: {configuration_path}", file=stdout)
+    print(f"exchange_directory: {exchange_directory}", file=stdout)
+
+
+def _configure_exchange_directory_command(
+    directory: Path,
+    *,
+    stdout: TextIO,
+    stderr: TextIO,
+) -> int:
+    try:
+        configuration_path, configuration = configure_exchange_directory(
+            directory
+        )
+    except PatchHarborError as exc:
+        print(format_tool_message(str(exc)), file=stderr)
+        return int(exc.exit_code)
+
+    _write_configuration(
+        configuration_path,
+        configuration.exchange_directory,
+        stdout=stdout,
+    )
+    return 0
+
+
+def _configure_show_command(
+    *,
+    stdout: TextIO,
+    stderr: TextIO,
+) -> int:
+    try:
+        configuration_path, configuration = shared_configuration()
+    except PatchHarborError as exc:
+        print(format_tool_message(str(exc)), file=stderr)
+        return int(exc.exit_code)
+
+    _write_configuration(
+        configuration_path,
+        configuration.exchange_directory,
+        stdout=stdout,
+    )
+    return 0
 
 
 def _register_command(
@@ -916,6 +993,22 @@ def main(
 
     parser = _build_parser()
     args = parser.parse_args(argv)
+
+    if (
+        args.command == "configure"
+        and args.configure_command == "exchange-directory"
+    ):
+        return _configure_exchange_directory_command(
+            args.directory,
+            stdout=actual_stdout,
+            stderr=actual_stderr,
+        )
+
+    if args.command == "configure" and args.configure_command == "show":
+        return _configure_show_command(
+            stdout=actual_stdout,
+            stderr=actual_stderr,
+        )
 
     if args.command == "register":
         return _register_command(

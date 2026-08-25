@@ -17,6 +17,7 @@ EXPECTED_CORE_RUNTIME_FILES = {
     "bundle_paths.py",
     "bundles.py",
     "cli.py",
+    "configuration.py",
     "context_output.py",
     "errors.py",
     "execution.py",

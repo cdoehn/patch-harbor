@@ -33,6 +33,7 @@ EXPECTED_RUNTIME_FILES = {
     "patchharbor/bundle_paths.py",
     "patchharbor/bundles.py",
     "patchharbor/cli.py",
+    "patchharbor/configuration.py",
     "patchharbor/context_output.py",
     "patchharbor/errors.py",
     "patchharbor/execution.py",
@@ -455,6 +456,9 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
 
     for help_arguments in (
         ("--help",),
+        ("configure", "--help"),
+        ("configure", "exchange-directory", "--help"),
+        ("configure", "show", "--help"),
         ("register", "--help"),
         ("registry", "--help"),
         ("registry", "list", "--help"),
