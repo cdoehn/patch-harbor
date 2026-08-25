@@ -82,18 +82,18 @@ from patchharbor.sources import (
     select_directory_candidate,
     stdin_input_artifact,
 )
-from patchharbor.user_paths import registration_user_paths
+from patchharbor.user_paths import configuration_user_paths
 
 
 def configure_exchange_directory(path: Path) -> tuple[Path, UserConfiguration]:
     """Persist one shared exchange directory and expose its config path."""
-    paths = registration_user_paths()
+    paths = configuration_user_paths()
     return paths.configuration_path, write_exchange_directory(paths, path)
 
 
 def shared_configuration() -> tuple[Path, UserConfiguration]:
     """Return the currently persisted shared user configuration."""
-    paths = registration_user_paths()
+    paths = configuration_user_paths()
     return paths.configuration_path, load_configuration(paths)
 
 

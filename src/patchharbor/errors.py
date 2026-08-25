@@ -33,6 +33,7 @@ class ErrorKind(str, Enum):
     """Stable machine-readable categories for structured tool failures."""
 
     TOOL_ERROR = "tool_error"
+    CONFIGURATION_ERROR = "configuration_error"
     REGISTRY_ERROR = "registry_error"
     REPOSITORY_RESOLUTION_ERROR = "repository_resolution_error"
     STATE_MISMATCH = "state_mismatch"
@@ -61,6 +62,15 @@ class PatchHarborError(Exception):
         self.emergency_diagnostics_path = emergency_diagnostics_path
         self.emergency_diagnostics_failed = emergency_diagnostics_failed
         self.run_report = run_report
+
+
+def configuration_error(message: str) -> PatchHarborError:
+    """Create one centrally categorized user-configuration failure."""
+    return PatchHarborError(
+        message,
+        ExitCode.SOURCE_ERROR,
+        error_kind=ErrorKind.CONFIGURATION_ERROR,
+    )
 
 
 def registry_error(message: str) -> PatchHarborError:

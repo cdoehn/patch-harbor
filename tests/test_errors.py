@@ -3,6 +3,7 @@ from __future__ import annotations
 from patchharbor.errors import (
     ErrorKind,
     ExitCode,
+    configuration_error,
     format_tool_message,
     format_tool_warning,
     patch_package_error,
@@ -42,6 +43,7 @@ def test_public_tool_message_prefixes_are_stable() -> None:
 
 
 def test_error_factories_keep_public_codes_and_categories() -> None:
+    configuration_failure = configuration_error("configuration failed")
     registry_failure = registry_error("registry failed")
     resolution_failure = repository_resolution_error("resolution failed")
     result_bundle_failure = result_bundle_error("bundle failed")
@@ -52,6 +54,11 @@ def test_error_factories_keep_public_codes_and_categories() -> None:
         "unsupported state"
     )
 
+    assert configuration_failure.exit_code is ExitCode.SOURCE_ERROR
+    assert (
+        configuration_failure.error_kind
+        is ErrorKind.CONFIGURATION_ERROR
+    )
     assert registry_failure.exit_code is ExitCode.REPOSITORY_ERROR
     assert registry_failure.error_kind is ErrorKind.REGISTRY_ERROR
     assert resolution_failure.exit_code is ExitCode.REPOSITORY_ERROR
