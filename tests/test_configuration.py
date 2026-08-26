@@ -348,3 +348,50 @@ def test_configuration_user_path_failures_have_their_own_category(
     assert captured.value.exit_code is ExitCode.SOURCE_ERROR
     assert captured.value.error_kind is ErrorKind.CONFIGURATION_ERROR
     assert "required for configuration" in str(captured.value)
+
+
+def test_configure_holds_registry_lock_through_publication_and_revalidates_snapshot(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from patchharbor.application import configure_exchange_directory
+    from patchharbor.models import RepositoryId, RepositoryPath
+    from patchharbor.registry import registry_snapshot
+    from tests.platform_support import project_environment
+    from tests.registration_support import probe_registry_lock
+
+    paths = _isolated_paths(tmp_path, monkeypatch)
+    exchange = tmp_path / "exchange"
+    expected_snapshot = registry_snapshot({})
+    changed_snapshot = registry_snapshot(
+        {
+            RepositoryId.new(): RepositoryPath(
+                (tmp_path / "unrelated-repository").resolve()
+            )
+        }
+    )
+    observed_calls = 0
+
+    def changing_registry(_paths: RegistrationUserPaths):
+        nonlocal observed_calls
+        observed_calls += 1
+        if observed_calls == 1:
+            return expected_snapshot
+        assert probe_registry_lock(project_environment()) == int(
+            ExitCode.REPOSITORY_ERROR
+        )
+        return changed_snapshot
+
+    monkeypatch.setattr("patchharbor.application.load_registry", changing_registry)
+
+    with pytest.raises(PatchHarborError) as captured:
+        configure_exchange_directory(exchange)
+
+    assert captured.value.exit_code is ExitCode.REPOSITORY_ERROR
+    assert captured.value.error_kind is ErrorKind.REGISTRY_ERROR
+    assert str(captured.value) == (
+        "repository registry changed while configuring exchange directory"
+    )
+    assert observed_calls == 2
+    assert exchange.is_dir()
+    assert not paths.configuration_path.exists()

@@ -12,10 +12,13 @@ from patchharbor.errors import (
     registry_error,
     repository_resolution_error,
 )
-from patchharbor.path_configuration import (
-    PathConfigurationError,
-    load_configured_paths,
-    require_repository_registration_allowed,
+from patchharbor.configuration import (
+    UserConfiguration,
+    load_configuration_if_present,
+)
+from patchharbor.exchange_paths import (
+    ExchangePathPolicyError,
+    require_repository_outside_exchange,
 )
 from patchharbor.models import (
     RegistryListResult,
@@ -91,6 +94,7 @@ class _RegistrationObservation:
 
     repository: RepositoryPath
     registry_state: RegistryFileState
+    configuration: UserConfiguration | None
     local_id: RepositoryId | None
     local_state: LocalRegistrationState
 
@@ -169,26 +173,49 @@ def _plan_identity_transition(
     )
 
 
+def _require_registration_exchange_allowed(
+    repository: RepositoryPath,
+    configuration: UserConfiguration | None,
+) -> None:
+    if configuration is None:
+        return
+    try:
+        require_repository_outside_exchange(
+            repository,
+            configuration.exchange_directory,
+        )
+    except ExchangePathPolicyError as exc:
+        raise repository_resolution_error(str(exc)) from exc
+
+
 def _observe_registration(
     paths: RegistrationUserPaths,
     path: Path,
 ) -> _RegistrationObservation:
     repository = inspect_repository(path)
-    try:
-        require_repository_registration_allowed(
-            repository,
-            load_configured_paths(paths),
-        )
-    except PathConfigurationError as exc:
-        raise repository_resolution_error(str(exc)) from exc
     registry_state = load_registry_state(paths)
+    configuration = load_configuration_if_present(paths)
+    _require_registration_exchange_allowed(repository, configuration)
     local_id, local_state = inspect_local_registration(repository)
     return _RegistrationObservation(
         repository=repository,
         registry_state=registry_state,
+        configuration=configuration,
         local_id=local_id,
         local_state=local_state,
     )
+
+
+def _revalidate_registration_exchange(
+    paths: RegistrationUserPaths,
+    expected: _RegistrationObservation,
+) -> None:
+    current = load_configuration_if_present(paths)
+    if current != expected.configuration:
+        raise repository_resolution_error(
+            "exchange configuration changed while registering repository"
+        )
+    _require_registration_exchange_allowed(expected.repository, current)
 
 
 def _restore_identity_transition(
@@ -275,6 +302,10 @@ def _revalidate_new_identity_transition(
         raise repository_resolution_error(
             "repository ID changed while acquiring its lock"
         )
+    if observed.configuration != expected.configuration:
+        raise repository_resolution_error(
+            "exchange configuration changed while acquiring repository lock"
+        )
 
     transition = _plan_identity_transition(
         observed.registry_state,
@@ -328,8 +359,10 @@ def register_local_repository(
                     replacement_id=transition.repo_id,
                     locked_id=affected_id,
                 )
+                _revalidate_registration_exchange(user_paths, observed)
                 _commit_identity_transition(user_paths, transition)
         else:
+            _revalidate_registration_exchange(user_paths, observed)
             _commit_identity_transition(user_paths, transition)
 
     return transition.repo_id, observed.repository

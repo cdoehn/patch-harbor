@@ -480,3 +480,72 @@ def test_local_identity_persistence_rejects_a_noncanonical_repository_id(
     assert captured.value.error_kind is ErrorKind.REPOSITORY_RESOLUTION_ERROR
     assert not state.internal_directory.exists()
     assert state.exclude_path.read_bytes() == exclude_before
+
+
+def test_registration_rejects_exchange_overlap_in_both_directions(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from patchharbor.configuration import write_exchange_directory
+
+    set_isolated_user_environment(monkeypatch, tmp_path / "user")
+    paths = registration_user_paths()
+
+    outer_repository = create_repository(tmp_path / "outer-repository")
+    exchange_inside_repository = outer_repository / "exchange"
+    write_exchange_directory(paths, exchange_inside_repository)
+
+    with pytest.raises(PatchHarborError) as inside_captured:
+        register_local_repository(outer_repository)
+
+    assert inside_captured.value.exit_code is ExitCode.REPOSITORY_ERROR
+    assert inside_captured.value.error_kind is ErrorKind.REPOSITORY_RESOLUTION_ERROR
+    assert str(inside_captured.value) == (
+        "repository overlaps configured exchange directory"
+    )
+    assert not (outer_repository / ".patchharbor").exists()
+
+    paths.configuration_path.unlink()
+    exchange = tmp_path / "exchange-root"
+    write_exchange_directory(paths, exchange)
+    nested_repository = create_repository(exchange / "nested-repository")
+
+    with pytest.raises(PatchHarborError) as outer_captured:
+        register_local_repository(nested_repository)
+
+    assert outer_captured.value.exit_code is ExitCode.REPOSITORY_ERROR
+    assert outer_captured.value.error_kind is ErrorKind.REPOSITORY_RESOLUTION_ERROR
+    assert str(outer_captured.value) == (
+        "repository overlaps configured exchange directory"
+    )
+    assert not (nested_repository / ".patchharbor").exists()
+
+
+def test_registration_does_not_read_legacy_paths_json_as_exchange_configuration(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repository = create_repository(tmp_path / "repository")
+    legacy_watcher = repository / "legacy-watcher"
+    legacy_watcher.mkdir()
+    set_isolated_user_environment(monkeypatch, tmp_path / "user")
+    paths = registration_user_paths()
+    paths.path_configuration_path.write_text(
+        json.dumps(
+            {
+                "format_version": 1,
+                "result_directories": [],
+                "watcher_input_directories": [str(legacy_watcher.resolve())],
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    repo_id, registered_path = register_local_repository(repository)
+
+    assert registered_path.value == repository.resolve()
+    assert (repository / ".patchharbor" / "id").read_text(
+        encoding="ascii"
+    ) == f"{repo_id}\n"
+    assert not paths.configuration_path.exists()

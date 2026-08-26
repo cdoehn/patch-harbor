@@ -20,12 +20,21 @@ from patchharbor.bundles import resolve_patch_bundle
 from patchharbor.configuration import (
     UserConfiguration,
     load_configuration,
-    write_exchange_directory,
+    prepare_exchange_directory,
+    resolve_exchange_directory_candidate,
+    revalidate_exchange_directory,
+    write_prepared_configuration,
 )
 from patchharbor.errors import (
     ExitCode,
     PatchHarborError,
+    configuration_error,
+    registry_error,
     state_mismatch_error,
+)
+from patchharbor.exchange_paths import (
+    ExchangePathPolicyError,
+    require_exchange_outside_registry,
 )
 from patchharbor.execution import (
     DEFAULT_TIMEOUT_SECONDS,
@@ -33,10 +42,12 @@ from patchharbor.execution import (
     execute_prepared_script_with_log,
     execute_script_text,
 )
+from patchharbor.locks import registry_lock
 from patchharbor.models import (
     BundleScript,
     InputArtifact,
     RegistryListResult,
+    RegistrySnapshot,
     RepositoryContext,
     RepositoryId,
     RepositoryPath,
@@ -59,6 +70,7 @@ from patchharbor.registration import (
     register_local_repository,
     unregister_local_repository,
 )
+from patchharbor.registry import load_registry
 from patchharbor.repository_state import (
     capture_repository_context,
     require_clean_repository,
@@ -85,10 +97,55 @@ from patchharbor.sources import (
 from patchharbor.user_paths import configuration_user_paths
 
 
+def _require_exchange_configuration_allowed(
+    exchange_directory: Path,
+    registry_snapshot: RegistrySnapshot,
+    *,
+    exchange_must_exist: bool,
+) -> None:
+    try:
+        require_exchange_outside_registry(
+            exchange_directory,
+            registry_snapshot,
+            exchange_must_exist=exchange_must_exist,
+        )
+    except ExchangePathPolicyError as exc:
+        raise configuration_error(str(exc)) from exc
+
+
 def configure_exchange_directory(path: Path) -> tuple[Path, UserConfiguration]:
-    """Persist one shared exchange directory and expose its config path."""
+    """Persist one registry-safe shared exchange directory under the global lock."""
     paths = configuration_user_paths()
-    return paths.configuration_path, write_exchange_directory(paths, path)
+    candidate = resolve_exchange_directory_candidate(path)
+    with registry_lock(paths):
+        expected_registry = load_registry(paths)
+        _require_exchange_configuration_allowed(
+            candidate,
+            expected_registry,
+            exchange_must_exist=False,
+        )
+        configuration = prepare_exchange_directory(paths, path)
+        _require_exchange_configuration_allowed(
+            configuration.exchange_directory,
+            expected_registry,
+            exchange_must_exist=True,
+        )
+
+        current_registry = load_registry(paths)
+        if current_registry != expected_registry:
+            raise registry_error(
+                "repository registry changed while configuring exchange directory"
+            )
+        configuration = revalidate_exchange_directory(configuration)
+        _require_exchange_configuration_allowed(
+            configuration.exchange_directory,
+            current_registry,
+            exchange_must_exist=True,
+        )
+        return (
+            paths.configuration_path,
+            write_prepared_configuration(paths, configuration),
+        )
 
 
 def shared_configuration() -> tuple[Path, UserConfiguration]:

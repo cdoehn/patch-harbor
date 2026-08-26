@@ -120,3 +120,84 @@ def test_configure_show_rejects_invalid_direct_file_edit(
     assert json.loads(configuration_path.read_text(encoding="utf-8")) == (
         invalid_content
     )
+
+
+def test_configure_rejects_exchange_inside_or_above_registered_repository(
+    tmp_path: Path,
+) -> None:
+    from tests.registration_support import create_repository
+
+    environment = isolated_user_environment(tmp_path / "user")
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    repository = create_repository(workspace / "repository")
+    registered = run_cli(
+        tmp_path,
+        "register",
+        str(repository),
+        environment_overrides=environment,
+    )
+    assert registered.returncode == 0
+
+    inside = repository / "exchange"
+    inside_result = run_cli(
+        tmp_path,
+        "configure",
+        "exchange-directory",
+        str(inside),
+        environment_overrides=environment,
+    )
+    assert inside_result.returncode == 4
+    assert inside_result.stdout == ""
+    assert inside_result.stderr == (
+        "patchharbor: exchange directory overlaps a registered repository\n"
+    )
+    assert not inside.exists()
+    assert not _configuration_path(environment).exists()
+
+    parent = repository.parent
+    parent_result = run_cli(
+        tmp_path,
+        "configure",
+        "exchange-directory",
+        str(parent),
+        environment_overrides=environment,
+    )
+    assert parent_result.returncode == 4
+    assert parent_result.stdout == ""
+    assert parent_result.stderr == (
+        "patchharbor: exchange directory overlaps a registered repository\n"
+    )
+    assert not _configuration_path(environment).exists()
+
+
+def test_register_rejects_repository_overlapping_configured_exchange(
+    tmp_path: Path,
+) -> None:
+    from tests.registration_support import create_repository
+
+    environment = isolated_user_environment(tmp_path / "user")
+    exchange = tmp_path / "exchange"
+    configured = run_cli(
+        tmp_path,
+        "configure",
+        "exchange-directory",
+        str(exchange),
+        environment_overrides=environment,
+    )
+    assert configured.returncode == 0
+
+    repository = create_repository(exchange / "repository")
+    registered = run_cli(
+        tmp_path,
+        "register",
+        str(repository),
+        environment_overrides=environment,
+    )
+
+    assert registered.returncode == 8
+    assert registered.stdout == ""
+    assert registered.stderr == (
+        "patchharbor: repository overlaps configured exchange directory\n"
+    )
+    assert not (repository / ".patchharbor").exists()

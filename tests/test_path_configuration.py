@@ -123,7 +123,7 @@ def test_watcher_input_rejects_overlap_with_recorded_result_directory(
         prepare_watcher_input_directory(watcher)
 
 
-def test_registration_rejects_repository_overlapping_configured_watcher(
+def test_registration_ignores_legacy_watcher_overlap_configuration(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -133,11 +133,12 @@ def test_registration_rejects_repository_overlapping_configured_watcher(
     incoming.mkdir()
     prepare_watcher_input_directory(incoming)
 
-    with pytest.raises(PatchHarborError) as captured:
-        register_local_repository(repository)
+    repo_id, registered = register_local_repository(repository)
 
-    assert captured.value.exit_code is ExitCode.REPOSITORY_ERROR
-    assert not (repository / ".patchharbor").exists()
+    assert registered.value == repository.resolve()
+    assert (repository / ".patchharbor" / "id").read_text(
+        encoding="ascii"
+    ).strip() == str(repo_id)
 
 
 def test_registration_allows_repository_below_flat_watcher_input(
@@ -158,7 +159,7 @@ def test_registration_allows_repository_below_flat_watcher_input(
     ).read_text(encoding="ascii").strip() == str(repo_id)
 
 
-def test_registration_rejects_repository_containing_recorded_result_directory(
+def test_registration_ignores_legacy_result_directory_configuration(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -167,11 +168,12 @@ def test_registration_rejects_repository_containing_recorded_result_directory(
     result = repository / "results"
     _prepare_result_directory(result)
 
-    with pytest.raises(PatchHarborError) as captured:
-        register_local_repository(repository)
+    repo_id, registered = register_local_repository(repository)
 
-    assert captured.value.exit_code is ExitCode.REPOSITORY_ERROR
-    assert not (repository / ".patchharbor").exists()
+    assert registered.value == repository.resolve()
+    assert (repository / ".patchharbor" / "id").read_text(
+        encoding="ascii"
+    ).strip() == str(repo_id)
 
 
 def test_watcher_and_result_directories_are_persisted_canonically(

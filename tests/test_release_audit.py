@@ -22,6 +22,7 @@ EXPECTED_CORE_RUNTIME_FILES = {
     "context_output.py",
     "errors.py",
     "execution.py",
+    "exchange_paths.py",
     "git_capture.py",
     "git_objects.py",
     "git_patches.py",
