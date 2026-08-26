@@ -155,7 +155,7 @@ Repo Assist kann insbesondere:
 - ein Entwicklungsjournal führen,
 - Reproduzierbarkeit und Zuordnung von Aufgaben, Patches, Tests und Commits sichern,
 - PatchHarbor Core aufrufen und PatchHarbor Result Bundles anfordern,
-- Tests mit Timeouts ausführen und Testresultate bewerten,
+- Tests mit einer plattformgerechten Timeout-Strategie ausführen und Testresultate bewerten,
 - nur bei erfolgreichem Workflow Commits erzeugen,
 - Retry und Abort verwalten,
 - eigene Repo-Assist-Journal-Bundles erzeugen,
@@ -2291,7 +2291,8 @@ PatchHarbor wird pragmatisch verhaltensorientiert entwickelt.
 - echte Dateien, echte Git-Repositories und echte Prozesse,
 - Verhalten statt interner Implementierungsdetails,
 - keine dogmatische Forderung nach vollständiger Testabdeckung,
-- jeder Testlauf besitzt einen äußeren Timeout,
+- automatisierte CI- und Release-Testläufe besitzen einen ausreichend bemessenen äußeren Timeout,
+- interaktive Commit-Skripte im dokumentierten Pixel-/Termux-Workflow dürfen ohne künstlichen Einzeltest- oder Gesamtsuite-Timeout laufen,
 - Human-readable Fließtexte und Help-Beschreibungen werden nicht vollständig als Snapshot getestet,
 - geschlossene JSON-Verträge und die exakt standardisierten Statuszeilen aus `CHAT_INSTRUCTIONS.md` dürfen und sollen byte- beziehungsweise textgenau getestet werden.
 
@@ -2459,7 +2460,8 @@ Der vorbereitende 1.1.1-Dokumentationscommit erweitert den bestehenden Audit zun
 
 - Jeder Implementierungscommit hat eine erkennbare Absicht.
 - Feature und zugehöriger Verhaltenstest gehören zusammen.
-- Nach jedem Commit ist die bis dahin geltende Testsuite mit harten Timeouts grün.
+- Nach jedem Commit ist die bis dahin geltende Testsuite mit einer plattformgerechten Timeout-Strategie grün.
+- Ausgelieferte Commit-Skripte für den dokumentierten Pixel-/Termux-Workflow verwenden keinen künstlichen Einzeltest- oder Gesamtsuite-Timeout.
 - Bei fehlgeschlagenen Tests entsteht kein Commit.
 - Plattform- und Akzeptanztests werden vor Release vollständig ausgeführt.
 - Ubuntu 24.04, Ubuntu 26.04 und der echte Windows-Runner sind blockierende Release-Gates; eine rote verbindliche Lane verhindert die Freigabe.
@@ -2665,7 +2667,8 @@ Das Paket:
 - verwendet unverändert `repo_id`, Base-Commit, Fingerprint und Algorithmus aus dem aktuellen Result Bundle,
 - enthält genau einen manifestierten Entrypoint mit dem Pflichtmarker `# PATCHHARBOR`,
 - enthält nur die für den Auftrag notwendigen sicheren Nutzdateien,
-- führt die zur Änderung passenden Tests mit harten Timeouts aus,
+- führt die zur Änderung passenden Tests mit einer plattformgerechten Timeout-Strategie aus,
+- verwendet im dokumentierten Pixel-/Termux-Workflow keinen künstlichen Einzeltest- oder Gesamtsuite-Timeout; fachlich notwendige interne Prozess- und Timeout-Tests bleiben bestehen,
 - verwendet bei breitem oder riskantem Scope die vollständige Testsuite,
 - erzeugt den vorgesehenen Git-Commit erst nach grünen Tests,
 - ruft nicht selbst `patchharbor bundle` auf.
@@ -2719,7 +2722,7 @@ Verbindliches Beispiel für einen Plan-Commit:
 
 🟩 PLAN
 🟩 1.a.W
-🟩 1 / 33
+🟩 1 / 12
 
 Commit:
 feat(config): add shared exchange directory configuration
@@ -2742,7 +2745,7 @@ Tests:
 • vollständige Suite im Patch
 
 Noch offen:
-32 Plan-Commits
+11 Plan-Commits
 
 [Patch herunterladen](sandbox:/pfad/zum/patch.zip)
 🟩🟩 PATCH BEREIT 🟩🟩
@@ -2808,7 +2811,7 @@ Ein Erfolg darf erst nach Prüfung von `run.json`, Git-Zustand und erwartetem Co
 - Blockierende Situationen verwenden eine standardisierte rote STOP-Ausgabe, nicht blockierende Auffälligkeiten eine gelbe WARNING-Ausgabe.
 - Ein fertiges Patch-Paket wird oben und als letzte Zeile mit `🟩🟩 PATCH BEREIT 🟩🟩` angezeigt.
 - `PATCH BEREIT` darf erst erscheinen, wenn genau eine herunterladbare Patch-Datei tatsächlich vorhanden ist.
-- Ein Chat-Patch soll die zur Änderung passenden Projekttests mit Timeouts ausführen und bei Testfehler ohne Commit enden; PatchHarbor selbst bewertet die Tests nicht und führt keinen Rollback durch.
+- Ein Chat-Patch soll die zur Änderung passenden Projekttests mit einer plattformgerechten Timeout-Strategie ausführen und bei Testfehler ohne Commit enden; im dokumentierten Pixel-/Termux-Workflow verwendet das Commit-Skript keinen künstlichen Einzeltest- oder Gesamtsuite-Timeout. PatchHarbor selbst bewertet die Tests nicht und führt keinen Rollback durch.
 - Nach Erfolg oder Fehler erzeugt PatchHarbor soweit möglich ein Result Bundle mit realem Repository-Zustand sowie `run.json` und `execution.log`.
 - `watcher.json` und `paths.json` werden nicht migriert oder als Fallback gelesen.
 - Der fortgeführte manuelle Runner behält seine Datei-, Ordner-, Pipe-, ZIP-, Interpreter-, Prozess-, TUI-, Logging- und Ressourcenverträge.

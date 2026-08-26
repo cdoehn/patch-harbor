@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from pathlib import Path
+import re
 import tomllib
+from pathlib import Path
 
 from tests.platform_support import PROJECT_ROOT
 
@@ -115,3 +116,72 @@ def test_release_documents_exist_at_their_canonical_paths() -> None:
     }
 
     assert all(path.is_file() for path in expected_documents)
+
+
+def test_v111_commit_plan_has_one_consistent_consolidated_sequence() -> None:
+    plan = (
+        PROJECT_ROOT / "planning" / "1.1.1" / "commit-plan.md"
+    ).read_text(encoding="utf-8")
+
+    rows = re.findall(
+        r"^\| (\d+) \| `([^`]+)` \| (DONE|NEXT|OPEN) "
+        r"\| `([^`]+)` \|",
+        plan,
+        flags=re.MULTILINE,
+    )
+    assert [int(position) for position, *_ in rows] == list(range(1, 13))
+
+    statuses = [status for _, _, status, _ in rows]
+    completed = 0
+    while completed < len(statuses) and statuses[completed] == "DONE":
+        completed += 1
+    if completed < len(statuses):
+        assert statuses[completed] == "NEXT"
+        assert statuses[completed + 1 :] == ["OPEN"] * (
+            len(statuses) - completed - 1
+        )
+    else:
+        assert "NEXT" not in statuses
+        assert "OPEN" not in statuses
+
+    status_match = re.search(
+        r"\*\*Planstatus:\*\* (\d+) / 12 Plan-Commits umgesetzt;",
+        plan,
+    )
+    assert status_match is not None
+    assert int(status_match.group(1)) == completed
+
+    identifiers = re.findall(
+        r"^### ([0-9]+\.[a-z]+\.[WRC]) –",
+        plan,
+        flags=re.MULTILINE,
+    )
+    positions = re.findall(
+        r"^\*\*Commitposition:\*\* (\d+) / 12<br>$",
+        plan,
+        flags=re.MULTILINE,
+    )
+    messages = re.findall(
+        r"^\*\*Commit-Message:\*\* `([^`]+)`<br>$",
+        plan,
+        flags=re.MULTILINE,
+    )
+    assert identifiers == [identifier for _, identifier, _, _ in rows]
+    assert [int(position) for position in positions] == list(range(1, 13))
+    assert messages == [message for _, _, _, message in rows]
+
+    specification = (
+        PROJECT_ROOT / "spec" / "SPECIFICATION.md"
+    ).read_text(encoding="utf-8")
+    assert "🟩 1 / 12" in specification
+    assert "11 Plan-Commits" in specification
+    assert "🟩 1 / 33" not in specification
+    assert "32 Plan-Commits" not in specification
+    assert "`OFF-PLAN` `PLAN12`" in plan
+    assert "ohne künstliche Einzeltest- oder Gesamtsuite-Timeouts" in plan
+    assert "patchharbor bundle --output-dir \"$HOME/Downloads\"" in plan
+    assert (
+        "verwendet im dokumentierten Pixel-/Termux-Workflow keinen "
+        "künstlichen Einzeltest- oder Gesamtsuite-Timeout"
+    ) in specification
+    assert "führt die zur Änderung passenden Tests mit harten Timeouts aus" not in specification

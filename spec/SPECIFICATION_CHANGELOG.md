@@ -1,7 +1,7 @@
 # PatchHarbor – Spezifikations-Changelog
 
 **Dateiname:** `SPECIFICATION_CHANGELOG.md`<br>
-**Stand:** 2026-08-25
+**Stand:** 2026-08-26
 
 Dieses Dokument protokolliert Änderungen am verbindlichen Produktziel. Es ist kein Git-Commit-Log und ersetzt nicht die getrennten Umsetzungspläne unter `planning/`.
 
@@ -10,6 +10,16 @@ Dieses Dokument protokolliert Änderungen am verbindlichen Produktziel. Es ist k
 ## [1.1.1] – 2026-08-25
 
 **Status:** Verbindliches, implementierungsreifes Zielbild; die Umsetzung erfolgt über `planning/1.1.1/commit-plan.md`.
+
+### Planning correction – 2026-08-26
+
+- Der mechanische 33-Commit-Plan wurde ohne Änderung des Produktziels auf 12 fachlich eigenständige Plan-Commits konsolidiert.
+- Die bereits umgesetzten Commits `1.a.W` und `1.a.R` ergeben den Planstand 2 / 12; die Konsolidierung selbst ist ein Off-Plan-Commit und verändert den Zähler nicht.
+- W-R-C bleibt als Qualitätsprinzip erhalten, wird aber nicht mehr als zwingendes Dreiermuster für jeden Step verwendet.
+- Die Fortschrittstabelle im Plan wird ab jetzt mit jedem Plan-Commit aktualisiert, damit ein neuer Chat den Stand aus dem Result-Bundle-Snapshot bestimmen kann.
+- Das UI-Beispiel in der Spezifikation wurde hinsichtlich der neuen Gesamtzahl angepasst.
+- Die Testausführungsregel wurde plattformgerecht präzisiert: Termux-Commit-Skripte auf Christians Pixel laufen ohne künstliche Einzeltest- oder Gesamtsuite-Timeouts; produktinterne Timeout-Verträge sowie CI- und Release-Grenzen bleiben bestehen.
+- Alle fachlichen 1.1.1-Produktfunktionen bleiben unverändert.
 
 ### Added
 
