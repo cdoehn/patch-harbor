@@ -4,7 +4,6 @@ from pathlib import Path
 
 import pytest
 
-from patchharbor.errors import ExitCode, PatchHarborError
 from patchharbor.locks import registry_lock
 from patchharbor.models import RegistrySnapshot
 from patchharbor.path_configuration import (
@@ -75,7 +74,7 @@ def test_watcher_input_may_contain_a_registered_repository_because_scan_is_flat(
 
 
 @pytest.mark.parametrize("relationship", ["inside", "contains"])
-def test_result_directory_rejects_overlap_with_configured_watcher_input(
+def test_explicit_result_target_ignores_legacy_watcher_overlap_configuration(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     relationship: str,
@@ -86,10 +85,9 @@ def test_result_directory_rejects_overlap_with_configured_watcher_input(
     prepare_watcher_input_directory(watcher)
     result = watcher / "results" if relationship == "inside" else tmp_path
 
-    with pytest.raises(PatchHarborError) as captured:
-        _prepare_result_directory(result)
+    _prepare_result_directory(result)
 
-    assert captured.value.exit_code is ExitCode.RESULT_BUNDLE_ERROR
+    assert result.is_dir()
 
 
 def test_watcher_input_rejects_default_result_directory_before_first_bundle(
@@ -105,22 +103,25 @@ def test_watcher_input_rejects_default_result_directory_before_first_bundle(
 
 
 @pytest.mark.parametrize("relationship", ["inside", "contains"])
-def test_watcher_input_rejects_overlap_with_recorded_result_directory(
+def test_explicit_result_target_is_not_recorded_as_legacy_watcher_policy(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     relationship: str,
 ) -> None:
     set_isolated_user_environment(monkeypatch, tmp_path / "user")
-    result = tmp_path / "results"
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    result = workspace / "results"
     _prepare_result_directory(result)
     if relationship == "inside":
         watcher = result / "incoming"
         watcher.mkdir()
     else:
-        watcher = tmp_path
+        watcher = workspace
 
-    with pytest.raises(PathConfigurationError):
-        prepare_watcher_input_directory(watcher)
+    prepared = prepare_watcher_input_directory(watcher)
+
+    assert prepared.directory == watcher.resolve()
 
 
 def test_registration_ignores_legacy_watcher_overlap_configuration(
@@ -176,7 +177,7 @@ def test_registration_ignores_legacy_result_directory_configuration(
     ).strip() == str(repo_id)
 
 
-def test_watcher_and_result_directories_are_persisted_canonically(
+def test_only_legacy_watcher_directory_is_persisted_canonically(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -190,10 +191,10 @@ def test_watcher_and_result_directories_are_persisted_canonically(
     configured = load_configured_paths(registration_user_paths())
 
     assert configured.watcher_input_directories == (incoming.resolve(),)
-    assert set(configured.result_directories) == {
+    assert configured.result_directories == (
         registration_user_paths().result_directory.resolve(),
-        result.resolve(),
-    }
+    )
+    assert result.is_dir()
     assert prepared.directory == incoming.resolve()
     assert prepared.state_path.parent == registration_user_paths().watcher_state_directory
 

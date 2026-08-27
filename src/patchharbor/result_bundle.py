@@ -442,7 +442,7 @@ def create_manual_result_bundle(
                 resolved_repository = repository
                 resolved_repo_id = repo_id
                 target = prepare_result_bundle_target(
-                    output_directory or paths.result_directory,
+                    output_directory,
                     registry_snapshot,
                     paths,
                     filename=filename,

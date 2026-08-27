@@ -31,6 +31,12 @@ from tests.registration_support import (
 pytestmark = pytest.mark.acceptance
 
 
+def _exchange_directory(environment: dict[str, str]) -> Path:
+    if "APPDATA" in environment:
+        return Path(environment["APPDATA"]).parent / "exchange"
+    return Path(environment["XDG_CONFIG_HOME"]).parent / "exchange"
+
+
 def _register_and_context(
     repository: Path,
     environment: dict[str, str],
@@ -41,6 +47,14 @@ def _register_and_context(
         environment_overrides=environment,
     )
     assert registered.returncode == 0
+    configured = run_cli(
+        repository,
+        "configure",
+        "exchange-directory",
+        str(_exchange_directory(environment)),
+        environment_overrides=environment,
+    )
+    assert configured.returncode == 0
 
     completed = run_cli(
         repository,
@@ -103,19 +117,17 @@ def test_v110_acceptance_complete_repository_workflow(tmp_path: Path) -> None:
     environment = isolated_user_environment(tmp_path / "user")
     context = _register_and_context(repository, environment)
 
-    manual_results = tmp_path / "manual-results"
     manual = run_cli(
         repository,
         "bundle",
         "--json",
-        "--output-dir",
-        str(manual_results),
         environment_overrides=environment,
         timeout_seconds=120,
     )
     assert manual.returncode == 0
     manual_envelope = json.loads(manual.stdout)
     manual_bundle = Path(manual_envelope["result"]["result_bundle_path"])
+    assert manual_bundle.parent == _exchange_directory(environment).resolve()
     assert manual_bundle.is_file()
     with zipfile.ZipFile(manual_bundle) as archive:
         initial_bundle_context = json.loads(archive.read("context.json"))

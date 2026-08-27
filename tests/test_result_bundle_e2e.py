@@ -20,6 +20,7 @@ import patchharbor.temporary_resources as temporary_resources_module
 import patchharbor.result_bundle_capture as result_bundle_capture_module
 import patchharbor.result_bundle_publication as result_bundle_publication_module
 from patchharbor.cli import main as cli_main
+from patchharbor.configuration import load_configuration
 from patchharbor.errors import ExitCode, PatchHarborError
 from patchharbor.platform.filesystem import MetadataSyncStatus
 from patchharbor.result_bundle import create_manual_result_bundle
@@ -29,6 +30,8 @@ from tests.registration_support import (
     create_repository,
     git,
     isolated_user_environment,
+    user_configuration_path,
+    write_exchange_configuration,
     probe_repository_lock,
     release_repository_lock_holder,
     start_repository_lock_holder,
@@ -44,8 +47,10 @@ def isolate_bundle_environment(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    for name, value in isolated_user_environment(tmp_path / "user").items():
+    environment = isolated_user_environment(tmp_path / "user")
+    for name, value in environment.items():
         monkeypatch.setenv(name, value)
+    write_exchange_configuration(environment, tmp_path / "exchange")
     system_temp = tmp_path / "system-temp"
     system_temp.mkdir()
     for name in ("TMPDIR", "TEMP", "TMP"):
@@ -58,9 +63,9 @@ def isolate_bundle_environment(
 
 
 def _result_bundles() -> tuple[Path, ...]:
-    directory = registration_user_paths().result_directory
-    if not directory.exists():
-        return ()
+    directory = load_configuration(
+        registration_user_paths()
+    ).exchange_directory
     return tuple(sorted(directory.glob("patchharbor_result_*.zip")))
 
 
@@ -185,6 +190,7 @@ def test_manual_bundle_materializes_committed_blobs_without_export_rules(
     completed = run_cli(invocation_directory, "bundle", *arguments)
 
     assert completed.returncode == 0
+    assert not registration_user_paths().path_configuration_path.exists()
     bundles = _result_bundles()
     assert len(bundles) == 1
     with zipfile.ZipFile(bundles[0]) as archive:
@@ -355,6 +361,87 @@ def test_manual_bundle_structured_outputs_do_not_capture_secret_environment(
     result_path = Path(json.loads(completed.stdout)["result"]["result_bundle_path"])
     with zipfile.ZipFile(result_path) as archive:
         assert secret.encode("utf-8") not in archive.read("logs/run.json")
+
+
+@pytest.mark.parametrize(
+    ("configuration_state", "expected_message"),
+    (
+        ("missing", "configuration does not exist"),
+        (
+            "invalid",
+            "configuration must contain exactly the two format-1 fields",
+        ),
+    ),
+)
+def test_manual_bundle_requires_valid_exchange_configuration_without_override(
+    tmp_path: Path,
+    configuration_state: str,
+    expected_message: str,
+) -> None:
+    repository = create_repository(tmp_path / "repository")
+    assert run_cli(repository, "register").returncode == 0
+    paths = registration_user_paths()
+    exchange = load_configuration(paths).exchange_directory
+    if configuration_state == "missing":
+        paths.configuration_path.unlink()
+    else:
+        paths.configuration_path.write_text("{}\n", encoding="utf-8")
+    paths.path_configuration_path.write_text(
+        '{"result_directories":["/legacy"],"watcher_input_directories":[]}\n',
+        encoding="utf-8",
+    )
+
+    completed = run_cli(repository, "bundle", "--json")
+
+    assert completed.returncode == int(ExitCode.RESULT_BUNDLE_ERROR)
+    envelope = json.loads(completed.stdout)
+    assert envelope["success"] is False
+    assert envelope["error"]["kind"] == "configuration_error"
+    assert envelope["error"]["message"] == expected_message
+    assert envelope["error"]["patchharbor_error_code"] == int(
+        ExitCode.RESULT_BUNDLE_ERROR
+    )
+    emergency_path = Path(
+        envelope["error"]["emergency_diagnostics_path"]
+    )
+    run = json.loads(
+        (emergency_path / "run.json").read_text(encoding="utf-8")
+    )
+    assert run["repository_resolved"] is True
+    assert run["primary_result"]["kind"] == "validation_error"
+    assert run["result_bundle"]["status"] == "failed"
+    assert not tuple(exchange.glob("patchharbor_result_*.zip"))
+
+
+@pytest.mark.parametrize("configuration_state", ("missing", "invalid"))
+def test_manual_bundle_explicit_output_ignores_exchange_configuration(
+    tmp_path: Path,
+    configuration_state: str,
+) -> None:
+    repository = create_repository(tmp_path / "repository")
+    assert run_cli(repository, "register").returncode == 0
+    paths = registration_user_paths()
+    if configuration_state == "missing":
+        paths.configuration_path.unlink()
+    else:
+        paths.configuration_path.write_text("{}\n", encoding="utf-8")
+    paths.path_configuration_path.write_text("not-json\n", encoding="utf-8")
+    output_directory = tmp_path / "explicit-results"
+
+    completed = run_cli(
+        repository,
+        "bundle",
+        "--json",
+        "--output-dir",
+        str(output_directory),
+    )
+
+    assert completed.returncode == 0
+    result_path = Path(
+        json.loads(completed.stdout)["result"]["result_bundle_path"]
+    )
+    assert result_path.parent == output_directory.resolve()
+    assert result_path.is_file()
 
 
 def test_manual_bundle_failure_returns_exit_11_and_emergency_run_report(
@@ -1003,6 +1090,34 @@ def test_manual_bundle_reports_best_effort_sync_outcomes(
         result.publication_durability.directory_after_replace
         is MetadataSyncStatus.FAILED
     )
+
+
+def test_manual_bundle_rejects_exchange_configuration_retargeted_during_capture(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repository = create_repository(tmp_path / "repository")
+    assert run_cli(repository, "register").returncode == 0
+    paths = registration_user_paths()
+    original_exchange = load_configuration(paths).exchange_directory
+    alternate_exchange = tmp_path / "alternate-exchange"
+    environment = isolated_user_environment(tmp_path / "user")
+
+    def retarget_exchange_directory() -> None:
+        write_exchange_configuration(environment, alternate_exchange)
+
+    _synchronize_after_base_capture(monkeypatch, retarget_exchange_directory)
+
+    with pytest.raises(PatchHarborError) as captured:
+        create_manual_result_bundle(repository)
+
+    assert captured.value.exit_code == ExitCode.RESULT_BUNDLE_ERROR
+    assert captured.value.error_kind.value == "configuration_error"
+    assert str(captured.value) == (
+        "exchange directory changed during Result Bundle preparation"
+    )
+    assert not tuple(original_exchange.glob("patchharbor_result_*.zip"))
+    assert not tuple(alternate_exchange.glob("patchharbor_result_*.zip"))
 
 
 def test_manual_bundle_rejects_output_directory_retargeted_during_capture(

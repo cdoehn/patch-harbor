@@ -986,7 +986,10 @@ def test_matching_package_preflights_private_entrypoint_and_payload_bytes(
         entrypoint=entrypoint,
         payloads=(payload,),
     )
-    with preflight_patch_package_repository(package) as mutation_gate:
+    with preflight_patch_package_repository(
+        package,
+        output_directory=tmp_path / "results",
+    ) as mutation_gate:
         prepared = mutation_gate.prepared_package
         entrypoint_path = prepared.entrypoint.path
 
@@ -1041,6 +1044,7 @@ def test_private_entrypoint_uses_the_resolved_interpreter_suffix(
 
     with preflight_patch_package_repository(
         _package(_manifest(context)),
+        output_directory=tmp_path / "results",
     ) as mutation_gate:
         entrypoint_path = mutation_gate.prepared_package.entrypoint.path
         assert entrypoint_path.name == "script.ps1"
@@ -1067,6 +1071,7 @@ def test_apply_preflight_presents_resolved_repository_and_entrypoint_messages(
 
     with preflight_patch_package_repository(
         _package(_manifest(context), entrypoint=entrypoint),
+        output_directory=tmp_path / "results",
         presentation=presentation,
     ):
         pass
@@ -1121,7 +1126,8 @@ def test_entrypoint_preflight_rejects_invalid_scripts_without_repository_files(
                         content=b"payload",
                     ),
                 ),
-            )
+            ),
+            output_directory=tmp_path / "results",
         )
 
     assert captured.value.exit_code is expected_exit
@@ -1173,7 +1179,8 @@ def test_interpreter_availability_is_checked_before_private_writes(
                         content=b"payload",
                     ),
                 ),
-            )
+            ),
+            output_directory=tmp_path / "results",
         )
 
     assert captured.value.exit_code is ExitCode.INTERPRETER_ERROR

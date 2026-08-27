@@ -138,7 +138,7 @@ def safely_resolved_repository(
                 manifest.repo_id,
             )
             target = prepare_result_bundle_target(
-                output_directory or paths.result_directory,
+                output_directory,
                 initial_registry,
                 paths,
                 filename=result_bundle_filename(session),

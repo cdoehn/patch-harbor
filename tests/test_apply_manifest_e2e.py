@@ -98,6 +98,13 @@ def _registered_context(
         "register",
         environment_overrides=environment,
     ).returncode == 0
+    assert run_cli(
+        repository,
+        "configure",
+        "exchange-directory",
+        str(user_root / "exchange"),
+        environment_overrides=environment,
+    ).returncode == 0
     completed = run_cli(
         repository,
         "context",

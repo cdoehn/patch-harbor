@@ -20,6 +20,7 @@ from tests.platform_support import (
     run_cli,
 )
 from tests.registration_support import (
+    configured_exchange_directory,
     create_repository,
     git,
     isolated_user_environment,
@@ -28,6 +29,7 @@ from tests.registration_support import (
     release_repository_lock_holder,
     start_repository_lock_holder,
     stop_repository_lock_holder,
+    user_configuration_path,
 )
 
 
@@ -45,6 +47,14 @@ def _register_context(
         environment_overrides=environment,
     )
     assert registered.returncode == 0
+    configured = run_cli(
+        repository,
+        "configure",
+        "exchange-directory",
+        str(user_root / "exchange"),
+        environment_overrides=environment,
+    )
+    assert configured.returncode == 0
 
     completed = run_cli(
         repository,
@@ -136,16 +146,8 @@ def _run_dry_run(
     )
 
 
-def _result_directory(environment: dict[str, str]) -> Path:
-    if os.name == "nt":
-        return Path(environment["LOCALAPPDATA"]) / "PatchHarbor" / "results"
-    return Path(environment["XDG_STATE_HOME"]) / "patchharbor" / "results"
-
-
 def _result_bundles(environment: dict[str, str]) -> tuple[Path, ...]:
-    directory = _result_directory(environment)
-    if not directory.exists():
-        return ()
+    directory = configured_exchange_directory(environment)
     return tuple(sorted(directory.glob("patchharbor_result_*.zip")))
 
 
@@ -415,6 +417,104 @@ def test_matching_manifest_resolves_exact_registered_repository_without_mutation
     completed = _run_dry_run(package, tmp_path / "caller", environment)
 
     assert completed.returncode == 0
+    _assert_repository_unmodified(repository)
+    bundles = _result_bundles(environment)
+    assert len(bundles) == 1
+    assert bundles[0].parent == configured_exchange_directory(environment)
+    configuration_path = user_configuration_path(environment)
+    assert not (configuration_path.parent / "paths.json").exists()
+
+
+@pytest.mark.parametrize(
+    ("configuration_state", "expected_message"),
+    (
+        ("missing", "configuration does not exist"),
+        (
+            "invalid",
+            "configuration must contain exactly the two format-1 fields",
+        ),
+    ),
+)
+def test_apply_requires_valid_exchange_configuration_without_override(
+    tmp_path: Path,
+    configuration_state: str,
+    expected_message: str,
+) -> None:
+    repository = create_repository(tmp_path / "repository")
+    environment, context = _register_context(repository, tmp_path / "user")
+    package = tmp_path / "patch.zip"
+    _write_package(package, _manifest(context))
+    configuration_path = user_configuration_path(environment)
+    exchange = configured_exchange_directory(environment)
+    if configuration_state == "missing":
+        configuration_path.unlink()
+    else:
+        configuration_path.write_text("{}\n", encoding="utf-8")
+    (configuration_path.parent / "paths.json").write_text(
+        '{"result_directories":["/legacy"],"watcher_input_directories":[]}\n',
+        encoding="utf-8",
+    )
+
+    completed = _run_dry_run(
+        package,
+        tmp_path / "caller",
+        environment,
+        json_output=True,
+    )
+
+    assert completed.returncode == int(ExitCode.SOURCE_ERROR)
+    envelope = json.loads(completed.stdout)
+    assert envelope["success"] is False
+    assert envelope["error"]["kind"] == "configuration_error"
+    assert envelope["error"]["message"] == expected_message
+    assert envelope["error"]["patchharbor_error_code"] == int(
+        ExitCode.SOURCE_ERROR
+    )
+    result = envelope["result"]
+    assert result["repository_resolved"] is False
+    assert result["result_bundle"] == {
+        "attempted": False,
+        "status": "not_attempted",
+        "path": None,
+        "emergency_diagnostics_path": None,
+    }
+    assert not tuple(exchange.glob("patchharbor_result_*.zip"))
+    _assert_repository_unmodified(repository)
+
+
+@pytest.mark.parametrize("configuration_state", ("missing", "invalid"))
+def test_apply_explicit_output_ignores_exchange_configuration(
+    tmp_path: Path,
+    configuration_state: str,
+) -> None:
+    repository = create_repository(tmp_path / "repository")
+    environment, context = _register_context(repository, tmp_path / "user")
+    package = tmp_path / "patch.zip"
+    _write_package(package, _manifest(context))
+    configuration_path = user_configuration_path(environment)
+    if configuration_state == "missing":
+        configuration_path.unlink()
+    else:
+        configuration_path.write_text("{}\n", encoding="utf-8")
+    (configuration_path.parent / "paths.json").write_text(
+        "not-json\n",
+        encoding="utf-8",
+    )
+    output_directory = tmp_path / "explicit-results"
+
+    completed = _run_dry_run(
+        package,
+        tmp_path / "caller",
+        environment,
+        json_output=True,
+        output_directory=output_directory,
+    )
+
+    assert completed.returncode == 0
+    result = json.loads(completed.stdout)["result"]
+    bundle_path = Path(result["result_bundle"]["path"])
+    assert bundle_path.parent == output_directory.resolve()
+    assert bundle_path.is_file()
     _assert_repository_unmodified(repository)
 
 

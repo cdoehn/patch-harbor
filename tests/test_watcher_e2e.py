@@ -78,6 +78,14 @@ def test_watcher_delegation_is_stopped_by_the_core_repository_lock(
         environment_overrides=environment,
     )
     assert registered.returncode == 0
+    configured = run_cli(
+        repository,
+        "configure",
+        "exchange-directory",
+        str(tmp_path / "exchange"),
+        environment_overrides=environment,
+    )
+    assert configured.returncode == 0
     context_completed = run_cli(
         repository,
         "context",

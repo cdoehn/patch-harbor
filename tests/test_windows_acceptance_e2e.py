@@ -74,6 +74,16 @@ def _register_context(
         timeout_seconds=120,
     )
     assert registered.returncode == 0
+    exchange = Path(environment["APPDATA"]).parent / "exchange"
+    configured = run_cli(
+        repository,
+        "configure",
+        "exchange-directory",
+        str(exchange),
+        environment_overrides=environment,
+        timeout_seconds=120,
+    )
+    assert configured.returncode == 0
 
     completed = run_cli(
         repository,
@@ -187,6 +197,7 @@ def test_windows_user_paths_json_and_repository_lock_are_native(
     configuration = Path(environment["APPDATA"]) / "PatchHarbor"
     state = Path(environment["LOCALAPPDATA"]) / "PatchHarbor"
     assert (configuration / "registry.json").is_file()
+    assert (configuration / "config.json").is_file()
     assert (state / "locks").is_dir()
     assert normalized_path(context["repository_path"]) == normalized_path(
         repository
@@ -225,7 +236,7 @@ def test_windows_user_paths_json_and_repository_lock_are_native(
     assert bundled.returncode == 0
     bundle_document = json.loads(bundled.stdout)
     bundle_path = Path(bundle_document["result"]["result_bundle_path"])
-    assert bundle_path.parent.resolve() == (state / "results").resolve()
+    assert bundle_path.parent.resolve() == (tmp_path / "benutzer-ä" / "exchange").resolve()
     assert bundle_path.is_file()
 
 

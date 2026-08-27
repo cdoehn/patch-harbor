@@ -13,6 +13,7 @@ from patchharbor.apply_mutation import (
     MutationFailureKind,
     apply_payload_mutation,
 )
+from patchharbor.configuration import write_exchange_directory
 from patchharbor.errors import ExitCode
 from patchharbor.models import BundlePayload, RepositoryContext
 from patchharbor.patch_manifest import (
@@ -22,6 +23,7 @@ from patchharbor.patch_manifest import (
 )
 from patchharbor.patch_package import ValidatedPatchPackage
 from patchharbor.payload_files import PayloadTargetError, PayloadWriteError
+from patchharbor.user_paths import registration_user_paths
 from tests.platform_support import project_environment
 from tests.registration_support import (
     create_repository,
@@ -54,11 +56,19 @@ def _package(
     )
 
 
+def _configure_exchange(tmp_path: Path) -> None:
+    write_exchange_directory(
+        registration_user_paths(),
+        tmp_path / "exchange",
+    )
+
+
 def test_mutation_boundary_rechecks_and_writes_while_repository_is_locked(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     set_isolated_user_environment(monkeypatch, tmp_path / "user")
+    _configure_exchange(tmp_path)
     repository = create_repository(tmp_path / "repository")
     context = register_repository(repository)
     payload = BundlePayload("files/payload.bin", b"payload")
@@ -99,6 +109,7 @@ def test_mutation_boundary_reports_changed_state_without_payload_write(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     set_isolated_user_environment(monkeypatch, tmp_path / "user")
+    _configure_exchange(tmp_path)
     repository = create_repository(tmp_path / "repository")
     context = register_repository(repository)
     package = _package(
@@ -133,6 +144,7 @@ def test_mutation_boundary_keeps_target_and_write_failures_distinct(
     expected_kind: MutationFailureKind,
 ) -> None:
     set_isolated_user_environment(monkeypatch, tmp_path / "user")
+    _configure_exchange(tmp_path)
     repository = create_repository(tmp_path / "repository")
     context = register_repository(repository)
     package = _package(

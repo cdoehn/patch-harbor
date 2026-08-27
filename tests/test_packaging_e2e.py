@@ -581,6 +581,19 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
     )
     assert registered.returncode == 0
 
+    exchange_directory = tmp_path / "exchange"
+    configured_exchange = _run(
+        [
+            str(executable),
+            "configure",
+            "exchange-directory",
+            str(exchange_directory),
+        ],
+        cwd=empty_workdir,
+        environment=runtime_environment,
+    )
+    assert configured_exchange.returncode == 0
+
     context = _successful_json_result(
         _run(
             [str(executable), "context", "--json", str(repository)],
@@ -596,8 +609,6 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
                 str(executable),
                 "bundle",
                 "--json",
-                "--output-dir",
-                str(tmp_path / "manual-results"),
                 str(repository),
             ],
             cwd=empty_workdir,
@@ -605,6 +616,7 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
         )
     )
     manual_bundle = Path(str(manual_result["result_bundle_path"]))
+    assert manual_bundle.parent == exchange_directory.resolve()
     assert manual_bundle.is_file()
     with zipfile.ZipFile(manual_bundle) as archive:
         assert archive.read("base/tracked.txt") == b"release-base\n"
@@ -643,8 +655,6 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
                 "--no-color",
                 "--timeout",
                 "30",
-                "--output-dir",
-                str(tmp_path / "apply-results"),
                 str(package_path),
             ],
             cwd=empty_workdir,
@@ -660,6 +670,7 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
     ) == "entrypoint-ok"
     assert not (repository / entrypoint_name).exists()
     apply_bundle = Path(str(apply_result["result_bundle"]["path"]))
+    assert apply_bundle.parent == exchange_directory.resolve()
     assert apply_bundle.is_file()
     with zipfile.ZipFile(apply_bundle) as archive:
         assert "logs/execution.log" in archive.namelist()

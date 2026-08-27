@@ -94,6 +94,20 @@ def test_runtime_module_inventory_matches_the_release_architecture() -> None:
     assert not (PROJECT_ROOT / "src" / "promptbridge").exists()
 
 
+def test_result_bundle_defaults_use_shared_configuration_not_legacy_paths() -> None:
+    target_source = (
+        CORE_PACKAGE_ROOT / "result_bundle_target.py"
+    ).read_text(encoding="utf-8")
+    assert "from patchharbor.configuration import" in target_source
+    assert "from patchharbor.path_configuration import" not in target_source
+    assert "load_configuration" in target_source
+    assert "uses_exchange_directory" in target_source
+
+    for relative_path in ("apply_repository.py", "result_bundle.py"):
+        source = (CORE_PACKAGE_ROOT / relative_path).read_text(encoding="utf-8")
+        assert "paths.result_directory" not in source
+
+
 def test_release_entry_point_and_runtime_dependency_contract_are_exact() -> None:
     project = tomllib.loads(
         (PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8")

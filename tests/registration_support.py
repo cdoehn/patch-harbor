@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 import subprocess
@@ -66,6 +67,46 @@ def isolated_user_environment(root: Path) -> dict[str, str]:
         "XDG_CONFIG_HOME": str(root / "config"),
         "XDG_STATE_HOME": str(root / "state"),
     }
+
+
+def user_configuration_path(environment: dict[str, str]) -> Path:
+    """Return the isolated shared config.json path for one test environment."""
+    if os.name == "nt":
+        return Path(environment["APPDATA"]) / "PatchHarbor" / "config.json"
+    return Path(environment["XDG_CONFIG_HOME"]) / "patchharbor" / "config.json"
+
+
+def configured_exchange_directory(environment: dict[str, str]) -> Path:
+    """Read the canonical exchange directory from one test config.json."""
+    document = json.loads(
+        user_configuration_path(environment).read_text(encoding="utf-8")
+    )
+    return Path(document["exchange_directory"])
+
+
+def write_exchange_configuration(
+    environment: dict[str, str],
+    directory: Path,
+) -> Path:
+    """Create one exact format-1 exchange configuration for subprocess tests."""
+    directory.mkdir(parents=True, exist_ok=True)
+    canonical = directory.resolve()
+    path = user_configuration_path(environment)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(
+            {
+                "exchange_directory": str(canonical),
+                "format_version": 1,
+            },
+            ensure_ascii=False,
+            allow_nan=False,
+            separators=(",", ":"),
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    return canonical
 
 
 def set_isolated_user_environment(
