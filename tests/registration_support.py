@@ -84,6 +84,15 @@ def configured_exchange_directory(environment: dict[str, str]) -> Path:
     return Path(document["exchange_directory"])
 
 
+def exchange_state_path(environment: dict[str, str]) -> Path:
+    """Return the shared persistent Exchange processing document."""
+    if os.name == "nt":
+        state = Path(environment["LOCALAPPDATA"]) / "PatchHarbor"
+    else:
+        state = Path(environment["XDG_STATE_HOME"]) / "patchharbor"
+    return state / "exchange" / "state.json"
+
+
 def write_exchange_configuration(
     environment: dict[str, str],
     directory: Path,

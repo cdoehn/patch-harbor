@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum, auto
+from hashlib import sha256
 import errno
 import os
 from pathlib import Path
@@ -46,6 +47,16 @@ class StableRegularFile:
 
     content: bytes
     executable: bool
+
+
+@dataclass(frozen=True, slots=True)
+class StableRegularFileHash:
+    """Stable full-file identity with content retained only below one limit."""
+
+    content: bytes | None
+    executable: bool
+    size: int
+    sha256: str
 
 
 class FileSystemOperationError(OSError):
@@ -192,8 +203,12 @@ def _regular_path_metadata(path: Path) -> os.stat_result:
     return metadata
 
 
-def read_stable_regular_file(path: Path) -> StableRegularFile:
-    """Read one regular file without following links and reject path races."""
+def _read_stable_regular_file(
+    path: Path,
+    *,
+    retained_content_limit: int | None,
+    calculate_sha256: bool,
+) -> tuple[bytes | None, bool, int, str | None]:
     initial_metadata = _regular_path_metadata(path)
 
     flags = os.O_RDONLY
@@ -213,9 +228,23 @@ def read_stable_regular_file(path: Path) -> StableRegularFile:
         if not _same_path_and_open_file_state(current_metadata, opened_metadata):
             raise FileChangedDuringRead
 
+        hasher = sha256() if calculate_sha256 else None
+        retained: bytearray | None = bytearray()
+        size = 0
         with os.fdopen(descriptor, "rb", closefd=True) as handle:
             descriptor = None
-            content = handle.read()
+            while chunk := handle.read(1024 * 1024):
+                size += len(chunk)
+                if hasher is not None:
+                    hasher.update(chunk)
+                if retained is not None:
+                    if (
+                        retained_content_limit is None
+                        or size <= retained_content_limit
+                    ):
+                        retained.extend(chunk)
+                    else:
+                        retained = None
             finished_metadata = os.fstat(handle.fileno())
     except (FileChangedDuringRead, UnsupportedFileTypeError):
         raise
@@ -232,13 +261,54 @@ def read_stable_regular_file(path: Path) -> StableRegularFile:
     if (
         not _same_open_file_state(opened_metadata, finished_metadata)
         or not _same_path_and_open_file_state(final_metadata, finished_metadata)
-        or len(content) != finished_metadata.st_size
+        or size != finished_metadata.st_size
     ):
         raise FileChangedDuringRead
 
-    return StableRegularFile(
+    return (
+        bytes(retained) if retained is not None else None,
+        bool(finished_metadata.st_mode & 0o111),
+        size,
+        hasher.hexdigest() if hasher is not None else None,
+    )
+
+
+def read_stable_regular_file(path: Path) -> StableRegularFile:
+    """Read one regular file without following links and reject path races."""
+    content, executable, _size, _digest = _read_stable_regular_file(
+        path,
+        retained_content_limit=None,
+        calculate_sha256=False,
+    )
+    if content is None:
+        raise RuntimeError("unlimited stable file read discarded its content")
+    return StableRegularFile(content=content, executable=executable)
+
+
+def read_stable_regular_file_with_sha256(
+    path: Path,
+    *,
+    retained_content_limit: int,
+) -> StableRegularFileHash:
+    """Hash a stable regular file while bounding retained in-memory content."""
+    if (
+        isinstance(retained_content_limit, bool)
+        or not isinstance(retained_content_limit, int)
+        or retained_content_limit <= 0
+    ):
+        raise ValueError("retained_content_limit must be a positive integer")
+    content, executable, size, digest = _read_stable_regular_file(
+        path,
+        retained_content_limit=retained_content_limit,
+        calculate_sha256=True,
+    )
+    if digest is None:
+        raise RuntimeError("stable hashed file read did not produce a digest")
+    return StableRegularFileHash(
         content=content,
-        executable=bool(finished_metadata.st_mode & 0o111),
+        executable=executable,
+        size=size,
+        sha256=digest,
     )
 
 

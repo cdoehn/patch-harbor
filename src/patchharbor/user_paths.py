@@ -47,6 +47,21 @@ class RegistrationUserPaths:
         return self.state_directory / "results"
 
     @property
+    def exchange_state_directory(self) -> Path:
+        """Return the directory containing shared Exchange processing state."""
+        return self.state_directory / "exchange"
+
+    @property
+    def exchange_state_path(self) -> Path:
+        """Return the atomically replaced Exchange processing document."""
+        return self.exchange_state_directory / "state.json"
+
+    @property
+    def exchange_state_lock_path(self) -> Path:
+        """Return the shared Exchange processing lock file."""
+        return self.lock_directory / "exchange.lock"
+
+    @property
     def watcher_state_directory(self) -> Path:
         """Return the directory containing persistent watcher state."""
         return self.state_directory / "watcher"

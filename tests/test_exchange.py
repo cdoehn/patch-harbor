@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from hashlib import sha256
 import json
 import os
 from pathlib import Path
@@ -7,14 +8,20 @@ import zipfile
 
 import pytest
 
+import patchharbor.exchange as exchange_module
+from patchharbor.errors import PatchHarborError
 from patchharbor.exchange import (
     ExchangeArtifactKind,
     ExchangeScanError,
     classify_exchange_artifact,
+    materialize_exchange_patch,
     scan_exchange_directory,
 )
 from patchharbor.patch_manifest import PATCH_FORMAT_VERSION, PATCH_MARKER
+from patchharbor.resource_policy import ResourcePolicy
 from patchharbor.state_fingerprint import FINGERPRINT_ALGORITHM
+from patchharbor.user_paths import registration_user_paths
+from tests.registration_support import set_isolated_user_environment
 
 
 _MANIFEST = {
@@ -115,3 +122,77 @@ def test_flat_scan_skips_temporary_nonregular_and_nested_entries(
 def test_scan_reports_an_unreadable_or_missing_directory(tmp_path: Path) -> None:
     with pytest.raises(ExchangeScanError, match="cannot scan exchange directory"):
         scan_exchange_directory(tmp_path / "missing")
+
+
+def test_persistent_classification_cache_is_reused_only_for_same_identity(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    set_isolated_user_environment(monkeypatch, tmp_path / "user")
+    paths = registration_user_paths()
+    patch = tmp_path / "patch.package"
+    _write_patch(patch)
+
+    first = scan_exchange_directory(tmp_path, paths=paths)
+    assert first[0].kind is ExchangeArtifactKind.PATCH_PACKAGE
+
+    def fail_reclassification(*_args: object, **_kwargs: object):
+        raise AssertionError("unchanged identity was reclassified")
+
+    monkeypatch.setattr(exchange_module, "_classify_content", fail_reclassification)
+    cached = scan_exchange_directory(tmp_path, paths=paths)
+    assert cached[0].identity == first[0].identity
+    assert cached[0].package is None
+
+    patch.write_bytes(patch.read_bytes() + b"changed")
+    with pytest.raises(AssertionError, match="reclassified"):
+        scan_exchange_directory(tmp_path, paths=paths)
+
+
+def test_selected_patch_is_reopened_and_rejected_after_byte_replacement(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    set_isolated_user_environment(monkeypatch, tmp_path / "user")
+    paths = registration_user_paths()
+    patch = tmp_path / "patch.package"
+    _write_patch(patch)
+    selected = scan_exchange_directory(tmp_path, paths=paths)[0]
+    original_identity = selected.identity
+
+    patch.write_bytes(patch.read_bytes() + b"replacement")
+
+    with pytest.raises(
+        PatchHarborError,
+        match="selected exchange patch changed during automatic discovery",
+    ):
+        materialize_exchange_patch(selected, directory=tmp_path.resolve())
+
+    assert patch.is_file()
+    state = exchange_module.load_exchange_state(paths)
+    original_record = state.record_for(original_identity)
+    assert original_record is not None and original_record.attempted is False
+
+
+def test_oversized_exchange_file_is_hashed_without_retaining_or_parsing_bytes(
+    tmp_path: Path,
+) -> None:
+    artifact_path = tmp_path / "large-download.bin"
+    artifact_path.write_bytes(b"0123456789abcdef")
+    policy = ResourcePolicy(
+        warning_bytes=4,
+        max_input_artifact_bytes=8,
+        max_content_bytes=8,
+        max_zip_total_bytes=16,
+        max_zip_entries=10,
+    )
+
+    artifact = classify_exchange_artifact(
+        artifact_path,
+        resource_policy=policy,
+    )
+
+    assert artifact.kind is ExchangeArtifactKind.OTHER
+    assert artifact.identity.sha256 == sha256(
+        artifact_path.read_bytes()
+    ).hexdigest()

@@ -24,6 +24,7 @@ EXPECTED_CORE_RUNTIME_FILES = {
     "execution.py",
     "exchange.py",
     "exchange_paths.py",
+    "exchange_state.py",
     "git_capture.py",
     "git_objects.py",
     "git_patches.py",
@@ -218,3 +219,43 @@ def test_v111_commit_plan_has_one_consistent_consolidated_sequence() -> None:
         "künstlichen Einzeltest- oder Gesamtsuite-Timeout"
     ) in specification
     assert "führt die zur Änderung passenden Tests mit harten Timeouts aus" not in specification
+
+
+def test_exchange_attempt_state_is_core_owned_and_published_at_mutation_boundary() -> None:
+    state_source = (CORE_PACKAGE_ROOT / "exchange_state.py").read_text(
+        encoding="utf-8"
+    )
+    application_source = (CORE_PACKAGE_ROOT / "application.py").read_text(
+        encoding="utf-8"
+    )
+    mutation_source = (CORE_PACKAGE_ROOT / "apply_mutation.py").read_text(
+        encoding="utf-8"
+    )
+    exchange_source = (CORE_PACKAGE_ROOT / "exchange.py").read_text(
+        encoding="utf-8"
+    )
+    user_paths_source = (CORE_PACKAGE_ROOT / "user_paths.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert "ExchangeFileIdentity" in state_source
+    assert "mark_exchange_attempted" in state_source
+    assert '"sha256"' in state_source
+    assert '"attempted"' in state_source
+    assert "atomic_replace_bytes" in state_source
+    assert "mark_exchange_attempted" in application_source
+    assert "before_mutation" in mutation_source
+    assert "read_stable_regular_file_with_sha256" in exchange_source
+    assert "exchange_state_path" in user_paths_source
+    assert "exchange_state_lock_path" in user_paths_source
+
+    forbidden_exchange_mutations = (
+        ".unlink(",
+        ".rename(",
+        ".replace(",
+        "shutil.move",
+        "os.remove",
+    )
+    assert not any(
+        operation in exchange_source for operation in forbidden_exchange_mutations
+    )

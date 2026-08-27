@@ -39,6 +39,7 @@ EXPECTED_RUNTIME_FILES = {
     "patchharbor/execution.py",
     "patchharbor/exchange.py",
     "patchharbor/exchange_paths.py",
+    "patchharbor/exchange_state.py",
     "patchharbor/git_capture.py",
     "patchharbor/git_objects.py",
     "patchharbor/git_patches.py",

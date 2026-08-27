@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
 
@@ -43,6 +44,7 @@ class ApplyMutationGate:
     package: ValidatedPatchPackage
     prepared_package: PreparedPatchPackage
     dry_run: bool
+    before_mutation: Callable[[], None] | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.dry_run, bool):
@@ -136,6 +138,9 @@ def apply_payload_mutation(
                 "repository changed after apply preflight"
             ),
         )
+
+    if mutation_gate.before_mutation is not None:
+        mutation_gate.before_mutation()
 
     try:
         # The mutation boundary deliberately starts again from the repository

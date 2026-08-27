@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from io import DEFAULT_BUFFER_SIZE
+from io import BytesIO, DEFAULT_BUFFER_SIZE
 from pathlib import Path
 import stat
 import zipfile
@@ -128,6 +128,14 @@ def _validate_input_artifact(path: Path, policy: ResourcePolicy) -> None:
         )
 
 
+def _validate_input_bytes(content: bytes, policy: ResourcePolicy) -> None:
+    if len(content) > policy.max_input_artifact_bytes:
+        raise ZipResourceLimitError(
+            "input artifact exceeds "
+            f"{policy.max_input_artifact_bytes} bytes"
+        )
+
+
 def _member_is_directory(entry: zipfile.ZipInfo) -> bool:
     if entry.create_system != 3:
         if entry.is_dir() and entry.file_size != 0:
@@ -183,26 +191,11 @@ def _validate_members(
     )
 
 
-def read_zip_payloads(
-    path: Path,
+def _read_open_archive(
+    archive: zipfile.ZipFile,
     *,
-    policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY,
+    policy: ResourcePolicy,
 ) -> tuple[BundlePayload, ...]:
-    """Fully validate and read every regular ZIP member in archive order."""
-    _validate_input_artifact(path, policy)
-    try:
-        archive = zipfile.ZipFile(path, "r")
-    except zipfile.BadZipFile as exc:
-        raise NotZipArchiveError("artifact is not a ZIP archive") from exc
-    except (
-        NotImplementedError,
-        OSError,
-        RuntimeError,
-        ValueError,
-        zipfile.LargeZipFile,
-    ) as exc:
-        raise ZipArchiveReadError(str(exc)) from exc
-
     try:
         with archive:
             entries = archive.infolist()
@@ -228,6 +221,41 @@ def read_zip_payloads(
         zipfile.LargeZipFile,
     ) as exc:
         raise ZipArchiveReadError(str(exc)) from exc
+
+
+def _open_archive(source: object) -> zipfile.ZipFile:
+    try:
+        return zipfile.ZipFile(source, "r")
+    except zipfile.BadZipFile as exc:
+        raise NotZipArchiveError("artifact is not a ZIP archive") from exc
+    except (
+        NotImplementedError,
+        OSError,
+        RuntimeError,
+        ValueError,
+        zipfile.LargeZipFile,
+    ) as exc:
+        raise ZipArchiveReadError(str(exc)) from exc
+
+
+def read_zip_payloads(
+    path: Path,
+    *,
+    policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY,
+) -> tuple[BundlePayload, ...]:
+    """Fully validate and read every regular ZIP member in archive order."""
+    _validate_input_artifact(path, policy)
+    return _read_open_archive(_open_archive(path), policy=policy)
+
+
+def read_zip_payload_bytes(
+    content: bytes,
+    *,
+    policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY,
+) -> tuple[BundlePayload, ...]:
+    """Validate ZIP bytes already captured through a stable file boundary."""
+    _validate_input_bytes(content, policy)
+    return _read_open_archive(_open_archive(BytesIO(content)), policy=policy)
 
 
 def zip_payload_warnings(

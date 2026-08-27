@@ -14,7 +14,7 @@ from patchharbor.apply_mutation import (
     apply_payload_mutation,
 )
 from patchharbor.configuration import write_exchange_directory
-from patchharbor.errors import ExitCode
+from patchharbor.errors import ExitCode, PatchHarborError, patch_package_error
 from patchharbor.models import BundlePayload, RepositoryContext
 from patchharbor.patch_manifest import (
     PATCH_FORMAT_VERSION,
@@ -173,4 +173,101 @@ def test_mutation_boundary_keeps_target_and_write_failures_distinct(
     assert result.error is not None
     assert result.error.exit_code is ExitCode.PAYLOAD_PREPARATION_ERROR
     assert result.context == context
+    assert not (repository / "payload.bin").exists()
+
+
+def test_attempt_publication_runs_after_state_check_and_before_payload_write(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    set_isolated_user_environment(monkeypatch, tmp_path / "user")
+    _configure_exchange(tmp_path)
+    repository = create_repository(tmp_path / "repository")
+    context = register_repository(repository)
+    target = repository / "payload.bin"
+    observations: list[tuple[bool, int]] = []
+
+    def publish_attempt() -> None:
+        observations.append(
+            (
+                target.exists(),
+                probe_repository_lock(
+                    str(context.repo_id),
+                    project_environment(),
+                ),
+            )
+        )
+
+    package = _package(
+        context,
+        payloads=(BundlePayload("payload.bin", b"payload"),),
+    )
+    with preflight_patch_package_repository(
+        package,
+        dry_run=False,
+        before_mutation=publish_attempt,
+    ) as gate:
+        result = apply_payload_mutation(gate)
+
+    assert result.success is True
+    assert observations == [(False, int(ExitCode.REPOSITORY_BUSY))]
+    assert target.read_bytes() == b"payload"
+
+
+def test_failed_attempt_publication_prevents_every_repository_write(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    set_isolated_user_environment(monkeypatch, tmp_path / "user")
+    _configure_exchange(tmp_path)
+    repository = create_repository(tmp_path / "repository")
+    context = register_repository(repository)
+    target = repository / "payload.bin"
+
+    def fail_attempt_publication() -> None:
+        assert not target.exists()
+        raise patch_package_error("cannot publish automatic attempt")
+
+    package = _package(
+        context,
+        payloads=(BundlePayload("payload.bin", b"payload"),),
+    )
+    with preflight_patch_package_repository(
+        package,
+        dry_run=False,
+        before_mutation=fail_attempt_publication,
+    ) as gate:
+        with pytest.raises(
+            PatchHarborError,
+            match="cannot publish automatic attempt",
+        ):
+            apply_payload_mutation(gate)
+
+    assert not target.exists()
+
+
+def test_state_mismatch_prevents_attempt_publication(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    set_isolated_user_environment(monkeypatch, tmp_path / "user")
+    _configure_exchange(tmp_path)
+    repository = create_repository(tmp_path / "repository")
+    context = register_repository(repository)
+    publications: list[bool] = []
+    package = _package(
+        context,
+        payloads=(BundlePayload("payload.bin", b"payload"),),
+    )
+
+    with preflight_patch_package_repository(
+        package,
+        dry_run=False,
+        before_mutation=lambda: publications.append(True),
+    ) as gate:
+        (repository / "external.txt").write_bytes(b"changed")
+        result = apply_payload_mutation(gate)
+
+    assert result.failure_kind is MutationFailureKind.STATE_MISMATCH
+    assert publications == []
     assert not (repository / "payload.bin").exists()

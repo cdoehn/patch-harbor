@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import errno
+from hashlib import sha256
 from pathlib import Path
 
 import pytest
@@ -14,6 +15,7 @@ from patchharbor.platform.filesystem import (
     UnsupportedFileTypeError,
     path_kind,
     read_stable_regular_file,
+    read_stable_regular_file_with_sha256,
     replace_path,
     sync_directory_best_effort,
     sync_regular_file_best_effort,
@@ -75,6 +77,28 @@ def test_stable_regular_file_reader_preserves_bytes_and_final_metadata(
 
     assert snapshot.content == content
     assert snapshot.executable is False
+
+
+def test_stable_hash_reader_bounds_retained_content_but_hashes_all_bytes(
+    tmp_path: Path,
+) -> None:
+    target = tmp_path / "large.bin"
+    content = b"0123456789abcdef"
+    target.write_bytes(content)
+
+    retained = read_stable_regular_file_with_sha256(
+        target,
+        retained_content_limit=len(content),
+    )
+    discarded = read_stable_regular_file_with_sha256(
+        target,
+        retained_content_limit=4,
+    )
+
+    assert retained.content == content
+    assert discarded.content is None
+    assert retained.size == discarded.size == len(content)
+    assert retained.sha256 == discarded.sha256 == sha256(content).hexdigest()
 
 
 def test_stable_regular_file_reader_rejects_non_regular_targets(

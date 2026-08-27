@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from hashlib import sha256
 import json
 import os
 from pathlib import Path
@@ -20,6 +21,8 @@ from tests.platform_support import (
 from tests.registration_support import (
     configured_exchange_directory,
     create_repository,
+    exchange_state_path,
+    git,
     isolated_user_environment,
     release_repository_lock_holder,
     start_repository_lock_holder,
@@ -106,6 +109,68 @@ def _write_package(
         )
         archive.writestr(entrypoint_name, entrypoint.encode("utf-8"))
         archive.writestr("files/generated.bin", b"payload")
+
+
+
+
+def _write_custom_package(
+    path: Path,
+    context: dict[str, object],
+    *,
+    posix_entrypoint: str,
+    powershell_entrypoint: str,
+    payloads: dict[str, bytes] | None = None,
+) -> None:
+    entrypoint_name = native_value("run.sh", "run.ps1")
+    entrypoint = native_script(posix_entrypoint, powershell_entrypoint)
+    with zipfile.ZipFile(path, "w") as archive:
+        archive.writestr(
+            "patch.json",
+            json.dumps(
+                _manifest(context),
+                ensure_ascii=False,
+                allow_nan=False,
+                separators=(",", ":"),
+            ).encode("utf-8"),
+        )
+        archive.writestr(entrypoint_name, entrypoint.encode("utf-8"))
+        for relative_path, content in (payloads or {}).items():
+            archive.writestr(relative_path, content)
+
+
+def _exchange_records(environment: dict[str, str]) -> list[dict[str, object]]:
+    document = json.loads(
+        exchange_state_path(environment).read_text(encoding="utf-8")
+    )
+    assert document["format_version"] == 1
+    records = document["entries"]
+    assert isinstance(records, list)
+    return records
+
+
+def _identity_record(
+    environment: dict[str, str],
+    path: Path,
+    content_hash: str | None = None,
+) -> dict[str, object]:
+    expected_hash = content_hash or sha256(path.read_bytes()).hexdigest()
+    matches = [
+        record
+        for record in _exchange_records(environment)
+        if record["path"] == str(path.resolve())
+        and record["sha256"] == expected_hash
+    ]
+    assert len(matches) == 1
+    return matches[0]
+
+
+def _ignore_automatic_outputs(repository: Path) -> None:
+    (repository / ".gitignore").write_text(
+        "automatic-result.txt\nautomatic-runs.txt\nfiles/\n",
+        encoding="utf-8",
+    )
+    git(repository, "add", ".gitignore")
+    git(repository, "commit", "--quiet", "-m", "ignore automatic outputs")
 
 
 def _write_result_bundle_marker(path: Path, *, include_patch: bool = False) -> None:
@@ -381,3 +446,213 @@ def test_automatic_selection_fails_closed_when_candidate_repository_is_busy(
     assert envelope["result"]["repository_resolved"] is False
     assert not tuple(exchange.glob("patchharbor_result_*.zip"))
     assert not (repository / "automatic-result.txt").exists()
+
+
+def test_dry_run_does_not_consume_but_automatic_apply_does(
+    tmp_path: Path,
+) -> None:
+    environment, exchange = _configure_user(tmp_path)
+    repository = create_repository(tmp_path / "repository")
+    _ignore_automatic_outputs(repository)
+    context = _register_context(repository, environment)
+    package = exchange / "retryable.package"
+    _write_custom_package(
+        package,
+        context,
+        posix_entrypoint="printf x >> automatic-runs.txt",
+        powershell_entrypoint=(
+            "[System.IO.File]::AppendAllText('automatic-runs.txt', 'x')"
+        ),
+        payloads={"files/generated.bin": b"payload"},
+    )
+
+    first_dry_run = _automatic_apply(
+        tmp_path / "dry-run-one",
+        environment,
+        dry_run=True,
+    )
+    second_dry_run = _automatic_apply(
+        tmp_path / "dry-run-two",
+        environment,
+        dry_run=True,
+    )
+
+    assert first_dry_run.returncode == 0
+    assert second_dry_run.returncode == 0
+    assert _identity_record(environment, package)["attempted"] is False
+    assert not (repository / "automatic-runs.txt").exists()
+
+    applied = _automatic_apply(tmp_path / "automatic", environment)
+
+    assert applied.returncode == 0
+    assert _identity_record(environment, package)["attempted"] is True
+    assert (repository / "automatic-runs.txt").read_text(encoding="utf-8") == "x"
+
+    repeated = _automatic_apply(tmp_path / "automatic-repeat", environment)
+    _assert_unresolved_selection_failure(
+        repeated,
+        message="no state-bound patch package matches a registered repository",
+    )
+    assert (repository / "automatic-runs.txt").read_text(encoding="utf-8") == "x"
+
+    explicit = run_cli(
+        tmp_path,
+        "apply",
+        "--json",
+        str(package),
+        environment_overrides=environment,
+        timeout_seconds=120,
+    )
+
+    assert explicit.returncode == 0
+    assert (repository / "automatic-runs.txt").read_text(encoding="utf-8") == "xx"
+    assert package.is_file()
+
+
+def test_changed_bytes_at_the_same_exchange_path_are_a_new_identity(
+    tmp_path: Path,
+) -> None:
+    environment, exchange = _configure_user(tmp_path)
+    repository = create_repository(tmp_path / "repository")
+    _ignore_automatic_outputs(repository)
+    context = _register_context(repository, environment)
+    package = exchange / "replaced.package"
+    _write_custom_package(
+        package,
+        context,
+        posix_entrypoint="printf 1 >> automatic-runs.txt",
+        powershell_entrypoint=(
+            "[System.IO.File]::AppendAllText('automatic-runs.txt', '1')"
+        ),
+    )
+    first_hash = sha256(package.read_bytes()).hexdigest()
+
+    first = _automatic_apply(tmp_path / "first", environment)
+    assert first.returncode == 0
+
+    _write_custom_package(
+        package,
+        context,
+        posix_entrypoint="printf 2 >> automatic-runs.txt",
+        powershell_entrypoint=(
+            "[System.IO.File]::AppendAllText('automatic-runs.txt', '2')"
+        ),
+    )
+    second_hash = sha256(package.read_bytes()).hexdigest()
+    assert second_hash != first_hash
+
+    second = _automatic_apply(tmp_path / "second", environment)
+
+    assert second.returncode == 0
+    assert (repository / "automatic-runs.txt").read_text(encoding="utf-8") == "12"
+    assert _identity_record(environment, package, first_hash)["attempted"] is True
+    assert _identity_record(environment, package, second_hash)["attempted"] is True
+    assert package.is_file()
+
+
+def test_preflight_failure_remains_retryable_without_attempt_mark(
+    tmp_path: Path,
+) -> None:
+    environment, exchange = _configure_user(tmp_path)
+    repository = create_repository(tmp_path / "repository")
+    context = _register_context(repository, environment)
+    package = exchange / "invalid-entrypoint.package"
+    entrypoint_name = native_value("run.sh", "run.ps1")
+    with zipfile.ZipFile(package, "w") as archive:
+        archive.writestr(
+            "patch.json",
+            json.dumps(_manifest(context), separators=(",", ":")).encode(
+                "utf-8"
+            ),
+        )
+        archive.writestr(entrypoint_name, b"not a PatchHarbor script\n")
+
+    first = _automatic_apply(tmp_path / "first", environment)
+    second = _automatic_apply(tmp_path / "second", environment)
+
+    assert first.returncode == int(ExitCode.NO_VALID_SCRIPT)
+    assert second.returncode == int(ExitCode.NO_VALID_SCRIPT)
+    assert _identity_record(environment, package)["attempted"] is False
+    assert package.is_file()
+
+
+def test_entrypoint_failure_consumes_automatic_identity(
+    tmp_path: Path,
+) -> None:
+    environment, exchange = _configure_user(tmp_path)
+    repository = create_repository(tmp_path / "repository")
+    _ignore_automatic_outputs(repository)
+    context = _register_context(repository, environment)
+    package = exchange / "entrypoint-failure.package"
+    _write_custom_package(
+        package,
+        context,
+        posix_entrypoint="printf x >> automatic-runs.txt\nexit 23",
+        powershell_entrypoint=(
+            "[System.IO.File]::AppendAllText('automatic-runs.txt', 'x')\n"
+            "exit 23"
+        ),
+    )
+
+    failed = _automatic_apply(tmp_path / "first", environment)
+
+    assert failed.returncode == 23
+    assert _identity_record(environment, package)["attempted"] is True
+    assert (repository / "automatic-runs.txt").read_text(encoding="utf-8") == "x"
+
+    repeated = _automatic_apply(tmp_path / "second", environment)
+    _assert_unresolved_selection_failure(
+        repeated,
+        message="no state-bound patch package matches a registered repository",
+    )
+    assert (repository / "automatic-runs.txt").read_text(encoding="utf-8") == "x"
+    assert package.is_file()
+
+
+def test_result_bundle_failure_still_consumes_automatic_identity(
+    tmp_path: Path,
+) -> None:
+    environment, exchange = _configure_user(tmp_path)
+    repository = create_repository(tmp_path / "repository")
+    _ignore_automatic_outputs(repository)
+    context = _register_context(repository, environment)
+    package = exchange / "bundle-failure.package"
+    output_directory = tmp_path / "results"
+    posix_output = str(output_directory).replace("'", "'\"'\"'")
+    powershell_output = str(output_directory).replace("'", "''")
+    _write_custom_package(
+        package,
+        context,
+        posix_entrypoint=(
+            "printf x >> automatic-runs.txt\n"
+            f"rm -rf -- '{posix_output}'\n"
+            f"printf blocked > '{posix_output}'"
+        ),
+        powershell_entrypoint=(
+            "[System.IO.File]::AppendAllText('automatic-runs.txt', 'x')\n"
+            f"Remove-Item -LiteralPath '{powershell_output}' -Recurse -Force\n"
+            f"[System.IO.File]::WriteAllText('{powershell_output}', 'blocked')"
+        ),
+    )
+
+    failed = run_cli(
+        tmp_path,
+        "apply",
+        "--json",
+        "--output-dir",
+        str(output_directory),
+        environment_overrides=environment,
+        timeout_seconds=120,
+    )
+
+    assert failed.returncode == int(ExitCode.RESULT_BUNDLE_ERROR)
+    assert _identity_record(environment, package)["attempted"] is True
+    assert (repository / "automatic-runs.txt").read_text(encoding="utf-8") == "x"
+    assert output_directory.is_file()
+
+    repeated = _automatic_apply(tmp_path / "second", environment)
+    _assert_unresolved_selection_failure(
+        repeated,
+        message="no state-bound patch package matches a registered repository",
+    )
+    assert package.is_file()

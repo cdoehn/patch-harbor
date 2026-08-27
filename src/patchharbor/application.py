@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import ExitStack, contextmanager
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TextIO
 
@@ -37,7 +38,13 @@ from patchharbor.exchange import (
     ExchangeArtifact,
     ExchangeArtifactKind,
     ExchangeScanError,
+    materialize_exchange_patch,
+    require_exchange_identity_unchanged,
     scan_exchange_directory,
+)
+from patchharbor.exchange_state import (
+    ExchangePatchSelection,
+    mark_exchange_attempted,
 )
 from patchharbor.exchange_paths import (
     ExchangePathPolicyError,
@@ -195,6 +202,53 @@ def _manifest_matches_context(
     )
 
 
+@dataclass(frozen=True, slots=True)
+class DiscoveredExchangePatch:
+    """One uniquely selected package plus its persistent attempt boundary."""
+
+    artifact: ExchangeArtifact
+    package: ValidatedPatchPackage
+    paths: RegistrationUserPaths
+    configuration: UserConfiguration
+
+    def __post_init__(self) -> None:
+        if self.artifact.selection is None:
+            raise ValueError("discovered Exchange patch requires selection data")
+        if self.artifact.attempted:
+            raise ValueError("discovered Exchange patch must be unattempted")
+        if (
+            self.artifact.selection
+            != ExchangePatchSelection.from_manifest(self.package.manifest)
+        ):
+            raise ValueError("discovered Exchange package changed after selection")
+
+    def publish_attempt(self) -> None:
+        """Consume this identity immediately before repository mutation."""
+        selection = self.artifact.selection
+        if selection is None:
+            raise RuntimeError("discovered Exchange patch lost selection data")
+
+        def verify_identity() -> None:
+            current_configuration = revalidate_exchange_directory(
+                load_configuration(self.paths)
+            )
+            if current_configuration != self.configuration:
+                raise configuration_error(
+                    "exchange directory changed before repository mutation"
+                )
+            require_exchange_identity_unchanged(
+                self.artifact.identity,
+                directory=self.configuration.exchange_directory,
+            )
+
+        mark_exchange_attempted(
+            self.paths,
+            self.artifact.identity,
+            selection,
+            verify_identity=verify_identity,
+        )
+
+
 def _revalidate_exchange_discovery(
     paths: RegistrationUserPaths,
     expected_configuration: UserConfiguration,
@@ -220,8 +274,8 @@ def _revalidate_exchange_discovery(
         )
 
 
-def discover_exchange_patch() -> ExchangeArtifact:
-    """Return the only Patch Package matching one registered current state."""
+def discover_exchange_patch() -> DiscoveredExchangePatch:
+    """Return the only unattempted package matching one registered state."""
     paths = configuration_user_paths()
     configuration = revalidate_exchange_directory(load_configuration(paths))
     with registry_lock(paths):
@@ -234,7 +288,8 @@ def discover_exchange_patch() -> ExchangeArtifact:
 
     try:
         artifacts = scan_exchange_directory(
-            configuration.exchange_directory
+            configuration.exchange_directory,
+            paths=paths,
         )
     except ExchangeScanError as exc:
         raise configuration_error("cannot scan exchange directory") from exc
@@ -242,19 +297,19 @@ def discover_exchange_patch() -> ExchangeArtifact:
     matches: list[ExchangeArtifact] = []
     contexts: dict[RepositoryId, RepositoryContext | None] = {}
     for artifact in artifacts:
-        if artifact.kind is not ExchangeArtifactKind.PATCH_PACKAGE:
+        if (
+            artifact.kind is not ExchangeArtifactKind.PATCH_PACKAGE
+            or artifact.attempted
+        ):
             continue
-        package = artifact.package
-        if package is None:
-            raise RuntimeError("Patch Package artifact has no package")
-        repo_id = package.manifest.repo_id
+        selection = artifact.selection
+        if selection is None:
+            raise RuntimeError("Patch Package artifact has no selection data")
+        repo_id = selection.repo_id
         if repo_id not in contexts:
             contexts[repo_id] = capture_repository_context_for_id(repo_id)
         context = contexts[repo_id]
-        if context is not None and _manifest_matches_context(
-            package.manifest,
-            context,
-        ):
+        if context is not None and selection.matches_context(context):
             matches.append(artifact)
 
     _revalidate_exchange_discovery(paths, configuration, registry)
@@ -268,7 +323,24 @@ def discover_exchange_patch() -> ExchangeArtifact:
             "multiple state-bound patch packages match registered repositories; "
             "pass PATCH_ZIP explicitly"
         )
-    return matches[0]
+
+    artifact = matches[0]
+    package = materialize_exchange_patch(
+        artifact,
+        directory=configuration.exchange_directory,
+    )
+    _revalidate_exchange_discovery(paths, configuration, registry)
+    context = contexts[package.manifest.repo_id]
+    if context is None or not _manifest_matches_context(package.manifest, context):
+        raise patch_package_error(
+            "selected exchange patch changed during automatic discovery"
+        )
+    return DiscoveredExchangePatch(
+        artifact=artifact,
+        package=package,
+        paths=paths,
+        configuration=configuration,
+    )
 
 
 def _complete_apply_result_bundle(
@@ -327,6 +399,7 @@ def preflight_patch_package_repository(
     dry_run: bool = True,
     output: OutputTargets | None = None,
     presentation: DashboardPresentation | None = None,
+    before_mutation: Callable[[], None] | None = None,
 ) -> Iterator[ApplyMutationGate]:
     """Yield the explicit mutation gate while private inputs and locks live."""
     actual_session = session or RunSession.start()
@@ -417,6 +490,7 @@ def preflight_patch_package_repository(
                 package=package,
                 prepared_package=prepared_package,
                 dry_run=dry_run,
+                before_mutation=before_mutation,
             )
 
 
@@ -502,6 +576,7 @@ def apply_patch_package(
     output: OutputTargets | None = None,
     session: RunSession | None = None,
     presentation: DashboardPresentation | None = None,
+    before_mutation: Callable[[], None] | None = None,
 ) -> RunReport:
     """Write one validated package, run its private entrypoint, and bundle it."""
     actual_session = session or RunSession.start()
@@ -512,6 +587,7 @@ def apply_patch_package(
         dry_run=False,
         output=output,
         presentation=presentation,
+        before_mutation=before_mutation,
     ) as mutation_gate:
         _require_payload_mutation(mutation_gate)
         prepared_package = mutation_gate.prepared_package
@@ -539,12 +615,11 @@ def run_apply_path(
     """Run one Apply request through a single public application boundary."""
     actual_session = session or RunSession.start()
     try:
+        discovered: DiscoveredExchangePatch | None = None
         if path is None:
-            selected = discover_exchange_patch()
-            selected_path = selected.path
-            package = selected.package
-            if package is None:
-                raise RuntimeError("selected Exchange artifact has no package")
+            discovered = discover_exchange_patch()
+            selected_path = discovered.artifact.path
+            package = discovered.package
         else:
             selected_path = path
             package = resolve_patch_package(selected_path)
@@ -597,6 +672,11 @@ def run_apply_path(
             output=output,
             session=actual_session,
             presentation=presentation,
+            before_mutation=(
+                discovered.publish_attempt
+                if discovered is not None
+                else None
+            ),
         )
     except PatchHarborError as error:
         report = error.run_report
