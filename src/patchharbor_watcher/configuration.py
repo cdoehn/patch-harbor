@@ -6,6 +6,11 @@ import json
 import os
 from pathlib import Path
 
+from patchharbor.configuration import (
+    load_configuration,
+    revalidate_exchange_directory,
+)
+from patchharbor.errors import PatchHarborError
 from patchharbor.path_configuration import (
     PreparedWatcherInput,
     prepare_watcher_input_directory,
@@ -16,7 +21,10 @@ from patchharbor.platform.filesystem import (
     atomic_replace_bytes,
     path_kind,
 )
-from patchharbor.user_paths import registration_user_paths
+from patchharbor.user_paths import (
+    configuration_user_paths,
+    registration_user_paths,
+)
 
 
 _WATCHER_CONFIGURATION_VERSION = 1
@@ -54,6 +62,18 @@ def _require_configuration_target(path: Path) -> None:
         raise WatcherConfigurationError(
             "watcher configuration is not a regular file"
         )
+
+
+def load_shared_exchange_directory() -> Path:
+    """Load the canonical Exchange directory from the shared Core config."""
+    try:
+        paths = configuration_user_paths()
+        configuration = revalidate_exchange_directory(
+            load_configuration(paths)
+        )
+    except PatchHarborError as exc:
+        raise WatcherConfigurationError(str(exc)) from exc
+    return configuration.exchange_directory
 
 
 def configure_watcher_input_directory(

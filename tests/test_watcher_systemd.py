@@ -9,7 +9,11 @@ import sys
 import pytest
 
 from patchharbor_watcher import cli as watcher_cli
-from tests.registration_support import set_isolated_user_environment
+from tests.registration_support import (
+    isolated_user_environment,
+    set_isolated_user_environment,
+    write_exchange_configuration,
+)
 
 
 IS_LINUX = os.name == "posix" and sys.platform.startswith("linux")
@@ -26,14 +30,10 @@ def test_non_linux_action_rejects_systemd_without_loading_linux_module(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    set_isolated_user_environment(monkeypatch, tmp_path / "user")
-    incoming = tmp_path / "incoming"
-    incoming.mkdir()
-    assert watcher_cli.main(
-        ["--configure", str(incoming)],
-        stdout=StringIO(),
-        stderr=StringIO(),
-    ) == 0
+    environment = isolated_user_environment(tmp_path / "user")
+    for name, value in environment.items():
+        monkeypatch.setenv(name, value)
+    write_exchange_configuration(environment, tmp_path / "exchange")
 
     sys.modules.pop("patchharbor_watcher.systemd_linux", None)
     monkeypatch.setattr(watcher_cli.sys, "platform", "win32")
@@ -68,13 +68,8 @@ def test_cli_installs_disabled_journald_service_only_after_configuration(
     ) == 1
     assert not unit_path.exists()
 
-    incoming = tmp_path / "incoming"
-    incoming.mkdir()
-    assert watcher_cli.main(
-        ["--configure", str(incoming)],
-        stdout=StringIO(),
-        stderr=StringIO(),
-    ) == 0
+    environment = isolated_user_environment(tmp_path / "user")
+    write_exchange_configuration(environment, tmp_path / "exchange")
     assert watcher_cli.main(
         ["--install-systemd-user-unit"],
         stdout=StringIO(),

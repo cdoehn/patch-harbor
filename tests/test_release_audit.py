@@ -259,3 +259,23 @@ def test_exchange_attempt_state_is_core_owned_and_published_at_mutation_boundary
     assert not any(
         operation in exchange_source for operation in forbidden_exchange_mutations
     )
+
+
+def test_watcher_shared_mode_delegates_exchange_discovery_to_core() -> None:
+    cli_source = (WATCHER_PACKAGE_ROOT / "cli.py").read_text(encoding="utf-8")
+    loop_source = (WATCHER_PACKAGE_ROOT / "loop.py").read_text(encoding="utf-8")
+    boundary_source = (WATCHER_PACKAGE_ROOT / "apply_boundary.py").read_text(
+        encoding="utf-8"
+    )
+    configuration_source = (
+        WATCHER_PACKAGE_ROOT / "configuration.py"
+    ).read_text(encoding="utf-8")
+
+    assert "load_shared_exchange_directory" in cli_source
+    assert "run_shared_exchange_watcher" in cli_source
+    assert "delegate_to_automatic_apply" in cli_source
+    assert "scan_exchange_directory" not in loop_source
+    assert "ExchangeFileIdentity" not in loop_source
+    assert 'arguments = [*apply_command, "apply", "--json"]' in boundary_source
+    assert "load_configuration" in configuration_source
+    assert "revalidate_exchange_directory" in configuration_source

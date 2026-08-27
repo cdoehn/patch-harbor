@@ -9,16 +9,22 @@ import sys
 from typing import TextIO
 
 from patchharbor.path_configuration import prepare_watcher_input_directory
-from patchharbor_watcher.loop import run_watcher
+from patchharbor_watcher.loop import (
+    run_shared_exchange_watcher,
+    run_watcher,
+)
 from patchharbor_watcher.configuration import (
     configure_watcher_input_directory,
-    load_configured_watcher_input_directory,
+    load_shared_exchange_directory,
 )
 from patchharbor_watcher.lifecycle import (
     WatcherStopController,
     installed_stop_signals,
 )
-from patchharbor_watcher.apply_boundary import delegate_to_apply
+from patchharbor_watcher.apply_boundary import (
+    delegate_to_apply,
+    delegate_to_automatic_apply,
+)
 
 
 def _install_systemd_user_unit() -> Path:
@@ -47,8 +53,8 @@ def _build_parser() -> argparse.ArgumentParser:
         prog="patchharbor-watcher",
         allow_abbrev=False,
         description=(
-            "Watch one input directory and delegate stable files to "
-            "'patchharbor apply --json'."
+            "Watch the shared Exchange directory and delegate automatic "
+            "requests to 'patchharbor apply --json'."
         ),
     )
     parser.add_argument(
@@ -114,28 +120,38 @@ def main(
             print(prepared.directory, file=actual_stdout)
             return 0
         if arguments.install_systemd_user_unit:
-            load_configured_watcher_input_directory()
+            load_shared_exchange_directory()
             unit_path = _install_systemd_user_unit()
             print(unit_path, file=actual_stdout)
             return 0
 
-        prepared_input = (
-            prepare_watcher_input_directory(arguments.input_directory)
-            if arguments.input_directory is not None
-            else load_configured_watcher_input_directory()
-        )
         stop_controller = WatcherStopController()
         with installed_stop_signals(stop_controller):
-            run_watcher(
-                prepared_input.directory,
-                delegate=delegate_to_apply,
-                state_path=prepared_input.state_path,
-                poll_interval_seconds=arguments.poll_interval,
-                log_stream=actual_stdout,
-                error_stream=actual_stderr,
-                stop_requested=stop_controller.stop_requested,
-                wait_between_polls=stop_controller.wait,
-            )
+            if arguments.input_directory is None:
+                exchange_directory = load_shared_exchange_directory()
+                run_shared_exchange_watcher(
+                    exchange_directory,
+                    delegate=delegate_to_automatic_apply,
+                    poll_interval_seconds=arguments.poll_interval,
+                    log_stream=actual_stdout,
+                    error_stream=actual_stderr,
+                    stop_requested=stop_controller.stop_requested,
+                    wait_between_polls=stop_controller.wait,
+                )
+            else:
+                prepared_input = prepare_watcher_input_directory(
+                    arguments.input_directory
+                )
+                run_watcher(
+                    prepared_input.directory,
+                    delegate=delegate_to_apply,
+                    state_path=prepared_input.state_path,
+                    poll_interval_seconds=arguments.poll_interval,
+                    log_stream=actual_stdout,
+                    error_stream=actual_stderr,
+                    stop_requested=stop_controller.stop_requested,
+                    wait_between_polls=stop_controller.wait,
+                )
     except KeyboardInterrupt:
         return 130
     except (OSError, RuntimeError, ValueError) as exc:

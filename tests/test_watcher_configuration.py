@@ -12,8 +12,13 @@ from patchharbor_watcher.configuration import (
     WatcherConfigurationError,
     configure_watcher_input_directory,
     load_configured_watcher_input_directory,
+    load_shared_exchange_directory,
 )
-from tests.registration_support import set_isolated_user_environment
+from tests.registration_support import (
+    isolated_user_environment,
+    set_isolated_user_environment,
+    write_exchange_configuration,
+)
 
 
 def _successful_completion() -> ApplyCompletion:
@@ -98,36 +103,62 @@ def test_missing_or_nonregular_watcher_configuration_is_rejected(
         load_configured_watcher_input_directory()
 
 
-def test_cli_configures_then_runs_the_persisted_input_without_a_positional_path(
+def test_cli_without_positional_path_uses_only_the_shared_exchange_config(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     from patchharbor_watcher import cli as watcher_cli
 
-    set_isolated_user_environment(monkeypatch, tmp_path / "user")
-    incoming = tmp_path / "incoming"
-    incoming.mkdir()
-    assert watcher_cli.main(
-        ["--configure", str(incoming)],
-        stdout=StringIO(),
-        stderr=StringIO(),
-    ) == 0
+    environment = isolated_user_environment(tmp_path / "user")
+    for name, value in environment.items():
+        monkeypatch.setenv(name, value)
+    exchange = write_exchange_configuration(
+        environment,
+        tmp_path / "exchange",
+    )
+
+    legacy = tmp_path / "legacy-input"
+    legacy.mkdir()
+    configure_watcher_input_directory(legacy)
 
     observed: dict[str, object] = {}
 
-    def fake_run_watcher(input_directory: Path, **options: object) -> None:
-        observed["input_directory"] = input_directory
+    def fake_run_shared_exchange_watcher(
+        exchange_directory: Path,
+        **options: object,
+    ) -> None:
+        observed["exchange_directory"] = exchange_directory
         observed.update(options)
 
-    monkeypatch.setattr(watcher_cli, "run_watcher", fake_run_watcher)
+    monkeypatch.setattr(
+        watcher_cli,
+        "run_shared_exchange_watcher",
+        fake_run_shared_exchange_watcher,
+    )
 
     assert watcher_cli.main(
         ["--poll-interval", "0.25"],
         stdout=StringIO(),
         stderr=StringIO(),
     ) == 0
-    assert observed["input_directory"] == incoming.resolve()
-    assert observed["state_path"] == (
-        configure_watcher_input_directory(incoming).state_path
-    )
+    assert load_shared_exchange_directory() == exchange
+    assert observed["exchange_directory"] == exchange
     assert observed["poll_interval_seconds"] == 0.25
+    assert observed["delegate"] is watcher_cli.delegate_to_automatic_apply
+    assert "state_path" not in observed
+
+
+def test_cli_shared_mode_rejects_missing_config_even_if_legacy_config_exists(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from patchharbor_watcher import cli as watcher_cli
+
+    set_isolated_user_environment(monkeypatch, tmp_path / "user")
+    legacy = tmp_path / "legacy-input"
+    legacy.mkdir()
+    configure_watcher_input_directory(legacy)
+    stderr = StringIO()
+
+    assert watcher_cli.main([], stdout=StringIO(), stderr=stderr) == 1
+    assert "configuration does not exist" in stderr.getvalue()

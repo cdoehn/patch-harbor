@@ -415,3 +415,204 @@ def test_watcher_console_entry_point_configures_the_polling_loop(
     assert callable(observed["wait_between_polls"])
     assert observed["log_stream"] is stdout
     assert observed["error_stream"] is stderr
+
+
+def _automatic_apply_envelope(
+    *,
+    success: bool,
+    process_exit_code: int,
+    error_kind: str | None = None,
+    error_message: str | None = None,
+    run_id: str = "run-id",
+) -> dict[str, object]:
+    return {
+        "output_version": 1,
+        "command": "apply",
+        "success": success,
+        "result": {
+            "run_id": run_id,
+            "repository_resolved": success,
+        },
+        "error": (
+            None
+            if error_kind is None
+            else {
+                "kind": error_kind,
+                "message": error_message,
+            }
+        ),
+        "process_exit_code": process_exit_code,
+    }
+
+
+def test_shared_poll_delegates_to_core_and_deduplicates_idle_records(
+    tmp_path: Path,
+) -> None:
+    from patchharbor_watcher.loop import (
+        SharedWatcherEventState,
+        WatcherPollOutcome,
+        poll_shared_exchange_once,
+    )
+
+    exchange = tmp_path.resolve()
+    calls = 0
+    run_ids = iter(("idle-one", "idle-two"))
+    log = StringIO()
+    errors = StringIO()
+
+    def delegate() -> ApplyCompletion:
+        nonlocal calls
+        calls += 1
+        return _completion(
+            exit_code=10,
+            result=_automatic_apply_envelope(
+                success=False,
+                process_exit_code=10,
+                error_kind="patch_package_error",
+                error_message=(
+                    "no state-bound patch package matches a registered repository"
+                ),
+                run_id=next(run_ids),
+            ),
+        )
+
+    state = SharedWatcherEventState()
+    first = poll_shared_exchange_once(
+        exchange,
+        state,
+        delegate=delegate,
+        log_stream=log,
+        error_stream=errors,
+    )
+    second = poll_shared_exchange_once(
+        exchange,
+        state,
+        delegate=delegate,
+        log_stream=log,
+        error_stream=errors,
+    )
+
+    assert (first, second) == (
+        WatcherPollOutcome.WAITING,
+        WatcherPollOutcome.WAITING,
+    )
+    assert calls == 2
+    records = [json.loads(line) for line in log.getvalue().splitlines()]
+    assert len(records) == 1
+    assert records[0]["event"] == "waiting_for_exchange_patch"
+    assert records[0]["exchange_directory"] == str(exchange)
+    assert "input_path" not in records[0]
+    assert errors.getvalue() == ""
+
+
+def test_shared_poll_records_success_and_distinct_core_error(
+    tmp_path: Path,
+) -> None:
+    from patchharbor_watcher.loop import (
+        SharedWatcherEventState,
+        WatcherPollOutcome,
+        poll_shared_exchange_once,
+    )
+
+    exchange = tmp_path.resolve()
+    completions = iter(
+        (
+            _completion(
+                result=_automatic_apply_envelope(
+                    success=True,
+                    process_exit_code=0,
+                    run_id="applied-run",
+                )
+            ),
+            _completion(
+                exit_code=10,
+                result=_automatic_apply_envelope(
+                    success=False,
+                    process_exit_code=10,
+                    error_kind="patch_package_error",
+                    error_message=(
+                        "multiple state-bound patch packages match registered "
+                        "repositories; pass PATCH_ZIP explicitly"
+                    ),
+                    run_id="ambiguous-run",
+                ),
+                stderr="core diagnostic",
+            ),
+        )
+    )
+    log = StringIO()
+    errors = StringIO()
+    state = SharedWatcherEventState()
+
+    outcomes = tuple(
+        poll_shared_exchange_once(
+            exchange,
+            state,
+            delegate=lambda: next(completions),
+            log_stream=log,
+            error_stream=errors,
+        )
+        for _ in range(2)
+    )
+
+    assert outcomes == (
+        WatcherPollOutcome.APPLIED,
+        WatcherPollOutcome.ERROR,
+    )
+    records = [json.loads(line) for line in log.getvalue().splitlines()]
+    assert [record["event"] for record in records] == [
+        "automatic_apply_completed",
+        "automatic_apply_failed",
+    ]
+    assert errors.getvalue() == "core diagnostic\n"
+
+
+def test_shared_watcher_publishes_lifecycle_and_stops_between_polls(
+    tmp_path: Path,
+) -> None:
+    from patchharbor_watcher.loop import run_shared_exchange_watcher
+
+    calls = 0
+    waits = 0
+    stopping = False
+    log = StringIO()
+
+    def delegate() -> ApplyCompletion:
+        nonlocal calls
+        calls += 1
+        return _completion(
+            exit_code=10,
+            result=_automatic_apply_envelope(
+                success=False,
+                process_exit_code=10,
+                error_kind="patch_package_error",
+                error_message=(
+                    "no state-bound patch package matches a registered repository"
+                ),
+                run_id=f"idle-{calls}",
+            ),
+        )
+
+    def wait(_seconds: float) -> None:
+        nonlocal waits, stopping
+        waits += 1
+        stopping = waits == 2
+
+    run_shared_exchange_watcher(
+        tmp_path,
+        delegate=delegate,
+        poll_interval_seconds=0.25,
+        log_stream=log,
+        error_stream=StringIO(),
+        stop_requested=lambda: stopping,
+        wait_between_polls=wait,
+    )
+
+    assert calls == 2
+    records = [json.loads(line) for line in log.getvalue().splitlines()]
+    assert [record["event"] for record in records] == [
+        "watcher_started",
+        "waiting_for_exchange_patch",
+        "watcher_stopped",
+    ]
+    assert records[0]["poll_interval_seconds"] == 0.25

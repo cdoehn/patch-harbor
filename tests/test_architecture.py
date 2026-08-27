@@ -400,6 +400,8 @@ def test_watcher_is_separate_and_uses_only_the_public_apply_process_boundary() -
         )
 
     allowed_shared_core_boundaries = {
+        "patchharbor.configuration",
+        "patchharbor.errors",
         "patchharbor.path_configuration",
         "patchharbor.platform.paths",
         "patchharbor.platform.filesystem",
@@ -418,6 +420,28 @@ def test_watcher_is_separate_and_uses_only_the_public_apply_process_boundary() -
         for dependency in graph["patchharbor_watcher.apply_boundary"]
         if dependency.startswith("patchharbor.")
     }
+
+    watcher_loop_source = _runtime_modules()[
+        "patchharbor_watcher.loop"
+    ].read_text(encoding="utf-8")
+    watcher_cli_source = _runtime_modules()[
+        "patchharbor_watcher.cli"
+    ].read_text(encoding="utf-8")
+    watcher_boundary_source = _runtime_modules()[
+        "patchharbor_watcher.apply_boundary"
+    ].read_text(encoding="utf-8")
+    for forbidden_core_detail in (
+        "scan_exchange_directory",
+        "load_exchange_state",
+        "mark_exchange_attempted",
+        "capture_repository_context_for_id",
+    ):
+        assert forbidden_core_detail not in watcher_loop_source
+        assert forbidden_core_detail not in watcher_cli_source
+    assert 'arguments = [*apply_command, "apply", "--json"]' in (
+        watcher_boundary_source
+    )
+    assert "delegate_to_automatic_apply" in watcher_cli_source
 
     for module in watcher_modules:
         path = _runtime_modules()[module]
