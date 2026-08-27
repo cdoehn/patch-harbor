@@ -39,7 +39,7 @@ def _unsafe_patch_zip(path: Path, detail: object) -> PatchHarborError:
     )
 
 
-def _classify_patch_payloads(
+def resolve_patch_payloads(
     payloads: tuple[BundlePayload, ...],
     *,
     resource_policy: ResourcePolicy,
@@ -105,7 +105,7 @@ def resolve_patch_package(
     except ZipPayloadError as exc:
         raise _unsafe_patch_zip(path, exc) from exc
 
-    return _classify_patch_payloads(
+    return resolve_patch_payloads(
         payloads,
         resource_policy=resource_policy,
         package_path=path,

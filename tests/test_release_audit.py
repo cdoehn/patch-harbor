@@ -22,6 +22,7 @@ EXPECTED_CORE_RUNTIME_FILES = {
     "context_output.py",
     "errors.py",
     "execution.py",
+    "exchange.py",
     "exchange_paths.py",
     "git_capture.py",
     "git_objects.py",
@@ -92,6 +93,23 @@ def test_runtime_module_inventory_matches_the_release_architecture() -> None:
     assert _runtime_files(WATCHER_PACKAGE_ROOT) == EXPECTED_WATCHER_RUNTIME_FILES
     assert not (PROJECT_ROOT / "src" / "repo_assist").exists()
     assert not (PROJECT_ROOT / "src" / "promptbridge").exists()
+
+
+def test_automatic_apply_discovery_stays_in_the_core_application_boundary() -> None:
+    application_source = (CORE_PACKAGE_ROOT / "application.py").read_text(
+        encoding="utf-8"
+    )
+    exchange_source = (CORE_PACKAGE_ROOT / "exchange.py").read_text(
+        encoding="utf-8"
+    )
+    cli_source = (CORE_PACKAGE_ROOT / "cli.py").read_text(encoding="utf-8")
+
+    assert "discover_exchange_patch" in application_source
+    assert "scan_exchange_directory" in application_source
+    assert "capture_repository_context_for_id" in application_source
+    assert "resolve_patch_payloads" in exchange_source
+    assert 'nargs="?"' in cli_source
+    assert "scan_exchange_directory" not in cli_source
 
 
 def test_result_bundle_defaults_use_shared_configuration_not_legacy_paths() -> None:

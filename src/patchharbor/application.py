@@ -29,8 +29,15 @@ from patchharbor.errors import (
     ExitCode,
     PatchHarborError,
     configuration_error,
+    patch_package_error,
     registry_error,
     state_mismatch_error,
+)
+from patchharbor.exchange import (
+    ExchangeArtifact,
+    ExchangeArtifactKind,
+    ExchangeScanError,
+    scan_exchange_directory,
 )
 from patchharbor.exchange_paths import (
     ExchangePathPolicyError,
@@ -73,6 +80,7 @@ from patchharbor.registration import (
 from patchharbor.registry import load_registry
 from patchharbor.repository_state import (
     capture_repository_context,
+    capture_repository_context_for_id,
     require_clean_repository,
 )
 from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY, ResourcePolicy
@@ -94,7 +102,10 @@ from patchharbor.sources import (
     select_directory_candidate,
     stdin_input_artifact,
 )
-from patchharbor.user_paths import configuration_user_paths
+from patchharbor.user_paths import (
+    RegistrationUserPaths,
+    configuration_user_paths,
+)
 
 
 def _require_exchange_configuration_allowed(
@@ -170,6 +181,94 @@ def validate_patch_package(
 ) -> PatchManifest:
     """Validate one complete patch package through the package boundary."""
     return _validate_patch_package(path, resource_policy=resource_policy)
+
+
+def _manifest_matches_context(
+    manifest: PatchManifest,
+    context: RepositoryContext,
+) -> bool:
+    return (
+        manifest.repo_id == context.repo_id
+        and manifest.base_commit == context.base_commit
+        and manifest.fingerprint_algorithm == context.fingerprint_algorithm
+        and manifest.state_fingerprint == context.state_fingerprint
+    )
+
+
+def _revalidate_exchange_discovery(
+    paths: RegistrationUserPaths,
+    expected_configuration: UserConfiguration,
+    expected_registry: RegistrySnapshot,
+) -> None:
+    current_configuration = revalidate_exchange_directory(
+        load_configuration(paths)
+    )
+    if current_configuration != expected_configuration:
+        raise configuration_error(
+            "exchange directory changed during automatic patch discovery"
+        )
+    with registry_lock(paths):
+        current_registry = load_registry(paths)
+        if current_registry != expected_registry:
+            raise registry_error(
+                "repository registry changed during automatic patch discovery"
+            )
+        _require_exchange_configuration_allowed(
+            current_configuration.exchange_directory,
+            current_registry,
+            exchange_must_exist=True,
+        )
+
+
+def discover_exchange_patch() -> ExchangeArtifact:
+    """Return the only Patch Package matching one registered current state."""
+    paths = configuration_user_paths()
+    configuration = revalidate_exchange_directory(load_configuration(paths))
+    with registry_lock(paths):
+        registry = load_registry(paths)
+        _require_exchange_configuration_allowed(
+            configuration.exchange_directory,
+            registry,
+            exchange_must_exist=True,
+        )
+
+    try:
+        artifacts = scan_exchange_directory(
+            configuration.exchange_directory
+        )
+    except ExchangeScanError as exc:
+        raise configuration_error("cannot scan exchange directory") from exc
+
+    matches: list[ExchangeArtifact] = []
+    contexts: dict[RepositoryId, RepositoryContext | None] = {}
+    for artifact in artifacts:
+        if artifact.kind is not ExchangeArtifactKind.PATCH_PACKAGE:
+            continue
+        package = artifact.package
+        if package is None:
+            raise RuntimeError("Patch Package artifact has no package")
+        repo_id = package.manifest.repo_id
+        if repo_id not in contexts:
+            contexts[repo_id] = capture_repository_context_for_id(repo_id)
+        context = contexts[repo_id]
+        if context is not None and _manifest_matches_context(
+            package.manifest,
+            context,
+        ):
+            matches.append(artifact)
+
+    _revalidate_exchange_discovery(paths, configuration, registry)
+
+    if not matches:
+        raise patch_package_error(
+            "no state-bound patch package matches a registered repository"
+        )
+    if len(matches) != 1:
+        raise patch_package_error(
+            "multiple state-bound patch packages match registered repositories; "
+            "pass PATCH_ZIP explicitly"
+        )
+    return matches[0]
 
 
 def _complete_apply_result_bundle(
@@ -428,7 +527,7 @@ def apply_patch_package(
 
 
 def run_apply_path(
-    path: Path,
+    path: Path | None,
     *,
     dry_run: bool,
     output_directory: Path | None = None,
@@ -440,7 +539,15 @@ def run_apply_path(
     """Run one Apply request through a single public application boundary."""
     actual_session = session or RunSession.start()
     try:
-        package = resolve_patch_package(path)
+        if path is None:
+            selected = discover_exchange_patch()
+            selected_path = selected.path
+            package = selected.package
+            if package is None:
+                raise RuntimeError("selected Exchange artifact has no package")
+        else:
+            selected_path = path
+            package = resolve_patch_package(selected_path)
     except PatchHarborError as error:
         return unresolved_apply_report(
             session=actual_session,
@@ -450,7 +557,7 @@ def run_apply_path(
 
     if presentation is not None:
         presentation.begin_request(
-            source_name=str(path),
+            source_name=str(selected_path),
             repository_name="resolving…",
             repository_context=f"repo_id: {package.manifest.repo_id}",
             bundle_files=(

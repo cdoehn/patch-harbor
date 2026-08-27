@@ -5,7 +5,7 @@
 **Vorgesehener Repository-Pfad:** `planning/1.1.1/commit-plan.md`<br>
 **Vorbereitender Commit außerhalb des Zählers:** `docs: define PatchHarbor 1.1.1 implementation plan`<br>
 **Plan-Konsolidierung außerhalb des Zählers:** `docs(plan): consolidate PatchHarbor 1.1.1 implementation plan` (`OFF-PLAN` `PLAN12`)<br>
-**Planstatus:** 4 / 12 Plan-Commits umgesetzt; nächster Plan-Commit: `2.b.W`; 8 Plan-Commits offen.<br>
+**Planstatus:** 5 / 12 Plan-Commits umgesetzt; nächster Plan-Commit: `2.b.R`; 7 Plan-Commits offen.<br>
 **Umfang:** 5 Meilensteine, 12 fachlich eigenständige Plan-Commits.
 
 ---
@@ -76,8 +76,8 @@ Fixes verwenden `<PLAN-ID>-FIX<n>` und verändern den Plan-Zähler nicht. Off-Pl
 | 2 | `1.a.R` | DONE | `fix(config): harden exchange configuration persistence` | Schema, Lesen, Schreiben und Fehlervertrag sind gehärtet. |
 | 3 | `1.b.W` | DONE | `feat(config): complete exchange repository boundaries` | Pfadpolitik und Konfigurationsgrenze sind vollständig abgeschlossen. |
 | 4 | `2.a.W` | DONE | `feat(bundle): publish result bundles to the exchange directory` | Manuelle und automatische Bundles verwenden standardmäßig Exchange. |
-| 5 | `2.b.W` | NEXT | `feat(apply): discover one state-bound exchange patch` | `apply` findet ohne Pfad genau ein passendes Paket. |
-| 6 | `2.b.R` | OPEN | `fix(exchange): harden processing identity and retry semantics` | Wiederverarbeitung und Retry-Vertrag werden persistent und eindeutig. |
+| 5 | `2.b.W` | DONE | `feat(apply): discover one state-bound exchange patch` | `apply` findet ohne Pfad genau ein passendes Paket. |
+| 6 | `2.b.R` | NEXT | `fix(exchange): harden processing identity and retry semantics` | Wiederverarbeitung und Retry-Vertrag werden persistent und eindeutig. |
 | 7 | `3.a.W` | OPEN | `feat(watcher): use shared exchange discovery` | Watcher verwendet dieselbe Core-Konfiguration und Erkennung. |
 | 8 | `3.a.C` | OPEN | `refactor(watcher): remove legacy exchange configuration` | Doppelte Watcher-Konfiguration und Übergangslogik entfallen. |
 | 9 | `4.a.W` | OPEN | `docs(chat): add the complete PatchHarbor chat contract` | Vollständige `CHAT_INSTRUCTIONS.md` wird ausgeliefert. |
@@ -163,7 +163,7 @@ Der Exchange-Ordner ist die zentrale Übergabestelle in beide Richtungen. Der Be
 
 **Commitposition:** 5 / 12<br>
 **Commit-Message:** `feat(apply): discover one state-bound exchange patch`<br>
-**Status:** NEXT
+**Status:** DONE
 
 - `patchharbor apply` und `patchharbor apply --dry-run` ohne `PATCH_ZIP` erlauben,
 - ausschließlich die direkte Ebene von `exchange_directory` untersuchen,
@@ -179,7 +179,7 @@ Der Exchange-Ordner ist die zentrale Übergabestelle in beide Richtungen. Der Be
 
 **Commitposition:** 6 / 12<br>
 **Commit-Message:** `fix(exchange): harden processing identity and retry semantics`<br>
-**Status:** OPEN
+**Status:** NEXT
 
 - persistente Dateidentität aus physischem Pfad und SHA-256 einführen,
 - unveränderte bereits automatisch versuchte Dateien nicht ungeplant erneut ausführen,

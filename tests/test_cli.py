@@ -72,6 +72,36 @@ def test_public_cli_rejects_abbreviated_options(
     capsys.readouterr()
 
 
+def test_apply_without_patch_path_delegates_exchange_discovery(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    observed: list[Path | None] = []
+    report = SimpleNamespace(warnings=())
+
+    def fake_run_apply_path(
+        path: Path | None,
+        **_options: object,
+    ) -> object:
+        observed.append(path)
+        return report
+
+    monkeypatch.setattr(cli, "run_apply_path", fake_run_apply_path)
+    monkeypatch.setattr(
+        cli,
+        "_write_apply_completion",
+        lambda _report, **_options: 0,
+    )
+
+    result = main(
+        ["apply", "--json"],
+        stdout=StringIO(),
+        stderr=StringIO(),
+    )
+
+    assert result == 0
+    assert observed == [None]
+
+
 def test_fs_run_without_path_on_terminal_is_a_usage_error(
     capsys: pytest.CaptureFixture[str],
 ) -> None:

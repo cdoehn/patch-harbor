@@ -191,6 +191,7 @@ def test_application_is_the_only_core_workflow_orchestrator() -> None:
         "patchharbor.sources",
         "patchharbor.bundles",
         "patchharbor.execution",
+        "patchharbor.exchange",
         "patchharbor.presentation",
     }
     application_dependencies = graph["patchharbor.application"]
@@ -220,6 +221,7 @@ def test_cli_composes_public_boundaries_without_domain_orchestration() -> None:
         "patchharbor.apply_preflight",
         "patchharbor.apply_repository",
         "patchharbor.bundles",
+        "patchharbor.exchange",
         "patchharbor.git_*",
         "patchharbor.locks",
         "patchharbor.patch_manifest",
@@ -237,6 +239,19 @@ def test_cli_composes_public_boundaries_without_domain_orchestration() -> None:
 def test_runtime_responsibilities_follow_the_specified_boundaries() -> None:
     graph = _dependency_graph()
     forbidden_by_module = {
+        "patchharbor.exchange": {
+            "patchharbor.application",
+            "patchharbor.apply_*",
+            "patchharbor.execution",
+            "patchharbor.git_*",
+            "patchharbor.locks",
+            "patchharbor.presentation",
+            "patchharbor.registration",
+            "patchharbor.registry",
+            "patchharbor.repository*",
+            "patchharbor.result_bundle*",
+            "patchharbor_watcher*",
+        },
         "patchharbor.sources": {
             "patchharbor.application",
             "patchharbor.bundles",

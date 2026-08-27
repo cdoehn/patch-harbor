@@ -202,6 +202,88 @@ def repository_context_from_snapshot(
     )
 
 
+def _repository_path_for_id(
+    snapshot: RegistrySnapshot,
+    repo_id: RepositoryId,
+) -> RepositoryPath | None:
+    id_matches = tuple(
+        mapping
+        for mapping in snapshot.repositories
+        if mapping.repo_id == repo_id
+    )
+    if not id_matches:
+        return None
+    if len(id_matches) != 1:
+        raise _error("repository ID has conflicting registrations")
+
+    repository = id_matches[0].repository_path
+    path_matches = tuple(
+        mapping
+        for mapping in snapshot.repositories
+        if mapping.repository_path == repository
+    )
+    if len(path_matches) != 1 or path_matches[0].repo_id != repo_id:
+        raise _error("repository path has conflicting registrations")
+    return repository
+
+
+def capture_repository_context_for_id(
+    repo_id: RepositoryId,
+) -> RepositoryContext | None:
+    """Capture one registered ID under the normal registry/repository locks."""
+    paths = registration_user_paths()
+    with ExitStack() as repository_scope:
+        with registry_lock(paths):
+            expected_repository = _repository_path_for_id(
+                load_registry(paths),
+                repo_id,
+            )
+            if expected_repository is None:
+                return None
+
+            repository = inspect_repository(expected_repository.value)
+            if repository != expected_repository:
+                raise _error(
+                    "registered repository path no longer identifies "
+                    "the same repository"
+                )
+            observed_id = _registered_identity(paths, repository)
+            if observed_id != repo_id:
+                raise _error(
+                    "repository identity changed before acquiring its lock"
+                )
+
+            repository_scope.enter_context(repository_lock(paths, repo_id))
+
+            locked_repository = _repository_path_for_id(
+                load_registry(paths),
+                repo_id,
+            )
+            if locked_repository != repository:
+                raise _error(
+                    "repository path changed while acquiring its lock"
+                )
+            inspected_repository = inspect_repository(repository.value)
+            if inspected_repository != repository:
+                raise _error(
+                    "registered repository path no longer identifies "
+                    "the same repository"
+                )
+            locked_id = _registered_identity(paths, inspected_repository)
+            if locked_id != repo_id:
+                raise _error(
+                    "repository identity changed while acquiring its lock"
+                )
+
+        snapshot = capture_consistent_repository_snapshot(inspected_repository)
+
+    return repository_context_from_snapshot(
+        inspected_repository,
+        locked_id,
+        snapshot,
+    )
+
+
 def capture_repository_context(path: Path) -> RepositoryContext:
     """Capture one registered repository and release its lock after capture."""
     paths = registration_user_paths()

@@ -261,8 +261,12 @@ def _build_parser() -> argparse.ArgumentParser:
     apply_parser.add_argument(
         "patch_zip",
         type=Path,
+        nargs="?",
         metavar="PATCH_ZIP",
-        help="ZIP patch package containing a root patch.json",
+        help=(
+            "ZIP patch package containing a root patch.json; "
+            "when omitted, discover one matching package in Exchange"
+        ),
     )
 
     fs_parser = commands.add_parser(
@@ -728,7 +732,7 @@ def _output_targets_for_presentation(
 
 
 def _apply_command(
-    path: Path,
+    path: Path | None,
     *,
     dry_run: bool,
     timeout_seconds: float,
