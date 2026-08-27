@@ -52,7 +52,6 @@ EXPECTED_RUNTIME_FILES = {
     "patchharbor/patch_manifest.py",
     "patchharbor/patch_package.py",
     "patchharbor/payload_files.py",
-    "patchharbor/path_configuration.py",
     "patchharbor/presentation.py",
     "patchharbor/registration.py",
     "patchharbor/registry.py",
@@ -76,10 +75,7 @@ EXPECTED_RUNTIME_FILES = {
     "patchharbor_watcher/__init__.py",
     "patchharbor_watcher/loop.py",
     "patchharbor_watcher/cli.py",
-    "patchharbor_watcher/configuration.py",
     "patchharbor_watcher/lifecycle.py",
-    "patchharbor_watcher/loop_guard.py",
-    "patchharbor_watcher/state.py",
     "patchharbor_watcher/apply_boundary.py",
     "patchharbor_watcher/systemd_linux.py",
     "patchharbor/zip_payloads.py",
@@ -359,10 +355,7 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
             f"{root}/src/patchharbor_watcher/__init__.py",
             f"{root}/src/patchharbor_watcher/loop.py",
             f"{root}/src/patchharbor_watcher/cli.py",
-            f"{root}/src/patchharbor_watcher/configuration.py",
             f"{root}/src/patchharbor_watcher/lifecycle.py",
-            f"{root}/src/patchharbor_watcher/loop_guard.py",
-            f"{root}/src/patchharbor_watcher/state.py",
             f"{root}/src/patchharbor_watcher/apply_boundary.py",
             f"{root}/src/patchharbor_watcher/systemd_linux.py",
         ):
@@ -680,11 +673,20 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
             b"\x00release-payload\xff"
         )
 
-    incoming = tmp_path / "watcher-input"
-    incoming.mkdir()
-    configured = _run(
-        [str(watcher_executable), "--configure", str(incoming)],
+    watcher_help = _run(
+        [str(watcher_executable), "--help"],
         cwd=empty_workdir,
         environment=runtime_environment,
     )
-    assert configured.returncode == 0
+    assert watcher_help.returncode == 0
+    assert "--install-systemd-user-unit" in watcher_help.stdout
+    assert "--poll-interval" in watcher_help.stdout
+    assert "--configure" not in watcher_help.stdout
+    assert "INPUT_DIRECTORY" not in watcher_help.stdout
+
+    legacy_watcher = _run(
+        [str(watcher_executable), "--configure", str(tmp_path / "incoming")],
+        cwd=empty_workdir,
+        environment=runtime_environment,
+    )
+    assert legacy_watcher.returncode == 2

@@ -5,7 +5,7 @@
 **Vorgesehener Repository-Pfad:** `planning/1.1.1/commit-plan.md`<br>
 **Vorbereitender Commit außerhalb des Zählers:** `docs: define PatchHarbor 1.1.1 implementation plan`<br>
 **Plan-Konsolidierung außerhalb des Zählers:** `docs(plan): consolidate PatchHarbor 1.1.1 implementation plan` (`OFF-PLAN` `PLAN12`)<br>
-**Planstatus:** 7 / 12 Plan-Commits umgesetzt; nächster Plan-Commit: `3.a.C`; 5 Plan-Commits offen.<br>
+**Planstatus:** 8 / 12 Plan-Commits umgesetzt; nächster Plan-Commit: `4.a.W`; 4 Plan-Commits offen.<br>
 **Umfang:** 5 Meilensteine, 12 fachlich eigenständige Plan-Commits.
 
 ---
@@ -79,8 +79,8 @@ Fixes verwenden `<PLAN-ID>-FIX<n>` und verändern den Plan-Zähler nicht. Off-Pl
 | 5 | `2.b.W` | DONE | `feat(apply): discover one state-bound exchange patch` | `apply` findet ohne Pfad genau ein passendes Paket. |
 | 6 | `2.b.R` | DONE | `fix(exchange): harden processing identity and retry semantics` | Wiederverarbeitung und Retry-Vertrag werden persistent und eindeutig. |
 | 7 | `3.a.W` | DONE | `feat(watcher): use shared exchange discovery` | Watcher verwendet dieselbe Core-Konfiguration und Erkennung. |
-| 8 | `3.a.C` | NEXT | `refactor(watcher): remove legacy exchange configuration` | Doppelte Watcher-Konfiguration und Übergangslogik entfallen. |
-| 9 | `4.a.W` | OPEN | `docs(chat): add the complete PatchHarbor chat contract` | Vollständige `CHAT_INSTRUCTIONS.md` wird ausgeliefert. |
+| 8 | `3.a.C` | DONE | `refactor(watcher): remove legacy exchange configuration` | Doppelte Watcher-Konfiguration und Übergangslogik entfallen. |
+| 9 | `4.a.W` | NEXT | `docs(chat): add the complete PatchHarbor chat contract` | Vollständige `CHAT_INSTRUCTIONS.md` wird ausgeliefert. |
 | 10 | `4.a.C` | OPEN | `test(chat): lock the initialization and status contract` | Chat-Vertrag, UI und Packaging werden strukturell abgesichert. |
 | 11 | `5.a.W` | OPEN | `docs(readme): document PatchHarbor 1.1.1 workflows` | README und Help erklären alle Initialisierungs- und Betriebsfälle. |
 | 12 | `5.b.C` | OPEN | `release: finalize PatchHarbor 1.1.1` | Akzeptanz, Plattformen, Packaging und Version 1.1.1 sind freigegeben. |
@@ -217,7 +217,7 @@ Der optionale Watcher ist nur noch ein dauerhafter Auslöser. Konfiguration, Kla
 
 **Commitposition:** 8 / 12<br>
 **Commit-Message:** `refactor(watcher): remove legacy exchange configuration`<br>
-**Status:** NEXT
+**Status:** DONE
 
 - `watcher.json`, alte Configure-Pfade und doppelte Input-Verzeichnis-Modelle entfernen,
 - systemd-Unit auf parameterlosen Start mit gemeinsamer Config umstellen,
@@ -240,7 +240,7 @@ Ein neuer Entwicklungs-Chat versteht PatchHarbor vollständig, wenn er `CHAT_INS
 
 **Commitposition:** 9 / 12<br>
 **Commit-Message:** `docs(chat): add the complete PatchHarbor chat contract`<br>
-**Status:** OPEN
+**Status:** NEXT
 
 - Root-Datei `CHAT_INSTRUCTIONS.md` vollständig anlegen,
 - PatchHarbor-Fähigkeiten, Sicherheitsgrenze, Paketformat und Result-Bundle-Kreislauf erklären,

@@ -190,7 +190,10 @@ def test_manual_bundle_materializes_committed_blobs_without_export_rules(
     completed = run_cli(invocation_directory, "bundle", *arguments)
 
     assert completed.returncode == 0
-    assert not registration_user_paths().path_configuration_path.exists()
+    legacy_paths = (
+        registration_user_paths().configuration_directory / "paths.json"
+    )
+    assert not legacy_paths.exists()
     bundles = _result_bundles()
     assert len(bundles) == 1
     with zipfile.ZipFile(bundles[0]) as archive:
@@ -386,7 +389,7 @@ def test_manual_bundle_requires_valid_exchange_configuration_without_override(
         paths.configuration_path.unlink()
     else:
         paths.configuration_path.write_text("{}\n", encoding="utf-8")
-    paths.path_configuration_path.write_text(
+    (paths.configuration_directory / "paths.json").write_text(
         '{"result_directories":["/legacy"],"watcher_input_directories":[]}\n',
         encoding="utf-8",
     )
@@ -425,7 +428,10 @@ def test_manual_bundle_explicit_output_ignores_exchange_configuration(
         paths.configuration_path.unlink()
     else:
         paths.configuration_path.write_text("{}\n", encoding="utf-8")
-    paths.path_configuration_path.write_text("not-json\n", encoding="utf-8")
+    (paths.configuration_directory / "paths.json").write_text(
+        "not-json\n",
+        encoding="utf-8",
+    )
     output_directory = tmp_path / "explicit-results"
 
     completed = run_cli(

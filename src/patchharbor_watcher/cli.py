@@ -8,23 +8,26 @@ from pathlib import Path
 import sys
 from typing import TextIO
 
-from patchharbor.path_configuration import prepare_watcher_input_directory
-from patchharbor_watcher.loop import (
-    run_shared_exchange_watcher,
-    run_watcher,
+from patchharbor.configuration import (
+    load_configuration,
+    revalidate_exchange_directory,
 )
-from patchharbor_watcher.configuration import (
-    configure_watcher_input_directory,
-    load_shared_exchange_directory,
-)
+from patchharbor.errors import PatchHarborError
+from patchharbor.user_paths import configuration_user_paths
+from patchharbor_watcher.apply_boundary import delegate_to_automatic_apply
 from patchharbor_watcher.lifecycle import (
     WatcherStopController,
     installed_stop_signals,
 )
-from patchharbor_watcher.apply_boundary import (
-    delegate_to_apply,
-    delegate_to_automatic_apply,
-)
+from patchharbor_watcher.loop import run_shared_exchange_watcher
+
+
+def _load_exchange_directory() -> Path:
+    """Load the one shared Core Exchange directory for watcher startup."""
+    configuration = revalidate_exchange_directory(
+        load_configuration(configuration_user_paths())
+    )
+    return configuration.exchange_directory
 
 
 def _install_systemd_user_unit() -> Path:
@@ -53,24 +56,11 @@ def _build_parser() -> argparse.ArgumentParser:
         prog="patchharbor-watcher",
         allow_abbrev=False,
         description=(
-            "Watch the shared Exchange directory and delegate automatic "
+            "Poll the shared Exchange directory and delegate automatic "
             "requests to 'patchharbor apply --json'."
         ),
     )
     parser.add_argument(
-        "input_directory",
-        nargs="?",
-        type=Path,
-        metavar="INPUT_DIRECTORY",
-    )
-    action = parser.add_mutually_exclusive_group()
-    action.add_argument(
-        "--configure",
-        type=Path,
-        metavar="INPUT_DIRECTORY",
-        help="persist the default input directory and exit",
-    )
-    action.add_argument(
         "--install-systemd-user-unit",
         action="store_true",
         help="install the Linux systemd user unit without enabling it",
@@ -80,20 +70,9 @@ def _build_parser() -> argparse.ArgumentParser:
         type=_positive_seconds,
         default=1.0,
         metavar="SECONDS",
-        help="seconds between non-recursive scans (default: 1.0)",
+        help="seconds between Core apply requests (default: 1.0)",
     )
     return parser
-
-
-def _require_action_without_positional_input(
-    parser: argparse.ArgumentParser,
-    input_directory: Path | None,
-    action_requested: bool,
-) -> None:
-    if action_requested and input_directory is not None:
-        parser.error(
-            "INPUT_DIRECTORY cannot be combined with a configuration action"
-        )
 
 
 def main(
@@ -102,59 +81,33 @@ def main(
     stdout: TextIO | None = None,
     stderr: TextIO | None = None,
 ) -> int:
-    """Configure, install, or run the separate polling watcher."""
+    """Install or run the thin shared-Exchange watcher."""
     parser = _build_parser()
     arguments = parser.parse_args(argv)
     actual_stdout = sys.stdout if stdout is None else stdout
     actual_stderr = sys.stderr if stderr is None else stderr
-    _require_action_without_positional_input(
-        parser,
-        arguments.input_directory,
-        arguments.configure is not None
-        or arguments.install_systemd_user_unit,
-    )
+    stop_controller = WatcherStopController()
 
     try:
-        if arguments.configure is not None:
-            prepared = configure_watcher_input_directory(arguments.configure)
-            print(prepared.directory, file=actual_stdout)
-            return 0
+        exchange_directory = _load_exchange_directory()
         if arguments.install_systemd_user_unit:
-            load_shared_exchange_directory()
             unit_path = _install_systemd_user_unit()
             print(unit_path, file=actual_stdout)
             return 0
 
-        stop_controller = WatcherStopController()
         with installed_stop_signals(stop_controller):
-            if arguments.input_directory is None:
-                exchange_directory = load_shared_exchange_directory()
-                run_shared_exchange_watcher(
-                    exchange_directory,
-                    delegate=delegate_to_automatic_apply,
-                    poll_interval_seconds=arguments.poll_interval,
-                    log_stream=actual_stdout,
-                    error_stream=actual_stderr,
-                    stop_requested=stop_controller.stop_requested,
-                    wait_between_polls=stop_controller.wait,
-                )
-            else:
-                prepared_input = prepare_watcher_input_directory(
-                    arguments.input_directory
-                )
-                run_watcher(
-                    prepared_input.directory,
-                    delegate=delegate_to_apply,
-                    state_path=prepared_input.state_path,
-                    poll_interval_seconds=arguments.poll_interval,
-                    log_stream=actual_stdout,
-                    error_stream=actual_stderr,
-                    stop_requested=stop_controller.stop_requested,
-                    wait_between_polls=stop_controller.wait,
-                )
+            run_shared_exchange_watcher(
+                exchange_directory,
+                delegate=delegate_to_automatic_apply,
+                poll_interval_seconds=arguments.poll_interval,
+                log_stream=actual_stdout,
+                error_stream=actual_stderr,
+                stop_requested=stop_controller.stop_requested,
+                wait_between_polls=stop_controller.wait,
+            )
     except KeyboardInterrupt:
         return 130
-    except (OSError, RuntimeError, ValueError) as exc:
+    except (PatchHarborError, OSError, RuntimeError, ValueError) as exc:
         print(f"patchharbor-watcher: {exc}", file=actual_stderr)
         return 1
     return 130 if stop_controller.was_interrupted() else 0

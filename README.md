@@ -72,14 +72,18 @@ general secret detection.
 
 ## Linux watcher
 
-The optional watcher is installed with PatchHarbor. Configure one
-non-recursive input directory and install its systemd user unit with:
+The optional watcher is installed with PatchHarbor. Configure the shared
+Exchange directory through PatchHarbor Core and install its systemd user unit:
 
 ```bash
-patchharbor-watcher --configure ~/Downloads
+patchharbor configure exchange-directory ~/Downloads
 patchharbor-watcher --install-systemd-user-unit
 systemctl --user daemon-reload
 ```
+
+The watcher has no separate input-directory argument or configuration file. It
+uses the same `config.json`, package discovery, and retry state as parameterless
+`patchharbor apply`.
 
 Activate or deactivate the service explicitly:
 

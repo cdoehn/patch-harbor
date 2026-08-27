@@ -42,11 +42,6 @@ class RegistrationUserPaths:
         return self.lock_directory.parent
 
     @property
-    def result_directory(self) -> Path:
-        """Return the default user-specific Result Bundle directory."""
-        return self.state_directory / "results"
-
-    @property
     def exchange_state_directory(self) -> Path:
         """Return the directory containing shared Exchange processing state."""
         return self.state_directory / "exchange"
@@ -60,21 +55,6 @@ class RegistrationUserPaths:
     def exchange_state_lock_path(self) -> Path:
         """Return the shared Exchange processing lock file."""
         return self.lock_directory / "exchange.lock"
-
-    @property
-    def watcher_state_directory(self) -> Path:
-        """Return the directory containing persistent watcher state."""
-        return self.state_directory / "watcher"
-
-    @property
-    def path_configuration_path(self) -> Path:
-        """Return the atomically persisted configured-path document."""
-        return self.configuration_directory / "paths.json"
-
-    @property
-    def watcher_configuration_path(self) -> Path:
-        """Return the default watcher operating configuration document."""
-        return self.configuration_directory / "watcher.json"
 
 
 _ErrorFactory = Callable[[str], PatchHarborError]

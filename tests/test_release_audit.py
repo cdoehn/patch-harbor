@@ -37,7 +37,6 @@ EXPECTED_CORE_RUNTIME_FILES = {
     "patch_manifest.py",
     "patch_package.py",
     "payload_files.py",
-    "path_configuration.py",
     "presentation.py",
     "registration.py",
     "registry.py",
@@ -73,11 +72,8 @@ EXPECTED_WATCHER_RUNTIME_FILES = {
     "__init__.py",
     "apply_boundary.py",
     "cli.py",
-    "configuration.py",
     "lifecycle.py",
     "loop.py",
-    "loop_guard.py",
-    "state.py",
     "systemd_linux.py",
 }
 
@@ -261,21 +257,34 @@ def test_exchange_attempt_state_is_core_owned_and_published_at_mutation_boundary
     )
 
 
-def test_watcher_shared_mode_delegates_exchange_discovery_to_core() -> None:
+def test_watcher_is_only_shared_configuration_lifecycle_and_core_apply() -> None:
     cli_source = (WATCHER_PACKAGE_ROOT / "cli.py").read_text(encoding="utf-8")
     loop_source = (WATCHER_PACKAGE_ROOT / "loop.py").read_text(encoding="utf-8")
     boundary_source = (WATCHER_PACKAGE_ROOT / "apply_boundary.py").read_text(
         encoding="utf-8"
     )
-    configuration_source = (
-        WATCHER_PACKAGE_ROOT / "configuration.py"
-    ).read_text(encoding="utf-8")
+    user_paths_source = (CORE_PACKAGE_ROOT / "user_paths.py").read_text(
+        encoding="utf-8"
+    )
+    readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
 
-    assert "load_shared_exchange_directory" in cli_source
+    assert "load_configuration" in cli_source
+    assert "revalidate_exchange_directory" in cli_source
     assert "run_shared_exchange_watcher" in cli_source
     assert "delegate_to_automatic_apply" in cli_source
+    assert '"apply", "--json"' in boundary_source
+    assert "delegate_to_apply" not in boundary_source
     assert "scan_exchange_directory" not in loop_source
     assert "ExchangeFileIdentity" not in loop_source
-    assert 'arguments = [*apply_command, "apply", "--json"]' in boundary_source
-    assert "load_configuration" in configuration_source
-    assert "revalidate_exchange_directory" in configuration_source
+    assert "os.scandir" not in loop_source
+    assert "sha256" not in loop_source
+    assert "zipfile" not in loop_source
+    assert "watcher_configuration_path" not in user_paths_source
+    assert "path_configuration_path" not in user_paths_source
+    assert "watcher_state_directory" not in user_paths_source
+    assert "result_directory" not in user_paths_source
+    assert "patchharbor-watcher --configure" not in readme
+    assert "patchharbor configure exchange-directory" in readme
+    assert not (CORE_PACKAGE_ROOT / "path_configuration.py").exists()
+    for removed in ("configuration.py", "loop_guard.py", "state.py"):
+        assert not (WATCHER_PACKAGE_ROOT / removed).exists()

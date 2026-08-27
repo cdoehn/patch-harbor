@@ -79,7 +79,10 @@ def test_cli_installs_disabled_journald_service_only_after_configuration(
     unit = _read_unit(unit_path)
     assert unit["Service"]["Type"] == "simple"
     assert os.path.abspath(sys.executable) in unit["Service"]["ExecStart"]
-    assert "-m patchharbor_watcher.cli" in unit["Service"]["ExecStart"]
+    exec_start = unit["Service"]["ExecStart"]
+    assert "-m patchharbor_watcher.cli" in exec_start
+    assert "--configure" not in exec_start
+    assert "INPUT_DIRECTORY" not in exec_start
     assert unit["Service"]["Restart"] == "on-failure"
     assert unit["Service"]["StandardOutput"] == "journal"
     assert unit["Service"]["StandardError"] == "journal"

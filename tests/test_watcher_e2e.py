@@ -15,15 +15,9 @@ from patchharbor.state_fingerprint import FINGERPRINT_ALGORITHM
 from patchharbor_watcher.loop import (
     SharedWatcherEventState,
     WatcherPollOutcome,
-    poll_input_directory_once,
     poll_shared_exchange_once,
-    run_watcher,
 )
-from patchharbor_watcher.state import ProcessedFileStore, StabilityTracker
-from patchharbor_watcher.apply_boundary import (
-    delegate_to_apply,
-    delegate_to_automatic_apply,
-)
+from patchharbor_watcher.apply_boundary import delegate_to_automatic_apply
 from tests.platform_support import (
     native_script,
     native_value,
@@ -76,25 +70,23 @@ def _write_lock_protected_package(
         archive.writestr(entrypoint_name, entrypoint.encode("utf-8"))
 
 
-def test_watcher_delegation_is_stopped_by_the_core_repository_lock(
+def test_watcher_retries_after_core_repository_lock_is_released(
     tmp_path: Path,
 ) -> None:
     repository = create_repository(tmp_path / "repository")
     environment = isolated_user_environment(tmp_path / "user")
-    registered = run_cli(
+    assert run_cli(
         repository,
         "register",
         environment_overrides=environment,
-    )
-    assert registered.returncode == 0
-    configured = run_cli(
+    ).returncode == 0
+    assert run_cli(
         repository,
         "configure",
         "exchange-directory",
         str(tmp_path / "exchange"),
         environment_overrides=environment,
-    )
-    assert configured.returncode == 0
+    ).returncode == 0
     context_completed = run_cli(
         repository,
         "context",
@@ -102,23 +94,16 @@ def test_watcher_delegation_is_stopped_by_the_core_repository_lock(
         environment_overrides=environment,
     )
     assert context_completed.returncode == 0
-    context_envelope = json.loads(context_completed.stdout)
-    context = context_envelope["result"]
+    context = json.loads(context_completed.stdout)["result"]
     assert isinstance(context, dict)
 
-    incoming = tmp_path / "incoming"
-    incoming.mkdir()
-    package = incoming / "patch.zip"
+    exchange = configured_exchange_directory(environment)
+    package = exchange / "patch.zip"
     _write_lock_protected_package(package, context)
-    log = StringIO()
-    stability = StabilityTracker()
-    processed = ProcessedFileStore.in_memory(incoming.resolve())
     apply_environment = project_environment(environment)
 
-    def delegate(path: Path):
-        return delegate_to_apply(
-            path,
-            apply_command=(sys.executable, "-m", "patchharbor.cli"),
+    def delegate():
+        return delegate_to_automatic_apply(
             environment=apply_environment,
         )
 
@@ -126,21 +111,13 @@ def test_watcher_delegation_is_stopped_by_the_core_repository_lock(
         str(context["repo_id"]),
         environment=apply_environment,
     )
+    locked_log = StringIO()
     try:
-        first = poll_input_directory_once(
-            incoming,
-            stability,
-            processed,
+        locked = poll_shared_exchange_once(
+            exchange,
+            SharedWatcherEventState(),
             delegate=delegate,
-            log_stream=log,
-            error_stream=StringIO(),
-        )
-        second = poll_input_directory_once(
-            incoming,
-            stability,
-            processed,
-            delegate=delegate,
-            log_stream=log,
+            log_stream=locked_log,
             error_stream=StringIO(),
         )
     finally:
@@ -149,11 +126,27 @@ def test_watcher_delegation_is_stopped_by_the_core_repository_lock(
         finally:
             stop_repository_lock_holder(holder)
 
-    records = [json.loads(line) for line in log.getvalue().splitlines()]
-    assert (first, second) == (0, 1)
-    assert len(records) == 1
-    assert records[0]["process_exit_code"] == int(ExitCode.REPOSITORY_BUSY)
+    locked_record = json.loads(locked_log.getvalue())
+    locked_response = locked_record["apply_result"]
+    assert locked is WatcherPollOutcome.ERROR
+    assert locked_record["process_exit_code"] == int(ExitCode.REPOSITORY_BUSY)
+    assert isinstance(locked_response, dict)
+    assert locked_response["error"]["kind"] == "repository_busy"
     assert not (repository / "watcher-executed.txt").exists()
+
+    retried = poll_shared_exchange_once(
+        exchange,
+        SharedWatcherEventState(),
+        delegate=delegate,
+        log_stream=StringIO(),
+        error_stream=StringIO(),
+    )
+
+    assert retried is WatcherPollOutcome.APPLIED
+    assert (repository / "watcher-executed.txt").read_text(
+        encoding="utf-8"
+    ) == "executed"
+    assert package.is_file()
 
 
 def _write_automatic_watcher_package(

@@ -368,7 +368,6 @@ def test_platform_specific_mechanics_stay_inside_platform_package() -> None:
     assert "patchharbor.platform.filesystem" in graph["patchharbor.payload_files"]
     assert "patchharbor.platform.filesystem" in graph["patchharbor.git_capture"]
     assert "patchharbor.platform.locking" in graph["patchharbor.locks"]
-    assert "patchharbor.platform.paths" in graph["patchharbor.path_configuration"]
     assert "patchharbor.platform.runtime" in graph["patchharbor.user_paths"]
     assert "patchharbor.physical_paths" not in graph
 
@@ -402,7 +401,6 @@ def test_watcher_is_separate_and_uses_only_the_public_apply_process_boundary() -
     allowed_shared_core_boundaries = {
         "patchharbor.configuration",
         "patchharbor.errors",
-        "patchharbor.path_configuration",
         "patchharbor.platform.paths",
         "patchharbor.platform.filesystem",
         "patchharbor.user_paths",
@@ -442,6 +440,14 @@ def test_watcher_is_separate_and_uses_only_the_public_apply_process_boundary() -
         watcher_boundary_source
     )
     assert "delegate_to_automatic_apply" in watcher_cli_source
+    assert "delegate_to_apply" not in watcher_boundary_source
+    assert "os.scandir" not in watcher_loop_source
+    assert "sha256" not in watcher_loop_source
+    assert "zipfile" not in watcher_loop_source
+    assert "watcher.json" not in watcher_cli_source
+    assert "paths.json" not in watcher_cli_source
+    assert "--configure" not in watcher_cli_source
+    assert "input_directory" not in watcher_cli_source
 
     for module in watcher_modules:
         path = _runtime_modules()[module]

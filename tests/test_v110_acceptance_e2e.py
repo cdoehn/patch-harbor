@@ -13,9 +13,12 @@ import pytest
 from patchharbor.errors import ExitCode
 from patchharbor.patch_manifest import PATCH_FORMAT_VERSION, PATCH_MARKER
 from patchharbor.state_fingerprint import FINGERPRINT_ALGORITHM
-from patchharbor_watcher.apply_boundary import delegate_to_apply
-from patchharbor_watcher.loop import poll_input_directory_once
-from patchharbor_watcher.state import ProcessedFileStore, StabilityTracker
+from patchharbor_watcher.apply_boundary import delegate_to_automatic_apply
+from patchharbor_watcher.loop import (
+    SharedWatcherEventState,
+    WatcherPollOutcome,
+    poll_shared_exchange_once,
+)
 from tests.platform_support import (
     native_script,
     native_value,
@@ -382,9 +385,8 @@ def test_v110_acceptance_watcher_delegates_to_real_apply_once(
     repository = create_repository(tmp_path / "repository")
     environment = isolated_user_environment(tmp_path / "user")
     context = _register_and_context(repository, environment)
-    incoming = tmp_path / "incoming"
-    incoming.mkdir()
-    package = incoming / "watcher-package.zip"
+    exchange = _exchange_directory(environment).resolve()
+    package = exchange / "watcher-package.zip"
     _write_patch_package(
         package,
         context,
@@ -396,32 +398,33 @@ def test_v110_acceptance_watcher_delegates_to_real_apply_once(
         payloads={"watcher-payload.bin": b"watcher-payload"},
     )
     package_bytes = package.read_bytes()
-    stability = StabilityTracker()
-    processed = ProcessedFileStore.in_memory(incoming.resolve())
     log_stream = StringIO()
     error_stream = StringIO()
     apply_environment = project_environment(environment)
 
-    def delegate(path: Path):
-        return delegate_to_apply(
-            path,
+    def delegate():
+        return delegate_to_automatic_apply(
             apply_command=(sys.executable, "-m", "patchharbor.cli"),
             environment=apply_environment,
         )
 
-    delegated = [
-        poll_input_directory_once(
-            incoming,
-            stability,
-            processed,
-            delegate=delegate,
-            log_stream=log_stream,
-            error_stream=error_stream,
-        )
-        for _ in range(3)
-    ]
+    first = poll_shared_exchange_once(
+        exchange,
+        SharedWatcherEventState(),
+        delegate=delegate,
+        log_stream=log_stream,
+        error_stream=error_stream,
+    )
+    second = poll_shared_exchange_once(
+        exchange,
+        SharedWatcherEventState(),
+        delegate=delegate,
+        log_stream=StringIO(),
+        error_stream=StringIO(),
+    )
 
-    assert delegated == [0, 1, 0]
+    assert first is WatcherPollOutcome.APPLIED
+    assert second is WatcherPollOutcome.WAITING
     assert package.read_bytes() == package_bytes
     assert (repository / "watcher-payload.bin").read_bytes() == b"watcher-payload"
     assert (repository / "watcher-applied.txt").read_text(encoding="utf-8") == (

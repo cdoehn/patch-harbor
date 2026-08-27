@@ -530,7 +530,7 @@ def test_registration_does_not_read_legacy_paths_json_as_exchange_configuration(
     legacy_watcher.mkdir()
     set_isolated_user_environment(monkeypatch, tmp_path / "user")
     paths = registration_user_paths()
-    paths.path_configuration_path.write_text(
+    (paths.configuration_directory / "paths.json").write_text(
         json.dumps(
             {
                 "format_version": 1,
