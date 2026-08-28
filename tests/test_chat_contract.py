@@ -111,6 +111,7 @@ def test_chat_contract_is_canonical_versioned_and_compact() -> None:
     assert all(line.rstrip() == line for line in document.splitlines())
     assert (PROJECT_ROOT / ".gitattributes").read_text(encoding="utf-8") == (
         "/CHAT_INSTRUCTIONS.md text eol=lf\n"
+        "/README.md text eol=lf\n"
     )
     assert document.startswith(
         "# PatchHarbor 1.1.1 – Chat-Initialisierung\n\n"
