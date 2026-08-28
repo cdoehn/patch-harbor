@@ -5,7 +5,7 @@
 **Vorgesehener Repository-Pfad:** `planning/1.1.1/commit-plan.md`<br>
 **Vorbereitender Commit außerhalb des Zählers:** `docs: define PatchHarbor 1.1.1 implementation plan`<br>
 **Plan-Konsolidierung außerhalb des Zählers:** `docs(plan): consolidate PatchHarbor 1.1.1 implementation plan` (`OFF-PLAN` `PLAN12`)<br>
-**Planstatus:** 8 / 12 Plan-Commits umgesetzt; nächster Plan-Commit: `4.a.W`; 4 Plan-Commits offen.<br>
+**Planstatus:** 9 / 12 Plan-Commits umgesetzt; nächster Plan-Commit: `4.a.C`; 3 Plan-Commits offen.<br>
 **Umfang:** 5 Meilensteine, 12 fachlich eigenständige Plan-Commits.
 
 ---
@@ -80,8 +80,8 @@ Fixes verwenden `<PLAN-ID>-FIX<n>` und verändern den Plan-Zähler nicht. Off-Pl
 | 6 | `2.b.R` | DONE | `fix(exchange): harden processing identity and retry semantics` | Wiederverarbeitung und Retry-Vertrag werden persistent und eindeutig. |
 | 7 | `3.a.W` | DONE | `feat(watcher): use shared exchange discovery` | Watcher verwendet dieselbe Core-Konfiguration und Erkennung. |
 | 8 | `3.a.C` | DONE | `refactor(watcher): remove legacy exchange configuration` | Doppelte Watcher-Konfiguration und Übergangslogik entfallen. |
-| 9 | `4.a.W` | NEXT | `docs(chat): add the complete PatchHarbor chat contract` | Vollständige `CHAT_INSTRUCTIONS.md` wird ausgeliefert. |
-| 10 | `4.a.C` | OPEN | `test(chat): lock the initialization and status contract` | Chat-Vertrag, UI und Packaging werden strukturell abgesichert. |
+| 9 | `4.a.W` | DONE | `docs(chat): add the complete PatchHarbor chat contract` | Vollständige `CHAT_INSTRUCTIONS.md` wird ausgeliefert. |
+| 10 | `4.a.C` | NEXT | `test(chat): lock the initialization and status contract` | Chat-Vertrag, UI und Packaging werden strukturell abgesichert. |
 | 11 | `5.a.W` | OPEN | `docs(readme): document PatchHarbor 1.1.1 workflows` | README und Help erklären alle Initialisierungs- und Betriebsfälle. |
 | 12 | `5.b.C` | OPEN | `release: finalize PatchHarbor 1.1.1` | Akzeptanz, Plattformen, Packaging und Version 1.1.1 sind freigegeben. |
 
@@ -240,9 +240,10 @@ Ein neuer Entwicklungs-Chat versteht PatchHarbor vollständig, wenn er `CHAT_INS
 
 **Commitposition:** 9 / 12<br>
 **Commit-Message:** `docs(chat): add the complete PatchHarbor chat contract`<br>
-**Status:** NEXT
+**Status:** DONE
 
 - Root-Datei `CHAT_INSTRUCTIONS.md` vollständig anlegen,
+- Datei im kanonischen Release-Dokument-Audit aufnehmen,
 - PatchHarbor-Fähigkeiten, Sicherheitsgrenze, Paketformat und Result-Bundle-Kreislauf erklären,
 - Auswertung von `manifest.json`, `context.json`, Snapshot, Patches, untracked Dateien, `run.json` und `execution.log` festlegen,
 - Plan- und Spezifikationssuche in der vereinbarten Reihenfolge beschreiben,
@@ -257,9 +258,9 @@ Ein neuer Entwicklungs-Chat versteht PatchHarbor vollständig, wenn er `CHAT_INS
 
 **Commitposition:** 10 / 12<br>
 **Commit-Message:** `test(chat): lock the initialization and status contract`<br>
-**Status:** OPEN
+**Status:** NEXT
 
-- Release-Audit und Packaging um `CHAT_INSTRUCTIONS.md` erweitern,
+- den in `4.a.W` begonnenen Release-Audit vertiefen und Packaging um `CHAT_INSTRUCTIONS.md` erweitern,
 - Pflichtabschnitte, Paketmarker, UI-Reihenfolge und exakte Statuszeilen testen,
 - Widersprüche zwischen Spezifikation, Chat-Datei, README-Vorbereitung und CLI erkennen,
 - sicherstellen, dass `PATCH BEREIT` nur bei genau einer vorhandenen Download-Datei verwendet wird,

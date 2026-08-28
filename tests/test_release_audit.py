@@ -137,6 +137,7 @@ def test_release_entry_point_and_runtime_dependency_contract_are_exact() -> None
 
 def test_release_documents_exist_at_their_canonical_paths() -> None:
     expected_documents = {
+        PROJECT_ROOT / "CHAT_INSTRUCTIONS.md",
         PROJECT_ROOT / "spec" / "SPECIFICATION.md",
         PROJECT_ROOT / "spec" / "SPECIFICATION_CHANGELOG.md",
         PROJECT_ROOT / "planning" / "1.0.0" / "commit-plan.md",
