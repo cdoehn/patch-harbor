@@ -56,3 +56,6 @@ version = { attr = "patchharbor.__version__" }
 [tool.setuptools.packages.find]
 where = ["src"]
 include = ["patchharbor", "patchharbor.*", "patchharbor_watcher", "patchharbor_watcher.*"]
+
+[tool.setuptools.data-files]
+"share/patchharbor" = ["CHAT_INSTRUCTIONS.md"]

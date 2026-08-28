@@ -316,6 +316,13 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
         ]
         assert runtime_requirements == []
         assert any(name.endswith(".dist-info/licenses/LICENSE") for name in names)
+        chat_data_name = (
+            f"patchharbor-{RELEASE_VERSION}.data/data/share/patchharbor/"
+            "CHAT_INSTRUCTIONS.md"
+        )
+        assert wheel.read(chat_data_name) == (
+            release_source / "CHAT_INSTRUCTIONS.md"
+        ).read_bytes()
 
         entry_points_name = next(
             name for name in names if name.endswith(".dist-info/entry_points.txt")
@@ -348,6 +355,7 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
         )["project"]
         assert tuple(sorted(source_project["scripts"].items())) == wheel_scripts
         for required in (
+            f"{root}/CHAT_INSTRUCTIONS.md",
             f"{root}/LICENSE",
             f"{root}/README.md",
             f"{root}/pyproject.toml",
@@ -371,6 +379,13 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
             f"{root}/dist/",
         ):
             assert not any(name.startswith(forbidden) for name in names)
+        chat_member = source_distribution.extractfile(
+            f"{root}/CHAT_INSTRUCTIONS.md"
+        )
+        assert chat_member is not None
+        assert chat_member.read() == (
+            release_source / "CHAT_INSTRUCTIONS.md"
+        ).read_bytes()
         assert not any(name.endswith(".log") for name in names)
         assert f"{root}/src/patchharbor/input.py" not in names
         assert f"{root}/src/patchharbor/files.py" not in names

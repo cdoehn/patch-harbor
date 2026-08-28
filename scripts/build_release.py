@@ -21,6 +21,7 @@ from typing import NamedTuple
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 _RELEASE_INPUT_FILES = (
+    "CHAT_INSTRUCTIONS.md",
     "LICENSE",
     "README.md",
     "pyproject.toml",
@@ -153,6 +154,51 @@ def _source_distribution_contract(
     return _DistributionContract(metadata, description, scripts)
 
 
+def _packaged_chat_instructions(
+    wheel: Path,
+    source_distribution: Path,
+) -> tuple[bytes, bytes]:
+    with zipfile.ZipFile(wheel) as archive:
+        wheel_names = [
+            name
+            for name in archive.namelist()
+            if name.endswith(
+                ".data/data/share/patchharbor/CHAT_INSTRUCTIONS.md"
+            )
+        ]
+        if len(wheel_names) != 1:
+            raise RuntimeError(
+                "wheel must contain exactly one CHAT_INSTRUCTIONS.md data file"
+            )
+        wheel_document = archive.read(wheel_names[0])
+
+    with tarfile.open(source_distribution, "r:gz") as archive:
+        roots = {
+            member.name.split("/", 1)[0]
+            for member in archive.getmembers()
+            if member.name
+        }
+        if len(roots) != 1:
+            raise RuntimeError(
+                "source distribution must contain one root directory"
+            )
+        root = next(iter(roots))
+        try:
+            member = archive.getmember(f"{root}/CHAT_INSTRUCTIONS.md")
+        except KeyError as exc:
+            raise RuntimeError(
+                "source distribution is missing CHAT_INSTRUCTIONS.md"
+            ) from exc
+        source_file = archive.extractfile(member)
+        if source_file is None:
+            raise RuntimeError(
+                "source-distribution CHAT_INSTRUCTIONS.md is unreadable"
+            )
+        source_document = source_file.read()
+
+    return wheel_document, source_document
+
+
 def _audit_release_artifacts(wheel: Path, source_distribution: Path) -> None:
     wheel_contract = _wheel_contract(wheel)
     source_contract = _source_distribution_contract(source_distribution)
@@ -168,6 +214,16 @@ def _audit_release_artifacts(wheel: Path, source_distribution: Path) -> None:
     if source_distribution.name != f"patchharbor-{version}.tar.gz":
         raise RuntimeError(
             "source-distribution filename does not match release metadata"
+        )
+
+    expected_chat = (PROJECT_ROOT / "CHAT_INSTRUCTIONS.md").read_bytes()
+    wheel_chat, source_chat = _packaged_chat_instructions(
+        wheel,
+        source_distribution,
+    )
+    if wheel_chat != expected_chat or source_chat != expected_chat:
+        raise RuntimeError(
+            "release artifacts do not contain the canonical chat instructions"
         )
 
 

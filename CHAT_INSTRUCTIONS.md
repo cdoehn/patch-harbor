@@ -39,7 +39,7 @@ patchharbor configure exchange-directory VERZEICHNIS
 patchharbor configure show
 patchharbor register [REPOSITORY]
 patchharbor registry list
-patchharbor unregister [REPOSITORY_OR_REPO_ID]
+patchharbor unregister REPOSITORY_OR_REPO_ID
 patchharbor context [REPOSITORY]
 patchharbor bundle [REPOSITORY]
 patchharbor apply [PATCH_ZIP]

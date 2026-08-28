@@ -124,15 +124,30 @@ def test_result_bundle_defaults_use_shared_configuration_not_legacy_paths() -> N
 
 
 def test_release_entry_point_and_runtime_dependency_contract_are_exact() -> None:
-    project = tomllib.loads(
+    configuration = tomllib.loads(
         (PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8")
-    )["project"]
+    )
+    project = configuration["project"]
 
     assert project["scripts"] == {
         "patchharbor": "patchharbor.cli:main",
         "patchharbor-watcher": "patchharbor_watcher.cli:main",
     }
     assert project["dependencies"] == []
+    assert configuration["tool"]["setuptools"]["data-files"] == {
+        "share/patchharbor": ["CHAT_INSTRUCTIONS.md"]
+    }
+
+    build_source = (
+        PROJECT_ROOT / "scripts" / "build_release.py"
+    ).read_text(encoding="utf-8")
+    assert '_RELEASE_INPUT_FILES = (\n    "CHAT_INSTRUCTIONS.md",' in (
+        build_source
+    )
+    assert ".data/data/share/patchharbor/CHAT_INSTRUCTIONS.md" in (
+        build_source
+    )
+    assert not (PROJECT_ROOT / "MANIFEST.in").exists()
 
 
 def test_release_documents_exist_at_their_canonical_paths() -> None:
