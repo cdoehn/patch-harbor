@@ -83,12 +83,16 @@ def _build_parser() -> argparse.ArgumentParser:
     parser = _ExactArgumentParser(
         prog="patchharbor",
         description=(
-            "Run generated Bash and PowerShell scripts or ZIP "
-            "PatchBundles with controlled execution."
+            "Register local Git repository instances, exchange complete "
+            "Result Bundles, and validate or apply repository-bound ZIP "
+            "patch packages. The separate 'fs run' command executes "
+            "explicit scripts and ZIP PatchBundles."
         ),
         epilog=(
-            "Use 'patchharbor fs run --help' for input formats, "
-            "execution rules, and run options."
+            "Configure the shared Exchange directory once with "
+            "'patchharbor configure exchange-directory DIRECTORY'. "
+            "Use 'patchharbor COMMAND --help' for one command's complete "
+            "options."
         ),
     )
     parser.add_argument(
@@ -106,6 +110,14 @@ def _build_parser() -> argparse.ArgumentParser:
     configure_parser = commands.add_parser(
         "configure",
         help="configure shared PatchHarbor user settings",
+        description=(
+            "Manage the one user-specific config.json shared by Result "
+            "Bundles, automatic Apply discovery, and the optional watcher."
+        ),
+        epilog=(
+            "The Exchange directory is global per user and must not overlap "
+            "any registered repository."
+        ),
     )
     configure_commands = configure_parser.add_subparsers(
         dest="configure_command",
@@ -115,6 +127,10 @@ def _build_parser() -> argparse.ArgumentParser:
     exchange_directory_parser = configure_commands.add_parser(
         "exchange-directory",
         help="set the shared exchange directory",
+        description=(
+            "Create when necessary, validate, physically resolve, and "
+            "persist the shared Exchange directory in config.json."
+        ),
     )
     exchange_directory_parser.add_argument(
         "directory",
@@ -125,11 +141,20 @@ def _build_parser() -> argparse.ArgumentParser:
     configure_commands.add_parser(
         "show",
         help="show the shared PatchHarbor configuration",
+        description=(
+            "Show the active config.json path and the canonical shared "
+            "Exchange directory."
+        ),
     )
 
     register_parser = commands.add_parser(
         "register",
         help="register one local Git repository instance",
+        description=(
+            "Register one physical Git repository instance with a committed "
+            "HEAD. Registration writes .patchharbor/id and a central UUID "
+            "mapping; it does not configure the Exchange directory."
+        ),
     )
     register_parser.add_argument(
         "repository",
@@ -178,6 +203,10 @@ def _build_parser() -> argparse.ArgumentParser:
     context_parser = commands.add_parser(
         "context",
         help="describe one registered repository state",
+        description=(
+            "Print the repository UUID, base commit, dirty state, and exact "
+            "state fingerprint without creating a Result Bundle."
+        ),
     )
     context_parser.add_argument(
         "repository",
@@ -196,6 +225,16 @@ def _build_parser() -> argparse.ArgumentParser:
     bundle_parser = commands.add_parser(
         "bundle",
         help="create a Result Bundle for one registered repository",
+        description=(
+            "Capture the complete current repository state: the base commit, "
+            "staged and unstaged changes, and non-ignored untracked regular "
+            "files."
+        ),
+        epilog=(
+            "Without --output-dir, publish in the configured Exchange "
+            "directory. Result Bundles contain no Git history and may "
+            "contain secrets."
+        ),
     )
     bundle_parser.add_argument(
         "repository",
@@ -208,7 +247,7 @@ def _build_parser() -> argparse.ArgumentParser:
         "--output-dir",
         type=Path,
         metavar="DIRECTORY",
-        help="publish the Result Bundle in this directory",
+        help="override the configured Exchange directory for this bundle",
     )
     bundle_parser.add_argument(
         "--json",
@@ -220,6 +259,19 @@ def _build_parser() -> argparse.ArgumentParser:
     apply_parser = commands.add_parser(
         "apply",
         help="validate or apply one repository-bound patch package",
+        description=(
+            "Validate or apply one repository-bound ZIP patch package. Omit "
+            "PATCH_ZIP to discover exactly one unattempted package in the "
+            "configured Exchange directory whose repository ID and state "
+            "match a registered repository."
+        ),
+        epilog=(
+            "An explicit PATCH_ZIP bypasses automatic discovery. An explicit "
+            "--output-dir overrides only the Result Bundle destination. The "
+            "current directory does not select the target repository. Apply "
+            "attempts a Result Bundle after repository resolution; earlier "
+            "writes are not globally rolled back after a later failure."
+        ),
     )
     apply_parser.add_argument(
         "--dry-run",
@@ -240,7 +292,10 @@ def _build_parser() -> argparse.ArgumentParser:
         "--output-dir",
         type=Path,
         metavar="DIRECTORY",
-        help="publish a Result Bundle in this directory when one is attempted",
+        help=(
+            "override the configured Exchange directory for an attempted "
+            "Result Bundle"
+        ),
     )
     apply_parser.add_argument(
         "--plain",
@@ -264,8 +319,8 @@ def _build_parser() -> argparse.ArgumentParser:
         nargs="?",
         metavar="PATCH_ZIP",
         help=(
-            "ZIP patch package containing a root patch.json; "
-            "when omitted, discover one matching package in Exchange"
+            "explicit ZIP package containing a root patch.json; when omitted, "
+            "discover exactly one matching unattempted Exchange package"
         ),
     )
 

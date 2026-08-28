@@ -5,7 +5,7 @@
 **Vorgesehener Repository-Pfad:** `planning/1.1.1/commit-plan.md`<br>
 **Vorbereitender Commit außerhalb des Zählers:** `docs: define PatchHarbor 1.1.1 implementation plan`<br>
 **Plan-Konsolidierung außerhalb des Zählers:** `docs(plan): consolidate PatchHarbor 1.1.1 implementation plan` (`OFF-PLAN` `PLAN12`)<br>
-**Planstatus:** 10 / 12 Plan-Commits umgesetzt; nächster Plan-Commit: `5.a.W`; 2 Plan-Commits offen.<br>
+**Planstatus:** 11 / 12 Plan-Commits umgesetzt; nächster Plan-Commit: `5.b.C`; 1 Plan-Commit offen.<br>
 **Umfang:** 5 Meilensteine, 12 fachlich eigenständige Plan-Commits.
 
 ---
@@ -82,8 +82,8 @@ Fixes verwenden `<PLAN-ID>-FIX<n>` und verändern den Plan-Zähler nicht. Off-Pl
 | 8 | `3.a.C` | DONE | `refactor(watcher): remove legacy exchange configuration` | Doppelte Watcher-Konfiguration und Übergangslogik entfallen. |
 | 9 | `4.a.W` | DONE | `docs(chat): add the complete PatchHarbor chat contract` | Vollständige `CHAT_INSTRUCTIONS.md` wird ausgeliefert. |
 | 10 | `4.a.C` | DONE | `test(chat): lock the initialization and status contract` | Chat-Vertrag, UI und Packaging werden strukturell abgesichert. |
-| 11 | `5.a.W` | NEXT | `docs(readme): document PatchHarbor 1.1.1 workflows` | README und Help erklären alle Initialisierungs- und Betriebsfälle. |
-| 12 | `5.b.C` | OPEN | `release: finalize PatchHarbor 1.1.1` | Akzeptanz, Plattformen, Packaging und Version 1.1.1 sind freigegeben. |
+| 11 | `5.a.W` | DONE | `docs(readme): document PatchHarbor 1.1.1 workflows` | README und Help erklären alle Initialisierungs- und Betriebsfälle. |
+| 12 | `5.b.C` | NEXT | `release: finalize PatchHarbor 1.1.1` | Akzeptanz, Plattformen, Packaging und Version 1.1.1 sind freigegeben. |
 
 Statuswerte sind ausschließlich `DONE`, `NEXT` und `OPEN`. Die `DONE`-Zeilen müssen lückenlos am Anfang stehen; solange der Plan nicht abgeschlossen ist, folgt genau eine `NEXT`-Zeile.
 
@@ -281,7 +281,7 @@ README, Help, Verhalten, Tests und Paketversion beschreiben denselben vollständ
 
 **Commitposition:** 11 / 12<br>
 **Commit-Message:** `docs(readme): document PatchHarbor 1.1.1 workflows`<br>
-**Status:** NEXT
+**Status:** DONE
 
 - README für neues Repository, bestehendes unregistriertes Repository und bereits registriertes Repository aktualisieren,
 - Lage und geschlossenes Schema von `config.json` erklären,
@@ -298,7 +298,7 @@ README, Help, Verhalten, Tests und Paketversion beschreiben denselben vollständ
 
 **Commitposition:** 12 / 12<br>
 **Commit-Message:** `release: finalize PatchHarbor 1.1.1`<br>
-**Status:** OPEN
+**Status:** NEXT
 
 - vollständigen manuellen 1.1.1-Kreislauf End-to-End prüfen,
 - Watcher-Delegation, Result-Bundle-Ignorierung und persistente Dateidentität prüfen,

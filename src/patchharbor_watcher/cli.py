@@ -56,14 +56,24 @@ def _build_parser() -> argparse.ArgumentParser:
         prog="patchharbor-watcher",
         allow_abbrev=False,
         description=(
-            "Poll the shared Exchange directory and delegate automatic "
-            "requests to 'patchharbor apply --json'."
+            "Continuously invoke parameterless 'patchharbor apply --json' "
+            "for the shared Exchange directory from PatchHarbor config.json."
+        ),
+        epilog=(
+            "Configure Exchange first with 'patchharbor configure "
+            "exchange-directory DIRECTORY'. Run in the foreground or install "
+            "the optional Linux systemd user unit; the installer does not "
+            "enable or start it. Use manual 'patchharbor apply' on "
+            "Termux/Android."
         ),
     )
     parser.add_argument(
         "--install-systemd-user-unit",
         action="store_true",
-        help="install the Linux systemd user unit without enabling it",
+        help=(
+            "install the Linux systemd user unit after Exchange is configured; "
+            "do not enable or start it"
+        ),
     )
     parser.add_argument(
         "--poll-interval",

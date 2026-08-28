@@ -386,6 +386,9 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
         assert chat_member.read() == (
             release_source / "CHAT_INSTRUCTIONS.md"
         ).read_bytes()
+        readme_member = source_distribution.extractfile(f"{root}/README.md")
+        assert readme_member is not None
+        assert readme_member.read() == (release_source / "README.md").read_bytes()
         assert not any(name.endswith(".log") for name in names)
         assert f"{root}/src/patchharbor/input.py" not in names
         assert f"{root}/src/patchharbor/files.py" not in names
@@ -465,6 +468,7 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
 
     assert watcher_executable.is_file()
 
+    help_outputs: dict[tuple[str, ...], str] = {}
     for help_arguments in (
         ("--help",),
         ("configure", "--help"),
@@ -486,6 +490,15 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
             environment=environment,
         )
         assert help_result.returncode == 0
+        help_outputs[help_arguments] = " ".join(help_result.stdout.split())
+
+    assert "Register local Git repository instances" in help_outputs[("--help",)]
+    assert "one user-specific config.json" in help_outputs[("configure", "--help")]
+    assert "committed HEAD" in help_outputs[("register", "--help")]
+    assert "exactly one unattempted package" in help_outputs[("apply", "--help")]
+    assert "current directory does not select the target repository" in (
+        help_outputs[("apply", "--help")]
+    )
 
     watcher_help = _run(
         [str(watcher_executable), "--help"],
@@ -493,6 +506,12 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
         environment=environment,
     )
     assert watcher_help.returncode == 0
+    watcher_help_text = " ".join(watcher_help.stdout.split())
+    assert "PatchHarbor config.json" in watcher_help_text
+    assert "patchharbor configure exchange-directory DIRECTORY" in (
+        watcher_help_text
+    )
+    assert "Termux/Android" in watcher_help_text
 
     for excluded_command in (
         "websocket",
