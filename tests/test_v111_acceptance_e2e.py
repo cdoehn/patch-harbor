@@ -1,4 +1,4 @@
-"""Complete public acceptance workflows for PatchHarbor 1.1.0."""
+"""Complete public acceptance workflows for PatchHarbor 1.1.1."""
 
 from __future__ import annotations
 
@@ -115,7 +115,7 @@ def _result_bundle_path(envelope: dict[str, object]) -> Path:
     return Path(path)
 
 
-def test_v110_acceptance_complete_repository_workflow(tmp_path: Path) -> None:
+def test_v111_acceptance_complete_repository_workflow(tmp_path: Path) -> None:
     repository = create_repository(tmp_path / "repository")
     environment = isolated_user_environment(tmp_path / "user")
     context = _register_and_context(repository, environment)
@@ -142,7 +142,8 @@ def test_v110_acceptance_complete_repository_workflow(tmp_path: Path) -> None:
         == context["state_fingerprint"]
     )
 
-    package = tmp_path / "workflow.zip"
+    exchange = _exchange_directory(environment).resolve()
+    package = exchange / "workflow.zip"
     entrypoint_name = _write_patch_package(
         package,
         context,
@@ -153,8 +154,9 @@ def test_v110_acceptance_complete_repository_workflow(tmp_path: Path) -> None:
             "[System.IO.File]::WriteAllText("
             "'applied.txt', \"entrypoint-ran`n\")",
         ),
-        payloads={"tracked.txt": b"patched\n", "nested/payload.bin": b"\x00v110\xff"},
+        payloads={"tracked.txt": b"patched\n", "nested/payload.bin": b"\x00v111\xff"},
     )
+    package_bytes = package.read_bytes()
     caller = tmp_path / "caller"
     caller.mkdir()
 
@@ -163,9 +165,6 @@ def test_v110_acceptance_complete_repository_workflow(tmp_path: Path) -> None:
         "apply",
         "--dry-run",
         "--json",
-        "--output-dir",
-        str(tmp_path / "dry-results"),
-        str(package),
         environment_overrides=environment,
         timeout_seconds=120,
     )
@@ -175,7 +174,9 @@ def test_v110_acceptance_complete_repository_workflow(tmp_path: Path) -> None:
     assert (repository / "tracked.txt").read_bytes() == b"base\n"
     assert not (repository / "nested").exists()
     assert not (repository / "applied.txt").exists()
-    with zipfile.ZipFile(_result_bundle_path(dry_envelope)) as archive:
+    dry_bundle = _result_bundle_path(dry_envelope)
+    assert dry_bundle.parent == exchange
+    with zipfile.ZipFile(dry_bundle) as archive:
         assert "logs/execution.log" not in archive.namelist()
         assert json.loads(archive.read("context.json"))["dirty"] is False
 
@@ -183,9 +184,6 @@ def test_v110_acceptance_complete_repository_workflow(tmp_path: Path) -> None:
         caller,
         "apply",
         "--json",
-        "--output-dir",
-        str(tmp_path / "apply-results"),
-        str(package),
         environment_overrides=environment,
         timeout_seconds=120,
     )
@@ -193,18 +191,21 @@ def test_v110_acceptance_complete_repository_workflow(tmp_path: Path) -> None:
     applied_envelope = json.loads(applied.stdout)
     assert applied_envelope["result"]["primary_result"]["kind"] == "success"
     assert (repository / "tracked.txt").read_bytes() == b"patched\n"
-    assert (repository / "nested" / "payload.bin").read_bytes() == b"\x00v110\xff"
+    assert (repository / "nested" / "payload.bin").read_bytes() == b"\x00v111\xff"
     assert (repository / "applied.txt").read_text(encoding="utf-8") == (
         "entrypoint-ran\n"
     )
     assert not (repository / entrypoint_name).exists()
 
-    with zipfile.ZipFile(_result_bundle_path(applied_envelope)) as archive:
+    applied_bundle = _result_bundle_path(applied_envelope)
+    assert applied_bundle.parent == exchange
+    assert package.read_bytes() == package_bytes
+    with zipfile.ZipFile(applied_bundle) as archive:
         names = set(archive.namelist())
         final_context = json.loads(archive.read("context.json"))
         assert archive.read("base/tracked.txt") == b"base\n"
         assert archive.read("changes/unstaged.patch")
-        assert archive.read("untracked/nested/payload.bin") == b"\x00v110\xff"
+        assert archive.read("untracked/nested/payload.bin") == b"\x00v111\xff"
         assert archive.read("untracked/applied.txt") == b"entrypoint-ran\n"
         assert b"accepted" in archive.read("logs/execution.log").splitlines()
     assert "logs/run.json" in names
@@ -212,7 +213,7 @@ def test_v110_acceptance_complete_repository_workflow(tmp_path: Path) -> None:
     assert final_context["state_fingerprint"] != context["state_fingerprint"]
 
 
-def test_v110_acceptance_state_mismatch_writes_nothing_and_bundles_actual_state(
+def test_v111_acceptance_state_mismatch_writes_nothing_and_bundles_actual_state(
     tmp_path: Path,
 ) -> None:
     repository = create_repository(tmp_path / "repository")
@@ -263,7 +264,7 @@ def test_v110_acceptance_state_mismatch_writes_nothing_and_bundles_actual_state(
     ]
 
 
-def test_v110_acceptance_entrypoint_failure_preserves_exit_and_result_bundle(
+def test_v111_acceptance_entrypoint_failure_preserves_exit_and_result_bundle(
     tmp_path: Path,
 ) -> None:
     repository = create_repository(tmp_path / "repository")
@@ -313,7 +314,7 @@ def test_v110_acceptance_entrypoint_failure_preserves_exit_and_result_bundle(
     assert run_report["process_exit_code"] == 23
 
 
-def test_v110_acceptance_bundle_failure_after_success_returns_eleven(
+def test_v111_acceptance_bundle_failure_after_success_returns_eleven(
     tmp_path: Path,
 ) -> None:
     repository = create_repository(tmp_path / "repository")
@@ -379,7 +380,8 @@ def test_v110_acceptance_bundle_failure_after_success_returns_eleven(
     assert emergency_run["result_bundle"]["status"] == "failed"
     assert emergency_run["process_exit_code"] == int(ExitCode.RESULT_BUNDLE_ERROR)
 
-def test_v110_acceptance_watcher_delegates_to_real_apply_once(
+
+def test_v111_acceptance_watcher_delegates_to_real_apply_once(
     tmp_path: Path,
 ) -> None:
     repository = create_repository(tmp_path / "repository")

@@ -1,15 +1,22 @@
 # PatchHarbor – Spezifikations-Changelog
 
 **Dateiname:** `SPECIFICATION_CHANGELOG.md`<br>
-**Stand:** 2026-08-26
+**Stand:** 2026-08-28
 
 Dieses Dokument protokolliert Änderungen am verbindlichen Produktziel. Es ist kein Git-Commit-Log und ersetzt nicht die getrennten Umsetzungspläne unter `planning/`.
 
 ---
 
-## [1.1.1] – 2026-08-25
+## [1.1.1] – 2026-08-28
 
-**Status:** Verbindliches, implementierungsreifes Zielbild; die Umsetzung erfolgt über `planning/1.1.1/commit-plan.md`.
+**Status:** Freigegeben und vollständig umgesetzt; der abgeschlossene Plan liegt unter `planning/1.1.1/commit-plan.md`.
+
+### Release – 2026-08-28
+
+- Paketversion und Release-Artefakte verwenden verbindlich `1.1.1`.
+- Der konsolidierte Plan ist mit 12 / 12 Plan-Commits vollständig abgeschlossen und enthält keine `NEXT`- oder `OPEN`-Zeile mehr.
+- Der vollständige manuelle Exchange-Kreislauf, die Watcher-Delegation, persistente Dateiidentität, Linux- und Windows-Verträge sowie Wheel-, Source-Distribution- und pipx-Installation sind blockierend abgesichert.
+- Spezifikation, README, Chat-Vertrag, CLI, Packaging und Release-Audits beschreiben denselben freigegebenen 1.1.1-Stand.
 
 ### Planning correction – 2026-08-26
 

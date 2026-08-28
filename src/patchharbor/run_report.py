@@ -36,7 +36,7 @@ class RunOperation(str, Enum):
 
 
 class PrimaryResultKind(str, Enum):
-    """Stable primary-result categories defined by the 1.1.0 contract."""
+    """Stable primary-result categories in the public run contract."""
 
     SUCCESS = "success"
     DRY_RUN_SUCCESS = "dry_run_success"

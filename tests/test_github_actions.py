@@ -113,6 +113,7 @@ def test_pytest_groups_are_registered_and_assigned_to_public_suites() -> None:
         "test_acceptance_e2e.py": "acceptance",
         "test_cli_e2e.py": "e2e",
         "test_platform_e2e.py": "platform",
+        "test_v111_acceptance_e2e.py": "acceptance",
         "test_windows_acceptance_e2e.py": "platform",
         "test_packaging_e2e.py": "packaging",
     }

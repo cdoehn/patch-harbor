@@ -23,7 +23,7 @@ from tests.registration_support import isolated_user_environment
 pytestmark = pytest.mark.packaging
 
 MAX_WHEEL_BYTES = 256 * 1024
-RELEASE_VERSION = "1.1.0"
+RELEASE_VERSION = "1.1.1"
 EXPECTED_RUNTIME_FILES = {
     "patchharbor/__init__.py",
     "patchharbor/application.py",

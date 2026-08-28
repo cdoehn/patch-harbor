@@ -305,3 +305,50 @@ def test_watcher_is_only_shared_configuration_lifecycle_and_core_apply() -> None
     assert not (CORE_PACKAGE_ROOT / "path_configuration.py").exists()
     for removed in ("configuration.py", "loop_guard.py", "state.py"):
         assert not (WATCHER_PACKAGE_ROOT / removed).exists()
+
+
+def test_v111_release_state_is_complete_and_versioned() -> None:
+    from patchharbor import __version__
+
+    plan = (
+        PROJECT_ROOT / "planning" / "1.1.1" / "commit-plan.md"
+    ).read_text(encoding="utf-8")
+    specification = (
+        PROJECT_ROOT / "spec" / "SPECIFICATION.md"
+    ).read_text(encoding="utf-8")
+    changelog = (
+        PROJECT_ROOT / "spec" / "SPECIFICATION_CHANGELOG.md"
+    ).read_text(encoding="utf-8")
+    packaging = (
+        PROJECT_ROOT / "tests" / "test_packaging_e2e.py"
+    ).read_text(encoding="utf-8")
+    chat = (PROJECT_ROOT / "CHAT_INSTRUCTIONS.md").read_text(encoding="utf-8")
+    readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
+
+    assert __version__ == "1.1.1"
+    assert 'RELEASE_VERSION = "1.1.1"' in packaging
+    assert "**Produktversion:** `1.1.1`<br>" in specification
+    assert "**Vertragsversion:** 1.1.1<br>" in chat
+    assert "PatchHarbor 1.1.1" in readme
+    assert (
+        "**Planstatus:** 12 / 12 Plan-Commits umgesetzt; "
+        "Plan abgeschlossen; 0 Plan-Commits offen.<br>"
+    ) in plan
+    done_rows = re.findall(
+        r"^\| \d+ \| `[^`]+` \| DONE \|",
+        plan,
+        re.MULTILINE,
+    )
+    assert len(done_rows) == 12
+    assert "| NEXT |" not in plan
+    assert "| OPEN |" not in plan
+    assert (
+        "**Status:** Verbindliche, freigegebene Produktspezifikation"
+        in specification
+    )
+    assert "**Status:** Freigegeben und vollständig umgesetzt;" in changelog
+    assert (PROJECT_ROOT / "tests" / "test_v111_acceptance_e2e.py").is_file()
+    assert not (PROJECT_ROOT / "tests" / "test_v110_acceptance_e2e.py").exists()
+    assert "PatchHarbor 1.1.0" not in (
+        PROJECT_ROOT / "tests" / "test_v111_acceptance_e2e.py"
+    ).read_text(encoding="utf-8")

@@ -2,14 +2,14 @@
 
 **Dateiname:** `SPECIFICATION.md`<br>
 **Produktversion:** `1.1.1`<br>
-**Spezifikationsstand:** 2026-08-25<br>
-**Status:** Verbindliches, implementierungsreifes Zielbild für PatchHarbor 1.1.1<br>
+**Spezifikationsstand:** 2026-08-28<br>
+**Status:** Verbindliche, freigegebene Produktspezifikation für PatchHarbor 1.1.1<br>
 **Projektname:** `PatchHarbor`<br>
 **Kommando:** `patchharbor`<br>
 **Skriptmarker:** `# PATCHHARBOR`<br>
 **Patch-Paketmarker:** `patch-harbor`
 
-Der aktuelle Umsetzungs- und Commit-Plan ist von dieser Produktspezifikation getrennt und liegt unter `planning/1.1.1/commit-plan.md`. Die abgeschlossenen Pläne für 1.0.0 und 1.1.0 bleiben als historische Umsetzungsgrundlage erhalten. Änderungen am Produktziel werden in `spec/SPECIFICATION_CHANGELOG.md` dokumentiert.
+Der abgeschlossene Umsetzungs- und Commit-Plan ist von dieser Produktspezifikation getrennt und liegt unter `planning/1.1.1/commit-plan.md`. Die abgeschlossenen Pläne für 1.0.0 und 1.1.0 bleiben als historische Umsetzungsgrundlage erhalten. Änderungen am Produktziel werden in `spec/SPECIFICATION_CHANGELOG.md` dokumentiert.
 
 ---
 
@@ -2557,7 +2557,7 @@ Daher gilt verbindlich:
 
 ### 25.3 Umsetzungsblöcke
 
-Die weitere Umsetzung folgt ausschließlich `planning/1.1.1/commit-plan.md` und umfasst:
+Die abgeschlossene Umsetzung folgte ausschließlich `planning/1.1.1/commit-plan.md` und umfasste:
 
 1. gemeinsame `config.json` und Exchange-Pfadpolitik,
 2. Result-Bundle-Ausgabe in den Exchange-Ordner,
