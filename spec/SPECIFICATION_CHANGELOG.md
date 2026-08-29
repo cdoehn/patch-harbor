@@ -1,7 +1,7 @@
 # PatchHarbor – Spezifikations-Changelog
 
 **Dateiname:** `SPECIFICATION_CHANGELOG.md`<br>
-**Stand:** 2026-08-28
+**Stand:** 2026-08-29
 
 Dieses Dokument protokolliert Änderungen am verbindlichen Produktziel. Es ist kein Git-Commit-Log und ersetzt nicht die getrennten Umsetzungspläne unter `planning/`.
 
@@ -10,6 +10,13 @@ Dieses Dokument protokolliert Änderungen am verbindlichen Produktziel. Es ist k
 ## [1.1.1] – 2026-08-28
 
 **Status:** Freigegeben und vollständig umgesetzt; der abgeschlossene Plan liegt unter `planning/1.1.1/commit-plan.md`.
+
+### Post-release fix – 2026-08-29
+
+- `2.b.R-FIX1` hält die automatische Exchange-Erkennung auf gemeinsamem Android-/Termux-Speicher funktionsfähig, wenn Pfad- und Deskriptoransicht keine vergleichbare Inode-Identität liefern.
+- Der Fallback bleibt auf Exchange-Dateien begrenzt und verlangt weiterhin übereinstimmenden Dateityp, Größe und Änderungszeit sowie den vollständigen SHA-256; ausgewählte Pakete werden vor der Mutation erneut geöffnet und gehasht.
+- Eine einzelne instabile, nicht lesbare oder gleichzeitig veränderte Fremddatei wird nur für den aktuellen Scan übersprungen und macht nicht mehr den gesamten Exchange-Ordner unbrauchbar.
+- Der gemeinsame Standard-Timeout für `patchharbor apply` und `patchharbor fs run` steigt von 300 auf 10.800 Sekunden (drei Stunden); `--timeout` bleibt die explizite Überschreibung pro Aufruf. Der Watcher verwendet denselben Core-Default.
 
 ### Release – 2026-08-28
 

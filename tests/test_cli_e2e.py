@@ -135,7 +135,7 @@ def test_fs_run_help_is_limited_to_public_arguments(tmp_path: Path) -> None:
         "before any script starts."
     ) in help_text
     assert "--timeout SECONDS" in completed.stdout
-    assert "default: 300" in completed.stdout
+    assert "default: 10800" in completed.stdout
     assert "--plain" in completed.stdout
     assert "--no-color" in completed.stdout
     assert "--log" in completed.stdout
@@ -962,7 +962,7 @@ def test_fs_run_log_contains_complete_output_and_run_metadata(
         assert "PatchHarbor run log\n" in log_text
         expected_cwd = json.dumps(str(tmp_path), ensure_ascii=False)
         assert f"working_directory: {expected_cwd}\n" in log_text
-        assert "timeout_seconds: 300\n" in log_text
+        assert "timeout_seconds: 10800\n" in log_text
         assert "plain_output:" not in log_text
         assert "color_enabled:" not in log_text
         assert "--- output ---\n" in log_text

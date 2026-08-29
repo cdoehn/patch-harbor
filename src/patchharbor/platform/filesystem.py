@@ -162,13 +162,29 @@ def _descriptor_signature(metadata: os.stat_result) -> tuple[int, ...]:
     return common
 
 
+def _portable_content_signature(metadata: os.stat_result) -> tuple[int, ...]:
+    """Metadata that path and descriptor views should expose consistently."""
+    return (
+        stat.S_IFMT(metadata.st_mode),
+        metadata.st_size,
+        metadata.st_mtime_ns,
+    )
+
+
 def _same_path_and_open_file_state(
     path_metadata: os.stat_result,
     opened_metadata: os.stat_result,
+    *,
+    allow_path_identity_fallback: bool,
 ) -> bool:
-    return os.path.samestat(path_metadata, opened_metadata) and (
+    if os.path.samestat(path_metadata, opened_metadata) and (
         _path_and_descriptor_signature(path_metadata)
         == _path_and_descriptor_signature(opened_metadata)
+    ):
+        return True
+    return allow_path_identity_fallback and (
+        _portable_content_signature(path_metadata)
+        == _portable_content_signature(opened_metadata)
     )
 
 
@@ -208,6 +224,7 @@ def _read_stable_regular_file(
     *,
     retained_content_limit: int | None,
     calculate_sha256: bool,
+    allow_path_identity_fallback: bool,
 ) -> tuple[bytes | None, bool, int, str | None]:
     initial_metadata = _regular_path_metadata(path)
 
@@ -221,11 +238,19 @@ def _read_stable_regular_file(
         descriptor = os.open(path, flags)
         opened_metadata = os.fstat(descriptor)
         _require_regular_file(opened_metadata)
-        if not _same_path_and_open_file_state(initial_metadata, opened_metadata):
+        if not _same_path_and_open_file_state(
+            initial_metadata,
+            opened_metadata,
+            allow_path_identity_fallback=allow_path_identity_fallback,
+        ):
             raise FileChangedDuringRead
 
         current_metadata = _regular_path_metadata(path)
-        if not _same_path_and_open_file_state(current_metadata, opened_metadata):
+        if not _same_path_and_open_file_state(
+            current_metadata,
+            opened_metadata,
+            allow_path_identity_fallback=allow_path_identity_fallback,
+        ):
             raise FileChangedDuringRead
 
         hasher = sha256() if calculate_sha256 else None
@@ -260,7 +285,11 @@ def _read_stable_regular_file(
     final_metadata = _regular_path_metadata(path)
     if (
         not _same_open_file_state(opened_metadata, finished_metadata)
-        or not _same_path_and_open_file_state(final_metadata, finished_metadata)
+        or not _same_path_and_open_file_state(
+            final_metadata,
+            finished_metadata,
+            allow_path_identity_fallback=allow_path_identity_fallback,
+        )
         or size != finished_metadata.st_size
     ):
         raise FileChangedDuringRead
@@ -279,6 +308,7 @@ def read_stable_regular_file(path: Path) -> StableRegularFile:
         path,
         retained_content_limit=None,
         calculate_sha256=False,
+        allow_path_identity_fallback=False,
     )
     if content is None:
         raise RuntimeError("unlimited stable file read discarded its content")
@@ -289,8 +319,15 @@ def read_stable_regular_file_with_sha256(
     path: Path,
     *,
     retained_content_limit: int,
+    allow_path_identity_fallback: bool = False,
 ) -> StableRegularFileHash:
-    """Hash a stable regular file while bounding retained in-memory content."""
+    """Hash a stable regular file while bounding retained in-memory content.
+
+    The opt-in fallback accepts matching type, size, and mtime when a virtual
+    filesystem does not expose comparable path and descriptor identities. It
+    remains unsuitable as a sole trust decision and is reserved for callers
+    that subsequently re-open and verify the complete content hash.
+    """
     if (
         isinstance(retained_content_limit, bool)
         or not isinstance(retained_content_limit, int)
@@ -301,6 +338,7 @@ def read_stable_regular_file_with_sha256(
         path,
         retained_content_limit=retained_content_limit,
         calculate_sha256=True,
+        allow_path_identity_fallback=allow_path_identity_fallback,
     )
     if digest is None:
         raise RuntimeError("stable hashed file read did not produce a digest")

@@ -9,6 +9,7 @@ import pytest
 import patchharbor.platform.filesystem as filesystem_module
 from patchharbor.platform.errors import describe_os_error
 from patchharbor.platform.filesystem import (
+    FileChangedDuringRead,
     FileSystemOperationError,
     MetadataSyncStatus,
     PathKind,
@@ -77,6 +78,42 @@ def test_stable_regular_file_reader_preserves_bytes_and_final_metadata(
 
     assert snapshot.content == content
     assert snapshot.executable is False
+
+
+def test_stable_hash_reader_can_fallback_when_path_identity_is_unreliable(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    target = tmp_path / "shared-storage.bin"
+    content = b"stable shared-storage payload"
+    target.write_bytes(content)
+
+    monkeypatch.setattr(
+        filesystem_module.os.path,
+        "samestat",
+        lambda *_metadata: False,
+    )
+    monkeypatch.setattr(
+        filesystem_module,
+        "_same_open_file_state",
+        lambda *_metadata: True,
+    )
+
+    with pytest.raises(FileChangedDuringRead):
+        read_stable_regular_file_with_sha256(
+            target,
+            retained_content_limit=len(content),
+        )
+
+    snapshot = read_stable_regular_file_with_sha256(
+        target,
+        retained_content_limit=len(content),
+        allow_path_identity_fallback=True,
+    )
+
+    assert snapshot.content == content
+    assert snapshot.size == len(content)
+    assert snapshot.sha256 == sha256(content).hexdigest()
 
 
 def test_stable_hash_reader_bounds_retained_content_but_hashes_all_bytes(

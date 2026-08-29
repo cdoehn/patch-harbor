@@ -129,6 +129,9 @@ def test_readme_covers_manual_overrides_termux_and_watcher_workflows() -> None:
     assert "No match or multiple matches stop without repository mutation" in (
         compact
     )
+    assert "default timeout for one script or repository entrypoint is 10,800 seconds" in (
+        compact
+    )
     assert "Use manual mode on Termux" in compact
     assert "No Termux-specific watcher support is claimed" in compact
     assert "patchharbor-watcher --configure" not in document
@@ -166,6 +169,7 @@ def test_core_help_explains_the_documented_exchange_workflow() -> None:
     assert "An explicit PATCH_ZIP bypasses automatic discovery" in apply_help
     assert "current directory does not select the target repository" in apply_help
     assert "earlier writes are not globally rolled back" in apply_help
+    assert "default: 10800" in apply_help
 
 
 def test_watcher_help_explains_shared_config_systemd_and_termux_boundary() -> None:

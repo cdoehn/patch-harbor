@@ -6,6 +6,7 @@
 **Vorbereitender Commit außerhalb des Zählers:** `docs: define PatchHarbor 1.1.1 implementation plan`<br>
 **Plan-Konsolidierung außerhalb des Zählers:** `docs(plan): consolidate PatchHarbor 1.1.1 implementation plan` (`OFF-PLAN` `PLAN12`)<br>
 **Planstatus:** 12 / 12 Plan-Commits umgesetzt; Plan abgeschlossen; 0 Plan-Commits offen.<br>
+**Nachgelagerte Fixes:** `2.b.R-FIX1` – `Fix: support shared storage and three-hour patch runs`; Plan-Zähler unverändert.<br>
 **Umfang:** 5 Meilensteine, 12 fachlich eigenständige Plan-Commits.
 
 ---
@@ -179,7 +180,8 @@ Der Exchange-Ordner ist die zentrale Übergabestelle in beide Richtungen. Der Be
 
 **Commitposition:** 6 / 12<br>
 **Commit-Message:** `fix(exchange): harden processing identity and retry semantics`<br>
-**Status:** DONE
+**Status:** DONE<br>
+**Nachgelagerter Fix:** `2.b.R-FIX1` – `Fix: support shared storage and three-hour patch runs` (`DONE`; Plan-Zähler unverändert).
 
 - persistente Dateidentität aus physischem Pfad und SHA-256 einführen,
 - unveränderte bereits automatisch versuchte Dateien nicht ungeplant erneut ausführen,
@@ -189,6 +191,7 @@ Der Exchange-Ordner ist die zentrale Übergabestelle in beide Richtungen. Der Be
 - Exchange-Dateien niemals verschieben, löschen, umbenennen, archivieren oder aufräumen,
 - denselben Statusvertrag für späteren Watcher-Verbrauch bereitstellen,
 - Retry-, Race-, Persistenz-, Plattform- und vollständige Regressionstests ergänzen.
+- den gemeinsamen produktiven Standard-Timeout für Skripte und Repository-Entrypoints auf 10.800 Sekunden (drei Stunden) erhöhen; `--timeout` bleibt pro Aufruf überschreibbar.
 
 **Definition of Done Meilenstein 2:** `bundle` und `apply` funktionieren im manuellen Standardablauf ohne lokale Pfadangaben; alte Patches, Result Bundles, Logs und andere Dateien dürfen gefahrlos nebeneinander liegen bleiben.
 

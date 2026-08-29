@@ -341,7 +341,7 @@ Die Optionen sind pro Befehl verbindlich begrenzt:
 | `patchharbor bundle` | `--json`, `--output-dir VERZEICHNIS` |
 | `patchharbor apply` | `--dry-run`, `--timeout SEKUNDEN`, `--plain`, `--no-color`, `--json`, `--output-dir VERZEICHNIS` |
 
-Für `patchharbor apply` beträgt der Standard-Timeout 300 Sekunden.
+Für `patchharbor apply` beträgt der Standard-Timeout 10.800 Sekunden (drei Stunden).
 
 Ist `PATCH_ZIP` angegeben, wird ausschließlich diese Datei verarbeitet. Ist `PATCH_ZIP` nicht angegeben, sucht PatchHarbor im konfigurierten Exchange-Ordner genau ein passendes Paket nach Abschnitt 16.2. Der aktuelle Arbeitsordner und ein lokaler Repository-Pfad sind dabei keine Auswahlinformation.
 
@@ -559,7 +559,7 @@ patchharbor fs run [PFAD]
 
 Unterstützte Optionen:
 
-- `--timeout SEKUNDEN` mit Standardwert 300,
+- `--timeout SEKUNDEN` mit Standardwert 10.800 (drei Stunden),
 - `--log` für eine vollständige temporäre Logdatei,
 - `--plain` für einfache fortlaufende Textausgabe,
 - `--no-color`,
@@ -889,7 +889,7 @@ Nicht unterstützt sind insbesondere:
 
 ### 11.4 Timeout und Prozessende
 
-- Standard-Timeout: 300 Sekunden pro Skript beziehungsweise Entrypoint.
+- Standard-Timeout: 10.800 Sekunden (drei Stunden) pro Skript beziehungsweise Entrypoint.
 - Der Wert ist über `--timeout` änderbar.
 - Bei normalem Ende wird der Skript-Exit-Code übernommen.
 - Bei Timeout versucht PatchHarbor zunächst eine geordnete Beendigung.
@@ -1644,6 +1644,10 @@ Die automatische Auswahl:
 11. wählt nur dann aus, wenn genau ein noch nicht automatisch versuchtes Paket zum aktuellen Zustand genau einer registrierten Repository-Instanz passt.
 
 Der persistente Exchange-Dateistatus darf für unveränderte Dateien die Inhaltsklasse und bei Patch-Kandidaten die geprüften Manifest-Auswahldaten zwischenspeichern. Ein gültiger Patch-Kandidat, der lediglich zum derzeitigen Repository-Zustand nicht passt, wird bei einem späteren Scan erneut gegen den dann aktuellen Zustand geprüft. Dauerhaft inhaltsbedingt ungültige Pakete, Result Bundles und sonstige Nichtkandidaten müssen dagegen nicht erneut vollständig analysiert werden.
+
+Kann eine einzelne reguläre Exchange-Datei während eines Scans nicht stabil oder nicht sicher gelesen werden, wird ausschließlich dieser Eintrag für den aktuellen Scan ignoriert. Ein solcher Einzelfehler darf die Klassifikation anderer Dateien und eines unabhängig lesbaren passenden Patch-Pakets nicht verhindern. Der Fehler „cannot scan exchange directory“ bleibt einem tatsächlichen Fehler beim Auflisten des konfigurierten Verzeichnisses vorbehalten.
+
+Auf virtuellen oder gemeinsam eingebundenen Dateisystemen dürfen Pfad- und Deskriptoransicht trotz unveränderter Datei keine vergleichbare Inode-Identität liefern. Ausschließlich für Exchange-Dateien darf die stabile Aufnahme in diesem Fall auf übereinstimmenden regulären Dateityp, Größe und Änderungszeit zurückfallen. Der vollständige SHA-256 bleibt Bestandteil der Identität; ein ausgewähltes Paket wird vor Materialisierung und unmittelbar vor der ersten Mutation erneut geöffnet und gegen denselben vollständigen Hash geprüft. Andere PatchHarbor-Vertrauensgrenzen verwenden weiterhin die strikte physische Dateidentität.
 
 Die Zustandsprüfung während der Auswahl verwendet dieselbe gesperrte und konsistente Kontextaufnahme wie `patchharbor context`. Auswahlprüfungen dürfen Repositorys nur lesend und nacheinander sperren. Nach der eindeutigen Kandidatenentscheidung wird für den eigentlichen Apply-Auftrag die vollständige Sperr-, Preflight- und Revalidierungsfolge erneut durchlaufen.
 

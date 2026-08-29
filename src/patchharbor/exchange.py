@@ -162,6 +162,7 @@ def _read_exchange_file(
                 if retained_content_limit is None
                 else retained_content_limit
             ),
+            allow_path_identity_fallback=True,
         )
         canonical_after = physically_canonicalize(path, must_exist=True)
     except ExchangeScanError:
@@ -313,11 +314,18 @@ def scan_exchange_directory(
     uncached_records: list[ExchangeStateRecord] = []
 
     for path in _top_level_regular_paths(directory):
-        snapshot = _read_exchange_file(
-            path,
-            directory=directory,
-            resource_policy=resource_policy,
-        )
+        try:
+            snapshot = _read_exchange_file(
+                path,
+                directory=directory,
+                resource_policy=resource_policy,
+            )
+        except ExchangeScanError:
+            # One unstable, unreadable, or concurrently changing download is
+            # not evidence that the configured directory itself is unusable.
+            # Ignore it for this scan; selected patches are re-opened and
+            # hash-verified again before any repository mutation.
+            continue
         cached = initial_records.get(snapshot.identity)
         if cached is not None:
             artifacts.append(_artifact_from_record(path, cached))

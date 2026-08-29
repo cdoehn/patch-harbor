@@ -26,7 +26,7 @@ from patchharbor.temporary_resources import (
 )
 
 
-DEFAULT_TIMEOUT_SECONDS = 300.0
+DEFAULT_TIMEOUT_SECONDS = 10_800.0
 
 
 @contextmanager

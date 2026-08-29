@@ -9,6 +9,7 @@ import zipfile
 import pytest
 
 import patchharbor.exchange as exchange_module
+import patchharbor.platform.filesystem as filesystem_module
 from patchharbor.errors import PatchHarborError
 from patchharbor.exchange import (
     ExchangeArtifactKind,
@@ -117,6 +118,61 @@ def test_flat_scan_skips_temporary_nonregular_and_nested_entries(
         ExchangeArtifactKind.RESULT_BUNDLE,
         ExchangeArtifactKind.PATCH_PACKAGE,
     )
+
+
+def test_exchange_scan_uses_content_metadata_when_inode_identity_is_unreliable(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    patch = tmp_path / "shared-storage-patch.zip"
+    _write_patch(patch)
+
+    monkeypatch.setattr(
+        filesystem_module.os.path,
+        "samestat",
+        lambda *_metadata: False,
+    )
+    monkeypatch.setattr(
+        filesystem_module,
+        "_same_open_file_state",
+        lambda *_metadata: True,
+    )
+
+    artifacts = scan_exchange_directory(tmp_path)
+
+    assert tuple(artifact.path for artifact in artifacts) == (patch,)
+    assert artifacts[0].kind is ExchangeArtifactKind.PATCH_PACKAGE
+    assert artifacts[0].package is not None
+
+
+def test_flat_scan_skips_one_unreadable_entry_without_losing_candidates(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    unreadable = tmp_path / "a-unreadable-download.bin"
+    unreadable.write_bytes(b"unrelated")
+    patch = tmp_path / "z-matching-patch.zip"
+    _write_patch(patch)
+    original_read = exchange_module._read_exchange_file
+
+    def read_exchange_file(
+        path: Path,
+        **kwargs: object,
+    ) -> object:
+        if path == unreadable:
+            raise ExchangeScanError("exchange entry cannot be read safely")
+        return original_read(path, **kwargs)
+
+    monkeypatch.setattr(
+        exchange_module,
+        "_read_exchange_file",
+        read_exchange_file,
+    )
+
+    artifacts = scan_exchange_directory(tmp_path)
+
+    assert tuple(artifact.path for artifact in artifacts) == (patch,)
+    assert artifacts[0].kind is ExchangeArtifactKind.PATCH_PACKAGE
 
 
 def test_scan_reports_an_unreadable_or_missing_directory(tmp_path: Path) -> None:

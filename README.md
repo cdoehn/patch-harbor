@@ -149,6 +149,9 @@ commit, and state fingerprint match a currently registered repository. The
 current working directory does not select the repository. No match or multiple
 matches stop without repository mutation.
 
+The default timeout for one script or repository entrypoint is 10,800 seconds
+(three hours). Use `--timeout SECONDS` to override it for one invocation.
+
 A Dry Run validates the selected package without changing the repository and
 does not mark it as attempted. A non-Dry-Run Apply records the automatic attempt
 immediately before mutation or entrypoint execution and then attempts a Result
