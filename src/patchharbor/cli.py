@@ -30,6 +30,7 @@ from patchharbor.errors import (
     format_tool_message,
 )
 from patchharbor.execution import DEFAULT_TIMEOUT_SECONDS
+from patchharbor.identifier_presentation import shorten_identifier
 from patchharbor.json_document import serialize_json_document
 from patchharbor.output import OutputTargets
 from patchharbor.platform.errors import describe_os_error
@@ -261,9 +262,10 @@ def _build_parser() -> argparse.ArgumentParser:
         help="validate or apply one repository-bound patch package",
         description=(
             "Validate or apply one repository-bound ZIP patch package. Omit "
-            "PATCH_ZIP to discover exactly one unattempted package in the "
-            "configured Exchange directory whose repository ID and state "
-            "match a registered repository."
+            "PATCH_ZIP to discover the eligible package with the greatest "
+            "mtime_ns in the configured Exchange directory after repository "
+            "ID and state matching. A deliberate manual Apply may retry a "
+            "previously failed package."
         ),
         epilog=(
             "An explicit PATCH_ZIP bypasses automatic discovery. An explicit "
@@ -314,13 +316,18 @@ def _build_parser() -> argparse.ArgumentParser:
         help="write the versioned machine-readable result",
     )
     apply_parser.add_argument(
+        "--automatic",
+        action="store_true",
+        help=argparse.SUPPRESS,
+    )
+    apply_parser.add_argument(
         "patch_zip",
         type=Path,
         nargs="?",
         metavar="PATCH_ZIP",
         help=(
             "explicit ZIP package containing a root patch.json; when omitted, "
-            "discover exactly one matching unattempted Exchange package"
+            "discover the matching eligible Exchange package with greatest mtime_ns"
         ),
     )
 
@@ -566,7 +573,8 @@ def _registry_list_command(
     else:
         for repository in result.repositories:
             print(
-                f"{repository.repo_id}\t{repository.status.value}\t"
+                f"{shorten_identifier(repository.repo_id)}\t"
+                f"{repository.status.value}\t"
                 f"{repository.repository_path}",
                 file=stdout,
             )
@@ -654,7 +662,10 @@ def _write_apply_completion(
                     file=stderr,
                 )
         else:
-            print(f"run_id: {report.run_id_text}", file=stdout)
+            print(
+                f"run_id: {shorten_identifier(report.run_id_text)}",
+                file=stdout,
+            )
             print(f"repository_path: {report.resolved_repository}", file=stdout)
             print(f"result_bundle_path: {report.result_bundle.path}", file=stdout)
     _write_emergency_diagnostics_notice(
@@ -710,7 +721,7 @@ def _bundle_command(
             stdout,
         )
     else:
-        print(f"run_id: {result.run_id}", file=stdout)
+        print(f"run_id: {shorten_identifier(result.run_id)}", file=stdout)
         print(f"result_bundle_path: {result.path}", file=stdout)
     return 0
 
@@ -795,6 +806,7 @@ def _apply_command(
     force_plain: bool,
     no_color: bool,
     json_output: bool,
+    automatic: bool,
     stdout: TextIO,
     stderr: TextIO,
 ) -> int:
@@ -819,6 +831,7 @@ def _apply_command(
                 output_directory=output_directory,
                 output=output,
                 presentation=dashboard,
+                automatic=automatic,
             )
         except OSError as exc:
             operation = (
@@ -884,7 +897,7 @@ def _unregister_command(
         print(format_tool_message(str(exc)), file=stderr)
         return int(exc.exit_code)
 
-    print(f"repo_id: {repo_id}", file=stdout)
+    print(f"repo_id: {shorten_identifier(repo_id)}", file=stdout)
     print(f"repository_path: {repository_path}", file=stdout)
     return 0
 
@@ -1054,6 +1067,13 @@ def main(
     args = parser.parse_args(argv)
 
     if (
+        args.command == "apply"
+        and args.automatic
+        and args.patch_zip is not None
+    ):
+        parser.error("internal --automatic mode does not accept PATCH_ZIP")
+
+    if (
         args.command == "configure"
         and args.configure_command == "exchange-directory"
     ):
@@ -1117,6 +1137,7 @@ def main(
             force_plain=args.plain,
             no_color=args.no_color,
             json_output=args.json_output,
+            automatic=args.automatic,
             stdout=actual_stdout,
             stderr=actual_stderr,
         )

@@ -236,8 +236,8 @@ class RunSession:
 
     @property
     def filename_timestamp(self) -> str:
-        """Stable UTC timestamp component for Result-Bundle filenames."""
-        return self.started_at.astimezone(timezone.utc).strftime("%Y%m%d_%H%M%S")
+        """Stable UTC time-and-date component for bundle filenames."""
+        return self.started_at.astimezone(timezone.utc).strftime("%H%M%S_%m%d")
 
     def finish(
         self,

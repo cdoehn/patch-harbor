@@ -141,7 +141,10 @@ def safely_resolved_repository(
                 output_directory,
                 initial_registry,
                 paths,
-                filename=result_bundle_filename(session),
+                filename=result_bundle_filename(
+                    session,
+                    repository_name=expected_repository.value.name,
+                ),
             )
             publication = reserve_result_bundle_publication(
                 target.final_path,

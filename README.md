@@ -102,9 +102,12 @@ patchharbor context
 patchharbor bundle
 ```
 
-`context` is an optional human-readable check. The Result Bundle already
-contains the repository ID, base commit, state fingerprint, committed snapshot,
-staged and unstaged changes, and non-ignored untracked regular files.
+`context` is an optional human-readable check. Human-facing terminal output
+shortens long technical identifiers to their first six characters plus `…`;
+use `patchharbor context --json` for the complete values. The Result Bundle
+already contains the full repository ID, base commit, state fingerprint,
+committed snapshot, staged and unstaged changes, and non-ignored untracked
+regular files.
 
 Use `patchharbor registry list` to inspect all registrations. Use
 `patchharbor unregister REPOSITORY_OR_REPO_ID` only to remove a central mapping,
@@ -124,10 +127,11 @@ need either path: the Result Bundle supplies the repository identity and exact
 state, while local PatchHarbor resolves the registered path.
 
 The chat contract requires one downloadable repository-bound ZIP patch package.
-After an Apply, upload the newly created Result Bundle back to the same chat.
-For a failed entrypoint or test run, that bundle contains the actual remaining
-repository state plus `logs/run.json` and, when execution started,
-`logs/execution.log`.
+Patch filenames use
+`<Repository>_Patch_<HHMMSS>_<MMDD>_<ID6>.zip`. After an Apply, upload the
+newly created Result Bundle back to the same chat. For a failed entrypoint or
+test run, that bundle contains the actual remaining repository state plus
+`logs/run.json` and, when execution started, `logs/execution.log`.
 
 ## Manual workflow
 
@@ -144,19 +148,22 @@ patchharbor apply
 ```
 
 Parameterless `apply` scans only the top level of the configured Exchange
-directory. It selects exactly one unattempted package whose `repo_id`, base
-commit, and state fingerprint match a currently registered repository. The
-current working directory does not select the repository. No match or multiple
-matches stop without repository mutation.
+directory. It first retains only packages whose `repo_id`, base commit, and state
+fingerprint match a currently registered repository, then selects the unique
+candidate with the greatest nanosecond modification time (`mtime_ns`). An exact
+tie for the newest value stops without mutation and requires an explicit path.
+The current working directory does not select the repository. The filename does not select it either.
 
 The default timeout for one script or repository entrypoint is 10,800 seconds
 (three hours). Use `--timeout SECONDS` to override it for one invocation.
 
-A Dry Run validates the selected package without changing the repository and
-does not mark it as attempted. A non-Dry-Run Apply records the automatic attempt
-immediately before mutation or entrypoint execution and then attempts a Result
-Bundle in the Exchange directory. An unchanged automatically attempted package
-is not selected again; an explicit package path can deliberately retry it.
+A Dry Run validates the selected package without changing the repository or its
+replay state. A non-Dry-Run Apply records `attempted` immediately before mutation
+or entrypoint execution and publishes `failed` or `succeeded` from the actual
+result. A successful package remains replay-protected. A failed package can be
+retried by another deliberate manual parameterless `patchharbor apply` while its
+complete repository binding still matches. An explicit package path remains a
+separate deliberate override.
 
 ### Explicit path overrides
 
@@ -190,9 +197,10 @@ support is claimed by PatchHarbor 1.1.1.
 
 ## Linux watcher
 
-The optional watcher is a thin permanent trigger for the same parameterless Core
-Apply operation. It has no input-directory argument and no separate
-configuration or file-classification logic.
+The optional watcher is a thin permanent trigger for Core's parameterless
+automatic Apply mode. It has no input-directory argument and no separate
+configuration or file-classification logic. Unlike a deliberate manual Apply,
+this mode does not retry an unchanged failed package on later polls.
 
 Configure the shared Exchange directory first, then install the disabled systemd
 user unit:
@@ -215,10 +223,11 @@ journalctl --user -u patchharbor-watcher.service
 systemctl --user disable --now patchharbor-watcher.service
 ```
 
-The watcher uses the same `config.json`, automatic package discovery, persistent
-attempt identity, repository locks, and Result Bundle behavior as
-`patchharbor apply`. Do not run the autonomous watcher and Repo Assist or another
-orchestrator for the same repositories at the same time.
+The watcher uses the same `config.json`, package validation, persistent replay
+state, repository locks, and Result Bundle behavior as `patchharbor apply`. A
+failed package remains available for a later manual Apply but is not immediately
+repeated by the watcher. Do not run the autonomous watcher and Repo Assist or
+another orchestrator for the same repositories at the same time.
 
 ## Security and responsibility boundaries
 
@@ -236,9 +245,12 @@ PromptBridge owns chat, network, upload, and download transport.
 ## Result Bundles
 
 `patchharbor bundle [REPOSITORY]` creates a complete repository snapshot
-without Git history. It contains every file from the current base commit, staged and
-unstaged changes, and every non-ignored untracked regular file. Without
-`--output-dir`, it publishes directly in the configured Exchange directory.
+without Git history. It contains every file from the current base commit, staged
+and unstaged changes, and every non-ignored untracked regular file. Without
+`--output-dir`, it publishes directly in the configured Exchange directory. The
+filename is `<Repository>_Result_<HHMMSS>_<MMDD>_<ID6>.zip`, using UTC, no
+year, and the first six run-ID characters without an ellipsis. Filenames are
+presentation only; Exchange classification still uses validated content.
 
 Review a Result Bundle before sharing it. It can contain complete source code
 and secrets from non-ignored files. PatchHarbor excludes `.git`, the local

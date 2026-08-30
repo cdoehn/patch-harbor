@@ -59,6 +59,7 @@ from patchharbor.execution import (
     execute_prepared_script_with_log,
     execute_script_text,
 )
+from patchharbor.identifier_presentation import shorten_identifier
 from patchharbor.locks import registry_lock
 from patchharbor.models import (
     BundleScript,
@@ -213,12 +214,18 @@ class DiscoveredExchangePatch:
     package: ValidatedPatchPackage
     paths: RegistrationUserPaths
     configuration: UserConfiguration
+    retry_failed: bool = False
 
     def __post_init__(self) -> None:
         if self.artifact.selection is None:
             raise ValueError("discovered Exchange patch requires selection data")
-        if self.artifact.apply_status is not None:
-            raise ValueError("discovered Exchange patch must be unattempted")
+        expected_status = (
+            ExchangeApplyStatus.FAILED if self.retry_failed else None
+        )
+        if self.artifact.apply_status is not expected_status:
+            raise ValueError(
+                "discovered Exchange patch has an ineligible apply status"
+            )
         if (
             self.artifact.selection
             != ExchangePatchSelection.from_manifest(self.package.manifest)
@@ -249,6 +256,7 @@ class DiscoveredExchangePatch:
             self.artifact.identity,
             selection,
             verify_identity=verify_identity,
+            retry_failed=self.retry_failed,
         )
 
     def publish_outcome(self, succeeded: bool) -> None:
@@ -293,8 +301,11 @@ def _revalidate_exchange_discovery(
         )
 
 
-def discover_exchange_patch() -> DiscoveredExchangePatch:
-    """Return the only unattempted package matching one registered state."""
+def discover_exchange_patch(
+    *,
+    allow_failed_retry: bool = True,
+) -> DiscoveredExchangePatch:
+    """Return the newest eligible package matching one registered state."""
     paths = configuration_user_paths()
     configuration = revalidate_exchange_directory(load_configuration(paths))
     with registry_lock(paths):
@@ -316,9 +327,11 @@ def discover_exchange_patch() -> DiscoveredExchangePatch:
     matches: list[ExchangeArtifact] = []
     contexts: dict[RepositoryId, RepositoryContext | None] = {}
     for artifact in artifacts:
-        if (
-            artifact.kind is not ExchangeArtifactKind.PATCH_PACKAGE
-            or artifact.attempted
+        if artifact.kind is not ExchangeArtifactKind.PATCH_PACKAGE:
+            continue
+        if artifact.apply_status is not None and not (
+            allow_failed_retry
+            and artifact.apply_status is ExchangeApplyStatus.FAILED
         ):
             continue
         selection = artifact.selection
@@ -337,13 +350,19 @@ def discover_exchange_patch() -> DiscoveredExchangePatch:
         raise patch_package_error(
             "no state-bound patch package matches a registered repository"
         )
-    if len(matches) != 1:
+    newest_mtime_ns = max(artifact.mtime_ns for artifact in matches)
+    newest_matches = tuple(
+        artifact
+        for artifact in matches
+        if artifact.mtime_ns == newest_mtime_ns
+    )
+    if len(newest_matches) != 1:
         raise patch_package_error(
-            "multiple state-bound patch packages match registered repositories; "
+            "multiple state-bound patch packages share the newest mtime_ns; "
             "pass PATCH_ZIP explicitly"
         )
 
-    artifact = matches[0]
+    artifact = newest_matches[0]
     package = materialize_exchange_patch(
         artifact,
         directory=configuration.exchange_directory,
@@ -359,6 +378,7 @@ def discover_exchange_patch() -> DiscoveredExchangePatch:
         package=package,
         paths=paths,
         configuration=configuration,
+        retry_failed=(artifact.apply_status is ExchangeApplyStatus.FAILED),
     )
 
 
@@ -445,9 +465,9 @@ def preflight_patch_package_repository(
             presentation.update_repository(
                 repository_name=str(resolved.repository),
                 repository_context=(
-                    f"repo_id: {resolved.repo_id} · "
-                    f"base: {str(resolved.context.base_commit)[:12]} · "
-                    f"state: {resolved.context.state_fingerprint}"
+                    f"repo_id: {shorten_identifier(resolved.repo_id)} · "
+                    f"base: {shorten_identifier(resolved.context.base_commit)} · "
+                    f"state: {shorten_identifier(resolved.context.state_fingerprint)}"
                 ),
             )
 
@@ -680,13 +700,16 @@ def run_apply_path(
     output: OutputTargets | None = None,
     session: RunSession | None = None,
     presentation: DashboardPresentation | None = None,
+    automatic: bool = False,
 ) -> RunReport:
     """Run one Apply request through a single public application boundary."""
     actual_session = session or RunSession.start()
     try:
         discovered: DiscoveredExchangePatch | None = None
         if path is None:
-            discovered = discover_exchange_patch()
+            discovered = discover_exchange_patch(
+                allow_failed_retry=not automatic,
+            )
             selected_path = discovered.artifact.path
             package = discovered.package
         else:
@@ -703,7 +726,9 @@ def run_apply_path(
         presentation.begin_request(
             source_name=str(selected_path),
             repository_name="resolving…",
-            repository_context=f"repo_id: {package.manifest.repo_id}",
+            repository_context=(
+                f"repo_id: {shorten_identifier(package.manifest.repo_id)}"
+            ),
             bundle_files=(
                 PresentedFile(
                     name=package.entrypoint.relative_path,

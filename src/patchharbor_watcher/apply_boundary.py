@@ -49,7 +49,7 @@ def delegate_to_automatic_apply(
     environment: Mapping[str, str] | None = None,
 ) -> ApplyCompletion:
     """Ask Core to discover and process one shared Exchange candidate."""
-    arguments = [*apply_command, "apply", "--json"]
+    arguments = [*apply_command, "apply", "--json", "--automatic"]
     completed = subprocess.run(
         arguments,
         check=False,

@@ -56,8 +56,8 @@ def _build_parser() -> argparse.ArgumentParser:
         prog="patchharbor-watcher",
         allow_abbrev=False,
         description=(
-            "Continuously invoke parameterless 'patchharbor apply --json' "
-            "for the shared Exchange directory from PatchHarbor config.json."
+            "Continuously invoke PatchHarbor's parameterless automatic Apply "
+            "mode for the shared Exchange directory from PatchHarbor config.json."
         ),
         epilog=(
             "Configure Exchange first with 'patchharbor configure "

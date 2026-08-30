@@ -29,7 +29,7 @@ PatchHarbor kann insbesondere:
 - genau einen geprüften Bash- oder PowerShell-Entrypoint ausführen,
 - stdout, stderr, Exit-Code, Laufzeit, Abbruch und Tool-Fehler erfassen,
 - nach einem Apply soweit möglich ein vollständiges Result Bundle erzeugen,
-- im konfigurierten Exchange-Ordner genau ein passendes Patch-Paket finden,
+- im Exchange-Ordner passende Pakete sicher filtern und das neueste nach `mtime_ns` wählen,
 - Result Bundles und sonstige Dateien sicher von Patch-Paketen unterscheiden.
 
 Die für diesen Vertrag relevanten öffentlichen Befehle sind:
@@ -49,10 +49,12 @@ patchharbor-watcher
 ```
 
 `bundle` veröffentlicht ohne explizites Ausgabeziel im konfigurierten
-Exchange-Ordner. `apply` findet ohne `PATCH_ZIP` dort genau ein zum aktuellen
-Repository-Zustand passendes Paket. Der Watcher löst denselben parameterlosen
-Apply-Vertrag nur dauerhaft aus. `fs run` ist der ältere explizite Runner und
-ist kein Ersatz für den repositorygebundenen sicheren Patch-Paket-Workflow.
+Exchange-Ordner. Ein manueller parameterloser `apply` wählt nach vollständiger
+Repository-Bindungsprüfung den eindeutigen Kandidaten mit dem höchsten `mtime_ns`;
+einen weiterhin passenden fehlgeschlagenen Patch darf er bewusst
+erneut versuchen. Der Watcher verwendet dagegen einen automatischen Ursprung,
+der fehlgeschlagene Pakete nicht erneut pollt. Erfolgreiche Pakete bleiben in
+beiden Fällen Replay-geschützt. `fs run` ist der ältere explizite Runner.
 
 PatchHarbor ist keine Sandbox und authentifiziert nicht den Ersteller eines
 Pakets. Es verwaltet außerdem keine fachlichen Tests, Git-Commits,
@@ -210,7 +212,12 @@ nur ein ausdrücklich verlangter nicht committender Diagnoseauftrag.
 
 Erzeuge genau eine herunterladbare ZIP-Datei im sicheren PatchHarbor-Format.
 Liefere keine parallele Shell-Datei, keinen zweiten Patch und keine alternative
-manuelle Änderungsanleitung.
+manuelle Änderungsanleitung. Der Dateiname folgt exakt
+`<Repository>_Patch_<HHMMSS>_<MMDD>_<ID6>.zip`: Repository-Name zuerst,
+dann `Patch`, UTC-Uhrzeit, Monat/Tag ohne Jahr und die ersten sechs Zeichen
+einer Paket-UUID ohne `…`. Für Result Bundles gilt exakt
+`<Repository>_Result_<HHMMSS>_<MMDD>_<ID6>.zip`; dessen ID6 stammt aus der
+vollständigen Run-ID.
 
 Das ZIP enthält genau eine Root-Datei `patch.json`. Für Format 1 sind dort
 exakt diese sieben Felder erlaubt:
@@ -230,7 +237,9 @@ exakt diese sieben Felder erlaubt:
 `patch.json` ist UTF-8 ohne BOM und enthält genau ein JSON-Objekt. Doppelte
 Schlüssel, Kommentare, nachgestellte Daten und nicht endliche Zahlen sind
 ungültig. Verwende `repo_id`, `base_commit`, `state_fingerprint` und
-`fingerprint_algorithm` unverändert aus dem aktuellen Result Bundle. Ergänze
+`fingerprint_algorithm` unverändert und vollständig aus dem aktuellen Result
+Bundle. Die Terminal-UI darf diese Werte als sechs Zeichen plus `…` darstellen;
+für `patch.json` gelten ausschließlich die vollständigen JSON-Werte. Ergänze
 keine unbekannten Felder.
 
 Beachte zusätzlich:

@@ -45,10 +45,11 @@ def test_context_representations_include_the_same_values(
         "fingerprint_algorithm": context.fingerprint_algorithm,
     }
     human = stream.getvalue()
-    for value in (
-        str(context.repo_id),
-        str(context.base_commit),
-        context.state_fingerprint,
-        context.fingerprint_algorithm,
-    ):
-        assert value in human
+    assert "repo_id: a3f9c2…" in human
+    assert "base_commit: ffffff…" in human
+    assert "state_fingerprint: 7c9d2a…" in human
+    assert context.fingerprint_algorithm in human
+    assert str(context.repo_id) not in human
+    assert str(context.base_commit) not in human
+    assert context.state_fingerprint not in human
+    assert "Vollständige Werte für patch.json mit --json ausgeben." in human

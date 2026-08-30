@@ -122,13 +122,11 @@ def test_readme_covers_manual_overrides_termux_and_watcher_workflows() -> None:
     ):
         assert command in document
 
-    assert "selects exactly one unattempted package" in compact
+    assert "selects the unique candidate with the greatest nanosecond modification time" in compact
     assert (
         "The current working directory does not select the repository" in compact
     )
-    assert "No match or multiple matches stop without repository mutation" in (
-        compact
-    )
+    assert "An exact tie for the newest value stops without mutation" in compact
     assert "default timeout for one script or repository entrypoint is 10,800 seconds" in (
         compact
     )
@@ -137,6 +135,11 @@ def test_readme_covers_manual_overrides_termux_and_watcher_workflows() -> None:
     assert "patchharbor-watcher --configure" not in document
     assert "input-directory argument" in document
     assert "does not move, rename, archive, or delete" in document
+    assert "A failed package can be retried by another deliberate manual" in compact
+    assert "is not immediately repeated by the watcher" in compact
+    assert "<Repository>_Patch_<HHMMSS>_<MMDD>_<ID6>.zip" in document
+    assert "<Repository>_Result_<HHMMSS>_<MMDD>_<ID6>.zip" in document
+    assert "first six characters plus `…`" in document
 
 
 def test_core_help_explains_the_documented_exchange_workflow() -> None:
@@ -165,7 +168,7 @@ def test_core_help_explains_the_documented_exchange_workflow() -> None:
         bundle_help
     )
     assert "contain no Git history and may contain secrets" in bundle_help
-    assert "Omit PATCH_ZIP to discover exactly one unattempted package" in apply_help
+    assert "Omit PATCH_ZIP to discover the eligible package with the greatest mtime_ns" in apply_help
     assert "An explicit PATCH_ZIP bypasses automatic discovery" in apply_help
     assert "current directory does not select the target repository" in apply_help
     assert "earlier writes are not globally rolled back" in apply_help
@@ -175,7 +178,7 @@ def test_core_help_explains_the_documented_exchange_workflow() -> None:
 def test_watcher_help_explains_shared_config_systemd_and_termux_boundary() -> None:
     help_text = _compact(build_watcher_parser().format_help())
 
-    assert "parameterless 'patchharbor apply --json'" in help_text
+    assert "parameterless automatic Apply mode" in help_text
     assert "shared Exchange directory from PatchHarbor config.json" in help_text
     assert "patchharbor configure exchange-directory DIRECTORY" in help_text
     assert "installer does not enable or start it" in help_text

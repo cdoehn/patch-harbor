@@ -8,6 +8,7 @@ import unicodedata
 import pytest
 
 from patchharbor.application import run_script_path
+from patchharbor.identifier_presentation import shorten_identifier
 from patchharbor.output import OutputTargets
 from patchharbor.presentation import (
     DASHBOARD_MIN_WIDTH,
@@ -70,6 +71,12 @@ class _CountingTerminal(_EncodedTerminal):
     def flush(self) -> None:
         self.flush_count += 1
         super().flush()
+
+
+def test_long_identifiers_use_one_shared_six_character_presentation() -> None:
+    assert shorten_identifier("abcdef012345") == "abcdef…"
+    assert shorten_identifier("abcdef012345", with_ellipsis=False) == "abcdef"
+    assert shorten_identifier("short") == "short"
 
 
 def test_presented_completion_requires_a_consistent_decided_state() -> None:

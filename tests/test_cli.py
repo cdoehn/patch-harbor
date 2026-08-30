@@ -72,17 +72,26 @@ def test_public_cli_rejects_abbreviated_options(
     capsys.readouterr()
 
 
-def test_apply_without_patch_path_delegates_exchange_discovery(
+@pytest.mark.parametrize(
+    ("arguments", "expected_automatic"),
+    (
+        (("apply", "--json"), False),
+        (("apply", "--json", "--automatic"), True),
+    ),
+)
+def test_parameterless_apply_propagates_manual_or_automatic_origin(
     monkeypatch: pytest.MonkeyPatch,
+    arguments: tuple[str, ...],
+    expected_automatic: bool,
 ) -> None:
-    observed: list[Path | None] = []
+    observed: list[tuple[Path | None, bool]] = []
     report = SimpleNamespace(warnings=())
 
     def fake_run_apply_path(
         path: Path | None,
-        **_options: object,
+        **options: object,
     ) -> object:
-        observed.append(path)
+        observed.append((path, bool(options["automatic"])))
         return report
 
     monkeypatch.setattr(cli, "run_apply_path", fake_run_apply_path)
@@ -93,13 +102,27 @@ def test_apply_without_patch_path_delegates_exchange_discovery(
     )
 
     result = main(
-        ["apply", "--json"],
+        list(arguments),
         stdout=StringIO(),
         stderr=StringIO(),
     )
 
     assert result == 0
-    assert observed == [None]
+    assert observed == [(None, expected_automatic)]
+
+
+def test_internal_automatic_origin_is_hidden_and_rejects_an_explicit_path(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    with pytest.raises(SystemExit) as help_exit:
+        main(["apply", "--help"])
+    assert help_exit.value.code == 0
+    assert "--automatic" not in capsys.readouterr().out
+
+    with pytest.raises(SystemExit) as path_exit:
+        main(["apply", "--automatic", "patch.zip"])
+    assert path_exit.value.code == 2
+    assert "does not accept PATCH_ZIP" in capsys.readouterr().err
 
 
 def test_fs_run_without_path_on_terminal_is_a_usage_error(

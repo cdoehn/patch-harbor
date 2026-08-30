@@ -1,7 +1,7 @@
 # PatchHarbor – Spezifikations-Changelog
 
 **Dateiname:** `SPECIFICATION_CHANGELOG.md`<br>
-**Stand:** 2026-08-29
+**Stand:** 2026-08-30
 
 Dieses Dokument protokolliert Änderungen am verbindlichen Produktziel. Es ist kein Git-Commit-Log und ersetzt nicht die getrennten Umsetzungspläne unter `planning/`.
 
@@ -10,6 +10,15 @@ Dieses Dokument protokolliert Änderungen am verbindlichen Produktziel. Es ist k
 ## [1.1.1] – 2026-08-28
 
 **Status:** Freigegeben und vollständig umgesetzt; der abgeschlossene Plan liegt unter `planning/1.1.1/commit-plan.md`.
+
+### Post-release replay and presentation update – 2026-08-30
+
+- Der persistente Replay-State unterscheidet `attempted`, `failed` und `succeeded`; erfolgreiche Pakete bleiben gesperrt, während ein bewusster manueller parameterloser Apply einen weiterhin exakt gebundenen fehlgeschlagenen Patch erneut versuchen darf.
+- Der Watcher kennzeichnet seinen Core-Aufruf intern als automatisch und wiederholt eine fehlgeschlagene unveränderte Paketidentität bei späteren Polls nicht erneut.
+- Bei mehreren vollständig passenden Kandidaten gewinnt erst nach allen Sicherheits- und State-Prüfungen der eindeutige höchste `mtime_ns`; ein exakter Höchstwert-Tie wird fail-safe abgelehnt.
+- Patch- und Result-Dateinamen folgen `<Repository>_Patch_<HHMMSS>_<MMDD>_<ID6>.zip` beziehungsweise `<Repository>_Result_<HHMMSS>_<MMDD>_<ID6>.zip`; Uhrzeit ist UTC, das Jahr entfällt und ID6 enthält kein Auslassungszeichen.
+- Menschenlesbare Terminalausgaben kürzen lange technische Kennungen zentral auf sechs Zeichen plus `…`; JSON, Manifeste, Logs, Persistenz und Sicherheitsvergleiche behalten vollständige Werte.
+- Ein öffentlicher `--retry-failed`-Schalter wird nicht eingeführt, weil der normale manuelle parameterlose Apply bereits die bewusste Retry-Aktion ist.
 
 ### Post-release fix – 2026-08-29
 

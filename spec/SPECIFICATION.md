@@ -80,7 +80,7 @@ PatchHarbor ist kein Testmanager, kein Commit-Manager, kein Build-System, kein C
 - ein vollständiges PatchHarbor Result Bundle erzeugen,
 - die gemeinsame Benutzerkonfiguration aus `config.json` lesen und sicher schreiben,
 - einen konfigurierten Exchange-Ordner als Standardübergabe in beide Richtungen verwenden,
-- bei `patchharbor apply` ohne Dateipfad genau ein passendes, noch nicht automatisch verarbeitetes Patch-Paket auswählen,
+- bei parameterlosem `patchharbor apply` vollständig passende Pakete filtern und den eindeutigen neuesten Kandidaten nach `mtime_ns` auswählen,
 - Patch-Pakete, Result Bundles und sonstige Dateien im Exchange-Ordner sicher voneinander unterscheiden,
 - einen maschinenlesbaren Ergebnisvertrag für Watcher, Repo Assist und einen späteren Orchestrator anbieten.
 
@@ -343,7 +343,7 @@ Die Optionen sind pro Befehl verbindlich begrenzt:
 
 Für `patchharbor apply` beträgt der Standard-Timeout 10.800 Sekunden (drei Stunden).
 
-Ist `PATCH_ZIP` angegeben, wird ausschließlich diese Datei verarbeitet. Ist `PATCH_ZIP` nicht angegeben, sucht PatchHarbor im konfigurierten Exchange-Ordner genau ein passendes Paket nach Abschnitt 16.2. Der aktuelle Arbeitsordner und ein lokaler Repository-Pfad sind dabei keine Auswahlinformation.
+Ist `PATCH_ZIP` angegeben, wird ausschließlich diese Datei verarbeitet. Ist `PATCH_ZIP` nicht angegeben, filtert PatchHarbor im konfigurierten Exchange-Ordner alle vollständig passenden und für den Aufruf zulässigen Pakete und wählt nach Abschnitt 16.2 den eindeutigen Kandidaten mit dem höchsten `mtime_ns`. Der aktuelle Arbeitsordner, ein lokaler Repository-Pfad und der Dateiname sind dabei keine Auswahlinformation. Ein bewusster manueller Aufruf darf einen weiterhin exakt gebundenen fehlgeschlagenen Patch erneut versuchen; der Watcher verwendet einen internen automatischen Ursprung, der dies nicht tut. Ein öffentlicher Schalter `--retry-failed` ist nicht erforderlich.
 
 Ohne `--output-dir` veröffentlicht `bundle` sein Result Bundle im Exchange-Ordner. Dasselbe gilt für den Result-Bundle-Versuch von `apply`. Ein explizites `--output-dir` überschreibt nur das Ausgabeziel, nicht die Paketauswahl.
 
@@ -480,7 +480,7 @@ Das erfolgreiche `result`-Objekt besitzt exakt:
     "state_fingerprint": "a1b2c3d4e5f67890",
     "fingerprint_algorithm": "patchharbor-state-v1",
     "result_bundle_status": "created",
-    "result_bundle_path": "/home/user/Downloads/patchharbor_result_20260825_093000_b592be12.zip",
+    "result_bundle_path": "/home/user/Downloads/patchharbor_Result_093000_0825_b592be.zip",
     "emergency_diagnostics_path": null
   },
   "error": null,
@@ -540,7 +540,7 @@ Zulässige Bundle-Statuswerte sind `created`, `failed` und `not_attempted`. `not
     "result_bundle": {
       "attempted": true,
       "status": "created",
-      "path": "/home/user/Downloads/patchharbor_result_20260825_093000_b592be12.zip",
+      "path": "/home/user/Downloads/patchharbor_Result_093000_0825_b592be.zip",
       "emergency_diagnostics_path": null
     }
   },
@@ -1146,20 +1146,22 @@ Beispiel:
 ```text
 PATCH_HARBOR_CONTEXT
 
-repo_id: a3f9c2e1-7b4d-4a91-9d2e-5c6f8a1b2c3d
-base_commit: f4e9c2a7b8c9d01234567890abcdef1234567890
+repo_id: a3f9c2…
+base_commit: f4e9c2…
 dirty: true
-state_fingerprint: a1b2c3d4e5f67890
+state_fingerprint: a1b2c3…
 fingerprint_algorithm: patchharbor-state-v1
 
 INSTRUCTIONS:
-- Verwende diese Werte unverändert in patch.json.
+- Vollständige Werte für patch.json mit --json ausgeben.
 - Erzeuge bei geändertem Repository-Zustand einen neuen Kontext.
 - Lokale Repository- und Exchange-Pfade gehören nicht in patch.json.
 - Verwende für einen vollständigen Entwicklungsauftrag zusätzlich CHAT_INSTRUCTIONS.md und ein aktuelles Result Bundle.
 ```
 
-Der Chat darf Repository-ID, Base-Commit oder Fingerprint nicht erraten.
+Menschenlesbare Terminalausgaben kürzen lange technische Kennungen zentral auf die ersten sechs Zeichen plus das einzelne Zeichen `…`. Das betrifft insbesondere Repository-IDs, Run-IDs, Base-Commits und Zustands-Fingerprints. Dateinamen verwenden denselben Sechs-Zeichen-Präfix ohne `…`. Maschinenlesbare JSON-Ausgaben, Manifeste, persistenter Zustand, Logs und alle Sicherheitsvergleiche behalten stets den vollständigen Wert.
+
+Der Chat darf Repository-ID, Base-Commit oder Fingerprint nicht erraten und verwendet für `patch.json` die vollständigen JSON-Werte.
 
 ### 14.2 Base-Commit
 
@@ -1625,25 +1627,27 @@ Die Sperre koordiniert PatchHarbor-Aufträge. Fremde Editoren oder andere Git-Pr
 
 Bei einer Auflösung über die zentrale Registry gilt die Lock-Reihenfolge aus Abschnitt 13: zuerst globaler Registry-Lock, danach Repository-Lock. Nach erfolgreicher Revalidierung wird der Registry-Lock freigegeben, während der Repository-Lock bis zum Auftragsende gehalten bleibt.
 
-### 16.2 Automatische Paketauswahl im Exchange-Ordner
+### 16.2 Parameterlose Paketauswahl im Exchange-Ordner
 
-Wird `patchharbor apply` ohne `PATCH_ZIP` aufgerufen, verwendet PatchHarbor ausschließlich den konfigurierten Exchange-Ordner.
+Wird `patchharbor apply` ohne `PATCH_ZIP` aufgerufen, verwendet PatchHarbor ausschließlich den konfigurierten Exchange-Ordner. Der Aufruf besitzt intern entweder den Ursprung `manual` oder `automatic`; der normale CLI-Aufruf ist manuell, der Watcher delegiert mit automatischem Ursprung.
 
-Die automatische Auswahl:
+Die parameterlose Auswahl:
 
 1. lädt und validiert `config.json`,
 2. scannt genau die oberste Verzeichnisebene und niemals rekursiv,
 3. berücksichtigt nur reguläre Dateien und folgt keinen Symlinks oder Junctions,
 4. ignoriert bekannte temporäre Browser-Downloads,
-5. ermittelt eine stabile Dateidentität aus physisch kanonischem Pfad und vollständigem SHA-256-Inhalt,
+5. ermittelt eine stabile Dateiaufnahme mit physisch kanonischem Pfad, vollständigem SHA-256-Inhalt und `mtime_ns`,
 6. verwendet für eine unveränderte Identität eine bereits sicher gespeicherte Inhaltsklassifikation, statt dieselbe Nichtkandidaten-Datei fortlaufend neu zu analysieren,
-7. schließt eine Patch-Identität nur dann von der automatischen Ausführung aus, wenn sie bereits als tatsächlich versucht gespeichert wurde; eine bloße Klassifikation oder ein derzeitiger Zustands-Mismatch ist kein dauerhafter Ausschluss,
+7. berücksichtigt beim manuellen Ursprung sowohl noch nie gestartete als auch mit `failed` abgeschlossene Identitäten; beim automatischen Ursprung ausschließlich noch nie gestartete Identitäten; `attempted` und `succeeded` sind in beiden Fällen ausgeschlossen,
 8. unterscheidet anhand des tatsächlichen ZIP-Inhalts und nicht anhand von Dateiname oder Endung zwischen Patch-Paket, Result Bundle und sonstiger Datei,
 9. liest bei Patch-Kandidaten die Root-`patch.json` streng genug, um `repo_id`, Base-Commit und Fingerprint zu bestimmen,
 10. prüft für jeden Kandidaten unter der verbindlichen Registry-/Repository-Lock-Reihenfolge, ob die `repo_id` registriert ist und der aktuelle Repository-Zustand zu Base-Commit und Fingerprint passt,
-11. wählt nur dann aus, wenn genau ein noch nicht automatisch versuchtes Paket zum aktuellen Zustand genau einer registrierten Repository-Instanz passt.
+11. bildet erst danach die Menge der vollständig passenden und für den Ursprung zulässigen Kandidaten und wählt daraus den eindeutigen Kandidaten mit dem höchsten `mtime_ns`.
 
 Der persistente Exchange-Dateistatus darf für unveränderte Dateien die Inhaltsklasse und bei Patch-Kandidaten die geprüften Manifest-Auswahldaten zwischenspeichern. Ein gültiger Patch-Kandidat, der lediglich zum derzeitigen Repository-Zustand nicht passt, wird bei einem späteren Scan erneut gegen den dann aktuellen Zustand geprüft. Dauerhaft inhaltsbedingt ungültige Pakete, Result Bundles und sonstige Nichtkandidaten müssen dagegen nicht erneut vollständig analysiert werden.
+
+`mtime_ns` ist ausschließlich die Rangfolge unter bereits vollständig validierten und state-kompatiblen Kandidaten. Dateiname, Verzeichnisreihenfolge, Repository-Nähe oder ein nur sekundengenauer Zeitwert entscheiden nicht. Teilen mehrere passende Kandidaten exakt denselben höchsten `mtime_ns`, ist kein eindeutiger neuester Kandidat vorhanden; der Auftrag endet ohne Mutation und verlangt einen expliziten Pfad.
 
 Kann eine einzelne reguläre Exchange-Datei während eines Scans nicht stabil oder nicht sicher gelesen werden, wird ausschließlich dieser Eintrag für den aktuellen Scan ignoriert. Ein solcher Einzelfehler darf die Klassifikation anderer Dateien und eines unabhängig lesbaren passenden Patch-Pakets nicht verhindern. Der Fehler „cannot scan exchange directory“ bleibt einem tatsächlichen Fehler beim Auflisten des konfigurierten Verzeichnisses vorbehalten.
 
@@ -1653,9 +1657,11 @@ Die Zustandsprüfung während der Auswahl verwendet dieselbe gesperrte und konsi
 
 Result Bundles werden an ihrem eigenen Marker erkannt und niemals als Patch ausgeführt. Andere ZIP-Dateien, direkte Skripte, alte Shell-Patch-ZIPs und beliebige sonstige Dateien sind keine Kandidaten für den sicheren Apply-Pfad.
 
-Gibt es keinen passenden Kandidaten, endet der Auftrag ohne Mutation mit einem klaren Fehler. Gibt es mehrere passende Kandidaten, wird nicht nach Name, Zeitstempel, Verzeichnisreihenfolge, Repository-Nähe oder sonstiger Heuristik geraten; der Auftrag endet als mehrdeutig und verlangt einen expliziten Pfad.
+Gibt es keinen passenden Kandidaten, endet der Auftrag ohne Mutation mit einem klaren Fehler. Ein manueller parameterloser Apply darf eine Identität im Zustand `failed` nur dann erneut öffnen, wenn Repository-ID, Base-Commit, Zustands-Fingerprint, Paketvalidierung und Revalidierung weiterhin vollständig passen. Unmittelbar vor der ersten Mutation wechselt diese Identität atomar zurück auf `attempted`; nach dem tatsächlichen Ausführungsergebnis wird sie als `failed` oder `succeeded` abgeschlossen.
 
-Ein explizites `patchharbor apply PATCH_ZIP` übersteuert die automatische Auswahl und darf eine zuvor automatisch versuchte Datei bewusst erneut ausführen. Ein Dry-Run markiert eine Datei nicht als versucht. Bei einem automatischen Nicht-Dry-Run-Auftrag wird die Identität nach vollständigem Preflight und letzter Zustandsprüfung unmittelbar vor der ersten Repository-Mutation oder dem Start des Entrypoints atomar als versucht gespeichert. Scheitert diese Statuspublikation, beginnt keine Mutation und kein Entrypoint. Die Markierung bleibt unabhängig vom späteren Entrypoint-, Test- oder Result-Bundle-Ergebnis bestehen; ein expliziter Wiederholungsaufruf bleibt möglich.
+Erfolgreiche Patch-Pakete sind gegen Replay geschützt. Ein fehlgeschlagener Patch kann durch einen bewussten manuellen Apply erneut versucht werden, solange Repository-Bindung und Patch-Zustand weiterhin exakt passen. Der Watcher wiederholt fehlgeschlagene Pakete nicht automatisch in einer Endlosschleife.
+
+Ein explizites `patchharbor apply PATCH_ZIP` übersteuert die parameterlose Auswahl und behält seine vollständigen Sicherheitsprüfungen. Es ist kein öffentlicher `--retry-failed`-Schalter erforderlich, weil der normale parameterlose manuelle Aufruf bereits die bewusste Benutzeraktion darstellt. Ein Dry-Run verändert keinen Replay-Status.
 
 PatchHarbor verschiebt, löscht, archiviert, sortiert oder benennt die ausgewählte Datei nicht um. Wird unter demselben Pfad später anderer Inhalt abgelegt, entsteht wegen des neuen SHA-256 eine neue Dateidentität.
 
@@ -1681,7 +1687,7 @@ Kann das Repository vorher nicht sicher aufgelöst werden, entsteht kein Reposit
 
 `patchharbor apply [PATCH_ZIP]` führt mindestens aus:
 
-1. Bei fehlendem `PATCH_ZIP` genau einen Kandidaten nach Abschnitt 16.2 auswählen; andernfalls ausschließlich den expliziten Pfad verwenden.
+1. Bei fehlendem `PATCH_ZIP` den eindeutigen neuesten zulässigen Kandidaten nach Abschnitt 16.2 auswählen; andernfalls ausschließlich den expliziten Pfad verwenden.
 2. Eingabedatei stabil und vollständig lesbar öffnen.
 3. Tatsächliches ZIP-Format prüfen.
 4. Archivstruktur, Eintragstypen, Pfade und Ressourcenlimits vollständig prüfen.
@@ -1700,11 +1706,11 @@ Kann das Repository vorher nicht sicher aufgelöst werden, entsteht kein Reposit
 17. Alle Nutzdateiinhalte vollständig in Speicher oder ein privates auftragsbezogenes Temp-Verzeichnis außerhalb des Repositorys aufnehmen.
 18. Vor der ersten Repository-Schreiboperation Base-Commit, Fingerprint, Registry-Zuordnung, lokale ID, alle Zielpfade und deren relevante Eltern erneut prüfen.
 19. Beim Dry-Run keine Dateidentität konsumieren, keine Nutzdatei schreiben und keinen Entrypoint starten.
-20. Bei einem automatisch ausgewählten Nicht-Dry-Run-Auftrag die Dateidentität atomar als versucht speichern; bei Fehler ohne Mutation abbrechen.
+20. Bei einem parameterlos ausgewählten Nicht-Dry-Run-Auftrag die Identität atomar auf `attempted` setzen; nur ein manueller Ursprung darf dabei `failed` erneut öffnen; bei Fehler ohne Mutation abbrechen.
 21. Beim echten Apply Nutzdateien einzeln atomar schreiben oder ersetzen.
 22. Entrypoint mit Repository-Wurzel als CWD ausführen.
 23. stdout und stderr vollständig in den Run-Log aufnehmen.
-24. Exit-Code, Timeout, Strg+C oder Tool-Fehler als primäres Ergebnis bestimmen.
+24. Exit-Code, Timeout, Strg+C oder Tool-Fehler als primäres Ergebnis bestimmen und den Replay-Status atomar als `failed` oder `succeeded` abschließen.
 25. Konsistenten aktuellen Repository-Snapshot aufnehmen.
 26. Result Bundle in der reservierten temporären Datei im endgültigen Ausgabeordner erstellen, prüfen und atomar veröffentlichen.
 27. Primäres Ergebnis und Result-Bundle-Ergebnis nach Abschnitt 18 zusammenführen.
@@ -1715,7 +1721,7 @@ Kann das Repository vorher nicht sicher aufgelöst werden, entsteht kein Reposit
 PatchHarbor lehnt vor der ersten Repository-Änderung unter anderem ab:
 
 - fehlende oder ungültige Exchange-Konfiguration, soweit kein vollständiger expliziter Pfad- und Ausgabeauftrag vorliegt,
-- keinen passenden oder mehrere passende automatische Exchange-Kandidaten,
+- keinen passenden Kandidaten oder mehrere passende Kandidaten mit exakt demselben höchsten `mtime_ns`,
 - unbekannte oder widersprüchliche Repository-ID,
 - fehlende oder kopierte lokale ID,
 - ungültige Registry-Zuordnung,
@@ -2001,7 +2007,7 @@ Es gibt keinen reduzierten Standardmodus, der nur den Commit-Hash enthält.
 ### 19.4 Struktur
 
 ```text
-patchharbor_result_<timestamp>_<run-id>.zip
+<Repository>_Result_<HHMMSS>_<MMDD>_<ID6>.zip
 ├── manifest.json
 ├── context.json
 ├── base/
@@ -2015,6 +2021,8 @@ patchharbor_result_<timestamp>_<run-id>.zip
     ├── execution.log
     └── run.json
 ```
+
+Der Dateiname beginnt mit dem Namen des Repository-Wurzelverzeichnisses, verwendet danach das Schlüsselwort `Result`, die UTC-Uhrzeit `HHMMSS`, Monat und Tag `MMDD` ohne Jahr sowie die ersten sechs Zeichen der vollständigen Run-ID ohne `…`. Das entsprechende Chat-Patch-Schema verwendet an derselben Position `Patch` und eine Paket-UUID. Der Dateiname ist keine Sicherheits- oder Klassifikationsinformation.
 
 `execution.log` fehlt bei einem manuellen Bundle oder Dry-Run ohne Entrypoint-Ausführung.
 
@@ -2249,6 +2257,8 @@ Empfohlene Verantwortlichkeiten:
 - `execution.py` – temporäre Skriptdatei, Prozessstart, Timeout und Ergebnis,
 - `run_log.py` – vollständiger Run-Log und strukturierter Run-Bericht,
 - `presentation.py` – Plain-Ausgabe, TUI, Farben und Rolling Buffer,
+- `identifier_presentation.py` – zentrale Sechs-Zeichen-Darstellung technischer Kennungen,
+- `exchange.py` und `exchange_state.py` – Inhaltsklassifikation, `mtime_ns`-Auswahl und persistenter Replay-Status,
 - `registry.py` – zentrale Repository-Registrierung,
 - `repository_state.py` – Base-Commit, kanonischer Fingerprint und Snapshot-Zustand,
 - `locks.py` – globale Registry-Sperre und exklusive Sperre pro Repository-ID,
@@ -2418,12 +2428,19 @@ Mindestens zusätzlich zu prüfen sind:
 - explizites `--output-dir` übersteuert das Standardziel,
 - nicht rekursiver Exchange-Scan ohne Abhängigkeit von Dateiname oder Endung,
 - Result Bundles, direkte Skripte, alte Patch-ZIPs, Browser-Temporärdateien und sonstige Dateien werden nicht als sichere Patch-Kandidaten ausgeführt,
-- genau ein zustandsgebunden passendes Patch-Paket wird ausgewählt,
-- kein Treffer und mehrere Treffer werden ohne Mutation eindeutig abgelehnt,
+- vollständig passende Kandidaten werden vor jeder Zeitrangfolge anhand von `repo_id`, Base-Commit und Fingerprint gefiltert,
+- bei mehreren passenden Kandidaten wird der eindeutige höchste `mtime_ns` gewählt; ein exakter Höchstwert-Tie wird ohne Mutation abgelehnt,
 - explizites `PATCH_ZIP` übersteuert die Auswahl,
-- Dry-Run konsumiert keine Dateiidentität,
-- Nicht-Dry-Run-Aufträge werden nach einem Versuch unabhängig vom Entrypoint-Exit-Code nicht automatisch wiederholt,
+- Dry-Run verändert keinen Replay-Status,
+- `attempted`, `failed` und `succeeded` bleiben über Prozessneustarts unterscheidbar,
+- ein fehlgeschlagener parameterloser manueller Apply kann bei unveränderter vollständiger State-Bindung dasselbe Paket erneut ausführen,
+- ein Watcher-Poll wiederholt dasselbe fehlgeschlagene Paket nicht unmittelbar erneut,
+- ein erfolgreiches Paket bleibt für manuelle parameterlose und automatische Auswahl Replay-geschützt,
+- Base-Commit- oder Fingerprint-Mismatch verhindert den manuellen Retry eines fehlgeschlagenen Pakets,
+- mehrere Pakete für verschiedene Repositorys oder Zustände führen nicht zur Auswahl eines falschen Kandidaten,
 - geänderter Inhalt unter demselben Namen ist eine neue Identität,
+- Patch- und Result-Dateinamen folgen dem Repository-/Typ-/Uhrzeit-/Datum-/ID6-Vertrag,
+- menschenlesbare technische IDs erscheinen zentral als sechs Zeichen plus `…`, während JSON und Sicherheitsdaten vollständig bleiben,
 - Exchange-Dateien bleiben nach Verarbeitung unverändert am Ort,
 - Core und Watcher teilen Konfiguration, Klassifikation und Dateidentitätsvertrag,
 - Watcher-Neustart führt nicht zur erneuten Verarbeitung unveränderter Dateien,
@@ -2663,7 +2680,7 @@ Ein Chat-Patch erzeugt nach grünen Tests genau einen Git-Commit der angezeigten
 
 ### 26.6 Patch-Paket- und Testvertrag des Chats
 
-Der Chat erzeugt genau eine herunterladbare ZIP-Datei im sicheren PatchHarbor-Paketformat. Er liefert keine parallele Shell-Datei, keinen zweiten Patch und keine alternative manuelle Änderungsanleitung.
+Der Chat erzeugt genau eine herunterladbare ZIP-Datei im sicheren PatchHarbor-Paketformat. Er liefert keine parallele Shell-Datei, keinen zweiten Patch und keine alternative manuelle Änderungsanleitung. Der Dateiname folgt `<Repository>_Patch_<HHMMSS>_<MMDD>_<ID6>.zip` mit UTC-Uhrzeit, Monat/Tag ohne Jahr und den ersten sechs Zeichen einer Paket-UUID ohne `…`.
 
 Das Paket:
 
@@ -2801,10 +2818,12 @@ Ein Erfolg darf erst nach Prüfung von `run.json`, Git-Zustand und erwartetem Co
 - Der Exchange-Ordner ist eine gemeinsame flache Übergabestelle für Patch-Pakete, Result Bundles und sonstige Dateien.
 - Exchange-Ordner und registrierte Repositorys dürfen sich in keiner Richtung überlappen.
 - `bundle` und Apply-Result-Bundles verwenden ohne explizites `--output-dir` den Exchange-Ordner.
-- `apply` ohne `PATCH_ZIP` wählt genau ein noch nicht automatisch verarbeitetes Paket anhand von `repo_id`, Base-Commit und Fingerprint aus.
-- Bei keinem oder mehreren passenden Kandidaten wird nicht geraten und nichts mutiert.
+- `apply` ohne `PATCH_ZIP` filtert vollständig nach `repo_id`, Base-Commit und Fingerprint und wählt danach den eindeutigen höchsten `mtime_ns`.
+- Ein exakter Tie des neuesten `mtime_ns` wird ohne Mutation abgelehnt und verlangt einen expliziten Pfad.
 - Result Bundles und sonstige Dateien werden nie als sichere Patch-Pakete ausgeführt.
-- Unveränderte bereits versuchte Dateien werden nicht automatisch erneut gestartet; ein expliziter Pfad erlaubt den bewussten Retry.
+- Erfolgreiche Identitäten bleiben Replay-geschützt; fehlgeschlagene Identitäten sind nur für einen bewussten manuellen parameterlosen Retry erneut zulässig, nicht für den Watcher.
+- Patch- und Result-Dateinamen beginnen mit dem Repository-Namen, danach folgen `Patch` oder `Result`, UTC-Uhrzeit, Monat/Tag ohne Jahr und ID6.
+- Menschenlesbare technische Kennungen verwenden sechs Zeichen plus `…`; JSON, Manifeste, Logs, Persistenz und Sicherheitsvergleiche bleiben vollständig.
 - PatchHarbor verschiebt, löscht, archiviert oder sortiert Exchange-Dateien nicht; diese spätere Ablage gehört zu Repo Assist.
 - Der Watcher verwendet dieselbe `config.json`, Paketklassifikation und Dateidentität wie der Core.
 - `CHAT_INSTRUCTIONS.md` plus aktuelles Result Bundle initialisieren einen neuen Entwicklungs-Chat.

@@ -44,6 +44,7 @@ EXPECTED_RUNTIME_FILES = {
     "patchharbor/git_objects.py",
     "patchharbor/git_patches.py",
     "patchharbor/git_commands.py",
+    "patchharbor/identifier_presentation.py",
     "patchharbor/interpreters.py",
     "patchharbor/json_document.py",
     "patchharbor/models.py",
@@ -149,7 +150,8 @@ def _copy_project_for_release(tmp_path: Path) -> Path:
             "*.pyc",
             "*.pyo",
             "*.log",
-            "patchharbor_*_result_*.zip",
+            "*_Patch_*.zip",
+            "*_Result_*.zip",
         ),
     )
 
@@ -495,7 +497,7 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
     assert "Register local Git repository instances" in help_outputs[("--help",)]
     assert "one user-specific config.json" in help_outputs[("configure", "--help")]
     assert "committed HEAD" in help_outputs[("register", "--help")]
-    assert "exactly one unattempted package" in help_outputs[("apply", "--help")]
+    assert "eligible package with the greatest mtime_ns" in help_outputs[("apply", "--help")]
     assert "current directory does not select the target repository" in (
         help_outputs[("apply", "--help")]
     )

@@ -328,6 +328,7 @@ def test_runtime_responsibilities_follow_the_specified_boundaries() -> None:
     }
 
     assert graph["patchharbor.parser"] == frozenset()
+    assert graph["patchharbor.identifier_presentation"] == frozenset()
     assert graph["patchharbor.presentation"] == frozenset()
 
     for module, forbidden in forbidden_by_module.items():
@@ -438,8 +439,9 @@ def test_watcher_is_separate_and_uses_only_the_public_apply_process_boundary() -
     ):
         assert forbidden_core_detail not in watcher_loop_source
         assert forbidden_core_detail not in watcher_cli_source
-    assert 'arguments = [*apply_command, "apply", "--json"]' in (
-        watcher_boundary_source
+    assert (
+        'arguments = [*apply_command, "apply", "--json", "--automatic"]'
+        in watcher_boundary_source
     )
     assert "delegate_to_automatic_apply" in watcher_cli_source
     assert "delegate_to_apply" not in watcher_boundary_source

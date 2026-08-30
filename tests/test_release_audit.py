@@ -30,6 +30,7 @@ EXPECTED_CORE_RUNTIME_FILES = {
     "git_patches.py",
     "git_commands.py",
     "interpreters.py",
+    "identifier_presentation.py",
     "json_document.py",
     "models.py",
     "output.py",
@@ -296,7 +297,7 @@ def test_watcher_is_only_shared_configuration_lifecycle_and_core_apply() -> None
     assert "revalidate_exchange_directory" in cli_source
     assert "run_shared_exchange_watcher" in cli_source
     assert "delegate_to_automatic_apply" in cli_source
-    assert '"apply", "--json"' in boundary_source
+    assert '"apply", "--json", "--automatic"' in boundary_source
     assert "delegate_to_apply" not in boundary_source
     assert "scan_exchange_directory" not in loop_source
     assert "ExchangeFileIdentity" not in loop_source

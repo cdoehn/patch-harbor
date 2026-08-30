@@ -13,6 +13,7 @@ from uuid import UUID
 import zipfile
 
 from patchharbor.errors import PatchHarborError, result_bundle_error
+from patchharbor.identifier_presentation import shorten_identifier
 from patchharbor.platform.filesystem import (
     MetadataSyncStatus,
     PathKind,
@@ -73,10 +74,15 @@ class PublishedResultBundle:
     durability: PublicationDurability
 
 
-def result_bundle_filename(session: RunSession) -> str:
-    """Return the unique final filename for one structured run session."""
+def result_bundle_filename(
+    session: RunSession,
+    *,
+    repository_name: str,
+) -> str:
+    """Return the human-oriented final filename for one Result Bundle."""
     return (
-        f"patchharbor_result_{session.filename_timestamp}_{session.run_id}.zip"
+        f"{repository_name}_Result_{session.filename_timestamp}_"
+        f"{shorten_identifier(session.run_id, with_ellipsis=False)}.zip"
     )
 
 

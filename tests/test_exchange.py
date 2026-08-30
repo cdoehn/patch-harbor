@@ -65,6 +65,19 @@ def _write_result_bundle(path: Path, *, include_patch: bool = False) -> None:
             archive.writestr("run.sh", b"# PATCHHARBOR\nprintf unsafe\n")
 
 
+def test_classification_exposes_the_stable_nanosecond_mtime(
+    tmp_path: Path,
+) -> None:
+    patch = tmp_path / "patch.zip"
+    _write_patch(patch)
+    expected_mtime_ns = 1_700_000_000_123_456_700
+    os.utime(patch, ns=(expected_mtime_ns, expected_mtime_ns))
+
+    artifact = classify_exchange_artifact(patch)
+
+    assert artifact.mtime_ns == expected_mtime_ns
+
+
 def test_content_classification_does_not_depend_on_name_or_extension(
     tmp_path: Path,
 ) -> None:

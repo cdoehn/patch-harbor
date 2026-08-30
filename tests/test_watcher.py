@@ -132,8 +132,8 @@ def test_shared_poll_records_success_and_distinct_core_error(
                     process_exit_code=10,
                     error_kind="patch_package_error",
                     error_message=(
-                        "multiple state-bound patch packages match registered "
-                        "repositories; pass PATCH_ZIP explicitly"
+                        "multiple state-bound patch packages share the newest "
+                        "mtime_ns; pass PATCH_ZIP explicitly"
                     ),
                     run_id="ambiguous-run",
                 ),

@@ -65,12 +65,15 @@ class ExchangeArtifact:
 
     path: Path
     identity: ExchangeFileIdentity
+    mtime_ns: int
     kind: ExchangeArtifactKind
     selection: ExchangePatchSelection | None = None
     apply_status: ExchangeApplyStatus | None = None
     package: ValidatedPatchPackage | None = None
 
     def __post_init__(self) -> None:
+        if isinstance(self.mtime_ns, bool) or not isinstance(self.mtime_ns, int):
+            raise ValueError("Exchange artifact mtime_ns must be an integer")
         is_patch = self.kind is ExchangeArtifactKind.PATCH_PACKAGE
         if (self.selection is not None) != is_patch:
             raise ValueError("only Patch Package artifacts carry selection data")
@@ -96,6 +99,7 @@ class ExchangeArtifact:
 @dataclass(frozen=True, slots=True)
 class _ExchangeFileSnapshot:
     identity: ExchangeFileIdentity
+    mtime_ns: int
     content: bytes | None
 
 
@@ -190,6 +194,7 @@ def _read_exchange_file(
             path=canonical_after,
             sha256=stable_file.sha256,
         ),
+        mtime_ns=stable_file.mtime_ns,
         content=stable_file.content,
     )
 
@@ -230,11 +235,13 @@ def _artifact_from_record(
     path: Path,
     record: ExchangeStateRecord,
     *,
+    mtime_ns: int,
     package: ValidatedPatchPackage | None = None,
 ) -> ExchangeArtifact:
     return ExchangeArtifact(
         path=path,
         identity=record.identity,
+        mtime_ns=mtime_ns,
         kind=ExchangeArtifactKind(record.kind),
         selection=record.manifest,
         apply_status=record.apply_status,
@@ -276,6 +283,7 @@ def classify_exchange_artifact(
     return _artifact_from_record(
         snapshot.identity.path,
         _record_from_classification(snapshot, classification),
+        mtime_ns=snapshot.mtime_ns,
         package=classification.package,
     )
 
@@ -334,7 +342,13 @@ def scan_exchange_directory(
             continue
         cached = initial_records.get(snapshot.identity)
         if cached is not None:
-            artifacts.append(_artifact_from_record(path, cached))
+            artifacts.append(
+                _artifact_from_record(
+                    path,
+                    cached,
+                    mtime_ns=snapshot.mtime_ns,
+                )
+            )
             continue
 
         classification = _classify_content(
@@ -348,6 +362,7 @@ def scan_exchange_directory(
             _artifact_from_record(
                 path,
                 record,
+                mtime_ns=snapshot.mtime_ns,
                 package=classification.package,
             )
         )
@@ -364,6 +379,7 @@ def scan_exchange_directory(
             artifact.path,
             current_records.get(artifact.identity)
             or _record_from_artifact(artifact),
+            mtime_ns=artifact.mtime_ns,
             package=artifact.package,
         )
         for artifact in artifacts

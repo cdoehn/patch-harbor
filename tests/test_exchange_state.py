@@ -110,6 +110,56 @@ def test_classification_and_apply_lifecycle_are_persisted_in_closed_v2_state(
         )
 
 
+def test_failed_apply_can_be_reopened_only_by_an_explicit_retry_transition(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    set_isolated_user_environment(monkeypatch, tmp_path / "user")
+    paths = registration_user_paths()
+    patch = tmp_path / "exchange" / "patch.zip"
+    patch.parent.mkdir()
+    patch.write_bytes(b"package")
+    record = _record(patch)
+    merge_exchange_classifications(paths, (record,))
+    mark_exchange_apply_started(
+        paths,
+        record.identity,
+        _selection(),
+        verify_identity=lambda: None,
+    )
+    mark_exchange_apply_finished(
+        paths,
+        record.identity,
+        _selection(),
+        ExchangeApplyStatus.FAILED,
+    )
+
+    with pytest.raises(
+        PatchHarborError,
+        match="selected exchange patch was already attempted",
+    ):
+        mark_exchange_apply_started(
+            paths,
+            record.identity,
+            _selection(),
+            verify_identity=lambda: None,
+        )
+
+    verified: list[bool] = []
+    mark_exchange_apply_started(
+        paths,
+        record.identity,
+        _selection(),
+        verify_identity=lambda: verified.append(True),
+        retry_failed=True,
+    )
+
+    assert verified == [True]
+    reopened = load_exchange_state(paths).record_for(record.identity)
+    assert reopened is not None
+    assert reopened.apply_status is ExchangeApplyStatus.ATTEMPTED
+
+
 def test_successful_apply_is_persisted_as_a_distinct_terminal_state(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

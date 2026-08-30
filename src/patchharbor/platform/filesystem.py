@@ -56,6 +56,7 @@ class StableRegularFileHash:
     content: bytes | None
     executable: bool
     size: int
+    mtime_ns: int
     sha256: str
 
 
@@ -225,7 +226,7 @@ def _read_stable_regular_file(
     retained_content_limit: int | None,
     calculate_sha256: bool,
     allow_path_identity_fallback: bool,
-) -> tuple[bytes | None, bool, int, str | None]:
+) -> tuple[bytes | None, bool, int, int, str | None]:
     initial_metadata = _regular_path_metadata(path)
 
     flags = os.O_RDONLY
@@ -298,13 +299,14 @@ def _read_stable_regular_file(
         bytes(retained) if retained is not None else None,
         bool(finished_metadata.st_mode & 0o111),
         size,
+        finished_metadata.st_mtime_ns,
         hasher.hexdigest() if hasher is not None else None,
     )
 
 
 def read_stable_regular_file(path: Path) -> StableRegularFile:
     """Read one regular file without following links and reject path races."""
-    content, executable, _size, _digest = _read_stable_regular_file(
+    content, executable, _size, _mtime_ns, _digest = _read_stable_regular_file(
         path,
         retained_content_limit=None,
         calculate_sha256=False,
@@ -334,7 +336,7 @@ def read_stable_regular_file_with_sha256(
         or retained_content_limit <= 0
     ):
         raise ValueError("retained_content_limit must be a positive integer")
-    content, executable, size, digest = _read_stable_regular_file(
+    content, executable, size, mtime_ns, digest = _read_stable_regular_file(
         path,
         retained_content_limit=retained_content_limit,
         calculate_sha256=True,
@@ -346,6 +348,7 @@ def read_stable_regular_file_with_sha256(
         content=content,
         executable=executable,
         size=size,
+        mtime_ns=mtime_ns,
         sha256=digest,
     )
 

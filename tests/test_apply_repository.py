@@ -254,7 +254,7 @@ def test_state_mismatch_publishes_while_repository_lock_is_held(
     assert captured.value.exit_code == ExitCode.STATE_MISMATCH
     assert observed_lock_codes == [int(ExitCode.REPOSITORY_BUSY)]
     assert probe_repository_lock(str(context.repo_id), environment) == 0
-    bundles = tuple(output_directory.glob("patchharbor_result_*.zip"))
+    bundles = tuple(output_directory.glob("*_Result_*.zip"))
     assert len(bundles) == 1
     assert not tuple(output_directory.glob(".*.tmp"))
 
@@ -446,7 +446,7 @@ def test_apply_result_matrix_preserves_emergency_execution_diagnostics(
     assert run_document["primary_result"]["kind"] == expected_kind.value
     assert run_document["result_bundle"]["status"] == "failed"
     assert run_document["process_exit_code"] == expected_exit
-    assert not tuple(output_directory.glob("patchharbor_result_*.zip"))
+    assert not tuple(output_directory.glob("*_Result_*.zip"))
     assert not tuple(output_directory.glob(".*.tmp"))
 
 
@@ -583,7 +583,7 @@ def test_apply_json_is_closed_and_preserves_emergency_execution_files(
     assert raw_marker.encode("utf-8") in (
         emergency_path / "execution.log"
     ).read_bytes()
-    assert not tuple(output_directory.glob("patchharbor_result_*.zip"))
+    assert not tuple(output_directory.glob("*_Result_*.zip"))
     assert not tuple(output_directory.glob(".*.tmp"))
 
 
@@ -1080,9 +1080,12 @@ def test_apply_preflight_presents_resolved_repository_and_entrypoint_messages(
     assert presentation.repository["repository_name"] == str(repository.resolve())
     repository_context = presentation.repository["repository_context"]
     assert isinstance(repository_context, str)
-    assert str(context.repo_id) in repository_context
-    assert str(context.base_commit)[:12] in repository_context
-    assert context.state_fingerprint in repository_context
+    assert f"repo_id: {str(context.repo_id)[:6]}…" in repository_context
+    assert f"base: {str(context.base_commit)[:6]}…" in repository_context
+    assert f"state: {context.state_fingerprint[:6]}…" in repository_context
+    assert str(context.repo_id) not in repository_context
+    assert str(context.base_commit) not in repository_context
+    assert context.state_fingerprint not in repository_context
     assert presentation.script == {
         "script_name": "run.sh",
         "script_index": 1,

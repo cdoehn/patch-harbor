@@ -218,7 +218,7 @@ def test_shared_watcher_delegates_discovery_identity_and_retry_to_core(
 
     package = exchange / "chat-output.bin"
     _write_automatic_watcher_package(package, context)
-    result_bundle = exchange / "patchharbor_result_existing.zip"
+    result_bundle = exchange / "repository_Result_000000_0101_abcdef.zip"
     with zipfile.ZipFile(result_bundle, "w") as archive:
         archive.writestr(
             "manifest.json",
@@ -253,7 +253,7 @@ def test_shared_watcher_delegates_discovery_identity_and_retry_to_core(
     assert (exchange / "unfinished.crdownload").is_file()
     generated_bundles = tuple(
         path
-        for path in exchange.glob("patchharbor_result_*.zip")
+        for path in exchange.glob("*_Result_*.zip")
         if path != result_bundle
     )
     assert len(generated_bundles) == 1
@@ -288,3 +288,104 @@ def test_shared_watcher_delegates_discovery_identity_and_retry_to_core(
     assert second_record["event"] == "waiting_for_exchange_patch"
     assert "input_path" not in first_record
     assert "input_sha256" not in first_record
+
+
+def test_watcher_does_not_loop_after_a_failed_entrypoint(
+    tmp_path: Path,
+) -> None:
+    repository = create_repository(tmp_path / "repository")
+    (repository / ".gitignore").write_text(
+        "watcher-failed-runs.txt\n",
+        encoding="utf-8",
+    )
+    git(repository, "add", ".gitignore")
+    git(repository, "commit", "--quiet", "-m", "ignore watcher failure count")
+    environment = isolated_user_environment(tmp_path / "user")
+    assert run_cli(
+        repository,
+        "register",
+        environment_overrides=environment,
+    ).returncode == 0
+    assert run_cli(
+        repository,
+        "configure",
+        "exchange-directory",
+        str(tmp_path / "exchange"),
+        environment_overrides=environment,
+    ).returncode == 0
+    context_completed = run_cli(
+        repository,
+        "context",
+        "--json",
+        environment_overrides=environment,
+    )
+    assert context_completed.returncode == 0
+    context = json.loads(context_completed.stdout)["result"]
+    assert isinstance(context, dict)
+
+    exchange = configured_exchange_directory(environment)
+    package = exchange / "failing-watcher-patch.zip"
+    entrypoint_name = native_value("run.sh", "run.ps1")
+    manifest = {
+        "marker": PATCH_MARKER,
+        "format_version": PATCH_FORMAT_VERSION,
+        "repo_id": context["repo_id"],
+        "base_commit": context["base_commit"],
+        "state_fingerprint": context["state_fingerprint"],
+        "fingerprint_algorithm": FINGERPRINT_ALGORITHM,
+        "entrypoint": entrypoint_name,
+    }
+    entrypoint = native_script(
+        "printf x >> watcher-failed-runs.txt\nexit 23",
+        (
+            "[System.IO.File]::AppendAllText("
+            "'watcher-failed-runs.txt', 'x')\nexit 23"
+        ),
+    )
+    with zipfile.ZipFile(package, "w") as archive:
+        archive.writestr(
+            "patch.json",
+            json.dumps(
+                manifest,
+                ensure_ascii=False,
+                allow_nan=False,
+                separators=(",", ":"),
+            ).encode("utf-8"),
+        )
+        archive.writestr(entrypoint_name, entrypoint.encode("utf-8"))
+
+    apply_environment = project_environment(environment)
+
+    def delegate():
+        return delegate_to_automatic_apply(environment=apply_environment)
+
+    first = poll_shared_exchange_once(
+        exchange,
+        SharedWatcherEventState(),
+        delegate=delegate,
+        log_stream=StringIO(),
+        error_stream=StringIO(),
+    )
+    second = poll_shared_exchange_once(
+        exchange,
+        SharedWatcherEventState(),
+        delegate=delegate,
+        log_stream=StringIO(),
+        error_stream=StringIO(),
+    )
+
+    assert first is WatcherPollOutcome.ERROR
+    assert second is WatcherPollOutcome.WAITING
+    assert (repository / "watcher-failed-runs.txt").read_text(
+        encoding="utf-8"
+    ) == "x"
+    state_document = json.loads(
+        exchange_state_path(environment).read_text(encoding="utf-8")
+    )
+    matching_records = [
+        record
+        for record in state_document["entries"]
+        if record["path"] == str(package.resolve())
+    ]
+    assert len(matching_records) == 1
+    assert matching_records[0]["apply_status"] == "failed"

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 import errno
 from pathlib import Path
 from uuid import UUID
@@ -15,9 +16,24 @@ from patchharbor.result_bundle_publication import (
     publish_result_bundle,
     release_result_bundle_publication,
     reserve_result_bundle_publication,
+    result_bundle_filename,
 )
 from patchharbor.result_bundle_snapshot import build_result_bundle_snapshot
+from patchharbor.run_report import RunSession
 from tests.run_report_support import successful_bundle_run_report
+
+
+def test_result_bundle_filename_starts_with_repository_and_uses_short_run_id() -> None:
+    session = RunSession(
+        run_id=UUID("12345678-1234-4234-8234-123456789abc"),
+        started_at=datetime(2026, 8, 30, 10, 21, 39, tzinfo=timezone.utc),
+        started_monotonic=1.0,
+    )
+
+    assert result_bundle_filename(
+        session,
+        repository_name="patch-harbor",
+    ) == "patch-harbor_Result_102139_0830_123456.zip"
 
 
 def _publish(publication: ResultBundlePublication) -> None:

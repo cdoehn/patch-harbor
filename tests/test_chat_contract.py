@@ -329,6 +329,22 @@ def test_patch_ready_ui_is_narrow_ordered_and_download_safe() -> None:
     ) in ui_section
 
 
+def test_chat_contract_carries_retry_filename_and_identifier_presentation() -> None:
+    chat = _text(CHAT_PATH)
+    specification = _text(SPEC_PATH)
+    readme = _text(README_PATH)
+
+    for document in (chat, specification, readme):
+        assert "<Repository>_Patch_<HHMMSS>_<MMDD>_<ID6>.zip" in document
+        assert "<Repository>_Result_<HHMMSS>_<MMDD>_<ID6>.zip" in document
+    assert "höchsten `mtime_ns`" in chat
+    assert "fehlgeschlagenen Patch darf er bewusst" in chat
+    assert "fehlgeschlagene Pakete nicht erneut pollt" in chat
+    assert "sechs Zeichen plus `…`" in specification
+    assert "vollständigen JSON-Werte" in chat
+    assert "--retry-failed" not in build_core_parser().format_help()
+
+
 def test_result_bundle_and_responsibility_boundaries_match_spec_and_readme() -> None:
     chat = _text(CHAT_PATH)
     specification = _text(SPEC_PATH)

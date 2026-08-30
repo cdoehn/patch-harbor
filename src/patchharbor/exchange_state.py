@@ -485,8 +485,9 @@ def mark_exchange_apply_started(
     selection: ExchangePatchSelection,
     *,
     verify_identity: Callable[[], None],
+    retry_failed: bool = False,
 ) -> None:
-    """Verify and atomically record the start of one automatic apply."""
+    """Verify and atomically record a fresh or deliberate failed retry."""
     with _state_lock(paths):
         verify_identity()
         current = _load_unlocked(paths)
@@ -499,7 +500,11 @@ def mark_exchange_apply_started(
             raise _error(
                 "selected exchange patch has no matching processing state"
             )
-        if record.apply_status is not None:
+        retrying_failed = (
+            retry_failed
+            and record.apply_status is ExchangeApplyStatus.FAILED
+        )
+        if record.apply_status is not None and not retrying_failed:
             raise _error("selected exchange patch was already attempted")
         next_records = tuple(
             replace(candidate, apply_status=ExchangeApplyStatus.ATTEMPTED)

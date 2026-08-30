@@ -432,8 +432,6 @@ def create_manual_result_bundle(
     resolved_repo_id: RepositoryId | None = None
     try:
         paths = registration_user_paths()
-        filename = result_bundle_filename(session)
-
         with ExitStack() as repository_scope:
             with registry_lock(paths):
                 registry_snapshot = load_registry(paths)
@@ -441,6 +439,10 @@ def create_manual_result_bundle(
                 repo_id = _registered_identity(registry_snapshot, repository)
                 resolved_repository = repository
                 resolved_repo_id = repo_id
+                filename = result_bundle_filename(
+                    session,
+                    repository_name=repository.value.name,
+                )
                 target = prepare_result_bundle_target(
                     output_directory,
                     registry_snapshot,

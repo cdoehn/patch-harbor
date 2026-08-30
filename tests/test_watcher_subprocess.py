@@ -41,7 +41,9 @@ raise SystemExit(9)
     )
 
     assert completion.process_exit_code == 9
-    assert completion.apply_result == {"argv": ["apply", "--json"]}
+    assert completion.apply_result == {
+        "argv": ["apply", "--json", "--automatic"]
+    }
     assert completion.invalid_response_text is None
 
 
