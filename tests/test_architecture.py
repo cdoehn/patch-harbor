@@ -432,6 +432,8 @@ def test_watcher_is_separate_and_uses_only_the_public_apply_process_boundary() -
         "scan_exchange_directory",
         "load_exchange_state",
         "mark_exchange_attempted",
+        "mark_exchange_apply_started",
+        "mark_exchange_apply_finished",
         "capture_repository_context_for_id",
     ):
         assert forbidden_core_detail not in watcher_loop_source

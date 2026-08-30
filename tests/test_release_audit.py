@@ -234,7 +234,7 @@ def test_v111_commit_plan_has_one_consistent_consolidated_sequence() -> None:
     assert "führt die zur Änderung passenden Tests mit harten Timeouts aus" not in specification
 
 
-def test_exchange_attempt_state_is_core_owned_and_published_at_mutation_boundary() -> None:
+def test_exchange_apply_lifecycle_is_core_owned_and_published_around_execution() -> None:
     state_source = (CORE_PACKAGE_ROOT / "exchange_state.py").read_text(
         encoding="utf-8"
     )
@@ -252,11 +252,18 @@ def test_exchange_attempt_state_is_core_owned_and_published_at_mutation_boundary
     )
 
     assert "ExchangeFileIdentity" in state_source
-    assert "mark_exchange_attempted" in state_source
+    assert "ExchangeApplyStatus" in state_source
+    assert "mark_exchange_apply_started" in state_source
+    assert "mark_exchange_apply_finished" in state_source
     assert '"sha256"' in state_source
+    assert '"apply_status"' in state_source
     assert '"attempted"' in state_source
+    assert '"failed"' in state_source
+    assert '"succeeded"' in state_source
     assert "atomic_replace_bytes" in state_source
-    assert "mark_exchange_attempted" in application_source
+    assert "mark_exchange_apply_started" in application_source
+    assert "mark_exchange_apply_finished" in application_source
+    assert "publish_attempt_outcome" in application_source
     assert "before_mutation" in mutation_source
     assert "read_stable_regular_file_with_sha256" in exchange_source
     assert "exchange_state_path" in user_paths_source

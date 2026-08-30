@@ -267,7 +267,7 @@ def test_shared_watcher_delegates_discovery_identity_and_retry_to_core(
         if record["path"] == str(package.resolve())
     ]
     assert len(matching_records) == 1
-    assert matching_records[0]["attempted"] is True
+    assert matching_records[0]["apply_status"] == "succeeded"
 
     restart_log = StringIO()
     second = poll_shared_exchange_once(

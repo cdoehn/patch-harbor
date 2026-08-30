@@ -142,7 +142,7 @@ def _exchange_records(environment: dict[str, str]) -> list[dict[str, object]]:
     document = json.loads(
         exchange_state_path(environment).read_text(encoding="utf-8")
     )
-    assert document["format_version"] == 1
+    assert document["format_version"] == 2
     records = document["entries"]
     assert isinstance(records, list)
     return records
@@ -479,13 +479,13 @@ def test_dry_run_does_not_consume_but_automatic_apply_does(
 
     assert first_dry_run.returncode == 0
     assert second_dry_run.returncode == 0
-    assert _identity_record(environment, package)["attempted"] is False
+    assert _identity_record(environment, package)["apply_status"] is None
     assert not (repository / "automatic-runs.txt").exists()
 
     applied = _automatic_apply(tmp_path / "automatic", environment)
 
     assert applied.returncode == 0
-    assert _identity_record(environment, package)["attempted"] is True
+    assert _identity_record(environment, package)["apply_status"] == "succeeded"
     assert (repository / "automatic-runs.txt").read_text(encoding="utf-8") == "x"
 
     repeated = _automatic_apply(tmp_path / "automatic-repeat", environment)
@@ -545,8 +545,14 @@ def test_changed_bytes_at_the_same_exchange_path_are_a_new_identity(
 
     assert second.returncode == 0
     assert (repository / "automatic-runs.txt").read_text(encoding="utf-8") == "12"
-    assert _identity_record(environment, package, first_hash)["attempted"] is True
-    assert _identity_record(environment, package, second_hash)["attempted"] is True
+    assert (
+        _identity_record(environment, package, first_hash)["apply_status"]
+        == "succeeded"
+    )
+    assert (
+        _identity_record(environment, package, second_hash)["apply_status"]
+        == "succeeded"
+    )
     assert package.is_file()
 
 
@@ -572,12 +578,14 @@ def test_preflight_failure_remains_retryable_without_attempt_mark(
 
     assert first.returncode == int(ExitCode.NO_VALID_SCRIPT)
     assert second.returncode == int(ExitCode.NO_VALID_SCRIPT)
-    assert _identity_record(environment, package)["attempted"] is False
+    assert _identity_record(environment, package)["apply_status"] is None
     assert package.is_file()
 
 
-def test_entrypoint_failure_consumes_automatic_identity(
+@pytest.mark.parametrize("repository_change", ("base_commit", "state_fingerprint"))
+def test_entrypoint_failure_is_persisted_without_masquerading_as_success(
     tmp_path: Path,
+    repository_change: str,
 ) -> None:
     environment, exchange = _configure_user(tmp_path)
     repository = create_repository(tmp_path / "repository")
@@ -587,26 +595,47 @@ def test_entrypoint_failure_consumes_automatic_identity(
     _write_custom_package(
         package,
         context,
-        posix_entrypoint="printf x >> automatic-runs.txt\nexit 23",
-        powershell_entrypoint=(
-            "[System.IO.File]::AppendAllText('automatic-runs.txt', 'x')\n"
-            "exit 23"
-        ),
+        posix_entrypoint="exit 23",
+        powershell_entrypoint="exit 23",
     )
-
     failed = _automatic_apply(tmp_path / "first", environment)
 
     assert failed.returncode == 23
-    assert _identity_record(environment, package)["attempted"] is True
-    assert (repository / "automatic-runs.txt").read_text(encoding="utf-8") == "x"
+    assert _identity_record(environment, package)["apply_status"] == "failed"
+    assert git(repository, "status", "--porcelain").stdout == ""
+    current = run_cli(
+        repository,
+        "context",
+        "--json",
+        environment_overrides=environment,
+    )
+    assert current.returncode == 0
+    assert json.loads(current.stdout)["result"] == context
 
     repeated = _automatic_apply(tmp_path / "second", environment)
     _assert_unresolved_selection_failure(
         repeated,
         message="no state-bound patch package matches a registered repository",
     )
-    assert (repository / "automatic-runs.txt").read_text(encoding="utf-8") == "x"
     assert package.is_file()
+
+    (repository / "tracked.txt").write_text("changed\n", encoding="utf-8")
+    if repository_change == "base_commit":
+        git(repository, "add", "tracked.txt")
+        git(repository, "commit", "--quiet", "-m", "change repository state")
+    mismatched = run_cli(
+        tmp_path,
+        "apply",
+        "--json",
+        str(package),
+        environment_overrides=environment,
+        timeout_seconds=120,
+    )
+
+    assert mismatched.returncode == int(ExitCode.STATE_MISMATCH)
+    mismatch_result = json.loads(mismatched.stdout)
+    assert mismatch_result["error"]["kind"] == "state_mismatch"
+    assert _identity_record(environment, package)["apply_status"] == "failed"
 
 
 def test_result_bundle_failure_still_consumes_automatic_identity(
@@ -646,7 +675,7 @@ def test_result_bundle_failure_still_consumes_automatic_identity(
     )
 
     assert failed.returncode == int(ExitCode.RESULT_BUNDLE_ERROR)
-    assert _identity_record(environment, package)["attempted"] is True
+    assert _identity_record(environment, package)["apply_status"] == "succeeded"
     assert (repository / "automatic-runs.txt").read_text(encoding="utf-8") == "x"
     assert output_directory.is_file()
 

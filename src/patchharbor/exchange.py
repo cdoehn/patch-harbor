@@ -11,6 +11,7 @@ import stat
 
 from patchharbor.errors import PatchHarborError, patch_package_error
 from patchharbor.exchange_state import (
+    ExchangeApplyStatus,
     ExchangeFileIdentity,
     ExchangePatchSelection,
     ExchangeStateRecord,
@@ -66,7 +67,7 @@ class ExchangeArtifact:
     identity: ExchangeFileIdentity
     kind: ExchangeArtifactKind
     selection: ExchangePatchSelection | None = None
-    attempted: bool = False
+    apply_status: ExchangeApplyStatus | None = None
     package: ValidatedPatchPackage | None = None
 
     def __post_init__(self) -> None:
@@ -81,10 +82,15 @@ class ExchangeArtifact:
                 != self.selection
             ):
                 raise ValueError("Patch Package selection data is inconsistent")
-        if self.attempted and not is_patch:
-            raise ValueError("only Patch Package artifacts may be attempted")
+        if self.apply_status is not None and not is_patch:
+            raise ValueError("only Patch Package artifacts may have apply status")
         if self.path != self.identity.path:
             raise ValueError("Exchange artifact path and identity disagree")
+
+    @property
+    def attempted(self) -> bool:
+        """Return whether automatic apply has started for this identity."""
+        return self.apply_status is not None
 
 
 @dataclass(frozen=True, slots=True)
@@ -231,7 +237,7 @@ def _artifact_from_record(
         identity=record.identity,
         kind=ExchangeArtifactKind(record.kind),
         selection=record.manifest,
-        attempted=record.attempted,
+        apply_status=record.apply_status,
         package=package,
     )
 
@@ -369,7 +375,7 @@ def _record_from_artifact(artifact: ExchangeArtifact) -> ExchangeStateRecord:
         identity=artifact.identity,
         kind=artifact.kind.value,
         manifest=artifact.selection,
-        attempted=artifact.attempted,
+        apply_status=artifact.apply_status,
     )
 
 

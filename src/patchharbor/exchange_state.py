@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable, Iterable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, replace
+from enum import Enum
 import json
 import os
 from pathlib import Path
@@ -37,10 +38,14 @@ from patchharbor.state_fingerprint import FINGERPRINT_ALGORITHM
 from patchharbor.user_paths import RegistrationUserPaths
 
 
-_FORMAT_VERSION = 1
+_LEGACY_FORMAT_VERSION = 1
+_FORMAT_VERSION = 2
 _DOCUMENT_FIELDS = frozenset({"entries", "format_version"})
-_ENTRY_FIELDS = frozenset(
+_LEGACY_ENTRY_FIELDS = frozenset(
     {"attempted", "kind", "manifest", "path", "sha256"}
+)
+_ENTRY_FIELDS = frozenset(
+    {"apply_status", "kind", "manifest", "path", "sha256"}
 )
 _MANIFEST_FIELDS = frozenset(
     {
@@ -51,6 +56,14 @@ _MANIFEST_FIELDS = frozenset(
     }
 )
 _ALLOWED_KINDS = frozenset({"other", "patch_package", "result_bundle"})
+
+
+class ExchangeApplyStatus(str, Enum):
+    """Persisted lifecycle state for one automatically selected package."""
+
+    ATTEMPTED = "attempted"
+    FAILED = "failed"
+    SUCCEEDED = "succeeded"
 
 
 @dataclass(frozen=True, slots=True, order=True)
@@ -109,22 +122,30 @@ class ExchangePatchSelection:
 
 @dataclass(frozen=True, slots=True)
 class ExchangeStateRecord:
-    """Cached classification and automatic-attempt state for one identity."""
+    """Cached classification and apply lifecycle for one Exchange identity."""
 
     identity: ExchangeFileIdentity
     kind: str
     manifest: ExchangePatchSelection | None
-    attempted: bool = False
+    apply_status: ExchangeApplyStatus | None = None
 
     def __post_init__(self) -> None:
         if self.kind not in _ALLOWED_KINDS:
             raise ValueError("exchange state kind is invalid")
-        if not isinstance(self.attempted, bool):
-            raise ValueError("exchange attempted state must be boolean")
+        if self.apply_status is not None and not isinstance(
+            self.apply_status,
+            ExchangeApplyStatus,
+        ):
+            raise ValueError("exchange apply status is invalid")
         if (self.manifest is not None) != (self.kind == "patch_package"):
             raise ValueError("only patch-package state may contain a manifest")
-        if self.attempted and self.kind != "patch_package":
-            raise ValueError("only patch-package state may be attempted")
+        if self.apply_status is not None and self.kind != "patch_package":
+            raise ValueError("only patch-package state may have an apply status")
+
+    @property
+    def attempted(self) -> bool:
+        """Return whether this identity has crossed the apply-start boundary."""
+        return self.apply_status is not None
 
     def same_classification(self, other: ExchangeStateRecord) -> bool:
         return (
@@ -222,22 +243,42 @@ def _parse_selection(value: object) -> ExchangePatchSelection | None:
         raise ValueError("exchange state manifest is invalid") from exc
 
 
-def _parse_record(value: object) -> ExchangeStateRecord:
-    if type(value) is not dict or set(value) != _ENTRY_FIELDS:
+def _parse_apply_status(value: object) -> ExchangeApplyStatus | None:
+    if value is None:
+        return None
+    if type(value) is not str:
+        raise ValueError("exchange state apply status is invalid")
+    try:
+        return ExchangeApplyStatus(value)
+    except ValueError as exc:
+        raise ValueError("exchange state apply status is invalid") from exc
+
+
+def _parse_record(value: object, *, format_version: int) -> ExchangeStateRecord:
+    expected_fields = (
+        _LEGACY_ENTRY_FIELDS
+        if format_version == _LEGACY_FORMAT_VERSION
+        else _ENTRY_FIELDS
+    )
+    if type(value) is not dict or set(value) != expected_fields:
         raise ValueError("exchange state entry is invalid")
     path_text = _require_string(value, "path")
     sha256 = _require_string(value, "sha256")
     kind = _require_string(value, "kind")
-    attempted = value["attempted"]
-    if type(attempted) is not bool:
-        raise ValueError("exchange state attempted flag is invalid")
+    if format_version == _LEGACY_FORMAT_VERSION:
+        attempted = value["attempted"]
+        if type(attempted) is not bool:
+            raise ValueError("exchange state attempted flag is invalid")
+        apply_status = ExchangeApplyStatus.ATTEMPTED if attempted else None
+    else:
+        apply_status = _parse_apply_status(value["apply_status"])
     path = Path(path_text)
     try:
         return ExchangeStateRecord(
             identity=ExchangeFileIdentity(path=path, sha256=sha256),
             kind=kind,
             manifest=_parse_selection(value["manifest"]),
-            attempted=attempted,
+            apply_status=apply_status,
         )
     except ValueError as exc:
         raise ValueError("exchange state entry is invalid") from exc
@@ -260,17 +301,21 @@ def _parse_state(content: bytes) -> ExchangeStateSnapshot:
         raise _error("exchange processing state is not one valid JSON object") from exc
     if type(document) is not dict or set(document) != _DOCUMENT_FIELDS:
         raise _error("exchange processing state has an invalid schema")
-    if (
-        type(document["format_version"]) is not int
-        or document["format_version"] != _FORMAT_VERSION
-    ):
+    format_version = document["format_version"]
+    if type(format_version) is not int or format_version not in {
+        _LEGACY_FORMAT_VERSION,
+        _FORMAT_VERSION,
+    }:
         raise _error("exchange processing state format_version is invalid")
     entries = document["entries"]
     if type(entries) is not list:
         raise _error("exchange processing state entries are invalid")
     try:
         return ExchangeStateSnapshot(
-            records=tuple(_parse_record(entry) for entry in entries)
+            records=tuple(
+                _parse_record(entry, format_version=format_version)
+                for entry in entries
+            )
         )
     except ValueError as exc:
         raise _error(f"exchange processing state is invalid: {exc}") from exc
@@ -301,7 +346,11 @@ def _encoded_state(snapshot: ExchangeStateSnapshot) -> bytes:
         {
             "entries": [
                 {
-                    "attempted": record.attempted,
+                    "apply_status": (
+                        record.apply_status.value
+                        if record.apply_status is not None
+                        else None
+                    ),
                     "kind": record.kind,
                     "manifest": _selection_document(record.manifest),
                     "path": os.fspath(record.identity.path),
@@ -408,7 +457,7 @@ def merge_exchange_classifications(
     paths: RegistrationUserPaths,
     records: Iterable[ExchangeStateRecord],
 ) -> ExchangeStateSnapshot:
-    """Atomically add deterministic classifications without losing attempts."""
+    """Atomically add classifications without losing apply lifecycle state."""
     pending = tuple(records)
     with _state_lock(paths):
         current = _load_unlocked(paths)
@@ -430,14 +479,14 @@ def merge_exchange_classifications(
         return next_snapshot
 
 
-def mark_exchange_attempted(
+def mark_exchange_apply_started(
     paths: RegistrationUserPaths,
     identity: ExchangeFileIdentity,
     selection: ExchangePatchSelection,
     *,
     verify_identity: Callable[[], None],
 ) -> None:
-    """Verify and atomically consume one automatic patch identity."""
+    """Verify and atomically record the start of one automatic apply."""
     with _state_lock(paths):
         verify_identity()
         current = _load_unlocked(paths)
@@ -450,12 +499,62 @@ def mark_exchange_attempted(
             raise _error(
                 "selected exchange patch has no matching processing state"
             )
-        if record.attempted:
+        if record.apply_status is not None:
             raise _error("selected exchange patch was already attempted")
         next_records = tuple(
-            replace(candidate, attempted=True)
+            replace(candidate, apply_status=ExchangeApplyStatus.ATTEMPTED)
             if candidate.identity == identity
             else candidate
             for candidate in current.records
         )
         _write_unlocked(paths, ExchangeStateSnapshot(next_records))
+
+
+def mark_exchange_apply_finished(
+    paths: RegistrationUserPaths,
+    identity: ExchangeFileIdentity,
+    selection: ExchangePatchSelection,
+    status: ExchangeApplyStatus,
+) -> None:
+    """Atomically record the known failed or successful primary apply result."""
+    if status not in {
+        ExchangeApplyStatus.FAILED,
+        ExchangeApplyStatus.SUCCEEDED,
+    }:
+        raise ValueError("finished exchange apply requires a terminal status")
+    with _state_lock(paths):
+        current = _load_unlocked(paths)
+        record = current.record_for(identity)
+        if (
+            record is None
+            or record.kind != "patch_package"
+            or record.manifest != selection
+        ):
+            raise _error(
+                "selected exchange patch has no matching processing state"
+            )
+        if record.apply_status is not ExchangeApplyStatus.ATTEMPTED:
+            raise _error("selected exchange patch has no active attempt")
+        next_records = tuple(
+            replace(candidate, apply_status=status)
+            if candidate.identity == identity
+            else candidate
+            for candidate in current.records
+        )
+        _write_unlocked(paths, ExchangeStateSnapshot(next_records))
+
+
+def mark_exchange_attempted(
+    paths: RegistrationUserPaths,
+    identity: ExchangeFileIdentity,
+    selection: ExchangePatchSelection,
+    *,
+    verify_identity: Callable[[], None],
+) -> None:
+    """Compatibility alias for the explicit apply-start transition."""
+    mark_exchange_apply_started(
+        paths,
+        identity,
+        selection,
+        verify_identity=verify_identity,
+    )

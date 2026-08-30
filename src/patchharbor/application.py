@@ -10,6 +10,7 @@ from typing import TextIO
 
 from patchharbor.apply_mutation import (
     ApplyMutationGate,
+    MutationFailureKind,
     apply_payload_mutation,
 )
 from patchharbor.apply_preflight import prepare_patch_package
@@ -43,8 +44,10 @@ from patchharbor.exchange import (
     scan_exchange_directory,
 )
 from patchharbor.exchange_state import (
+    ExchangeApplyStatus,
     ExchangePatchSelection,
-    mark_exchange_attempted,
+    mark_exchange_apply_finished,
+    mark_exchange_apply_started,
 )
 from patchharbor.exchange_paths import (
     ExchangePathPolicyError,
@@ -214,7 +217,7 @@ class DiscoveredExchangePatch:
     def __post_init__(self) -> None:
         if self.artifact.selection is None:
             raise ValueError("discovered Exchange patch requires selection data")
-        if self.artifact.attempted:
+        if self.artifact.apply_status is not None:
             raise ValueError("discovered Exchange patch must be unattempted")
         if (
             self.artifact.selection
@@ -241,11 +244,27 @@ class DiscoveredExchangePatch:
                 directory=self.configuration.exchange_directory,
             )
 
-        mark_exchange_attempted(
+        mark_exchange_apply_started(
             self.paths,
             self.artifact.identity,
             selection,
             verify_identity=verify_identity,
+        )
+
+    def publish_outcome(self, succeeded: bool) -> None:
+        """Persist the known terminal result of this started automatic apply."""
+        selection = self.artifact.selection
+        if selection is None:
+            raise RuntimeError("discovered Exchange patch lost selection data")
+        mark_exchange_apply_finished(
+            self.paths,
+            self.artifact.identity,
+            selection,
+            (
+                ExchangeApplyStatus.SUCCEEDED
+                if succeeded
+                else ExchangeApplyStatus.FAILED
+            ),
         )
 
 
@@ -521,7 +540,34 @@ def dry_run_patch_package(
         return report
 
 
-def _require_payload_mutation(mutation_gate: ApplyMutationGate) -> None:
+def _publish_attempt_outcome(
+    mutation_gate: ApplyMutationGate,
+    publisher: Callable[[bool], None] | None,
+    *,
+    succeeded: bool,
+    execution_log: bytes | None = None,
+    actual_context: RepositoryContext | None = None,
+) -> None:
+    """Persist one automatic outcome or complete it as a PatchHarbor failure."""
+    if publisher is None:
+        return
+    try:
+        publisher(succeeded)
+    except PatchHarborError as error:
+        report = _complete_mutation_result_bundle(
+            mutation_gate,
+            primary_outcome=ApplyPrimaryOutcome.from_tool_error(error),
+            execution_log=execution_log,
+            actual_context=actual_context,
+        )
+        raise report.reported_error() from error
+
+
+def _require_payload_mutation(
+    mutation_gate: ApplyMutationGate,
+    *,
+    publish_attempt_outcome: Callable[[bool], None] | None = None,
+) -> None:
     """Complete a failed mutation as the primary apply result."""
     try:
         result = apply_payload_mutation(mutation_gate)
@@ -534,6 +580,13 @@ def _require_payload_mutation(mutation_gate: ApplyMutationGate) -> None:
 
     if result.success:
         return
+    if result.failure_kind is not MutationFailureKind.STATE_MISMATCH:
+        _publish_attempt_outcome(
+            mutation_gate,
+            publish_attempt_outcome,
+            succeeded=False,
+            actual_context=result.context,
+        )
     error = result.error
     if error is None:
         raise RuntimeError("failed mutation result has no error")
@@ -548,12 +601,20 @@ def _require_payload_mutation(mutation_gate: ApplyMutationGate) -> None:
 def _complete_entrypoint_execution(
     mutation_gate: ApplyMutationGate,
     execution: ScriptExecutionResult,
+    *,
+    publish_attempt_outcome: Callable[[bool], None] | None = None,
 ) -> RunReport:
     """Publish one execution result before unwinding the shared apply scope."""
     primary_outcome = ApplyPrimaryOutcome.from_execution_result(
         entrypoint_started=execution.entrypoint_started,
         entrypoint_exit_code=execution.entrypoint_exit_code,
         patchharbor_error=execution.patchharbor_error,
+    )
+    _publish_attempt_outcome(
+        mutation_gate,
+        publish_attempt_outcome,
+        succeeded=primary_outcome.result.success,
+        execution_log=(execution.output if execution.entrypoint_started else None),
     )
     report = _complete_mutation_result_bundle(
         mutation_gate,
@@ -577,6 +638,7 @@ def apply_patch_package(
     session: RunSession | None = None,
     presentation: DashboardPresentation | None = None,
     before_mutation: Callable[[], None] | None = None,
+    publish_attempt_outcome: Callable[[bool], None] | None = None,
 ) -> RunReport:
     """Write one validated package, run its private entrypoint, and bundle it."""
     actual_session = session or RunSession.start()
@@ -589,7 +651,10 @@ def apply_patch_package(
         presentation=presentation,
         before_mutation=before_mutation,
     ) as mutation_gate:
-        _require_payload_mutation(mutation_gate)
+        _require_payload_mutation(
+            mutation_gate,
+            publish_attempt_outcome=publish_attempt_outcome,
+        )
         prepared_package = mutation_gate.prepared_package
         execution = execute_prepared_script_with_log(
             prepared_package.entrypoint.path,
@@ -599,7 +664,11 @@ def apply_patch_package(
             execution_log_path=prepared_package.execution_log_path,
             output=output,
         )
-        return _complete_entrypoint_execution(mutation_gate, execution)
+        return _complete_entrypoint_execution(
+            mutation_gate,
+            execution,
+            publish_attempt_outcome=publish_attempt_outcome,
+        )
 
 
 def run_apply_path(
@@ -674,6 +743,11 @@ def run_apply_path(
             presentation=presentation,
             before_mutation=(
                 discovered.publish_attempt
+                if discovered is not None
+                else None
+            ),
+            publish_attempt_outcome=(
+                discovered.publish_outcome
                 if discovered is not None
                 else None
             ),
