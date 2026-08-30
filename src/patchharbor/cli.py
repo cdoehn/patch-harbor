@@ -156,6 +156,12 @@ def _build_parser() -> argparse.ArgumentParser:
             "HEAD. Registration writes .patchharbor/id and a central UUID "
             "mapping; it does not configure the Exchange directory."
         ),
+        epilog=(
+            "The success summary shortens technical identifiers. Run "
+            "'patchharbor context --json' in the registered repository, or "
+            "'patchharbor context --json REPOSITORY' elsewhere, for complete "
+            "values. Register itself has no --json option."
+        ),
     )
     register_parser.add_argument(
         "repository",
@@ -183,12 +189,23 @@ def _build_parser() -> argparse.ArgumentParser:
     registry_list_parser = registry_commands.add_parser(
         "list",
         help="list registered local repository instances",
+        description=(
+            "List registrations as human-readable rows with shortened "
+            "repository UUIDs."
+        ),
+        epilog=(
+            "Use --json for full repository UUIDs. Short display prefixes are "
+            "not accepted by unregister; use the full UUID or repository path."
+        ),
     )
     registry_list_parser.add_argument(
         "--json",
         action="store_true",
         dest="json_output",
-        help="write the versioned machine-readable result",
+        help=(
+            "write full repository UUIDs in the versioned machine-readable "
+            "result"
+        ),
     )
 
     unregister_parser = commands.add_parser(
@@ -205,8 +222,13 @@ def _build_parser() -> argparse.ArgumentParser:
         "context",
         help="describe one registered repository state",
         description=(
-            "Print the repository UUID, base commit, dirty state, and exact "
-            "state fingerprint without creating a Result Bundle."
+            "Print a human-readable repository summary without creating a "
+            "Result Bundle. Long technical identifiers are shortened to six "
+            "characters plus an ellipsis."
+        ),
+        epilog=(
+            "Use --json for the complete repository UUID, base commit, and "
+            "state fingerprint. The shortened display is not machine input."
         ),
     )
     context_parser.add_argument(
@@ -220,7 +242,10 @@ def _build_parser() -> argparse.ArgumentParser:
         "--json",
         action="store_true",
         dest="json_output",
-        help="write the versioned machine-readable result",
+        help=(
+            "write complete identifiers in the versioned machine-readable "
+            "result"
+        ),
     )
 
     bundle_parser = commands.add_parser(

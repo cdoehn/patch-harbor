@@ -97,6 +97,15 @@ def test_readme_covers_all_repository_and_chat_initialization_cases() -> None:
     )
     assert "`logs/run.json`" in document
     assert "`logs/execution.log`" in document
+    assert "including the context printed by `patchharbor register`" in document
+    assert "do not copy it into `patch.json`" in document
+    assert "`register` itself deliberately has no `--json` option" in document
+    assert "For standard chat initialization, upload that Result" in document
+    assert "`context.json` is the authoritative source" in document
+    assert "patchharbor registry list --json" in document
+    assert "six-character display prefix is never a valid repository selector" in (
+        _compact(document)
+    )
 
     chat = CHAT_PATH.read_text(encoding="utf-8")
     assert "Du benötigst weder den lokalen Repository-Pfad noch den lokalen\nExchange-Pfad" in (
@@ -151,6 +160,10 @@ def test_core_help_explains_the_documented_exchange_workflow() -> None:
     )
     show_help = _compact(_subparser(parser, "configure", "show").format_help())
     register_help = _compact(_subparser(parser, "register").format_help())
+    registry_list_help = _compact(
+        _subparser(parser, "registry", "list").format_help()
+    )
+    context_help = _compact(_subparser(parser, "context").format_help())
     bundle_help = _compact(_subparser(parser, "bundle").format_help())
     apply_help = _compact(_subparser(parser, "apply").format_help())
 
@@ -162,6 +175,18 @@ def test_core_help_explains_the_documented_exchange_workflow() -> None:
     assert "active config.json path" in show_help
     assert "committed HEAD" in register_help
     assert "does not configure the Exchange directory" in register_help
+    assert "success summary shortens technical identifiers" in register_help
+    assert "patchharbor context --json REPOSITORY" in register_help
+    assert "Register itself has no --json option" in register_help
+    assert "human-readable rows with shortened repository UUIDs" in (
+        registry_list_help
+    )
+    assert "Use --json for full repository UUIDs" in registry_list_help
+    assert "not accepted by unregister" in registry_list_help
+    assert "human-readable repository summary" in context_help
+    assert "six characters plus an ellipsis" in context_help
+    assert "Use --json for the complete repository UUID" in context_help
+    assert "shortened display is not machine input" in context_help
     assert "staged and unstaged changes" in bundle_help
     assert "non-ignored untracked regular files" in bundle_help
     assert "Without --output-dir, publish in the configured Exchange directory" in (

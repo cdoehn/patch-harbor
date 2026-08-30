@@ -76,6 +76,14 @@ Für einen Entwicklungsauftrag benötigst du mindestens:
 3. die konkrete Benutzeraufgabe oder die Anweisung, den nächsten Plan-Commit
    vorzubereiten.
 
+Eine menschenlesbare `register`-, `context`- oder `registry list`-Kurzansicht
+mit `…` ist kein maschinenlesbarer Eingabevertrag und darf niemals als Quelle
+für `patch.json` dienen. Das aktuelle Result Bundle ist im normalen
+Entwicklungsworkflow die Quelle der vollständigen Bindungswerte. Wird
+ausnahmsweise ein separater Kontext übergeben, muss er aus
+`patchharbor context --json` stammen. Rekonstruiere niemals vollständige
+Kennungen aus verkürzten Präfixen.
+
 Behaupte nicht aus Gesprächserinnerung, den aktuellen Repository-Zustand zu
 kennen. Fehlt ein aktuelles oder ausreichend vollständiges Result Bundle,
 verwende `REPOSITORY_STATE_INCOMPLETE` nach Abschnitt 10 und erzeuge kein

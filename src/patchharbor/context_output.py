@@ -9,7 +9,7 @@ from patchharbor.models import RepositoryContext
 
 
 def write_context_block(context: RepositoryContext, stream: TextIO) -> None:
-    """Write the copyable human representation of *context*."""
+    """Write the shortened human-facing summary of *context*."""
     print("PATCH_HARBOR_CONTEXT", file=stream)
     print(file=stream)
     print(f"repo_id: {shorten_identifier(context.repo_id)}", file=stream)
@@ -27,7 +27,13 @@ def write_context_block(context: RepositoryContext, stream: TextIO) -> None:
     print(file=stream)
     print("INSTRUCTIONS:", file=stream)
     print(
-        "- Vollständige Werte für patch.json mit --json ausgeben.",
+        "- Kurzansicht nicht in patch.json oder als Chat-/Maschineninput "
+        "verwenden.",
+        file=stream,
+    )
+    print(
+        "- Vollständige Werte mit patchharbor context --json [REPOSITORY] "
+        "ausgeben.",
         file=stream,
     )
     print(

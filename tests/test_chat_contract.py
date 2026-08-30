@@ -342,6 +342,11 @@ def test_chat_contract_carries_retry_filename_and_identifier_presentation() -> N
     assert "fehlgeschlagene Pakete nicht erneut pollt" in chat
     assert "sechs Zeichen plus `…`" in specification
     assert "vollständigen JSON-Werte" in chat
+    assert "`register`-, `context`- oder `registry list`-Kurzansicht" in chat
+    assert "patchharbor context --json" in chat
+    assert "Rekonstruiere niemals vollständige" in chat
+    assert "keine kopierbare Maschinenrepräsentation" in specification
+    assert "Kontextblock zum Kopieren in den Chat" not in specification
     assert "--retry-failed" not in build_core_parser().format_help()
 
 

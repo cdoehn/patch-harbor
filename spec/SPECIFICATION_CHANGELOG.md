@@ -11,6 +11,14 @@ Dieses Dokument protokolliert Änderungen am verbindlichen Produktziel. Es ist k
 
 **Status:** Freigegeben und vollständig umgesetzt; der abgeschlossene Plan liegt unter `planning/1.1.1/commit-plan.md`.
 
+### Post-release complete-identifier guidance – 2026-08-30
+
+- Die Kurzansichten von `register`, `context` und `registry list` werden ausdrücklich als reine Präsentation dokumentiert und dürfen nicht als Chat- oder Maschineninput beziehungsweise für `patch.json` verwendet werden.
+- Der Kontext-Hinweis nennt jetzt den tatsächlich unterstützten Befehl `patchharbor context --json`; `register` besitzt weiterhin bewusst keine `--json`-Option.
+- README und CLI-Hilfe verweisen für vollständige Registry-UUIDs auf `patchharbor registry list --json` und stellen klar, dass gekürzte Präfixe keine gültigen `unregister`-Selektoren sind.
+- Der normale Chat-Workflow verwendet weiterhin `CHAT_INSTRUCTIONS.md` und das aktuelle Result Bundle, dessen `context.json` alle Bindungswerte vollständig enthält.
+- JSON-Schema, persistierte Identitäten und sämtliche Sicherheitsvergleiche bleiben unverändert.
+
 ### Post-release replay and presentation update – 2026-08-30
 
 - Der persistente Replay-State unterscheidet `attempted`, `failed` und `succeeded`; erfolgreiche Pakete bleiben gesperrt, während ein bewusster manueller parameterloser Apply einen weiterhin exakt gebundenen fehlgeschlagenen Patch erneut versuchen darf.

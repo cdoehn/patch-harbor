@@ -1037,7 +1037,7 @@ PatchHarbor führt unter dem globalen Registry-Lock mindestens aus:
 8. den vollständigen lokalen Pfad `.patchharbor/` über den von `git rev-parse --git-path info/exclude` gelieferten Exclude-Pfad aus der normalen Git-Statusanzeige ausnehmen,
 9. veraltete zentrale Zuordnungen desselben kanonischen Pfads entfernen,
 10. lokale ID-Datei und zentrale Registry konsistent und atomar aktualisieren,
-11. einen fertigen Kontextblock zum Kopieren in den Chat ausgeben.
+11. eine gekürzte menschenlesbare Kontextzusammenfassung mit eindeutigem Verweis auf `patchharbor context --json` für vollständige Werte ausgeben.
 
 PatchHarbor verändert nicht ungefragt die gemeinsam versionierte `.gitignore`.
 
@@ -1058,7 +1058,7 @@ Eigenschaften:
 - praktisch eindeutig,
 - unabhängig von Name, Remote-URL, Branch und Pfad,
 - stabil für genau diese lokale Instanz,
-- nicht zu kürzen,
+- intern, persistent und maschinenlesbar nicht zu kürzen; nur die menschenlesbare UI darf einen klar gekennzeichneten Sechs-Zeichen-Präfix anzeigen,
 - nicht fachlich zu interpretieren.
 
 Jeder lokale Klon oder Worktree erhält eine eigene UUID.
@@ -1111,6 +1111,11 @@ liest unter dem globalen Registry-Lock einen konsistenten Snapshot und zeigt min
 - kanonischen Pfad,
 - Status `ok`, `missing` oder `conflict`.
 
+Die menschenlesbare Liste kürzt `repo_id` auf sechs Zeichen plus `…`. Vollständige
+UUIDs liefert `patchharbor registry list --json`. Ein gekürzter Präfix ist reine
+Präsentation und kein gültiger Selektor für `unregister`; dort ist die
+vollständige kanonische UUID oder der exakte Repository-Pfad zu verwenden.
+
 ```bash
 patchharbor unregister REPOSITORY_OR_REPO_ID
 ```
@@ -1137,6 +1142,8 @@ Registry-Mutationen, die eine aktuell gesperrte Repository-Instanz verändern w�
 ```bash
 patchharbor context
 patchharbor context /pfad/zum/repository
+patchharbor context --json
+patchharbor context --json /pfad/zum/repository
 ```
 
 Der Kontextbefehl verwendet den Repository-Lock für die Dauer seiner Zustandsaufnahme.
@@ -1153,15 +1160,16 @@ state_fingerprint: a1b2c3…
 fingerprint_algorithm: patchharbor-state-v1
 
 INSTRUCTIONS:
-- Vollständige Werte für patch.json mit --json ausgeben.
+- Kurzansicht nicht in patch.json oder als Chat-/Maschineninput verwenden.
+- Vollständige Werte mit patchharbor context --json [REPOSITORY] ausgeben.
 - Erzeuge bei geändertem Repository-Zustand einen neuen Kontext.
-- Lokale Repository- und Exchange-Pfade gehören nicht in patch.json.
-- Verwende für einen vollständigen Entwicklungsauftrag zusätzlich CHAT_INSTRUCTIONS.md und ein aktuelles Result Bundle.
 ```
 
 Menschenlesbare Terminalausgaben kürzen lange technische Kennungen zentral auf die ersten sechs Zeichen plus das einzelne Zeichen `…`. Das betrifft insbesondere Repository-IDs, Run-IDs, Base-Commits und Zustands-Fingerprints. Dateinamen verwenden denselben Sechs-Zeichen-Präfix ohne `…`. Maschinenlesbare JSON-Ausgaben, Manifeste, persistenter Zustand, Logs und alle Sicherheitsvergleiche behalten stets den vollständigen Wert.
 
-Der Chat darf Repository-ID, Base-Commit oder Fingerprint nicht erraten und verwendet für `patch.json` die vollständigen JSON-Werte.
+Der Block `PATCH_HARBOR_CONTEXT` ist daher ausschließlich eine Kurzansicht zur menschlichen Kontrolle und keine kopierbare Maschinenrepräsentation. `patchharbor register` gibt denselben Block aus und besitzt bewusst keine `--json`-Option. Vollständige eigenständige Kontextwerte werden mit `patchharbor context --json [REPOSITORY]` ausgegeben.
+
+Der Chat darf Repository-ID, Base-Commit oder Fingerprint nicht erraten und verwendet für `patch.json` die vollständigen Werte aus `context.json` des aktuellen Result Bundles. Wird ausnahmsweise ein separater Kontext als JSON übergeben, muss er aus `patchharbor context --json` stammen; die verkürzte Standardausgabe ist kein zulässiger Ersatz.
 
 ### 14.2 Base-Commit
 

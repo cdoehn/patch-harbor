@@ -52,4 +52,15 @@ def test_context_representations_include_the_same_values(
     assert str(context.repo_id) not in human
     assert str(context.base_commit) not in human
     assert context.state_fingerprint not in human
-    assert "Vollständige Werte für patch.json mit --json ausgeben." in human
+    assert (
+        "Kurzansicht nicht in patch.json oder als Chat-/Maschineninput "
+        "verwenden."
+        in human
+    )
+    assert (
+        "Vollständige Werte mit patchharbor context --json [REPOSITORY] "
+        "ausgeben."
+        in human
+    )
+    assert "CHAT_INSTRUCTIONS.md" not in human
+    assert "Vollständige Werte für patch.json mit --json ausgeben." not in human

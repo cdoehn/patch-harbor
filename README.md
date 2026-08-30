@@ -102,16 +102,26 @@ patchharbor context
 patchharbor bundle
 ```
 
-`context` is an optional human-readable check. Human-facing terminal output
-shortens long technical identifiers to their first six characters plus `…`;
-use `patchharbor context --json` for the complete values. The Result Bundle
-already contains the full repository ID, base commit, state fingerprint,
-committed snapshot, staged and unstaged changes, and non-ignored untracked
-regular files.
+`context` is an optional human-readable check. Human-facing terminal output,
+including the context printed by `patchharbor register`, shortens long technical
+identifiers to their first six characters plus `…`. This shortened text is
+presentation only: do not copy it into `patch.json` or use it as chat or machine
+input. Run `patchharbor context --json` from the repository root, or
+`patchharbor context --json REPOSITORY` from elsewhere, when complete values are
+required. `register` itself deliberately has no `--json` option.
 
-Use `patchharbor registry list` to inspect all registrations. Use
-`patchharbor unregister REPOSITORY_OR_REPO_ID` only to remove a central mapping,
-and `patchharbor register --new-id` only when intentionally replacing the local
+The Result Bundle already contains the full repository ID, base commit, state
+fingerprint, committed snapshot, staged and unstaged changes, and non-ignored
+untracked regular files. For standard chat initialization, upload that Result
+Bundle instead of copying either form of terminal context output. Its
+`context.json` is the authoritative source of complete repository-binding values.
+
+Use `patchharbor registry list` to inspect all registrations. Its normal rows
+also shorten repository UUIDs. Use `patchharbor registry list --json` when a full
+UUID is needed for machine processing or `unregister`; alternatively pass the
+exact repository path to `patchharbor unregister REPOSITORY_OR_REPO_ID`. A
+six-character display prefix is never a valid repository selector. Use
+`patchharbor register --new-id` only when intentionally replacing the local
 instance identity.
 
 ## Initialize a new development chat
@@ -124,7 +134,9 @@ Start a new chat with exactly these repository inputs:
 
 Do not give the chat the local repository path or Exchange path. It does not
 need either path: the Result Bundle supplies the repository identity and exact
-state, while local PatchHarbor resolves the registered path.
+state, while local PatchHarbor resolves the registered path. The chat takes all
+repository-binding identifiers from the bundle's complete `context.json`, never
+from shortened human-facing terminal output.
 
 The chat contract requires one downloadable repository-bound ZIP patch package.
 Patch filenames use
