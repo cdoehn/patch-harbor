@@ -497,8 +497,16 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
     assert "Register local Git repository instances" in help_outputs[("--help",)]
     assert "one user-specific config.json" in help_outputs[("configure", "--help")]
     assert "committed HEAD" in help_outputs[("register", "--help")]
-    assert "eligible package with the greatest mtime_ns" in help_outputs[("apply", "--help")]
-    assert "current directory does not select the target repository" in (
+    assert "current working directory to one registered repository" in (
+        help_outputs[("apply", "--help")]
+    )
+    assert "newest eligible Exchange package by mtime_ns" in (
+        help_outputs[("apply", "--help")]
+    )
+    assert "deterministic normalized-filename tie-breaker" in (
+        help_outputs[("apply", "--help")]
+    )
+    assert "watcher's internal automatic mode remains global" in (
         help_outputs[("apply", "--help")]
     )
 

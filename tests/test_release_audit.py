@@ -103,8 +103,12 @@ def test_automatic_apply_discovery_stays_in_the_core_application_boundary() -> N
     cli_source = (CORE_PACKAGE_ROOT / "cli.py").read_text(encoding="utf-8")
 
     assert "discover_exchange_patch" in application_source
-    assert "scan_exchange_directory" in application_source
+    assert "_manual_exchange_discovery_scope" in application_source
+    assert "_automatic_exchange_discovery_scope" in application_source
+    assert "capture_repository_context" in application_source
     assert "capture_repository_context_for_id" in application_source
+    assert 'unicodedata.normalize("NFC", filename)' in application_source
+    assert "scan_exchange_directory" in application_source
     assert "resolve_patch_payloads" in exchange_source
     assert 'nargs="?"' in cli_source
     assert "scan_exchange_directory" not in cli_source

@@ -131,11 +131,21 @@ def test_readme_covers_manual_overrides_termux_and_watcher_workflows() -> None:
     ):
         assert command in document
 
-    assert "selects the unique candidate with the greatest nanosecond modification time" in compact
     assert (
-        "The current working directory does not select the repository" in compact
+        "first resolves the current working directory to exactly one registered "
+        "Git repository" in compact
     )
-    assert "An exact tie for the newest value stops without mutation" in compact
+    assert "Calls from any subdirectory of that repository" in compact
+    assert "without scanning for a fallback package" in compact
+    assert "greatest nanosecond modification time (`mtime_ns`) wins" in compact
+    assert (
+        "Equal `mtime_ns` values use the lexicographically first filename after "
+        "Unicode NFC normalization" in compact
+    )
+    assert "newer foreign, state-mismatched, or replay-ineligible package" in compact
+    assert "Its selection scope remains global" in compact
+    assert "does not use the watcher's current working directory" in compact
+    assert "resolve another registered repository" in compact
     assert "default timeout for one script or repository entrypoint is 10,800 seconds" in (
         compact
     )
@@ -193,9 +203,15 @@ def test_core_help_explains_the_documented_exchange_workflow() -> None:
         bundle_help
     )
     assert "contain no Git history and may contain secrets" in bundle_help
-    assert "Omit PATCH_ZIP to discover the eligible package with the greatest mtime_ns" in apply_help
-    assert "An explicit PATCH_ZIP bypasses automatic discovery" in apply_help
-    assert "current directory does not select the target repository" in apply_help
+    assert (
+        "manual call without PATCH_ZIP resolves the current working directory "
+        "to one registered repository" in apply_help
+    )
+    assert "selects its newest eligible Exchange package by mtime_ns" in apply_help
+    assert "deterministic normalized-filename tie-breaker" in apply_help
+    assert "An explicit PATCH_ZIP bypasses parameterless discovery" in apply_help
+    assert "may resolve another registered repository through its repo_id" in apply_help
+    assert "watcher's internal automatic mode remains global" in apply_help
     assert "earlier writes are not globally rolled back" in apply_help
     assert "default: 10800" in apply_help
 

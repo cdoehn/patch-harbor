@@ -80,7 +80,7 @@ PatchHarbor ist kein Testmanager, kein Commit-Manager, kein Build-System, kein C
 - ein vollständiges PatchHarbor Result Bundle erzeugen,
 - die gemeinsame Benutzerkonfiguration aus `config.json` lesen und sicher schreiben,
 - einen konfigurierten Exchange-Ordner als Standardübergabe in beide Richtungen verwenden,
-- bei parameterlosem `patchharbor apply` vollständig passende Pakete filtern und den eindeutigen neuesten Kandidaten nach `mtime_ns` auswählen,
+- bei manuellem parameterlosem `patchharbor apply` das aktuelle registrierte Repository bestimmen und ausschließlich dafür den neuesten zulässigen Kandidaten nach `mtime_ns` mit deterministischem Dateinamen-Tie-Breaker auswählen,
 - Patch-Pakete, Result Bundles und sonstige Dateien im Exchange-Ordner sicher voneinander unterscheiden,
 - einen maschinenlesbaren Ergebnisvertrag für Watcher, Repo Assist und einen späteren Orchestrator anbieten.
 
@@ -343,7 +343,7 @@ Die Optionen sind pro Befehl verbindlich begrenzt:
 
 Für `patchharbor apply` beträgt der Standard-Timeout 10.800 Sekunden (drei Stunden).
 
-Ist `PATCH_ZIP` angegeben, wird ausschließlich diese Datei verarbeitet. Ist `PATCH_ZIP` nicht angegeben, filtert PatchHarbor im konfigurierten Exchange-Ordner alle vollständig passenden und für den Aufruf zulässigen Pakete und wählt nach Abschnitt 16.2 den eindeutigen Kandidaten mit dem höchsten `mtime_ns`. Der aktuelle Arbeitsordner, ein lokaler Repository-Pfad und der Dateiname sind dabei keine Auswahlinformation. Ein bewusster manueller Aufruf darf einen weiterhin exakt gebundenen fehlgeschlagenen Patch erneut versuchen; der Watcher verwendet einen internen automatischen Ursprung, der dies nicht tut. Ein öffentlicher Schalter `--retry-failed` ist nicht erforderlich.
+Ist `PATCH_ZIP` angegeben, wird ausschließlich diese Datei verarbeitet. Das Paket bestimmt über seine vollständige `repo_id` das registrierte Ziel-Repository; das aktuelle Arbeitsverzeichnis schränkt diesen expliziten Auftrag nicht ein. Ist `PATCH_ZIP` nicht angegeben, löst ein manueller Aufruf zuerst das aktuelle Arbeitsverzeichnis einschließlich Unterverzeichnissen zu genau einer registrierten Repository-Instanz auf. Danach betrachtet PatchHarbor im konfigurierten Exchange-Ordner ausschließlich Pakete für diese `repo_id`, filtert vollständige State-Bindung und Replay-Eignung und wählt nach Abschnitt 16.2 den höchsten `mtime_ns` mit deterministischem Dateinamen-Tie-Breaker. Ist das aktuelle Repository nicht eindeutig registriert, gibt es keinen repositoryübergreifenden Fallback. Ein bewusster manueller Aufruf darf einen weiterhin exakt gebundenen fehlgeschlagenen Patch erneut versuchen. Der Watcher verwendet einen internen automatischen Ursprung, bleibt repositoryübergreifend und wiederholt fehlgeschlagene Identitäten nicht. Ein öffentlicher Schalter `--retry-failed` ist nicht erforderlich.
 
 Ohne `--output-dir` veröffentlicht `bundle` sein Result Bundle im Exchange-Ordner. Dasselbe gilt für den Result-Bundle-Versuch von `apply`. Ein explizites `--output-dir` überschreibt nur das Ausgabeziel, nicht die Paketauswahl.
 
@@ -1639,7 +1639,17 @@ Bei einer Auflösung über die zentrale Registry gilt die Lock-Reihenfolge aus A
 
 Wird `patchharbor apply` ohne `PATCH_ZIP` aufgerufen, verwendet PatchHarbor ausschließlich den konfigurierten Exchange-Ordner. Der Aufruf besitzt intern entweder den Ursprung `manual` oder `automatic`; der normale CLI-Aufruf ist manuell, der Watcher delegiert mit automatischem Ursprung.
 
-Die parameterlose Auswahl:
+Beim manuellen Ursprung wird vor dem Exchange-Scan zuerst der Auswahlkontext bestimmt:
+
+1. Das aktuelle Arbeitsverzeichnis wird zu seiner kanonischen Git-Repository-Wurzel aufgelöst; ein Aufruf aus einem beliebigen Unterverzeichnis gehört zur selben Wurzel.
+2. Lokale Repository-ID und zentrale Registry müssen diese konkrete Repository-Instanz eindeutig und widerspruchsfrei registrieren.
+3. Unter der verbindlichen Lock-Reihenfolge werden `repo_id`, Base-Commit, Fingerprint und Fingerprint-Algorithmus konsistent aufgenommen.
+
+Kann das aktuelle Arbeitsverzeichnis nicht genau einer registrierten Repository-Instanz zugeordnet werden, endet der manuelle Auftrag kontrolliert vor der Exchange-Auswahl. PatchHarbor darf dann kein Paket eines anderen registrierten Repositorys als Ersatz auswählen.
+
+Beim automatischen Ursprung wird kein Repository aus dem Arbeitsverzeichnis vorgegeben. Dieser Ursprung bleibt für den Watcher global und darf Pakete für alle registrierten Repository-Instanzen klassifizieren.
+
+Die anschließende gemeinsame Kandidatenklassifikation:
 
 1. lädt und validiert `config.json`,
 2. scannt genau die oberste Verzeichnisebene und niemals rekursiv,
@@ -1647,21 +1657,22 @@ Die parameterlose Auswahl:
 4. ignoriert bekannte temporäre Browser-Downloads,
 5. ermittelt eine stabile Dateiaufnahme mit physisch kanonischem Pfad, vollständigem SHA-256-Inhalt und `mtime_ns`,
 6. verwendet für eine unveränderte Identität eine bereits sicher gespeicherte Inhaltsklassifikation, statt dieselbe Nichtkandidaten-Datei fortlaufend neu zu analysieren,
-7. berücksichtigt beim manuellen Ursprung sowohl noch nie gestartete als auch mit `failed` abgeschlossene Identitäten; beim automatischen Ursprung ausschließlich noch nie gestartete Identitäten; `attempted` und `succeeded` sind in beiden Fällen ausgeschlossen,
-8. unterscheidet anhand des tatsächlichen ZIP-Inhalts und nicht anhand von Dateiname oder Endung zwischen Patch-Paket, Result Bundle und sonstiger Datei,
-9. liest bei Patch-Kandidaten die Root-`patch.json` streng genug, um `repo_id`, Base-Commit und Fingerprint zu bestimmen,
-10. prüft für jeden Kandidaten unter der verbindlichen Registry-/Repository-Lock-Reihenfolge, ob die `repo_id` registriert ist und der aktuelle Repository-Zustand zu Base-Commit und Fingerprint passt,
-11. bildet erst danach die Menge der vollständig passenden und für den Ursprung zulässigen Kandidaten und wählt daraus den eindeutigen Kandidaten mit dem höchsten `mtime_ns`.
+7. unterscheidet anhand des tatsächlichen ZIP-Inhalts und nicht anhand von Dateiname oder Endung zwischen Patch-Paket, Result Bundle und sonstiger Datei,
+8. liest bei Patch-Kandidaten die Root-`patch.json` streng genug, um `repo_id`, Base-Commit und Fingerprint zu bestimmen,
+9. verwirft beim manuellen Ursprung jedes Paket, dessen `repo_id` nicht der bereits bestimmten aktuellen Repository-Instanz entspricht; beim automatischen Ursprung löst sie die jeweilige Paket-`repo_id` global über die Registry auf,
+10. prüft unter der verbindlichen Registry-/Repository-Lock-Reihenfolge, ob Base-Commit, Fingerprint und Fingerprint-Algorithmus zum jeweiligen Repository-Kontext passen,
+11. berücksichtigt beim manuellen Ursprung sowohl noch nie gestartete als auch mit `failed` abgeschlossene Identitäten; beim automatischen Ursprung ausschließlich noch nie gestartete Identitäten; `attempted` und `succeeded` sind in beiden Fällen ausgeschlossen,
+12. bildet erst danach die Menge der vollständig passenden, repositoryzulässigen und replayzulässigen Kandidaten und wählt den höchsten `mtime_ns`.
 
 Der persistente Exchange-Dateistatus darf für unveränderte Dateien die Inhaltsklasse und bei Patch-Kandidaten die geprüften Manifest-Auswahldaten zwischenspeichern. Ein gültiger Patch-Kandidat, der lediglich zum derzeitigen Repository-Zustand nicht passt, wird bei einem späteren Scan erneut gegen den dann aktuellen Zustand geprüft. Dauerhaft inhaltsbedingt ungültige Pakete, Result Bundles und sonstige Nichtkandidaten müssen dagegen nicht erneut vollständig analysiert werden.
 
-`mtime_ns` ist ausschließlich die Rangfolge unter bereits vollständig validierten und state-kompatiblen Kandidaten. Dateiname, Verzeichnisreihenfolge, Repository-Nähe oder ein nur sekundengenauer Zeitwert entscheiden nicht. Teilen mehrere passende Kandidaten exakt denselben höchsten `mtime_ns`, ist kein eindeutiger neuester Kandidat vorhanden; der Auftrag endet ohne Mutation und verlangt einen expliziten Pfad.
+`mtime_ns` ist ausschließlich die Rangfolge unter bereits vollständig validierten, repositoryzulässigen, state-kompatiblen und replayzulässigen Kandidaten. Ein neueres fremdes, state-inkompatibles oder bereits erfolgreich verarbeitetes Paket blockiert deshalb keinen älteren zulässigen Kandidaten. Teilen mehrere zulässige Kandidaten exakt denselben höchsten `mtime_ns`, entscheidet der lexikografisch kleinste Unicode-NFC-normalisierte Dateiname; sind auch die normalisierten Namen gleich, entscheidet der unveränderte Dateiname als letzter deterministischer Tie-Breaker. Die Auswahl hängt niemals von der Reihenfolge von `os.scandir()` ab. Der Dateiname ist keine Repository- oder State-Bindung und wird ausschließlich für diesen Gleichstand verwendet.
 
 Kann eine einzelne reguläre Exchange-Datei während eines Scans nicht stabil oder nicht sicher gelesen werden, wird ausschließlich dieser Eintrag für den aktuellen Scan ignoriert. Ein solcher Einzelfehler darf die Klassifikation anderer Dateien und eines unabhängig lesbaren passenden Patch-Pakets nicht verhindern. Der Fehler „cannot scan exchange directory“ bleibt einem tatsächlichen Fehler beim Auflisten des konfigurierten Verzeichnisses vorbehalten.
 
 Auf virtuellen oder gemeinsam eingebundenen Dateisystemen dürfen Pfad- und Deskriptoransicht trotz unveränderter Datei keine vergleichbare Inode-Identität liefern. Ausschließlich für Exchange-Dateien darf die stabile Aufnahme in diesem Fall auf übereinstimmenden regulären Dateityp, Größe und Änderungszeit zurückfallen. Der vollständige SHA-256 bleibt Bestandteil der Identität; ein ausgewähltes Paket wird vor Materialisierung und unmittelbar vor der ersten Mutation erneut geöffnet und gegen denselben vollständigen Hash geprüft. Andere PatchHarbor-Vertrauensgrenzen verwenden weiterhin die strikte physische Dateidentität.
 
-Die Zustandsprüfung während der Auswahl verwendet dieselbe gesperrte und konsistente Kontextaufnahme wie `patchharbor context`. Auswahlprüfungen dürfen Repositorys nur lesend und nacheinander sperren. Nach der eindeutigen Kandidatenentscheidung wird für den eigentlichen Apply-Auftrag die vollständige Sperr-, Preflight- und Revalidierungsfolge erneut durchlaufen.
+Die Zustandsprüfung während der Auswahl verwendet dieselbe gesperrte und konsistente Kontextaufnahme wie `patchharbor context`. Beim manuellen Ursprung wird nur das aktuelle Repository aufgenommen. Beim automatischen Ursprung dürfen Repositorys nur lesend und nacheinander gesperrt werden. Nach der Kandidatenentscheidung wird für den eigentlichen Apply-Auftrag die vollständige Sperr-, Preflight- und Revalidierungsfolge erneut durchlaufen.
 
 Result Bundles werden an ihrem eigenen Marker erkannt und niemals als Patch ausgeführt. Andere ZIP-Dateien, direkte Skripte, alte Shell-Patch-ZIPs und beliebige sonstige Dateien sind keine Kandidaten für den sicheren Apply-Pfad.
 
@@ -1669,7 +1680,7 @@ Gibt es keinen passenden Kandidaten, endet der Auftrag ohne Mutation mit einem k
 
 Erfolgreiche Patch-Pakete sind gegen Replay geschützt. Ein fehlgeschlagener Patch kann durch einen bewussten manuellen Apply erneut versucht werden, solange Repository-Bindung und Patch-Zustand weiterhin exakt passen. Der Watcher wiederholt fehlgeschlagene Pakete nicht automatisch in einer Endlosschleife.
 
-Ein explizites `patchharbor apply PATCH_ZIP` übersteuert die parameterlose Auswahl und behält seine vollständigen Sicherheitsprüfungen. Es ist kein öffentlicher `--retry-failed`-Schalter erforderlich, weil der normale parameterlose manuelle Aufruf bereits die bewusste Benutzeraktion darstellt. Ein Dry-Run verändert keinen Replay-Status.
+Ein explizites `patchharbor apply PATCH_ZIP` übersteuert die parameterlose Auswahl. Es darf unabhängig vom aktuellen Arbeitsverzeichnis das über seine `repo_id` bestimmte registrierte Repository auflösen und behält sämtliche Paket-, State-, Pfad- und Revalidierungsprüfungen. Es ist kein öffentlicher `--retry-failed`-Schalter erforderlich, weil der normale parameterlose manuelle Aufruf bereits die bewusste Benutzeraktion darstellt. Ein Dry-Run verändert keinen Replay-Status.
 
 PatchHarbor verschiebt, löscht, archiviert, sortiert oder benennt die ausgewählte Datei nicht um. Wird unter demselben Pfad später anderer Inhalt abgelegt, entsteht wegen des neuen SHA-256 eine neue Dateidentität.
 
@@ -1695,7 +1706,7 @@ Kann das Repository vorher nicht sicher aufgelöst werden, entsteht kein Reposit
 
 `patchharbor apply [PATCH_ZIP]` führt mindestens aus:
 
-1. Bei fehlendem `PATCH_ZIP` den eindeutigen neuesten zulässigen Kandidaten nach Abschnitt 16.2 auswählen; andernfalls ausschließlich den expliziten Pfad verwenden.
+1. Bei fehlendem `PATCH_ZIP` den manuellen oder automatischen Auswahlkontext bestimmen und den neuesten zulässigen Kandidaten nach Abschnitt 16.2 auswählen; andernfalls ausschließlich den expliziten Pfad verwenden.
 2. Eingabedatei stabil und vollständig lesbar öffnen.
 3. Tatsächliches ZIP-Format prüfen.
 4. Archivstruktur, Eintragstypen, Pfade und Ressourcenlimits vollständig prüfen.
@@ -1729,7 +1740,8 @@ Kann das Repository vorher nicht sicher aufgelöst werden, entsteht kein Reposit
 PatchHarbor lehnt vor der ersten Repository-Änderung unter anderem ab:
 
 - fehlende oder ungültige Exchange-Konfiguration, soweit kein vollständiger expliziter Pfad- und Ausgabeauftrag vorliegt,
-- keinen passenden Kandidaten oder mehrere passende Kandidaten mit exakt demselben höchsten `mtime_ns`,
+- beim manuellen parameterlosen Apply ein nicht eindeutig registriertes aktuelles Repository,
+- keinen passenden Kandidaten im jeweiligen manuellen oder automatischen Repository-Scope,
 - unbekannte oder widersprüchliche Repository-ID,
 - fehlende oder kopierte lokale ID,
 - ungültige Registry-Zuordnung,
@@ -2254,7 +2266,7 @@ Das Python-Paket bleibt so flach wie sinnvoll.
 Empfohlene Verantwortlichkeiten:
 
 - `cli.py` – argparse und öffentliche Befehle,
-- `application.py` – Orchestrierung genau eines Auftrags,
+- `application.py` – Orchestrierung genau eines Auftrags einschließlich manueller beziehungsweise automatischer Repository-Scope-Wahl und deterministischer Kandidatenauswahl,
 - `sources.py` – Datei, Ordner und STDIN als neutrales `InputArtifact`,
 - `bundles.py` – manuelle direkte Skripte und ZIP-Container zu `PatchBundle`s auflösen,
 - `bundle_paths.py` – gemeinsame sichere ZIP-Pfadregeln,
@@ -2266,7 +2278,7 @@ Empfohlene Verantwortlichkeiten:
 - `run_log.py` – vollständiger Run-Log und strukturierter Run-Bericht,
 - `presentation.py` – Plain-Ausgabe, TUI, Farben und Rolling Buffer,
 - `identifier_presentation.py` – zentrale Sechs-Zeichen-Darstellung technischer Kennungen,
-- `exchange.py` und `exchange_state.py` – Inhaltsklassifikation, `mtime_ns`-Auswahl und persistenter Replay-Status,
+- `exchange.py` und `exchange_state.py` – stabile Inhaltsklassifikation, Exchange-Dateiidentität und persistenter Replay-Status,
 - `registry.py` – zentrale Repository-Registrierung,
 - `repository_state.py` – Base-Commit, kanonischer Fingerprint und Snapshot-Zustand,
 - `locks.py` – globale Registry-Sperre und exklusive Sperre pro Repository-ID,
@@ -2436,16 +2448,19 @@ Mindestens zusätzlich zu prüfen sind:
 - explizites `--output-dir` übersteuert das Standardziel,
 - nicht rekursiver Exchange-Scan ohne Abhängigkeit von Dateiname oder Endung,
 - Result Bundles, direkte Skripte, alte Patch-ZIPs, Browser-Temporärdateien und sonstige Dateien werden nicht als sichere Patch-Kandidaten ausgeführt,
-- vollständig passende Kandidaten werden vor jeder Zeitrangfolge anhand von `repo_id`, Base-Commit und Fingerprint gefiltert,
-- bei mehreren passenden Kandidaten wird der eindeutige höchste `mtime_ns` gewählt; ein exakter Höchstwert-Tie wird ohne Mutation abgelehnt,
-- explizites `PATCH_ZIP` übersteuert die Auswahl,
+- manueller parameterloser Apply löst das aktuelle registrierte Repository einschließlich Unterverzeichnisaufrufen zuerst auf und betrachtet keine Pakete fremder Repositorys,
+- ein nicht registriertes oder nicht eindeutig auflösbares aktuelles Repository führt ohne repositoryübergreifenden Fallback zum kontrollierten Fehler,
+- vollständig passende Kandidaten werden vor jeder Zeitrangfolge anhand von Repository-Scope, `repo_id`, Base-Commit, Fingerprint und Replay-Eignung gefiltert,
+- bei mehreren zulässigen Kandidaten wird der höchste `mtime_ns` gewählt; ein exakter Zeitgleichstand wird deterministisch über Unicode-NFC-normalisierten Dateinamen und unveränderten Dateinamen aufgelöst,
+- ein neuerer unzulässiger Kandidat blockiert keinen älteren zulässigen Kandidaten,
+- explizites `PATCH_ZIP` übersteuert die parameterlose CWD-Auswahl und darf ein anderes registriertes Repository über `repo_id` bestimmen,
 - Dry-Run verändert keinen Replay-Status,
 - `attempted`, `failed` und `succeeded` bleiben über Prozessneustarts unterscheidbar,
 - ein fehlgeschlagener parameterloser manueller Apply kann bei unveränderter vollständiger State-Bindung dasselbe Paket erneut ausführen,
 - ein Watcher-Poll wiederholt dasselbe fehlgeschlagene Paket nicht unmittelbar erneut,
 - ein erfolgreiches Paket bleibt für manuelle parameterlose und automatische Auswahl Replay-geschützt,
 - Base-Commit- oder Fingerprint-Mismatch verhindert den manuellen Retry eines fehlgeschlagenen Pakets,
-- mehrere Pakete für verschiedene Repositorys oder Zustände führen nicht zur Auswahl eines falschen Kandidaten,
+- mehrere Pakete für verschiedene Repositorys oder Zustände führen beim manuellen Apply nicht zur Auswahl eines falschen Kandidaten; der Watcher bleibt global,
 - geänderter Inhalt unter demselben Namen ist eine neue Identität,
 - Patch- und Result-Dateinamen folgen dem Repository-/Typ-/Uhrzeit-/Datum-/ID6-Vertrag,
 - menschenlesbare technische IDs erscheinen zentral als sechs Zeichen plus `…`, während JSON und Sicherheitsdaten vollständig bleiben,
@@ -2826,8 +2841,9 @@ Ein Erfolg darf erst nach Prüfung von `run.json`, Git-Zustand und erwartetem Co
 - Der Exchange-Ordner ist eine gemeinsame flache Übergabestelle für Patch-Pakete, Result Bundles und sonstige Dateien.
 - Exchange-Ordner und registrierte Repositorys dürfen sich in keiner Richtung überlappen.
 - `bundle` und Apply-Result-Bundles verwenden ohne explizites `--output-dir` den Exchange-Ordner.
-- `apply` ohne `PATCH_ZIP` filtert vollständig nach `repo_id`, Base-Commit und Fingerprint und wählt danach den eindeutigen höchsten `mtime_ns`.
-- Ein exakter Tie des neuesten `mtime_ns` wird ohne Mutation abgelehnt und verlangt einen expliziten Pfad.
+- Ein manueller `apply` ohne `PATCH_ZIP` ist an das registrierte Repository des aktuellen Arbeitsverzeichnisses gebunden; Unterverzeichnisse werden zur Repository-Wurzel aufgelöst und fremde Repository-Pakete sind keine Kandidaten.
+- Der Watcher bleibt mit internem automatischem Ursprung repositoryübergreifend.
+- Erst nach Repository-, State- und Replay-Filterung gewinnt der höchste `mtime_ns`; bei Zeitgleichstand entscheidet deterministisch der Unicode-NFC-normalisierte und danach der unveränderte Dateiname.
 - Result Bundles und sonstige Dateien werden nie als sichere Patch-Pakete ausgeführt.
 - Erfolgreiche Identitäten bleiben Replay-geschützt; fehlgeschlagene Identitäten sind nur für einen bewussten manuellen parameterlosen Retry erneut zulässig, nicht für den Watcher.
 - Patch- und Result-Dateinamen beginnen mit dem Repository-Namen, danach folgen `Patch` oder `Result`, UTC-Uhrzeit, Monat/Tag ohne Jahr und ID6.

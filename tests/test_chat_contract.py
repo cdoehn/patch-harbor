@@ -207,6 +207,24 @@ def test_chat_public_commands_are_real_and_use_correct_optionality() -> None:
         assert invented not in text_blocks[0]
 
 
+def test_chat_contract_distinguishes_manual_explicit_and_watcher_selection() -> None:
+    document = _normalise_space(_text(CHAT_PATH))
+
+    assert (
+        "Ein manueller parameterloser `apply` löst zuerst das aktuelle "
+        "Arbeitsverzeichnis einschließlich Repository-Unterverzeichnissen auf"
+        in document
+    )
+    assert "ausschließlich Pakete für genau diese registrierte Repository-Instanz" in (
+        document
+    )
+    assert "Unicode-NFC-normalisierte Dateiname deterministisch" in document
+    assert "Der Watcher bleibt dagegen global für alle registrierten Repositorys" in (
+        document
+    )
+    assert "Ein expliziter `PATCH_ZIP` darf weiterhin über seine `repo_id`" in document
+
+
 def test_chat_and_spec_share_commit_warning_stop_and_ui_contracts() -> None:
     chat = _text(CHAT_PATH)
     specification = _text(SPEC_PATH)
@@ -333,13 +351,14 @@ def test_chat_contract_carries_retry_filename_and_identifier_presentation() -> N
     chat = _text(CHAT_PATH)
     specification = _text(SPEC_PATH)
     readme = _text(README_PATH)
+    compact_chat = _normalise_space(chat)
 
     for document in (chat, specification, readme):
         assert "<Repository>_Patch_<HHMMSS>_<MMDD>_<ID6>.zip" in document
         assert "<Repository>_Result_<HHMMSS>_<MMDD>_<ID6>.zip" in document
-    assert "höchsten `mtime_ns`" in chat
-    assert "fehlgeschlagenen Patch darf er bewusst" in chat
-    assert "fehlgeschlagene Pakete nicht erneut pollt" in chat
+    assert "höchsten `mtime_ns`" in compact_chat
+    assert "fehlgeschlagenen Patch darf der manuelle Aufruf bewusst" in compact_chat
+    assert "fehlgeschlagene Pakete nicht erneut pollt" in compact_chat
     assert "sechs Zeichen plus `…`" in specification
     assert "vollständigen JSON-Werte" in chat
     assert "`register`-, `context`- oder `registry list`-Kurzansicht" in chat

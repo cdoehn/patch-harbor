@@ -49,12 +49,18 @@ patchharbor-watcher
 ```
 
 `bundle` veröffentlicht ohne explizites Ausgabeziel im konfigurierten
-Exchange-Ordner. Ein manueller parameterloser `apply` wählt nach vollständiger
-Repository-Bindungsprüfung den eindeutigen Kandidaten mit dem höchsten `mtime_ns`;
-einen weiterhin passenden fehlgeschlagenen Patch darf er bewusst
-erneut versuchen. Der Watcher verwendet dagegen einen automatischen Ursprung,
+Exchange-Ordner. Ein manueller parameterloser `apply` löst zuerst das aktuelle
+Arbeitsverzeichnis einschließlich Repository-Unterverzeichnissen auf und
+betrachtet ausschließlich Pakete für genau diese registrierte Repository-Instanz.
+Unter den vollständig state- und replay-kompatiblen Kandidaten gewinnt der
+Kandidat mit dem höchsten `mtime_ns`; bei Gleichstand entscheidet der Unicode-NFC-normalisierte
+Dateiname deterministisch. Einen weiterhin passenden fehlgeschlagenen Patch darf
+der manuelle Aufruf bewusst erneut versuchen. Der Watcher bleibt dagegen global
+für alle registrierten Repositorys und verwendet einen automatischen Ursprung,
 der fehlgeschlagene Pakete nicht erneut pollt. Erfolgreiche Pakete bleiben in
-beiden Fällen Replay-geschützt. `fs run` ist der ältere explizite Runner.
+beiden Fällen Replay-geschützt. Ein expliziter `PATCH_ZIP` darf weiterhin über
+seine `repo_id` ein anderes registriertes Repository als das aktuelle auswählen.
+`fs run` ist der ältere explizite Runner.
 
 PatchHarbor ist keine Sandbox und authentifiziert nicht den Ersteller eines
 Pakets. Es verwaltet außerdem keine fachlichen Tests, Git-Commits,

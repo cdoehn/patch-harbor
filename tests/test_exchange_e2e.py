@@ -34,6 +34,17 @@ from tests.registration_support import (
 pytestmark = pytest.mark.e2e
 
 
+_MANUAL_NO_MATCH = (
+    "no state-bound patch package matches the current registered repository"
+)
+_AUTOMATIC_NO_MATCH = (
+    "no state-bound patch package matches a registered repository"
+)
+_CURRENT_REPOSITORY_ERROR = (
+    "current directory is not inside a uniquely registered PatchHarbor repository"
+)
+
+
 def _configure_user(tmp_path: Path) -> tuple[dict[str, str], Path]:
     environment = isolated_user_environment(tmp_path / "user")
     exchange = tmp_path / "exchange"
@@ -109,7 +120,6 @@ def _write_package(
         )
         archive.writestr(entrypoint_name, entrypoint.encode("utf-8"))
         archive.writestr("files/generated.bin", b"payload")
-
 
 
 
@@ -234,7 +244,27 @@ def _assert_unresolved_selection_failure(
     }
 
 
-def test_dry_run_discovers_one_content_classified_top_level_package(
+def _assert_unresolved_repository_failure(completed) -> None:
+    assert completed.returncode == int(ExitCode.REPOSITORY_ERROR)
+    envelope = json.loads(completed.stdout)
+    assert envelope["command"] == "apply"
+    assert envelope["success"] is False
+    assert envelope["error"] == {
+        "kind": "repository_resolution_error",
+        "message": _CURRENT_REPOSITORY_ERROR,
+        "patchharbor_error_code": int(ExitCode.REPOSITORY_ERROR),
+        "emergency_diagnostics_path": None,
+    }
+    assert envelope["result"]["repository_resolved"] is False
+    assert envelope["result"]["result_bundle"] == {
+        "attempted": False,
+        "status": "not_attempted",
+        "path": None,
+        "emergency_diagnostics_path": None,
+    }
+
+
+def test_dry_run_from_repository_subdirectory_discovers_top_level_package(
     tmp_path: Path,
 ) -> None:
     environment, exchange = _configure_user(tmp_path)
@@ -261,8 +291,10 @@ def test_dry_run_discovers_one_content_classified_top_level_package(
             exchange / "download-without-extension"
         )
 
+    caller = repository / "tests" / "unit"
+    caller.mkdir(parents=True)
     completed = _parameterless_apply(
-        tmp_path / "unrelated-caller",
+        caller,
         environment,
         dry_run=True,
     )
@@ -279,7 +311,7 @@ def test_dry_run_discovers_one_content_classified_top_level_package(
     assert not (repository / "files" / "generated.bin").exists()
 
 
-def test_parameterless_apply_selects_by_repo_id_and_current_state_across_repositories(
+def test_manual_parameterless_apply_only_selects_current_repository_package(
     tmp_path: Path,
 ) -> None:
     environment, exchange = _configure_user(tmp_path)
@@ -287,28 +319,45 @@ def test_parameterless_apply_selects_by_repo_id_and_current_state_across_reposit
     second = create_repository(tmp_path / "second")
     first_context = _register_context(first, environment)
     second_context = _register_context(second, environment)
+    first_package = exchange / "first.zip"
+    second_package = exchange / "second.zip"
+    _write_package(first_package, first_context, result_text="first")
+    _write_package(second_package, second_context, result_text="second")
 
-    stale_package = exchange / "stale-first.zip"
-    matching_package = exchange / "matching-second.bin"
-    _write_package(stale_package, first_context, result_text="stale")
-    (first / "changed-after-context.txt").write_text("dirty\n", encoding="utf-8")
-    _write_package(
-        matching_package,
-        second_context,
-        result_text="second",
-    )
-    os.utime(stale_package, ns=(1_700_000_000_900_000_000,) * 2)
-    os.utime(matching_package, ns=(1_700_000_000_100_000_000,) * 2)
-
-    completed = _parameterless_apply(tmp_path / "caller", environment)
+    completed = _parameterless_apply(first, environment)
 
     assert completed.returncode == 0
     result = json.loads(completed.stdout)["result"]
-    assert result["repository_path"] == str(second.resolve())
-    assert result["repo_id"] == second_context["repo_id"]
-    assert (second / "automatic-result.txt").read_text(encoding="utf-8") == "second"
-    assert (second / "files" / "generated.bin").read_bytes() == b"payload"
-    assert not (first / "automatic-result.txt").exists()
+    assert result["repository_path"] == str(first.resolve())
+    assert result["repo_id"] == first_context["repo_id"]
+    assert (first / "automatic-result.txt").read_text(encoding="utf-8") == "first"
+    assert not (second / "automatic-result.txt").exists()
+    assert _identity_record(environment, first_package)["apply_status"] == "succeeded"
+    assert _identity_record(environment, second_package)["apply_status"] is None
+
+
+def test_newer_foreign_repository_package_is_irrelevant_to_manual_apply(
+    tmp_path: Path,
+) -> None:
+    environment, exchange = _configure_user(tmp_path)
+    first = create_repository(tmp_path / "first")
+    second = create_repository(tmp_path / "second")
+    first_context = _register_context(first, environment)
+    second_context = _register_context(second, environment)
+    first_package = exchange / "first-older.zip"
+    second_package = exchange / "second-newer.zip"
+    _write_package(first_package, first_context, result_text="first")
+    _write_package(second_package, second_context, result_text="second")
+    os.utime(first_package, ns=(1_700_000_000_100_000_000,) * 2)
+    os.utime(second_package, ns=(1_700_000_000_900_000_000,) * 2)
+
+    completed = _parameterless_apply(first, environment)
+
+    assert completed.returncode == 0
+    assert (first / "automatic-result.txt").read_text(encoding="utf-8") == "first"
+    assert not (second / "automatic-result.txt").exists()
+    assert _identity_record(environment, first_package)["apply_status"] == "succeeded"
+    assert _identity_record(environment, second_package)["apply_status"] is None
 
 
 def test_no_matching_candidate_fails_without_repository_mutation_or_bundle(
@@ -328,11 +377,11 @@ def test_no_matching_candidate_fails_without_repository_mutation_or_bundle(
     unknown_context["repo_id"] = str(uuid4())
     _write_package(exchange / "unknown.zip", unknown_context)
 
-    completed = _parameterless_apply(tmp_path / "caller", environment)
+    completed = _parameterless_apply(repository, environment)
 
     _assert_unresolved_selection_failure(
         completed,
-        message="no state-bound patch package matches a registered repository",
+        message=_MANUAL_NO_MATCH,
     )
     assert not (repository / "automatic-result.txt").exists()
     assert not tuple(exchange.glob("*_Result_*.zip"))
@@ -351,7 +400,7 @@ def test_multiple_matching_candidates_select_the_newest_mtime_ns(
     os.utime(first, ns=(1_700_000_000_200_000_000,) * 2)
     os.utime(second, ns=(1_700_000_000_100_000_000,) * 2)
 
-    completed = _parameterless_apply(tmp_path / "caller", environment)
+    completed = _parameterless_apply(repository, environment)
 
     assert completed.returncode == 0
     assert (repository / "automatic-result.txt").read_text(
@@ -361,35 +410,107 @@ def test_multiple_matching_candidates_select_the_newest_mtime_ns(
     assert _identity_record(environment, second)["apply_status"] is None
 
 
-def test_matching_candidates_with_equal_newest_mtime_fail_closed(
+def test_newer_state_mismatch_does_not_block_older_matching_package(
     tmp_path: Path,
 ) -> None:
     environment, exchange = _configure_user(tmp_path)
     repository = create_repository(tmp_path / "repository")
     context = _register_context(repository, environment)
-    first = exchange / "first.zip"
-    second = exchange / "second.zip"
-    _write_package(first, context, result_text="first")
-    _write_package(second, context, result_text="second")
+    matching = exchange / "older-matching.zip"
+    mismatched = exchange / "newer-mismatched.zip"
+    _write_package(matching, context, result_text="matching")
+    mismatched_context = dict(context)
+    mismatched_context["state_fingerprint"] = "0" * 16
+    if mismatched_context["state_fingerprint"] == context["state_fingerprint"]:
+        mismatched_context["state_fingerprint"] = "1" * 16
+    _write_package(mismatched, mismatched_context, result_text="mismatched")
+    os.utime(matching, ns=(1_700_000_000_100_000_000,) * 2)
+    os.utime(mismatched, ns=(1_700_000_000_900_000_000,) * 2)
+
+    completed = _parameterless_apply(repository, environment)
+
+    assert completed.returncode == 0
+    assert (repository / "automatic-result.txt").read_text(
+        encoding="utf-8"
+    ) == "matching"
+    assert _identity_record(environment, matching)["apply_status"] == "succeeded"
+    assert _identity_record(environment, mismatched)["apply_status"] is None
+
+
+@pytest.mark.parametrize(
+    "creation_order",
+    (("alpha.zip", "zulu.zip"), ("zulu.zip", "alpha.zip")),
+)
+def test_equal_mtime_uses_deterministic_normalized_filename_tie_breaker(
+    tmp_path: Path,
+    creation_order: tuple[str, str],
+) -> None:
+    environment, exchange = _configure_user(tmp_path)
+    repository = create_repository(tmp_path / "repository")
+    context = _register_context(repository, environment)
+    for filename in creation_order:
+        _write_package(
+            exchange / filename,
+            context,
+            result_text=filename.removesuffix(".zip"),
+        )
     tied_mtime_ns = 1_700_000_000_300_000_000
-    os.utime(first, ns=(tied_mtime_ns, tied_mtime_ns))
-    os.utime(second, ns=(tied_mtime_ns, tied_mtime_ns))
+    for package in exchange.glob("*.zip"):
+        os.utime(package, ns=(tied_mtime_ns, tied_mtime_ns))
 
-    completed = _parameterless_apply(tmp_path / "caller", environment)
+    completed = _parameterless_apply(repository, environment)
 
-    _assert_unresolved_selection_failure(
-        completed,
-        message=(
-            "multiple state-bound patch packages share the newest mtime_ns; "
-            "pass PATCH_ZIP explicitly"
+    assert completed.returncode == 0
+    assert (repository / "automatic-result.txt").read_text(
+        encoding="utf-8"
+    ) == "alpha"
+    assert _identity_record(
+        environment, exchange / "alpha.zip"
+    )["apply_status"] == "succeeded"
+    assert _identity_record(
+        environment, exchange / "zulu.zip"
+    )["apply_status"] is None
+
+
+def test_newer_succeeded_package_does_not_block_older_eligible_package(
+    tmp_path: Path,
+) -> None:
+    environment, exchange = _configure_user(tmp_path)
+    repository = create_repository(tmp_path / "repository")
+    _ignore_automatic_outputs(repository)
+    context = _register_context(repository, environment)
+    older = exchange / "older-eligible.zip"
+    newer = exchange / "newer-first.zip"
+    _write_custom_package(
+        older,
+        context,
+        posix_entrypoint="printf o >> automatic-runs.txt",
+        powershell_entrypoint=(
+            "[System.IO.File]::AppendAllText('automatic-runs.txt', 'o')"
         ),
     )
-    assert not (repository / "automatic-result.txt").exists()
-    assert not (repository / "files" / "generated.bin").exists()
-    assert not tuple(exchange.glob("*_Result_*.zip"))
+    _write_custom_package(
+        newer,
+        context,
+        posix_entrypoint="printf n >> automatic-runs.txt",
+        powershell_entrypoint=(
+            "[System.IO.File]::AppendAllText('automatic-runs.txt', 'n')"
+        ),
+    )
+    os.utime(older, ns=(1_700_000_000_100_000_000,) * 2)
+    os.utime(newer, ns=(1_700_000_000_900_000_000,) * 2)
+
+    first = _parameterless_apply(repository, environment)
+    second = _parameterless_apply(repository, environment)
+
+    assert first.returncode == 0
+    assert second.returncode == 0
+    assert (repository / "automatic-runs.txt").read_text(encoding="utf-8") == "no"
+    assert _identity_record(environment, newer)["apply_status"] == "succeeded"
+    assert _identity_record(environment, older)["apply_status"] == "succeeded"
 
 
-def test_explicit_patch_path_overrides_ambiguous_exchange_candidates(
+def test_explicit_patch_path_bypasses_exchange_candidate_selection(
     tmp_path: Path,
 ) -> None:
     environment, exchange = _configure_user(tmp_path)
@@ -415,6 +536,83 @@ def test_explicit_patch_path_overrides_ambiguous_exchange_candidates(
     ).read_text(encoding="utf-8") == "explicit"
 
 
+def test_unregistered_current_repository_does_not_fall_back_to_other_package(
+    tmp_path: Path,
+) -> None:
+    environment, exchange = _configure_user(tmp_path)
+    registered = create_repository(tmp_path / "registered")
+    registered_context = _register_context(registered, environment)
+    package = exchange / "registered-repository.zip"
+    _write_package(package, registered_context, result_text="must-not-run")
+    unregistered = create_repository(tmp_path / "unregistered")
+
+    completed = _parameterless_apply(unregistered, environment)
+
+    _assert_unresolved_repository_failure(completed)
+    assert not (registered / "automatic-result.txt").exists()
+    assert not (unregistered / "automatic-result.txt").exists()
+    assert not exchange_state_path(environment).exists()
+
+
+def test_explicit_patch_path_may_target_another_registered_repository(
+    tmp_path: Path,
+) -> None:
+    environment, exchange = _configure_user(tmp_path)
+    current = create_repository(tmp_path / "current")
+    target = create_repository(tmp_path / "target")
+    _register_context(current, environment)
+    target_context = _register_context(target, environment)
+    package = exchange / "explicit-target.zip"
+    _write_package(package, target_context, result_text="target")
+
+    completed = run_cli(
+        current,
+        "apply",
+        "--json",
+        str(package),
+        environment_overrides=environment,
+        timeout_seconds=120,
+    )
+
+    assert completed.returncode == 0
+    result = json.loads(completed.stdout)["result"]
+    assert result["repository_path"] == str(target.resolve())
+    assert result["repo_id"] == target_context["repo_id"]
+    assert (target / "automatic-result.txt").read_text(encoding="utf-8") == "target"
+    assert not (current / "automatic-result.txt").exists()
+
+
+def test_automatic_parameterless_apply_remains_global_across_repositories(
+    tmp_path: Path,
+) -> None:
+    environment, exchange = _configure_user(tmp_path)
+    first = create_repository(tmp_path / "first")
+    second = create_repository(tmp_path / "second")
+    first_context = _register_context(first, environment)
+    second_context = _register_context(second, environment)
+    first_package = exchange / "first-older.zip"
+    second_package = exchange / "second-newer.zip"
+    _write_package(first_package, first_context, result_text="first")
+    _write_package(second_package, second_context, result_text="second")
+    os.utime(first_package, ns=(1_700_000_000_100_000_000,) * 2)
+    os.utime(second_package, ns=(1_700_000_000_900_000_000,) * 2)
+
+    completed = _parameterless_apply(
+        tmp_path / "watcher-caller",
+        environment,
+        automatic=True,
+    )
+
+    assert completed.returncode == 0
+    result = json.loads(completed.stdout)["result"]
+    assert result["repository_path"] == str(second.resolve())
+    assert result["repo_id"] == second_context["repo_id"]
+    assert not (first / "automatic-result.txt").exists()
+    assert (second / "automatic-result.txt").read_text(encoding="utf-8") == "second"
+    assert _identity_record(environment, first_package)["apply_status"] is None
+    assert _identity_record(environment, second_package)["apply_status"] == "succeeded"
+
+
 @pytest.mark.parametrize(
     ("configuration_state", "expected_message"),
     (
@@ -431,12 +629,19 @@ def test_parameterless_apply_requires_valid_exchange_configuration(
     expected_message: str,
 ) -> None:
     environment = isolated_user_environment(tmp_path / "user")
+    repository = create_repository(tmp_path / "repository")
+    registered = run_cli(
+        repository,
+        "register",
+        environment_overrides=environment,
+    )
+    assert registered.returncode == 0
     if configuration_state == "invalid":
         path = user_configuration_path(environment)
-        path.parent.mkdir(parents=True)
+        path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text("{}\n", encoding="utf-8")
 
-    completed = _parameterless_apply(tmp_path / "caller", environment)
+    completed = _parameterless_apply(repository, environment)
 
     assert completed.returncode == int(ExitCode.SOURCE_ERROR)
     envelope = json.loads(completed.stdout)
@@ -451,7 +656,7 @@ def test_parameterless_apply_requires_valid_exchange_configuration(
     assert envelope["result"]["result_bundle"]["attempted"] is False
 
 
-def test_automatic_selection_fails_closed_when_candidate_repository_is_busy(
+def test_manual_selection_fails_closed_when_current_repository_is_busy(
     tmp_path: Path,
 ) -> None:
     environment, exchange = _configure_user(tmp_path)
@@ -464,7 +669,7 @@ def test_automatic_selection_fails_closed_when_candidate_repository_is_busy(
     )
     try:
         completed = _parameterless_apply(
-            tmp_path / "caller",
+            repository,
             environment,
             dry_run=True,
         )
@@ -502,12 +707,12 @@ def test_dry_run_does_not_consume_but_parameterless_apply_does(
     )
 
     first_dry_run = _parameterless_apply(
-        tmp_path / "dry-run-one",
+        repository,
         environment,
         dry_run=True,
     )
     second_dry_run = _parameterless_apply(
-        tmp_path / "dry-run-two",
+        repository,
         environment,
         dry_run=True,
     )
@@ -517,16 +722,16 @@ def test_dry_run_does_not_consume_but_parameterless_apply_does(
     assert _identity_record(environment, package)["apply_status"] is None
     assert not (repository / "automatic-runs.txt").exists()
 
-    applied = _parameterless_apply(tmp_path / "automatic", environment)
+    applied = _parameterless_apply(repository, environment)
 
     assert applied.returncode == 0
     assert _identity_record(environment, package)["apply_status"] == "succeeded"
     assert (repository / "automatic-runs.txt").read_text(encoding="utf-8") == "x"
 
-    repeated = _parameterless_apply(tmp_path / "automatic-repeat", environment)
+    repeated = _parameterless_apply(repository, environment)
     _assert_unresolved_selection_failure(
         repeated,
-        message="no state-bound patch package matches a registered repository",
+        message=_MANUAL_NO_MATCH,
     )
     assert (repository / "automatic-runs.txt").read_text(encoding="utf-8") == "x"
 
@@ -562,7 +767,7 @@ def test_changed_bytes_at_the_same_exchange_path_are_a_new_identity(
     )
     first_hash = sha256(package.read_bytes()).hexdigest()
 
-    first = _parameterless_apply(tmp_path / "first", environment)
+    first = _parameterless_apply(repository, environment)
     assert first.returncode == 0
 
     _write_custom_package(
@@ -576,7 +781,7 @@ def test_changed_bytes_at_the_same_exchange_path_are_a_new_identity(
     second_hash = sha256(package.read_bytes()).hexdigest()
     assert second_hash != first_hash
 
-    second = _parameterless_apply(tmp_path / "second", environment)
+    second = _parameterless_apply(repository, environment)
 
     assert second.returncode == 0
     assert (repository / "automatic-runs.txt").read_text(encoding="utf-8") == "12"
@@ -608,8 +813,8 @@ def test_preflight_failure_remains_retryable_without_attempt_mark(
         )
         archive.writestr(entrypoint_name, b"not a PatchHarbor script\n")
 
-    first = _parameterless_apply(tmp_path / "first", environment)
-    second = _parameterless_apply(tmp_path / "second", environment)
+    first = _parameterless_apply(repository, environment)
+    second = _parameterless_apply(repository, environment)
 
     assert first.returncode == int(ExitCode.NO_VALID_SCRIPT)
     assert second.returncode == int(ExitCode.NO_VALID_SCRIPT)
@@ -642,7 +847,7 @@ def test_failed_parameterless_apply_can_be_retried_manually_and_then_succeeds(
         ),
     )
 
-    first = _parameterless_apply(tmp_path / "first", environment)
+    first = _parameterless_apply(repository, environment)
 
     assert first.returncode == 23
     assert _identity_record(environment, package)["apply_status"] == "failed"
@@ -657,7 +862,7 @@ def test_failed_parameterless_apply_can_be_retried_manually_and_then_succeeds(
     assert json.loads(current.stdout)["result"] == context
 
     trigger.write_text("ready\n", encoding="utf-8")
-    second = _parameterless_apply(tmp_path / "second", environment)
+    second = _parameterless_apply(repository, environment)
 
     assert second.returncode == 0
     assert _identity_record(environment, package)["apply_status"] == "succeeded"
@@ -672,11 +877,58 @@ def test_failed_parameterless_apply_can_be_retried_manually_and_then_succeeds(
     )
     _assert_unresolved_selection_failure(
         third,
-        message="no state-bound patch package matches a registered repository",
+        message=_AUTOMATIC_NO_MATCH,
     )
     assert (repository / "automatic-runs.txt").read_text(
         encoding="utf-8"
     ) == "x"
+
+
+def test_failed_newer_automatic_candidate_does_not_block_older_package(
+    tmp_path: Path,
+) -> None:
+    environment, exchange = _configure_user(tmp_path)
+    repository = create_repository(tmp_path / "repository")
+    _ignore_automatic_outputs(repository)
+    context = _register_context(repository, environment)
+    older = exchange / "older-success.zip"
+    newer = exchange / "newer-failure.zip"
+    _write_custom_package(
+        older,
+        context,
+        posix_entrypoint="printf o >> automatic-runs.txt",
+        powershell_entrypoint=(
+            "[System.IO.File]::AppendAllText('automatic-runs.txt', 'o')"
+        ),
+    )
+    _write_custom_package(
+        newer,
+        context,
+        posix_entrypoint="printf f >> automatic-runs.txt\nexit 23",
+        powershell_entrypoint=(
+            "[System.IO.File]::AppendAllText('automatic-runs.txt', 'f')\n"
+            "exit 23"
+        ),
+    )
+    os.utime(older, ns=(1_700_000_000_100_000_000,) * 2)
+    os.utime(newer, ns=(1_700_000_000_900_000_000,) * 2)
+
+    first = _parameterless_apply(
+        tmp_path / "automatic-first",
+        environment,
+        automatic=True,
+    )
+    second = _parameterless_apply(
+        tmp_path / "automatic-second",
+        environment,
+        automatic=True,
+    )
+
+    assert first.returncode == 23
+    assert second.returncode == 0
+    assert (repository / "automatic-runs.txt").read_text(encoding="utf-8") == "fo"
+    assert _identity_record(environment, newer)["apply_status"] == "failed"
+    assert _identity_record(environment, older)["apply_status"] == "succeeded"
 
 
 def test_automatic_apply_does_not_repeat_a_failed_package(
@@ -711,7 +963,7 @@ def test_automatic_apply_does_not_repeat_a_failed_package(
     assert first.returncode == 23
     _assert_unresolved_selection_failure(
         second,
-        message="no state-bound patch package matches a registered repository",
+        message=_AUTOMATIC_NO_MATCH,
     )
     assert _identity_record(environment, package)["apply_status"] == "failed"
     assert (repository / "automatic-runs.txt").read_text(
@@ -735,7 +987,7 @@ def test_failed_manual_retry_still_requires_the_original_repository_state(
         posix_entrypoint="exit 23",
         powershell_entrypoint="exit 23",
     )
-    failed = _parameterless_apply(tmp_path / "first", environment)
+    failed = _parameterless_apply(repository, environment)
 
     assert failed.returncode == 23
     assert _identity_record(environment, package)["apply_status"] == "failed"
@@ -746,11 +998,11 @@ def test_failed_manual_retry_still_requires_the_original_repository_state(
         git(repository, "add", "tracked.txt")
         git(repository, "commit", "--quiet", "-m", "change repository state")
 
-    mismatched = _parameterless_apply(tmp_path / "second", environment)
+    mismatched = _parameterless_apply(repository, environment)
 
     _assert_unresolved_selection_failure(
         mismatched,
-        message="no state-bound patch package matches a registered repository",
+        message=_MANUAL_NO_MATCH,
     )
     assert _identity_record(environment, package)["apply_status"] == "failed"
     assert package.is_file()
@@ -783,7 +1035,7 @@ def test_result_bundle_failure_still_consumes_automatic_identity(
     )
 
     failed = run_cli(
-        tmp_path,
+        repository,
         "apply",
         "--json",
         "--output-dir",
@@ -797,9 +1049,9 @@ def test_result_bundle_failure_still_consumes_automatic_identity(
     assert (repository / "automatic-runs.txt").read_text(encoding="utf-8") == "x"
     assert output_directory.is_file()
 
-    repeated = _parameterless_apply(tmp_path / "second", environment)
+    repeated = _parameterless_apply(repository, environment)
     _assert_unresolved_selection_failure(
         repeated,
-        message="no state-bound patch package matches a registered repository",
+        message=_MANUAL_NO_MATCH,
     )
     assert package.is_file()

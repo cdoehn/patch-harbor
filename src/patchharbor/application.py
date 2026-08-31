@@ -6,6 +6,7 @@ from collections.abc import Callable, Iterator
 from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass
 from pathlib import Path
+import unicodedata
 from typing import TextIO
 
 from patchharbor.apply_mutation import (
@@ -28,11 +29,13 @@ from patchharbor.configuration import (
     write_prepared_configuration,
 )
 from patchharbor.errors import (
+    ErrorKind,
     ExitCode,
     PatchHarborError,
     configuration_error,
     patch_package_error,
     registry_error,
+    repository_resolution_error,
     state_mismatch_error,
 )
 from patchharbor.exchange import (
@@ -208,7 +211,7 @@ def _manifest_matches_context(
 
 @dataclass(frozen=True, slots=True)
 class DiscoveredExchangePatch:
-    """One uniquely selected package plus its persistent attempt boundary."""
+    """One selected package plus its persistent attempt boundary."""
 
     artifact: ExchangeArtifact
     package: ValidatedPatchPackage
@@ -301,11 +304,87 @@ def _revalidate_exchange_discovery(
         )
 
 
+@dataclass(frozen=True, slots=True)
+class ExchangeDiscoveryScope:
+    """Repository and retry boundaries for one parameterless Apply."""
+
+    repository_context: RepositoryContext | None
+    allow_failed_retry: bool
+
+    @property
+    def is_repository_scoped(self) -> bool:
+        """Whether candidates are restricted to one pre-resolved repository."""
+        return self.repository_context is not None
+
+
+def _manual_exchange_discovery_scope(
+    current_directory: Path,
+) -> ExchangeDiscoveryScope:
+    """Resolve manual parameterless Apply to the current registered repository."""
+    try:
+        context = capture_repository_context(current_directory)
+    except PatchHarborError as exc:
+        if exc.error_kind is ErrorKind.REPOSITORY_RESOLUTION_ERROR:
+            raise repository_resolution_error(
+                "current directory is not inside a uniquely registered "
+                "PatchHarbor repository"
+            ) from exc
+        raise
+    return ExchangeDiscoveryScope(
+        repository_context=context,
+        allow_failed_retry=True,
+    )
+
+
+def _automatic_exchange_discovery_scope() -> ExchangeDiscoveryScope:
+    """Keep watcher-triggered parameterless Apply global and non-retrying."""
+    return ExchangeDiscoveryScope(
+        repository_context=None,
+        allow_failed_retry=False,
+    )
+
+
+def _candidate_filename_key(artifact: ExchangeArtifact) -> tuple[str, str]:
+    """Return one deterministic Unicode-normalized filename tie-break key."""
+    filename = artifact.path.name
+    return unicodedata.normalize("NFC", filename), filename
+
+
+def _select_exchange_candidate(
+    matches: list[ExchangeArtifact],
+) -> ExchangeArtifact:
+    """Select newest mtime_ns, then the lexicographically first filename."""
+    return min(
+        matches,
+        key=lambda artifact: (
+            -artifact.mtime_ns,
+            *_candidate_filename_key(artifact),
+        ),
+    )
+
+
+def _context_for_exchange_candidate(
+    selection: ExchangePatchSelection,
+    scope: ExchangeDiscoveryScope,
+    contexts: dict[RepositoryId, RepositoryContext | None],
+) -> RepositoryContext | None:
+    """Resolve one candidate inside the requested repository scope."""
+    scoped_context = scope.repository_context
+    if scoped_context is not None:
+        if selection.repo_id != scoped_context.repo_id:
+            return None
+        return scoped_context
+
+    repo_id = selection.repo_id
+    if repo_id not in contexts:
+        contexts[repo_id] = capture_repository_context_for_id(repo_id)
+    return contexts[repo_id]
+
+
 def discover_exchange_patch(
-    *,
-    allow_failed_retry: bool = True,
+    scope: ExchangeDiscoveryScope,
 ) -> DiscoveredExchangePatch:
-    """Return the newest eligible package matching one registered state."""
+    """Return the newest eligible package inside one selection scope."""
     paths = configuration_user_paths()
     configuration = revalidate_exchange_directory(load_configuration(paths))
     with registry_lock(paths):
@@ -326,49 +405,42 @@ def discover_exchange_patch(
 
     matches: list[ExchangeArtifact] = []
     contexts: dict[RepositoryId, RepositoryContext | None] = {}
+    if scope.repository_context is not None:
+        contexts[scope.repository_context.repo_id] = scope.repository_context
     for artifact in artifacts:
         if artifact.kind is not ExchangeArtifactKind.PATCH_PACKAGE:
-            continue
-        if artifact.apply_status is not None and not (
-            allow_failed_retry
-            and artifact.apply_status is ExchangeApplyStatus.FAILED
-        ):
             continue
         selection = artifact.selection
         if selection is None:
             raise RuntimeError("Patch Package artifact has no selection data")
-        repo_id = selection.repo_id
-        if repo_id not in contexts:
-            contexts[repo_id] = capture_repository_context_for_id(repo_id)
-        context = contexts[repo_id]
-        if context is not None and selection.matches_context(context):
-            matches.append(artifact)
+        context = _context_for_exchange_candidate(selection, scope, contexts)
+        if context is None or not selection.matches_context(context):
+            continue
+        if artifact.apply_status is not None and not (
+            scope.allow_failed_retry
+            and artifact.apply_status is ExchangeApplyStatus.FAILED
+        ):
+            continue
+        matches.append(artifact)
 
     _revalidate_exchange_discovery(paths, configuration, registry)
 
     if not matches:
-        raise patch_package_error(
-            "no state-bound patch package matches a registered repository"
+        message = (
+            "no state-bound patch package matches the current registered "
+            "repository"
+            if scope.is_repository_scoped
+            else "no state-bound patch package matches a registered repository"
         )
-    newest_mtime_ns = max(artifact.mtime_ns for artifact in matches)
-    newest_matches = tuple(
-        artifact
-        for artifact in matches
-        if artifact.mtime_ns == newest_mtime_ns
-    )
-    if len(newest_matches) != 1:
-        raise patch_package_error(
-            "multiple state-bound patch packages share the newest mtime_ns; "
-            "pass PATCH_ZIP explicitly"
-        )
+        raise patch_package_error(message)
 
-    artifact = newest_matches[0]
+    artifact = _select_exchange_candidate(matches)
     package = materialize_exchange_patch(
         artifact,
         directory=configuration.exchange_directory,
     )
     _revalidate_exchange_discovery(paths, configuration, registry)
-    context = contexts[package.manifest.repo_id]
+    context = contexts.get(package.manifest.repo_id)
     if context is None or not _manifest_matches_context(package.manifest, context):
         raise patch_package_error(
             "selected exchange patch changed during automatic discovery"
@@ -707,9 +779,12 @@ def run_apply_path(
     try:
         discovered: DiscoveredExchangePatch | None = None
         if path is None:
-            discovered = discover_exchange_patch(
-                allow_failed_retry=not automatic,
+            scope = (
+                _automatic_exchange_discovery_scope()
+                if automatic
+                else _manual_exchange_discovery_scope(Path.cwd())
             )
+            discovered = discover_exchange_patch(scope)
             selected_path = discovered.artifact.path
             package = discovered.package
         else:

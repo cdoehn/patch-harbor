@@ -159,12 +159,21 @@ patchharbor apply --dry-run
 patchharbor apply
 ```
 
-Parameterless `apply` scans only the top level of the configured Exchange
-directory. It first retains only packages whose `repo_id`, base commit, and state
-fingerprint match a currently registered repository, then selects the unique
-candidate with the greatest nanosecond modification time (`mtime_ns`). An exact
-tie for the newest value stops without mutation and requires an explicit path.
-The current working directory does not select the repository. The filename does not select it either.
+A deliberate manual parameterless `patchharbor apply` first resolves the
+current working directory to exactly one registered Git repository. Calls from
+any subdirectory of that repository resolve to the same repository root. If the
+current directory is not inside a uniquely registered repository, Apply stops
+without scanning for a fallback package belonging to another repository.
+
+PatchHarbor then scans only the top level of the configured Exchange directory
+and considers packages for that one `repo_id`. It filters by base commit, state
+fingerprint, package validity, and manual replay eligibility before ranking the
+remaining candidates. The greatest nanosecond modification time (`mtime_ns`)
+wins. Equal `mtime_ns` values use the lexicographically first filename after
+Unicode NFC normalization, with the original filename as a final deterministic
+fallback. A newer foreign, state-mismatched, or replay-ineligible package never
+blocks an older eligible package. Filenames do not determine repository or state
+binding; they are used only for that final tie-breaker.
 
 The default timeout for one script or repository entrypoint is 10,800 seconds
 (three hours). Use `--timeout SECONDS` to override it for one invocation.
@@ -179,8 +188,12 @@ separate deliberate override.
 
 ### Explicit path overrides
 
-An explicit patch path bypasses automatic package selection. An explicit
-`--output-dir` overrides only the Result Bundle destination:
+An explicit patch path bypasses parameterless package selection. Its complete
+`repo_id` may resolve another registered repository even when it differs from
+the repository containing the current working directory. This is a deliberate
+user selection; all package, state-binding, path, and revalidation checks remain
+mandatory. An explicit `--output-dir` overrides only the Result Bundle
+destination:
 
 ```bash
 patchharbor bundle --output-dir /path/to/results /path/to/repository
@@ -211,8 +224,11 @@ support is claimed by PatchHarbor 1.1.1.
 
 The optional watcher is a thin permanent trigger for Core's parameterless
 automatic Apply mode. It has no input-directory argument and no separate
-configuration or file-classification logic. Unlike a deliberate manual Apply,
-this mode does not retry an unchanged failed package on later polls.
+configuration or file-classification logic. Its selection scope remains global:
+it can inspect eligible packages for every registered repository and does not
+use the watcher's current working directory as a repository restriction. Unlike
+a deliberate manual Apply, this mode does not retry an unchanged failed package
+on later polls.
 
 Configure the shared Exchange directory first, then install the disabled systemd
 user unit:

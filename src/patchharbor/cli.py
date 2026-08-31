@@ -286,18 +286,20 @@ def _build_parser() -> argparse.ArgumentParser:
         "apply",
         help="validate or apply one repository-bound patch package",
         description=(
-            "Validate or apply one repository-bound ZIP patch package. Omit "
-            "PATCH_ZIP to discover the eligible package with the greatest "
-            "mtime_ns in the configured Exchange directory after repository "
-            "ID and state matching. A deliberate manual Apply may retry a "
-            "previously failed package."
+            "Validate or apply one repository-bound ZIP patch package. A "
+            "manual call without PATCH_ZIP resolves the current working "
+            "directory to one registered repository, then selects its newest "
+            "eligible Exchange package by mtime_ns. Equal timestamps use a "
+            "deterministic normalized-filename tie-breaker."
         ),
         epilog=(
-            "An explicit PATCH_ZIP bypasses automatic discovery. An explicit "
-            "--output-dir overrides only the Result Bundle destination. The "
-            "current directory does not select the target repository. Apply "
-            "attempts a Result Bundle after repository resolution; earlier "
-            "writes are not globally rolled back after a later failure."
+            "An explicit PATCH_ZIP bypasses parameterless discovery and may "
+            "resolve another registered repository through its repo_id. The "
+            "watcher's internal automatic mode remains global across all "
+            "registered repositories. An explicit --output-dir overrides only "
+            "the Result Bundle destination. Apply attempts a Result Bundle "
+            "after repository resolution; earlier writes are not globally "
+            "rolled back after a later failure."
         ),
     )
     apply_parser.add_argument(
@@ -352,7 +354,8 @@ def _build_parser() -> argparse.ArgumentParser:
         metavar="PATCH_ZIP",
         help=(
             "explicit ZIP package containing a root patch.json; when omitted, "
-            "discover the matching eligible Exchange package with greatest mtime_ns"
+            "use the current registered repository and its newest eligible "
+            "Exchange package"
         ),
     )
 

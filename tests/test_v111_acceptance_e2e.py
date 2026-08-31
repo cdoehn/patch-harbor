@@ -157,7 +157,7 @@ def test_v111_acceptance_complete_repository_workflow(tmp_path: Path) -> None:
         payloads={"tracked.txt": b"patched\n", "nested/payload.bin": b"\x00v111\xff"},
     )
     package_bytes = package.read_bytes()
-    caller = tmp_path / "caller"
+    caller = repository / "manual-caller"
     caller.mkdir()
 
     dry_run = run_cli(

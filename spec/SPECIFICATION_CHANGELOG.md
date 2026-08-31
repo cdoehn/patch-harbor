@@ -1,7 +1,7 @@
 # PatchHarbor – Spezifikations-Changelog
 
 **Dateiname:** `SPECIFICATION_CHANGELOG.md`<br>
-**Stand:** 2026-08-30
+**Stand:** 2026-08-31
 
 Dieses Dokument protokolliert Änderungen am verbindlichen Produktziel. Es ist kein Git-Commit-Log und ersetzt nicht die getrennten Umsetzungspläne unter `planning/`.
 
@@ -10,6 +10,16 @@ Dieses Dokument protokolliert Änderungen am verbindlichen Produktziel. Es ist k
 ## [1.1.1] – 2026-08-28
 
 **Status:** Freigegeben und vollständig umgesetzt; der abgeschlossene Plan liegt unter `planning/1.1.1/commit-plan.md`.
+
+### Post-release repository-scoped manual Apply – 2026-08-31
+
+- Ein manueller parameterloser `patchharbor apply` löst zuerst das registrierte Repository des aktuellen Arbeitsverzeichnisses auf; Aufrufe aus Unterverzeichnissen werden der Repository-Wurzel zugeordnet.
+- Pakete anderer registrierter Repositorys sind für diesen manuellen Aufruf keine Kandidaten. Ist das aktuelle Repository nicht eindeutig registriert, endet der Auftrag ohne globalen Fallback.
+- Ein explizites `patchharbor apply PATCH_ZIP` bleibt eine bewusste paketgesteuerte Auswahl und darf weiterhin das über `repo_id` bestimmte andere registrierte Repository verwenden.
+- Der Watcher bleibt mit seinem internen automatischen Ursprung repositoryübergreifend und verwendet weiterhin den Schutz gegen die sofortige Wiederholung fehlgeschlagener Pakete.
+- Unter den nach Repository-, State- und Replay-Prüfung verbleibenden Kandidaten gewinnt der höchste `mtime_ns`; bei identischem Zeitstempel entscheidet der Unicode-NFC-normalisierte und anschließend der unveränderte Dateiname deterministisch.
+- Ein neuerer fremder, state-inkompatibler oder replaygeschützter Kandidat blockiert keinen älteren zulässigen Kandidaten.
+- Paketformat, Fingerprint-Algorithmus, Drei-Stunden-Standardtimeout und das bereits veröffentlichte Bundle-Namensschema bleiben unverändert.
 
 ### Post-release complete-identifier guidance – 2026-08-30
 
