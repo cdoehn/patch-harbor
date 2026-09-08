@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 import stat
 
+from patchharbor.bundle_names import is_browser_temporary_name
 from patchharbor.errors import PatchHarborError, patch_package_error
 from patchharbor.exchange_state import (
     ExchangeApplyStatus,
@@ -37,14 +38,6 @@ from patchharbor.zip_payloads import ZipPayloadError, read_zip_payload_bytes
 
 _RESULT_BUNDLE_MANIFEST = "manifest.json"
 _RESULT_BUNDLE_MARKER = "patch-harbor-result-bundle"
-_BROWSER_TEMP_SUFFIXES = (
-    ".crdownload",
-    ".download",
-    ".opdownload",
-    ".part",
-    ".partial",
-    ".tmp",
-)
 
 
 class ExchangeScanError(RuntimeError):
@@ -108,11 +101,6 @@ class _ContentClassification:
     kind: ExchangeArtifactKind
     selection: ExchangePatchSelection | None = None
     package: ValidatedPatchPackage | None = None
-
-
-def is_browser_temporary_name(name: str) -> bool:
-    """Recognize common incomplete browser-download names."""
-    return name.casefold().endswith(_BROWSER_TEMP_SUFFIXES)
 
 
 def _unique_json_object(

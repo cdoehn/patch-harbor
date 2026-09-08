@@ -66,7 +66,8 @@ def test_shared_configuration_round_trips_direct_file_edits(
     assert first_exchange.is_dir()
     assert json.loads(paths.configuration_path.read_text(encoding="utf-8")) == {
         "exchange_directory": str(first_exchange.resolve()),
-        "format_version": 1,
+        "format_version": 2,
+        "bundle_suffix": "",
     }
 
     second_exchange = tmp_path / "second-exchange"
@@ -97,7 +98,8 @@ def test_written_configuration_is_exact_utf8_with_one_lf(
         json.dumps(
             {
                 "exchange_directory": str(exchange_directory.resolve()),
-                "format_version": 1,
+                "format_version": 2,
+                "bundle_suffix": "",
             },
             ensure_ascii=False,
             allow_nan=False,
@@ -161,7 +163,7 @@ def test_exchange_directory_is_physically_canonicalized(
             "configuration format_version is invalid",
         ),
         (
-            {"exchange_directory": "/missing", "format_version": 2},
+            {"exchange_directory": "/missing", "format_version": 3},
             "configuration format_version is invalid",
         ),
         (

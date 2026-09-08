@@ -211,7 +211,9 @@ def _manifest_document(
     return document
 
 
-def _context_document(report: RunReport) -> dict[str, object]:
+def _context_document(
+    report: RunReport, *, bundle_suffix: str = "",
+) -> dict[str, object]:
     context = report.context
     if context is None:
         raise ValueError("successful Result Bundle report has no context")
@@ -222,6 +224,7 @@ def _context_document(report: RunReport) -> dict[str, object]:
         "state_fingerprint": context.state_fingerprint,
         "fingerprint_algorithm": context.fingerprint_algorithm,
         "created_at": report.timing.started_at_text,
+        "bundle_suffix": bundle_suffix,
     }
 
 
@@ -360,7 +363,7 @@ def create_apply_result_bundle(
                 snapshot=captured.bundle_snapshot,
                 expected_manifest=expected_manifest,
             ),
-            context_document=_context_document(report),
+            context_document=_context_document(report, bundle_suffix=target.bundle_suffix),
             run_report=report,
             snapshot=captured.bundle_snapshot,
             execution_log=execution_log,
@@ -490,7 +493,7 @@ def create_manual_result_bundle(
                     report=report,
                     snapshot=bundle_snapshot,
                 ),
-                context_document=_context_document(report),
+                context_document=_context_document(report, bundle_suffix=target.bundle_suffix),
                 run_report=report,
                 snapshot=bundle_snapshot,
             )

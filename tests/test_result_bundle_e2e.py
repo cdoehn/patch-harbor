@@ -251,6 +251,7 @@ def test_manual_bundle_materializes_committed_blobs_without_export_rules(
         "state_fingerprint": "7c9d2a24e397e0e5",
         "fingerprint_algorithm": "patchharbor-state-v1",
         "created_at": manifest["created_at"],
+        "bundle_suffix": "",
     }
     assert manifest["repo_id"] == context["repo_id"]
     assert manifest["base_commit"] == context["base_commit"]

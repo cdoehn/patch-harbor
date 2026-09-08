@@ -42,7 +42,8 @@ def test_configure_exchange_directory_and_show_use_the_same_file(
     assert exchange_directory.is_dir()
     assert json.loads(configuration_path.read_text(encoding="utf-8")) == {
         "exchange_directory": str(canonical_exchange),
-        "format_version": 1,
+        "format_version": 2,
+        "bundle_suffix": "",
     }
 
     shown = run_cli(

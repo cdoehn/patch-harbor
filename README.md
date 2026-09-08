@@ -45,12 +45,13 @@ On Windows, it is:
 %APPDATA%\PatchHarbor\config.json
 ```
 
-Format 1 is a closed JSON schema with exactly these fields:
+Format 2 is a closed JSON schema with exactly these fields:
 
 ```json
 {
   "exchange_directory": "/absolute/path/to/exchange",
-  "format_version": 1
+  "format_version": 2,
+  "bundle_suffix": ""
 }
 ```
 
@@ -64,6 +65,58 @@ The flat Exchange directory may contain patch packages, Result Bundles, old
 packages, and unrelated files together. PatchHarbor identifies content rather
 than relying on filenames, and it does not move, rename, archive, or delete
 Exchange files.
+
+### Optional bundle filename suffix
+
+Configure a suffix once, using the same shared configuration as the Exchange
+path. For example, to append `.txt` **after** the existing `.zip` extension:
+
+```bash
+patchharbor configure bundle-suffix .txt
+patchharbor configure show
+```
+
+All newly generated Result Bundles then use
+`<Repository>_Result_<HHMMSS>_<MMDD>_<ID6>.zip.txt`, including manual `bundle`,
+automatic Apply results (success, failure, dry-run), Watcher results, and explicit
+`--output-dir` targets. There is no suffix argument on `apply` or `bundle`.
+Disable it with:
+
+```bash
+patchharbor configure bundle-suffix --clear
+```
+
+An empty `bundle_suffix` produces the unchanged `.zip` name. The suffix is literal:
+no dot is inserted automatically. It may contain at most 32 ASCII letters,
+digits, dots, underscores or hyphens, must include a letter or digit, and must
+not contain `..` or end with a dot. Paths, whitespace, control characters and
+incomplete-download endings such as `.part`, `.tmp` or `.crdownload` are rejected.
+Set the Exchange directory before configuring the suffix. Changing either
+setting preserves the other. Reads accept existing closed Format-1 configuration
+files as an empty suffix without rewriting them; the next configuration write
+atomically migrates to Format 2. Older PatchHarbor versions cannot read Format 2.
+
+Patch packages are created by the development chat, not by a new local command.
+The new Result Bundle's `context.json` carries `bundle_suffix` as optional
+filename metadata. The matching chat instructions require the same suffix on
+`<Repository>_Patch_<HHMMSS>_<MMDD>_<ID6>.zip`. Missing metadata in older bundles
+means no suffix. After changing the setting, give the chat a fresh Result Bundle.
+Do not put this field in `patch.json`: it is not part of repository binding.
+`patchharbor context --json` keeps its existing closed schema; a standalone
+context therefore needs the naming preference supplied separately.
+
+The content stays ZIP, not text. Renaming alone does not guarantee that another
+application can read it. Existing files are never renamed. Old `.zip` and new
+`.zip.txt` packages may coexist; selection, state binding, `mtime_ns`, manual
+retry and the Watcher guard remain content-based and unchanged. Result Bundles
+are never executed as patches, regardless of their filename.
+
+Explicit `--output-dir` remains usable with missing or malformed configuration,
+as before; it then uses no suffix. A valid configured suffix is honored even if
+the configured Exchange directory is temporarily unavailable. With default
+Exchange output, invalid configuration remains an error. A suffix change during
+Result Bundle preparation is rejected rather than publishing inconsistent
+filename metadata.
 
 ## Initialize a repository
 
@@ -140,7 +193,8 @@ from shortened human-facing terminal output.
 
 The chat contract requires one downloadable repository-bound ZIP patch package.
 Patch filenames use
-`<Repository>_Patch_<HHMMSS>_<MMDD>_<ID6>.zip`. After an Apply, upload the
+`<Repository>_Patch_<HHMMSS>_<MMDD>_<ID6>.zip`, followed by `bundle_suffix`
+from the Result Bundle when configured. After an Apply, upload the
 newly created Result Bundle back to the same chat. For a failed entrypoint or
 test run, that bundle contains the actual remaining repository state plus
 `logs/run.json` and, when execution started, `logs/execution.log`.

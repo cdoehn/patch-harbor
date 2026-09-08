@@ -59,6 +59,8 @@ EXPECTED_HEADINGS = [
 EXPECTED_COMMAND_BLOCK = "\n".join(
     (
         "patchharbor configure exchange-directory VERZEICHNIS",
+        "patchharbor configure bundle-suffix .txt",
+        "patchharbor configure bundle-suffix --clear",
         "patchharbor configure show",
         "patchharbor register [REPOSITORY]",
         "patchharbor registry list",

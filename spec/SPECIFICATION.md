@@ -249,19 +249,24 @@ Exchange-Dateistatus:      %LOCALAPPDATA%\PatchHarbor\exchange\
 Locks:                     %LOCALAPPDATA%\PatchHarbor\locks\
 ```
 
-Die allgemeine Benutzerkonfiguration besitzt in Formatversion 1 exakt dieses geschlossene Schema:
+Die allgemeine Benutzerkonfiguration besitzt in Formatversion 2 exakt dieses geschlossene Schema:
 
 ```json
 {
   "exchange_directory": "/absoluter/pfad/zum/austauschordner",
-  "format_version": 1
+  "format_version": 2,
+  "bundle_suffix": ""
 }
 ```
 
 Verbindliche Regeln:
 
 - unbekannte oder fehlende Felder werden abgelehnt,
-- `format_version` ist die Ganzzahl `1`,
+- `format_version` ist die Ganzzahl `2`,
+- `bundle_suffix` ist ein String; `""` deaktiviert das Suffix,
+- ein gesetztes Suffix ist höchstens 32 ASCII-Zeichen lang, enthält nur Buchstaben, Ziffern, Punkte, Unterstriche und Bindestriche sowie mindestens einen Buchstaben oder eine Ziffer; `..`, abschließender Punkt, Pfade, Leerraum und Steuerzeichen sind unzulässig,
+- die Endungen `.crdownload`, `.download`, `.opdownload`, `.part`, `.partial` und `.tmp` sind ohne Beachtung der Groß-/Kleinschreibung unzulässig, damit fertige Bundles nicht als unvollständige Downloads ausgefiltert werden,
+- das bisherige geschlossene Format 1 mit ausschließlich `exchange_directory` und `format_version: 1` wird weiterhin gelesen und bedeutet ein leeres Suffix; Lesen schreibt nicht, der nächste Konfigurationsschreibvorgang migriert atomar nach Format 2,
 - `exchange_directory` ist ein absoluter Pfad,
 - der Pfad wird vor Speicherung und vor jeder Verwendung physisch kanonisiert,
 - der Pfad muss ein echtes Verzeichnis sein; Symlinks, Junctions und Elternpfade werden auf ihr tatsächliches Ziel aufgelöst,
@@ -273,14 +278,18 @@ Die empfohlenen sicheren Benutzerbefehle lauten:
 
 ```bash
 patchharbor configure exchange-directory VERZEICHNIS
+patchharbor configure bundle-suffix .txt
+patchharbor configure bundle-suffix --clear
 patchharbor configure show
 ```
 
-`configure exchange-directory` legt das Zielverzeichnis bei Bedarf an, validiert es gegen die Registry und veröffentlicht anschließend die vollständige `config.json` atomar. `configure show` zeigt den Pfad der verwendeten Konfigurationsdatei und den kanonischen Exchange-Ordner. Die Datei bleibt die alleinige persistente Quelle.
+`configure exchange-directory` legt das Zielverzeichnis bei Bedarf an, validiert es gegen die Registry und veröffentlicht anschließend die vollständige `config.json` atomar. Es erhält das bestehende Suffix auch bei Reparatur eines nicht mehr verfügbaren Exchange-Pfads. `configure bundle-suffix SUFFIX` setzt nur das Suffix, `configure bundle-suffix --clear` setzt es auf den leeren String; beide benötigen eine vorhandene gültige Exchange-Konfiguration und verwenden denselben globalen Registry-/Konfigurationslock. Fehlendes Argument oder gleichzeitiges Argument und `--clear` sind CLI-Fehler. `configure show` zeigt Konfigurationspfad, kanonischen Exchange-Ordner und `bundle_suffix`. Die Datei bleibt die alleinige persistente Quelle.
+
+Das Suffix gilt benutzerspezifisch für alle neu erzeugten Bundles. Es wird ohne zusätzlichen Punkt unmittelbar hinter `.zip` angehängt. Weder `apply` noch `bundle` erhalten einen Suffix-Schalter. Bestehende Dateien werden nicht umbenannt. Inhalt und Paketformat bleiben ZIP; eine fremde Anwendung muss diese Inhalte trotzdem unterstützen. Ältere PatchHarbor-Versionen verstehen Format-2-Konfigurationen nicht.
 
 Der Exchange-Ordner ist benutzerspezifisch und nicht repositoryspezifisch. `patchharbor register` fragt ihn nicht ab. Die Befehle `register`, `registry`, `unregister`, `context` und `fs run` benötigen keine Exchange-Konfiguration.
 
-Ohne `--output-dir` benötigen `bundle` sowie jeder Apply-Auftrag, der ein Result Bundle versucht, eine gültige Exchange-Konfiguration. `patchharbor apply` ohne `PATCH_ZIP` und der Watcher benötigen sie ebenfalls. Ein explizites `PATCH_ZIP` zusammen mit einem expliziten `--output-dir` bleibt auch ohne Exchange-Konfiguration möglich.
+Ohne `--output-dir` benötigen `bundle` sowie jeder Apply-Auftrag, der ein Result Bundle versucht, eine gültige Exchange-Konfiguration. `patchharbor apply` ohne `PATCH_ZIP` und der Watcher benötigen sie ebenfalls. Ein explizites `PATCH_ZIP` zusammen mit einem expliziten `--output-dir` bleibt auch ohne Exchange-Konfiguration möglich. Ein gültiges Suffix wird auch bei explizitem Ausgabeziel verwendet; hierfür ist die Existenz des konfigurierten Exchange-Verzeichnisses nicht erforderlich. Die bisherige explizite Wiederherstellungsmöglichkeit bei fehlender oder ungültiger Konfiguration bleibt erhalten und verwendet dann ein leeres Suffix. Der bei der Zielvorbereitung gelesene Suffixwert wird bis zur Veröffentlichung erneut geprüft; eine Änderung führt zum kontrollierten Fehler.
 
 Für den Exchange-Ordner gelten verbindlich:
 
@@ -2042,7 +2051,7 @@ Es gibt keinen reduzierten Standardmodus, der nur den Commit-Hash enthält.
     └── run.json
 ```
 
-Der Dateiname beginnt mit dem Namen des Repository-Wurzelverzeichnisses, verwendet danach das Schlüsselwort `Result`, die UTC-Uhrzeit `HHMMSS`, Monat und Tag `MMDD` ohne Jahr sowie die ersten sechs Zeichen der vollständigen Run-ID ohne `…`. Das entsprechende Chat-Patch-Schema verwendet an derselben Position `Patch` und eine Paket-UUID. Der Dateiname ist keine Sicherheits- oder Klassifikationsinformation.
+Der Dateiname beginnt mit dem Namen des Repository-Wurzelverzeichnisses, verwendet danach das Schlüsselwort `Result`, die UTC-Uhrzeit `HHMMSS`, Monat und Tag `MMDD` ohne Jahr sowie die ersten sechs Zeichen der vollständigen Run-ID ohne `…`. Das entsprechende Chat-Patch-Schema verwendet an derselben Position `Patch` und eine Paket-UUID. Der Dateiname ist keine Sicherheits- oder Klassifikationsinformation. An beide Basisschemata wird das konfigurierte `bundle_suffix` angehängt, beispielsweise `.zip.txt`; dies gilt auch für automatische Fehler-, Dry-Run- und Watcher-Resultate sowie explizite Ausgabeziele. Die Konfigurations- und Ausgabeschichten lesen den Wert einmal bei der Zielvorbereitung und verwenden denselben Wert für Dateiname und Kontextmetadaten.
 
 `execution.log` fehlt bei einem manuellen Bundle oder Dry-Run ohne Entrypoint-Ausführung.
 
@@ -2088,9 +2097,19 @@ Bei `apply` enthält das Manifest außerdem die aus `patch.json` erwarteten und 
   "dirty": true,
   "state_fingerprint": "a1b2c3d4e5f67890",
   "fingerprint_algorithm": "patchharbor-state-v1",
-  "created_at": "2026-08-25T06:00:00Z"
+  "created_at": "2026-08-25T06:00:00Z",
+  "bundle_suffix": ".txt"
 }
 ```
+
+`bundle_suffix` ist zusätzliche optionale Dateinamen-Präsentationsmetadaten,
+kein Teil des Repository-Zustands. Ältere Result Bundles ohne dieses Feld gelten
+als suffixlos. Der externe Entwicklungs-Chat übernimmt den Wert unverändert für
+seinen nächsten Patch-Dateinamen. Er fügt ihn niemals in `patch.json` ein und
+verwendet ihn nicht für Fingerprint, Repository-Zuordnung oder Replay. Die
+vollständigen Bindungswerte, Result-Marker und Formatversion 1 bleiben erhalten.
+Die geschlossene CLI-Antwort von `context --json` bleibt unverändert; bei einer
+separaten Kontextübergabe muss die Dateinamenpräferenz zusätzlich genannt werden.
 
 ### 19.7 `base/`
 
@@ -2299,7 +2318,9 @@ Abhängigkeitsregeln:
 - `payload_files` schreibt Dateien, steuert aber keine Execution.
 - `patch_manifest` kennt weder Git noch Execution.
 - `registry` kennt weder TUI noch ZIP-Inhalte.
-- `configuration` verwaltet ausschließlich `config.json` und kennt weder Git-Zustand noch Execution.
+- `configuration` verwaltet ausschließlich `config.json` einschließlich Format-1-Leser und Format-2-Schreiber und kennt weder Git-Zustand noch Execution.
+- `bundle_names` enthält reine Validierung und Anfügen des Suffixes sowie die gemeinsame Erkennung temporärer Download-Namen; es liest keine Konfiguration und keine Dateien.
+- `result_bundle_target` bindet das konfigurierte Suffix an das Ausgabeziel und revalidiert es; `result_bundle` übergibt denselben Wert als optionale Kontextmetadaten. Der Chat bleibt für die Benennung externer Patch-Pakete verantwortlich.
 - `exchange` klassifiziert flache Dateikandidaten und persistiert Dateidentitäten, führt aber keinen Entrypoint aus.
 - `repository_state` kennt weder TUI noch Watcher.
 - `locks` kennt keine Ausführungs- oder Bundle-Semantik.
@@ -2837,7 +2858,7 @@ Ein Erfolg darf erst nach Prüfung von `run.json`, Git-Zustand und erwartetem Co
 - Primäres Auftragsergebnis und Result-Bundle-Ergebnis bleiben getrennt.
 - Result Bundles enthalten den vollständigen Base-Commit, staged und unstaged Patches, nicht ignorierte untracked Dateien, Kontext und Run-Logs, aber keine Git-Historie.
 - Result Bundles werden im endgültigen Ausgabeordner atomar veröffentlicht.
-- `config.json` ist die einzige Benutzerkonfiguration für `exchange_directory`.
+- `config.json` ist die einzige Benutzerkonfiguration für `exchange_directory` und `bundle_suffix`; Format 1 bleibt lesbar, neue Schreibvorgänge verwenden Format 2.
 - Der Exchange-Ordner ist eine gemeinsame flache Übergabestelle für Patch-Pakete, Result Bundles und sonstige Dateien.
 - Exchange-Ordner und registrierte Repositorys dürfen sich in keiner Richtung überlappen.
 - `bundle` und Apply-Result-Bundles verwenden ohne explizites `--output-dir` den Exchange-Ordner.

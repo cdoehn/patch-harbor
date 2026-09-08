@@ -16,6 +16,7 @@ EXPECTED_CORE_RUNTIME_FILES = {
     "apply_preflight.py",
     "apply_repository.py",
     "bundle_paths.py",
+    "bundle_names.py",
     "bundles.py",
     "cli.py",
     "configuration.py",

@@ -13,6 +13,7 @@ from typing import Any, BinaryIO, TextIO
 from patchharbor import __version__
 from patchharbor.application import (
     bundle_repository,
+    configure_bundle_suffix,
     configure_exchange_directory,
     register_repository,
     registered_repositories,
@@ -139,12 +140,29 @@ def _build_parser() -> argparse.ArgumentParser:
         metavar="DIRECTORY",
         help="exchange directory to persist in config.json",
     )
+    suffix_parser = configure_commands.add_parser(
+        "bundle-suffix",
+        help="set or clear the persistent filename suffix for all bundles",
+        description=(
+            "Append SUFFIX literally after .zip for every new bundle, including "
+            "automatic Result Bundles and explicit output directories. "
+            "ZIP contents and package validation are unchanged. "
+            "Example: patchharbor configure bundle-suffix .txt"
+        ),
+    )
+    suffix_parser.add_argument(
+        "suffix", nargs="?", metavar="SUFFIX",
+        help="portable filename suffix, for example .txt (maximum 32 characters)",
+    )
+    suffix_parser.add_argument(
+        "--clear", action="store_true", help="disable the configured bundle suffix",
+    )
     configure_commands.add_parser(
         "show",
         help="show the shared PatchHarbor configuration",
         description=(
             "Show the active config.json path and the canonical shared "
-            "Exchange directory."
+            "Exchange directory and the bundle suffix (empty when disabled)."
         ),
     )
 
@@ -258,8 +276,8 @@ def _build_parser() -> argparse.ArgumentParser:
         ),
         epilog=(
             "Without --output-dir, publish in the configured Exchange "
-            "directory. Result Bundles contain no Git history and may "
-            "contain secrets."
+            "directory. The configured bundle suffix is appended after .zip. "
+            "Result Bundles contain no Git history and may contain secrets."
         ),
     )
     bundle_parser.add_argument(
@@ -445,10 +463,12 @@ def _write_configuration(
     configuration_path: Path,
     exchange_directory: Path,
     *,
+    bundle_suffix: str,
     stdout: TextIO,
 ) -> None:
     print(f"configuration_path: {configuration_path}", file=stdout)
     print(f"exchange_directory: {exchange_directory}", file=stdout)
+    print(f"bundle_suffix: {bundle_suffix}", file=stdout)
 
 
 def _configure_exchange_directory_command(
@@ -468,6 +488,27 @@ def _configure_exchange_directory_command(
     _write_configuration(
         configuration_path,
         configuration.exchange_directory,
+        bundle_suffix=configuration.bundle_suffix,
+        stdout=stdout,
+    )
+    return 0
+
+
+def _configure_bundle_suffix_command(
+    suffix: str,
+    *,
+    stdout: TextIO,
+    stderr: TextIO,
+) -> int:
+    try:
+        configuration_path, configuration = configure_bundle_suffix(suffix)
+    except PatchHarborError as exc:
+        print(format_tool_message(str(exc)), file=stderr)
+        return int(exc.exit_code)
+    _write_configuration(
+        configuration_path,
+        configuration.exchange_directory,
+        bundle_suffix=configuration.bundle_suffix,
         stdout=stdout,
     )
     return 0
@@ -487,6 +528,7 @@ def _configure_show_command(
     _write_configuration(
         configuration_path,
         configuration.exchange_directory,
+        bundle_suffix=configuration.bundle_suffix,
         stdout=stdout,
     )
     return 0
@@ -1111,6 +1153,18 @@ def main(
             stderr=actual_stderr,
         )
 
+    if args.command == "configure" and args.configure_command == "bundle-suffix":
+        if (args.suffix is None) == (not args.clear):
+            print(
+                format_tool_message("specify either a bundle suffix or --clear"),
+                file=actual_stderr,
+            )
+            return 2
+        return _configure_bundle_suffix_command(
+            "" if args.clear else args.suffix,
+            stdout=actual_stdout,
+            stderr=actual_stderr,
+        )
     if args.command == "configure" and args.configure_command == "show":
         return _configure_show_command(
             stdout=actual_stdout,

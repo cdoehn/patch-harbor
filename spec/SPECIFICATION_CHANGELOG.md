@@ -1,7 +1,7 @@
 # PatchHarbor – Spezifikations-Changelog
 
 **Dateiname:** `SPECIFICATION_CHANGELOG.md`<br>
-**Stand:** 2026-08-31
+**Stand:** 2026-09-08
 
 Dieses Dokument protokolliert Änderungen am verbindlichen Produktziel. Es ist kein Git-Commit-Log und ersetzt nicht die getrennten Umsetzungspläne unter `planning/`.
 
@@ -10,6 +10,16 @@ Dieses Dokument protokolliert Änderungen am verbindlichen Produktziel. Es ist k
 ## [1.1.1] – 2026-08-28
 
 **Status:** Freigegeben und vollständig umgesetzt; der abgeschlossene Plan liegt unter `planning/1.1.1/commit-plan.md`.
+
+### Post-release konfigurierbares Bundle-Suffix – 2026-09-08
+
+- `configure bundle-suffix SUFFIX` und `configure bundle-suffix --clear` ergänzen die bestehende Configure-CLI; `configure show` zeigt den Wert.
+- Die Konfiguration verwendet das geschlossene Format 2 mit `exchange_directory`, `format_version` und `bundle_suffix`. Format 1 bleibt ohne Suffix lesbar; erst ein expliziter Schreibvorgang migriert atomar. Beide Konfigurationsbefehle erhalten jeweils die andere Einstellung und nutzen denselben globalen Lock.
+- Das Suffix wird nach `.zip` an alle neu erzeugten Result-Bundle-Namen angehängt, auch bei Fehler, Dry-Run, Watcher und explizitem Ausgabeziel. Der leere String erhält das bisherige Namensschema.
+- Result-`context.json` trägt den bei der Ausgabe verwendeten Wert als optionale, nicht zustandsbindende Metadaten für die Patch-Dateinamen externer Chats. Alte Bundles ohne Feld gelten als suffixlos; `patch.json` und das geschlossene `context --json`-Schema bleiben unverändert.
+- Ein zentraler reiner Helfer validiert portable Suffixe und fügt sie an. Temporäre Download-Endungen werden nicht als fertiges Suffix zugelassen. Ziel und Suffix werden vor Veröffentlichung revalidiert.
+- Inhaltsbasierte Erkennung akzeptiert alte und suffigierte ZIPs weiterhin ohne Umbenennen. CWD-Bindung, Replay-/Retry-Regeln, Watcher-Schutz, `mtime_ns`, vollständige Kennungen, Fingerprint und 10.800-Sekunden-Timeout bleiben unverändert.
+- README, CLI-Hilfe, Chat-Vertrag und Spezifikation dokumentieren Einrichtung, Abschalten, Migration und die Grenzen reiner Dateiumbenennung. Regressionen umfassen Konfiguration, atomare Persistenz, Suffix-Erkennung, automatische Resultate, manuellen Retry, Watcher und Änderungen während der Ausgabe.
 
 ### Post-release repository-scoped manual Apply – 2026-08-31
 

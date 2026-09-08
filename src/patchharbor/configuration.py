@@ -6,6 +6,7 @@ from dataclasses import dataclass
 import json
 from pathlib import Path
 
+from patchharbor.bundle_names import validate_bundle_suffix
 from patchharbor.errors import PatchHarborError, configuration_error
 from patchharbor.json_document import serialize_json_document
 from patchharbor.platform.errors import describe_os_error
@@ -22,13 +23,15 @@ from patchharbor.platform.paths import physically_canonicalize
 from patchharbor.user_paths import RegistrationUserPaths
 
 
-_FORMAT_VERSION = 1
-_CONFIGURATION_FIELDS = frozenset(
+_FORMAT_VERSION = 2
+_LEGACY_CONFIGURATION_FIELDS = frozenset(
     {
         "exchange_directory",
         "format_version",
     }
 )
+
+_CONFIGURATION_FIELDS = _LEGACY_CONFIGURATION_FIELDS | {"bundle_suffix"}
 
 
 @dataclass(frozen=True)
@@ -36,6 +39,10 @@ class UserConfiguration:
     """One loaded shared PatchHarbor configuration."""
 
     exchange_directory: Path
+    bundle_suffix: str = ""
+
+    def __post_init__(self) -> None:
+        validate_bundle_suffix(self.bundle_suffix)
 
 
 class _DuplicateJsonKey(ValueError):
@@ -133,7 +140,9 @@ def _canonical_exchange_directory(
     return canonical
 
 
-def _parse_configuration(content: bytes) -> UserConfiguration:
+def _parse_configuration(
+    content: bytes, *, validate_directory: bool = True,
+) -> UserConfiguration:
     if content.startswith(b"\xef\xbb\xbf"):
         raise _error("configuration must be UTF-8 without a BOM")
     try:
@@ -152,31 +161,44 @@ def _parse_configuration(content: bytes) -> UserConfiguration:
 
     if type(document) is not dict:
         raise _error("configuration must contain one JSON object")
-    if set(document) != _CONFIGURATION_FIELDS:
-        raise _error(
-            "configuration must contain exactly the two format-1 fields"
-        )
-
-    format_version = document["format_version"]
-    if type(format_version) is not int or format_version != _FORMAT_VERSION:
+    # Diagnose a missing version using the legacy closed-field contract.
+    # The exact field-set check below still rejects a missing version.
+    format_version = document.get("format_version", 1)
+    if type(format_version) is not int or format_version not in {1, _FORMAT_VERSION}:
         raise _error("configuration format_version is invalid")
+    expected_fields = (
+        _LEGACY_CONFIGURATION_FIELDS if format_version == 1 else _CONFIGURATION_FIELDS
+    )
+    if set(document) != expected_fields:
+        fields_description = "two format-1" if format_version == 1 else "three format-2"
+        raise _error(
+            f"configuration must contain exactly the {fields_description} fields"
+        )
+    try:
+        bundle_suffix = validate_bundle_suffix(document.get("bundle_suffix", ""))
+    except ValueError as exc:
+        raise _error(str(exc)) from exc
 
     exchange_directory = document["exchange_directory"]
     if type(exchange_directory) is not str:
         raise _error("configuration exchange_directory is invalid")
 
     return UserConfiguration(
-        exchange_directory=_canonical_exchange_directory(
-            Path(exchange_directory),
-            create=False,
-        )
+        exchange_directory=(
+            _canonical_exchange_directory(Path(exchange_directory), create=False)
+            if validate_directory
+            else _absolute_exchange_directory(Path(exchange_directory))
+        ),
+        bundle_suffix=bundle_suffix,
     )
 
 
 def load_configuration_if_present(
     paths: RegistrationUserPaths,
+    *,
+    validate_directory: bool = True,
 ) -> UserConfiguration | None:
-    """Load the shared configuration, treating only file absence as optional."""
+    """Load config; directory validation may be deferred for explicit output/repair."""
     if _configuration_file_kind(paths.configuration_path) is PathKind.MISSING:
         return None
 
@@ -192,7 +214,7 @@ def load_configuration_if_present(
             f"{describe_os_error(exc.cause)}"
         ) from exc
 
-    return _parse_configuration(content)
+    return _parse_configuration(content, validate_directory=validate_directory)
 
 
 def revalidate_exchange_directory(
@@ -213,6 +235,7 @@ def _encoded_configuration(configuration: UserConfiguration) -> bytes:
         {
             "exchange_directory": str(configuration.exchange_directory),
             "format_version": _FORMAT_VERSION,
+            "bundle_suffix": configuration.bundle_suffix,
         }
     ).encode("utf-8")
 
@@ -223,12 +246,13 @@ def prepare_exchange_directory(
 ) -> UserConfiguration:
     """Create and physically canonicalize an exchange directory for publication."""
     absolute_directory = _absolute_exchange_directory(requested_directory)
-    _configuration_file_kind(paths.configuration_path)
+    previous = load_configuration_if_present(paths, validate_directory=False)
     return UserConfiguration(
         exchange_directory=_canonical_exchange_directory(
             absolute_directory,
             create=True,
-        )
+        ),
+        bundle_suffix=previous.bundle_suffix if previous is not None else "",
     )
 
 
@@ -264,7 +288,7 @@ def write_exchange_directory(
 
 
 def load_configuration(paths: RegistrationUserPaths) -> UserConfiguration:
-    """Load one strictly validated and usable format-1 configuration."""
+    """Load one strictly validated and usable format-1 or format-2 configuration."""
     configuration = load_configuration_if_present(paths)
     if configuration is None:
         raise _error("configuration does not exist")

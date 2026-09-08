@@ -36,6 +36,8 @@ Die für diesen Vertrag relevanten öffentlichen Befehle sind:
 
 ```text
 patchharbor configure exchange-directory VERZEICHNIS
+patchharbor configure bundle-suffix .txt
+patchharbor configure bundle-suffix --clear
 patchharbor configure show
 patchharbor register [REPOSITORY]
 patchharbor registry list
@@ -232,6 +234,21 @@ dann `Patch`, UTC-Uhrzeit, Monat/Tag ohne Jahr und die ersten sechs Zeichen
 einer Paket-UUID ohne `…`. Für Result Bundles gilt exakt
 `<Repository>_Result_<HHMMSS>_<MMDD>_<ID6>.zip`; dessen ID6 stammt aus der
 vollständigen Run-ID.
+
+Hänge das optionale `bundle_suffix` aus der Result-`context.json` unverändert
+an den Basisdateinamen an: `.txt` ergibt beispielsweise
+`patch-harbor_Patch_181530_0908_abcdef.zip.txt`. Fehlendes Feld in älteren Bundles
+oder leerer String bedeutet kein Suffix. Maßgeblich sind diese Metadaten,
+nicht die Endung einer möglicherweise umbenannten Upload-Datei.
+
+Der Benutzer setzt es einmal per `patchharbor configure bundle-suffix .txt`,
+löscht es per `patchharbor configure bundle-suffix --clear` und erzeugt danach
+ein frisches Result Bundle. `apply` und `bundle` benötigen keinen Schalter.
+Der Core erzeugt Result Bundles; du benennst externe Patch-Pakete entsprechend.
+ZIP-Inhalt und State-Bindung bleiben unverändert. Füge `bundle_suffix` niemals
+in `patch.json` ein. Das geschlossene `context --json`-Schema bleibt unverändert;
+bei separater Kontextübergabe muss die Suffixpräferenz zusätzlich genannt werden.
+Ohne diese Information gilt kein Suffix.
 
 Das ZIP enthält genau eine Root-Datei `patch.json`. Für Format 1 sind dort
 exakt diese sieben Felder erlaubt:

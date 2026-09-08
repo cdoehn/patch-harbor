@@ -31,6 +31,7 @@ EXPECTED_RUNTIME_FILES = {
     "patchharbor/apply_preflight.py",
     "patchharbor/apply_repository.py",
     "patchharbor/bundle_paths.py",
+    "patchharbor/bundle_names.py",
     "patchharbor/bundles.py",
     "patchharbor/cli.py",
     "patchharbor/configuration.py",

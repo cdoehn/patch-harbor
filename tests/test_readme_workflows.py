@@ -68,7 +68,8 @@ def test_readme_is_canonical_and_documents_the_closed_global_configuration() -> 
     assert len(json_blocks) == 1
     assert json.loads(json_blocks[0]) == {
         "exchange_directory": "/absolute/path/to/exchange",
-        "format_version": 1,
+        "format_version": 2,
+        "bundle_suffix": "",
     }
 
 

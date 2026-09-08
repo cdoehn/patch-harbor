@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterator
 from contextlib import ExitStack, contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 import unicodedata
 from typing import TextIO
@@ -19,6 +19,7 @@ from patchharbor.apply_repository import (
     SafeResolvedRepository,
     safely_resolved_repository,
 )
+from patchharbor.bundle_names import validate_bundle_suffix
 from patchharbor.bundles import resolve_patch_bundle
 from patchharbor.configuration import (
     UserConfiguration,
@@ -171,6 +172,22 @@ def configure_exchange_directory(path: Path) -> tuple[Path, UserConfiguration]:
             paths.configuration_path,
             write_prepared_configuration(paths, configuration),
         )
+
+
+def configure_bundle_suffix(suffix: str) -> tuple[Path, UserConfiguration]:
+    """Update only the suffix, under the shared registry/configuration lock."""
+    try:
+        suffix = validate_bundle_suffix(suffix)
+    except ValueError as exc:
+        raise configuration_error(str(exc)) from exc
+    paths = configuration_user_paths()
+    with registry_lock(paths):
+        configuration = replace(load_configuration(paths), bundle_suffix=suffix)
+        registry = load_registry(paths)
+        _require_exchange_configuration_allowed(
+            configuration.exchange_directory, registry, exchange_must_exist=True,
+        )
+        return paths.configuration_path, write_prepared_configuration(paths, configuration)
 
 
 def shared_configuration() -> tuple[Path, UserConfiguration]:
