@@ -27,6 +27,12 @@ RELEASE_VERSION = "1.1.1"
 EXPECTED_RUNTIME_FILES = {
     "patchharbor/__init__.py",
     "patchharbor/application.py",
+    "patchharbor/archive_policy.py",
+    "patchharbor/archive_evidence.py",
+    "patchharbor/archive_git.py",
+    "patchharbor/archive_files.py",
+    "patchharbor/exchange_archive.py",
+    "patchharbor/platform/archive.py",
     "patchharbor/apply_mutation.py",
     "patchharbor/apply_preflight.py",
     "patchharbor/apply_repository.py",

@@ -68,8 +68,9 @@ def test_readme_is_canonical_and_documents_the_closed_global_configuration() -> 
     assert len(json_blocks) == 1
     assert json.loads(json_blocks[0]) == {
         "exchange_directory": "/absolute/path/to/exchange",
-        "format_version": 2,
+        "format_version": 3,
         "bundle_suffix": "",
+        "archive_directory": "PatchHarbor-Archive",
     }
 
 
@@ -152,7 +153,9 @@ def test_readme_covers_manual_overrides_termux_and_watcher_workflows() -> None:
     assert "No Termux-specific watcher support is claimed" in compact
     assert "patchharbor-watcher --configure" not in document
     assert "input-directory argument" in document
-    assert "does not move, rename, archive, or delete" in document
+    assert "with complete obsolescence proofs" in compact
+    assert "nothing is deleted" in compact
+    assert "unsupported safe rename leaves the source in place" in compact
     assert "A failed package can be retried by another deliberate manual" in compact
     assert "is not immediately repeated by the watcher" in compact
     assert "<Repository>_Patch_<HHMMSS>_<MMDD>_<ID6>.zip" in document
@@ -225,3 +228,36 @@ def test_watcher_help_explains_shared_config_systemd_and_termux_boundary() -> No
     assert "manual 'patchharbor apply' on Termux/Android" in help_text
     assert "--configure" not in help_text
     assert "INPUT_DIRECTORY" not in help_text
+
+
+def test_archive_documentation_matches_fail_safe_configuration_and_scope() -> None:
+    document = _readme()
+    compact = _compact(document)
+    for command in (
+        "patchharbor configure archive-dir PatchHarbor-Archive",
+        "patchharbor configure archive-dir .PatchHarbor-Archive",
+        "patchharbor configure archive-dir --clear",
+        'patchharbor configure archive-dir ""',
+    ):
+        assert command in document
+    for rule in (
+        "a timestamp, filename or mere successful exit is never enough",
+        "legacy records without a completion receipt",
+        "the watcher remains global",
+        "dry-run never archives",
+        "the archive is never scanned recursively",
+        "no copy-and-delete fallback",
+        "does not set a hidden attribute",
+    ):
+        assert rule in compact.lower()
+
+
+def test_spec_has_no_obsolete_blanket_archive_prohibition() -> None:
+    specification = (PROJECT_ROOT / "spec" / "SPECIFICATION.md").read_text(encoding="utf-8")
+    for obsolete in (
+        "keine Dateien im Exchange-Ordner archivieren",
+        "Er verschiebt, löscht, archiviert oder sortiert dort keine Datei",
+        "PatchHarbor verschiebt, löscht, archiviert oder sortiert Exchange-Dateien nicht",
+    ):
+        assert obsolete not in specification
+    assert "Nachweisbasierte Exchange-Archivierung" in specification

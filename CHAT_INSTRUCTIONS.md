@@ -38,6 +38,8 @@ Die für diesen Vertrag relevanten öffentlichen Befehle sind:
 patchharbor configure exchange-directory VERZEICHNIS
 patchharbor configure bundle-suffix .txt
 patchharbor configure bundle-suffix --clear
+patchharbor configure archive-dir PatchHarbor-Archive
+patchharbor configure archive-dir --clear
 patchharbor configure show
 patchharbor register [REPOSITORY]
 patchharbor registry list
@@ -63,6 +65,18 @@ der fehlgeschlagene Pakete nicht erneut pollt. Erfolgreiche Pakete bleiben in
 beiden Fällen Replay-geschützt. Ein expliziter `PATCH_ZIP` darf weiterhin über
 seine `repo_id` ein anderes registriertes Repository als das aktuelle auswählen.
 `fs run` ist der ältere explizite Runner.
+
+Der normale Exchange-Scan kann ausschließlich nachweislich überholte, vollständig
+geprüfte eigene Bundles in `PatchHarbor-Archive` direkt unter dem Exchange-Ordner
+verschieben. Ein leerer Archivname (`configure archive-dir --clear`) deaktiviert
+dies. Es werden keine Bundles gelöscht. Alter und Dateiname sind keine Beweise.
+Patch-Pakete benötigen einen erfolgreichen Replay-Beleg mit bestätigtem
+Abschlusscommit in der aktuellen Git-Historie; alte Belege ohne Abschlusscommit
+bleiben liegen. Result Bundles benötigen einen vollständig geprüften sauberen
+Erfolgssnapshot eines echten Vorfahren des aktuellen sauberen HEAD. Im Zweifel
+bleibt die Datei unverändert. Manueller Scope und globaler Watcher bleiben wie
+oben getrennt. Dry-Run archiviert nichts. Der explizit gewählte Patch bleibt vor
+seiner Ausführung unangetastet. Führe keine eigene pauschale Archivierung aus.
 
 PatchHarbor ist keine Sandbox und authentifiziert nicht den Ersteller eines
 Pakets. Es verwaltet außerdem keine fachlichen Tests, Git-Commits,
@@ -520,6 +534,8 @@ Verbindliche Regeln:
 - PromptBridge übernimmt Chat- und Dateitransport.
 - Ein weiterer Orchestrator kann oberhalb dieser Komponenten liegen.
 
-PatchHarbor selbst verschiebt, löscht, archiviert, sortiert oder benennt keine
-Datei im Exchange-Ordner um. Alte Patches, Result Bundles und sonstige Dateien
-dürfen dort nebeneinander liegen.
+PatchHarbor verschiebt ausschließlich nachweislich überholte eigene Bundles
+nach der konservativen Archivierungsregel aus Abschnitt 1. Es löscht keine
+Bundles und betreibt keine allgemeine Download-Verwaltung. Unklare, aktuelle
+und fremde Dateien bleiben im aktiven Exchange-Ordner. Die abschließende
+State-/Git-Prüfung vor jedem Verschieben bleibt auch bei optimierten Scans frisch.

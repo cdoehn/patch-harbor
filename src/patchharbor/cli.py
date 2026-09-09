@@ -13,6 +13,7 @@ from typing import Any, BinaryIO, TextIO
 from patchharbor import __version__
 from patchharbor.application import (
     bundle_repository,
+    configure_archive_directory,
     configure_bundle_suffix,
     configure_exchange_directory,
     register_repository,
@@ -157,12 +158,24 @@ def _build_parser() -> argparse.ArgumentParser:
     suffix_parser.add_argument(
         "--clear", action="store_true", help="disable the configured bundle suffix",
     )
+    archive_parser = configure_commands.add_parser(
+        "archive-dir",
+        help="set or disable the Exchange archive subfolder",
+        description=(
+            "Archive only provably obsolete bundles inside the Exchange directory. "
+            "Default: PatchHarbor-Archive. NAME must be one portable folder name, "
+            "not a path. An empty name or --clear disables archival. A leading "
+            "dot is accepted unchanged; no Windows Hidden attribute is set."
+        ),
+    )
+    archive_parser.add_argument("name", nargs="?", metavar="NAME")
+    archive_parser.add_argument("--clear", action="store_true", help="disable automatic archival")
     configure_commands.add_parser(
         "show",
         help="show the shared PatchHarbor configuration",
         description=(
             "Show the active config.json path and the canonical shared "
-            "Exchange directory and the bundle suffix (empty when disabled)."
+            "Exchange directory, bundle suffix and archive directory (empty when disabled)."
         ),
     )
 
@@ -464,11 +477,13 @@ def _write_configuration(
     exchange_directory: Path,
     *,
     bundle_suffix: str,
+    archive_directory: str,
     stdout: TextIO,
 ) -> None:
     print(f"configuration_path: {configuration_path}", file=stdout)
     print(f"exchange_directory: {exchange_directory}", file=stdout)
     print(f"bundle_suffix: {bundle_suffix}", file=stdout)
+    print(f"archive_directory: {archive_directory}", file=stdout)
 
 
 def _configure_exchange_directory_command(
@@ -489,6 +504,7 @@ def _configure_exchange_directory_command(
         configuration_path,
         configuration.exchange_directory,
         bundle_suffix=configuration.bundle_suffix,
+        archive_directory=configuration.archive_directory,
         stdout=stdout,
     )
     return 0
@@ -509,7 +525,24 @@ def _configure_bundle_suffix_command(
         configuration_path,
         configuration.exchange_directory,
         bundle_suffix=configuration.bundle_suffix,
+        archive_directory=configuration.archive_directory,
         stdout=stdout,
+    )
+    return 0
+
+
+def _configure_archive_directory_command(
+    name: str, *, stdout: TextIO, stderr: TextIO,
+) -> int:
+    try:
+        configuration_path, configuration = configure_archive_directory(name)
+    except PatchHarborError as exc:
+        print(format_tool_message(str(exc)), file=stderr)
+        return int(exc.exit_code)
+    _write_configuration(
+        configuration_path, configuration.exchange_directory,
+        bundle_suffix=configuration.bundle_suffix,
+        archive_directory=configuration.archive_directory, stdout=stdout,
     )
     return 0
 
@@ -529,6 +562,7 @@ def _configure_show_command(
         configuration_path,
         configuration.exchange_directory,
         bundle_suffix=configuration.bundle_suffix,
+        archive_directory=configuration.archive_directory,
         stdout=stdout,
     )
     return 0
@@ -1164,6 +1198,13 @@ def main(
             "" if args.clear else args.suffix,
             stdout=actual_stdout,
             stderr=actual_stderr,
+        )
+    if args.command == "configure" and args.configure_command == "archive-dir":
+        if (args.name is None) == (not args.clear):
+            print(format_tool_message("specify either an archive folder name or --clear"), file=actual_stderr)
+            return int(ExitCode.USAGE_ERROR)
+        return _configure_archive_directory_command(
+            "" if args.clear else args.name, stdout=actual_stdout, stderr=actual_stderr,
         )
     if args.command == "configure" and args.configure_command == "show":
         return _configure_show_command(

@@ -47,13 +47,14 @@ On Windows, it is:
 %APPDATA%\PatchHarbor\config.json
 ```
 
-Format 2 is a closed JSON schema with exactly these fields:
+Format 3 is a closed JSON schema with exactly these fields:
 
 ```json
 {
   "exchange_directory": "/absolute/path/to/exchange",
-  "format_version": 2,
-  "bundle_suffix": ""
+  "format_version": 3,
+  "bundle_suffix": "",
+  "archive_directory": "PatchHarbor-Archive"
 }
 ```
 
@@ -65,8 +66,71 @@ not equal, contain, or be inside any registered repository. `watcher.json` and
 
 The flat Exchange directory may contain patch packages, Result Bundles, old
 packages, and unrelated files together. PatchHarbor identifies content rather
-than relying on filenames, and it does not move, rename, archive, or delete
-Exchange files.
+than relying on filenames. Conservative automatic archival moves only bundles
+with complete obsolescence proofs into a direct child folder; nothing is deleted.
+Other downloads and unprovable bundles remain untouched.
+
+### Conservative automatic Exchange archival
+
+The default archive is **`PatchHarbor-Archive`**, directly inside the configured
+Exchange directory. It is created on demand during normal Apply discovery,
+Watcher scans, or manual bundle creation. No separate cleanup command is needed.
+Configure its single folder name through the existing configuration interface:
+
+```bash
+patchharbor configure archive-dir PatchHarbor-Archive
+patchharbor configure archive-dir .PatchHarbor-Archive
+patchharbor configure show
+```
+
+A leading dot uses normal Linux hidden-file semantics. On Windows it is simply
+part of the name; PatchHarbor does not set a Hidden attribute. Absolute paths,
+path separators, `.`/`..`, traversal and non-portable names are rejected. The
+name supports 1–128 ASCII letters, digits, dots, underscores and hyphens, but no
+trailing dot or Windows reserved device name. Disable all automatic archival
+with either of these equivalent settings (existing archive files are retained):
+
+```bash
+patchharbor configure archive-dir --clear
+patchharbor configure archive-dir ""
+```
+
+**A timestamp, filename or mere successful exit is never enough.** The existing
+replay state now records a full `completed_commit` only when a successful tracked
+Apply moves the repository to a new, clean descendant commit. A patch can be
+archived only if its exact path/content identity, full manifest binding and
+successful completion receipt agree, and the current clean repository still
+contains that commit in its original Git history. Explicit exchange packages
+also record this evidence, without changing explicit retry eligibility. Legacy
+records without a completion receipt remain conservatively unarchived.
+
+A Result Bundle can be archived only when it describes a successful, clean,
+completed run at a strict ancestor of the current clean HEAD. Its manifest,
+context and run log must agree; every snapshot blob hash, size and mode is
+checked against the complete actual Git tree, and unexpected contents are
+rejected. Current, dirty, failed, incomplete, contradictory or damaged results
+remain. Unknown repositories, shallow/grafted/replaced histories, Git failures
+and unavailable proofs always mean **keep the original file**.
+
+Manual parameterless Apply and bundle creation maintain only the current
+registered repository. Explicit Apply maintains the package's repository, but
+never archives the explicitly selected file before executing it. The Watcher
+remains global across registered repositories. Dry-run never archives. Only
+top-level files are considered; the archive is never scanned recursively.
+
+Directories are physically checked, pinned and revalidated; links/junctions
+cannot redirect the destination. Bundle bytes and repository evidence are
+rechecked immediately before a no-overwrite rename. Name collisions use a fresh
+unique destination name; existing files are never replaced. A failed or
+unsupported safe rename leaves the source in place (no copy-and-delete
+fallback). Retained replay receipts continue to prevent unintended reprocessing.
+
+Within one scan, validated candidates are grouped by repository and share one
+initial consistent state capture. Current results and patches without a usable
+completion receipt need no ancestry query. Each actual move still rehashes the
+file and captures the full repository state again, then checks fresh Git,
+registration, configuration and replay evidence. Nothing authorizing a move is
+cached across scans or reused in place of this final check.
 
 ### Optional bundle filename suffix
 
@@ -94,9 +158,11 @@ digits, dots, underscores or hyphens, must include a letter or digit, and must
 not contain `..` or end with a dot. Paths, whitespace, control characters and
 incomplete-download endings such as `.part`, `.tmp` or `.crdownload` are rejected.
 Set the Exchange directory before configuring the suffix. Changing either
-setting preserves the other. Reads accept existing closed Format-1 configuration
-files as an empty suffix without rewriting them; the next configuration write
-atomically migrates to Format 2. Older PatchHarbor versions cannot read Format 2.
+setting preserves the other and the archive setting. Reads accept existing closed
+Format-1 files as an empty suffix and Format-2 files with their existing suffix.
+Both use the default archive name without rewriting the file. The next
+configuration write atomically migrates to Format 3. Older versions cannot read
+Format-3 configuration or the new Format-3 replay state.
 
 Patch packages are created by the development chat, not by a new local command.
 The new Result Bundle's `context.json` carries `bundle_suffix` as optional
@@ -108,7 +174,7 @@ Do not put this field in `patch.json`: it is not part of repository binding.
 context therefore needs the naming preference supplied separately.
 
 The content stays ZIP, not text. Renaming alone does not guarantee that another
-application can read it. Existing files are never renamed. Old `.zip` and new
+application can read it. The suffix setting never renames existing files. Old `.zip` and new
 `.zip.txt` packages may coexist; selection, state binding, `mtime_ns`, manual
 retry and the Watcher guard remain content-based and unchanged. Result Bundles
 are never executed as patches, regardless of their filename.
@@ -328,6 +394,12 @@ process lifecycle as a reliable systemd service environment. Download the patch
 ZIP into the configured Exchange directory and run `patchharbor apply` manually;
 reusing the previous shell command is sufficient. No Termux-specific watcher
 support is claimed by PatchHarbor 1.1.1.
+
+Functional CLI test helpers have no default subprocess deadline; slow Git or
+shared storage must not turn a correct scan into an arbitrary 20-second failure.
+Explicitly requested lifecycle/timeout checks retain their bounds. Termux patch
+entrypoints run pytest without per-test or whole-suite deadlines. The product's
+10,800-second default entrypoint timeout is unchanged, as are CI/release bounds.
 
 ## Linux watcher
 

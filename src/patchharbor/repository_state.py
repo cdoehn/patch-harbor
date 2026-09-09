@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from contextlib import ExitStack
+from collections.abc import Iterator
+from contextlib import ExitStack, contextmanager
 from pathlib import Path
 
 from patchharbor.errors import PatchHarborError, repository_resolution_error
@@ -227,10 +228,11 @@ def _repository_path_for_id(
     return repository
 
 
-def capture_repository_context_for_id(
+@contextmanager
+def locked_repository_context_for_id(
     repo_id: RepositoryId,
-) -> RepositoryContext | None:
-    """Capture one registered ID under the normal registry/repository locks."""
+) -> Iterator[RepositoryContext | None]:
+    """Yield one stable ID context while its existing repository lock remains held."""
     paths = registration_user_paths()
     with ExitStack() as repository_scope:
         with registry_lock(paths):
@@ -239,7 +241,8 @@ def capture_repository_context_for_id(
                 repo_id,
             )
             if expected_repository is None:
-                return None
+                yield None
+                return
 
             repository = inspect_repository(expected_repository.value)
             if repository != expected_repository:
@@ -277,11 +280,19 @@ def capture_repository_context_for_id(
 
         snapshot = capture_consistent_repository_snapshot(inspected_repository)
 
-    return repository_context_from_snapshot(
-        inspected_repository,
-        locked_id,
-        snapshot,
-    )
+        yield repository_context_from_snapshot(
+            inspected_repository,
+            locked_id,
+            snapshot,
+        )
+
+
+def capture_repository_context_for_id(
+    repo_id: RepositoryId,
+) -> RepositoryContext | None:
+    """Capture one registered ID under the normal registry/repository locks."""
+    with locked_repository_context_for_id(repo_id) as context:
+        return context
 
 
 def capture_repository_context(path: Path) -> RepositoryContext:

@@ -106,7 +106,7 @@ PatchHarbor ist kein Testmanager, kein Commit-Manager, kein Build-System, kein C
 - keine vollständige Pakettransaktion oder automatische globale Rückabwicklung versprechen,
 - keine dauerhafte zentrale Loghistorie oder Logrotation verwalten,
 - keine beliebigen Diagnose-, Test- oder Build-Artefakte automatisch einsammeln,
-- keine Dateien im Exchange-Ordner archivieren, sortieren, umbenennen, verschieben oder löschen.
+- keine Dateien ohne vollständigen eigenen Entbehrlichkeitsnachweis archivieren oder beliebig sortieren und keine Bundles endgültig löschen.
 
 Ein vertrauenswürdiger, vom Chat erzeugter Entrypoint darf im Auftrag des Benutzers Projekttests und Git-Kommandos ausführen. PatchHarbor Core behandelt deren Output und Exit-Code jedoch nur als Entrypoint-Ergebnis und übernimmt weder fachliche Testbewertung noch Commit-Verwaltung.
 
@@ -143,7 +143,7 @@ Der Watcher besitzt keine eigene Eingangsordner-Konfiguration. Er verwendet dies
 
 Der Watcher implementiert keine eigene Repository-, Git-, Manifest-, Fingerprint-, Lock-, Ausführungs- oder Result-Bundle-Logik. Er darf Prüfungen des Core weder nachbauen noch umgehen.
 
-Der Watcher scannt den Exchange-Ordner nicht rekursiv. Er verschiebt, löscht, archiviert oder sortiert dort keine Datei. Result Bundles, alte Patches und sonstige Dateien dürfen dauerhaft neben neuen Patch-Paketen liegen; unveränderte Nichtkandidaten und bereits verarbeitete Dateien werden nicht fortlaufend neu delegiert.
+Der Watcher scannt den Exchange-Ordner nicht rekursiv und implementiert keine eigene Archivierungslogik. Sein globaler Core-Scan darf nach Abschnitt 16.2.1 nachweislich überholte Bundles in den konfigurierten Archiv-Unterordner verschieben. Sonstige Dateien und unklare Zustände bleiben liegen; unveränderte Nichtkandidaten und bereits verarbeitete Dateien werden nicht fortlaufend neu delegiert.
 
 ### 3.3 Repo Assist
 
@@ -249,24 +249,26 @@ Exchange-Dateistatus:      %LOCALAPPDATA%\PatchHarbor\exchange\
 Locks:                     %LOCALAPPDATA%\PatchHarbor\locks\
 ```
 
-Die allgemeine Benutzerkonfiguration besitzt in Formatversion 2 exakt dieses geschlossene Schema:
+Die allgemeine Benutzerkonfiguration besitzt in Formatversion 3 exakt dieses geschlossene Schema:
 
 ```json
 {
   "exchange_directory": "/absoluter/pfad/zum/austauschordner",
-  "format_version": 2,
-  "bundle_suffix": ""
+  "format_version": 3,
+  "bundle_suffix": "",
+  "archive_directory": "PatchHarbor-Archive"
 }
 ```
 
 Verbindliche Regeln:
 
 - unbekannte oder fehlende Felder werden abgelehnt,
-- `format_version` ist die Ganzzahl `2`,
+- `format_version` ist die Ganzzahl `3`,
 - `bundle_suffix` ist ein String; `""` deaktiviert das Suffix,
+- `archive_directory` ist ein einzelner portabler Ordnername innerhalb des Exchange-Ordners; Standard ist `PatchHarbor-Archive`, `""` deaktiviert die Archivierung vollständig,
 - ein gesetztes Suffix ist höchstens 32 ASCII-Zeichen lang, enthält nur Buchstaben, Ziffern, Punkte, Unterstriche und Bindestriche sowie mindestens einen Buchstaben oder eine Ziffer; `..`, abschließender Punkt, Pfade, Leerraum und Steuerzeichen sind unzulässig,
 - die Endungen `.crdownload`, `.download`, `.opdownload`, `.part`, `.partial` und `.tmp` sind ohne Beachtung der Groß-/Kleinschreibung unzulässig, damit fertige Bundles nicht als unvollständige Downloads ausgefiltert werden,
-- das bisherige geschlossene Format 1 mit ausschließlich `exchange_directory` und `format_version: 1` wird weiterhin gelesen und bedeutet ein leeres Suffix; Lesen schreibt nicht, der nächste Konfigurationsschreibvorgang migriert atomar nach Format 2,
+- die bisherigen geschlossenen Formate 1 und 2 bleiben lesbar; Format 1 bedeutet ein leeres Suffix, beide verwenden ohne zusätzlichen Schreibvorgang den Standard-Archivnamen; der nächste Konfigurationsschreibvorgang migriert atomar nach Format 3,
 - `exchange_directory` ist ein absoluter Pfad,
 - der Pfad wird vor Speicherung und vor jeder Verwendung physisch kanonisiert,
 - der Pfad muss ein echtes Verzeichnis sein; Symlinks, Junctions und Elternpfade werden auf ihr tatsächliches Ziel aufgelöst,
@@ -280,12 +282,14 @@ Die empfohlenen sicheren Benutzerbefehle lauten:
 patchharbor configure exchange-directory VERZEICHNIS
 patchharbor configure bundle-suffix .txt
 patchharbor configure bundle-suffix --clear
+patchharbor configure archive-dir PatchHarbor-Archive
+patchharbor configure archive-dir --clear
 patchharbor configure show
 ```
 
-`configure exchange-directory` legt das Zielverzeichnis bei Bedarf an, validiert es gegen die Registry und veröffentlicht anschließend die vollständige `config.json` atomar. Es erhält das bestehende Suffix auch bei Reparatur eines nicht mehr verfügbaren Exchange-Pfads. `configure bundle-suffix SUFFIX` setzt nur das Suffix, `configure bundle-suffix --clear` setzt es auf den leeren String; beide benötigen eine vorhandene gültige Exchange-Konfiguration und verwenden denselben globalen Registry-/Konfigurationslock. Fehlendes Argument oder gleichzeitiges Argument und `--clear` sind CLI-Fehler. `configure show` zeigt Konfigurationspfad, kanonischen Exchange-Ordner und `bundle_suffix`. Die Datei bleibt die alleinige persistente Quelle.
+`configure exchange-directory` legt das Zielverzeichnis bei Bedarf an, validiert es gegen die Registry und veröffentlicht anschließend die vollständige `config.json` atomar. Es erhält das bestehende Suffix auch bei Reparatur eines nicht mehr verfügbaren Exchange-Pfads. `configure bundle-suffix SUFFIX` setzt nur das Suffix, `configure bundle-suffix --clear` setzt es auf den leeren String; beide benötigen eine vorhandene gültige Exchange-Konfiguration und verwenden denselben globalen Registry-/Konfigurationslock. Fehlendes Argument oder gleichzeitiges Argument und `--clear` sind CLI-Fehler. `configure archive-dir NAME` setzt ausschließlich den Archivordnernamen, `--clear` oder ein leerer String deaktiviert die Archivierung. Absolute Pfade, Trennzeichen, Traversal, Leerraum, abschließende Punkte und reservierte Windows-Gerätenamen sind verboten; zulässig sind 1–128 ASCII-Buchstaben, Ziffern, Punkte, Unterstriche und Bindestriche. Ein führender Punkt bleibt erlaubt. Alle Setter erhalten die jeweils anderen Einstellungen. `configure show` zeigt Konfigurationspfad, kanonischen Exchange-Ordner, `bundle_suffix` und `archive_directory`. Die Datei bleibt die alleinige persistente Quelle.
 
-Das Suffix gilt benutzerspezifisch für alle neu erzeugten Bundles. Es wird ohne zusätzlichen Punkt unmittelbar hinter `.zip` angehängt. Weder `apply` noch `bundle` erhalten einen Suffix-Schalter. Bestehende Dateien werden nicht umbenannt. Inhalt und Paketformat bleiben ZIP; eine fremde Anwendung muss diese Inhalte trotzdem unterstützen. Ältere PatchHarbor-Versionen verstehen Format-2-Konfigurationen nicht.
+Das Suffix gilt benutzerspezifisch für alle neu erzeugten Bundles. Es wird ohne zusätzlichen Punkt unmittelbar hinter `.zip` angehängt. Weder `apply` noch `bundle` erhalten einen Suffix-Schalter. Die Suffix-Konfiguration benennt bestehende Dateien nicht um. Inhalt und Paketformat bleiben ZIP; eine fremde Anwendung muss diese Inhalte trotzdem unterstützen. Ältere PatchHarbor-Versionen verstehen Format-3-Konfigurationen und Format-3-Replay-State nicht.
 
 Der Exchange-Ordner ist benutzerspezifisch und nicht repositoryspezifisch. `patchharbor register` fragt ihn nicht ab. Die Befehle `register`, `registry`, `unregister`, `context` und `fs run` benötigen keine Exchange-Konfiguration.
 
@@ -1691,7 +1695,88 @@ Erfolgreiche Patch-Pakete sind gegen Replay geschützt. Ein fehlgeschlagener Pat
 
 Ein explizites `patchharbor apply PATCH_ZIP` übersteuert die parameterlose Auswahl. Es darf unabhängig vom aktuellen Arbeitsverzeichnis das über seine `repo_id` bestimmte registrierte Repository auflösen und behält sämtliche Paket-, State-, Pfad- und Revalidierungsprüfungen. Es ist kein öffentlicher `--retry-failed`-Schalter erforderlich, weil der normale parameterlose manuelle Aufruf bereits die bewusste Benutzeraktion darstellt. Ein Dry-Run verändert keinen Replay-Status.
 
-PatchHarbor verschiebt, löscht, archiviert, sortiert oder benennt die ausgewählte Datei nicht um. Wird unter demselben Pfad später anderer Inhalt abgelegt, entsteht wegen des neuen SHA-256 eine neue Dateidentität.
+Die explizit ausgewählte Datei wird vor ihrer Ausführung nicht archiviert. Die optionale vorgeschaltete Exchange-Archivierung darf ausschließlich nachgewiesen überholte Bundles aus dem jeweiligen Repository-Scope verschieben; sie löscht keine Bundles. Wird unter demselben Pfad später anderer Inhalt abgelegt, entsteht wegen des neuen SHA-256 eine neue Dateidentität.
+
+### 16.2.1 Nachweisbasierte Exchange-Archivierung
+
+Der Standardordner `PatchHarbor-Archive` ist ein direktes Kind des konfigurierten
+Exchange-Ordners und wird beim normalen Scan bei Bedarf angelegt. Es gibt keinen
+zweiten frei wählbaren Archivpfad. Ein führender Punkt im konfigurierten Namen
+verwendet normale Linux-Semantik; unter Windows wird kein Hidden-Attribut gesetzt.
+Ein leerer `archive_directory`-Wert deaktiviert die gesamte Wartung einschließlich
+Verzeichniserzeugung. Bereits archivierte Dateien bleiben erhalten.
+
+Die Archivierung ist rein nachweisbasiert. Alter, Dateiname, `mtime_ns`, `ctime`
+und eine bloße Zustandsabweichung sind keine Entbehrlichkeitsbeweise. Nur vollständig
+validierte PatchHarbor-Bundles mit eindeutiger registrierter Repository-ID dürfen
+betrachtet werden. Ein Fehler, eine fehlende Historie, inkonsistente Metadaten oder
+ein konkurrierender Zustandswechsel bedeutet immer: Datei unverändert liegen lassen.
+
+Der vorhandene Exchange-State wird auf Format 3 erweitert: Ein `succeeded`-Eintrag
+kann zusätzlich einen vollständigen `completed_commit` enthalten. Dieser wird nach
+dem tatsächlichen erfolgreichen Entrypoint unter dem Repository-Lock ermittelt,
+aber nur bei einem neuen, sauberen und nachgewiesen vom Base-Commit abstammenden
+HEAD gespeichert. Fehlt der Beweis, bleibt der Wert `null`; Erfolg allein ist kein
+Commit-Beleg. Alte Formate 1/2 bleiben lesbar, liefern keinen nachträglich erfundenen
+Abschlusscommit und migrieren erst beim Schreiben. Ein neuer Versuch löscht einen
+alten Abschlussbeleg. Es wird kein zweites Consumption-Journal angelegt.
+
+Für ein Patch-Paket müssen exakter Pfad und vollständiger SHA-256, validiertes
+Manifest und Replay-Eintrag übereinstimmen. Der Status muss `succeeded` sein,
+der Base-Commit ein echter Vorfahr des bestätigten Abschlusscommits und dieser
+Abschlusscommit gleich dem aktuellen sauberen HEAD oder dessen Vorfahr. Der
+Nachweis bezieht sich ausschließlich auf dieselbe registrierte Repository-Instanz.
+Auch explizite Pakete direkt im Exchange-Ordner können nach ihrer Ausführung einen
+solchen Eintrag erzeugen; die explizite Retry-Semantik bleibt unverändert.
+
+Für Result Bundles sind vollständige, geschlossene Manifest-/Kontext-/Run-Schemas,
+ein erfolgreicher abgeschlossener Lauf, konsistente vollständige Bindungen, leerer
+staged-/unstaged-Diff und keine untracked Dateien erforderlich. Alle enthaltenen
+Base-Dateien werden nach Größe, Git-Blob-Hash und Modus geprüft; die vollständige
+Inventarliste muss exakt dem tatsächlichen Git-Baum entsprechen. Unerwartete
+ZIP-Inhalte, widersprüchliche Begleitdaten oder fehlende Dateien verhindern eine
+Archivierung. Der gespeicherte Commit muss echter Vorfahr des aktuellen sauberen
+HEAD sein. Aktuelle, dirty, fehlgeschlagene oder unklare Result Bundles bleiben.
+
+Git-Prüfungen verwenden vollständige Objekt-IDs und unveränderte Originalhistorie;
+Shallow-Repositories, Grafts und Replacement-Refs werden konservativ abgelehnt.
+Fehlende Git-Objekte oder Git-Fehler erlauben niemals einen Fallback auf Vermutungen.
+
+Beim manuellen parameterlosen Apply und beim manuellen Bundle-Bau gilt der Scope
+des aktuellen registrierten Repositorys. Bei explizitem Apply gilt die Paket-ID,
+wobei die ausgewählte Datei von der Wartung ausgeschlossen ist. Der Watcher bleibt
+repositoryübergreifend. Dry-Run archiviert nichts. Der vorhandene flache Scan
+betrachtet den Archiv-Unterordner nicht rekursiv als aktive Paketquelle.
+
+Die Zielverzeichnisse werden physisch geprüft, gegen Symlinks/Junctions geschützt,
+mit Dateisystem-Handles gepinnt und unmittelbar vor Mutation revalidiert. Unter
+den vorhandenen Repository-/Registry-Locks werden Konfiguration, Zuordnung,
+aktueller Zustand und Consumption-Beleg erneut geprüft; nach dem letzten vollen
+Dateihash folgt eine weitere Prüfung. Belegte/beschädigte/beschäftigte Zustände
+bleiben unangetastet. Der Move nutzt ausschließlich No-Replace-Rename (Linux:
+`renameat2(RENAME_NOREPLACE)`, Windows: nicht überschreibendes Rename). Bei
+Namenskollisionen wird ein eindeutiger Alternativname verwendet. Ist eine sichere
+Operation nicht verfügbar oder schlägt sie fehl, bleibt die Quelle erhalten.
+Es gibt keinen Copy-/Unlink-Fallback, keine überschriebenen Zieldateien und keine
+endgültig gelöschten Bundles. Replay-Belege werden durch Archivierung nicht gelöscht.
+
+Die Wartung gruppiert vollständig validierte Kandidaten innerhalb eines Scans
+nach Repository-ID. Ein konsistenter Anfangssnapshot wird je Repository geteilt;
+rein negative Entscheidungen (aktuelles Result oder fehlender Abschlussbeleg)
+benötigen keine Historienabfrage. Vor **jedem** Verschieben wird nach dem letzten
+Datei-Hash unter den bestehenden Locks ein frischer vollständiger konsistenter
+Repository-Snapshot erfasst. Registrierung, Konfiguration, Replay-Beleg und
+Originalhistorie werden dabei erneut geprüft. Diese endgültige Freigabe darf
+weder aus dem Anfangssnapshot noch aus einem Cache übernommen werden. Es gibt
+keinen scanübergreifenden Cache für Archivierungsentscheidungen.
+
+Funktionale CLI-Testhelfer haben standardmäßig keine interne
+`subprocess.run`-Zeitgrenze. Ein expliziter Test einer Prozess-/Timeout-Semantik
+kann weiterhin eine Grenze angeben; solche Produkttests bleiben unverändert.
+Das Abschalten von pytest-timeout allein deaktiviert keine separate
+Subprozess-Zeitgrenze. Termux-Entrypoints verwenden weder künstliche Einzeltest-
+noch Gesamtsuite-Timeouts; Core-Standard 10.800 Sekunden und CI-/Release-Grenzen
+bleiben unverändert.
 
 ### 16.3 Sicher aufgelöstes Repository
 
@@ -2364,7 +2449,11 @@ Empfohlene Verantwortlichkeiten:
 - `run_log.py` – vollständiger Run-Log und strukturierter Run-Bericht,
 - `presentation.py` – Plain-Ausgabe, TUI, Farben und Rolling Buffer,
 - `identifier_presentation.py` – zentrale Sechs-Zeichen-Darstellung technischer Kennungen,
-- `exchange.py` und `exchange_state.py` – stabile Inhaltsklassifikation, Exchange-Dateiidentität und persistenter Replay-Status,
+- `exchange.py` und `exchange_state.py` – stabile Inhaltsklassifikation, Exchange-Dateiidentität und persistenter Replay-Status einschließlich optionalem Abschlusscommit,
+- `archive_policy.py` – reine Validierung des direkten Archivordnernamens,
+- `archive_evidence.py` und `archive_git.py` – passive Bundle-Validierung und lesende Originalhistorien-Beweise,
+- `exchange_archive.py` – konservative Wartung des von `application` bestimmten Repository-Scopes,
+- `archive_files.py` und `platform/archive.py` – Kollisionsnamen und gepinnte No-Replace-Dateioperationen,
 - `registry.py` – zentrale Repository-Registrierung,
 - `repository_state.py` – Base-Commit, kanonischer Fingerprint und Snapshot-Zustand,
 - `locks.py` – globale Registry-Sperre und exklusive Sperre pro Repository-ID,
@@ -2385,11 +2474,12 @@ Abhängigkeitsregeln:
 - `payload_files` schreibt Dateien, steuert aber keine Execution.
 - `patch_manifest` kennt weder Git noch Execution.
 - `registry` kennt weder TUI noch ZIP-Inhalte.
-- `configuration` verwaltet ausschließlich `config.json` einschließlich Format-1-Leser und Format-2-Schreiber und kennt weder Git-Zustand noch Execution.
+- `configuration` verwaltet ausschließlich `config.json` einschließlich Format-1/2-Leser und Format-3-Schreiber und kennt weder Git-Zustand noch Execution.
 - `bundle_names` enthält reine Validierung und Anfügen des Suffixes sowie die gemeinsame Erkennung temporärer Download-Namen; es liest keine Konfiguration und keine Dateien.
 - `platform.environment` erfasst ausschließlich freigegebene lokale Laufzeitfelder; `chat_instructions` lädt die installierte statische Vorlage und rendert passive Dokumentation. `bundle_handoff` modelliert und validiert optionale Patch-Begleitdaten; `result_bundle_handoff` komponiert Result-Begleitdaten. Keine dieser Schichten führt Chat-, Plan- oder Commit-Anweisungen aus.
 - `result_bundle_target` bindet das konfigurierte Suffix an das Ausgabeziel und revalidiert es; `result_bundle` übergibt denselben Wert als optionale Kontextmetadaten. Der Chat bleibt für die Benennung externer Patch-Pakete verantwortlich.
 - `exchange` klassifiziert flache Dateikandidaten und persistiert Dateidentitäten, führt aber keinen Entrypoint aus.
+- `archive_evidence` liest nur geprüfte Bundle-Bytes; `archive_git` prüft nur Git und bestehende Statusbelege. `exchange_archive` erhält den Scope von `application`, wählt keine auszuführenden Patches und importiert weder CLI noch Execution. `archive_files` kennt keine Git-Semantik; native Rename-/Handle-Details liegen ausschließlich unter `platform/`.
 - `repository_state` kennt weder TUI noch Watcher.
 - `locks` kennt keine Ausführungs- oder Bundle-Semantik.
 - `interpreters` kennt nur den kleinen Interpretervertrag.
@@ -2620,7 +2710,7 @@ Folgende Funktionen gehören nicht zu PatchHarbor 1.1.1:
 - dauerhafte Logverwaltung und Logrotation im Core,
 - automatisches Einsammeln beliebiger zusätzlicher Diagnoseartefakte,
 - Netzwerk-, Chat-, Upload- oder Downloadlogik im Core,
-- automatische Archivierung, Sortierung, Verschiebung oder Löschung von Exchange-Dateien,
+- unbelegte oder altersbasierte Archivierung und beliebige Sortierung von Exchange-Dateien sowie jede endgültige Bundle-Löschung,
 - automatische Migration früherer `watcher.json`- oder `paths.json`-Dateien,
 - Submodule im sicheren 1.1.1-Kontext und Result Bundle.
 
@@ -2926,7 +3016,7 @@ Ein Erfolg darf erst nach Prüfung von `run.json`, Git-Zustand und erwartetem Co
 - Primäres Auftragsergebnis und Result-Bundle-Ergebnis bleiben getrennt.
 - Result Bundles enthalten den vollständigen Base-Commit, staged und unstaged Patches, nicht ignorierte untracked Dateien, Kontext und Run-Logs, aber keine Git-Historie.
 - Result Bundles werden im endgültigen Ausgabeordner atomar veröffentlicht.
-- `config.json` ist die einzige Benutzerkonfiguration für `exchange_directory` und `bundle_suffix`; Format 1 bleibt lesbar, neue Schreibvorgänge verwenden Format 2.
+- `config.json` ist die einzige Benutzerkonfiguration für `exchange_directory`, `bundle_suffix` und `archive_directory`; Formate 1/2 bleiben lesbar, neue Schreibvorgänge verwenden Format 3.
 - Der Exchange-Ordner ist eine gemeinsame flache Übergabestelle für Patch-Pakete, Result Bundles und sonstige Dateien.
 - Exchange-Ordner und registrierte Repositorys dürfen sich in keiner Richtung überlappen.
 - `bundle` und Apply-Result-Bundles verwenden ohne explizites `--output-dir` den Exchange-Ordner.
@@ -2937,7 +3027,7 @@ Ein Erfolg darf erst nach Prüfung von `run.json`, Git-Zustand und erwartetem Co
 - Erfolgreiche Identitäten bleiben Replay-geschützt; fehlgeschlagene Identitäten sind nur für einen bewussten manuellen parameterlosen Retry erneut zulässig, nicht für den Watcher.
 - Patch- und Result-Dateinamen beginnen mit dem Repository-Namen, danach folgen `Patch` oder `Result`, UTC-Uhrzeit, Monat/Tag ohne Jahr und ID6.
 - Menschenlesbare technische Kennungen verwenden sechs Zeichen plus `…`; JSON, Manifeste, Logs, Persistenz und Sicherheitsvergleiche bleiben vollständig.
-- PatchHarbor verschiebt, löscht, archiviert oder sortiert Exchange-Dateien nicht; diese spätere Ablage gehört zu Repo Assist.
+- Die optionale Core-Archivierung verschiebt ausschließlich nachgewiesen überholte eigene Bundles in einen direkten Exchange-Unterordner; weder beliebige Ablageverwaltung noch endgültiges Löschen gehören dazu.
 - Der Watcher verwendet dieselbe `config.json`, Paketklassifikation und Dateidentität wie der Core.
 - Das aktuelle Result Bundle enthält frisch erzeugte `CHAT_INSTRUCTIONS.md` und `environment.json` zur Initialisierung eines neuen Entwicklungs-Chats.
 - Repository-Pfad und Exchange-Pfad dienen nur Kommandozeilenbeispielen; sie ersetzen niemals die Repository-Bindung.

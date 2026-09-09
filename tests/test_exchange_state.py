@@ -44,7 +44,7 @@ def _record(path: Path, character: str = "a") -> ExchangeStateRecord:
     )
 
 
-def test_classification_and_apply_lifecycle_are_persisted_in_closed_v2_state(
+def test_classification_and_apply_lifecycle_are_persisted_in_closed_v3_state(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -63,6 +63,7 @@ def test_classification_and_apply_lifecycle_are_persisted_in_closed_v2_state(
         "entries": [
             {
                 "apply_status": None,
+                "completed_commit": None,
                 "kind": "patch_package",
                 "manifest": {
                     "base_commit": "b" * 40,
@@ -74,7 +75,7 @@ def test_classification_and_apply_lifecycle_are_persisted_in_closed_v2_state(
                 "sha256": "a" * 64,
             }
         ],
-        "format_version": 2,
+        "format_version": 3,
     }
 
     verified: list[bool] = []
@@ -235,7 +236,7 @@ def test_legacy_attempt_flags_load_conservatively_and_migrate_on_next_write(
 
     merge_exchange_classifications(paths, (_record(patch, "e"),))
     migrated = json.loads(paths.exchange_state_path.read_text(encoding="utf-8"))
-    assert migrated["format_version"] == 2
+    assert migrated["format_version"] == 3
     statuses = {
         entry["sha256"]: entry["apply_status"]
         for entry in migrated["entries"]
@@ -343,7 +344,7 @@ def test_failed_atomic_attempt_publication_preserves_the_previous_state(
     (
         b"{}\n",
         b'{"entries":[],"entries":[],"format_version":1}\n',
-        b'{"entries":[],"format_version":3}\n',
+        b'{"entries":[],"format_version":4}\n',
         b'{"entries":[{}],"format_version":1}\n',
         b'{"entries":[{}],"format_version":2}\n',
     ),
@@ -372,3 +373,40 @@ def test_exchange_state_uses_the_platform_state_directory_and_lock_directory(
     assert paths.exchange_state_directory == paths.state_directory / "exchange"
     assert paths.exchange_state_path == paths.exchange_state_directory / "state.json"
     assert paths.exchange_state_lock_path == paths.lock_directory / "exchange.lock"
+
+
+def test_completion_receipt_is_full_persistent_and_cleared_on_explicit_retry(tmp_path, monkeypatch):
+    set_isolated_user_environment(monkeypatch, tmp_path / "user")
+    paths = registration_user_paths()
+    package = tmp_path / "patch.zip"
+    package.write_bytes(b"package")
+    record = _record(package)
+    merge_exchange_classifications(paths, (record,))
+    mark_exchange_apply_started(paths, record.identity, _selection(), verify_identity=lambda: None)
+    commit = GitObjectId("d" * 40, GitObjectFormat.SHA1)
+    mark_exchange_apply_finished(paths, record.identity, _selection(), ExchangeApplyStatus.SUCCEEDED,
+                                 completed_commit=commit)
+    assert load_exchange_state(paths).record_for(record.identity).completed_commit == commit
+    mark_exchange_apply_started(paths, record.identity, _selection(), verify_identity=lambda: None,
+                                explicitly_selected=True)
+    reread = load_exchange_state(paths).record_for(record.identity)
+    assert reread.apply_status is ExchangeApplyStatus.ATTEMPTED
+    assert reread.completed_commit is None
+
+
+@pytest.mark.parametrize("status,commit", [
+    (None, "d" * 40), ("attempted", "d" * 40), ("failed", "d" * 40),
+    ("succeeded", "b" * 40), ("succeeded", "d" * 64),
+    ("succeeded", "abcdef"), ("succeeded", True), ("succeeded", 123),
+])
+def test_inconsistent_completion_receipts_are_rejected(tmp_path, monkeypatch, status, commit):
+    set_isolated_user_environment(monkeypatch, tmp_path / "user")
+    paths = registration_user_paths()
+    package = tmp_path / "patch.zip"
+    package.write_bytes(b"package")
+    merge_exchange_classifications(paths, (_record(package),))
+    document = json.loads(paths.exchange_state_path.read_bytes())
+    document["entries"][0].update(apply_status=status, completed_commit=commit)
+    paths.exchange_state_path.write_text(json.dumps(document))
+    with pytest.raises(PatchHarborError):
+        load_exchange_state(paths)

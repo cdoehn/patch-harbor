@@ -12,6 +12,12 @@ WATCHER_PACKAGE_ROOT = PROJECT_ROOT / "src" / "patchharbor_watcher"
 EXPECTED_CORE_RUNTIME_FILES = {
     "__init__.py",
     "application.py",
+    "archive_policy.py",
+    "archive_evidence.py",
+    "archive_git.py",
+    "archive_files.py",
+    "exchange_archive.py",
+    "platform/archive.py",
     "apply_mutation.py",
     "apply_preflight.py",
     "apply_repository.py",

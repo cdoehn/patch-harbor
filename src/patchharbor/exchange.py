@@ -446,3 +446,13 @@ def require_exchange_identity_unchanged(
         raise patch_package_error(
             "selected exchange patch changed before repository mutation"
         )
+
+
+def read_exchange_artifact_content(artifact: ExchangeArtifact, *, directory: Path) -> bytes:
+    """Reopen the exact classified identity for stricter, non-discovery consumers."""
+    snapshot = _read_exchange_file(
+        artifact.path, directory=directory, resource_policy=DEFAULT_RESOURCE_POLICY,
+    )
+    if snapshot.identity != artifact.identity or snapshot.content is None:
+        raise ExchangeScanError("exchange artifact changed or exceeds the parsing limit")
+    return snapshot.content

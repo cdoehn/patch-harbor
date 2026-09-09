@@ -72,9 +72,13 @@ def run_cli(
     *arguments: str,
     environment_overrides: Mapping[str, str] | None = None,
     input_text: str | None = None,
-    timeout_seconds: float = 20,
+    timeout_seconds: float | None = None,
 ) -> subprocess.CompletedProcess[str]:
-    """Run the real CLI in text mode with stable test defaults."""
+    """Run the real CLI without an arbitrary functional-test deadline.
+
+    A caller testing timeout/lifecycle behavior may pass an explicit bound.
+    Disabling pytest-timeout alone does not disable subprocess.run's timeout.
+    """
     standard_input = (
         {"stdin": subprocess.DEVNULL}
         if input_text is None
@@ -98,9 +102,9 @@ def run_cli_bytes(
     *arguments: str,
     input_bytes: bytes,
     environment_overrides: Mapping[str, str] | None = None,
-    timeout_seconds: float = 20,
+    timeout_seconds: float | None = None,
 ) -> subprocess.CompletedProcess[bytes]:
-    """Run the real CLI with byte input for binary transport tests."""
+    """Run binary transport tests, unbounded unless explicitly requested."""
     return subprocess.run(
         [sys.executable, "-m", "patchharbor.cli", *arguments],
         cwd=cwd,
@@ -118,9 +122,9 @@ def run_patchharbor(
     cwd: Path,
     environment_overrides: Mapping[str, str] | None = None,
     arguments: tuple[str, ...] = (),
-    timeout_seconds: float = 20,
+    timeout_seconds: float | None = None,
 ) -> subprocess.CompletedProcess[str]:
-    """Run the public file-system command against one source path."""
+    """Run a functional file-system test, preserving any explicit deadline."""
     return run_cli(
         cwd,
         "fs",

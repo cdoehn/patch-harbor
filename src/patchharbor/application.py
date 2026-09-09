@@ -19,11 +19,15 @@ from patchharbor.apply_repository import (
     SafeResolvedRepository,
     safely_resolved_repository,
 )
+from patchharbor.archive_git import completed_commit_for_context
+from patchharbor.archive_policy import validate_archive_directory
+from patchharbor.exchange_archive import archive_exchange_artifacts
 from patchharbor.bundle_names import validate_bundle_suffix
 from patchharbor.bundles import resolve_patch_bundle
 from patchharbor.configuration import (
     UserConfiguration,
     load_configuration,
+    load_configuration_if_present,
     prepare_exchange_directory,
     resolve_exchange_directory_candidate,
     revalidate_exchange_directory,
@@ -67,6 +71,7 @@ from patchharbor.identifier_presentation import shorten_identifier
 from patchharbor.locks import registry_lock
 from patchharbor.models import (
     BundleScript,
+    GitObjectId,
     InputArtifact,
     RegistryListResult,
     RegistrySnapshot,
@@ -94,6 +99,8 @@ from patchharbor.registration import (
 )
 from patchharbor.registry import load_registry
 from patchharbor.repository_state import (
+    capture_consistent_repository_snapshot,
+    repository_context_from_snapshot,
     capture_repository_context,
     capture_repository_context_for_id,
     require_clean_repository,
@@ -190,6 +197,21 @@ def configure_bundle_suffix(suffix: str) -> tuple[Path, UserConfiguration]:
         return paths.configuration_path, write_prepared_configuration(paths, configuration)
 
 
+def configure_archive_directory(name: str) -> tuple[Path, UserConfiguration]:
+    """Persist one archive child name using the existing shared config workflow."""
+    try:
+        name = validate_archive_directory(name)
+    except ValueError as exc:
+        raise configuration_error(str(exc)) from exc
+    paths = configuration_user_paths()
+    with registry_lock(paths):
+        configuration = replace(load_configuration(paths), archive_directory=name)
+        _require_exchange_configuration_allowed(
+            configuration.exchange_directory, load_registry(paths), exchange_must_exist=True,
+        )
+        return paths.configuration_path, write_prepared_configuration(paths, configuration)
+
+
 def shared_configuration() -> tuple[Path, UserConfiguration]:
     """Return the currently persisted shared user configuration."""
     paths = configuration_user_paths()
@@ -235,6 +257,7 @@ class DiscoveredExchangePatch:
     paths: RegistrationUserPaths
     configuration: UserConfiguration
     retry_failed: bool = False
+    explicitly_selected: bool = False
 
     def __post_init__(self) -> None:
         if self.artifact.selection is None:
@@ -242,7 +265,7 @@ class DiscoveredExchangePatch:
         expected_status = (
             ExchangeApplyStatus.FAILED if self.retry_failed else None
         )
-        if self.artifact.apply_status is not expected_status:
+        if not self.explicitly_selected and self.artifact.apply_status is not expected_status:
             raise ValueError(
                 "discovered Exchange patch has an ineligible apply status"
             )
@@ -277,9 +300,10 @@ class DiscoveredExchangePatch:
             selection,
             verify_identity=verify_identity,
             retry_failed=self.retry_failed,
+            explicitly_selected=self.explicitly_selected,
         )
 
-    def publish_outcome(self, succeeded: bool) -> None:
+    def publish_outcome(self, succeeded: bool, completed_commit: GitObjectId | None = None) -> None:
         """Persist the known terminal result of this started automatic apply."""
         selection = self.artifact.selection
         if selection is None:
@@ -293,6 +317,7 @@ class DiscoveredExchangePatch:
                 if succeeded
                 else ExchangeApplyStatus.FAILED
             ),
+            completed_commit=completed_commit,
         )
 
 
@@ -400,6 +425,9 @@ def _context_for_exchange_candidate(
 
 def discover_exchange_patch(
     scope: ExchangeDiscoveryScope,
+    *,
+    archive: bool = True,
+    output: OutputTargets | None = None,
 ) -> DiscoveredExchangePatch:
     """Return the newest eligible package inside one selection scope."""
     paths = configuration_user_paths()
@@ -419,6 +447,15 @@ def discover_exchange_patch(
         )
     except ExchangeScanError as exc:
         raise configuration_error("cannot scan exchange directory") from exc
+
+    if archive:
+        maintenance = archive_exchange_artifacts(
+            artifacts, configuration=configuration, paths=paths,
+            repository_id=(scope.repository_context.repo_id if scope.repository_context else None),
+        )
+        artifacts = maintenance.remaining
+        if output is not None:
+            output.write_warnings(maintenance.warnings)
 
     matches: list[ExchangeArtifact] = []
     contexts: dict[RepositoryId, RepositoryContext | None] = {}
@@ -469,6 +506,64 @@ def discover_exchange_patch(
         configuration=configuration,
         retry_failed=(artifact.apply_status is ExchangeApplyStatus.FAILED),
     )
+
+
+def _maintain_explicit_exchange(
+    package: ValidatedPatchPackage, path: Path, *, output: OutputTargets | None,
+) -> DiscoveredExchangePatch | None:
+    """Maintain this explicit target's scope without ever archiving the chosen ZIP.
+
+    Track direct Exchange packages in the same lifecycle ledger, but an explicit
+    path remains a deliberate selection and bypasses automatic retry filtering.
+    No configuration/scan is required for packages outside Exchange.
+    """
+    try:
+        paths = configuration_user_paths()
+        configuration = load_configuration_if_present(paths)
+        if configuration is None:
+            return None
+        with registry_lock(paths):
+            _require_exchange_configuration_allowed(
+                configuration.exchange_directory, load_registry(paths), exchange_must_exist=True,
+            )
+        selected = path.resolve(strict=True)
+        artifacts = scan_exchange_directory(configuration.exchange_directory, paths=paths)
+        maintenance = archive_exchange_artifacts(
+            artifacts, configuration=configuration, paths=paths,
+            repository_id=package.manifest.repo_id, excluded_paths=frozenset({selected}),
+        )
+        if output is not None:
+            output.write_warnings(maintenance.warnings)
+        for artifact in maintenance.remaining:
+            if artifact.path == selected and artifact.selection == ExchangePatchSelection.from_manifest(package.manifest):
+                materialized = materialize_exchange_patch(artifact, directory=configuration.exchange_directory)
+                if materialized != package:
+                    return None
+                return DiscoveredExchangePatch(artifact, package, paths, configuration,
+                                               explicitly_selected=True)
+    except (PatchHarborError, ExchangeScanError, OSError, ValueError):
+        # Optional maintenance must not impose discovery on the explicit API.
+        pass
+    return None
+
+
+def _maintain_bundle_exchange(path: Path) -> None:
+    """Archive only this registered repository before creating a fresh bundle."""
+    try:
+        paths = configuration_user_paths()
+        configuration = load_configuration_if_present(paths)
+        if configuration is None or not configuration.archive_directory:
+            return
+        context = capture_repository_context(path)
+        with registry_lock(paths):
+            _require_exchange_configuration_allowed(
+                configuration.exchange_directory, load_registry(paths), exchange_must_exist=True,
+            )
+        artifacts = scan_exchange_directory(configuration.exchange_directory, paths=paths)
+        archive_exchange_artifacts(artifacts, configuration=configuration, paths=paths,
+                                   repository_id=context.repo_id)
+    except (PatchHarborError, ExchangeScanError, OSError, ValueError):
+        pass
 
 
 def _complete_apply_result_bundle(
@@ -651,7 +746,7 @@ def dry_run_patch_package(
 
 def _publish_attempt_outcome(
     mutation_gate: ApplyMutationGate,
-    publisher: Callable[[bool], None] | None,
+    publisher: Callable[[bool, GitObjectId | None], None] | None,
     *,
     succeeded: bool,
     execution_log: bytes | None = None,
@@ -661,7 +756,20 @@ def _publish_attempt_outcome(
     if publisher is None:
         return
     try:
-        publisher(succeeded)
+        completed_commit = None
+        if succeeded:
+            # This optional receipt must never turn execution success into a
+            # claim that a commit exists when state/history capture is unclear.
+            try:
+                resolved = mutation_gate.resolved
+                after = repository_context_from_snapshot(
+                    resolved.repository, resolved.repo_id,
+                    capture_consistent_repository_snapshot(resolved.repository),
+                )
+                completed_commit = completed_commit_for_context(resolved.context, after)
+            except (PatchHarborError, OSError, ValueError):
+                pass
+        publisher(succeeded, completed_commit)
     except PatchHarborError as error:
         report = _complete_mutation_result_bundle(
             mutation_gate,
@@ -675,7 +783,7 @@ def _publish_attempt_outcome(
 def _require_payload_mutation(
     mutation_gate: ApplyMutationGate,
     *,
-    publish_attempt_outcome: Callable[[bool], None] | None = None,
+    publish_attempt_outcome: Callable[[bool, GitObjectId | None], None] | None = None,
 ) -> None:
     """Complete a failed mutation as the primary apply result."""
     try:
@@ -711,7 +819,7 @@ def _complete_entrypoint_execution(
     mutation_gate: ApplyMutationGate,
     execution: ScriptExecutionResult,
     *,
-    publish_attempt_outcome: Callable[[bool], None] | None = None,
+    publish_attempt_outcome: Callable[[bool, GitObjectId | None], None] | None = None,
 ) -> RunReport:
     """Publish one execution result before unwinding the shared apply scope."""
     primary_outcome = ApplyPrimaryOutcome.from_execution_result(
@@ -747,7 +855,7 @@ def apply_patch_package(
     session: RunSession | None = None,
     presentation: DashboardPresentation | None = None,
     before_mutation: Callable[[], None] | None = None,
-    publish_attempt_outcome: Callable[[bool], None] | None = None,
+    publish_attempt_outcome: Callable[[bool, GitObjectId | None], None] | None = None,
 ) -> RunReport:
     """Write one validated package, run its private entrypoint, and bundle it."""
     actual_session = session or RunSession.start()
@@ -801,12 +909,14 @@ def run_apply_path(
                 if automatic
                 else _manual_exchange_discovery_scope(Path.cwd())
             )
-            discovered = discover_exchange_patch(scope)
+            discovered = discover_exchange_patch(scope, archive=not dry_run, output=output)
             selected_path = discovered.artifact.path
             package = discovered.package
         else:
             selected_path = path
             package = resolve_patch_package(selected_path)
+            if not dry_run:
+                discovered = _maintain_explicit_exchange(package, selected_path, output=output)
     except PatchHarborError as error:
         return unresolved_apply_report(
             session=actual_session,
@@ -906,6 +1016,7 @@ def bundle_repository(
     output_directory: Path | None = None,
 ) -> ManualResultBundle:
     """Create one manual Result Bundle for a registered repository."""
+    _maintain_bundle_exchange(path)
     return create_manual_result_bundle(
         path,
         output_directory=output_directory,

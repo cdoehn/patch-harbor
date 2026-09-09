@@ -6,6 +6,7 @@ from dataclasses import dataclass
 import json
 from pathlib import Path
 
+from patchharbor.archive_policy import DEFAULT_ARCHIVE_DIRECTORY, validate_archive_directory
 from patchharbor.bundle_names import validate_bundle_suffix
 from patchharbor.errors import PatchHarborError, configuration_error
 from patchharbor.json_document import serialize_json_document
@@ -23,7 +24,7 @@ from patchharbor.platform.paths import physically_canonicalize
 from patchharbor.user_paths import RegistrationUserPaths
 
 
-_FORMAT_VERSION = 2
+_FORMAT_VERSION = 3
 _LEGACY_CONFIGURATION_FIELDS = frozenset(
     {
         "exchange_directory",
@@ -31,7 +32,8 @@ _LEGACY_CONFIGURATION_FIELDS = frozenset(
     }
 )
 
-_CONFIGURATION_FIELDS = _LEGACY_CONFIGURATION_FIELDS | {"bundle_suffix"}
+_VERSION_2_FIELDS = _LEGACY_CONFIGURATION_FIELDS | {"bundle_suffix"}
+_CONFIGURATION_FIELDS = _VERSION_2_FIELDS | {"archive_directory"}
 
 
 @dataclass(frozen=True)
@@ -40,9 +42,11 @@ class UserConfiguration:
 
     exchange_directory: Path
     bundle_suffix: str = ""
+    archive_directory: str = DEFAULT_ARCHIVE_DIRECTORY
 
     def __post_init__(self) -> None:
         validate_bundle_suffix(self.bundle_suffix)
+        validate_archive_directory(self.archive_directory)
 
 
 class _DuplicateJsonKey(ValueError):
@@ -164,18 +168,23 @@ def _parse_configuration(
     # Diagnose a missing version using the legacy closed-field contract.
     # The exact field-set check below still rejects a missing version.
     format_version = document.get("format_version", 1)
-    if type(format_version) is not int or format_version not in {1, _FORMAT_VERSION}:
+    if type(format_version) is not int or format_version not in {1, 2, _FORMAT_VERSION}:
         raise _error("configuration format_version is invalid")
     expected_fields = (
-        _LEGACY_CONFIGURATION_FIELDS if format_version == 1 else _CONFIGURATION_FIELDS
+        {1: _LEGACY_CONFIGURATION_FIELDS, 2: _VERSION_2_FIELDS,
+         3: _CONFIGURATION_FIELDS}[format_version]
     )
     if set(document) != expected_fields:
-        fields_description = "two format-1" if format_version == 1 else "three format-2"
+        fields_description = {1: "two format-1", 2: "three format-2",
+                              3: "four format-3"}[format_version]
         raise _error(
             f"configuration must contain exactly the {fields_description} fields"
         )
     try:
         bundle_suffix = validate_bundle_suffix(document.get("bundle_suffix", ""))
+        archive_directory = validate_archive_directory(
+            document.get("archive_directory", DEFAULT_ARCHIVE_DIRECTORY)
+        )
     except ValueError as exc:
         raise _error(str(exc)) from exc
 
@@ -190,6 +199,7 @@ def _parse_configuration(
             else _absolute_exchange_directory(Path(exchange_directory))
         ),
         bundle_suffix=bundle_suffix,
+        archive_directory=archive_directory,
     )
 
 
@@ -236,6 +246,7 @@ def _encoded_configuration(configuration: UserConfiguration) -> bytes:
             "exchange_directory": str(configuration.exchange_directory),
             "format_version": _FORMAT_VERSION,
             "bundle_suffix": configuration.bundle_suffix,
+            "archive_directory": configuration.archive_directory,
         }
     ).encode("utf-8")
 
@@ -253,6 +264,8 @@ def prepare_exchange_directory(
             create=True,
         ),
         bundle_suffix=previous.bundle_suffix if previous is not None else "",
+        archive_directory=(previous.archive_directory if previous is not None
+                           else DEFAULT_ARCHIVE_DIRECTORY),
     )
 
 
@@ -288,7 +301,7 @@ def write_exchange_directory(
 
 
 def load_configuration(paths: RegistrationUserPaths) -> UserConfiguration:
-    """Load one strictly validated and usable format-1 or format-2 configuration."""
+    """Load one strictly validated and usable format-1, format-2 or format-3 configuration."""
     configuration = load_configuration_if_present(paths)
     if configuration is None:
         raise _error("configuration does not exist")

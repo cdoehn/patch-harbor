@@ -61,6 +61,8 @@ EXPECTED_COMMAND_BLOCK = "\n".join(
         "patchharbor configure exchange-directory VERZEICHNIS",
         "patchharbor configure bundle-suffix .txt",
         "patchharbor configure bundle-suffix --clear",
+        "patchharbor configure archive-dir PatchHarbor-Archive",
+        "patchharbor configure archive-dir --clear",
         "patchharbor configure show",
         "patchharbor register [REPOSITORY]",
         "patchharbor registry list",
@@ -183,6 +185,8 @@ def test_chat_public_commands_are_real_and_use_correct_optionality() -> None:
     valid_arguments = (
         ["configure", "exchange-directory", "exchange"],
         ["configure", "show"],
+        ["configure", "archive-dir", "PatchHarbor-Archive"],
+        ["configure", "archive-dir", "--clear"],
         ["register"],
         ["registry", "list"],
         ["unregister", "repository-or-id"],
@@ -426,3 +430,10 @@ def test_chat_contract_remains_documentation_not_runtime_orchestration() -> None
                 if term == "CHAT_INSTRUCTIONS.md" and path.name == "bundle_handoff.py":
                     continue  # Passive output file roles, not workflow execution.
                 assert term not in source, f"{term!r} leaked into {path}"
+
+
+def test_archive_contract_has_no_blanket_prohibition_conflicting_with_maintenance() -> None:
+    document = _text(CHAT_PATH)
+    assert "PatchHarbor selbst verschiebt, löscht, archiviert, sortiert oder benennt keine" not in document
+    assert "Es löscht keine\nBundles" in document
+    assert "State-/Git-Prüfung vor jedem Verschieben" in document

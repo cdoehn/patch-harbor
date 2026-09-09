@@ -54,7 +54,8 @@ def test_legacy_configuration_is_read_only_until_explicit_write(paths, tmp_path:
     assert paths.configuration_path.read_bytes() == original
     configure_bundle_suffix(".txt")
     assert json.loads(paths.configuration_path.read_bytes()) == {
-        "format_version": 2, "exchange_directory": str(exchange.resolve()), "bundle_suffix": ".txt",
+        "format_version": 3, "exchange_directory": str(exchange.resolve()), "bundle_suffix": ".txt",
+        "archive_directory": "PatchHarbor-Archive",
     }
     assert load_configuration(paths).bundle_suffix == ".txt"
     configure_bundle_suffix("")

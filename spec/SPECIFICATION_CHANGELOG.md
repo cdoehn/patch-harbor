@@ -1,7 +1,7 @@
 # PatchHarbor – Spezifikations-Changelog
 
 **Dateiname:** `SPECIFICATION_CHANGELOG.md`<br>
-**Stand:** 2026-09-08
+**Stand:** 2026-09-09
 
 Dieses Dokument protokolliert Änderungen am verbindlichen Produktziel. Es ist kein Git-Commit-Log und ersetzt nicht die getrennten Umsetzungspläne unter `planning/`.
 
@@ -10,6 +10,20 @@ Dieses Dokument protokolliert Änderungen am verbindlichen Produktziel. Es ist k
 ## [1.1.1] – 2026-08-28
 
 **Status:** Freigegeben und vollständig umgesetzt; der abgeschlossene Plan liegt unter `planning/1.1.1/commit-plan.md`.
+
+### Post-release nachweisbasierte Exchange-Archivierung – 2026-09-09
+
+- Korrektur des noch nicht erfolgreich angewendeten Archivierungs-Patches: gemeinsame funktionale CLI-Testhelfer ohne pauschalen 20-Sekunden-Subprozess-Timeout; ausdrücklich angeforderte Timeout-/Prozesstests bleiben erhalten.
+- Validierte Kandidaten teilen je Repository und Scan genau eine anfängliche konsistente Zustandserfassung. Doppelte Vorab-Revalidierung entfällt; jeder tatsächliche Move erhält nach dem letzten Datei-Hash weiterhin eine frische vollständige State-/Git-/Registry-/Konfigurations-/Replay-Prüfung. Aktuelle Resultate und fehlende Abschlussbelege werden ohne Historienabfrage behalten.
+- Zusätzliche Regressionen zählen Zustandsabfragen statt Laufzeiten und simulieren Änderungen nach dem Datei-Hash; keine veraltete Freigabe wird gecacht und kein fachlicher Drei-Stunden-Timeout geändert.
+
+- `configure archive-dir NAME` verwendet die bestehende Konfiguration; Standard `PatchHarbor-Archive`, leerer Wert/`--clear` deaktiviert. Direkter Exchange-Unterordner, führender Punkt erlaubt, keine Windows-Hidden-Logik.
+- Konfiguration Format 3 erhält Exchange-Pfad und Suffix; Formate 1/2 werden ohne Schreibzugriff mit sicherem Standard gelesen.
+- Der bestehende Replay-State Format 3 speichert nach erfolgreichem Vorwärts-Commit optional `completed_commit`; alte attempted/succeeded-Daten erhalten keine erfundenen Commit-Belege.
+- Nur exakt gebundene erfolgreiche Patches mit Abschlussbeleg und validierte saubere Result-Snapshots echter Git-Vorfahren werden archiviert. Fehlende/unklare Beweise, fremde oder beschädigte Dateien, Dirty-/Fehler-Bundles und unvollständige/ersetzte Historien bleiben liegen.
+- Manueller Repository-Scope, explizite Paketauswahl und globaler Watcher bleiben getrennt; Dry-Run archiviert nichts. Alter/Dateiname beeinflussen die Entbehrlichkeit nicht.
+- Gepinnte Verzeichnisse, wiederholte Hash-/State-Prüfung und No-Replace-Rename verhindern Zielumleitung und Überschreiben; Kollisionen erhalten eindeutige Namen, fehlgeschlagene Moves behalten die Quelle. Kein Löschen, keine rekursive Archivsuche.
+- Regressionen decken Migration, Konfiguration, echte Git-Nachweise, Replay/Retry, Repository-Trennung, manipulierte Bundles, Symlinks, Kollisionen und Fehlerpfade ab. Paketformat, Fingerprint, Bundle-Benennung und 10.800-Sekunden-Timeout bleiben unverändert.
 
 ### Post-release selbstbeschreibende Bundle-Übergabe – 2026-09-08
 

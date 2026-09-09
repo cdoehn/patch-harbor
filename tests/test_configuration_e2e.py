@@ -42,8 +42,9 @@ def test_configure_exchange_directory_and_show_use_the_same_file(
     assert exchange_directory.is_dir()
     assert json.loads(configuration_path.read_text(encoding="utf-8")) == {
         "exchange_directory": str(canonical_exchange),
-        "format_version": 2,
+        "format_version": 3,
         "bundle_suffix": "",
+        "archive_directory": "PatchHarbor-Archive",
     }
 
     shown = run_cli(

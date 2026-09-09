@@ -39,14 +39,15 @@ from patchharbor.user_paths import RegistrationUserPaths
 
 
 _LEGACY_FORMAT_VERSION = 1
-_FORMAT_VERSION = 2
+_FORMAT_VERSION = 3
 _DOCUMENT_FIELDS = frozenset({"entries", "format_version"})
 _LEGACY_ENTRY_FIELDS = frozenset(
     {"attempted", "kind", "manifest", "path", "sha256"}
 )
-_ENTRY_FIELDS = frozenset(
+_VERSION_2_ENTRY_FIELDS = frozenset(
     {"apply_status", "kind", "manifest", "path", "sha256"}
 )
+_ENTRY_FIELDS = _VERSION_2_ENTRY_FIELDS | {"completed_commit"}
 _MANIFEST_FIELDS = frozenset(
     {
         "base_commit",
@@ -128,6 +129,7 @@ class ExchangeStateRecord:
     kind: str
     manifest: ExchangePatchSelection | None
     apply_status: ExchangeApplyStatus | None = None
+    completed_commit: GitObjectId | None = None
 
     def __post_init__(self) -> None:
         if self.kind not in _ALLOWED_KINDS:
@@ -141,6 +143,14 @@ class ExchangeStateRecord:
             raise ValueError("only patch-package state may contain a manifest")
         if self.apply_status is not None and self.kind != "patch_package":
             raise ValueError("only patch-package state may have an apply status")
+
+        if self.completed_commit is not None and (
+            self.apply_status is not ExchangeApplyStatus.SUCCEEDED
+            or self.manifest is None
+            or self.completed_commit.object_format != self.manifest.base_commit.object_format
+            or self.completed_commit == self.manifest.base_commit
+        ):
+            raise ValueError("completion commit requires a successful changed-HEAD apply")
 
     @property
     def attempted(self) -> bool:
@@ -258,7 +268,7 @@ def _parse_record(value: object, *, format_version: int) -> ExchangeStateRecord:
     expected_fields = (
         _LEGACY_ENTRY_FIELDS
         if format_version == _LEGACY_FORMAT_VERSION
-        else _ENTRY_FIELDS
+        else _VERSION_2_ENTRY_FIELDS if format_version == 2 else _ENTRY_FIELDS
     )
     if type(value) is not dict or set(value) != expected_fields:
         raise ValueError("exchange state entry is invalid")
@@ -272,6 +282,8 @@ def _parse_record(value: object, *, format_version: int) -> ExchangeStateRecord:
         apply_status = ExchangeApplyStatus.ATTEMPTED if attempted else None
     else:
         apply_status = _parse_apply_status(value["apply_status"])
+    if value.get("completed_commit") is not None and type(value["completed_commit"]) is not str:
+        raise ValueError("exchange completed commit is invalid")
     path = Path(path_text)
     try:
         return ExchangeStateRecord(
@@ -279,6 +291,11 @@ def _parse_record(value: object, *, format_version: int) -> ExchangeStateRecord:
             kind=kind,
             manifest=_parse_selection(value["manifest"]),
             apply_status=apply_status,
+            completed_commit=(
+                GitObjectId(value["completed_commit"],
+                            GitObjectFormat.for_hex_length(len(value["completed_commit"])))
+                if type(value.get("completed_commit")) is str else None
+            ),
         )
     except ValueError as exc:
         raise ValueError("exchange state entry is invalid") from exc
@@ -304,6 +321,7 @@ def _parse_state(content: bytes) -> ExchangeStateSnapshot:
     format_version = document["format_version"]
     if type(format_version) is not int or format_version not in {
         _LEGACY_FORMAT_VERSION,
+        2,
         _FORMAT_VERSION,
     }:
         raise _error("exchange processing state format_version is invalid")
@@ -351,6 +369,8 @@ def _encoded_state(snapshot: ExchangeStateSnapshot) -> bytes:
                         if record.apply_status is not None
                         else None
                     ),
+                    "completed_commit": (str(record.completed_commit)
+                                         if record.completed_commit is not None else None),
                     "kind": record.kind,
                     "manifest": _selection_document(record.manifest),
                     "path": os.fspath(record.identity.path),
@@ -486,6 +506,7 @@ def mark_exchange_apply_started(
     *,
     verify_identity: Callable[[], None],
     retry_failed: bool = False,
+    explicitly_selected: bool = False,
 ) -> None:
     """Verify and atomically record a fresh or deliberate failed retry."""
     with _state_lock(paths):
@@ -504,10 +525,10 @@ def mark_exchange_apply_started(
             retry_failed
             and record.apply_status is ExchangeApplyStatus.FAILED
         )
-        if record.apply_status is not None and not retrying_failed:
+        if record.apply_status is not None and not retrying_failed and not explicitly_selected:
             raise _error("selected exchange patch was already attempted")
         next_records = tuple(
-            replace(candidate, apply_status=ExchangeApplyStatus.ATTEMPTED)
+            replace(candidate, apply_status=ExchangeApplyStatus.ATTEMPTED, completed_commit=None)
             if candidate.identity == identity
             else candidate
             for candidate in current.records
@@ -520,6 +541,8 @@ def mark_exchange_apply_finished(
     identity: ExchangeFileIdentity,
     selection: ExchangePatchSelection,
     status: ExchangeApplyStatus,
+    *,
+    completed_commit: GitObjectId | None = None,
 ) -> None:
     """Atomically record the known failed or successful primary apply result."""
     if status not in {
@@ -541,7 +564,7 @@ def mark_exchange_apply_finished(
         if record.apply_status is not ExchangeApplyStatus.ATTEMPTED:
             raise _error("selected exchange patch has no active attempt")
         next_records = tuple(
-            replace(candidate, apply_status=status)
+            replace(candidate, apply_status=status, completed_commit=completed_commit)
             if candidate.identity == identity
             else candidate
             for candidate in current.records

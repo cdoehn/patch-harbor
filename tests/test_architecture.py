@@ -496,3 +496,20 @@ def test_bundle_handoff_is_passive_output_not_chat_or_commit_orchestration() -> 
     assert "patchharbor.result_bundle_handoff" in graph["patchharbor.result_bundle"]
     for module in ("patchharbor.chat_instructions", "patchharbor.bundle_handoff"):
         assert "subprocess" not in _import_roots(_runtime_modules()[module])
+
+
+def test_archive_proofs_and_files_do_not_import_execution_or_cli() -> None:
+    modules = _runtime_modules()
+    prohibited = {"patchharbor.application", "patchharbor.cli",
+                  "patchharbor.execution", "patchharbor.presentation"}
+    for name in ("archive_policy", "archive_evidence", "archive_git",
+                 "archive_files", "exchange_archive", "platform.archive"):
+        dependencies = _project_imports(modules["patchharbor." + name])
+        assert not dependencies & prohibited
+    assert not _project_imports(modules["patchharbor.archive_policy"])
+    assert "patchharbor.git_commands" not in _project_imports(
+        modules["patchharbor.archive_files"]
+    )
+    assert "patchharbor.platform.archive" not in _project_imports(
+        modules["patchharbor.archive_evidence"]
+    )
