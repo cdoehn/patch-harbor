@@ -7,6 +7,7 @@ import zipfile
 
 import pytest
 
+from patchharbor.bundle_handoff import BundleHandoff
 from patchharbor.errors import ExitCode, PatchHarborError
 from patchharbor.models import GitObjectFormat, GitObjectId
 from patchharbor.result_bundle_snapshot import build_result_bundle_snapshot
@@ -88,6 +89,7 @@ def test_snapshot_bytes_drive_manifest_and_zip_in_canonical_order(
             bundle_file,
             manifest={},
             context_document={},
+        handoff=BundleHandoff(b"contract\n", b"{}\n"),
             run_report=successful_bundle_run_report(
                 tmp_path / "repository",
                 destination,

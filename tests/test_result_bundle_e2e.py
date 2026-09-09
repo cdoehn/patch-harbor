@@ -216,6 +216,8 @@ def test_manual_bundle_materializes_committed_blobs_without_export_rules(
         assert names == expected_base_names | {
             "manifest.json",
             "context.json",
+            "CHAT_INSTRUCTIONS.md",
+            "environment.json",
             "changes/staged.patch",
             "changes/unstaged.patch",
             "logs/run.json",
@@ -863,6 +865,8 @@ def test_manual_bundle_uses_physically_resolved_explicit_output_directory(
         assert {
             "manifest.json",
             "context.json",
+            "CHAT_INSTRUCTIONS.md",
+            "environment.json",
             "changes/staged.patch",
             "changes/unstaged.patch",
             "logs/run.json",

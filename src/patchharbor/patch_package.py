@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from patchharbor.bundle_paths import BundlePathError, normalize_bundle_path
+from patchharbor.bundle_handoff import BundleHandoff, split_patch_handoff
 from patchharbor.errors import ExitCode, PatchHarborError, patch_package_error
 from patchharbor.models import BundlePayload
 from patchharbor.patch_manifest import (
@@ -30,6 +31,7 @@ class ValidatedPatchPackage:
     entrypoint: BundlePayload
     payloads: tuple[BundlePayload, ...]
     warnings: tuple[str, ...] = ()
+    handoff: BundleHandoff | None = None
 
 
 def _unsafe_patch_zip(path: Path, detail: object) -> PatchHarborError:
@@ -59,6 +61,8 @@ def resolve_patch_payloads(
         )
 
     manifest = parse_patch_manifest(manifest_payload.content)
+    all_payloads = payloads
+    payloads, handoff = split_patch_handoff(payloads, manifest)
     try:
         entrypoint_path = normalize_bundle_path(manifest.entrypoint)
     except BundlePathError as exc:
@@ -81,7 +85,7 @@ def resolve_patch_payloads(
 
     payload_tuple = tuple(package_payloads)
     warnings = zip_payload_warnings(
-        (entrypoint, *payload_tuple),
+        tuple(payload for payload in all_payloads if payload is not manifest_payload),
         policy=resource_policy,
     )
     return ValidatedPatchPackage(
@@ -89,6 +93,7 @@ def resolve_patch_payloads(
         entrypoint=entrypoint,
         payloads=payload_tuple,
         warnings=warnings,
+        handoff=handoff,
     )
 
 

@@ -93,9 +93,8 @@ def test_readme_covers_all_repository_and_chat_initialization_cases() -> None:
     assert "patchharbor unregister REPOSITORY_OR_REPO_ID" in document
     assert "the version-matching `CHAT_INSTRUCTIONS.md`" in document
     assert "the newest Result Bundle produced by `patchharbor bundle`" in document
-    assert "Do not give the chat the local repository path or Exchange path" in (
-        document
-    )
+    assert "These paths are informational" in document
+    assert "no extra command or separate" in document
     assert "`logs/run.json`" in document
     assert "`logs/execution.log`" in document
     assert "including the context printed by `patchharbor register`" in document
@@ -109,9 +108,8 @@ def test_readme_covers_all_repository_and_chat_initialization_cases() -> None:
     )
 
     chat = CHAT_PATH.read_text(encoding="utf-8")
-    assert "Du benötigst weder den lokalen Repository-Pfad noch den lokalen\nExchange-Pfad" in (
-        chat
-    )
+    assert "Lokale Repository- und Exchange-Pfade" in chat
+    assert "niemals als Repository-Zuordnung" in chat
     assert "local repository path or Exchange path" in document
 
 

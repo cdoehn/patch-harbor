@@ -8,6 +8,7 @@ from uuid import UUID
 import pytest
 
 import patchharbor.result_bundle_publication as publication_module
+from patchharbor.bundle_handoff import BundleHandoff
 from patchharbor.errors import ExitCode, PatchHarborError
 from patchharbor.platform.filesystem import FileSystemOperationError
 from patchharbor.result_bundle_publication import (
@@ -42,6 +43,7 @@ def _publish(publication: ResultBundlePublication) -> None:
         publication,
         manifest={},
         context_document={},
+        handoff=BundleHandoff(b"contract\n", b"{}\n"),
         run_report=successful_bundle_run_report(
             final_path.parent / "repository",
             final_path,

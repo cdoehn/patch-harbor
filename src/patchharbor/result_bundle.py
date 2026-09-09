@@ -25,6 +25,7 @@ from patchharbor.models import (
 from patchharbor.patch_manifest import PatchManifest
 from patchharbor.registry import load_registry
 from patchharbor.repository import inspect_local_registration, inspect_repository_root
+from patchharbor.result_bundle_handoff import create_result_handoff
 from patchharbor.result_bundle_capture import capture_result_bundle
 from patchharbor.result_bundle_publication import (
     PublicationDurability,
@@ -355,6 +356,8 @@ def create_apply_result_bundle(
             primary_outcome=primary_outcome,
             result_bundle=ResultBundleResult.created(target.final_path),
         )
+        handoff = create_result_handoff(report, target)
+        revalidate_result_bundle_target(target, registry_snapshot, paths)
         _write_run_document(run_directory, report)
         publish_result_bundle(
             publication,
@@ -365,6 +368,7 @@ def create_apply_result_bundle(
             ),
             context_document=_context_document(report, bundle_suffix=target.bundle_suffix),
             run_report=report,
+            handoff=handoff,
             snapshot=captured.bundle_snapshot,
             execution_log=execution_log,
         )
@@ -482,6 +486,8 @@ def create_manual_result_bundle(
                 primary_result=PrimaryResult.success_result(),
                 result_bundle=ResultBundleResult.created(target.final_path),
             )
+            handoff = create_result_handoff(report, target)
+            revalidate_result_bundle_target(target, locked_registry, paths)
             _write_run_document(run_directory, report)
             publication = prepare_result_bundle_publication(
                 target.final_path,
@@ -495,6 +501,7 @@ def create_manual_result_bundle(
                 ),
                 context_document=_context_document(report, bundle_suffix=target.bundle_suffix),
                 run_report=report,
+                handoff=handoff,
                 snapshot=bundle_snapshot,
             )
     except PatchHarborError as exc:

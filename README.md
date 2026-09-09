@@ -21,6 +21,8 @@ pipx install patchharbor
 Use the `CHAT_INSTRUCTIONS.md` shipped with the same PatchHarbor version. In a
 source checkout or source distribution it is in the project root; an installed
 wheel also carries it under its shared `share/patchharbor/` data directory.
+Every new Result Bundle embeds a freshly rendered copy of that template plus
+local environment data. The original repository file is never overwritten.
 
 ## One-time user setup
 
@@ -179,15 +181,18 @@ instance identity.
 
 ## Initialize a new development chat
 
-Start a new chat with exactly these repository inputs:
+Upload the newest Result Bundle produced by `patchharbor bundle` and the
+development request. Ask the chat to read the root `CHAT_INSTRUCTIONS.md` and
+initialize itself from that bundle. It already contains the version-matching
+contract plus a fresh local-environment section; no extra command or separate
+instructions file is required. For old bundles without embedded instructions,
+provide the version-matching `CHAT_INSTRUCTIONS.md` separately.
 
-1. the version-matching `CHAT_INSTRUCTIONS.md`,
-2. the newest Result Bundle produced by `patchharbor bundle`,
-3. the development request or instruction to prepare the next plan commit.
-
-Do not give the chat the local repository path or Exchange path. It does not
-need either path: the Result Bundle supplies the repository identity and exact
-state, while local PatchHarbor resolves the registered path. The chat takes all
+The local repository path or Exchange path in `environment.json` helps the chat
+write commands for the development computer. These paths are informational,
+never repository selectors or additions to `patch.json`. The Result Bundle
+supplies the repository identity and exact state, while local PatchHarbor
+resolves the registered path. The chat takes all
 repository-binding identifiers from the bundle's complete `context.json`, never
 from shortened human-facing terminal output.
 
@@ -199,6 +204,56 @@ newly created Result Bundle back to the same chat. For a failed entrypoint or
 test run, that bundle contains the actual remaining repository state plus
 `logs/run.json` and, when execution started, `logs/execution.log`.
 
+## Self-contained bundle handoff
+
+Every Result Bundle contains freshly generated root `CHAT_INSTRUCTIONS.md` and
+`environment.json`, including manual `bundle`, Apply success, failure, Dry Run,
+Watcher results, and explicit `--output-dir` targets. Both documents are verified
+and published atomically with the snapshot and logs. No sidecar is written and
+no `chat-instructions` command is introduced. Existing bundles are not rewritten.
+
+`environment.json` uses marker `patch-harbor-environment`, format version 1. It
+includes the actual resolved repository name/path and full binding values, the
+configured Exchange path, the distinct actual output directory, bundle suffix,
+filename schemas and UTC convention, and an allowlisted runtime description:
+OS/distribution, kernel release, architecture, Python version/implementation,
+`uv` version, configured shell, and PatchHarbor version. A new capture is made
+for each publication; no prior bundle or target-project instructions are reused.
+
+Missing facts are `null`, not guesses. For example, a missing or unresponsive
+`uv --version` does not prevent a Result Bundle; its optional local probe is
+limited to two seconds. OS detection makes no network requests. The distribution
+identifies the running userland (such as Ubuntu inside Termux/proot); its kernel
+may belong to the host. The configured shell comes only from `SHELL`/`COMSPEC`
+and is not evidence of the currently active shell. Command examples are quoted
+for POSIX shells or PowerShell, explicitly labelled, and omitted when unknown.
+
+Only allowlisted fields are collected, not hostnames, IP addresses, user-name
+fields, hardware serial numbers, tokens or the complete environment. Required
+absolute paths may naturally contain a user name. Review bundles before sharing.
+An explicit output directory remains usable without valid configuration; then
+unavailable configuration is recorded as unknown rather than silently replaced
+by that output directory. `context.json`, `patch.json`, fingerprints and replay
+identities do not gain environment-dependent fields.
+
+External chat-generated Patch packages carry the same passive documents under
+`PATCHHARBOR_META/CHAT_INSTRUCTIONS.md` and `PATCHHARBOR_META/environment.json`.
+The root `CHAT_INSTRUCTIONS.md` remains available as a genuine repository payload
+when a documentation change requires it. The reserved metadata pair is validated
+and excluded from mutation and execution; it cannot be an entrypoint. Existing
+packages without it still work. Each metadata file is UTF-8 without BOM, at most
+128 KiB, with the ordinary ZIP safety/resource rules still enforced. Unknown or
+incomplete reserved entries and metadata bindings that differ from `patch.json`
+are rejected. This is passive documentation, not authentication or orchestration.
+
+The chat generates a fresh handoff for each Patch using the latest target
+machine's environment snapshot, retaining its capture time and unknown values,
+not probing the chat sandbox as if it were the development machine. PatchHarbor
+Core creates Result Bundles; it does not create chat patches or edit received
+packages. See the chat contract for the first-upgrade bootstrap rule for older
+runners. The installed shared template is required; if missing, publication
+fails cleanly instead of emitting an apparently self-contained incomplete bundle.
+
 ## Manual workflow
 
 Manual mode is the normal interactive workflow and the recommended mode on
@@ -207,7 +262,7 @@ Termux/Android.
 ```bash
 cd /path/to/registered-repository
 patchharbor bundle
-# Upload CHAT_INSTRUCTIONS.md and the new Result Bundle to the chat.
+# Upload the new Result Bundle; its chat instructions are already inside.
 # Save the chat's one returned patch ZIP in the configured Exchange directory.
 patchharbor apply --dry-run
 patchharbor apply

@@ -12,6 +12,7 @@ from typing import BinaryIO, Iterator
 from uuid import UUID
 import zipfile
 
+from patchharbor.bundle_handoff import BundleHandoff, CHAT_INSTRUCTIONS_NAME, ENVIRONMENT_NAME
 from patchharbor.errors import PatchHarborError, result_bundle_error
 from patchharbor.identifier_presentation import shorten_identifier
 from patchharbor.platform.filesystem import (
@@ -31,6 +32,8 @@ _REQUIRED_RESULT_BUNDLE_ENTRIES = frozenset(
     (
         "manifest.json",
         "context.json",
+        CHAT_INSTRUCTIONS_NAME,
+        ENVIRONMENT_NAME,
         "changes/staged.patch",
         "changes/unstaged.patch",
         "logs/run.json",
@@ -275,6 +278,7 @@ def publish_result_bundle(
     *,
     manifest: dict[str, object],
     context_document: dict[str, object],
+    handoff: BundleHandoff,
     run_report: RunReport,
     snapshot: ResultBundleSnapshot,
     execution_log: bytes | None = None,
@@ -296,6 +300,7 @@ def publish_result_bundle(
                 destination,
                 manifest=manifest,
                 context_document=context_document,
+                handoff=handoff,
                 run_report=run_report,
                 snapshot=snapshot,
                 execution_log=execution_log,

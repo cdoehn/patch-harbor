@@ -7,6 +7,7 @@ from pathlib import Path
 
 from patchharbor.bundle_names import append_bundle_suffix
 from patchharbor.configuration import (
+    UserConfiguration,
     load_configuration_if_present,
     load_configuration,
     revalidate_exchange_directory,
@@ -37,6 +38,7 @@ class ResultBundleTarget:
     final_path: Path
     uses_exchange_directory: bool
     bundle_suffix: str = ""
+    exchange_directory: Path | None = None
 
     def __post_init__(self) -> None:
         if self.final_path.parent != self.directory:
@@ -84,26 +86,31 @@ def _require_directory(path: Path) -> None:
         raise result_bundle_error("Result Bundle path is not a directory")
 
 
-def _explicit_output_suffix(paths: RegistrationUserPaths) -> str:
+def _explicit_output_configuration(paths: RegistrationUserPaths) -> UserConfiguration | None:
     """Keep explicit output usable without a usable Exchange configuration."""
     try:
         configuration = load_configuration_if_present(paths, validate_directory=False)
     except PatchHarborError:
         # Explicit output has historically remained a recovery path even when
         # config.json is malformed. Never guess or apply an invalid suffix.
-        return ""
-    return configuration.bundle_suffix if configuration is not None else ""
+        return None
+    return configuration
 
 
 def _requested_result_directory(
     requested_directory: Path | None,
     paths: RegistrationUserPaths,
-) -> tuple[Path, bool, str]:
+) -> tuple[Path, bool, str, Path | None]:
     if requested_directory is not None:
-        return requested_directory, False, _explicit_output_suffix(paths)
+        configuration = _explicit_output_configuration(paths)
+        return (
+            requested_directory, False,
+            configuration.bundle_suffix if configuration is not None else "",
+            configuration.exchange_directory if configuration is not None else None,
+        )
 
     configuration = revalidate_exchange_directory(load_configuration(paths))
-    return configuration.exchange_directory, True, configuration.bundle_suffix
+    return configuration.exchange_directory, True, configuration.bundle_suffix, configuration.exchange_directory
 
 
 def prepare_result_bundle_target(
@@ -114,7 +121,7 @@ def prepare_result_bundle_target(
     filename: str,
 ) -> ResultBundleTarget:
     """Resolve one explicit target or the configured shared Exchange target."""
-    directory_request, uses_exchange_directory, bundle_suffix = _requested_result_directory(
+    directory_request, uses_exchange_directory, bundle_suffix, exchange_directory = _requested_result_directory(
         requested_directory,
         paths,
     )
@@ -156,6 +163,7 @@ def prepare_result_bundle_target(
             final_path=directory / append_bundle_suffix(filename, bundle_suffix),
             uses_exchange_directory=uses_exchange_directory,
             bundle_suffix=bundle_suffix,
+            exchange_directory=exchange_directory,
         )
     except PatchHarborError:
         raise
@@ -197,9 +205,16 @@ def revalidate_result_bundle_target(
                 directory_must_exist=True,
             )
         else:
-            if _explicit_output_suffix(paths) != target.bundle_suffix:
+            configuration = _explicit_output_configuration(paths)
+            suffix = configuration.bundle_suffix if configuration is not None else ""
+            exchange = configuration.exchange_directory if configuration is not None else None
+            if suffix != target.bundle_suffix:
                 raise configuration_error(
                     "bundle suffix changed during Result Bundle preparation"
+                )
+            if exchange != target.exchange_directory:
+                raise configuration_error(
+                    "exchange directory changed during Result Bundle preparation"
                 )
             _require_outside_registered_repositories(
                 current,

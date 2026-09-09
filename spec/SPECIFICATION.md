@@ -27,7 +27,7 @@ Es übernimmt die in 1.1.0 implementierten Produktverträge vollständig und erg
 - die versionierte Datei `CHAT_INSTRUCTIONS.md` zur Initialisierung eines neuen Entwicklungs-Chats,
 - eine verbindliche schmale Chat-Oberfläche für `PLAN`, `FIX`, `OFF-PLAN`, `WARNING`, `STOP` und fertige Patch-Pakete.
 
-PatchHarbor 1.1.1 führt keine Netzwerk-, Chat-, Commit-Plan- oder Journalfunktion in den Core ein. `CHAT_INSTRUCTIONS.md` ist eine ausgelieferte Handlungsanweisung für einen externen Chat; der Exchange-Ordner ist eine lokale Dateisystemgrenze.
+PatchHarbor 1.1.1 führt keine Netzwerk-, Chat-, Commit-Plan- oder Journalfunktion in den Core ein. `CHAT_INSTRUCTIONS.md` ist eine ausgelieferte Vorlage für passive Bundle-Begleitdokumentation und einen externen Chat; der Exchange-Ordner ist eine lokale Dateisystemgrenze.
 
 Für nicht produktiv genutzte 1.1.0-Entwicklungsstände wird kein Migrationscode für `watcher.json`, `paths.json` oder andere frühere interne Pfaddokumente bereitgestellt. 1.1.1 verwendet ausschließlich den neuen Vertrag. Das ist eine bewusste Projektentscheidung und kein stiller Fallback.
 
@@ -2039,6 +2039,8 @@ Es gibt keinen reduzierten Standardmodus, der nur den Commit-Hash enthält.
 <Repository>_Result_<HHMMSS>_<MMDD>_<ID6>.zip
 ├── manifest.json
 ├── context.json
+├── CHAT_INSTRUCTIONS.md
+├── environment.json
 ├── base/
 │   └── ... alle regulären Dateien des aktuellen Base-Commits ...
 ├── changes/
@@ -2110,6 +2112,71 @@ verwendet ihn nicht für Fingerprint, Repository-Zuordnung oder Replay. Die
 vollständigen Bindungswerte, Result-Marker und Formatversion 1 bleiben erhalten.
 Die geschlossene CLI-Antwort von `context --json` bleibt unverändert; bei einer
 separaten Kontextübergabe muss die Dateinamenpräferenz zusätzlich genannt werden.
+
+### 19.6a Frische Chat-Anweisungen und Umgebungsdaten
+
+Jede neue Result-Bundle-Veröffentlichung enthält genau eine Root-Datei
+`CHAT_INSTRUCTIONS.md` und `environment.json`: manuelles Bundle, Apply-Erfolg,
+Fehler, Dry Run, Watcher und explizites Ausgabeziel. Sie werden gemeinsam mit
+Snapshot und Logs geschrieben, CRC-geprüft und atomar veröffentlicht. Kein
+zusätzlicher CLI-Befehl, keine Sidecar-Datei, kein nachträgliches Umschreiben
+alter Bundles. Der tatsächlich aufgelöste Repository-Kontext ist maßgeblich,
+nicht CWD eines Watchers oder eines explizit anders gerichteten Apply.
+
+Die statische Root-`CHAT_INSTRUCTIONS.md` des PatchHarbor-Quellprojekts bleibt
+fachliche Vorlage. Bei Installation wird genau diese Version aus dem bestehenden
+`share/patchharbor`-Datenartefakt geladen, bei Quellbetrieb nur relativ zum
+laufenden Core-Modul. Niemals eine gleichnamige Datei aus einem fremden
+Zielrepository oder vorherige dynamische Instructions verwenden. Die Vorlage
+wird bei jedem Bundle neu gelesen; keine lokale Datei wird dabei überschrieben.
+Fehlt sie, schlägt die Bundle-Publikation kontrolliert fehl; bestehende
+Primärergebnis-/Notfalldiagnostikregeln gelten unverändert.
+
+`environment.json` hat Marker `patch-harbor-environment`, `format_version: 1`
+und enthält `captured_at`, `bundle_type`, `bundle_filename`, volle `run_id`,
+`repository_name`, `repository_path`, vollständigen `repository_context`,
+`exchange_directory`, `output_directory`, `bundle_suffix`, `filename_schemas`,
+`filename_timezone: UTC` sowie `runtime`. Die Suffix- und Exchange-Angaben
+stammen aus derselben Zielvorbereitung wie der Dateiname und werden revalidiert.
+Ein explizites Ausgabeziel bleibt vom konfigurierten Exchange-Pfad getrennt;
+bei fehlender/defekter Konfiguration bleibt der bisherige Recovery-Pfad erhalten
+und unbekannte Angaben sind `null`. `context.json` und `context --json` bleiben
+hinsichtlich ihres bisherigen Vertrags unverändert.
+
+`runtime` enthält ausschließlich System, Distributions-ID/-Name/-Version,
+Kernel-Release, Architektur, Python-Version/-Implementierung, uv-Version,
+konfigurierte Shell mit Quelle und PatchHarbor-Version. Die Probe ist lokal,
+ohne Netzwerk, ohne Ausführen einer Shell und ohne vollständige Umgebungs- oder
+OS-Dateidumps. Eine optionale `uv --version`-Probe hat zwei Sekunden Timeout;
+Fehler/Fehlen erzeugen `null` statt eines Bundle-Fehlers. Diese Probe verändert
+nicht den 10.800-Sekunden-Entrypoint-Timeout. OS-Distribution bezeichnet das
+laufende Userland (beispielsweise Ubuntu in proot), Kernel gegebenenfalls den
+Host. `SHELL`/`COMSPEC` beschreibt nur die konfigurierte Präferenz.
+Hostnamen, IP-Adressen, separate Benutzernamen und Seriennummern werden nicht
+gesammelt; erforderliche absolute Pfade können einen Benutzernamen enthalten.
+
+Die erzeugte Anleitung enthält alle Umgebungswerte als abgegrenzte JSON-Daten,
+passend gequotete lokale POSIX-/PowerShell-Befehle und den vollständigen statischen
+Vertrag. Unbekannte Systeme oder unsicher darstellbare Pfade erhalten keine
+scheinbar ausführbaren Beispiele. Umgebungswerte sind niemals Sicherheitsinput,
+Anweisungen, Repository-Auswahl oder Teil des Fingerprints.
+
+Neue externe Patch-Pakete enthalten dieselben beiden Dokumente im reservierten
+Namensraum `PATCHHARBOR_META/`. Für jedes Paket rendert der Chat die statische
+Vorlage neu mit dem letzten Zielrechner-Snapshot; er erhält dessen Erfassungszeit,
+setzt Paketart und Dateiname passend und erfindet keine Zielrechnerdaten aus
+seiner eigenen Laufzeit. Der Core erzeugt keine Patch-Pakete. Alte Pakete ohne
+Metadatenpaar bleiben gültig; das geschlossene `patch.json` bleibt Format 1 mit
+sieben Feldern. Andere/incomplete reservierte Dateien, reservierte Entrypoints,
+BOM, Nicht-UTF-8, mehr als 128 KiB je Datei, ungültiges JSON, doppelte Schlüssel,
+Nicht-Objekte, nicht endliche Zahlen und von `patch.json` abweichende Bindungen
+werden abgelehnt. Normale ZIP-, Pfad- und Ressourcengrenzen gelten zusätzlich.
+Begleitdateien werden weder als Nutzdateien geschrieben noch als Code ausgeführt.
+Eine echte Root-`CHAT_INSTRUCTIONS.md` in einem Patch bleibt eine Nutzdatei.
+Beim erstmaligen Upgrade eines älteren Runners darf ein nachweislich
+kollisionsfreier zustandsgebundener Bootstrap-Patch ausschließlich seine beiden
+bytegeprüften, vom alten Runner noch als Nutzdateien materialisierten
+Metadateien vor Tests/Commit entfernen. Bestandsdateien sind dabei tabu.
 
 ### 19.7 `base/`
 
@@ -2320,6 +2387,7 @@ Abhängigkeitsregeln:
 - `registry` kennt weder TUI noch ZIP-Inhalte.
 - `configuration` verwaltet ausschließlich `config.json` einschließlich Format-1-Leser und Format-2-Schreiber und kennt weder Git-Zustand noch Execution.
 - `bundle_names` enthält reine Validierung und Anfügen des Suffixes sowie die gemeinsame Erkennung temporärer Download-Namen; es liest keine Konfiguration und keine Dateien.
+- `platform.environment` erfasst ausschließlich freigegebene lokale Laufzeitfelder; `chat_instructions` lädt die installierte statische Vorlage und rendert passive Dokumentation. `bundle_handoff` modelliert und validiert optionale Patch-Begleitdaten; `result_bundle_handoff` komponiert Result-Begleitdaten. Keine dieser Schichten führt Chat-, Plan- oder Commit-Anweisungen aus.
 - `result_bundle_target` bindet das konfigurierte Suffix an das Ausgabeziel und revalidiert es; `result_bundle` übergibt denselben Wert als optionale Kontextmetadaten. Der Chat bleibt für die Benennung externer Patch-Pakete verantwortlich.
 - `exchange` klassifiziert flache Dateikandidaten und persistiert Dateidentitäten, führt aber keinen Entrypoint aus.
 - `repository_state` kennt weder TUI noch Watcher.
@@ -2490,7 +2558,7 @@ Mindestens zusätzlich zu prüfen sind:
 - Watcher-Neustart führt nicht zur erneuten Verarbeitung unveränderter Dateien,
 - Watcher verarbeitet ein neu erzeugtes Result Bundle im Exchange-Ordner nicht,
 - `CHAT_INSTRUCTIONS.md` ist vorhanden, versionsgebunden und widerspruchsfrei zu Spezifikation, README und CLI,
-- Chat-Initialisierung verwendet `CHAT_INSTRUCTIONS.md` plus aktuelles Result Bundle und keine lokalen Pfade,
+- Chat-Initialisierung verwendet die frisch eingebettete `CHAT_INSTRUCTIONS.md` und `environment.json` im aktuellen Result Bundle; Pfade dienen nur lokalen Befehlen,
 - Plan- und Spezifikationssuche folgt der festgelegten Priorität und stoppt bei Mehrdeutigkeit,
 - `PLAN`, `FIX` und `OFF-PLAN` besitzen die festgelegte Kennungs- und Zählersemantik,
 - Fix-Kennungen verwenden `<PLAN-ID>-FIX<n>` und erhöhen den Plan-Zähler nicht,
@@ -2640,11 +2708,11 @@ Die ausgelieferte Root-Datei `CHAT_INSTRUCTIONS.md` ist die versionsgebundene Ha
 
 Ein neuer Chat erhält mindestens:
 
-1. `CHAT_INSTRUCTIONS.md`,
+1. die im Bundle frisch eingebettete `CHAT_INSTRUCTIONS.md` (bei alten Bundles separat),
 2. das aktuelle PatchHarbor Result Bundle der zu bearbeitenden registrierten Repository-Instanz,
 3. die konkrete Benutzeraufgabe oder die Anweisung, den nächsten Plan-Commit vorzubereiten.
 
-Der Chat benötigt und erfragt weder den lokalen Repository-Pfad noch den lokalen Exchange-Pfad. Er verwendet `repo_id`, Base-Commit und Fingerprint aus dem Result Bundle und übernimmt diese Werte unverändert in die Root-`patch.json` des erzeugten Patch-Pakets.
+Der Chat erhält lokale Repository- und Exchange-Pfade aus `environment.json` für passende Kommandozeilen auf dem Entwicklungsrechner. Diese Pfade dienen niemals der Repository-Zuordnung und gehören nicht in `patch.json`. Dafür verwendet er weiterhin ausschließlich `repo_id`, Base-Commit und Fingerprint aus dem Result Bundle unverändert.
 
 Der Chat darf nicht aus Gesprächserinnerung behaupten, den Repository-Zustand zu kennen, wenn kein aktuelles Result Bundle vorliegt. Reichen die hochgeladenen Daten nicht für einen sicheren Patch aus, verwendet er eine STOP-Ausgabe nach Abschnitt 26.7.
 
@@ -2871,8 +2939,8 @@ Ein Erfolg darf erst nach Prüfung von `run.json`, Git-Zustand und erwartetem Co
 - Menschenlesbare technische Kennungen verwenden sechs Zeichen plus `…`; JSON, Manifeste, Logs, Persistenz und Sicherheitsvergleiche bleiben vollständig.
 - PatchHarbor verschiebt, löscht, archiviert oder sortiert Exchange-Dateien nicht; diese spätere Ablage gehört zu Repo Assist.
 - Der Watcher verwendet dieselbe `config.json`, Paketklassifikation und Dateidentität wie der Core.
-- `CHAT_INSTRUCTIONS.md` plus aktuelles Result Bundle initialisieren einen neuen Entwicklungs-Chat.
-- Der Chat benötigt weder Repository-Pfad noch Exchange-Pfad.
+- Das aktuelle Result Bundle enthält frisch erzeugte `CHAT_INSTRUCTIONS.md` und `environment.json` zur Initialisierung eines neuen Entwicklungs-Chats.
+- Repository-Pfad und Exchange-Pfad dienen nur Kommandozeilenbeispielen; sie ersetzen niemals die Repository-Bindung.
 - Die Spezifikation ist der fachliche Vertrag; der Commit-Plan ist die geplante Zerlegung.
 - Der Chat prüft Plan, Spezifikation und realen Repository-Zustand gegeneinander und fragt bei blockierenden Widersprüchen nach.
 - `PLAN`, `FIX` und `OFF-PLAN` sind feste Commit-Arten; Fixes verwenden `<ID>-FIX<n>` und verändern den Plan-Zähler nicht.

@@ -109,7 +109,7 @@ def test_chat_contract_is_canonical_versioned_and_compact() -> None:
     assert not raw.startswith(b"\xef\xbb\xbf")
     assert b"\r" not in raw
     assert raw.endswith(b"\n")
-    assert len(raw) <= 20 * 1024
+    assert len(raw) <= 28 * 1024
     assert all(line.rstrip() == line for line in document.splitlines())
     assert (PROJECT_ROOT / ".gitattributes").read_text(encoding="utf-8") == (
         "/CHAT_INSTRUCTIONS.md text eol=lf\n"
@@ -404,10 +404,8 @@ def test_result_bundle_and_responsibility_boundaries_match_spec_and_readme() -> 
         readme
     )
     assert "Es verwaltet außerdem keine fachlichen Tests, Git-Commits" in chat
-    assert "Erfrage beide Pfade nicht" in chat
-    assert "Der Chat benötigt weder Repository-Pfad noch Exchange-Pfad" in (
-        specification
-    )
+    assert "Lokale Repository- und Exchange-Pfade" in chat
+    assert "Pfad und Exchange-Pfad dienen nur Kommandozeilenbeispielen" in specification
 
 
 def test_chat_contract_remains_documentation_not_runtime_orchestration() -> None:
@@ -425,4 +423,6 @@ def test_chat_contract_remains_documentation_not_runtime_orchestration() -> None
         for path in package_root.rglob("*.py"):
             source = path.read_text(encoding="utf-8")
             for term in forbidden_runtime_terms:
+                if term == "CHAT_INSTRUCTIONS.md" and path.name == "bundle_handoff.py":
+                    continue  # Passive output file roles, not workflow execution.
                 assert term not in source, f"{term!r} leaked into {path}"

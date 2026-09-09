@@ -476,3 +476,23 @@ def test_runtime_imports_only_standard_library_and_project_packages() -> None:
         "patchharbor_watcher",
     }
     assert imported_roots <= allowed
+
+
+def test_bundle_handoff_is_passive_output_not_chat_or_commit_orchestration() -> None:
+    graph = _dependency_graph()
+    for module in (
+        "patchharbor.bundle_handoff",
+        "patchharbor.chat_instructions",
+        "patchharbor.result_bundle_handoff",
+        "patchharbor.platform.environment",
+    ):
+        assert not _forbidden_dependencies(graph[module], {
+            "patchharbor.application", "patchharbor.execution", "patchharbor.apply_*",
+            "patchharbor.git_*", "patchharbor.registry", "patchharbor_watcher*",
+        })
+    assert "patchharbor.bundle_handoff" in graph["patchharbor.patch_package"]
+    assert "patchharbor.chat_instructions" not in graph["patchharbor.patch_package"]
+    assert "patchharbor.platform.environment" in graph["patchharbor.result_bundle_handoff"]
+    assert "patchharbor.result_bundle_handoff" in graph["patchharbor.result_bundle"]
+    for module in ("patchharbor.chat_instructions", "patchharbor.bundle_handoff"):
+        assert "subprocess" not in _import_roots(_runtime_modules()[module])

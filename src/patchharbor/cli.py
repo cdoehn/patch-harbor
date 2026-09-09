@@ -277,7 +277,7 @@ def _build_parser() -> argparse.ArgumentParser:
         epilog=(
             "Without --output-dir, publish in the configured Exchange "
             "directory. The configured bundle suffix is appended after .zip. "
-            "Result Bundles contain no Git history and may contain secrets."
+            "Result Bundles include fresh chat handoff and local environment data, contain no Git history and may contain secrets."
         ),
     )
     bundle_parser.add_argument(

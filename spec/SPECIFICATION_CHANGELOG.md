@@ -11,6 +11,15 @@ Dieses Dokument protokolliert Änderungen am verbindlichen Produktziel. Es ist k
 
 **Status:** Freigegeben und vollständig umgesetzt; der abgeschlossene Plan liegt unter `planning/1.1.1/commit-plan.md`.
 
+### Post-release selbstbeschreibende Bundle-Übergabe – 2026-09-08
+
+- Jede Result-Bundle-Erzeugung rendert frisch die installierte statische Chat-Vorlage plus konkrete lokale Daten; `CHAT_INSTRUCTIONS.md` und `environment.json` werden atomar mitveröffentlicht, ohne Zusatzbefehl oder Sidecar.
+- Repository-Pfad, konfigurierter Exchange-Pfad, tatsächliches Ausgabeziel, Suffix, Namensschema und vollständige Bindungswerte sind konsistent; Pfade bleiben reine Hilfen für lokale Befehle und niemals Sicherheitsbindung.
+- Allowlist für Distribution, Kernel, Architektur, Python, uv, konfigurierte Shell und PatchHarbor-Version; fehlende optionale Daten sind `null`, uv-Probe begrenzt. Keine Netzwerkabfragen, Hostnamen, IPs oder Umgebungsdumps.
+- Die statische Vorlage bleibt fachliche Quelle und wird bei installiertem Betrieb aus dem versionierten Datenartefakt geladen. Keine Zielrepository-Datei überschreibt den Vertrag, keine zurückgelieferten Instructions werden ausgeführt.
+- Externe Patch-Pakete enthalten ein optionales, strikt geprüftes `PATCHHARBOR_META`-Paar, getrennt von Nutzdateien/Entrypoint; bestehende Pakete und `patch.json` bleiben kompatibel. Bootstrap-Regel für den ersten älteren Runner dokumentiert.
+- Regressionen decken alle Result-Pfade, frische Konfiguration, Fremdrepository/Watcher, fehlende Systemdaten, Metadaten-Isolation, Paketierung, unveränderte Bindung und atomare Fehlerbehandlung ab.
+
 ### Post-release konfigurierbares Bundle-Suffix – 2026-09-08
 
 - `configure bundle-suffix SUFFIX` und `configure bundle-suffix --clear` ergänzen die bestehende Configure-CLI; `configure show` zeigt den Wert.

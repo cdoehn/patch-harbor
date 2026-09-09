@@ -6,6 +6,7 @@ import stat
 import zipfile
 from typing import BinaryIO
 
+from patchharbor.bundle_handoff import BundleHandoff, CHAT_INSTRUCTIONS_NAME, ENVIRONMENT_NAME
 from patchharbor.errors import result_bundle_error
 from patchharbor.json_document import serialize_json_document
 from patchharbor.result_bundle_snapshot import ResultBundleSnapshot
@@ -39,6 +40,7 @@ def write_result_bundle(
     *,
     manifest: dict[str, object],
     context_document: dict[str, object],
+    handoff: BundleHandoff,
     run_report: RunReport,
     snapshot: ResultBundleSnapshot,
     execution_log: bytes | None = None,
@@ -65,6 +67,8 @@ def write_result_bundle(
                     name,
                     serialize_json_document(document).encode("utf-8"),
                 )
+            for name, content in handoff.entries():
+                _write_entry(archive, name, content)
             if execution_log is not None:
                 _write_entry(
                     archive,

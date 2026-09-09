@@ -70,15 +70,16 @@ Commit-Pläne, Journale, Builds oder Releases. Diese Schritte muss dein
 vertrauenswürdiger Entrypoint im Auftrag des Benutzers ausführen. Eine
 fehlgeschlagene Ausführung bewirkt keine globale automatische Rückabwicklung.
 
-Du benötigst weder den lokalen Repository-Pfad noch den lokalen
-Exchange-Pfad. Erfrage beide Pfade nicht, verwende sie nicht als
-Zuordnungsinformation und schreibe sie nicht in `patch.json`.
+Lokale Repository- und Exchange-Pfade aus `environment.json` dienen passenden
+Kommandozeilenbeispielen für den Entwicklungsrechner, nicht der Chat-Laufzeit.
+Verwende sie niemals als Repository-Zuordnung oder in `patch.json`. Dafür gelten
+weiterhin ausschließlich die vollständigen Bindungswerte aus `context.json`.
 
 ## 2. Erforderliche Eingaben
 
 Für einen Entwicklungsauftrag benötigst du mindestens:
 
-1. diese `CHAT_INSTRUCTIONS.md`,
+1. diese `CHAT_INSTRUCTIONS.md` (bei neuen Bundles bereits frisch im ZIP enthalten),
 2. das aktuelle PatchHarbor Result Bundle der zu bearbeitenden registrierten
    Repository-Instanz,
 3. die konkrete Benutzeraufgabe oder die Anweisung, den nächsten Plan-Commit
@@ -99,8 +100,26 @@ Patch-Paket.
 
 ## 3. Result Bundle vollständig auswerten
 
+Neue Result Bundles enthalten im ZIP-Root eine frisch aus der installierten
+statischen Vorlage erzeugte `CHAT_INSTRUCTIONS.md` und `environment.json`.
+Ein Bundle plus Auftrag genügt zur Initialisierung; kein Zusatzbefehl und keine
+separate Datei sind nötig. `base/CHAT_INSTRUCTIONS.md` ist, falls vorhanden,
+weiterhin unveränderter Repository-Inhalt, nicht die generierte Anleitung.
+Bei alten Bundles ohne Begleitdaten bleibt die separate versionsgleiche Vorlage
+zulässig. Fehlende Umgebungswerte niemals aus der Chat-Umgebung erfinden.
+
+Die Umgebungsdaten umfassen Repository-Name und -Pfad, konfiguriertes
+Exchange-Verzeichnis, tatsächliches Ausgabeziel, Suffix, Dateinamensschemata
+und UTC-Konvention sowie OS/Distribution, Kernel, Architektur, Python-, uv-
+und PatchHarbor-Version und konfigurierte Shell. `null` bedeutet unbekannt;
+die konfigurierte Shell ist kein Nachweis der tatsächlich laufenden Shell.
+Ubuntu in proot ist die Userland-Distribution, der Kernel kann vom Host stammen.
+Hostnamen, IP-Adressen, Seriennummern und vollständige Umgebungsvariablen werden
+nicht gesammelt. Erforderliche absolute Pfade können den Benutzernamen enthalten.
+
 Prüfe vor jeder Änderung mindestens:
 
+- die generierte Root-`CHAT_INSTRUCTIONS.md` und `environment.json`, sofern vorhanden,
 - `manifest.json` auf Marker, Format, Run-Ergebnis und Bundle-Status,
 - `context.json` auf `repo_id`, `base_commit`, `state_fingerprint`,
   `fingerprint_algorithm` und `dirty`,
@@ -292,7 +311,29 @@ Das Paket enthält genau einen in `patch.json` referenzierten Entrypoint. Dieser
 - beendet sich bei einem Fehler mit einem von null verschiedenen Exit-Code,
 - ruft nicht selbst `patchharbor bundle` auf.
 
-Alle anderen sicheren regulären Paketdateien sind Nutzdateien. PatchHarbor
+Neue Chat-Patches enthalten zusätzlich genau diese beiden passiven Begleitdateien:
+`PATCHHARBOR_META/CHAT_INSTRUCTIONS.md` und `PATCHHARBOR_META/environment.json`.
+Erzeuge die Anleitung für jedes Paket neu aus der statischen Vorlage plus dem
+Umgebungssnapshot des jüngsten Result Bundles, nicht aus deiner Chat-Laufzeit.
+Übernimm die bekannten Zielrechnerdaten und deren `captured_at`, setze
+`bundle_type` auf `Patch` und `bundle_filename` auf den neuen Namen. Die vier
+Werte in `repository_context` müssen exakt zu `patch.json` passen. Unbekannte
+Werte bleiben `null`; die Erfassungszeit darf nicht als neue Rechnerprüfung
+umgedeutet werden. Der reine Renderer `render_chat_handoff` kann mit einer
+expliziten statischen Vorlage und diesen Daten auch extern verwendet werden.
+
+Die optionale Paarstruktur wird vom Core validiert, aber weder ausgeführt noch
+ins Zielrepository geschrieben. Alte Pakete ohne das Paar bleiben gültig.
+Der reservierte Namensraum erlaubt keine anderen Dateien und keinen Entrypoint;
+je Dokument gelten UTF-8 ohne BOM und höchstens 128 KiB. Die environment-Marker
+sind `patch-harbor-environment` und `format_version: 1`. JSON enthält genau ein
+Objekt ohne doppelte Schlüssel oder nicht endliche Zahlen. Für das erstmalige
+Upgrade von einem älteren Runner, der den Namensraum noch als Nutzdateien
+behandelt, darf ausschließlich ein an einen nachweislich kollisionsfreien
+Snapshot gebundener Bootstrap-Entrypoint seine beiden bytegeprüften Metadateien
+vor Tests und Commit entfernen. Keine Bestandsdatei darf dabei verloren gehen.
+
+Alle übrigen sicheren regulären Paketdateien sind Nutzdateien. PatchHarbor
 schreibt sie vor dem Entrypoint bytegenau in den entsprechenden relativen
 Repository-Pfad. Der Entrypoint selbst wird nicht in das Repository geschrieben.
 Enthaltene Archive werden nicht rekursiv als weitere Patch-Pakete geöffnet.

@@ -32,6 +32,10 @@ EXPECTED_RUNTIME_FILES = {
     "patchharbor/apply_repository.py",
     "patchharbor/bundle_paths.py",
     "patchharbor/bundle_names.py",
+    "patchharbor/bundle_handoff.py",
+    "patchharbor/chat_instructions.py",
+    "patchharbor/result_bundle_handoff.py",
+    "patchharbor/platform/environment.py",
     "patchharbor/bundles.py",
     "patchharbor/cli.py",
     "patchharbor/configuration.py",
@@ -661,6 +665,15 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
     with zipfile.ZipFile(manual_bundle) as archive:
         assert archive.read("base/tracked.txt") == b"release-base\n"
         assert "logs/execution.log" not in archive.namelist()
+        assert archive.namelist().count("CHAT_INSTRUCTIONS.md") == 1
+        assert archive.namelist().count("environment.json") == 1
+        assert archive.read("CHAT_INSTRUCTIONS.md").endswith(
+            (release_source / "CHAT_INSTRUCTIONS.md").read_bytes()
+        )
+        handoff = json.loads(archive.read("environment.json"))
+        assert handoff["repository_path"] == str(repository.resolve())
+        assert handoff["exchange_directory"] == str(exchange_directory.resolve())
+        assert handoff["runtime"]["patchharbor_version"] == RELEASE_VERSION
 
     package_path = tmp_path / "release-package.zip"
     entrypoint_name = _write_release_patch_package(package_path, context)
