@@ -241,3 +241,39 @@ def test_template_failure_publishes_no_incomplete_bundle(tmp_path: Path, monkeyp
     assert not list(exchange.glob("*_Result_*"))
     assert not list(exchange.glob(".*.tmp"))
     assert git(repository, "status", "--porcelain").stdout == ""
+
+
+@pytest.mark.parametrize("line_ending", [b"\r\n", b"\r"], ids=["crlf", "cr"])
+def test_result_bundle_normalizes_generated_instructions_not_repository_bytes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, line_ending: bytes,
+) -> None:
+    import patchharbor.chat_instructions as template_module
+    environment, exchange = _configure_user(tmp_path)
+    repository = create_repository(tmp_path / "repository")
+    git(repository, "config", "core.autocrlf", "false")
+    repository_bytes = b"project-owned instructions\r\nkeep these exact bytes\r\n"
+    (repository / CHAT_INSTRUCTIONS_NAME).write_bytes(repository_bytes)
+    git(repository, "add", CHAT_INSTRUCTIONS_NAME)
+    git(repository, "commit", "--quiet", "-m", "project instructions with CRLF")
+    context = _register_context(repository, environment)
+    template = tmp_path / "installed-template.md"
+    template_bytes = b"canonical" + line_ending + b"contract" + line_ending
+    template.write_bytes(template_bytes)
+    for key, value in environment.items():
+        monkeypatch.setenv(key, value)
+    monkeypatch.setattr(template_module, "_template_path", lambda: template)
+    create_manual_result_bundle(repository)
+    paths = list(exchange.glob("*_Result_*.zip"))
+    assert len(paths) == 1
+    with zipfile.ZipFile(paths[0]) as archive:
+        assert archive.testzip() is None
+        generated = archive.read(CHAT_INSTRUCTIONS_NAME)
+        assert b"\r" not in generated
+        assert generated.endswith(b"canonical\ncontract\n")
+        assert archive.read("base/" + CHAT_INSTRUCTIONS_NAME) == repository_bytes
+        result_context = json.loads(archive.read("context.json"))
+        for key in ("repo_id", "base_commit", "state_fingerprint", "fingerprint_algorithm"):
+            assert result_context[key] == context[key]
+    assert template.read_bytes() == template_bytes
+    assert (repository / CHAT_INSTRUCTIONS_NAME).read_bytes() == repository_bytes
+    assert git(repository, "status", "--porcelain").stdout == ""

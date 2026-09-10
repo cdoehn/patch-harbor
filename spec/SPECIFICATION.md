@@ -2217,6 +2217,18 @@ wird bei jedem Bundle neu gelesen; keine lokale Datei wird dabei überschrieben.
 Fehlt sie, schlägt die Bundle-Publikation kontrolliert fehl; bestehende
 Primärergebnis-/Notfalldiagnostikregeln gelten unverändert.
 
+Die generierte Anleitung verwendet plattformübergreifend LF-Zeilenenden.
+Der Vorlagenloader normalisiert nach strenger UTF-8-Decodierung CRLF und
+alleinstehendes CR zu LF. Derselbe zentrale Helfer gilt für explizite
+Vorlagen des reinen Renderers `render_chat_handoff`, insbesondere bei externen
+Patch-Autoren. Alle übrigen Zeichen, Leerzeilen sowie vorhandene oder fehlende
+abschließende Zeilenumbrüche bleiben erhalten. Größe, leere Eingabe und BOM
+werden beim Dateiladen weiterhin anhand der ursprünglichen Bytes geprüft;
+Normalisierung darf keine zu große Vorlage nachträglich zulässig machen.
+Weder Quelldatei noch `base/`-Snapshot, empfangene Patch-Nutzdateien oder
+JSON-Feldwerte werden umgeschrieben. Bestehende Bundles und Metadatenformate
+bleiben kompatibel; Repository-Bindung und Fingerprint bleiben unverändert.
+
 `environment.json` hat Marker `patch-harbor-environment`, `format_version: 1`
 und enthält `captured_at`, `bundle_type`, `bundle_filename`, volle `run_id`,
 `repository_name`, `repository_path`, vollständigen `repository_context`,

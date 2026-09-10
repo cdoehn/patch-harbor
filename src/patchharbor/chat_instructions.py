@@ -36,14 +36,19 @@ def _template_path() -> Path:
     raise result_bundle_error("installed chat-instructions template is missing")
 
 
+def _normalize_line_endings(text: str) -> str:
+    """Canonicalize template newlines without trimming other text or JSON data."""
+    return text.replace("\r\n", "\n").replace("\r", "\n")
+
+
 def load_chat_template() -> str:
-    """Read the versioned template afresh; no cache or target-repo fallback."""
+    """Read fresh UTF-8 template text with LF newlines; never rewrite its file."""
     try:
         with _template_path().open("rb") as stream:
             raw = stream.read(MAX_HANDOFF_ENTRY_BYTES + 1)
         if not raw or len(raw) > MAX_HANDOFF_ENTRY_BYTES or raw.startswith(b"\xef\xbb\xbf"):
             raise ValueError("invalid template size or encoding")
-        return raw.decode("utf-8")
+        return _normalize_line_endings(raw.decode("utf-8"))
     except (OSError, UnicodeError, ValueError) as exc:
         raise result_bundle_error("cannot read installed chat-instructions template") from exc
 
@@ -86,7 +91,9 @@ def render_chat_handoff(
     document: dict[str, object], *, template: str | None = None,
 ) -> BundleHandoff:
     """Render from exact input data; external patch authors reuse target facts."""
-    contract = load_chat_template() if template is None else template
+    contract = (
+        load_chat_template() if template is None else _normalize_line_endings(template)
+    )
     # Prevent values containing Markdown fences from breaking the data block.
     data = json.dumps(document, ensure_ascii=True, allow_nan=False, indent=2).replace("`", "\\u0060")
     generated = (

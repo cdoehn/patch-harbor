@@ -1,7 +1,7 @@
 # PatchHarbor – Spezifikations-Changelog
 
 **Dateiname:** `SPECIFICATION_CHANGELOG.md`<br>
-**Stand:** 2026-09-09
+**Stand:** 2026-09-10
 
 Dieses Dokument protokolliert Änderungen am verbindlichen Produktziel. Es ist kein Git-Commit-Log und ersetzt nicht die getrennten Umsetzungspläne unter `planning/`.
 
@@ -10,6 +10,13 @@ Dieses Dokument protokolliert Änderungen am verbindlichen Produktziel. Es ist k
 ## [1.1.1] – 2026-08-28
 
 **Status:** Freigegeben und vollständig umgesetzt; der abgeschlossene Plan liegt unter `planning/1.1.1/commit-plan.md`.
+
+### Post-release Windows-Zeilenumbruchkorrektur – 2026-09-10
+
+- Der Loader der installierten Chat-Vorlage und der Renderer für explizite Vorlagen verwenden dieselbe zentrale CRLF-/CR-zu-LF-Normalisierung. Neu generierte Patch-/Result-Anleitungen erhalten damit kanonische LF-Zeilenenden auch unter Windows.
+- Die Normalisierung betrifft ausschließlich Vorlagentext im Speicher. Quelldateien, Repository-Snapshots, empfangene Nutzdateien und exakte JSON-Feldwerte bleiben unverändert. UTF-8-, BOM- und Rohbyte-Größenprüfungen werden nicht gelockert.
+- Plattformunabhängige Byte-Fixtures reproduzieren Windows-CRLF bereits unter Linux. Regressionen sichern LF, CRLF, CR, gemischte Endungen, Leerzeilen, Unicode, fehlenden Abschlussumbruch, installierte und explizite Vorlagen sowie die unveränderten Repository-Bytes im tatsächlichen Result Bundle.
+- Kein weiterer Replay-/Crash-Recovery-Fix, keine Änderung an Archivierung, Sicherheitsbindungen, Paketformat oder Drei-Stunden-Standardtimeout.
 
 ### Post-release nachweisbasierte Exchange-Archivierung – 2026-09-09
 

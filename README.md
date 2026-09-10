@@ -278,6 +278,15 @@ Watcher results, and explicit `--output-dir` targets. Both documents are verifie
 and published atomically with the snapshot and logs. No sidecar is written and
 no `chat-instructions` command is introduced. Existing bundles are not rewritten.
 
+Generated instructions use canonical LF line endings on every platform. The
+loader normalizes CRLF and lone CR in the installed UTF-8 template; the shared
+renderer applies the same rule to an explicitly supplied template for external
+Patch authors. Other text, blank lines and the presence or absence of a final
+newline are preserved. Template size/encoding checks remain strict and use the
+original input bytes. This affects only generated documentation: the template
+file, repository snapshots, received payload bytes and JSON values are not
+rewritten or normalized.
+
 `environment.json` uses marker `patch-harbor-environment`, format version 1. It
 includes the actual resolved repository name/path and full binding values, the
 configured Exchange path, the distinct actual output directory, bundle suffix,

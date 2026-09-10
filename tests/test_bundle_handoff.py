@@ -95,6 +95,86 @@ def test_installed_template_is_resolved_from_distribution_file_record(tmp_path: 
         load_chat_template()
 
 
+# Write exact bytes rather than relying on the host's text-mode newline
+# translation: these Windows regressions must fail on Linux before the fix too.
+LINE_ENDING_CASES = [
+    pytest.param("first\nsecond\n", "first\nsecond\n", id="lf"),
+    pytest.param("first\r\nsecond\r\n", "first\nsecond\n", id="crlf"),
+    pytest.param("first\rsecond\r", "first\nsecond\n", id="cr"),
+    pytest.param("first\r\n\rsecond\n\r\n", "first\n\nsecond\n\n", id="mixed"),
+    pytest.param("first\r\nlast", "first\nlast", id="no-final-newline"),
+    pytest.param("  Übung\t\r\n\r\nEnde  ", "  Übung\t\n\nEnde  ", id="whitespace"),
+    pytest.param("one\u2028two\u0085three\r\nfour", "one\u2028two\u0085three\nfour", id="unicode-not-newline"),
+]
+
+
+@pytest.mark.parametrize("text,expected", LINE_ENDING_CASES)
+def test_template_line_endings_are_lf_without_rewriting_source(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, text: str, expected: str,
+) -> None:
+    template = tmp_path / "template.md"
+    original = text.encode("utf-8")
+    template.write_bytes(original)
+    monkeypatch.setattr(instructions_module, "_template_path", lambda: template)
+    assert load_chat_template() == expected
+    handoff = render_chat_handoff(patch_environment())
+    assert handoff.instructions == render_chat_handoff(patch_environment(), template=expected).instructions
+    assert b"\r" not in handoff.instructions
+    assert template.read_bytes() == original
+
+
+@pytest.mark.parametrize("text,expected", LINE_ENDING_CASES)
+@pytest.mark.parametrize("bundle_type", ["Patch", "Result"])
+def test_explicit_template_line_endings_are_lf_and_environment_is_unchanged(
+    monkeypatch: pytest.MonkeyPatch, text: str, expected: str, bundle_type: str,
+) -> None:
+    def unexpected_load() -> str:
+        raise AssertionError("explicit templates must not load local instructions")
+    monkeypatch.setattr(instructions_module, "load_chat_template", unexpected_load)
+    document = patch_environment(bundle_type=bundle_type, note="exact\r\nvalue\rpreserved")
+    handoff = render_chat_handoff(document, template=text)
+    canonical = render_chat_handoff(document, template=expected)
+    assert handoff == canonical
+    assert handoff.instructions.endswith(expected.encode("utf-8"))
+    assert b"\r" not in handoff.instructions
+    assert json.loads(handoff.environment) == document
+    data = handoff.instructions.decode("utf-8").split("```json\n", 1)[1].split("\n```", 1)[0]
+    assert json.loads(data) == document
+
+
+@pytest.mark.parametrize("line_ending", [b"\n", b"\r\n", b"\r"], ids=["lf", "crlf", "cr"])
+def test_installed_template_line_endings_are_lf(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, line_ending: bytes,
+) -> None:
+    module = tmp_path / "site-packages" / "patchharbor" / "chat_instructions.py"
+    module.parent.mkdir(parents=True)
+    module.touch()
+    template = tmp_path / "share" / "patchharbor" / CHAT_INSTRUCTIONS_NAME
+    template.parent.mkdir(parents=True)
+    raw = b"installed canonical contract" + line_ending
+    template.write_bytes(raw)
+    monkeypatch.setattr(instructions_module, "__file__", str(module))
+    entry = Path("../../../share/patchharbor") / CHAT_INSTRUCTIONS_NAME
+    distribution = SimpleNamespace(files=[entry], locate_file=lambda item: template)
+    monkeypatch.setattr(instructions_module.metadata, "distribution", lambda name: distribution)
+    assert load_chat_template() == "installed canonical contract\n"
+    assert render_chat_handoff(patch_environment()).instructions.endswith(b"installed canonical contract\n")
+    assert template.read_bytes() == raw
+
+
+def test_template_raw_size_limit_is_checked_before_newline_normalization(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    template = tmp_path / "template.md"
+    monkeypatch.setattr(instructions_module, "_template_path", lambda: template)
+    raw = b"\r\n" * (MAX_HANDOFF_ENTRY_BYTES // 2)
+    template.write_bytes(raw)
+    assert load_chat_template() == "\n" * (MAX_HANDOFF_ENTRY_BYTES // 2)
+    template.write_bytes(raw + b"\r\n")
+    with pytest.raises(PatchHarborError, match="chat-instructions template"):
+        load_chat_template()
+
+
 def test_renderer_preserves_exact_values_and_quotes_local_commands() -> None:
     document = patch_environment()
     handoff = render_chat_handoff(document, template="STATIC CONTRACT\n")
