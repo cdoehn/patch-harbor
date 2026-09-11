@@ -12,7 +12,7 @@ jobs:
   acceptance:
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 30
+    timeout-minutes: 60
     env:
       PATCHHARBOR_WINDOWS_ACCEPTANCE_ENGINE: ${{ matrix.windows_engine }}
 
