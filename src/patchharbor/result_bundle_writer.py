@@ -6,6 +6,8 @@ import stat
 import zipfile
 from typing import BinaryIO
 
+from patchharbor.progress import activity
+
 from patchharbor.bundle_handoff import BundleHandoff, CHAT_INSTRUCTIONS_NAME, ENVIRONMENT_NAME
 from patchharbor.errors import result_bundle_error
 from patchharbor.json_document import serialize_json_document
@@ -29,10 +31,12 @@ def _write_entry(
     *,
     executable: bool = False,
 ) -> None:
+    activity("RESULT-ZIP", f"Write member: {name} ({len(content)} bytes)")
     archive.writestr(
         _zip_info(name, executable=executable),
         content,
     )
+    activity("RESULT-ZIP", f"Written: {name}", "success")
 
 
 def write_result_bundle(

@@ -66,6 +66,7 @@ EXPECTED_RUNTIME_FILES = {
     "patchharbor/patch_package.py",
     "patchharbor/payload_files.py",
     "patchharbor/presentation.py",
+    "patchharbor/progress.py",
     "patchharbor/registration.py",
     "patchharbor/registry.py",
     "patchharbor/repository.py",

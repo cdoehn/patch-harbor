@@ -9,6 +9,8 @@ from pathlib import Path
 import unicodedata
 from typing import TextIO
 
+from patchharbor.progress import activity
+
 from patchharbor.apply_mutation import (
     ApplyMutationGate,
     MutationFailureKind,
@@ -93,7 +95,7 @@ from patchharbor.payload_files import (
     validate_bundle_payload_targets,
     write_bundle_payloads,
 )
-from patchharbor.presentation import DashboardPresentation, PresentedFile
+from patchharbor.presentation import ConsolePresentation, PresentedFile
 from patchharbor.registration import (
     list_registered_repositories,
     register_local_repository,
@@ -296,6 +298,7 @@ class DiscoveredExchangePatch:
                 directory=self.configuration.exchange_directory,
             )
 
+        activity("REPLAY", f"Record attempted run {shorten_identifier(run_id)} before mutation")
         mark_exchange_apply_started(
             self.paths,
             self.artifact.identity,
@@ -309,6 +312,8 @@ class DiscoveredExchangePatch:
     def publish_result_digest(self, run_id: str, digest: str) -> None:
         """Persist a byte-exact result receipt before its final publication."""
         assert self.artifact.selection is not None
+        activity("RECEIPT", f"Pin Result SHA-256 {shorten_identifier(digest)} "
+                 f"for run {shorten_identifier(run_id)} before publication")
         record_exchange_result_digest(
             self.paths, self.artifact.identity, self.artifact.selection,
             run_id=run_id, result_sha256=digest,
@@ -320,6 +325,7 @@ class DiscoveredExchangePatch:
         selection = self.artifact.selection
         if selection is None:
             raise RuntimeError("discovered Exchange patch lost selection data")
+        activity("REPLAY", f"Record terminal attempt outcome: {'succeeded' if succeeded else 'failed'}")
         mark_exchange_apply_finished(
             self.paths,
             self.artifact.identity,
@@ -443,6 +449,7 @@ def discover_exchange_patch(
     output: OutputTargets | None = None,
 ) -> DiscoveredExchangePatch:
     """Return the newest eligible package inside one selection scope."""
+    activity("DISCOVER", "Load Exchange configuration and repository registry", "heading")
     paths = configuration_user_paths()
     configuration = revalidate_exchange_directory(load_configuration(paths))
     with registry_lock(paths):
@@ -479,24 +486,37 @@ def discover_exchange_patch(
     if scope.repository_context is not None:
         contexts[scope.repository_context.repo_id] = scope.repository_context
     for artifact in artifacts:
+        activity("SELECT", f"Evaluate candidate: {artifact.path.name}")
         if artifact.kind is not ExchangeArtifactKind.PATCH_PACKAGE:
+            activity("SKIP", f"{artifact.path.name}: {artifact.kind.value}, not a patch", "detail")
             continue
         selection = artifact.selection
         if selection is None:
             raise RuntimeError("Patch Package artifact has no selection data")
         context = _context_for_exchange_candidate(selection, scope, contexts)
-        if context is None or not selection.matches_context(context):
+        if context is None:
+            activity("SKIP", f"{artifact.path.name}: repository outside scope or unavailable", "detail")
+            continue
+        if not selection.matches_context(context):
+            activity("SKIP", f"{artifact.path.name}: repository state does not match "
+                     f"(expected base {shorten_identifier(selection.base_commit)}, "
+                     f"state {shorten_identifier(selection.state_fingerprint)}; "
+                     f"actual base {shorten_identifier(context.base_commit)}, "
+                     f"state {shorten_identifier(context.state_fingerprint)})", "detail")
             continue
         if artifact.apply_status is not None and not (
             scope.allow_failed_retry
             and artifact.apply_status is ExchangeApplyStatus.FAILED
         ):
+            activity("SKIP", f"{artifact.path.name}: replay status {artifact.apply_status.value} blocks this origin", "detail")
             continue
+        activity("MATCH", f"{artifact.path.name}: eligible, mtime_ns={artifact.mtime_ns}", "success")
         matches.append(artifact)
 
     _revalidate_exchange_discovery(paths, configuration, registry)
 
     if not matches:
+        activity("SELECT", "No eligible patch remains after content, scope, state and replay checks", "warning")
         message = (
             "no state-bound patch package matches the current registered "
             "repository"
@@ -506,6 +526,8 @@ def discover_exchange_patch(
         raise patch_package_error(message)
 
     artifact = _select_exchange_candidate(matches)
+    activity("SELECT", f"Selected newest eligible patch: {artifact.path.name} "
+             f"from {len(matches)} match(es); mtime_ns={artifact.mtime_ns}", "success")
     package = materialize_exchange_patch(
         artifact,
         directory=configuration.exchange_directory,
@@ -602,6 +624,7 @@ def _complete_apply_result_bundle(
     actual_context: RepositoryContext | None = None,
     before_result_publication: Callable[[str], None] | None = None,
 ) -> RunReport:
+    activity("BUNDLE", "Capture and publish the current Apply Result Bundle", "heading")
     return create_apply_result_bundle(
         resolved.repository,
         resolved.repo_id,
@@ -650,7 +673,7 @@ def preflight_patch_package_repository(
     session: RunSession | None = None,
     dry_run: bool = True,
     output: OutputTargets | None = None,
-    presentation: DashboardPresentation | None = None,
+    presentation: ConsolePresentation | None = None,
     before_mutation: Callable[[], None] | None = None,
 ) -> Iterator[ApplyMutationGate]:
     """Yield the explicit mutation gate while private inputs and locks live."""
@@ -684,7 +707,10 @@ def preflight_patch_package_repository(
                 ),
             )
 
+        activity("BINDING", f"Compare full manifest binding: base {shorten_identifier(manifest.base_commit)}, "
+                 f"state {shorten_identifier(manifest.state_fingerprint)}")
         if not resolved.matches_manifest_state(manifest):
+            activity("BINDING", "Manifest and repository state differ; mutation refused", "error")
             error = state_mismatch_error(
                 "patch package does not match the resolved repository state"
             )
@@ -698,6 +724,7 @@ def preflight_patch_package_repository(
             )
             raise report.reported_error()
 
+        activity("BINDING", "Repository binding matches", "success")
         with ExitStack() as private_resources:
             try:
                 prepared_package = private_resources.enter_context(
@@ -752,7 +779,7 @@ def dry_run_patch_package(
     output_directory: Path | None = None,
     output: OutputTargets | None = None,
     session: RunSession | None = None,
-    presentation: DashboardPresentation | None = None,
+    presentation: ConsolePresentation | None = None,
 ) -> RunReport:
     """Complete one safe dry-run and publish its unchanged Result Bundle."""
     actual_session = session or RunSession.start()
@@ -764,6 +791,7 @@ def dry_run_patch_package(
         output=output,
         presentation=presentation,
     ) as mutation_gate:
+        activity("DRY-RUN", "Validation complete; no payload write or entrypoint execution", "success")
         report = _complete_mutation_result_bundle(
             mutation_gate,
             primary_outcome=ApplyPrimaryOutcome.dry_run_success(),
@@ -897,7 +925,7 @@ def apply_patch_package(
     timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
     output: OutputTargets | None = None,
     session: RunSession | None = None,
-    presentation: DashboardPresentation | None = None,
+    presentation: ConsolePresentation | None = None,
     before_mutation: Callable[[], None] | None = None,
     publish_attempt_outcome: Callable[[bool, GitObjectId | None], None] | None = None,
     before_result_publication: Callable[[str], None] | None = None,
@@ -942,7 +970,7 @@ def run_apply_path(
     timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
     output: OutputTargets | None = None,
     session: RunSession | None = None,
-    presentation: DashboardPresentation | None = None,
+    presentation: ConsolePresentation | None = None,
     automatic: bool = False,
 ) -> RunReport:
     """Run one Apply request through a single public application boundary."""
@@ -1097,7 +1125,7 @@ def _execute_bundle_script(
     cwd: Path,
     timeout_seconds: float,
     output: OutputTargets | None = None,
-    presentation: DashboardPresentation | None = None,
+    presentation: ConsolePresentation | None = None,
 ) -> int:
     parsed_script = parse_script(bundle_script.text)
     script_warnings = parsed_script.warnings
@@ -1128,7 +1156,7 @@ def run_input_artifact(
     cwd: Path,
     timeout_seconds: float,
     output: OutputTargets | None = None,
-    presentation: DashboardPresentation | None = None,
+    presentation: ConsolePresentation | None = None,
     resource_policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY,
 ) -> int:
     """Resolve and execute every script in one input artifact."""
@@ -1173,7 +1201,7 @@ def run_standard_input(
     cwd: Path,
     timeout_seconds: float,
     output: OutputTargets | None = None,
-    presentation: DashboardPresentation | None = None,
+    presentation: ConsolePresentation | None = None,
     resource_policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY,
 ) -> int:
     """Own the temporary stdin artifact for exactly one runner request."""
@@ -1197,8 +1225,10 @@ def _is_directory_candidate(
             file_input_artifact(path),
             policy=resource_policy,
         )
+        activity("SELECT", f"Manual input candidate is executable: {path.name}", "success")
         return True
-    except PatchHarborError:
+    except PatchHarborError as exc:
+        activity("SKIP", f"{path.name}: not a valid manual input ({exc})", "detail")
         return False
 
 
@@ -1221,7 +1251,7 @@ def _run_selected_candidate(
     cwd: Path,
     timeout_seconds: float,
     output: OutputTargets | None = None,
-    presentation: DashboardPresentation | None = None,
+    presentation: ConsolePresentation | None = None,
     resource_policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY,
 ) -> int:
     if candidate.path.is_symlink() or not candidate.path.is_file():
@@ -1248,7 +1278,7 @@ def run_script_path(
     selection_input: TextIO,
     selection_output: TextIO,
     output: OutputTargets | None = None,
-    presentation: DashboardPresentation | None = None,
+    presentation: ConsolePresentation | None = None,
     resource_policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY,
 ) -> int:
     """Run a script/ZIP file or select one from a directory."""

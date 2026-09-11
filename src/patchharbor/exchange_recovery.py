@@ -7,6 +7,8 @@ from __future__ import annotations
 
 from dataclasses import replace
 
+from patchharbor.progress import activity
+
 from patchharbor.archive_evidence import ArchiveEvidence, parse_archive_evidence
 from patchharbor.archive_git import is_ancestor, is_proven_result_state
 from patchharbor.configuration import (
@@ -74,6 +76,7 @@ def recover_exchange_artifacts(
     name/suffix. A missing, moved, corrupt or contradictory proof means KEEP.
     Legacy attempts have no pinned receipt and cannot be retrospectively proven.
     """
+    activity("RECOVERY", "Check locally pinned evidence for interrupted attempts", "heading")
     try:
         snapshot = load_exchange_state(paths)
         pending = tuple(record for record in snapshot.records if (
@@ -83,6 +86,7 @@ def recover_exchange_artifacts(
             and (repository_id is None or record.manifest.repo_id == repository_id)
         ))
         if not pending:
+            activity("RECOVERY", "No in-scope attempted entries with pinned Result evidence", "detail")
             return artifacts
         by_identity = {artifact.identity: artifact for artifact in artifacts}
         results: dict[str, list[ExchangeArtifact]] = {}
@@ -97,29 +101,38 @@ def recover_exchange_artifacts(
                                               exchange_must_exist=True)
         changed = False
         for record in pending:
+            activity("RECOVERY", f"Examine attempted package: {record.identity.path.name}")
             patch = by_identity.get(record.identity)
             if patch is None or patch.kind is not ExchangeArtifactKind.PATCH_PACKAGE:
+                activity("KEEP", f"{record.identity.path.name}: matching patch not available", "detail")
                 continue
+            if not results.get(record.result_sha256, ()):
+                activity("KEEP", f"{patch.path.name}: pinned Result content not available", "detail")
             for result in results.get(record.result_sha256, ()):
+                activity("RECOVERY", f"Validate receipt pair: {patch.path.name} + {result.path.name}")
                 try:
                     package_evidence = parse_archive_evidence(
                         read_exchange_artifact_content(patch, directory=configuration.exchange_directory),
                         patch.path,
                     )
                     if package_evidence.kind != "patch_package" or package_evidence.selection != record.manifest:
+                        activity("KEEP", f"{patch.path.name}: patch proof does not match the recorded binding", "detail")
                         continue
                     evidence = parse_archive_evidence(
                         read_exchange_artifact_content(result, directory=configuration.exchange_directory),
                         result.path,
                     )
                     if not _matches_receipt(record, evidence):
+                        activity("KEEP", f"{result.path.name}: receipt does not match the attempt", "detail")
                         continue
                     assert record.manifest is not None and evidence.receipt is not None
                     selected_id = record.manifest.repo_id
                     # A busy repository is not a crash. Acquire the SAME lock as
                     # apply/context; never delete a lock file or inspect screen.
+                    activity("RECOVERY", "Acquire real repository lock and verify clean Git/state proof")
                     with locked_repository_context_for_id(selected_id) as context:
                         if context is None or not _proven_result(record, evidence, context):
+                            activity("KEEP", f"{patch.path.name}: no current clean repository/result proof", "detail")
                             continue
                         with registry_lock(paths):
                             def verify_evidence() -> None:
@@ -149,8 +162,10 @@ def recover_exchange_artifacts(
                                 verify_evidence=verify_evidence,
                             )
                             changed = True
+                            activity("RECOVERY", f"{patch.path.name}: proven attempt recovered as succeeded", "success")
                     break  # identical copies of a result are one receipt
-                except _KEEP_ERRORS:
+                except _KEEP_ERRORS as exc:
+                    activity("KEEP", f"{patch.path.name}: recovery not proven ({exc})", "detail")
                     continue
         if not changed:
             return artifacts
@@ -161,5 +176,6 @@ def recover_exchange_artifacts(
             and (record := latest.record_for(artifact.identity)) is not None
             else artifact for artifact in artifacts
         )
-    except _KEEP_ERRORS:
+    except _KEEP_ERRORS as exc:
+        activity("RECOVERY", f"Recovery unavailable; preserve existing state ({exc})", "warning")
         return artifacts

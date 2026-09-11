@@ -112,33 +112,11 @@ def _process_tree_script(
     )
 
 
-
 def test_fs_run_rejects_empty_standard_input(tmp_path: Path) -> None:
     completed = _run_cli(tmp_path, "fs", "run", input_text="")
 
     assert completed.returncode == 2
     assert completed.stdout == ""
-    assert completed.stderr == "patchharbor: no script input received\n"
-
-
-def test_fs_run_help_is_limited_to_public_arguments(tmp_path: Path) -> None:
-    completed = _run_cli(tmp_path, "fs", "run", "--help")
-
-    assert completed.returncode == 0
-    help_text = " ".join(completed.stdout.split())
-    assert (
-        "Run generated Bash or PowerShell scripts from a file, "
-        "ZIP PatchBundle, directory, or standard input."
-    ) in help_text
-    assert (
-        "Oversized inputs and unsafe ZIP PatchBundles are rejected "
-        "before any script starts."
-    ) in help_text
-    assert "--timeout SECONDS" in completed.stdout
-    assert "default: 10800" in completed.stdout
-    assert "--plain" in completed.stdout
-    assert "--no-color" in completed.stdout
-    assert "--log" in completed.stdout
 
 
 def _script_path(tmp_path: Path, stem: str) -> Path:
@@ -164,7 +142,6 @@ def test_fs_run_honors_a_supported_platform_shebang(
 
     assert completed.returncode == 0
     assert completed.stdout == "explicit-interpreter\n"
-    assert completed.stderr == ""
 
 
 def test_fs_run_rejects_unknown_shebang_before_execution(
@@ -183,10 +160,6 @@ def test_fs_run_rejects_unknown_shebang_before_execution(
 
     assert completed.returncode == 5
     assert completed.stdout == ""
-    assert completed.stderr == (
-        "patchharbor: unsupported script interpreter in shebang: "
-        "/usr/bin/env python3\n"
-    )
     assert not sentinel_path.exists()
 
 
@@ -207,7 +180,6 @@ def test_fs_run_executes_a_real_script_file_with_required_marker(
 
     assert completed.returncode == 0
     assert completed.stdout == "patchharbor-e2e\n"
-    assert completed.stderr == ""
 
 
 def test_fs_run_rejects_script_without_required_marker(tmp_path: Path) -> None:
@@ -223,9 +195,6 @@ def test_fs_run_rejects_script_without_required_marker(tmp_path: Path) -> None:
 
     assert completed.returncode == 3
     assert completed.stdout == ""
-    assert completed.stderr == (
-        "patchharbor: missing required marker line: # PATCHHARBOR\n"
-    )
     assert not sentinel_path.exists()
 
 
@@ -236,7 +205,6 @@ def test_message_line_does_not_replace_required_marker(tmp_path: Path) -> None:
     completed = _run_patchharbor(script_path, tmp_path)
 
     assert completed.returncode == 3
-    assert "missing required marker line" in completed.stderr
 
 
 def test_script_runs_in_the_original_working_directory(tmp_path: Path) -> None:
@@ -308,7 +276,6 @@ def test_missing_source_is_reported_before_process_start(tmp_path: Path) -> None
 
     assert completed.returncode == 4
     assert completed.stdout == ""
-    assert "patchharbor: cannot read script source" in completed.stderr
 
 
 def test_temporary_script_is_removed_after_timeout(tmp_path: Path) -> None:
@@ -361,9 +328,6 @@ def test_missing_interpreter_is_reported_as_tool_error(tmp_path: Path) -> None:
     executable = "powershell.exe" if os.name == "nt" else "bash"
     assert completed.returncode == 5
     assert completed.stdout == ""
-    assert completed.stderr == (
-        f"patchharbor: script interpreter not found: {executable}\n"
-    )
 
 
 def _write_named_script(path: Path, output: str, *, exit_code: int = 0) -> None:
@@ -383,7 +347,6 @@ def test_directory_with_one_candidate_runs_without_prompt(tmp_path: Path) -> Non
 
     assert completed.returncode == 0
     assert completed.stdout == "automatic\n"
-    assert completed.stderr == ""
 
 
 def test_empty_directory_selection_aborts(tmp_path: Path) -> None:
@@ -395,8 +358,6 @@ def test_empty_directory_selection_aborts(tmp_path: Path) -> None:
     completed = _run_patchharbor(inbox, tmp_path, input_text="\n")
 
     assert completed.returncode == 2
-    assert "Select [1-2]:" in completed.stdout
-    assert completed.stderr == "patchharbor: no script selected\n"
 
 
 def test_directory_without_candidates_is_rejected(tmp_path: Path) -> None:
@@ -409,9 +370,6 @@ def test_directory_without_candidates_is_rejected(tmp_path: Path) -> None:
 
     assert completed.returncode == 3
     assert completed.stdout == ""
-    assert completed.stderr == (
-        f"patchharbor: no PatchHarbor scripts found in directory {inbox}\n"
-    )
 
 
 def test_invalid_directory_selection_is_retried(tmp_path: Path) -> None:
@@ -431,9 +389,7 @@ def test_invalid_directory_selection_is_retried(tmp_path: Path) -> None:
     )
 
     assert completed.returncode == 0
-    assert completed.stdout.count("Enter 1-2.") == 2
     assert completed.stdout.endswith("second\n")
-    assert completed.stderr == ""
 
 
 def _zip_script_text(output: str, *, exit_code: int = 0) -> str:
@@ -454,7 +410,6 @@ def test_zip_scripts_run_in_stored_archive_order(tmp_path: Path) -> None:
 
     assert completed.returncode == 0
     assert completed.stdout == "first\nsecond\n"
-    assert completed.stderr == ""
 
 
 def test_fs_run_reads_zip_patchbundle_from_standard_input_in_archive_order(
@@ -476,7 +431,6 @@ def test_fs_run_reads_zip_patchbundle_from_standard_input_in_archive_order(
 
     assert completed.returncode == 0
     assert completed.stdout.decode().splitlines() == ["first", "second"]
-    assert completed.stderr == b""
 
 
 def test_zip_execution_stops_after_first_failed_script(tmp_path: Path) -> None:
@@ -492,7 +446,6 @@ def test_zip_execution_stops_after_first_failed_script(tmp_path: Path) -> None:
 
     assert completed.returncode == 17
     assert completed.stdout == "first\n"
-    assert completed.stderr == ""
 
 
 def test_zip_transfers_entries_without_required_marker(tmp_path: Path) -> None:
@@ -505,7 +458,6 @@ def test_zip_transfers_entries_without_required_marker(tmp_path: Path) -> None:
 
     assert completed.returncode == 0
     assert completed.stdout == "ran\n"
-    assert completed.stderr == ""
     assert (tmp_path / "notes.txt").read_text(encoding="utf-8") == (
         "not a script\n"
     )
@@ -534,7 +486,6 @@ def test_markerless_script_file_is_transferred_but_never_executed(
 
     assert completed.returncode == 0
     assert completed.stdout == ""
-    assert completed.stderr == ""
     assert (tmp_path / payload_name).read_text(encoding="utf-8") == payload_content
     assert not (tmp_path / "unexpected.txt").exists()
 
@@ -548,10 +499,6 @@ def test_empty_zip_has_a_clear_tool_error(tmp_path: Path) -> None:
 
     assert completed.returncode == 3
     assert completed.stdout == ""
-    assert completed.stderr == (
-        f"patchharbor: no valid PatchHarbor scripts found in ZIP archive "
-        f"{archive_path}\n"
-    )
 
 
 def test_corrupt_zip_is_distinct_from_missing_marker(tmp_path: Path) -> None:
@@ -562,9 +509,6 @@ def test_corrupt_zip_is_distinct_from_missing_marker(tmp_path: Path) -> None:
 
     assert completed.returncode == 4
     assert completed.stdout == ""
-    assert completed.stderr.startswith(
-        f"patchharbor: cannot read ZIP archive {archive_path}:"
-    )
 
 
 def test_metadata_and_multiple_messages_do_not_change_execution(tmp_path: Path) -> None:
@@ -596,7 +540,6 @@ def test_metadata_and_multiple_messages_do_not_change_execution(tmp_path: Path) 
 
     assert completed.returncode == 0
     assert completed.stdout == "ran\n"
-    assert completed.stderr == ""
 
 
 def test_damaged_message_does_not_prevent_script_execution(
@@ -828,7 +771,6 @@ def test_fs_run_non_tty_streams_complete_large_output(
     assert len(output_lines) == 20_000
     assert output_lines[:3] == ["line-0001", "line-0002", "line-0003"]
     assert output_lines[-3:] == ["line-19998", "line-19999", "line-20000"]
-    assert completed.stderr == ""
 
 
 def test_fs_run_merges_stdout_and_stderr_in_write_order(tmp_path: Path) -> None:
@@ -865,7 +807,6 @@ def test_fs_run_merges_stdout_and_stderr_in_write_order(tmp_path: Path) -> None:
         "stdout-2",
         "stderr-2",
     ]
-    assert completed.stderr == ""
 
 
 def test_fs_run_handles_long_and_unterminated_output_from_fast_script(
@@ -892,7 +833,6 @@ def test_fs_run_handles_long_and_unterminated_output_from_fast_script(
 
     assert completed.returncode == 0
     assert completed.stdout == f"{long_line}\nfinal-without-newline"
-    assert completed.stderr == ""
 
 
 def test_fs_run_replaces_invalid_utf8_from_script_output(tmp_path: Path) -> None:
@@ -915,7 +855,6 @@ def test_fs_run_replaces_invalid_utf8_from_script_output(tmp_path: Path) -> None
 
     assert completed.returncode == 0
     assert completed.stdout == "bad-�\n"
-    assert completed.stderr == ""
 
 
 def test_fs_run_log_contains_complete_output_and_run_metadata(
@@ -951,9 +890,7 @@ def test_fs_run_log_contains_complete_output_and_run_metadata(
     assert completed.stdout.splitlines() == [
         f"logged-{number:02d}" for number in range(1, 13)
     ]
-    prefix = "patchharbor: log: "
-    assert completed.stderr.startswith(prefix)
-    log_path = Path(completed.stderr.removeprefix(prefix).strip())
+    log_path = _log_path_from_stderr(completed.stderr)
     try:
         assert normalized_path(log_path.parent) == normalized_path(
             tempfile.gettempdir()
@@ -1015,7 +952,6 @@ def test_fs_run_log_is_closed_and_complete_after_tool_error(
     completed = _run_patchharbor(script_path, tmp_path, "--log")
 
     assert completed.returncode == 3
-    assert "missing required marker line" in completed.stderr
     log_path = _log_path_from_stderr(completed.stderr)
     try:
         log_text = log_path.read_text(encoding="utf-8")

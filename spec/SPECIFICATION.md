@@ -931,56 +931,59 @@ Damit führt auch im manuellen ZIP-Pfad ein vorhersehbar fehlender Interpreter n
 
 ### 12.1 Output-Erfassung
 
-- stdout und stderr werden zu einem gemeinsamen zeitlich beobachteten Strom zusammengeführt.
-- PatchHarbor liest fortlaufend, damit der Kindprozess nicht an vollen Pipes blockiert.
-- Intern werden die letzten zehn vollständigen oder begonnenen Ausgabezeilen im Rolling Buffer gehalten.
-- Im Execution-Bereich werden die letzten fünf Zeilen angezeigt.
-- Sehr lange Zeilen werden auf die verfügbare Breite gekürzt.
-- Eine letzte Zeile ohne Zeilenumbruch wird angezeigt.
-- Für die TUI werden ANSI- und andere Terminal-Steuersequenzen entfernt oder entschärft.
-- Der vollständige Run-Log ist nicht auf den Rolling Buffer begrenzt.
+stdout und stderr des Kindprozesses werden unverändert zu einem gemeinsamen
+zeitlich beobachteten Bytestrom zusammengeführt. PatchHarbor liest verfügbare
+Chunks laufend, ohne auf einen Zeilenumbruch zu warten. Auch Testpunkte und eine
+letzte unvollständige Zeile gelangen damit unmittelbar zur sichtbaren Ausgabe.
+Die Erfassung kann den Kindprozess nicht zum Flush seiner eigenen Puffer zwingen.
 
-### 12.2 Feste Terminaloberfläche
+Der vorhandene begrenzte Rolling Buffer bleibt für aufrufende Bibliotheksnutzer
+erhalten; er begrenzt weder Live-Ausgabe noch das bytegenaue Ausführungslog.
+Terminal-Steuersequenzen aus fremden Texten werden ausschließlich für die
+sichtbare Darstellung entschärft. Der rohe Logstrom bleibt unverändert.
 
-Im interaktiven Terminal verwendet PatchHarbor eine feste neu gezeichnete Oberfläche.
+### 12.2 Farbige fortlaufende Konsole
 
-Regeln:
+Die bisherige feste Oberfläche entfällt. Normale Apply-, Bundle- und manuelle
+Run-Aufträge erhalten eine ausführliche, chronologisch nach unten wachsende
+Ausgabe. Keine Bildschirm-Löschung, kein Cursor-Verstecken, keine Neuzeichnung,
+keine festen Fensterhöhen, keine Zeilen- oder Breitenkürzung von Meldungen.
+Farben, Symbole, Zeitstempel und klare Phasenüberschriften sorgen für Übersicht.
+`--no-color`, `NO_COLOR` und `TERM=dumb` deaktivieren Farben; `--plain` verwendet
+einfache farblose Kennzeichnungen. Technische IDs bleiben nach Abschnitt 14.1
+zentral auf sechs Zeichen plus `…` gekürzt, niemals in Maschinenverträgen.
 
-- maximale Breite 80 Zeichen,
-- bei schmalerem Terminal tatsächliche Breite verwenden,
-- bei zu schmalem Layout automatisch in den einfachen Textmodus wechseln,
-- kein horizontaler Umbruch innerhalb fester Bereiche; Text rechts kürzen,
-- feste Höhen für Informationsbereiche,
-- vertikalen Überlauf durch Anzahl weiterer Elemente anzeigen,
-- Redraw ungefähr alle 0,2 Sekunden während der Ausführung,
-- sofortiger finaler Redraw nach Prozessende,
-- sehr schnelle Skripte zeigen direkt den finalen Zustand,
-- keine künstliche Pause nach Ende,
-- keine zeitgesteuerten Informationen verschwinden lassen.
+Die Beobachtung beginnt bereits vor der Paketauswahl. Sie beschreibt die
+wirklich stattfindenden Datei-, Inhalts-, SHA-, Bindungs-, Replay-, Recovery-,
+Archivierungs-, Preflight-, Schreib-, Prozess- und Result-Schritte. Jeder
+untersuchte Exchange-Eintrag und jeder Ausschluss erhält seinen tatsächlichen
+Grund; eine aus identischem Inhalt wiederverwendete Klassifizierung wird als
+solche benannt. Ordner, Links und unfertige Downloads werden nicht zur Anzeige
+geöffnet. Es entstehen keine zusätzlichen Dateizugriffe oder Sicherheitsprüfungen
+allein für die Darstellung. Beobachter dürfen keine Berechtigung erteilen oder
+fachliche Entscheidungen beeinflussen.
 
-Vorgesehene Bereiche:
+Alle bereits geparsten MESSAGE-Blöcke erscheinen vollständig vor dem zugehörigen
+Skript, ohne Zeilenbegrenzung. Es handelt sich um deklarative Kommentarblöcke,
+nicht um zur Laufzeit ausgeführte Meldungsanweisungen. Laufende Skriptausgaben
+werden unabhängig davon sofort weitergereicht. Dateimeldungen zeigen Pfade,
+Rollen, Größen und Ergebnisse, niemals Nutzdateiinhalte.
 
-- Source,
-- Repository beziehungsweise Kontext, sofern vorhanden,
-- Messages,
-- Files,
-- Execution,
-- Result.
+### 12.3 Umleitung, JSON und Logs
 
-Dateibereiche zeigen Pfad, Größe und Status, niemals Dateiinhalt.
+Bei umgeleitetem stdout und bei `--plain` bleiben die sichtbaren Skriptdaten auf
+stdout; die zusätzlichen menschlichen Ablaufmeldungen gehen auf stderr. Im
+interaktiven Normalmodus erscheinen beide in der gemeinsamen Konsole. Es werden
+keine Farben in Pipes geschrieben. Bereits vorhandene Abschlussangaben für
+nicht interaktive Aufrufe bleiben verfügbar. JSON-Befehle verwenden weiterhin
+exakt ihr geschlossenes Schema und mischen keine Ablaufmeldungen oder
+Skriptausgaben in stdout.
 
-### 12.3 Nicht interaktive Ausgabe
-
-Ist stdout kein echtes Terminal, verwendet PatchHarbor automatisch fortlaufenden Text ohne Cursorsteuerung und Farben.
-
-Das gilt insbesondere für:
-
-- umgeleitete Ausgabe,
-- CI-Systeme,
-- Logsammler,
-- Tests ohne Pseudo-Terminal.
-
-`--plain` erzwingt diesen Modus auch im Terminal.
+Das zusätzliche interne Ablaufprotokoll ist Konsolenausgabe. Es wird nicht in
+das bytegenaue `logs/execution.log` eines Apply-Result-Bundles eingemischt und
+fügt keine neuen ZIP-Einträge zum bestehenden Result- oder Recovery-Vertrag
+hinzu. Dieser Log bleibt der vollständige rohe Entrypoint-Strom; strukturierte
+Run-Metadaten und die bisherigen manuellen Log-Metadaten bleiben erhalten.
 
 ### 12.4 `--log` des manuellen Runners
 
@@ -2586,10 +2589,10 @@ PatchHarbor wird pragmatisch verhaltensorientiert entwickelt.
 - echte Dateien, echte Git-Repositories und echte Prozesse,
 - Verhalten statt interner Implementierungsdetails,
 - keine dogmatische Forderung nach vollständiger Testabdeckung,
-- automatisierte CI- und Release-Testläufe besitzen einen ausreichend bemessenen äußeren Timeout,
+- automatisierte CI- und Release-Testläufe besitzen einen ausreichend bemessenen äußeren Timeout; der native Acceptance-Matrix-Job erhält 120 Minuten, die gesonderten PowerShell- und Docker-Grenzen bleiben unverändert,
 - interaktive Commit-Skripte im dokumentierten Pixel-/Termux-Workflow dürfen ohne künstlichen Einzeltest- oder Gesamtsuite-Timeout laufen,
-- Human-readable Fließtexte und Help-Beschreibungen werden nicht vollständig als Snapshot getestet,
-- geschlossene JSON-Verträge und die exakt standardisierten Statuszeilen aus `CHAT_INSTRUCTIONS.md` dürfen und sollen byte- beziehungsweise textgenau getestet werden.
+- menschliche Konsolenausgabe wird nicht automatisiert getestet: weder Texte, Farben, Symbole, Reihenfolge, Kürzungen noch Fenster- oder Streaming-Darstellung,
+- geschlossene JSON-Verträge, rohe Ausführungslogs, Dateiinhalte, Parserdaten, Zustandsübergänge und Exit-Codes bleiben funktional geprüft; die Chat-Paketverträge bleiben ebenfalls verbindlich.
 
 ### 22.2 Beizubehaltende 1.0.0-Verträge
 
@@ -2616,11 +2619,8 @@ Mindestens zu erhalten und weiter zu testen sind:
 - Timeout pro Skript,
 - Strg+C und vollständiger Prozessbaum,
 - fehlender Interpreter,
-- viel Output und Rolling Buffer zehn beziehungsweise Anzeige fünf,
-- sehr lange Zeile und letzte Zeile ohne Zeilenumbruch,
-- ANSI-Ausgabe zerstört die TUI nicht,
-- schneller Prozess zeigt finalen Zustand,
-- Plain-Modus ohne Cursorsequenzen,
+- verlustfreie Prozesserfassung bei viel Output und begrenzter interner Rolling Buffer,
+- lange beziehungsweise unvollständige Zeilen sowie beliebige Bytes bleiben im Rohlog erhalten,
 - temporäre Logdatei bei `--log`,
 - ursprüngliches Arbeitsverzeichnis,
 - Ressourcenlimits und ZIP-Bomben-Schutz,

@@ -11,6 +11,15 @@ Dieses Dokument protokolliert Änderungen am verbindlichen Produktziel. Es ist k
 
 **Status:** Freigegeben und vollständig umgesetzt; der abgeschlossene Plan liegt unter `planning/1.1.1/commit-plan.md`.
 
+### Post-release farbige Streaming-Konsole – 2026-09-11
+
+- Feste Dashboard-Flächen und Refresh-Schleife entfallen zugunsten fortlaufender farbiger Meldungen ohne Kürzung der Textinhalte. Kurze technische IDs bleiben bestehen.
+- Ausführliche Beobachtung bereits bei Exchange-Einträgen und Inhaltsklassifizierung; auch Ablehnungs-, Recovery- und Archivierungsgründe sowie Dateischreib- und Result-Schritte werden sichtbar. Keine zusätzlichen Dateioperationen oder veränderten Sicherheitsentscheidungen für die Anzeige.
+- Vollständige MESSAGE-Blöcke vor dem Skript und unmittelbare Weitergabe verfügbarer Prozess-Chunks. Kein Warten auf einen Zeilenumbruch durch PatchHarbor.
+- JSON und bytegenaue Ausführungslogs bleiben unverändert. Zusätzliche interne Meldungen sind Konsolenausgabe, kein neuer Result-ZIP-Eintrag. Bei Pipes/plain bleiben Skriptdaten und menschliche Diagnostik getrennt.
+- Keine automatisierten Tests der Konsolendarstellung; bestehende betroffene Anzeigeprüfungen werden entfernt. Funktionale Sicherheits-, Parser-, Prozess-, Log- und Maschinenverträge bleiben geprüft.
+- Acceptance-Matrix erhält 120 Minuten Job-Timeout. Separate PowerShell-/Docker-Grenzen und fachliche Prozess-Timeouts bleiben unverändert. Lokaler vollständiger Testlauf ohne künstliche Test-/Suite-Frist.
+
 ### Post-release SHA-gebundene Attempt-Recovery – 2026-09-11
 
 - Vollständige Paket-SHA aus den tatsächlich validierten ZIP-Bytes; neue Apply-Resultate korrelieren `patch_sha256`, Run-ID, ursprüngliche vollständige Bindung und optionalen verifizierten Abschlusscommit. Keine Änderung von `patch.json`, Fingerprint oder Benennung.

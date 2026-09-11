@@ -127,3 +127,11 @@ def test_local_test_runner_reports_slowest_tests_with_configurable_count() -> No
 
     assert 'test_durations="${PATCHHARBOR_TEST_DURATIONS:-10}"' in text
     assert '--durations="$test_durations"' in text
+
+
+def test_native_acceptance_matrix_allows_120_minutes() -> None:
+    text = _workflow_text()
+    matrix_job = text.split("  acceptance:\n", 1)[1].split(
+        "  windows-powershell7-acceptance:", 1,
+    )[0]
+    assert "    timeout-minutes: 120\n" in matrix_job

@@ -8,6 +8,8 @@ from pathlib import Path
 import stat
 import zipfile
 
+from patchharbor.progress import activity
+
 from patchharbor.bundle_paths import (
     BundlePathError,
     validate_bundle_member_paths,
@@ -77,6 +79,7 @@ class _ZipReadBudget:
         archive: zipfile.ZipFile,
         member: _ValidatedZipMember,
     ) -> bytes:
+        activity("ZIP", f"Read member: {member.relative_path} ({member.entry.file_size} bytes)")
         content = bytearray()
         entry_bytes_read = 0
         try:
@@ -111,6 +114,7 @@ class _ZipReadBudget:
             raise ZipArchiveReadError(
                 f"entry {member.relative_path!r} size changed while reading"
             )
+        activity("ZIP", f"Read complete: {member.relative_path} ({entry_bytes_read} bytes)", "success")
         return bytes(content)
 
 
@@ -166,9 +170,11 @@ def _member_is_directory(entry: zipfile.ZipInfo) -> bool:
 def _validate_members(
     entries: list[zipfile.ZipInfo],
 ) -> tuple[_ValidatedZipMember, ...]:
-    member_kinds = tuple(
-        (entry, _member_is_directory(entry)) for entry in entries
-    )
+    member_kinds: list[tuple[zipfile.ZipInfo, bool]] = []
+    for entry in entries:
+        activity("ZIP", f"Validate member type: {entry.orig_filename}")
+        member_kinds.append((entry, _member_is_directory(entry)))
+    activity("ZIP", "Validate all member paths and reject duplicate or unsafe targets")
     try:
         normalized_paths = validate_bundle_member_paths(
             (entry.orig_filename, is_directory)
@@ -199,6 +205,7 @@ def _read_open_archive(
     try:
         with archive:
             entries = archive.infolist()
+            activity("ZIP", f"ZIP structure opened; validate limits for {len(entries)} entries")
             budget = _ZipReadBudget(policy)
             budget.validate_declared_entries(entries)
             members = _validate_members(entries)
@@ -224,6 +231,7 @@ def _read_open_archive(
 
 
 def _open_archive(source: object) -> zipfile.ZipFile:
+    activity("ZIP", "Attempt to open ZIP structure")
     try:
         return zipfile.ZipFile(source, "r")
     except zipfile.BadZipFile as exc:

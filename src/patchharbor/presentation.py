@@ -1,40 +1,23 @@
-"""Protected fixed terminal dashboard for one interactive PatchHarbor request."""
+"""Colorful, append-only presentation; no frame, cursor movement or redraw loop."""
 
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
-from enum import Enum
+from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
+from enum import Enum
 import os
-import shutil
-from threading import Event, Lock, Thread, current_thread
-from typing import Callable, Protocol, TextIO
+from threading import RLock
+from typing import Protocol, TextIO
 import unicodedata
 
-
-DASHBOARD_MAX_WIDTH = 80
-DASHBOARD_MIN_WIDTH = 40
-DASHBOARD_REFRESH_SECONDS = 0.2
-SOURCE_ROWS = 2
-MESSAGE_ROWS = 4
-FILE_ROWS = 3
-EXECUTION_ROWS = 5
-RESULT_ROWS = 2
-
-_CLEAR_SCREEN = "\x1b[2J"
-_CURSOR_HOME = "\x1b[H"
-_CLEAR_TO_END = "\x1b[J"
-_HIDE_CURSOR = "\x1b[?25l"
-_SHOW_CURSOR = "\x1b[?25h"
 _RESET = "\x1b[0m"
-_CYAN = "\x1b[1;36m"
-_BLUE = "\x1b[1;34m"
-_GREEN = "\x1b[1;32m"
-_YELLOW = "\x1b[1;33m"
-_RED = "\x1b[1;31m"
-_DIM = "\x1b[2m"
-_DASHBOARD_GLYPHS = "┌─┐│├┤└┘…"
-
+_COLORS = {
+    "info": "\x1b[36m", "success": "\x1b[1;32m",
+    "warning": "\x1b[1;33m", "error": "\x1b[1;31m",
+    "heading": "\x1b[1;34m", "message": "\x1b[1;35m",
+    "detail": "\x1b[2m",
+}
 
 class PresentedStatus(str, Enum):
     """Presentation-only completion state chosen by the application boundary."""
@@ -78,78 +61,28 @@ class PresentedFile:
     kind: str
 
 
-@dataclass(frozen=True, slots=True)
-class DashboardSnapshot:
-    """Immutable presentation-only information for one dashboard frame."""
-
-    source_name: str = "—"
-    repository_name: str | None = None
-    repository_context: str | None = None
-    script_name: str = "—"
-    script_index: int = 0
-    script_total: int = 0
-    messages: tuple[tuple[str, str], ...] = ()
-    files: tuple[PresentedFile, ...] = ()
-    output_lines: tuple[str, ...] = ()
-    discarded_output_lines: int = 0
-    warnings: tuple[str, ...] = ()
-    status: str = "preparing"
-    exit_code: int | None = None
-    tool_error: str | None = None
-    log_path: str | None = None
-    result_path: str | None = None
-
-
-class DashboardPresentation(Protocol):
-    """Small application-facing contract for interactive presentation."""
+class ConsolePresentation(Protocol):
+    """Presentation only: the application supplies already-decided facts."""
 
     @property
-    def started(self) -> bool:
-        """Return whether the dashboard has drawn its first frame."""
+    def started(self) -> bool: ...
 
-    def begin_request(
-        self,
-        *,
-        source_name: str,
-        bundle_files: tuple[PresentedFile, ...],
-        script_total: int,
-        warnings: tuple[str, ...] = (),
-        repository_name: str | None = None,
-        repository_context: str | None = None,
-    ) -> None:
-        """Start the fixed dashboard for one validated request."""
+    def begin_request(self, *, source_name: str,
+                      bundle_files: tuple[PresentedFile, ...], script_total: int,
+                      warnings: tuple[str, ...] = (),
+                      repository_name: str | None = None,
+                      repository_context: str | None = None) -> None: ...
 
-    def update_repository(
-        self,
-        *,
-        repository_name: str,
-        repository_context: str | None,
-    ) -> None:
-        """Show the safely resolved repository and its checked context."""
+    def update_repository(self, *, repository_name: str,
+                          repository_context: str | None) -> None: ...
 
-    def begin_script(
-        self,
-        *,
-        script_name: str,
-        script_index: int,
-        script_total: int,
-        messages: tuple[tuple[str, str], ...],
-        warnings: tuple[str, ...],
-    ) -> None:
-        """Show context for the next script in the bundle."""
+    def begin_script(self, *, script_name: str, script_index: int,
+                     script_total: int, messages: tuple[tuple[str, str], ...],
+                     warnings: tuple[str, ...]) -> None: ...
 
-    def update_output(
-        self,
-        lines: tuple[str, ...],
-        discarded_line_count: int,
-    ) -> None:
-        """Update the bounded execution output without rendering immediately."""
+    def finish(self, completion: PresentedCompletion) -> None: ...
 
-    def finish(self, completion: PresentedCompletion) -> None:
-        """Render one already-decided final frame before caller cleanup."""
-
-    def close(self) -> None:
-        """Restore terminal state without masking an active application error."""
+    def close(self) -> None: ...
 
 
 def _skip_control_string(text: str, index: int) -> int:
@@ -263,261 +196,6 @@ class SanitizedTextStream:
         self._stream.flush()
 
 
-def _character_width(character: str) -> int:
-    if unicodedata.combining(character):
-        return 0
-    if unicodedata.category(character) in {"Mn", "Me", "Cf"}:
-        return 0
-    return 2 if unicodedata.east_asian_width(character) in {"W", "F"} else 1
-
-
-def _display_width(text: str) -> int:
-    return sum(_character_width(character) for character in text)
-
-
-def _clip(text: str, width: int) -> str:
-    if width <= 0:
-        return ""
-    safe_text = _sanitize_line(text)
-    if _display_width(safe_text) <= width:
-        return safe_text
-    if width == 1:
-        return "…"
-
-    target_width = width - 1
-    current_width = 0
-    result: list[str] = []
-    for character in safe_text:
-        character_width = _character_width(character)
-        if character_width and current_width + character_width > target_width:
-            break
-        result.append(character)
-        current_width += character_width
-    return "".join(result) + "…"
-
-
-def _fit(text: str, width: int) -> str:
-    clipped = _clip(text, width)
-    return clipped + " " * max(0, width - _display_width(clipped))
-
-
-def _center(text: str, width: int) -> str:
-    clipped = _clip(text, width)
-    remaining = max(0, width - _display_width(clipped))
-    left = remaining // 2
-    return " " * left + clipped + " " * (remaining - left)
-
-
-def _border(left: str, middle: str, right: str, width: int) -> str:
-    if width <= 1:
-        return left[:width]
-    return left + middle * max(0, width - 2) + right
-
-
-def _content(text: str, width: int) -> str:
-    if width <= 1:
-        return "│"[:width]
-    return "│" + _fit(" " + text, width - 2) + "│"
-
-
-def _centered_content(text: str, width: int) -> str:
-    if width <= 1:
-        return "│"[:width]
-    return "│" + _center(text, width - 2) + "│"
-
-
-def _section(title: str, width: int) -> str:
-    if width <= 1:
-        return "├"[:width]
-    inner_width = width - 2
-    label = _clip(f"─ {title} ", inner_width)
-    return "├" + label + "─" * max(0, inner_width - _display_width(label)) + "┤"
-
-
-def _message_rows(
-    messages: tuple[tuple[str, str], ...],
-    height: int,
-) -> tuple[str, ...]:
-    if not messages:
-        return ("—",) + ("",) * (height - 1)
-
-    rows: list[str] = []
-    for message_index, (name, text) in enumerate(messages):
-        content_lines = _sanitize_lines(text) or ("",)
-        block = [f"{_sanitize_line(name)}: {content_lines[0]}"]
-        block.extend(f"  {line}" for line in content_lines[1:])
-        remaining = height - len(rows)
-        if remaining <= 0:
-            rows[-1] = f"… +{len(messages) - message_index} weitere Messages"
-            break
-        if len(block) <= remaining:
-            rows.extend(block)
-            continue
-
-        if remaining > 1:
-            rows.extend(block[: remaining - 1])
-        hidden_messages = len(messages) - message_index - 1
-        if hidden_messages:
-            rows.append(f"… +{hidden_messages} weitere Messages")
-        else:
-            rows.append("… Message gekürzt")
-        break
-
-    return tuple(rows[:height]) + ("",) * max(0, height - len(rows))
-
-
-def _format_size(size_bytes: int) -> str:
-    if size_bytes < 1024:
-        return f"{size_bytes} B"
-    if size_bytes < 1024 * 1024:
-        return f"{size_bytes / 1024:.1f} KiB"
-    return f"{size_bytes / (1024 * 1024):.1f} MiB"
-
-
-def _file_rows(
-    files: tuple[PresentedFile, ...],
-    height: int,
-) -> tuple[str, ...]:
-    if not files:
-        return ("—",) + ("",) * (height - 1)
-
-    if len(files) <= height:
-        rows = [
-            f"{item.kind}: {item.name} ({_format_size(item.size_bytes)})"
-            for item in files
-        ]
-    else:
-        visible = files[: max(0, height - 1)]
-        rows = [
-            f"{item.kind}: {item.name} ({_format_size(item.size_bytes)})"
-            for item in visible
-        ]
-        rows.append(f"… +{len(files) - len(visible)} weitere Dateien")
-    return tuple(rows[:height]) + ("",) * max(0, height - len(rows))
-
-
-def _execution_rows(snapshot: DashboardSnapshot) -> tuple[str, ...]:
-    lines = tuple(_sanitize_line(line.rstrip("\r\n")) for line in snapshot.output_lines)
-    if not lines:
-        first = "waiting for script output…" if snapshot.status == "running" else "—"
-        return (first,) + ("",) * (EXECUTION_ROWS - 1)
-    rows = lines[-EXECUTION_ROWS:]
-    return rows + ("",) * max(0, EXECUTION_ROWS - len(rows))
-
-
-def _warning_summary(warnings: tuple[str, ...]) -> str:
-    if not warnings:
-        return ""
-    first = _sanitize_line(warnings[0])
-    suffix = f" · +{len(warnings) - 1}" if len(warnings) > 1 else ""
-    return f"warning: {first}{suffix}"
-
-
-def _result_rows(snapshot: DashboardSnapshot) -> tuple[str, str]:
-    if snapshot.status == "running":
-        return "status: running", _warning_summary(snapshot.warnings)
-    if snapshot.status == "preparing":
-        return "status: preparing", ""
-
-    if snapshot.tool_error is not None:
-        first = f"status: error · exit code: {snapshot.exit_code}"
-        second = f"detail: {snapshot.tool_error}"
-    elif snapshot.exit_code == 0:
-        first = "status: success · exit code: 0"
-        second = ""
-    else:
-        first = f"status: failed · exit code: {snapshot.exit_code}"
-        second = ""
-
-    if not second:
-        second = _warning_summary(snapshot.warnings)
-    if snapshot.log_path is not None:
-        log_text = f"log: {snapshot.log_path}"
-        second = f"{second} · {log_text}" if second else log_text
-    if snapshot.result_path is not None:
-        result_text = f"result: {snapshot.result_path}"
-        second = f"{second} · {result_text}" if second else result_text
-    return first, second
-
-
-def _line_color(line: str, snapshot: DashboardSnapshot) -> str:
-    if "PATCHHARBOR" in line:
-        return _CYAN
-    if any(
-        label in line
-        for label in ("SOURCE", "REPOSITORY", "MESSAGES", "FILES", "EXECUTION")
-    ):
-        return _BLUE
-    if "RESULT" in line:
-        if snapshot.status == "success":
-            return _GREEN
-        if snapshot.status in {"error", "failed"}:
-            return _RED
-        return _YELLOW
-    if "warning:" in line:
-        return _YELLOW
-    if "weitere" in line or "gekürzt" in line:
-        return _DIM
-    if "status: success" in line:
-        return _GREEN
-    if "status: error" in line or "status: failed" in line:
-        return _RED
-    if "status: running" in line or "status: preparing" in line:
-        return _YELLOW
-    return ""
-
-
-def render_dashboard(
-    snapshot: DashboardSnapshot,
-    *,
-    width: int,
-    color_enabled: bool = False,
-) -> str:
-    """Render one complete fixed-height dashboard frame."""
-    width = max(4, min(DASHBOARD_MAX_WIDTH, width))
-    script_text = "—"
-    if snapshot.script_total:
-        script_text = (
-            f"{snapshot.script_name} "
-            f"({snapshot.script_index}/{snapshot.script_total})"
-        )
-
-    rows: list[str] = [
-        _border("┌", "─", "┐", width),
-        _centered_content("PATCHHARBOR", width),
-        _section("SOURCE", width),
-        _content(f"source: {snapshot.source_name}", width),
-        _content(f"script: {script_text}", width),
-    ]
-    if snapshot.repository_name is not None:
-        rows.append(_section("REPOSITORY", width))
-        rows.extend(
-            (
-                _content(f"repository: {snapshot.repository_name}", width),
-                _content(snapshot.repository_context or "—", width),
-            )
-        )
-    rows.append(_section("MESSAGES", width))
-    rows.extend(_content(row, width) for row in _message_rows(snapshot.messages, MESSAGE_ROWS))
-    rows.append(_section("FILES", width))
-    rows.extend(_content(row, width) for row in _file_rows(snapshot.files, FILE_ROWS))
-    execution_title = "EXECUTION"
-    if snapshot.discarded_output_lines:
-        execution_title += f" · +{snapshot.discarded_output_lines} weitere Zeilen"
-    rows.append(_section(execution_title, width))
-    rows.extend(_content(row, width) for row in _execution_rows(snapshot))
-    rows.append(_section("RESULT", width))
-    rows.extend(_content(row, width) for row in _result_rows(snapshot))
-    rows.append(_border("└", "─", "┘", width))
-
-    if color_enabled:
-        rows = [
-            f"{color}{line}{_RESET}" if (color := _line_color(line, snapshot)) else line
-            for line in rows
-        ]
-    return "\n".join(rows) + "\n"
-
-
 def _stream_is_terminal(stream: TextIO) -> bool:
     try:
         return stream.isatty()
@@ -525,246 +203,199 @@ def _stream_is_terminal(stream: TextIO) -> bool:
         return False
 
 
-def _terminal_columns(stream: TextIO) -> int:
-    columns = shutil.get_terminal_size(fallback=(DASHBOARD_MAX_WIDTH, 24)).columns
-    try:
-        terminal_size = os.get_terminal_size(stream.fileno())
-        if terminal_size.columns > 0:
-            columns = terminal_size.columns
-    except (AttributeError, OSError):
-        pass
-    return columns
+class _ChildTextFilter:
+    """Discard child terminal commands, including sequences split across reads."""
+
+    def __init__(self) -> None:
+        self._state = "text"
+
+    def feed(self, text: str) -> str:
+        visible: list[str] = []
+        for char in text:
+            state = self._state
+            if state == "escape":
+                if char == "[":
+                    self._state = "csi"
+                elif char in "]PX^_":
+                    self._state = "string"
+                else:
+                    self._state = "text"
+                continue
+            if state == "csi":
+                if 0x40 <= ord(char) <= 0x7e:
+                    self._state = "text"
+                continue
+            if state == "string":
+                if char in ("\x07", "\x9c"):
+                    self._state = "text"
+                elif char == "\x1b":
+                    self._state = "string_escape"
+                continue
+            if state == "string_escape":
+                self._state = "text" if char == "\\" else "string"
+                continue
+            if char == "\x1b":
+                self._state = "escape"
+            elif char == "\x9b":
+                self._state = "csi"
+            elif char in "\x90\x98\x9d\x9e\x9f":
+                self._state = "string"
+            elif char in "\r\n":
+                visible.append("\n")
+            elif char == "\t":
+                visible.append("    ")
+            elif unicodedata.category(char) not in {"Cc", "Cf", "Cs"}:
+                visible.append(char)
+        return "".join(visible)
 
 
-def _stream_supports_dashboard_glyphs(stream: TextIO) -> bool:
-    encoding = getattr(stream, "encoding", None)
-    if not encoding:
-        return True
-    try:
-        _DASHBOARD_GLYPHS.encode(encoding)
-    except (LookupError, UnicodeEncodeError):
-        return False
-    return True
+class _ConsoleTextStream:
+    """A sink for either incremental child text or complete warning messages."""
+
+    def __init__(self, console: StreamingConsole, *, warning: bool = False) -> None:
+        self._console = console
+        self._warning = warning
+        self._filter = _ChildTextFilter()
+
+    def write(self, text: str) -> int:
+        if self._warning:
+            self._console.activity("WARN", text.rstrip("\n"), "warning")
+        else:
+            self._console.write_child(self._filter.feed(text))
+        return len(text)
+
+    def flush(self) -> None:
+        self._console.flush()
 
 
-def terminal_supports_dashboard(stream: TextIO) -> bool:
-    """Return whether a fixed Unicode dashboard is safe for this stream."""
-    return (
-        _stream_is_terminal(stream)
-        and _terminal_columns(stream) >= DASHBOARD_MIN_WIDTH
-        and _stream_supports_dashboard_glyphs(stream)
-    )
+class StreamingConsole:
+    """Write complete chronological records and live child chunks to one stream."""
 
-
-def _terminal_width(stream: TextIO) -> int:
-    return max(4, min(DASHBOARD_MAX_WIDTH, _terminal_columns(stream)))
-
-
-class TerminalDashboard:
-    """Periodically redraw one fixed dashboard while a script is running."""
-
-    def __init__(
-        self,
-        stream: TextIO,
-        *,
-        color_enabled: bool,
-        refresh_seconds: float = DASHBOARD_REFRESH_SECONDS,
-        width_supplier: Callable[[], int] | None = None,
-    ) -> None:
+    def __init__(self, stream: TextIO, *, color_enabled: bool,
+                 plain: bool = False, child_output: TextIO | None = None) -> None:
         self._stream = stream
-        self._color_enabled = color_enabled
-        self._refresh_seconds = refresh_seconds
-        self._width_supplier = width_supplier or (lambda: _terminal_width(stream))
-        self._state = DashboardSnapshot()
-        self._bundle_files: tuple[PresentedFile, ...] = ()
-        self._request_warnings: tuple[str, ...] = ()
-        self._state_lock = Lock()
-        self._write_lock = Lock()
-        self._stop = Event()
-        self._thread = Thread(
-            target=self._redraw_loop,
-            name="patchharbor-dashboard",
-            daemon=True,
-        )
+        self._child_output = child_output
+        self._color = (color_enabled and not plain and _stream_is_terminal(stream)
+                       and "NO_COLOR" not in os.environ
+                       and os.environ.get("TERM") != "dumb")
+        self._plain = plain
+        self._lock = RLock()
         self._started = False
-        self._thread_started = False
-        self._last_frame: str | None = None
-        self._cursor_hidden = False
+        self._child_line_open = False
         self._closed = False
-        self._render_error: Exception | None = None
+        self.child_stream = _ConsoleTextStream(self)
+        self.warning_stream = _ConsoleTextStream(self, warning=True)
 
     @property
     def started(self) -> bool:
         return self._started
 
-    def begin_request(
-        self,
-        *,
-        source_name: str,
-        bundle_files: tuple[PresentedFile, ...],
-        script_total: int,
-        warnings: tuple[str, ...] = (),
-        repository_name: str | None = None,
-        repository_context: str | None = None,
-    ) -> None:
-        with self._state_lock:
-            self._bundle_files = bundle_files
-            self._request_warnings = warnings
-            self._state = replace(
-                self._state,
-                source_name=source_name,
-                repository_name=repository_name,
-                repository_context=repository_context,
-                script_total=script_total,
-                files=bundle_files,
-                warnings=warnings,
-                status="preparing",
-            )
-            should_start = not self._started
-            if should_start:
-                self._started = True
-        if should_start:
-            self._render_now()
-            if self._render_error is not None:
-                error = self._render_error
-                self.close()
-                raise OSError(f"cannot render dashboard: {error}")
-            self._thread.start()
-            self._thread_started = True
+    @property
+    def separate_child_output(self) -> bool:
+        return self._child_output is not None
 
-    def update_repository(
-        self,
-        *,
-        repository_name: str,
-        repository_context: str | None,
-    ) -> None:
-        with self._state_lock:
-            self._state = replace(
-                self._state,
-                repository_name=repository_name,
-                repository_context=repository_context,
-            )
+    def _write(self, text: str) -> None:
+        # Embedded callers may supply a legacy-codepage stream. Never lose the
+        # actual path; only unrepresentable display glyphs get a safe fallback.
+        encoding = getattr(self._stream, "encoding", None)
+        if encoding:
+            text = text.encode(encoding, errors="backslashreplace").decode(encoding)
+        self._stream.write(text)
+        self._stream.flush()
 
-    def begin_script(
-        self,
-        *,
-        script_name: str,
-        script_index: int,
-        script_total: int,
-        messages: tuple[tuple[str, str], ...],
-        warnings: tuple[str, ...],
-    ) -> None:
-        with self._state_lock:
-            self._state = replace(
-                self._state,
-                script_name=script_name,
-                script_index=script_index,
-                script_total=script_total,
-                messages=messages,
-                files=self._bundle_files,
-                output_lines=(),
-                discarded_output_lines=0,
-                warnings=self._request_warnings + warnings,
-                status="running",
-                exit_code=None,
-                tool_error=None,
-            )
+    def _paint(self, text: str, level: str) -> str:
+        if self._color:
+            return _COLORS.get(level, _COLORS["info"]) + text + _RESET
+        return text
 
-    def update_output(
-        self,
-        lines: tuple[str, ...],
-        discarded_line_count: int,
-    ) -> None:
-        with self._state_lock:
-            self._state = replace(
-                self._state,
-                output_lines=lines,
-                discarded_output_lines=discarded_line_count,
-            )
+    def activity(self, phase: str, message: str, level: str = "info") -> None:
+        with self._lock:
+            if self._closed:
+                return
+            self._started = True
+            prefix = "\n" if self._child_line_open else ""
+            self._child_line_open = False
+            symbol = "" if self._plain else {
+                "success": "✓ ", "warning": "! ", "error": "✗ ",
+                "heading": "◆ ", "message": "◆ ",
+            }.get(level, "› ")
+            label = _sanitize_line(phase)
+            stamp = datetime.now().strftime("%H:%M:%S")
+            lines = _sanitize_lines(message)
+            rendered = []
+            for line in lines:
+                text = f"[{stamp}] {symbol}{label:<8} {line}"
+                rendered.append(self._paint(text, level))
+            self._write(prefix + "\n".join(rendered) + "\n")
+
+    def write_child(self, text: str) -> None:
+        with self._lock:
+            if self._closed or not text:
+                return
+            self._started = True
+            if self._child_output is not None:
+                self._child_output.write(text)
+                self._child_output.flush()
+                return
+            parts: list[str] = []
+            for part in text.splitlines(keepends=True):
+                if not self._child_line_open:
+                    stamp = datetime.now().strftime("%H:%M:%S")
+                    parts.append(self._paint(f"[{stamp}] EXEC     ", "detail"))
+                parts.append(part)
+                self._child_line_open = not part.endswith("\n")
+            self._write("".join(parts))
+
+    def flush(self) -> None:
+        with self._lock:
+            self._stream.flush()
+
+    def begin_request(self, *, source_name: str,
+                      bundle_files: tuple[PresentedFile, ...], script_total: int,
+                      warnings: tuple[str, ...] = (),
+                      repository_name: str | None = None,
+                      repository_context: str | None = None) -> None:
+        self.activity("PACKAGE", source_name, "heading")
+        self.activity("PACKAGE", f"Validated: {script_total} script(s), "
+                      f"{len(bundle_files)} package file(s)", "success")
+        for item in bundle_files:
+            self.activity("FILE", f"{item.kind}: {item.name} ({item.size_bytes} bytes)")
+        if repository_name is not None:
+            self.update_repository(repository_name=repository_name,
+                                   repository_context=repository_context)
+        # Warnings are routed once through OutputTargets.warning_text_stream.
+
+    def update_repository(self, *, repository_name: str,
+                          repository_context: str | None) -> None:
+        self.activity("REPO", repository_name, "heading")
+        if repository_context:
+            self.activity("CONTEXT", repository_context)
+
+    def begin_script(self, *, script_name: str, script_index: int,
+                     script_total: int, messages: tuple[tuple[str, str], ...],
+                     warnings: tuple[str, ...]) -> None:
+        self.activity("SCRIPT", f"Prepared {script_index}/{script_total}: {script_name}",
+                      "heading")
+        for name, text in messages:
+            self.activity("MESSAGE", name, "message")
+            self.activity("MESSAGE", text, "message")
 
     def finish(self, completion: PresentedCompletion) -> None:
-        if not self._started or self._closed:
-            return
-        with self._state_lock:
-            self._state = replace(
-                self._state,
-                status=completion.status.value,
-                exit_code=completion.exit_code,
-                tool_error=completion.detail,
-                log_path=(
-                    None
-                    if completion.log_path is None
-                    else str(completion.log_path)
-                ),
-                result_path=(
-                    None
-                    if completion.result_path is None
-                    else str(completion.result_path)
-                ),
-            )
-        self._stop_loop()
-        self._render_now(force=True)
-        if self._render_error is not None:
-            raise OSError(f"cannot render dashboard: {self._render_error}")
+        level = "success" if completion.status is PresentedStatus.SUCCESS else "error"
+        self.activity("RESULT", f"{completion.status.value.upper()} "
+                      f"(exit {completion.exit_code})", level)
+        if completion.detail:
+            self.activity("ERROR", completion.detail, "error")
+        if completion.log_path is not None:
+            self.activity("LOG", str(completion.log_path))
+        if completion.result_path is not None:
+            self.activity("BUNDLE", str(completion.result_path), "success")
 
     def close(self) -> None:
-        """Stop redraw and restore terminal controls; safe to call repeatedly."""
-        if self._closed:
-            return
-        self._stop_loop()
-        if self._cursor_hidden:
-            try:
-                with self._write_lock:
-                    self._stream.write(_RESET + _SHOW_CURSOR)
-                    self._stream.flush()
-            except Exception as exc:
-                if self._render_error is None:
-                    self._render_error = exc
-            self._cursor_hidden = False
-        self._closed = True
-
-    def _stop_loop(self) -> None:
-        self._stop.set()
-        if (
-            self._thread_started
-            and self._thread.is_alive()
-            and current_thread() is not self._thread
-        ):
-            self._thread.join(timeout=max(1.0, self._refresh_seconds * 4))
-
-    def _snapshot(self) -> DashboardSnapshot:
-        with self._state_lock:
-            return self._state
-
-    def _redraw_loop(self) -> None:
-        while not self._stop.wait(self._refresh_seconds):
-            self._render_now()
-            if self._render_error is not None:
-                self._stop.set()
-
-    def _render_now(self, *, force: bool = False) -> None:
-        if self._render_error is not None or self._closed:
-            return
-        snapshot = self._snapshot()
-        try:
-            width = self._width_supplier()
-            frame = render_dashboard(
-                snapshot,
-                width=width,
-                color_enabled=self._color_enabled,
-            )
-            if not force and frame == self._last_frame:
+        with self._lock:
+            if self._closed:
                 return
-
-            first_frame = self._last_frame is None
-            if first_frame:
-                self._cursor_hidden = True
-                prefix = _HIDE_CURSOR + _RESET + _CLEAR_SCREEN + _CURSOR_HOME
-            else:
-                prefix = _RESET + _CURSOR_HOME
-            with self._write_lock:
-                self._stream.write(prefix + frame + _RESET + _CLEAR_TO_END)
-                self._stream.flush()
-            self._last_frame = frame
-        except Exception as exc:
-            self._render_error = exc
+            self._closed = True
+            if self._child_line_open:
+                self._write("\n")
+                self._child_line_open = False

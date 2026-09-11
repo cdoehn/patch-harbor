@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from patchharbor.progress import activity
+
 from patchharbor.errors import result_bundle_error
 from patchharbor.git_objects import capture_base_bundle_entries
 from patchharbor.git_patches import capture_change_patches
@@ -37,16 +39,19 @@ def capture_result_bundle(
     repo_id: RepositoryId,
 ) -> CapturedResultBundle:
     """Capture one bundle and reject any before/after state difference."""
+    activity("SNAPSHOT", f"Capture current Git state: {repository}", "heading")
     before = capture_consistent_repository_snapshot(repository)
     before_context = repository_context_from_snapshot(
         repository,
         repo_id,
         before,
     )
+    activity("SNAPSHOT", "Read tracked base files and their Git object identities")
     base_entries = capture_base_bundle_entries(
         repository,
         before.base_commit,
     )
+    activity("SNAPSHOT", "Capture staged/unstaged deltas and untracked files")
     change_patches = capture_change_patches(
         repository,
         before.base_commit,
@@ -69,6 +74,7 @@ def capture_result_bundle(
         ),
     )
 
+    activity("SNAPSHOT", "Recheck consistency after capturing all snapshot bytes")
     after = capture_consistent_repository_snapshot(repository)
     after_context = repository_context_from_snapshot(
         repository,
@@ -80,6 +86,7 @@ def capture_result_bundle(
             "repository changed while the Result Bundle was captured"
         )
 
+    activity("SNAPSHOT", "Snapshot and context are consistent", "success")
     return CapturedResultBundle(
         repository_snapshot=before,
         context=before_context,

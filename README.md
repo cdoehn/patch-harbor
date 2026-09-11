@@ -425,6 +425,37 @@ repair old upgrade attempts that never recorded these proofs. A still-running
 older executable also does not gain the new receipt protocol by changing files:
 reinstall the current version before subsequent Apply runs.
 
+### Verbose streaming console
+
+Normal `apply`, `bundle` and `fs run` requests now use an append-only console,
+not a fixed dashboard. Colors, phase labels and timestamps remain; existing
+lines are never redrawn. Identifiers still use six characters plus `…` in human
+output, while JSON, manifests, state, logs and security comparisons retain their
+full values. `--no-color`, `NO_COLOR` and `TERM=dumb` disable terminal colors;
+`--plain` uses simple colorless labels.
+
+Progress starts before patch selection. It describes every inspected Exchange
+entry and its real outcome, content-based identification or reuse of a verified
+classification, state binding, recovery, archival decisions, payload validation
+and writes, process execution and Result Bundle creation. Skipped files include
+the reason. No extra file reads or safety decisions are introduced just to
+produce messages. ZIP entries read into memory are described as reads, not as
+files extracted to disk.
+
+All parsed `MESSAGE` blocks are shown in full before their script starts. Child
+output is forwarded as chunks arrive, including progress without a newline;
+PatchHarbor cannot force the child to flush its own buffers. In interactive
+terminals everything forms one chronological console. With redirected stdout
+or `--plain`, child text stays on stdout and human diagnostics go to stderr.
+JSON mode remains machine-only. Untrusted terminal controls are removed from
+visible text; raw execution logs keep the original bytes.
+
+The extra internal progress is **console-only**: it does not alter the raw
+`logs/execution.log` or add entries to the Result ZIP/recovery proof format.
+Display wording, colors, symbols, order, shortening and layout have no automated
+UI tests. Functional checks still cover selection, validation, mutation, process
+lifecycle, byte-exact logs, JSON, replay/recovery and Result Bundles.
+
 ### Explicit path overrides
 
 An explicit patch path bypasses parameterless package selection. Its complete
@@ -463,7 +494,8 @@ Functional CLI test helpers have no default subprocess deadline; slow Git or
 shared storage must not turn a correct scan into an arbitrary 20-second failure.
 Explicitly requested lifecycle/timeout checks retain their bounds. Termux patch
 entrypoints run pytest without per-test or whole-suite deadlines. The product's
-10,800-second default entrypoint timeout is unchanged, as are CI/release bounds.
+10,800-second default entrypoint timeout is unchanged. The native acceptance
+matrix has a 120-minute job limit; separate PowerShell/Docker bounds are unchanged.
 
 ## Linux watcher
 

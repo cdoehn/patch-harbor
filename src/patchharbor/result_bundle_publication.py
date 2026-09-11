@@ -13,6 +13,8 @@ from typing import BinaryIO, Iterator
 from uuid import UUID
 import zipfile
 
+from patchharbor.progress import activity
+
 from patchharbor.bundle_handoff import BundleHandoff, CHAT_INSTRUCTIONS_NAME, ENVIRONMENT_NAME
 from patchharbor.errors import PatchHarborError, result_bundle_error
 from patchharbor.identifier_presentation import shorten_identifier
@@ -112,6 +114,7 @@ def reserve_result_bundle_publication(
     run_id: UUID,
 ) -> ResultBundlePublication:
     """Exclusively reserve the same-directory temporary path for a later run."""
+    activity("RESERVE", f"Reserve Result destination: {final_path}")
     publication = prepare_result_bundle_publication(
         final_path,
         run_id=run_id,
@@ -287,6 +290,7 @@ def publish_result_bundle(
     before_publish: Callable[[str], None] | None = None,
 ) -> PublishedResultBundle:
     """Write, verify, best-effort sync, and atomically publish one bundle."""
+    activity("PUBLISH", f"Prepare atomic Result publication: {publication.final_path}", "heading")
     owned_stat = publication.reservation_stat
     owned_token = publication.reservation_token
     try:
@@ -313,6 +317,7 @@ def publish_result_bundle(
             publication.temporary_path,
             owned_stat,
         )
+        activity("VERIFY", "Verify temporary Result structure, required files and CRC")
         _verify_result_bundle(
             publication.temporary_path,
             execution_present=run_report.execution_present,
@@ -321,6 +326,7 @@ def publish_result_bundle(
             publication.temporary_path,
             owned_stat,
         )
+        activity("SYNC", "Synchronize Result file and parent directory where supported")
         temporary_file_sync = sync_regular_file_best_effort(
             publication.temporary_path
         )
@@ -332,6 +338,7 @@ def publish_result_bundle(
             owned_stat,
         )
         if before_publish is not None:
+            activity("RECEIPT", "Hash temporary Result bytes and pin recovery evidence before publication")
             digest = read_stable_regular_file_with_sha256(
                 publication.temporary_path, retained_content_limit=1,
                 allow_path_identity_fallback=True,
@@ -343,6 +350,7 @@ def publish_result_bundle(
                 allow_path_identity_fallback=True,
             ).sha256 != digest:
                 raise result_bundle_error("Result Bundle bytes changed before publication")
+        activity("PUBLISH", f"Publish verified Result atomically: {publication.final_path}")
         replace_path(
             publication.temporary_path,
             publication.final_path,
@@ -350,6 +358,7 @@ def publish_result_bundle(
         directory_after_replace = sync_directory_best_effort(
             publication.final_path.parent
         )
+        activity("PUBLISH", f"Result Bundle published: {publication.final_path}", "success")
         return PublishedResultBundle(
             path=publication.final_path,
             durability=PublicationDurability(

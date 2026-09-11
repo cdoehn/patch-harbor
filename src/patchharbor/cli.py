@@ -40,9 +40,9 @@ from patchharbor.presentation import (
     PresentedCompletion,
     PresentedStatus,
     SanitizedTextStream,
-    TerminalDashboard,
-    terminal_supports_dashboard,
+    StreamingConsole,
 )
+from patchharbor.progress import observe_activity
 from patchharbor.run_log import temporary_run_log
 from patchharbor.run_report import (
     ResultBundleStatus,
@@ -360,12 +360,12 @@ def _build_parser() -> argparse.ArgumentParser:
     apply_parser.add_argument(
         "--plain",
         action="store_true",
-        help="stream simple text output even when standard output is a terminal",
+        help="use undecorated, colorless streaming output (all messages remain visible)",
     )
     apply_parser.add_argument(
         "--no-color",
         action="store_true",
-        help="disable colors in the terminal dashboard",
+        help="disable colors in the streaming console",
     )
     apply_parser.add_argument(
         "--json",
@@ -443,12 +443,12 @@ def _build_parser() -> argparse.ArgumentParser:
     run_parser.add_argument(
         "--plain",
         action="store_true",
-        help="stream simple text output even when standard output is a terminal",
+        help="use undecorated, colorless streaming output (all messages remain visible)",
     )
     run_parser.add_argument(
         "--no-color",
         action="store_true",
-        help="disable colors in the terminal dashboard",
+        help="disable colors in the streaming console",
     )
     run_parser.add_argument(
         "--log",
@@ -789,10 +789,10 @@ def _bundle_command(
     stderr: TextIO,
 ) -> int:
     try:
-        result = bundle_repository(
-            path or Path.cwd(),
-            output_directory=output_directory,
-        )
+        with _console_scope(stdout, stderr=stderr, enabled=not json_output, color_enabled=True):
+            result = bundle_repository(
+                path or Path.cwd(), output_directory=output_directory,
+            )
     except PatchHarborError as exc:
         exit_code = int(exc.exit_code)
         if json_output:
@@ -854,50 +854,51 @@ def _presented_completion(
 
 
 @contextmanager
-def _dashboard_scope(
-    stdout: TextIO,
-    *,
-    enabled: bool,
-    color_enabled: bool,
-) -> Iterator[TerminalDashboard | None]:
-    """Own one optional dashboard and its single terminal-cleanup path."""
-    dashboard = (
-        TerminalDashboard(stdout, color_enabled=color_enabled)
-        if enabled and terminal_supports_dashboard(stdout)
-        else None
+def _console_scope(
+    stdout: TextIO, *, enabled: bool, color_enabled: bool,
+    stderr: TextIO | None = None,
+    plain: bool = False,
+) -> Iterator[StreamingConsole | None]:
+    """Start observation before discovery and release it on every exit path."""
+    try:
+        terminal = stdout.isatty() and not plain
+    except (AttributeError, OSError):
+        terminal = False
+    console = (
+        StreamingConsole(
+            stdout if terminal or stderr is None else stderr,
+            color_enabled=color_enabled and terminal, plain=plain,
+            child_output=None if terminal else stdout,
+        ) if enabled else None
     )
     try:
-        yield dashboard
+        with observe_activity(None if console is None else console.activity):
+            if console is not None:
+                console.activity("PATCHHARBOR", "Starting request", "heading")
+            yield console
     finally:
-        if dashboard is not None:
-            dashboard.close()
+        if console is not None:
+            console.close()
 
 
 def _output_targets_for_presentation(
-    *,
-    visible_stdout: TextIO,
-    visible_stderr: TextIO,
-    dashboard: TerminalDashboard | None,
-    suppress_visible_output: bool = False,
+    *, visible_stdout: TextIO, visible_stderr: TextIO,
+    console: StreamingConsole | None, suppress_visible_output: bool = False,
     raw_output_stream: BinaryIO | None = None,
     warning_observer: Callable[[str], None] | None = None,
 ) -> OutputTargets:
-    """Route output once for JSON, dashboard, or plain presentation."""
+    """Keep machine JSON and raw bytes separate from human streaming output."""
     if suppress_visible_output:
         return OutputTargets(
-            visible_text_stream=StringIO(),
-            raw_output_stream=raw_output_stream,
+            visible_text_stream=StringIO(), raw_output_stream=raw_output_stream,
             warning_observer=warning_observer,
         )
     return OutputTargets(
         visible_text_stream=visible_stdout,
-        live_text_stream=(None if dashboard is not None else visible_stdout),
+        live_text_stream=visible_stdout if console is None else console.child_stream,
         raw_output_stream=raw_output_stream,
-        warning_text_stream=(None if dashboard is not None else visible_stderr),
+        warning_text_stream=visible_stderr if console is None else console.warning_stream,
         warning_observer=warning_observer,
-        line_observer=(
-            None if dashboard is None else dashboard.update_output
-        ),
     )
 
 
@@ -916,15 +917,17 @@ def _apply_command(
 ) -> int:
     visible_stdout = stdout if json_output else SanitizedTextStream(stdout)
     visible_stderr = SanitizedTextStream(stderr)
-    with _dashboard_scope(
+    with _console_scope(
         stdout,
-        enabled=not json_output and not force_plain,
+        stderr=stderr,
+        enabled=not json_output,
         color_enabled=not no_color,
-    ) as dashboard:
+        plain=force_plain,
+    ) as console:
         output = _output_targets_for_presentation(
             visible_stdout=visible_stdout,
             visible_stderr=visible_stderr,
-            dashboard=dashboard,
+            console=console,
             suppress_visible_output=json_output,
         )
         try:
@@ -934,13 +937,13 @@ def _apply_command(
                 timeout_seconds=timeout_seconds,
                 output_directory=output_directory,
                 output=output,
-                presentation=dashboard,
+                presentation=console,
                 automatic=automatic,
             )
         except OSError as exc:
             operation = (
-                "cannot render terminal dashboard"
-                if dashboard is not None
+                "cannot render terminal console"
+                if console is not None
                 else "cannot write PatchHarbor output"
             )
             print(
@@ -951,7 +954,7 @@ def _apply_command(
             )
             return int(ExitCode.EXECUTION_ERROR)
 
-        if dashboard is None or not dashboard.started:
+        if console is None or not console.started:
             return _write_apply_completion(
                 report,
                 json_output=json_output,
@@ -961,7 +964,7 @@ def _apply_command(
 
         tool_error = report.completion_tool_error
         try:
-            dashboard.finish(
+            console.finish(
                 _presented_completion(
                     exit_code=report.process_exit_code,
                     tool_error=(
@@ -973,11 +976,15 @@ def _apply_command(
         except OSError as exc:
             print(
                 format_tool_message(
-                    "cannot restore terminal: " f"{describe_os_error(exc)}"
+                    "cannot write streaming console: " f"{describe_os_error(exc)}"
                 ),
                 file=visible_stderr,
             )
             return int(ExitCode.EXECUTION_ERROR)
+        if console.separate_child_output:
+            return _write_apply_completion(
+                report, json_output=False, stdout=visible_stdout, stderr=visible_stderr,
+            )
         _write_emergency_diagnostics_notice(
             report.result_bundle.emergency_diagnostics_path,
             failed=report.result_bundle.status is ResultBundleStatus.FAILED,
@@ -1014,7 +1021,7 @@ def _execute_request(
     stdin: TextIO,
     stdout: TextIO,
     output: OutputTargets,
-    dashboard: TerminalDashboard | None,
+    console: StreamingConsole | None,
 ) -> tuple[int, str | None]:
     try:
         if path is not None:
@@ -1026,7 +1033,7 @@ def _execute_request(
                     selection_input=stdin,
                     selection_output=stdout,
                     output=output,
-                    presentation=dashboard,
+                    presentation=console,
                 ),
                 None,
             )
@@ -1036,7 +1043,7 @@ def _execute_request(
                 cwd=cwd,
                 timeout_seconds=timeout_seconds,
                 output=output,
-                presentation=dashboard,
+                presentation=console,
             ),
             None,
         )
@@ -1065,11 +1072,13 @@ def _run_command(
     exit_code = 0
     tool_error: str | None = None
 
-    with _dashboard_scope(
+    with _console_scope(
         stdout,
-        enabled=not force_plain,
+        stderr=stderr,
+        enabled=True,
         color_enabled=not no_color,
-    ) as dashboard:
+        plain=force_plain,
+    ) as console:
         try:
             with log_context as run_log:
                 if run_log is not None:
@@ -1085,7 +1094,7 @@ def _run_command(
                 output = _output_targets_for_presentation(
                     visible_stdout=stdout,
                     visible_stderr=stderr,
-                    dashboard=dashboard,
+                    console=console,
                     raw_output_stream=(
                         None if run_log is None else run_log.raw_output_stream
                     ),
@@ -1101,7 +1110,7 @@ def _run_command(
                         stdin=stdin,
                         stdout=stdout,
                         output=output,
-                        dashboard=dashboard,
+                        console=console,
                     )
                 except KeyboardInterrupt:
                     exit_code = int(ExitCode.INTERRUPTED)
@@ -1122,19 +1131,19 @@ def _run_command(
             )
             exit_code = int(ExitCode.EXECUTION_ERROR)
 
-        if dashboard is not None and dashboard.started:
+        if console is not None and console.started:
             try:
-                dashboard.finish(
+                console.finish(
                     _presented_completion(
                         exit_code=exit_code,
                         tool_error=tool_error,
-                        log_path=log_path,
+                        log_path=None,
                     )
                 )
             except OSError as exc:
                 print(
                     format_tool_message(
-                        "cannot restore terminal: "
+                        "cannot write streaming console: "
                         f"{describe_os_error(exc)}"
                     ),
                     file=stderr,
@@ -1143,8 +1152,8 @@ def _run_command(
         else:
             if tool_error is not None:
                 print(format_tool_message(tool_error), file=stderr)
-            if log_path is not None:
-                print(format_tool_message(f"log: {log_path}"), file=stderr)
+        if log_path is not None:
+            print(format_tool_message(f"log: {log_path}"), file=stderr)
 
         return exit_code
 

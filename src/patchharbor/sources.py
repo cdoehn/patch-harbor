@@ -10,6 +10,8 @@ import os
 from pathlib import Path
 from typing import TextIO
 
+from patchharbor.progress import activity
+
 from patchharbor.errors import ExitCode, PatchHarborError
 from patchharbor.models import InputArtifact
 from patchharbor.platform.errors import describe_os_error
@@ -34,6 +36,7 @@ def _input_limit_error(
 
 def file_input_artifact(path: Path) -> InputArtifact:
     """Reference one filesystem input without interpreting its content."""
+    activity("SOURCE", f"Use explicit input file: {path}")
     return InputArtifact(path=path, display_name=str(path))
 
 
@@ -58,6 +61,7 @@ def stdin_input_artifact(
     policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY,
 ) -> Iterator[InputArtifact]:
     """Copy standard input as bounded bytes to one secure temporary artifact."""
+    activity("SOURCE", "Read standard input into a bounded private artifact")
     byte_stream = getattr(stream, "buffer", stream)
     bytes_written = 0
 
@@ -99,6 +103,7 @@ def stdin_input_artifact(
                     ExitCode.USAGE_ERROR,
                 )
 
+            activity("SOURCE", f"Prepared standard input: {bytes_written} bytes", "success")
             yield InputArtifact(
                 path=artifact_path,
                 display_name="standard input",
@@ -127,6 +132,7 @@ class DirectoryCandidate:
 
 def list_directory_entries(directory: Path) -> tuple[DirectoryCandidate, ...]:
     """Scan once and return sorted regular non-symlink files."""
+    activity("SCAN", f"Scan manual input directory: {directory}", "heading")
     try:
         entries = list(directory.iterdir())
     except OSError as exc:
@@ -138,8 +144,10 @@ def list_directory_entries(directory: Path) -> tuple[DirectoryCandidate, ...]:
 
     candidates: list[DirectoryCandidate] = []
     for entry in entries:
+        activity("SCAN", f"Inspect directory entry: {entry.name}")
         try:
             if entry.is_symlink() or not entry.is_file():
+                activity("SKIP", f"{entry.name}: link or non-regular input", "detail")
                 continue
             candidates.append(
                 DirectoryCandidate(
@@ -147,7 +155,8 @@ def list_directory_entries(directory: Path) -> tuple[DirectoryCandidate, ...]:
                     modified_ns=entry.stat().st_mtime_ns,
                 )
             )
-        except OSError:
+        except OSError as exc:
+            activity("SKIP", f"{entry.name}: metadata unavailable ({exc})", "detail")
             continue
 
     return tuple(
@@ -169,6 +178,7 @@ def select_directory_candidate(
 ) -> DirectoryCandidate:
     """Choose exactly one candidate without accessing the filesystem."""
     if len(candidates) == 1:
+        activity("SELECT", f"Only valid manual candidate: {candidates[0].display_name}", "success")
         return candidates[0]
 
     for index, candidate in enumerate(candidates, start=1):
@@ -192,6 +202,7 @@ def select_directory_candidate(
         if value.isascii() and value.isdecimal():
             index = int(value) - 1
             if 0 <= index < count:
+                activity("SELECT", f"Selected manual candidate: {candidates[index].display_name}", "success")
                 return candidates[index]
 
         print(f"Enter 1-{count}.", file=output_stream)

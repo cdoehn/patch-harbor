@@ -8,6 +8,8 @@ from dataclasses import dataclass
 from hashlib import sha256
 from pathlib import Path
 
+from patchharbor.progress import activity
+
 from patchharbor.errors import ExitCode, PatchHarborError
 from patchharbor.interpreters import (
     ResolvedInterpreter,
@@ -63,6 +65,7 @@ def _verified_private_resource(
     *,
     failure_exit: ExitCode,
 ) -> Path:
+    activity("PREPARE", f"Write and hash-verify private entrypoint resource: {relative_path}")
     target = _private_resource_path(root, relative_path)
     expected_hash = sha256(content).digest()
     try:
@@ -79,12 +82,14 @@ def _verified_private_resource(
             "private package resource does not match the validated ZIP entry",
             failure_exit,
         )
+    activity("PREPARE", f"Private resource verified: {relative_path}", "success")
     return target
 
 
 def _validated_entrypoint(
     package: ValidatedPatchPackage,
 ) -> tuple[ParsedScript, ResolvedInterpreter]:
+    activity("SCRIPT", f"Parse marker, metadata and MESSAGE blocks: {package.entrypoint.relative_path}")
     try:
         script = parse_script(package.entrypoint.content.decode("utf-8"))
     except (UnicodeError, ScriptFormatError) as exc:
@@ -92,6 +97,7 @@ def _validated_entrypoint(
             "patch package entrypoint is not a valid PatchHarbor script",
             ExitCode.NO_VALID_SCRIPT,
         ) from exc
+    activity("SCRIPT", "Resolve the required Bash/PowerShell interpreter")
     return script, resolve_script_interpreter(script.text)
 
 

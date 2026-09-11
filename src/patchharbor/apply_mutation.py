@@ -6,6 +6,8 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
 
+from patchharbor.progress import activity
+
 from patchharbor.apply_preflight import PreparedPatchPackage
 from patchharbor.apply_repository import SafeResolvedRepository
 from patchharbor.errors import (
@@ -129,8 +131,10 @@ def apply_payload_mutation(
     mutation_gate: ApplyMutationGate,
 ) -> ApplyMutationResult:
     """Recheck repository state, resolve targets afresh, and write payloads."""
+    activity("RECHECK", "Capture repository state again immediately before mutation")
     current_context = _capture_mutation_context(mutation_gate)
     if current_context != mutation_gate.context:
+        activity("RECHECK", "Repository changed after preflight; no payload writes", "error")
         return ApplyMutationResult.failed(
             current_context,
             kind=MutationFailureKind.STATE_MISMATCH,
@@ -139,6 +143,7 @@ def apply_payload_mutation(
             ),
         )
 
+    activity("RECHECK", "State unchanged; enter checked mutation boundary", "success")
     if mutation_gate.before_mutation is not None:
         mutation_gate.before_mutation()
 
@@ -163,4 +168,5 @@ def apply_payload_mutation(
             error=error,
         )
 
+    activity("PAYLOAD", "All payload files written", "success")
     return ApplyMutationResult.succeeded(current_context)

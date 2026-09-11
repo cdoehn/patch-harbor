@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+from patchharbor.progress import activity
+
 from patchharbor.bundle_paths import BundlePathError, normalize_bundle_path
 from patchharbor.bundle_handoff import BundleHandoff, split_patch_handoff
 from patchharbor.errors import ExitCode, PatchHarborError, patch_package_error
@@ -60,6 +62,7 @@ def resolve_patch_payloads(
     package_path: Path,
     package_sha256: str | None = None,
 ) -> ValidatedPatchPackage:
+    activity("MANIFEST", "Locate regular root patch.json")
     manifest_payload = next(
         (
             payload
@@ -73,8 +76,10 @@ def resolve_patch_payloads(
             "patch package must contain exactly one regular root patch.json"
         )
 
+    activity("MANIFEST", "Validate exact schema, marker and full repository binding")
     manifest = parse_patch_manifest(manifest_payload.content)
     all_payloads = payloads
+    activity("HANDOFF", "Validate passive chat/environment metadata separately from payloads")
     payloads, handoff = split_patch_handoff(payloads, manifest)
     try:
         entrypoint_path = normalize_bundle_path(manifest.entrypoint)
@@ -101,6 +106,7 @@ def resolve_patch_payloads(
         tuple(payload for payload in all_payloads if payload is not manifest_payload),
         policy=resource_policy,
     )
+    activity("MANIFEST", f"Validated entrypoint {entrypoint.relative_path} and {len(payload_tuple)} payload(s)", "success")
     return ValidatedPatchPackage(
         manifest=manifest,
         entrypoint=entrypoint,
@@ -117,6 +123,7 @@ def resolve_patch_package(
     resource_policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY,
 ) -> ValidatedPatchPackage:
     """Read every ZIP member, then apply format-1 package roles."""
+    activity("OPEN", f"Open explicit patch and capture stable content with SHA-256: {path}")
     try:
         target = path.resolve(strict=True)
         if target.stat().st_size > resource_policy.max_input_artifact_bytes:

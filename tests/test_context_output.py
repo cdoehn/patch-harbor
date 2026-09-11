@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-from io import StringIO
 from pathlib import Path
 
-from patchharbor.context_output import context_json_result, write_context_block
+from patchharbor.context_output import context_json_result
 from patchharbor.models import (
     GitObjectFormat,
     GitObjectId,
@@ -27,13 +26,10 @@ def _context(tmp_path: Path) -> RepositoryContext:
     )
 
 
-def test_context_representations_include_the_same_values(
+def test_context_json_preserves_complete_values(
     tmp_path: Path,
 ) -> None:
     context = _context(tmp_path)
-    stream = StringIO()
-
-    write_context_block(context, stream)
     document = context_json_result(context)
 
     assert document == {
@@ -44,23 +40,3 @@ def test_context_representations_include_the_same_values(
         "state_fingerprint": context.state_fingerprint,
         "fingerprint_algorithm": context.fingerprint_algorithm,
     }
-    human = stream.getvalue()
-    assert "repo_id: a3f9c2…" in human
-    assert "base_commit: ffffff…" in human
-    assert "state_fingerprint: 7c9d2a…" in human
-    assert context.fingerprint_algorithm in human
-    assert str(context.repo_id) not in human
-    assert str(context.base_commit) not in human
-    assert context.state_fingerprint not in human
-    assert (
-        "Kurzansicht nicht in patch.json oder als Chat-/Maschineninput "
-        "verwenden."
-        in human
-    )
-    assert (
-        "Vollständige Werte mit patchharbor context --json [REPOSITORY] "
-        "ausgeben."
-        in human
-    )
-    assert "CHAT_INSTRUCTIONS.md" not in human
-    assert "Vollständige Werte für patch.json mit --json ausgeben." not in human

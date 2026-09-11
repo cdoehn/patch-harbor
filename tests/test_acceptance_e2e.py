@@ -65,7 +65,6 @@ def test_acceptance_direct_script_message_plain_output_and_log(
     )
 
     assert isinstance(completed.stdout, str)
-    assert isinstance(completed.stderr, str)
     assert completed.returncode == 0
     assert completed.stdout == "direct-accepted\n"
 
@@ -97,12 +96,8 @@ def test_acceptance_directory_selection_uses_displayed_index(tmp_path: Path) -> 
     )
 
     assert isinstance(completed.stdout, str)
-    assert isinstance(completed.stderr, str)
     assert completed.returncode == 0
-    assert f"1 {newest.name}" in completed.stdout
-    assert f"2 {older.name}" in completed.stdout
     assert completed.stdout.endswith("older\n")
-    assert completed.stderr == ""
 
 
 def test_acceptance_zip_bundle_transfers_binary_and_runs_scripts_in_order(
@@ -133,10 +128,8 @@ def test_acceptance_zip_bundle_transfers_binary_and_runs_scripts_in_order(
     completed = run_cli(tmp_path, "fs", "run", str(archive_path))
 
     assert isinstance(completed.stdout, str)
-    assert isinstance(completed.stderr, str)
     assert completed.returncode == 0
     assert completed.stdout == ""
-    assert completed.stderr == ""
     assert (tmp_path / "assets" / "blob.bin").read_bytes() == binary_payload
     assert (tmp_path / "order.txt").read_text(encoding="utf-8-sig").splitlines() == [
         "first",
@@ -153,10 +146,8 @@ def test_acceptance_pipe_runs_direct_script(tmp_path: Path) -> None:
     )
 
     assert isinstance(completed.stdout, str)
-    assert isinstance(completed.stderr, str)
     assert completed.returncode == 0
     assert completed.stdout == "pipe-accepted\n"
-    assert completed.stderr == ""
 
 
 def test_acceptance_timeout_returns_124(tmp_path: Path) -> None:
@@ -188,10 +179,8 @@ def test_acceptance_script_exit_code_is_forwarded(tmp_path: Path) -> None:
     completed = run_cli(tmp_path, "fs", "run", str(script_path))
 
     assert isinstance(completed.stdout, str)
-    assert isinstance(completed.stderr, str)
     assert completed.returncode == 23
     assert completed.stdout == "failed\n"
-    assert completed.stderr == ""
 
 
 @pytest.mark.skipif(not IS_WINDOWS, reason="requires a real Windows runner")

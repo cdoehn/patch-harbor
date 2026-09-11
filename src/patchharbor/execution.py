@@ -9,6 +9,8 @@ from pathlib import Path
 import sys
 from typing import BinaryIO
 
+from patchharbor.progress import activity
+
 from patchharbor.errors import ExitCode, PatchHarborError
 from patchharbor.interpreters import (
     InterpreterSpec,
@@ -283,6 +285,7 @@ def _control_process(
         script_path,
     )
 
+    activity("EXEC", f"Start {executable_path} in {cwd}; timeout={timeout_seconds:g}s", "heading")
     try:
         process_tree = create_process_tree(command, cwd=cwd)
     except OSError as exc:
@@ -301,17 +304,20 @@ def _control_process(
 
     try:
         with process_tree:
+            activity("EXEC", "Interpreter started; drain complete merged stdout/stderr live", "success")
             capture.start()
             result = process_tree.run(timeout_seconds=timeout_seconds)
             capture.finish()
             targets.write_visible_lines(capture.visible_lines)
 
             if result.state is ProcessState.TIMED_OUT:
+                activity("TIMEOUT", f"Script exceeded {timeout_seconds:g}s; process tree stopped", "error")
                 raise PatchHarborError(
                     f"script timed out after {timeout_seconds:g} seconds",
                     ExitCode.TIMEOUT,
                 )
             if result.state is ProcessState.INTERRUPTED:
+                activity("INTERRUPT", "Script interrupted; process tree stopped", "warning")
                 raise PatchHarborError(
                     "script aborted by user",
                     ExitCode.INTERRUPTED,
@@ -320,6 +326,8 @@ def _control_process(
                 raise OSError("script process tree returned no terminal result")
             if result.return_code is None:
                 raise OSError("script process tree returned no exit code")
+            activity("EXEC", f"Interpreter completed with exit {result.return_code}",
+                     "success" if result.return_code == 0 else "error")
             return result.return_code
     except KeyboardInterrupt:
         _finish_capture_after_process_error(capture)

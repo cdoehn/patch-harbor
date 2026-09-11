@@ -37,7 +37,6 @@ def test_platform_default_interpreter_ignores_filename_extension(
     assert completed.returncode == 0
     expected = native_value("bash-default\n", "powershell-default\n")
     assert completed.stdout == expected
-    assert completed.stderr == ""
 
 
 def test_platform_uses_system_temp_for_staging_and_requested_cwd(
@@ -73,7 +72,6 @@ def test_platform_uses_system_temp_for_staging_and_requested_cwd(
 
     assert completed.returncode == 0
     assert completed.stdout == ""
-    assert completed.stderr == ""
     observed_cwd = (working_directory / "observed-cwd.txt").read_text(
         encoding="utf-8"
     ).strip()
@@ -119,7 +117,6 @@ def test_platform_zip_patchbundle_preserves_binary_payload(
 
     assert completed.returncode == 0
     assert completed.stdout == "bundle-ok\n"
-    assert completed.stderr == ""
     assert (tmp_path / "assets" / "blob.bin").read_bytes() == binary_payload
 
 
@@ -200,4 +197,3 @@ def test_platform_powershell_7_shebang_executes_when_available(
 
     assert completed.returncode == 0
     assert completed.stdout == "pwsh-seven\n"
-    assert completed.stderr == ""

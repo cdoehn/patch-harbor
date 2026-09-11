@@ -7,6 +7,8 @@ from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
+from patchharbor.progress import activity
+
 from patchharbor.errors import repository_resolution_error
 from patchharbor.locks import (
     registry_lock,
@@ -129,6 +131,7 @@ def safely_resolved_repository(
     output_directory: Path | None = None,
 ) -> Iterator[SafeResolvedRepository]:
     """Yield one exact context while its repository lock and output hold live."""
+    activity("REPO", "Resolve exact repository instance and reserve Result destination")
     paths = registration_user_paths()
     with ExitStack() as repository_scope:
         with registry_lock(paths):
@@ -160,11 +163,13 @@ def safely_resolved_repository(
                 manifest.repo_id,
             )
 
+            activity("LOCK", f"Acquire repository lock: {repository}")
             lock_path = repository_lock_path(paths, manifest.repo_id)
             repository_scope.enter_context(
                 repository_lock(paths, manifest.repo_id)
             )
 
+            activity("LOCK", "Repository lock held; revalidate registration and identity", "success")
             locked_registry = load_registry(paths)
             locked_path = _repository_path_for_id(
                 locked_registry,
@@ -180,6 +185,7 @@ def safely_resolved_repository(
             )
             revalidate_result_bundle_target(target, locked_registry, paths)
 
+        activity("STATE", f"Capture locked repository context: {locked_repository}")
         snapshot = capture_consistent_repository_snapshot(locked_repository)
         context = repository_context_from_snapshot(
             locked_repository,

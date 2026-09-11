@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from collections import deque
 from dataclasses import dataclass
-from io import BufferedReader, RawIOBase, TextIOWrapper
+from codecs import getincrementaldecoder
+from io import DEFAULT_BUFFER_SIZE, IncrementalNewlineDecoder, RawIOBase
 from threading import Lock, Thread
 import time
 from typing import BinaryIO, Callable, TextIO
@@ -237,30 +238,39 @@ class ProcessOutputCapture:
             self._live_text_stream = None
 
     def _drain(self) -> None:
-        text_stream: TextIOWrapper | None = None
+        # Decode available byte chunks instead of waiting for a newline. This
+        # also forwards pytest dots and final unterminated output immediately.
+        raw_tee = _RawOutputTee(
+            self._stream, self._raw_output_stream, self._remember_error,
+        )
+        decoder = IncrementalNewlineDecoder(
+            getincrementaldecoder("utf-8")(errors="replace"), translate=True,
+        )
+        pending = ""
+        buffer = bytearray(DEFAULT_BUFFER_SIZE)
         try:
-            raw_tee = _RawOutputTee(
-                self._stream,
-                self._raw_output_stream,
-                self._remember_error,
-            )
-            text_stream = TextIOWrapper(
-                BufferedReader(raw_tee),
-                encoding="utf-8",
-                errors="replace",
-                newline=None,
-            )
-            for line in text_stream:
-                self._buffer.append(line)
-                self._publish_text(line)
-                self._publish_snapshot()
+            while True:
+                count = raw_tee.readinto(buffer)
+                if count is None:
+                    continue
+                final = count == 0
+                text = decoder.decode(bytes(buffer[:count]), final=final)
+                if text:
+                    self._publish_text(text)
+                    pending += text
+                    while "\n" in pending:
+                        line, pending = pending.split("\n", 1)
+                        self._buffer.append(line + "\n")
+                        self._publish_snapshot()
+                if final:
+                    if pending:
+                        self._buffer.append(pending)
+                        self._publish_snapshot()
+                    break
         except Exception as exc:  # reported by finish() on the controlling thread
             self._remember_error("cannot read script output", exc)
         finally:
             try:
-                if text_stream is None:
-                    self._stream.close()
-                else:
-                    text_stream.close()
+                raw_tee.close()
             except OSError as exc:
                 self._remember_error("cannot close script output", exc)

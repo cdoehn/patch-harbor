@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from patchharbor.progress import activity
+
 from patchharbor.errors import ExitCode, PatchHarborError
 from patchharbor.models import (
     BundlePayload,
@@ -92,6 +94,7 @@ def _read_direct_artifact(
     artifact: InputArtifact,
     policy: ResourcePolicy,
 ) -> bytes:
+    activity("OPEN", f"Read possible direct script: {artifact.display_name}")
     try:
         with artifact.path.open("rb") as stream:
             raw_content = stream.read(policy.max_input_artifact_bytes + 1)
@@ -109,10 +112,12 @@ def _classify_zip_payloads(
     files: list[BundlePayload] = []
 
     for payload in payloads:
+        activity("IDENTIFY", f"Check script marker: {payload.relative_path}")
         try:
             script_text = payload.content.decode("utf-8")
             validate_required_marker(script_text)
         except (UnicodeError, ScriptFormatError):
+            activity("FILE", f"{payload.relative_path}: data payload, not an executable script", "detail")
             files.append(payload)
             continue
 
@@ -203,6 +208,7 @@ def resolve_patch_bundle(
     policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY,
 ) -> PatchBundle:
     """Resolve one source-neutral artifact to an ordered PatchBundle."""
+    activity("IDENTIFY", f"Check input size and ZIP content: {artifact.display_name}")
     artifact_warnings = _artifact_warnings(artifact, policy)
     raw_payloads = _read_zip_payloads(artifact, policy)
     if raw_payloads is not None:
@@ -219,6 +225,7 @@ def resolve_patch_bundle(
         artifact,
     )
     if direct_script is not None:
+        activity("SCRIPT", f"Validated direct script: {artifact.display_name}", "success")
         return PatchBundle(
             scripts=(direct_script,),
             warnings=artifact_warnings,

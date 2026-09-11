@@ -10,6 +10,8 @@ import os
 from pathlib import Path
 import stat
 
+from patchharbor.progress import activity
+
 from patchharbor.bundle_names import is_browser_temporary_name
 from patchharbor.errors import PatchHarborError, patch_package_error
 from patchharbor.exchange_state import (
@@ -146,6 +148,7 @@ def _read_exchange_file(
     resource_policy: ResourcePolicy,
     retained_content_limit: int | None = None,
 ) -> _ExchangeFileSnapshot:
+    activity("OPEN", f"Read and SHA-256 check Exchange file: {path}")
     if path.parent != directory:
         raise ExchangeScanError("exchange file is outside the configured directory")
     try:
@@ -178,6 +181,7 @@ def _read_exchange_file(
         ) from exc
     if canonical_after != canonical_before:
         raise ExchangeScanError("exchange file changed while it was being read")
+    activity("SHA256", f"Stable content read: {path.name}", "success")
     return _ExchangeFileSnapshot(
         identity=ExchangeFileIdentity(
             path=canonical_after,
@@ -194,14 +198,19 @@ def _classify_content(
     *,
     resource_policy: ResourcePolicy,
 ) -> _ContentClassification:
+    activity("IDENTIFY", f"Inspect content, not filename suffix: {path.name}")
     if content is None:
+        activity("SKIP", f"{path.name}: exceeds retained parsing limit", "detail")
         return _ContentClassification(kind=ExchangeArtifactKind.OTHER)
     try:
         payloads = read_zip_payload_bytes(content, policy=resource_policy)
-    except ZipPayloadError:
+    except ZipPayloadError as exc:
+        activity("SKIP", f"{path.name}: not a supported safe ZIP ({exc})", "detail")
         return _ContentClassification(kind=ExchangeArtifactKind.OTHER)
 
+    activity("IDENTIFY", f"Check PatchHarbor Result marker: {path.name}")
     if _is_result_bundle(payloads):
+        activity("RESULT", f"{path.name}: Result Bundle, not an executable patch", "detail")
         return _ContentClassification(kind=ExchangeArtifactKind.RESULT_BUNDLE)
 
     try:
@@ -211,9 +220,11 @@ def _classify_content(
             package_path=path,
             package_sha256=sha256(content).hexdigest(),
         )
-    except PatchHarborError:
+    except PatchHarborError as exc:
+        activity("SKIP", f"{path.name}: not a valid PatchHarbor patch ({exc})", "detail")
         return _ContentClassification(kind=ExchangeArtifactKind.OTHER)
 
+    activity("PATCH", f"{path.name}: validated PatchHarbor package", "success")
     return _ContentClassification(
         kind=ExchangeArtifactKind.PATCH_PACKAGE,
         selection=ExchangePatchSelection.from_manifest(package.manifest),
@@ -283,14 +294,19 @@ def _top_level_regular_paths(directory: Path) -> tuple[Path, ...]:
         with os.scandir(directory) as entries:
             regular_paths: list[Path] = []
             for entry in entries:
+                activity("SCAN", f"Inspect directory entry: {entry.name}")
                 if is_browser_temporary_name(entry.name):
+                    activity("SKIP", f"{entry.name}: unfinished browser download", "detail")
                     continue
                 try:
                     metadata = entry.stat(follow_symlinks=False)
-                except OSError:
+                except OSError as exc:
+                    activity("SKIP", f"{entry.name}: cannot inspect metadata ({exc})", "warning")
                     continue
                 if stat.S_ISREG(metadata.st_mode):
                     regular_paths.append(directory / entry.name)
+                else:
+                    activity("SKIP", f"{entry.name}: directory, link or non-regular entry; not opened", "detail")
     except OSError as exc:
         raise ExchangeScanError("cannot scan exchange directory") from exc
     regular_paths.sort(key=lambda candidate: os.fsencode(candidate.name))
@@ -304,6 +320,7 @@ def scan_exchange_directory(
     resource_policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY,
 ) -> tuple[ExchangeArtifact, ...]:
     """Classify top-level files with persistent identity and cached content kind."""
+    activity("SCAN", f"Scan Exchange directory: {directory}", "heading")
     initial_state = (
         load_exchange_state(paths)
         if paths is not None
@@ -324,7 +341,8 @@ def scan_exchange_directory(
                 directory=directory,
                 resource_policy=resource_policy,
             )
-        except ExchangeScanError:
+        except ExchangeScanError as exc:
+            activity("SKIP", f"{path.name}: unstable or unreadable file ({exc})", "warning")
             # One unstable, unreadable, or concurrently changing download is
             # not evidence that the configured directory itself is unusable.
             # Ignore it for this scan; selected patches are re-opened and
@@ -332,6 +350,7 @@ def scan_exchange_directory(
             continue
         cached = initial_records.get(snapshot.identity)
         if cached is not None:
+            activity("CACHE", f"{path.name}: same verified content; reuse {cached.kind} classification", "detail")
             artifacts.append(
                 _artifact_from_record(
                     path,
@@ -357,9 +376,11 @@ def scan_exchange_directory(
             )
         )
 
+    activity("SCAN", f"Classified {len(artifacts)} regular file(s)", "success")
     if paths is None:
         return tuple(artifacts)
 
+    activity("STATE", f"Persist {len(uncached_records)} new classification(s); retain replay state")
     current_state = merge_exchange_classifications(paths, uncached_records)
     current_records = {
         record.identity: record for record in current_state.records
@@ -392,6 +413,7 @@ def materialize_exchange_patch(
     resource_policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY,
 ) -> ValidatedPatchPackage:
     """Reopen the unique selected identity and require the same valid package."""
+    activity("RECHECK", f"Reopen selected package and verify identical content: {artifact.path.name}")
     if (
         artifact.kind is not ExchangeArtifactKind.PATCH_PACKAGE
         or artifact.selection is None

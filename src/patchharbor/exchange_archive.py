@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+from patchharbor.progress import activity
+
 from patchharbor.archive_evidence import ArchiveEvidence, parse_archive_evidence
 from patchharbor.archive_files import archive_verified_file
 from patchharbor.archive_git import is_proven_obsolete
@@ -58,7 +60,9 @@ def archive_exchange_artifacts(
     excluded_paths: frozenset[Path] = frozenset(),
 ) -> ArchiveMaintenance:
     """Maintain only the selected repository scope; None is the global watcher."""
+    activity("ARCHIVE", "Evaluate conservative Exchange archival", "heading")
     if not configuration.archive_directory:
+        activity("ARCHIVE", "Disabled by configuration; no files moved", "detail")
         return ArchiveMaintenance(artifacts)
     moved: set[ExchangeFileIdentity] = set()
     destinations: list[Path] = []
@@ -72,6 +76,7 @@ def archive_exchange_artifacts(
                 configuration.exchange_directory, registry, exchange_must_exist=True,
             )
             # Opening is also a containment/type check, not just mkdir(exist_ok).
+            activity("ARCHIVE", f"Open or create checked archive folder: {configuration.archive_directory}")
             location_scope = open_archive_location(
                 configuration.exchange_directory, configuration.archive_directory,
             )
@@ -86,13 +91,19 @@ def archive_exchange_artifacts(
             }
             candidates: dict[RepositoryId, list[tuple[ExchangeArtifact, ArchiveEvidence]]] = {}
             for artifact in artifacts:
+                activity("ARCHIVE", f"Examine: {artifact.path.name}")
                 if (artifact.kind is ExchangeArtifactKind.OTHER
                     or artifact.path in excluded_paths
                     or artifact.identity.sha256 in pending_results):
+                    reason = ("not a bundle" if artifact.kind is ExchangeArtifactKind.OTHER
+                              else "explicitly selected patch" if artifact.path in excluded_paths
+                              else "Result evidence required by a pending attempt")
+                    activity("KEEP", f"{artifact.path.name}: {reason}", "detail")
                     continue
                 # A known foreign binding cannot belong to the manual scope.
                 if (repository_id is not None and artifact.selection is not None
                     and artifact.selection.repo_id != repository_id):
+                    activity("KEEP", f"{artifact.path.name}: outside repository scope", "detail")
                     continue
                 try:
                     raw = read_exchange_artifact_content(
@@ -100,27 +111,33 @@ def archive_exchange_artifacts(
                     )
                     evidence = parse_archive_evidence(raw, artifact.path)
                     if evidence.kind != artifact.kind.value:
+                        activity("KEEP", f"{artifact.path.name}: content kind changed", "detail")
                         continue
                     if (artifact.selection is not None
                         and artifact.selection != evidence.selection):
+                        activity("KEEP", f"{artifact.path.name}: binding changed", "detail")
                         continue
                     selected_id = evidence.selection.repo_id
                     if repository_id is not None and selected_id != repository_id:
+                        activity("KEEP", f"{artifact.path.name}: outside repository scope", "detail")
                         continue
                     candidates.setdefault(selected_id, []).append((artifact, evidence))
-                except _KEEP_ERRORS:
+                except _KEEP_ERRORS as exc:
+                    activity("KEEP", f"{artifact.path.name}: archival evidence unavailable ({exc})", "detail")
                     continue
 
             for selected_id, repository_candidates in candidates.items():
                 try:
                     with locked_repository_context_for_id(selected_id) as context:
                         if context is None:
+                            activity("KEEP", "Repository unavailable; retain its archival candidates", "detail")
                             continue
                         state = load_exchange_state(paths)
                         for artifact, evidence in repository_candidates:
                             try:
                                 record = state.record_for(artifact.identity)
                                 if not is_proven_obsolete(evidence, context, record):
+                                    activity("KEEP", f"{artifact.path.name}: no proof that the bundle is obsolete", "detail")
                                     continue
                                 # Hold the existing repository and registry locks
                                 # through hash verification and the actual move.
@@ -149,23 +166,29 @@ def archive_exchange_artifacts(
                                             raise ValueError("archival registration or configuration changed")
                                         require_local_repository_identity(context.repository_path, selected_id)
 
+                                    activity("ARCHIVE", f"Recheck full content and current Git proof before moving: {artifact.path.name}")
                                     destination = archive_verified_file(
                                         location, artifact.identity, verify_eligibility=verify_eligibility,
                                     )
                                     moved.add(artifact.identity)
                                     destinations.append(destination)
-                            except _KEEP_ERRORS:
+                                    activity("ARCHIVE", f"Moved {artifact.path.name} to {destination}", "success")
+                            except _KEEP_ERRORS as exc:
+                                activity("KEEP", f"{artifact.path.name}: final archival check/move refused ({exc})", "detail")
                                 # One invalid/stale/unprovable artifact must not
                                 # block unrelated candidates or become a move.
                                 continue
-                except _KEEP_ERRORS:
+                except _KEEP_ERRORS as exc:
+                    activity("KEEP", f"Repository unavailable for archival ({exc})", "detail")
                     # Unknown, dirty/unsupported or unavailable repositories are
                     # keep cases. Global maintenance may continue with other IDs.
                     continue
         finally:
             location_scope.__exit__(None, None, None)
-    except _KEEP_ERRORS:
+    except _KEEP_ERRORS as exc:
+        activity("ARCHIVE", f"Archival unavailable; retain unarchived files ({exc})", "warning")
         warnings.append("Exchange archival unavailable; unarchived bundles were left in place")
+    activity("ARCHIVE", f"Maintenance complete: {len(destinations)} bundle(s) moved", "success")
     return ArchiveMaintenance(
         tuple(artifact for artifact in artifacts if artifact.identity not in moved),
         tuple(destinations), tuple(warnings),

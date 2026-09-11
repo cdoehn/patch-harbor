@@ -5,6 +5,8 @@ from __future__ import annotations
 from collections.abc import Iterable
 from pathlib import Path
 
+from patchharbor.progress import activity
+
 from patchharbor.bundle_paths import (
     BundlePathError,
     validate_bundle_member_paths,
@@ -55,7 +57,9 @@ def _kind_or_error(target: Path, *, label: str) -> PathKind:
 
 def _replace_bytes(target: Path, content: bytes, *, label: str) -> None:
     try:
+        activity("WRITE", f"Atomically write: {target} ({len(content)} bytes)")
         atomic_replace_bytes(target, content)
+        activity("WRITE", f"Written: {target}", "success")
     except FileSystemOperationError as exc:
         raise _write_error(label, exc.operation) from exc
 
@@ -66,6 +70,7 @@ def _resolve_payload_target(
     *,
     create_parents: bool,
 ) -> Path:
+    activity("TARGET", f"Validate repository target: {relative_path}")
     target = cwd
     segments = relative_path.split("/")
     label = f"bundle file {relative_path!r}"
@@ -77,6 +82,7 @@ def _resolve_payload_target(
             if not create_parents:
                 return cwd.joinpath(*segments)
             try:
+                activity("MKDIR", f"Create payload parent directory: {target}")
                 create_directory(target)
             except FileSystemOperationError as exc:
                 raise _write_error(label, exc.operation) from exc

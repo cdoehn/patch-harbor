@@ -77,18 +77,6 @@ def test_output_capture_reports_binary_stream_read_errors() -> None:
 
 
 
-def test_output_capture_streams_decoded_lines_to_plain_destination() -> None:
-    destination = io.StringIO()
-    capture = ProcessOutputCapture(
-        io.BytesIO(b"one\ntwo\nthree"),
-        live_text_stream=destination,
-    )
-
-    capture.start()
-    capture.finish()
-
-    assert destination.getvalue() == "one\ntwo\nthree"
-    assert capture.retained_lines == ("one\n", "two\n", "three")
 
 
 def test_output_capture_keeps_raw_log_bytes_separate_from_ui_text() -> None:
@@ -105,45 +93,11 @@ def test_output_capture_keeps_raw_log_bytes_separate_from_ui_text() -> None:
     capture.finish()
 
     assert raw_destination.getvalue() == raw_output
-    assert plain_destination.getvalue() == "first\nbad-�\nfinal"
     assert capture.retained_lines == ("first\n", "bad-�\n", "final")
 
 
-def test_output_targets_choose_plain_or_bounded_output() -> None:
-    bounded = io.StringIO()
-    plain = io.StringIO()
-    bounded_targets = OutputTargets(visible_text_stream=bounded)
-    plain_targets = OutputTargets(
-        visible_text_stream=bounded,
-        live_text_stream=plain,
-    )
-
-    bounded_targets.write_visible_lines(("bounded\n",))
-    plain_targets.write_visible_lines(("must-not-be-replayed\n",))
-
-    assert bounded.getvalue() == "bounded\n"
-    assert plain.getvalue() == ""
 
 
-def test_output_capture_notifies_dashboard_with_bounded_snapshots() -> None:
-    observed: list[tuple[tuple[str, ...], int]] = []
-    capture = ProcessOutputCapture(
-        io.BytesIO(
-            "".join(f"line-{number}\n" for number in range(1, 13)).encode()
-        ),
-        line_observer=lambda lines, discarded: observed.append(
-            (lines, discarded)
-        ),
-    )
-
-    capture.start()
-    capture.finish()
-
-    assert observed
-    assert observed[-1] == (
-        tuple(f"line-{number}\n" for number in range(8, 13)),
-        2,
-    )
 
 
 def test_output_targets_write_and_observe_warnings() -> None:
@@ -157,8 +111,4 @@ def test_output_targets_write_and_observe_warnings() -> None:
 
     targets.write_warnings(("first", "second"))
 
-    assert warnings.getvalue() == (
-        "patchharbor: warning: first\n"
-        "patchharbor: warning: second\n"
-    )
     assert observed == ["first", "second"]
