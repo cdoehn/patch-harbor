@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 from contextlib import ExitStack
+from collections.abc import Callable
 from dataclasses import dataclass
 import os
 from pathlib import Path
 from uuid import UUID
 
+from patchharbor.archive_git import completed_commit_for_context
 from patchharbor.errors import (
     ExitCode,
     PatchHarborError,
@@ -322,6 +324,8 @@ def create_apply_result_bundle(
     dry_run: bool,
     primary_outcome: ApplyPrimaryOutcome,
     execution_log: bytes | None = None,
+    package_sha256: str | None = None,
+    before_publish: Callable[[str], None] | None = None,
 ) -> RunReport:
     """Attempt one apply Result Bundle while the repository lock is held."""
     paths = registration_user_paths()
@@ -359,13 +363,25 @@ def create_apply_result_bundle(
         handoff = create_result_handoff(report, target)
         revalidate_result_bundle_target(target, registry_snapshot, paths)
         _write_run_document(run_directory, report)
+        manifest = _manifest_document(
+            report=report, snapshot=captured.bundle_snapshot,
+            expected_manifest=expected_manifest,
+        )
+        completed_commit = None
+        if (package_sha256 is not None and primary_outcome.result.success
+            and report.execution_present and not dry_run
+            and actual_context.base_commit == expected_manifest.base_commit):
+            try:
+                completed_commit = completed_commit_for_context(actual_context, captured.context)
+            except (PatchHarborError, OSError, ValueError):
+                pass  # A success/no-op is not automatically a committed success.
+        if package_sha256 is not None:
+            manifest.update({"patch_sha256": package_sha256,
+                             "completed_commit": str(completed_commit) if completed_commit else None})
         publish_result_bundle(
             publication,
-            manifest=_manifest_document(
-                report=report,
-                snapshot=captured.bundle_snapshot,
-                expected_manifest=expected_manifest,
-            ),
+            manifest=manifest,
+            before_publish=(before_publish if completed_commit is not None else None),
             context_document=_context_document(report, bundle_suffix=target.bundle_suffix),
             run_report=report,
             handoff=handoff,

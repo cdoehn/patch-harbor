@@ -14,11 +14,15 @@ from patchharbor.patch_manifest import (
     PatchManifest,
     parse_patch_manifest,
 )
+from patchharbor.platform.filesystem import (
+    FileChangedDuringRead, FileSystemOperationError, UnsupportedFileTypeError,
+    read_stable_regular_file_with_sha256,
+)
 from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY, ResourcePolicy
 from patchharbor.zip_payloads import (
     NotZipArchiveError,
     ZipPayloadError,
-    read_zip_payloads,
+    read_zip_payload_bytes,
     zip_payload_warnings,
 )
 
@@ -32,6 +36,14 @@ class ValidatedPatchPackage:
     payloads: tuple[BundlePayload, ...]
     warnings: tuple[str, ...] = ()
     handoff: BundleHandoff | None = None
+    package_sha256: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.package_sha256 is not None and (
+            type(self.package_sha256) is not str or len(self.package_sha256) != 64
+            or any(c not in "0123456789abcdef" for c in self.package_sha256)
+        ):
+            raise ValueError("package digest must be a complete lowercase SHA-256")
 
 
 def _unsafe_patch_zip(path: Path, detail: object) -> PatchHarborError:
@@ -46,6 +58,7 @@ def resolve_patch_payloads(
     *,
     resource_policy: ResourcePolicy,
     package_path: Path,
+    package_sha256: str | None = None,
 ) -> ValidatedPatchPackage:
     manifest_payload = next(
         (
@@ -94,6 +107,7 @@ def resolve_patch_payloads(
         payloads=payload_tuple,
         warnings=warnings,
         handoff=handoff,
+        package_sha256=package_sha256,
     )
 
 
@@ -104,16 +118,27 @@ def resolve_patch_package(
 ) -> ValidatedPatchPackage:
     """Read every ZIP member, then apply format-1 package roles."""
     try:
-        payloads = read_zip_payloads(path, policy=resource_policy)
+        target = path.resolve(strict=True)
+        if target.stat().st_size > resource_policy.max_input_artifact_bytes:
+            raise _unsafe_patch_zip(path, "input artifact exceeds the resource limit")
+        captured = read_stable_regular_file_with_sha256(
+            target, retained_content_limit=resource_policy.max_input_artifact_bytes,
+            allow_path_identity_fallback=True,
+        )
+        if captured.content is None:
+            raise _unsafe_patch_zip(path, "input artifact exceeds the resource limit")
+        payloads = read_zip_payload_bytes(captured.content, policy=resource_policy)
     except NotZipArchiveError as exc:
         raise patch_package_error("patch package is not a ZIP archive") from exc
-    except ZipPayloadError as exc:
+    except (ZipPayloadError, FileChangedDuringRead, FileSystemOperationError,
+            UnsupportedFileTypeError, OSError, RuntimeError) as exc:
         raise _unsafe_patch_zip(path, exc) from exc
 
     return resolve_patch_payloads(
         payloads,
         resource_policy=resource_policy,
         package_path=path,
+        package_sha256=captured.sha256,
     )
 
 

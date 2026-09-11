@@ -17,6 +17,7 @@ EXPECTED_CORE_RUNTIME_FILES = {
     "archive_git.py",
     "archive_files.py",
     "exchange_archive.py",
+    "exchange_recovery.py",
     "platform/archive.py",
     "apply_mutation.py",
     "apply_preflight.py",

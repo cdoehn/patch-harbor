@@ -44,7 +44,7 @@ def _record(path: Path, character: str = "a") -> ExchangeStateRecord:
     )
 
 
-def test_classification_and_apply_lifecycle_are_persisted_in_closed_v3_state(
+def test_classification_and_apply_lifecycle_are_persisted_in_closed_v4_state(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -64,6 +64,8 @@ def test_classification_and_apply_lifecycle_are_persisted_in_closed_v3_state(
             {
                 "apply_status": None,
                 "completed_commit": None,
+                "attempt_run_id": None,
+                "result_sha256": None,
                 "kind": "patch_package",
                 "manifest": {
                     "base_commit": "b" * 40,
@@ -75,7 +77,7 @@ def test_classification_and_apply_lifecycle_are_persisted_in_closed_v3_state(
                 "sha256": "a" * 64,
             }
         ],
-        "format_version": 3,
+        "format_version": 4,
     }
 
     verified: list[bool] = []
@@ -236,7 +238,7 @@ def test_legacy_attempt_flags_load_conservatively_and_migrate_on_next_write(
 
     merge_exchange_classifications(paths, (_record(patch, "e"),))
     migrated = json.loads(paths.exchange_state_path.read_text(encoding="utf-8"))
-    assert migrated["format_version"] == 3
+    assert migrated["format_version"] == 4
     statuses = {
         entry["sha256"]: entry["apply_status"]
         for entry in migrated["entries"]
@@ -344,7 +346,7 @@ def test_failed_atomic_attempt_publication_preserves_the_previous_state(
     (
         b"{}\n",
         b'{"entries":[],"entries":[],"format_version":1}\n',
-        b'{"entries":[],"format_version":4}\n',
+        b'{"entries":[],"format_version":99}\n',
         b'{"entries":[{}],"format_version":1}\n',
         b'{"entries":[{}],"format_version":2}\n',
     ),

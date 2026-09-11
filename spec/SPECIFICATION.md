@@ -289,7 +289,7 @@ patchharbor configure show
 
 `configure exchange-directory` legt das Zielverzeichnis bei Bedarf an, validiert es gegen die Registry und veröffentlicht anschließend die vollständige `config.json` atomar. Es erhält das bestehende Suffix auch bei Reparatur eines nicht mehr verfügbaren Exchange-Pfads. `configure bundle-suffix SUFFIX` setzt nur das Suffix, `configure bundle-suffix --clear` setzt es auf den leeren String; beide benötigen eine vorhandene gültige Exchange-Konfiguration und verwenden denselben globalen Registry-/Konfigurationslock. Fehlendes Argument oder gleichzeitiges Argument und `--clear` sind CLI-Fehler. `configure archive-dir NAME` setzt ausschließlich den Archivordnernamen, `--clear` oder ein leerer String deaktiviert die Archivierung. Absolute Pfade, Trennzeichen, Traversal, Leerraum, abschließende Punkte und reservierte Windows-Gerätenamen sind verboten; zulässig sind 1–128 ASCII-Buchstaben, Ziffern, Punkte, Unterstriche und Bindestriche. Ein führender Punkt bleibt erlaubt. Alle Setter erhalten die jeweils anderen Einstellungen. `configure show` zeigt Konfigurationspfad, kanonischen Exchange-Ordner, `bundle_suffix` und `archive_directory`. Die Datei bleibt die alleinige persistente Quelle.
 
-Das Suffix gilt benutzerspezifisch für alle neu erzeugten Bundles. Es wird ohne zusätzlichen Punkt unmittelbar hinter `.zip` angehängt. Weder `apply` noch `bundle` erhalten einen Suffix-Schalter. Die Suffix-Konfiguration benennt bestehende Dateien nicht um. Inhalt und Paketformat bleiben ZIP; eine fremde Anwendung muss diese Inhalte trotzdem unterstützen. Ältere PatchHarbor-Versionen verstehen Format-3-Konfigurationen und Format-3-Replay-State nicht.
+Das Suffix gilt benutzerspezifisch für alle neu erzeugten Bundles. Es wird ohne zusätzlichen Punkt unmittelbar hinter `.zip` angehängt. Weder `apply` noch `bundle` erhalten einen Suffix-Schalter. Die Suffix-Konfiguration benennt bestehende Dateien nicht um. Inhalt und Paketformat bleiben ZIP; eine fremde Anwendung muss diese Inhalte trotzdem unterstützen. Ältere PatchHarbor-Versionen verstehen Format-3-Konfigurationen und Format-4-Replay-State nicht.
 
 Der Exchange-Ordner ist benutzerspezifisch und nicht repositoryspezifisch. `patchharbor register` fragt ihn nicht ab. Die Befehle `register`, `registry`, `unregister`, `context` und `fs run` benötigen keine Exchange-Konfiguration.
 
@@ -1712,7 +1712,7 @@ validierte PatchHarbor-Bundles mit eindeutiger registrierter Repository-ID dürf
 betrachtet werden. Ein Fehler, eine fehlende Historie, inkonsistente Metadaten oder
 ein konkurrierender Zustandswechsel bedeutet immer: Datei unverändert liegen lassen.
 
-Der vorhandene Exchange-State wird auf Format 3 erweitert: Ein `succeeded`-Eintrag
+Der vorhandene Exchange-State verwendet Format 4 (Formate 1–3 bleiben lesbar): Ein `succeeded`-Eintrag
 kann zusätzlich einen vollständigen `completed_commit` enthalten. Dieser wird nach
 dem tatsächlichen erfolgreichen Entrypoint unter dem Repository-Lock ermittelt,
 aber nur bei einem neuen, sauberen und nachgewiesen vom Base-Commit abstammenden
@@ -1819,15 +1819,84 @@ Kann das Repository vorher nicht sicher aufgelöst werden, entsteht kein Reposit
 17. Alle Nutzdateiinhalte vollständig in Speicher oder ein privates auftragsbezogenes Temp-Verzeichnis außerhalb des Repositorys aufnehmen.
 18. Vor der ersten Repository-Schreiboperation Base-Commit, Fingerprint, Registry-Zuordnung, lokale ID, alle Zielpfade und deren relevante Eltern erneut prüfen.
 19. Beim Dry-Run keine Dateidentität konsumieren, keine Nutzdatei schreiben und keinen Entrypoint starten.
-20. Bei einem parameterlos ausgewählten Nicht-Dry-Run-Auftrag die Identität atomar auf `attempted` setzen; nur ein manueller Ursprung darf dabei `failed` erneut öffnen; bei Fehler ohne Mutation abbrechen.
+20. Bei einem im Exchange verfolgten Nicht-Dry-Run-Auftrag die Identität mit vollständiger `attempt_run_id` atomar auf `attempted` setzen; nur ein manueller Ursprung darf dabei `failed` erneut öffnen; bei Fehler ohne Mutation abbrechen.
 21. Beim echten Apply Nutzdateien einzeln atomar schreiben oder ersetzen.
 22. Entrypoint mit Repository-Wurzel als CWD ausführen.
 23. stdout und stderr vollständig in den Run-Log aufnehmen.
-24. Exit-Code, Timeout, Strg+C oder Tool-Fehler als primäres Ergebnis bestimmen und den Replay-Status atomar als `failed` oder `succeeded` abschließen.
+24. Exit-Code, Timeout, Strg+C oder Tool-Fehler als primäres Ergebnis bestimmen; den terminalen Replay-Status noch nicht vor der Result-Veröffentlichung abschließen.
 25. Konsistenten aktuellen Repository-Snapshot aufnehmen.
-26. Result Bundle in der reservierten temporären Datei im endgültigen Ausgabeordner erstellen, prüfen und atomar veröffentlichen.
-27. Primäres Ergebnis und Result-Bundle-Ergebnis nach Abschnitt 18 zusammenführen.
+26. Result Bundle in der reservierten temporären Datei im endgültigen Ausgabeordner erstellen und prüfen; bei beweisbarem Erfolg die vollständige Result-SHA im zugehörigen lokalen Attempt verankern, danach das Bundle atomar veröffentlichen.
+27. Den Replay-Status atomar aus dem tatsächlichen Ausführungsergebnis als `failed` oder `succeeded` abschließen und Ergebnisse nach Abschnitt 18 zusammenführen. Scheitert nur die terminale Persistenz, bleibt ein bereits veröffentlichtes Erfolgs-Result unverändert erhalten; der CLI-Auftrag meldet diesen Persistenzfehler.
 28. Repository-Sperre und alle temporären Ressourcen freigeben.
+
+### 16.4.1 Nachweisbasierte Recovery eines unterbrochenen Attempts
+
+Die bestehende Replay-Persistenz Format 4 ergänzt `attempt_run_id` (vollständige
+UUID des Runs oder `null`) und `result_sha256` (vollständige kleingeschriebene
+SHA-256 des bestätigten Result-ZIPs oder `null`). Formate 1, 2 und 3 bleiben strikt
+lesbar; Lesen schreibt nicht. Der nächste Schreibvorgang migriert atomar. Fehlende
+Legacy-Beweise werden niemals ergänzt, geraten oder aus Dateinamen hergeleitet.
+Die Benutzerkonfiguration bleibt davon unabhängig auf Format 3.
+
+Die Patch-SHA entsteht aus denselben stabil eingelesenen ZIP-Bytes wie Parser,
+Entrypoint und Nutzdaten, nicht aus einem später separat geöffneten Download.
+Neue Apply-Result-Manifeste enthalten bei bekannter Paket-SHA das optionale Paar
+`patch_sha256` und `completed_commit`. `completed_commit` ist nur bei tatsächlich
+erfolgreichem Entrypoint, sauberem konsistentem Result-Snapshot und bestätigtem
+Vorwärts-Commit gesetzt, sonst `null`. Die vorhandenen `run_id`, `repo_id`,
+`expected_*`- und `actual_*`-Felder vervollständigen die Bindung. Reine manuelle
+Bundles erfinden keine Paketzuordnung. `patch.json` bleibt unverändert.
+
+Der Publisher schreibt und prüft zuerst das temporäre Result-ZIP. Vor dessen
+atomarer Veröffentlichung wird die komplette Result-SHA unter dem vorhandenen
+Exchange-State-Lock im exakt passenden aktiven Attempt gespeichert. Er prüft die
+Datei danach erneut. Erst nach dem Veröffentlichungsversuch wird der terminale
+Replay-Status geschrieben. Bei einem Fehler nur dieses letzten Schreibschritts
+bleibt das erfolgreiche ZIP bytegleich erhalten. Keine zweite fehlerhafte Ausgabe
+überschreibt den bereits veröffentlichten Erfolgsbeleg. Synchronisierung bleibt
+plattformabhängig best-effort; es gibt keine absolute Stromausfallsicherheitszusage.
+
+Recovery erfolgt vor Archivierung bei nicht-trockenen Exchange-Scans. Manuelles
+Apply und `bundle` bleiben auf ihr Repository begrenzt, explizites Apply auf das
+Paket-Repository, der Watcher bleibt global. Die Funktion ist unabhängig vom
+Archivierungs-Schalter. Dry-Run repariert keine Einträge. Es gibt keinen neuen
+CLI-Schalter, kein zweites Journal und keinen parallelen Auswahlalgorithmus.
+
+Eine Reparatur `attempted -> succeeded + completed_commit` erfordert gleichzeitig:
+
+- die ursprüngliche verfolgte Patch-Dateiidentität (Pfad und vollständige SHA),
+- eine im aktiven Exchange liegende gültige Result-Datei mit exakt der vorher
+  lokal gespeicherten Result-SHA; Umbenennen bei identischen Bytes ist zulässig,
+- exakt übereinstimmende Patch-SHA, Attempt-/Run-ID, `repo_id`, erwarteten Base-Commit,
+  ursprünglichen State-Fingerprint und Fingerprint-Algorithmus,
+- konsistente erfolgreiche Manifest-/Run-/Context-Daten ohne Dry-Run oder Fehler,
+- vollständige unveränderte Snapshot-Blobs des echten `completed_commit`,
+- sauberen aktuellen Repository-Zustand, vollständige Originalhistorie ohne
+  shallow/graft/replace und `base -> completed_commit -> HEAD` mit `base != completed_commit`,
+- den tatsächlich erworbenen exklusiven Repository-Lock, erneute Registry-,
+  Konfigurations-, Datei-, Git- und State-Prüfung und atomaren Compare-and-swap
+  unter dem vorhandenen Replay-State-Lock; bei Änderung keine Reparatur.
+
+Eine Hash-Korrelation ersetzt keine digitale Signatur. Die Vertrauensbasis ist
+wie bisher die lokale Registry/State-Datei; ein Angreifer mit Schreibzugriff auf
+alle Belege einschließlich dieser Persistenz ist dadurch nicht authentifiziert.
+Im Exchange abgelegte fremde oder editierte ZIPs allein genügen niemals als Beweis.
+
+Ein lebender Lock-Halter wird nicht als Crash interpretiert. Ein fehlender
+Screen-Socket, geringe CPU-Last oder Dateialter sind keine Recovery-Auslöser.
+PatchHarbor löscht keinen Lock und setzt niemals automatisch Working-Tree- oder
+Index-Inhalte zurück. Bei Dirty-Zustand, fehlendem Result oder unklaren Beweisen
+bleiben Dateien und `attempted` erhalten, auch wenn bereits ein Commit existiert.
+Ein Abbruch zwischen gepinnter Result-SHA und Veröffentlichung reicht nicht zur
+Reparatur. Ein erfolgreich veröffentlichtes, aber noch nicht terminal gespeichertes
+Result kann dagegen beim nächsten freien Scan rekonstruiert werden.
+
+Result-Belege für noch offene Attempts bleiben vor Archivierung geschützt. Erst
+nach nachgewiesener Reparatur greifen die normalen Archivierungsregeln. Die Suche
+ist flach: keine rekursive Suche im Archiv, keine beliebigen externen Result-Pfade.
+Ein Result aus einem expliziten anderen Ausgabeordner muss für diesen Scan wieder
+bytegleich im aktiven Exchange liegen. Ohne ursprüngliche Patch-Dateiidentität
+oder bei alten Runs ohne lokal verankerte Hashes bleibt die Reparatur aus.
 
 ### 16.5 Harte Ablehnung
 
@@ -2171,7 +2240,7 @@ Das vollständige Manifest enthält zusätzlich zwei nach UTF-8-Pfadbytes sortie
 
 Diese Metadaten sind die plattformunabhängige Quelle für Dateimodi. Die ZIP-Einträge tragen zusätzlich passende reguläre Dateirechte, soweit das ZIP-Format sie abbilden kann.
 
-Bei `apply` enthält das Manifest außerdem die aus `patch.json` erwarteten und die tatsächlich ermittelten Zustandswerte, sodass ein Mismatch eindeutig nachvollziehbar bleibt.
+Bei `apply` enthält das Manifest außerdem die aus `patch.json` erwarteten und die tatsächlich ermittelten Zustandswerte, sodass ein Mismatch eindeutig nachvollziehbar bleibt. Neue Apply-Resultate mit bekannter Paket-SHA ergänzen gemeinsam `patch_sha256` und `completed_commit` gemäß Abschnitt 16.4.1. Der Abschlusscommit darf `null` sein; beide Felder fehlen in alten Resultaten und manuellen Bundles. Bestehende Resultate ohne diese optionalen Felder bleiben lesbar, liefern aber keinen neuen Recovery-Beleg.
 
 ### 19.6 `context.json`
 
@@ -2461,7 +2530,8 @@ Empfohlene Verantwortlichkeiten:
 - `run_log.py` – vollständiger Run-Log und strukturierter Run-Bericht,
 - `presentation.py` – Plain-Ausgabe, TUI, Farben und Rolling Buffer,
 - `identifier_presentation.py` – zentrale Sechs-Zeichen-Darstellung technischer Kennungen,
-- `exchange.py` und `exchange_state.py` – stabile Inhaltsklassifikation, Exchange-Dateiidentität und persistenter Replay-Status einschließlich optionalem Abschlusscommit,
+- `exchange.py` und `exchange_state.py` – stabile Inhaltsklassifikation, Exchange-Dateiidentität und persistenter Replay-Status einschließlich Run-ID, gepinnter Result-SHA und optionalem Abschlusscommit,
+- `exchange_recovery.py` – koordinierte Beweisprüfung unter Repository-/Registry-/State-Locks vor normaler Archivierung; keine PID-Heuristik und kein Rollback,
 - `archive_policy.py` – reine Validierung des direkten Archivordnernamens,
 - `archive_evidence.py` und `archive_git.py` – passive Bundle-Validierung und lesende Originalhistorien-Beweise,
 - `exchange_archive.py` – konservative Wartung des von `application` bestimmten Repository-Scopes,

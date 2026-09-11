@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
+from hashlib import sha256
 import json
 import os
 from pathlib import Path
@@ -208,6 +209,7 @@ def _classify_content(
             payloads,
             resource_policy=resource_policy,
             package_path=path,
+            package_sha256=sha256(content).hexdigest(),
         )
     except PatchHarborError:
         return _ContentClassification(kind=ExchangeArtifactKind.OTHER)

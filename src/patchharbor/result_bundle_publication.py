@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
+from collections.abc import Callable
 from dataclasses import dataclass
 import os
 from pathlib import Path
@@ -20,6 +21,7 @@ from patchharbor.platform.filesystem import (
     PathKind,
     path_kind,
     replace_path,
+    read_stable_regular_file_with_sha256,
     sync_directory_best_effort,
     sync_regular_file_best_effort,
 )
@@ -282,6 +284,7 @@ def publish_result_bundle(
     run_report: RunReport,
     snapshot: ResultBundleSnapshot,
     execution_log: bytes | None = None,
+    before_publish: Callable[[str], None] | None = None,
 ) -> PublishedResultBundle:
     """Write, verify, best-effort sync, and atomically publish one bundle."""
     owned_stat = publication.reservation_stat
@@ -328,6 +331,18 @@ def publish_result_bundle(
             publication.temporary_path,
             owned_stat,
         )
+        if before_publish is not None:
+            digest = read_stable_regular_file_with_sha256(
+                publication.temporary_path, retained_content_limit=1,
+                allow_path_identity_fallback=True,
+            ).sha256
+            before_publish(digest)
+            _require_owned_temporary_file(publication.temporary_path, owned_stat)
+            if read_stable_regular_file_with_sha256(
+                publication.temporary_path, retained_content_limit=1,
+                allow_path_identity_fallback=True,
+            ).sha256 != digest:
+                raise result_bundle_error("Result Bundle bytes changed before publication")
         replace_path(
             publication.temporary_path,
             publication.final_path,

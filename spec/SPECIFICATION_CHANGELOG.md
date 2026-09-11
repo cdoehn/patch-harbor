@@ -1,7 +1,7 @@
 # PatchHarbor – Spezifikations-Changelog
 
 **Dateiname:** `SPECIFICATION_CHANGELOG.md`<br>
-**Stand:** 2026-09-10
+**Stand:** 2026-09-11
 
 Dieses Dokument protokolliert Änderungen am verbindlichen Produktziel. Es ist kein Git-Commit-Log und ersetzt nicht die getrennten Umsetzungspläne unter `planning/`.
 
@@ -10,6 +10,15 @@ Dieses Dokument protokolliert Änderungen am verbindlichen Produktziel. Es ist k
 ## [1.1.1] – 2026-08-28
 
 **Status:** Freigegeben und vollständig umgesetzt; der abgeschlossene Plan liegt unter `planning/1.1.1/commit-plan.md`.
+
+### Post-release SHA-gebundene Attempt-Recovery – 2026-09-11
+
+- Vollständige Paket-SHA aus den tatsächlich validierten ZIP-Bytes; neue Apply-Resultate korrelieren `patch_sha256`, Run-ID, ursprüngliche vollständige Bindung und optionalen verifizierten Abschlusscommit. Keine Änderung von `patch.json`, Fingerprint oder Benennung.
+- Bestehender Replay-State Format 4 ergänzt Attempt-Run-ID und vor Result-Veröffentlichung lokal gepinnte Result-SHA. Formate 1–3 bleiben strikt lesbar, ohne nachträglich erfundene Belege. Konfiguration bleibt Format 3.
+- Result-Veröffentlichung vor terminalem Replay-Abschluss; ein Fehler beim letzten State-Schreiben überschreibt den Erfolgsbeleg nicht. Abbruch vor Veröffentlichung bleibt ohne Reparatur.
+- Recovery vor Archivierung unter echtem Repository-Lock, mit vollständiger ZIP-/Snapshot-/Git-Prüfung, Scope-Erhalt, frischer Revalidierung und Compare-and-swap. Kein Erfolg bei aktivem Lock, Dirty-Zustand, fehlenden oder widersprüchlichen Beweisen. Kein automatisches Reset/Rollback und keine Screen-/PID-Heuristik.
+- Pending-Result-Belege werden nicht vorzeitig archiviert. Recovery funktioniert auch ohne Archivierung; Dry-Run bleibt unverändert. Altfälle ohne lokal verankerte Beweise werden nicht rückwirkend als Erfolg ausgegeben.
+- Regressionen mit echten Prozessabbrüchen vor/nach Commit und Veröffentlichung, frischen Folgeläufen, aktiven Locks, Manipulation, Migrations- und Revalidierungsrennen. 10.800-Sekunden-Timeout, CWD-/Watcher-/Retry-Semantik und Sicherheitsgrenzen bleiben erhalten.
 
 ### Post-release Windows-Zeilenumbruchkorrektur – 2026-09-10
 

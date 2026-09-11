@@ -152,7 +152,7 @@ def _exchange_records(environment: dict[str, str]) -> list[dict[str, object]]:
     document = json.loads(
         exchange_state_path(environment).read_text(encoding="utf-8")
     )
-    assert document["format_version"] == 3
+    assert document["format_version"] == 4
     records = document["entries"]
     assert isinstance(records, list)
     return records

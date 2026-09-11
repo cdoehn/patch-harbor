@@ -37,7 +37,7 @@ def test_result_bundle_filename_starts_with_repository_and_uses_short_run_id() -
     ) == "patch-harbor_Result_102139_0830_123456.zip"
 
 
-def _publish(publication: ResultBundlePublication) -> None:
+def _publish(publication: ResultBundlePublication, **options) -> None:
     final_path = publication.final_path
     publish_result_bundle(
         publication,
@@ -54,6 +54,7 @@ def _publish(publication: ResultBundlePublication) -> None:
             unstaged_patch=b"",
             untracked_entries=(),
         ),
+        **options,
     )
 
 
@@ -152,3 +153,38 @@ def test_reserved_publication_never_overwrites_a_replaced_temporary_file(
     assert not final_path.exists()
     release_result_bundle_publication(publication)
     assert publication.temporary_path.read_bytes() == b"replacement"
+
+
+def test_result_digest_is_pinned_before_atomic_publication(tmp_path: Path) -> None:
+    from hashlib import sha256
+    final_path = tmp_path / "result.zip"
+    publication = prepare_result_bundle_publication(final_path, run_id=UUID("12345678-1234-4234-8234-123456789abc"))
+    observed = []
+    def pin(digest):
+        assert publication.temporary_path.is_file()
+        assert not final_path.exists()
+        assert digest == sha256(publication.temporary_path.read_bytes()).hexdigest()
+        observed.append(digest)
+    _publish(publication, before_publish=pin)
+    assert observed == [sha256(final_path.read_bytes()).hexdigest()]
+
+
+@pytest.mark.parametrize("failure", ["write-error", "edited-bytes", "replaced-file"])
+def test_receipt_failure_or_late_edit_never_publishes_success(tmp_path: Path, failure: str) -> None:
+    from patchharbor.errors import patch_package_error
+    final_path = tmp_path / "result.zip"
+    publication = prepare_result_bundle_publication(final_path, run_id=UUID("12345678-1234-4234-8234-123456789abc"))
+    def pin(_digest):
+        if failure == "write-error":
+            raise patch_package_error("simulated receipt write failure")
+        if failure == "replaced-file":
+            # Keep the original inode allocated, even on aggressively reusing FSes.
+            publication.temporary_path.rename(tmp_path / "displaced.zip")
+        publication.temporary_path.write_bytes(b"changed after hashing")
+    with pytest.raises(PatchHarborError):
+        _publish(publication, before_publish=pin)
+    assert not final_path.exists()
+    if failure == "replaced-file":
+        assert publication.temporary_path.read_bytes() == b"changed after hashing"
+    else:
+        assert not publication.temporary_path.exists()

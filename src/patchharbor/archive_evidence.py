@@ -38,11 +38,22 @@ _APPLY_FIELDS = {
     prefix + name for prefix in ("expected_", "actual_")
     for name in ("base_commit", "state_fingerprint", "fingerprint_algorithm")
 }
+_RECEIPT_FIELDS = {"patch_sha256", "completed_commit"}
 _RUN_FIELDS = _BINDING_FIELDS | {
     "run_id", "operation", "dry_run", "started_at", "ended_at", "duration_seconds",
     "repository_resolved", "repository_path", "warnings", "execution_present",
     "primary_result", "result_bundle", "process_exit_code",
 }
+
+
+@dataclass(frozen=True)
+class ApplyReceipt:
+    """An executed patch's full binding; trust also requires the local ZIP digest."""
+
+    patch_sha256: str
+    run_id: str
+    expected: ExchangePatchSelection
+    completed_commit: GitObjectId
 
 
 @dataclass(frozen=True)
@@ -52,6 +63,7 @@ class ArchiveEvidence:
     kind: str
     selection: ExchangePatchSelection
     base_entries: tuple[tuple[str, str, str], ...] = ()  # path, mode, object ID
+    receipt: ApplyReceipt | None = None
 
 
 def _unique_object(pairs: list[tuple[str, object]]) -> dict[str, object]:
@@ -106,7 +118,8 @@ def _result_evidence(files: dict[str, bytes]) -> ArchiveEvidence:
         manifest.get("marker") != "patch-harbor-result-bundle"
         or type(manifest.get("format_version")) is not int
         or manifest["format_version"] != 1
-        or set(manifest) not in (_MANIFEST_FIELDS, _MANIFEST_FIELDS | _APPLY_FIELDS)
+        or set(manifest) not in (_MANIFEST_FIELDS, _MANIFEST_FIELDS | _APPLY_FIELDS,
+                                        _MANIFEST_FIELDS | _APPLY_FIELDS | _RECEIPT_FIELDS)
         or set(context) not in (_BINDING_FIELDS | {"dirty", "created_at"},
                                 _BINDING_FIELDS | {"dirty", "created_at", "bundle_suffix"})
         or set(run) != _RUN_FIELDS
@@ -181,6 +194,20 @@ def _result_evidence(files: dict[str, bytes]) -> ArchiveEvidence:
                for key in _BINDING_FIELDS - {"repo_id"}):
             raise ValueError("inconsistent actual result state")
 
+    receipt = None
+    if _RECEIPT_FIELDS <= set(manifest):
+        digest = manifest["patch_sha256"]
+        if (type(digest) is not str or len(digest) != 64
+            or any(c not in "0123456789abcdef" for c in digest)):
+            raise ValueError("invalid patch package SHA-256")
+        completed = manifest["completed_commit"]
+        if completed is not None:
+            if (type(completed) is not str or not execution
+                or completed != str(binding.base_commit)
+                or completed == str(expected.base_commit)):
+                raise ValueError("inconsistent completion commit")
+            receipt = ApplyReceipt(digest, run["run_id"], expected, binding.base_commit)
+
     expected_files = {"manifest.json", "context.json", "logs/run.json",
                       "changes/staged.patch", "changes/unstaged.patch"}
     if execution:
@@ -232,7 +259,7 @@ def _result_evidence(files: dict[str, bytes]) -> ArchiveEvidence:
         inventory.append((path, mode, object_id))
     if set(files) != expected_files:
         raise ValueError("unaccounted bundle contents")
-    return ArchiveEvidence("result_bundle", binding, tuple(sorted(inventory)))
+    return ArchiveEvidence("result_bundle", binding, tuple(sorted(inventory)), receipt)
 
 
 def parse_archive_evidence(content: bytes, path: Path) -> ArchiveEvidence:

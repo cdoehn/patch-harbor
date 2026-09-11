@@ -191,6 +191,8 @@ def test_success_without_commit_and_legacy_success_are_not_commit_proofs(tmp_pat
     state["format_version"] = 2
     for entry in state["entries"]:
         entry.pop("completed_commit")
+        entry.pop("attempt_run_id")
+        entry.pop("result_sha256")
     state_path.write_text(json.dumps(state))
     _scan(repo, env)
     assert package.exists()
@@ -339,6 +341,8 @@ def test_legacy_success_loses_no_data_and_invents_no_completion_receipt(tmp_path
     state["format_version"] = 2
     for record in state["entries"]:
         record.pop("completed_commit")
+        record.pop("attempt_run_id")
+        record.pop("result_sha256")
     state_path.write_text(json.dumps(state))
     _scan(repo, env)
     assert package.exists()

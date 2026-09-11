@@ -162,7 +162,8 @@ setting preserves the other and the archive setting. Reads accept existing close
 Format-1 files as an empty suffix and Format-2 files with their existing suffix.
 Both use the default archive name without rewriting the file. The next
 configuration write atomically migrates to Format 3. Older versions cannot read
-Format-3 configuration or the new Format-3 replay state.
+Format-3 configuration or the new Format-4 replay state. Upgrade all installed
+PatchHarbor entrypoints after this change; do not delete the replay ledger.
 
 Patch packages are created by the development chat, not by a new local command.
 The new Result Bundle's `context.json` carries `bundle_suffix` as optional
@@ -369,6 +370,60 @@ result. A successful package remains replay-protected. A failed package can be
 retried by another deliberate manual parameterless `patchharbor apply` while its
 complete repository binding still matches. An explicit package path remains a
 separate deliberate override.
+
+### Recovering an interrupted Apply
+
+An `attempted` record alone is not evidence of a crash or success. A run can
+still be working even when `screen -ls` shows no socket. Recovery must acquire
+the **same exclusive repository lock** as Apply. A busy lock, dirty repository,
+missing receipt or contradiction leaves the attempt untouched. PatchHarbor does
+not infer liveness from process names and never automatically resets files.
+
+New Apply Result manifests record the full `patch_sha256` of the exact validated
+ZIP bytes and an optional `completed_commit`, alongside the existing `run_id`,
+repository ID and expected/actual state binding. A completion is recorded only
+for a successful executed entrypoint and a verified clean forward commit. Dry
+runs, failures and successful no-op runs have no completion proof.
+
+For tracked Exchange attempts the existing local replay ledger (Format 4) also
+stores `attempt_run_id` and `result_sha256`. The order is:
+
+1. Persist `attempted` and its run ID before mutation.
+2. Execute the entrypoint and capture its actual result and repository snapshot.
+3. Write and verify the Result ZIP; pin its full SHA-256 in the local ledger
+   **before** atomically publishing that ZIP.
+4. Publish the terminal replay outcome after the Result publication attempt.
+
+A later non-dry Exchange scan can repair `attempted` to `succeeded` and restore
+`completed_commit` only when the original patch identity, pinned Result digest,
+run ID, repository ID, complete original binding, successful report, clean full
+snapshot and original Git history all agree. The required history is
+`expected_base_commit -> completed_commit -> current HEAD`, where the first
+step must advance. It revalidates the evidence under the repository, registry
+and replay-state locks before a compare-and-swap. An edited Result cannot be
+made into proof just by retaining its filenames or JSON identifiers. Hashes are
+integrity/correlation checks anchored in the trusted local ledger, not digital
+signatures or authentication against somebody who can rewrite that ledger.
+
+Recovery runs before archival for manual CWD-scoped Apply, package-scoped
+explicit Apply and the global watcher, and during manual bundle maintenance.
+It also runs when archival is disabled. Dry runs do not repair state. A still
+pending receipt is protected from archival. Once proven, the existing archival
+rules may move the consumed patch; a current Result still remains active.
+
+Only the active Exchange level is searched. A Result moved or renamed within
+that level keeps the same proof if its bytes are identical; an explicit output
+outside Exchange must be brought into the active Exchange to be found. The
+original tracked patch path/content identity must still exist there. Archived
+subdirectories are not recursively searched.
+
+**Limits:** a crash before a success Result is published (even after a Git
+commit) does not prove success. It remains `attempted`; no automatic retry or
+rollback is attempted. Formats 1–3 remain readable without inventing run IDs,
+hashes or completion proofs; writes migrate to Format 4. This cannot retroactively
+repair old upgrade attempts that never recorded these proofs. A still-running
+older executable also does not gain the new receipt protocol by changing files:
+reinstall the current version before subsequent Apply runs.
 
 ### Explicit path overrides
 

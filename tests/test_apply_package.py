@@ -258,3 +258,37 @@ def test_large_entry_warnings_are_preserved_on_the_classified_package(
     assert len(package.warnings) == 2
     assert any("run.sh" in warning for warning in package.warnings)
     assert any("payload.bin" in warning for warning in package.warnings)
+
+
+def test_patch_digest_covers_exact_zip_bytes_and_not_only_manifest(tmp_path: Path) -> None:
+    from hashlib import sha256
+    first = tmp_path / "first.zip"
+    _write_package(first, entries=(("payload.txt", b"original"),))
+    initial = resolve_patch_package(first)
+    assert initial.package_sha256 == sha256(first.read_bytes()).hexdigest()
+    renamed = tmp_path / "renamed.zip.txt"
+    renamed.write_bytes(first.read_bytes())
+    assert resolve_patch_package(renamed) == initial
+    _write_package(first, entries=(("payload.txt", b"changed!"),))
+    changed = resolve_patch_package(first)
+    assert changed.manifest == initial.manifest
+    assert changed.package_sha256 != initial.package_sha256
+
+
+def test_parser_and_digest_use_the_same_immutable_package_capture(tmp_path: Path, monkeypatch) -> None:
+    from hashlib import sha256
+    import patchharbor.patch_package as package_module
+    first = tmp_path / "patch.zip"
+    _write_package(first, entries=(("payload.txt", b"original"),))
+    original_bytes = first.read_bytes()
+    original_read = package_module.read_stable_regular_file_with_sha256
+    def captured_then_changed(*args, **kwargs):
+        captured = original_read(*args, **kwargs)
+        _write_package(first, entries=(("payload.txt", b"changed!"),))
+        return captured
+    monkeypatch.setattr(package_module, "read_stable_regular_file_with_sha256", captured_then_changed)
+    package = resolve_patch_package(first)
+    assert package.package_sha256 == sha256(original_bytes).hexdigest()
+    assert package.payloads[0].content == b"original"
+    # Revalidation before mutation, not a second uncorrelated hash here, rejects
+    # the replaced source. Existing Apply race tests exercise that boundary.

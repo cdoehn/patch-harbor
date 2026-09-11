@@ -22,6 +22,7 @@ from patchharbor.apply_repository import (
 from patchharbor.archive_git import completed_commit_for_context
 from patchharbor.archive_policy import validate_archive_directory
 from patchharbor.exchange_archive import archive_exchange_artifacts
+from patchharbor.exchange_recovery import recover_exchange_artifacts
 from patchharbor.bundle_names import validate_bundle_suffix
 from patchharbor.bundles import resolve_patch_bundle
 from patchharbor.configuration import (
@@ -56,6 +57,7 @@ from patchharbor.exchange_state import (
     ExchangePatchSelection,
     mark_exchange_apply_finished,
     mark_exchange_apply_started,
+    record_exchange_result_digest,
 )
 from patchharbor.exchange_paths import (
     ExchangePathPolicyError,
@@ -275,7 +277,7 @@ class DiscoveredExchangePatch:
         ):
             raise ValueError("discovered Exchange package changed after selection")
 
-    def publish_attempt(self) -> None:
+    def publish_attempt(self, run_id: str | None = None) -> None:
         """Consume this identity immediately before repository mutation."""
         selection = self.artifact.selection
         if selection is None:
@@ -301,9 +303,19 @@ class DiscoveredExchangePatch:
             verify_identity=verify_identity,
             retry_failed=self.retry_failed,
             explicitly_selected=self.explicitly_selected,
+            run_id=run_id,
         )
 
-    def publish_outcome(self, succeeded: bool, completed_commit: GitObjectId | None = None) -> None:
+    def publish_result_digest(self, run_id: str, digest: str) -> None:
+        """Persist a byte-exact result receipt before its final publication."""
+        assert self.artifact.selection is not None
+        record_exchange_result_digest(
+            self.paths, self.artifact.identity, self.artifact.selection,
+            run_id=run_id, result_sha256=digest,
+        )
+
+    def publish_outcome(self, succeeded: bool, completed_commit: GitObjectId | None = None,
+                        *, run_id: str | None = None) -> None:
         """Persist the known terminal result of this started automatic apply."""
         selection = self.artifact.selection
         if selection is None:
@@ -318,6 +330,7 @@ class DiscoveredExchangePatch:
                 else ExchangeApplyStatus.FAILED
             ),
             completed_commit=completed_commit,
+            run_id=run_id,
         )
 
 
@@ -449,6 +462,10 @@ def discover_exchange_patch(
         raise configuration_error("cannot scan exchange directory") from exc
 
     if archive:
+        artifacts = recover_exchange_artifacts(
+            artifacts, configuration=configuration, paths=paths,
+            repository_id=(scope.repository_context.repo_id if scope.repository_context else None),
+        )
         maintenance = archive_exchange_artifacts(
             artifacts, configuration=configuration, paths=paths,
             repository_id=(scope.repository_context.repo_id if scope.repository_context else None),
@@ -528,6 +545,10 @@ def _maintain_explicit_exchange(
             )
         selected = path.resolve(strict=True)
         artifacts = scan_exchange_directory(configuration.exchange_directory, paths=paths)
+        artifacts = recover_exchange_artifacts(
+            artifacts, configuration=configuration, paths=paths,
+            repository_id=package.manifest.repo_id,
+        )
         maintenance = archive_exchange_artifacts(
             artifacts, configuration=configuration, paths=paths,
             repository_id=package.manifest.repo_id, excluded_paths=frozenset({selected}),
@@ -552,7 +573,7 @@ def _maintain_bundle_exchange(path: Path) -> None:
     try:
         paths = configuration_user_paths()
         configuration = load_configuration_if_present(paths)
-        if configuration is None or not configuration.archive_directory:
+        if configuration is None:
             return
         context = capture_repository_context(path)
         with registry_lock(paths):
@@ -560,6 +581,9 @@ def _maintain_bundle_exchange(path: Path) -> None:
                 configuration.exchange_directory, load_registry(paths), exchange_must_exist=True,
             )
         artifacts = scan_exchange_directory(configuration.exchange_directory, paths=paths)
+        artifacts = recover_exchange_artifacts(
+            artifacts, configuration=configuration, paths=paths, repository_id=context.repo_id,
+        )
         archive_exchange_artifacts(artifacts, configuration=configuration, paths=paths,
                                    repository_id=context.repo_id)
     except (PatchHarborError, ExchangeScanError, OSError, ValueError):
@@ -576,6 +600,7 @@ def _complete_apply_result_bundle(
     primary_outcome: ApplyPrimaryOutcome,
     execution_log: bytes | None = None,
     actual_context: RepositoryContext | None = None,
+    before_result_publication: Callable[[str], None] | None = None,
 ) -> RunReport:
     return create_apply_result_bundle(
         resolved.repository,
@@ -590,6 +615,8 @@ def _complete_apply_result_bundle(
         dry_run=dry_run,
         primary_outcome=primary_outcome,
         execution_log=execution_log,
+        package_sha256=package.package_sha256,
+        before_publish=before_result_publication,
     )
 
 
@@ -599,6 +626,7 @@ def _complete_mutation_result_bundle(
     primary_outcome: ApplyPrimaryOutcome,
     execution_log: bytes | None = None,
     actual_context: RepositoryContext | None = None,
+    before_result_publication: Callable[[str], None] | None = None,
 ) -> RunReport:
     """Complete one apply result from the single checked mutation gate."""
     return _complete_apply_result_bundle(
@@ -610,6 +638,7 @@ def _complete_mutation_result_bundle(
         primary_outcome=primary_outcome,
         execution_log=execution_log,
         actual_context=actual_context,
+        before_result_publication=before_result_publication,
     )
 
 
@@ -751,6 +780,7 @@ def _publish_attempt_outcome(
     succeeded: bool,
     execution_log: bytes | None = None,
     actual_context: RepositoryContext | None = None,
+    completed_report: RunReport | None = None,
 ) -> None:
     """Persist one automatic outcome or complete it as a PatchHarbor failure."""
     if publisher is None:
@@ -771,12 +801,23 @@ def _publish_attempt_outcome(
                 pass
         publisher(succeeded, completed_commit)
     except PatchHarborError as error:
-        report = _complete_mutation_result_bundle(
-            mutation_gate,
-            primary_outcome=ApplyPrimaryOutcome.from_tool_error(error),
-            execution_log=execution_log,
-            actual_context=actual_context,
-        )
+        if completed_report is not None:
+            # The successful execution bundle is already published and pinned.
+            # Do not overwrite it or attempt another bundle with the same name.
+            report = RunReport.completed_apply(
+                timing=completed_report.timing, dry_run=completed_report.dry_run,
+                context=completed_report.context, repository=completed_report.repository,
+                repo_id=completed_report.repo_id, warnings=completed_report.warnings,
+                primary_outcome=ApplyPrimaryOutcome.from_tool_error(error),
+                result_bundle=completed_report.result_bundle,
+            )
+        else:
+            report = _complete_mutation_result_bundle(
+                mutation_gate,
+                primary_outcome=ApplyPrimaryOutcome.from_tool_error(error),
+                execution_log=execution_log,
+                actual_context=actual_context,
+            )
         raise report.reported_error() from error
 
 
@@ -820,6 +861,7 @@ def _complete_entrypoint_execution(
     execution: ScriptExecutionResult,
     *,
     publish_attempt_outcome: Callable[[bool, GitObjectId | None], None] | None = None,
+    before_result_publication: Callable[[str], None] | None = None,
 ) -> RunReport:
     """Publish one execution result before unwinding the shared apply scope."""
     primary_outcome = ApplyPrimaryOutcome.from_execution_result(
@@ -827,16 +869,18 @@ def _complete_entrypoint_execution(
         entrypoint_exit_code=execution.entrypoint_exit_code,
         patchharbor_error=execution.patchharbor_error,
     )
+    report = _complete_mutation_result_bundle(
+        mutation_gate,
+        primary_outcome=primary_outcome,
+        execution_log=(execution.output if execution.entrypoint_started else None),
+        before_result_publication=before_result_publication,
+    )
     _publish_attempt_outcome(
         mutation_gate,
         publish_attempt_outcome,
         succeeded=primary_outcome.result.success,
         execution_log=(execution.output if execution.entrypoint_started else None),
-    )
-    report = _complete_mutation_result_bundle(
-        mutation_gate,
-        primary_outcome=primary_outcome,
-        execution_log=(execution.output if execution.entrypoint_started else None),
+        completed_report=report,
     )
 
     if execution.patchharbor_error is not None:
@@ -856,6 +900,7 @@ def apply_patch_package(
     presentation: DashboardPresentation | None = None,
     before_mutation: Callable[[], None] | None = None,
     publish_attempt_outcome: Callable[[bool, GitObjectId | None], None] | None = None,
+    before_result_publication: Callable[[str], None] | None = None,
 ) -> RunReport:
     """Write one validated package, run its private entrypoint, and bundle it."""
     actual_session = session or RunSession.start()
@@ -885,6 +930,7 @@ def apply_patch_package(
             mutation_gate,
             execution,
             publish_attempt_outcome=publish_attempt_outcome,
+            before_result_publication=before_result_publication,
         )
 
 
@@ -969,12 +1015,18 @@ def run_apply_path(
             session=actual_session,
             presentation=presentation,
             before_mutation=(
-                discovered.publish_attempt
+                (lambda: discovered.publish_attempt(str(actual_session.run_id)))
                 if discovered is not None
                 else None
             ),
+            before_result_publication=(
+                (lambda digest: discovered.publish_result_digest(str(actual_session.run_id), digest))
+                if discovered is not None else None
+            ),
             publish_attempt_outcome=(
-                discovered.publish_outcome
+                (lambda succeeded, commit: discovered.publish_outcome(
+                    succeeded, commit, run_id=str(actual_session.run_id),
+                ))
                 if discovered is not None
                 else None
             ),

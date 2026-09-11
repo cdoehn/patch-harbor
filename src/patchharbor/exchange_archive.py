@@ -16,7 +16,7 @@ from patchharbor.exchange import (
     ExchangeArtifact, ExchangeArtifactKind, ExchangeScanError, read_exchange_artifact_content,
 )
 from patchharbor.exchange_paths import ExchangePathPolicyError, require_exchange_outside_registry
-from patchharbor.exchange_state import ExchangeFileIdentity, load_exchange_state
+from patchharbor.exchange_state import ExchangeApplyStatus, ExchangeFileIdentity, load_exchange_state
 from patchharbor.locks import registry_lock
 from patchharbor.models import RepositoryId
 from patchharbor.platform.archive import open_archive_location
@@ -80,10 +80,15 @@ def archive_exchange_artifacts(
             # Fully validate bytes before locking any repository. Grouping only
             # reuses its initial context within this call; no evidence is cached
             # across scans, and every actual move has a fresh final proof.
+            pending_results = {
+                record.result_sha256 for record in load_exchange_state(paths).records
+                if record.apply_status is ExchangeApplyStatus.ATTEMPTED and record.result_sha256
+            }
             candidates: dict[RepositoryId, list[tuple[ExchangeArtifact, ArchiveEvidence]]] = {}
             for artifact in artifacts:
                 if (artifact.kind is ExchangeArtifactKind.OTHER
-                    or artifact.path in excluded_paths):
+                    or artifact.path in excluded_paths
+                    or artifact.identity.sha256 in pending_results):
                     continue
                 # A known foreign binding cannot belong to the manual scope.
                 if (repository_id is not None and artifact.selection is not None

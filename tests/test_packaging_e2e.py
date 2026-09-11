@@ -32,6 +32,7 @@ EXPECTED_RUNTIME_FILES = {
     "patchharbor/archive_git.py",
     "patchharbor/archive_files.py",
     "patchharbor/exchange_archive.py",
+    "patchharbor/exchange_recovery.py",
     "patchharbor/platform/archive.py",
     "patchharbor/apply_mutation.py",
     "patchharbor/apply_preflight.py",

@@ -89,6 +89,24 @@ Kommandozeilenbeispielen für den Entwicklungsrechner, nicht der Chat-Laufzeit.
 Verwende sie niemals als Repository-Zuordnung oder in `patch.json`. Dafür gelten
 weiterhin ausschließlich die vollständigen Bindungswerte aus `context.json`.
 
+### Unterbrochene Attempts und Erfolgsnachweis
+
+Neue Apply-Result-Manifeste verknüpfen `patch_sha256`, `run_id`, `repo_id`, die
+vollständige erwartete Bindung und optional `completed_commit`. Replay-Format 4
+speichert außerdem `attempt_run_id` und eine vor Veröffentlichung lokal verankerte
+`result_sha256`. Nur ein vollständig passendes erfolgreiches Result und sauberer
+Git-Nachweis unter dem echten freien Repository-Lock erlauben eine automatische
+Reparatur `attempted -> succeeded`. Ältere Einträge ohne Beweise bleiben unverändert.
+
+`screen -ls` ohne Socket beweist keinen Prozessabbruch. Ein `attempted`, ein dirty
+Working Tree oder ein fehlendes Result kann zu einem noch laufenden Apply gehören.
+Vor jeder manuellen Wiederherstellung den echten Lock-/Prozesszustand prüfen und
+Änderungen sichern; niemals aufgrund dieser Symptome allein `git restore`,
+`reset --hard` oder das Löschen von Lock-/Replay-Dateien anweisen. Recovery setzt
+selbst keine Repository-Dateien zurück. SHA-Werte sind vollständig zu verwenden;
+gekürzte UI-Werte und Dateinamen sind kein Erfolgsbeleg. Der lokale Replay-State
+ist Vertrauensbasis, die Hashes sind keine digitalen Signaturen.
+
 ## 2. Erforderliche Eingaben
 
 Für einen Entwicklungsauftrag benötigst du mindestens:
