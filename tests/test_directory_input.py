@@ -6,7 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from patchharbor.errors import ExitCode, PatchHarborError
+from patchharbor.exit_status import ExitCode, exit_code_for_error
+from patchharbor.errors import PatchHarborError
 from patchharbor.application import discover_directory_candidates, run_script_path
 from patchharbor.models import DirectoryCandidate
 from patchharbor.presentation import select_directory_candidate
@@ -90,7 +91,7 @@ def test_disappeared_selected_file_has_a_clear_source_error(tmp_path: Path) -> N
             ),
         )
 
-    assert raised.value.exit_code is ExitCode.SOURCE_ERROR
+    assert exit_code_for_error(raised.value) is ExitCode.SOURCE_ERROR
     assert str(raised.value) == "selected script is no longer available: first.sh"
 
 
@@ -101,4 +102,4 @@ def test_multiple_candidates_require_an_explicit_valid_choice(tmp_path: Path, un
     selector = (lambda candidates: DirectoryCandidate(tmp_path / "outside.sh", 0)) if unknown else None
     with pytest.raises(PatchHarborError) as raised:
         run_script_path(tmp_path, cwd=tmp_path, timeout_seconds=1, select_candidate=selector)
-    assert raised.value.exit_code is ExitCode.USAGE_ERROR
+    assert exit_code_for_error(raised.value) is ExitCode.USAGE_ERROR

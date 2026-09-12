@@ -5,7 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from patchharbor.errors import ExitCode, PatchHarborError
+from patchharbor.exit_status import ExitCode, exit_code_for_error
+from patchharbor.errors import PatchHarborError
 import patchharbor.interpreters as interpreters
 from patchharbor.interpreters import (
     build_interpreter_command,
@@ -73,7 +74,7 @@ def test_unknown_or_extended_shebang_is_rejected(shebang: str) -> None:
     with pytest.raises(PatchHarborError) as raised:
         select_interpreter(f"{shebang}\n# PATCHHARBOR\n")
 
-    assert raised.value.exit_code is ExitCode.INTERPRETER_ERROR
+    assert exit_code_for_error(raised.value) is ExitCode.INTERPRETER_ERROR
     assert str(raised.value).startswith(
         "unsupported script interpreter in shebang: "
     )
@@ -88,7 +89,7 @@ def test_missing_interpreter_is_reported_during_resolution(
     with pytest.raises(PatchHarborError) as raised:
         resolve_interpreter(selected)
 
-    assert raised.value.exit_code is ExitCode.INTERPRETER_ERROR
+    assert exit_code_for_error(raised.value) is ExitCode.INTERPRETER_ERROR
     assert str(raised.value) == "script interpreter not found: bash"
 
 

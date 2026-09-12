@@ -10,7 +10,7 @@ from pathlib import Path
 
 from patchharbor.progress import activity
 
-from patchharbor.errors import ExitCode, PatchHarborError
+from patchharbor.errors import FailureReason, PatchHarborError
 from patchharbor.interpreters import (
     ResolvedInterpreter,
     encode_script_file,
@@ -50,7 +50,7 @@ class PreparedPatchPackage:
         return self.entrypoint.script.warnings
 
 
-def _preflight_error(message: str, exit_code: ExitCode) -> PatchHarborError:
+def _preflight_error(message: str, exit_code: FailureReason) -> PatchHarborError:
     return PatchHarborError(message, exit_code)
 
 
@@ -63,7 +63,7 @@ def _verified_private_resource(
     relative_path: str,
     content: bytes,
     *,
-    failure_exit: ExitCode,
+    failure_exit: FailureReason,
 ) -> Path:
     activity("PREPARE", f"Write and hash-verify private entrypoint resource: {relative_path}")
     target = _private_resource_path(root, relative_path)
@@ -95,7 +95,7 @@ def _validated_entrypoint(
     except (UnicodeError, ScriptFormatError) as exc:
         raise _preflight_error(
             "patch package entrypoint is not a valid PatchHarbor script",
-            ExitCode.NO_VALID_SCRIPT,
+            FailureReason.NO_VALID_SCRIPT,
         ) from exc
     activity("SCRIPT", "Resolve the required Bash/PowerShell interpreter")
     return script, resolve_script_interpreter(script.text)
@@ -110,7 +110,7 @@ def _prepare_entrypoint(
         private_root / "entrypoint",
         f"script{interpreter.spec.script_suffix}",
         encode_script_file(script.text, interpreter.spec),
-        failure_exit=ExitCode.EXECUTION_ERROR,
+        failure_exit=FailureReason.EXECUTION_ERROR,
     )
     return PreparedEntrypoint(
         path=path,
@@ -131,7 +131,7 @@ def prepare_patch_package(
     except (OSError, RuntimeError) as exc:
         raise _preflight_error(
             f"cannot resolve the private system temporary directory: {exc}",
-            ExitCode.EXECUTION_ERROR,
+            FailureReason.EXECUTION_ERROR,
         ) from exc
 
     if is_physically_within(
@@ -142,7 +142,7 @@ def prepare_patch_package(
     ):
         raise _preflight_error(
             "private apply temporary directory is inside the repository",
-            ExitCode.EXECUTION_ERROR,
+            FailureReason.EXECUTION_ERROR,
         )
 
     try:
@@ -158,5 +158,5 @@ def prepare_patch_package(
     except OSError as exc:
         raise _preflight_error(
             f"cannot prepare private patch resources: {describe_os_error(exc)}",
-            ExitCode.EXECUTION_ERROR,
+            FailureReason.EXECUTION_ERROR,
         ) from exc

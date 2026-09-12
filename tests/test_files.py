@@ -5,7 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from patchharbor.errors import ExitCode, PatchHarborError
+from patchharbor.exit_status import ExitCode, exit_code_for_error
+from patchharbor.errors import PatchHarborError
 from patchharbor.models import BundlePayload
 import patchharbor.platform.filesystem as platform_filesystem
 from patchharbor.payload_files import write_bundle_payloads
@@ -77,7 +78,7 @@ def test_bundle_validates_every_target_before_replacing_any_file(
             cwd=tmp_path,
         )
 
-    assert raised.value.exit_code is ExitCode.PAYLOAD_PREPARATION_ERROR
+    assert exit_code_for_error(raised.value) is ExitCode.PAYLOAD_PREPARATION_ERROR
     assert first_target.read_bytes() == b"old"
     assert blocked_parent.read_bytes() == b"not a directory"
 
@@ -94,7 +95,7 @@ def test_bundle_rejects_duplicate_payload_targets_before_writing(
             cwd=tmp_path,
         )
 
-    assert raised.value.exit_code is ExitCode.PAYLOAD_PREPARATION_ERROR
+    assert exit_code_for_error(raised.value) is ExitCode.PAYLOAD_PREPARATION_ERROR
     assert list(tmp_path.iterdir()) == []
 
 
@@ -114,7 +115,7 @@ def test_bundle_does_not_follow_symbolic_link_parent(tmp_path: Path) -> None:
             cwd=tmp_path,
         )
 
-    assert raised.value.exit_code is ExitCode.PAYLOAD_PREPARATION_ERROR
+    assert exit_code_for_error(raised.value) is ExitCode.PAYLOAD_PREPARATION_ERROR
     assert not (outside / "blob.bin").exists()
 
 
@@ -133,7 +134,7 @@ def test_bundle_atomic_replace_failure_is_fatal_and_cleans_local_stage(
             cwd=tmp_path,
         )
 
-    assert raised.value.exit_code is ExitCode.PAYLOAD_PREPARATION_ERROR
+    assert exit_code_for_error(raised.value) is ExitCode.PAYLOAD_PREPARATION_ERROR
     assert "cannot replace target" in str(raised.value)
     assert not (tmp_path / "payload.bin").exists()
     assert list(tmp_path.glob(".patchharbor-*.tmp")) == []
@@ -151,7 +152,7 @@ def test_bundle_does_not_replace_symbolic_link_target(tmp_path: Path) -> None:
             cwd=tmp_path,
         )
 
-    assert raised.value.exit_code is ExitCode.PAYLOAD_PREPARATION_ERROR
+    assert exit_code_for_error(raised.value) is ExitCode.PAYLOAD_PREPARATION_ERROR
     assert real_target.read_bytes() == b"original"
     assert link.is_symlink()
 
@@ -167,6 +168,6 @@ def test_posix_fifo_bundle_target_is_not_replaced(tmp_path: Path) -> None:
             cwd=tmp_path,
         )
 
-    assert raised.value.exit_code is ExitCode.PAYLOAD_PREPARATION_ERROR
+    assert exit_code_for_error(raised.value) is ExitCode.PAYLOAD_PREPARATION_ERROR
     assert "target is not a regular file" in str(raised.value)
     assert target.exists()

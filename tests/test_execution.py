@@ -5,7 +5,9 @@ from pathlib import Path
 
 import pytest
 
-from patchharbor.errors import ExitCode, PatchHarborError
+from patchharbor.exit_status import ExitCode, exit_code_for_error
+from patchharbor.errors import FailureReason
+from patchharbor.errors import PatchHarborError
 import patchharbor.execution as execution
 from patchharbor.execution import (
     ScriptExecutionResult,
@@ -133,7 +135,7 @@ def test_interpreter_selection_error_happens_before_process_start(
             timeout_seconds=7,
         )
 
-    assert raised.value.exit_code is ExitCode.INTERPRETER_ERROR
+    assert exit_code_for_error(raised.value) is ExitCode.INTERPRETER_ERROR
     assert not process_started
 
 
@@ -158,7 +160,7 @@ def test_missing_selected_interpreter_happens_before_process_start(
             timeout_seconds=7,
         )
 
-    assert raised.value.exit_code is ExitCode.INTERPRETER_ERROR
+    assert exit_code_for_error(raised.value) is ExitCode.INTERPRETER_ERROR
     assert str(raised.value) == "script interpreter not found: bash"
     assert not process_started
 
@@ -181,7 +183,7 @@ def test_process_start_error_is_reported_as_interpreter_error(
             timeout_seconds=7,
         )
 
-    assert raised.value.exit_code is ExitCode.INTERPRETER_ERROR
+    assert exit_code_for_error(raised.value) is ExitCode.INTERPRETER_ERROR
     assert str(raised.value) == (
         "cannot start script interpreter: operating-system operation failed"
     )
@@ -250,7 +252,7 @@ def test_terminal_process_state_maps_to_exit_code_and_closes_tree(
             timeout_seconds=0.25,
         )
 
-    assert raised.value.exit_code is expected_exit_code
+    assert exit_code_for_error(raised.value) is expected_exit_code
     assert process_tree.closed == 1
     assert process_tree.exit_exception is PatchHarborError
 
@@ -287,7 +289,7 @@ def test_interrupt_during_output_capture_start_is_reported_as_interrupted(
             timeout_seconds=7,
         )
 
-    assert raised.value.exit_code is ExitCode.INTERRUPTED
+    assert exit_code_for_error(raised.value) is ExitCode.INTERRUPTED
     assert process_tree.run_timeouts == []
     assert process_tree.closed == 1
 
@@ -323,7 +325,7 @@ def test_prepared_timeout_preserves_output_for_result_bundle(
     assert result.entrypoint_started is True
     assert result.entrypoint_exit_code is None
     assert result.patchharbor_error is not None
-    assert result.patchharbor_error.exit_code is ExitCode.TIMEOUT
+    assert exit_code_for_error(result.patchharbor_error) is ExitCode.TIMEOUT
     assert result.output == b"before-timeout\n"
     assert process_tree.closed == 1
 
@@ -355,14 +357,14 @@ def test_prepared_process_start_failure_reports_no_entrypoint_start(
     assert result.entrypoint_started is False
     assert result.entrypoint_exit_code is None
     assert result.patchharbor_error is not None
-    assert result.patchharbor_error.exit_code is ExitCode.INTERPRETER_ERROR
+    assert exit_code_for_error(result.patchharbor_error) is ExitCode.INTERPRETER_ERROR
     assert result.output == b""
 
 
 def test_script_execution_result_keeps_exit_and_tool_error_distinct() -> None:
     exited = ScriptExecutionResult.exited(5, b"entrypoint output")
     failed = ScriptExecutionResult.failed(
-        PatchHarborError("tool failure", ExitCode.INTERPRETER_ERROR),
+        PatchHarborError("tool failure", FailureReason.INTERPRETER_ERROR),
         entrypoint_started=False,
         output=b"",
     )
@@ -371,14 +373,14 @@ def test_script_execution_result_keeps_exit_and_tool_error_distinct() -> None:
     assert exited.patchharbor_error is None
     assert failed.entrypoint_exit_code is None
     assert failed.patchharbor_error is not None
-    assert failed.patchharbor_error.exit_code is ExitCode.INTERPRETER_ERROR
+    assert exit_code_for_error(failed.patchharbor_error) is ExitCode.INTERPRETER_ERROR
 
     with pytest.raises(ValueError):
         ScriptExecutionResult(
             entrypoint_started=True,
             entrypoint_exit_code=5,
             patchharbor_error=PatchHarborError(
-                "tool failure", ExitCode.EXECUTION_ERROR
+                "tool failure", FailureReason.EXECUTION_ERROR
             ),
             output=b"",
         )
@@ -386,11 +388,11 @@ def test_script_execution_result_keeps_exit_and_tool_error_distinct() -> None:
 
 def test_script_execution_cleanup_error_never_replaces_stronger_result() -> None:
     cleanup_error = PatchHarborError(
-        "cannot close output", ExitCode.EXECUTION_ERROR
+        "cannot close output", FailureReason.EXECUTION_ERROR
     )
     entrypoint_exit = ScriptExecutionResult.exited(23, b"output")
     timeout = ScriptExecutionResult.failed(
-        PatchHarborError("timed out", ExitCode.TIMEOUT),
+        PatchHarborError("timed out", FailureReason.TIMEOUT),
         entrypoint_started=True,
         output=b"partial",
     )
@@ -499,7 +501,7 @@ def test_output_cleanup_failure_after_success_becomes_tool_error(
 
     assert result.entrypoint_exit_code is None
     assert result.patchharbor_error is not None
-    assert result.patchharbor_error.exit_code is ExitCode.EXECUTION_ERROR
+    assert exit_code_for_error(result.patchharbor_error) is ExitCode.EXECUTION_ERROR
     assert result.entrypoint_started is True
     assert process_tree.closed == 1
 
@@ -523,7 +525,7 @@ def test_process_tree_is_closed_when_waiting_raises_an_os_error(
             timeout_seconds=7,
         )
 
-    assert raised.value.exit_code is ExitCode.EXECUTION_ERROR
+    assert exit_code_for_error(raised.value) is ExitCode.EXECUTION_ERROR
     assert str(raised.value) == (
         "cannot control script process tree: operating-system operation failed"
     )
@@ -552,7 +554,7 @@ def test_process_tree_is_closed_when_final_descendant_cleanup_fails(
             timeout_seconds=7,
         )
 
-    assert raised.value.exit_code is ExitCode.EXECUTION_ERROR
+    assert exit_code_for_error(raised.value) is ExitCode.EXECUTION_ERROR
     assert str(raised.value) == (
         "cannot control script process tree: operating-system operation failed"
     )

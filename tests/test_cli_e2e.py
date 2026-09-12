@@ -676,6 +676,7 @@ import sys
 import threading
 import time
 
+from patchharbor.exit_status import exit_code_for_error
 from patchharbor.errors import PatchHarborError
 from patchharbor.execution import execute_script_text
 
@@ -707,7 +708,7 @@ try:
         timeout_seconds=30,
     )
 except PatchHarborError as exc:
-    raise SystemExit(int(exc.exit_code))
+    raise SystemExit(int(exit_code_for_error(exc)))
 raise SystemExit(result)
 """,
         encoding="utf-8",

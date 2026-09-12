@@ -8,7 +8,9 @@ from typing import Iterator
 
 import pytest
 
-from patchharbor.errors import ErrorKind, ExitCode, PatchHarborError
+from patchharbor.exit_status import ExitCode, exit_code_for_error
+from patchharbor.errors import FailureReason
+from patchharbor.errors import ErrorKind, PatchHarborError
 from patchharbor.models import RepositoryId, RepositoryPath
 from patchharbor.locks import registry_lock
 from patchharbor.registration import (
@@ -49,7 +51,7 @@ def test_failed_registry_publication_restores_all_local_registration_state(
     exclude_before = exclude_path.read_bytes()
 
     def fail_registry_publication(*_args: object, **_kwargs: object) -> None:
-        raise PatchHarborError("injected registry failure", ExitCode.REPOSITORY_ERROR)
+        raise PatchHarborError("injected registry failure", FailureReason.REPOSITORY_ERROR)
 
     monkeypatch.setattr(
         "patchharbor.registration.write_registry",
@@ -59,7 +61,7 @@ def test_failed_registry_publication_restores_all_local_registration_state(
     with pytest.raises(PatchHarborError) as captured:
         register_local_repository(repository)
 
-    assert captured.value.exit_code is ExitCode.REPOSITORY_ERROR
+    assert exit_code_for_error(captured.value) is ExitCode.REPOSITORY_ERROR
     assert not (repository / ".patchharbor").exists()
     assert exclude_path.read_bytes() == exclude_before
     assert git(repository, "status", "--porcelain=v1").stdout == ""
@@ -90,7 +92,7 @@ def test_repository_id_replacement_preserves_the_previous_file_on_failure(
     with pytest.raises(PatchHarborError) as captured:
         apply_local_registration(state, RepositoryId.new())
 
-    assert captured.value.exit_code is ExitCode.REPOSITORY_ERROR
+    assert exit_code_for_error(captured.value) is ExitCode.REPOSITORY_ERROR
     assert id_path.read_text(encoding="ascii") == f"{original_id}\n"
     assert not tuple(internal.glob(".patchharbor-*.tmp"))
 
@@ -128,7 +130,7 @@ def test_registry_replacement_preserves_the_previous_snapshot_on_failure(
     with pytest.raises(PatchHarborError) as captured:
         write_registry(paths, registry_snapshot(entries))
 
-    assert captured.value.exit_code is ExitCode.REPOSITORY_ERROR
+    assert exit_code_for_error(captured.value) is ExitCode.REPOSITORY_ERROR
     assert paths.registry_path.read_bytes() == previous_bytes
     assert not tuple(configuration.glob(".patchharbor-*.tmp"))
 
@@ -190,7 +192,7 @@ def test_registration_user_path_failures_use_the_registry_error_category(
     with pytest.raises(PatchHarborError) as captured:
         registration_user_paths()
 
-    assert captured.value.exit_code is ExitCode.REPOSITORY_ERROR
+    assert exit_code_for_error(captured.value) is ExitCode.REPOSITORY_ERROR
     assert captured.value.error_kind is ErrorKind.REGISTRY_ERROR
 
 
@@ -212,7 +214,7 @@ def test_identity_and_registry_publication_share_the_global_lock(
         with pytest.raises(PatchHarborError) as captured:
             with registry_lock(paths):
                 raise AssertionError("nested registry lock must not be acquired")
-        assert captured.value.exit_code is ExitCode.REPOSITORY_ERROR
+        assert exit_code_for_error(captured.value) is ExitCode.REPOSITORY_ERROR
 
     def apply_while_locked(*args: object, **kwargs: object) -> None:
         assert_registry_is_locked()
@@ -269,7 +271,7 @@ def test_new_id_revalidates_local_identity_after_repository_lock_acquisition(
     with pytest.raises(PatchHarborError) as captured:
         register_local_repository(repository, new_id=True)
 
-    assert captured.value.exit_code is ExitCode.REPOSITORY_ERROR
+    assert exit_code_for_error(captured.value) is ExitCode.REPOSITORY_ERROR
     assert captured.value.error_kind is ErrorKind.REPOSITORY_RESOLUTION_ERROR
     assert id_path.read_text(encoding="ascii") == f"{externally_changed_id}\n"
     assert paths.registry_path.read_bytes() == registry_before
@@ -303,7 +305,7 @@ def test_unregister_revalidates_registry_mapping_after_repository_lock_acquisiti
     with pytest.raises(PatchHarborError) as captured:
         unregister_local_repository(str(repo_id), cwd=tmp_path)
 
-    assert captured.value.exit_code is ExitCode.REPOSITORY_ERROR
+    assert exit_code_for_error(captured.value) is ExitCode.REPOSITORY_ERROR
     assert captured.value.error_kind is ErrorKind.REPOSITORY_RESOLUTION_ERROR
     persisted = json.loads(paths.registry_path.read_text(encoding="utf-8"))
     assert persisted["repositories"] == {
@@ -374,7 +376,7 @@ def test_failure_after_registry_publication_restores_exact_previous_state(
         real_write_registry(*args, **kwargs)
         raise PatchHarborError(
             "injected post-publication failure",
-            ExitCode.REPOSITORY_ERROR,
+            FailureReason.REPOSITORY_ERROR,
         )
 
     monkeypatch.setattr(
@@ -407,13 +409,13 @@ def test_failed_identity_rollback_is_reported_as_registry_inconsistency(
         real_apply_local_registration(*args, **kwargs)
         raise PatchHarborError(
             "injected mutation failure",
-            ExitCode.REPOSITORY_ERROR,
+            FailureReason.REPOSITORY_ERROR,
         )
 
     def fail_local_restore(*_args: object, **_kwargs: object) -> None:
         raise PatchHarborError(
             "injected rollback failure",
-            ExitCode.REPOSITORY_ERROR,
+            FailureReason.REPOSITORY_ERROR,
         )
 
     monkeypatch.setattr(
@@ -428,7 +430,7 @@ def test_failed_identity_rollback_is_reported_as_registry_inconsistency(
     with pytest.raises(PatchHarborError) as captured:
         register_local_repository(repository)
 
-    assert captured.value.exit_code is ExitCode.REPOSITORY_ERROR
+    assert exit_code_for_error(captured.value) is ExitCode.REPOSITORY_ERROR
     assert captured.value.error_kind is ErrorKind.REGISTRY_ERROR
 
 
@@ -458,7 +460,7 @@ def test_registry_persistence_rejects_a_noncanonical_repository_id(
     with pytest.raises(PatchHarborError) as captured:
         write_registry(paths, snapshot)
 
-    assert captured.value.exit_code is ExitCode.REPOSITORY_ERROR
+    assert exit_code_for_error(captured.value) is ExitCode.REPOSITORY_ERROR
     assert captured.value.error_kind is ErrorKind.REGISTRY_ERROR
     assert not paths.registry_path.exists()
 
@@ -476,7 +478,7 @@ def test_local_identity_persistence_rejects_a_noncanonical_repository_id(
     with pytest.raises(PatchHarborError) as captured:
         apply_local_registration(state, invalid_id)
 
-    assert captured.value.exit_code is ExitCode.REPOSITORY_ERROR
+    assert exit_code_for_error(captured.value) is ExitCode.REPOSITORY_ERROR
     assert captured.value.error_kind is ErrorKind.REPOSITORY_RESOLUTION_ERROR
     assert not state.internal_directory.exists()
     assert state.exclude_path.read_bytes() == exclude_before
@@ -498,7 +500,7 @@ def test_registration_rejects_exchange_overlap_in_both_directions(
     with pytest.raises(PatchHarborError) as inside_captured:
         register_local_repository(outer_repository)
 
-    assert inside_captured.value.exit_code is ExitCode.REPOSITORY_ERROR
+    assert exit_code_for_error(inside_captured.value) is ExitCode.REPOSITORY_ERROR
     assert inside_captured.value.error_kind is ErrorKind.REPOSITORY_RESOLUTION_ERROR
     assert str(inside_captured.value) == (
         "repository overlaps configured exchange directory"
@@ -513,7 +515,7 @@ def test_registration_rejects_exchange_overlap_in_both_directions(
     with pytest.raises(PatchHarborError) as outer_captured:
         register_local_repository(nested_repository)
 
-    assert outer_captured.value.exit_code is ExitCode.REPOSITORY_ERROR
+    assert exit_code_for_error(outer_captured.value) is ExitCode.REPOSITORY_ERROR
     assert outer_captured.value.error_kind is ErrorKind.REPOSITORY_RESOLUTION_ERROR
     assert str(outer_captured.value) == (
         "repository overlaps configured exchange directory"

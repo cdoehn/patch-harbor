@@ -11,7 +11,7 @@ from patchharbor.bundle_paths import (
     BundlePathError,
     validate_bundle_member_paths,
 )
-from patchharbor.errors import ExitCode, PatchHarborError
+from patchharbor.errors import FailureReason, PatchHarborError
 from patchharbor.models import BundlePayload
 from patchharbor.platform.filesystem import (
     FileSystemOperationError,
@@ -33,14 +33,14 @@ class PayloadWriteError(PatchHarborError):
 def _target_error(label: str, detail: object) -> PayloadTargetError:
     return PayloadTargetError(
         f"cannot write {label}: {detail}",
-        ExitCode.PAYLOAD_PREPARATION_ERROR,
+        FailureReason.PAYLOAD_PREPARATION_ERROR,
     )
 
 
 def _write_error(label: str, detail: object) -> PayloadWriteError:
     return PayloadWriteError(
         f"cannot write {label}: {detail}",
-        ExitCode.PAYLOAD_PREPARATION_ERROR,
+        FailureReason.PAYLOAD_PREPARATION_ERROR,
     )
 
 

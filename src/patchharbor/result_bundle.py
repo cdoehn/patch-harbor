@@ -11,7 +11,7 @@ from uuid import UUID
 
 from patchharbor.archive_git import completed_commit_for_context
 from patchharbor.errors import (
-    ExitCode,
+    FailureReason,
     PatchHarborError,
     repository_resolution_error,
     result_bundle_error,
@@ -279,7 +279,7 @@ def _manual_bundle_failure(
     )
     return PatchHarborError(
         str(error),
-        ExitCode.RESULT_BUNDLE_ERROR,
+        FailureReason.RESULT_BUNDLE_ERROR,
         error_kind=error.error_kind,
         emergency_diagnostics_path=emergency_path,
         emergency_diagnostics_failed=rescue_failed,

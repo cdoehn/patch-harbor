@@ -10,7 +10,7 @@ from typing import BinaryIO
 
 from patchharbor.progress import activity
 
-from patchharbor.errors import ExitCode, PatchHarborError
+from patchharbor.errors import FailureReason, PatchHarborError
 from patchharbor.interpreters import (
     InterpreterSpec,
     ResolvedInterpreter,
@@ -68,7 +68,7 @@ def execute_script_text(
     except OSError as exc:
         raise PatchHarborError(
             f"cannot prepare temporary script: {describe_os_error(exc)}",
-            ExitCode.EXECUTION_ERROR,
+            FailureReason.EXECUTION_ERROR,
         ) from exc
 
 
@@ -98,9 +98,9 @@ class ScriptExecutionResult:
         if self.patchharbor_error is not None:
             if not isinstance(self.patchharbor_error, PatchHarborError):
                 raise ValueError("script execution error must be a PatchHarbor error")
-            if self.patchharbor_error.exit_code in {
-                ExitCode.TIMEOUT,
-                ExitCode.INTERRUPTED,
+            if self.patchharbor_error.reason in {
+                FailureReason.TIMEOUT,
+                FailureReason.INTERRUPTED,
             } and not self.entrypoint_started:
                 raise ValueError("timeout and interruption require a started entrypoint")
         object.__setattr__(self, "output", bytes(self.output))
@@ -167,7 +167,7 @@ def _execution_log_error(exc: OSError) -> PatchHarborError:
     return PatchHarborError(
         "cannot capture script output: "
         f"{describe_os_error(exc)}",
-        ExitCode.EXECUTION_ERROR,
+        FailureReason.EXECUTION_ERROR,
     )
 
 
@@ -261,7 +261,7 @@ def _run_staged_script(
         return ScriptExecutionResult.failed(
             error,
             entrypoint_started=(
-                error.exit_code is not ExitCode.INTERPRETER_ERROR
+                error.reason is not FailureReason.INTERPRETER_ERROR
             ),
             output=b"",
         )
@@ -290,7 +290,7 @@ def _control_process(
     except OSError as exc:
         raise PatchHarborError(
             f"cannot start script interpreter: {describe_os_error(exc)}",
-            ExitCode.INTERPRETER_ERROR,
+            FailureReason.INTERPRETER_ERROR,
         ) from exc
 
     targets = output or OutputTargets()
@@ -313,13 +313,13 @@ def _control_process(
                 activity("TIMEOUT", f"Script exceeded {timeout_seconds:g}s; process tree stopped", "error")
                 raise PatchHarborError(
                     f"script timed out after {timeout_seconds:g} seconds",
-                    ExitCode.TIMEOUT,
+                    FailureReason.TIMEOUT,
                 )
             if result.state is ProcessState.INTERRUPTED:
                 activity("INTERRUPT", "Script interrupted; process tree stopped", "warning")
                 raise PatchHarborError(
                     "script aborted by user",
-                    ExitCode.INTERRUPTED,
+                    FailureReason.INTERRUPTED,
                 )
             if result.state is not ProcessState.EXITED:
                 raise OSError("script process tree returned no terminal result")
@@ -332,7 +332,7 @@ def _control_process(
         _finish_capture_after_process_error(capture)
         raise PatchHarborError(
             "script aborted by user",
-            ExitCode.INTERRUPTED,
+            FailureReason.INTERRUPTED,
         ) from None
     except PatchHarborError:
         _finish_capture_after_process_error(capture)
@@ -341,5 +341,5 @@ def _control_process(
         _finish_capture_after_process_error(capture)
         raise PatchHarborError(
             f"cannot control script process tree: {describe_os_error(exc)}",
-            ExitCode.EXECUTION_ERROR,
+            FailureReason.EXECUTION_ERROR,
         ) from exc

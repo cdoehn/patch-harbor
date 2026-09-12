@@ -14,7 +14,9 @@ from patchharbor.apply_mutation import (
     apply_payload_mutation,
 )
 from patchharbor.configuration import write_exchange_directory
-from patchharbor.errors import ExitCode, PatchHarborError, patch_package_error
+from patchharbor.exit_status import ExitCode, exit_code_for_error
+from patchharbor.errors import FailureReason
+from patchharbor.errors import PatchHarborError, patch_package_error
 from patchharbor.models import BundlePayload, RepositoryContext
 from patchharbor.patch_manifest import (
     PATCH_FORMAT_VERSION,
@@ -124,7 +126,7 @@ def test_mutation_boundary_reports_changed_state_without_payload_write(
     assert result.success is False
     assert result.failure_kind is MutationFailureKind.STATE_MISMATCH
     assert result.error is not None
-    assert result.error.exit_code is ExitCode.STATE_MISMATCH
+    assert exit_code_for_error(result.error) is ExitCode.STATE_MISMATCH
     assert result.context.state_fingerprint != context.state_fingerprint
     assert not (repository / "payload.bin").exists()
     assert not tuple(repository.rglob(".patchharbor-*.tmp"))
@@ -160,7 +162,7 @@ def test_mutation_boundary_keeps_target_and_write_failures_distinct(
         assert cwd == repository
         raise error_type(
             "simulated mutation failure",
-            ExitCode.PAYLOAD_PREPARATION_ERROR,
+            FailureReason.PAYLOAD_PREPARATION_ERROR,
         )
 
     monkeypatch.setattr(mutation_module, "write_bundle_payloads", fail_write)
@@ -171,7 +173,7 @@ def test_mutation_boundary_keeps_target_and_write_failures_distinct(
     assert result.success is False
     assert result.failure_kind is expected_kind
     assert result.error is not None
-    assert result.error.exit_code is ExitCode.PAYLOAD_PREPARATION_ERROR
+    assert exit_code_for_error(result.error) is ExitCode.PAYLOAD_PREPARATION_ERROR
     assert result.context == context
     assert not (repository / "payload.bin").exists()
 

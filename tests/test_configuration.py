@@ -13,7 +13,8 @@ from patchharbor.configuration import (
     load_configuration,
     write_exchange_directory,
 )
-from patchharbor.errors import ErrorKind, ExitCode, PatchHarborError
+from patchharbor.exit_status import ExitCode, exit_code_for_error
+from patchharbor.errors import ErrorKind, PatchHarborError
 from patchharbor.user_paths import (
     RegistrationUserPaths,
     configuration_user_paths,
@@ -37,7 +38,7 @@ def _assert_configuration_error(
 ) -> PatchHarborError:
     with pytest.raises(PatchHarborError) as captured:
         load_configuration(paths)
-    assert captured.value.exit_code is ExitCode.SOURCE_ERROR
+    assert exit_code_for_error(captured.value) is ExitCode.SOURCE_ERROR
     assert captured.value.error_kind is ErrorKind.CONFIGURATION_ERROR
     assert str(captured.value) == message
     return captured.value
@@ -287,7 +288,7 @@ def test_configure_rejects_relative_path_without_side_effects(
     with pytest.raises(PatchHarborError) as captured:
         write_exchange_directory(paths, relative_directory)
 
-    assert captured.value.exit_code is ExitCode.SOURCE_ERROR
+    assert exit_code_for_error(captured.value) is ExitCode.SOURCE_ERROR
     assert captured.value.error_kind is ErrorKind.CONFIGURATION_ERROR
     assert str(captured.value) == "exchange directory must be an absolute path"
     assert not paths.configuration_path.exists()
@@ -305,7 +306,7 @@ def test_configuration_target_is_checked_before_exchange_creation(
     with pytest.raises(PatchHarborError) as captured:
         write_exchange_directory(paths, exchange_directory)
 
-    assert captured.value.exit_code is ExitCode.SOURCE_ERROR
+    assert exit_code_for_error(captured.value) is ExitCode.SOURCE_ERROR
     assert captured.value.error_kind is ErrorKind.CONFIGURATION_ERROR
     assert str(captured.value) == "configuration must be a regular file"
     assert not exchange_directory.exists()
@@ -329,7 +330,7 @@ def test_atomic_replace_failure_preserves_previous_configuration(
     with pytest.raises(PatchHarborError) as captured:
         write_exchange_directory(paths, second_exchange)
 
-    assert captured.value.exit_code is ExitCode.SOURCE_ERROR
+    assert exit_code_for_error(captured.value) is ExitCode.SOURCE_ERROR
     assert captured.value.error_kind is ErrorKind.CONFIGURATION_ERROR
     assert str(captured.value) == "cannot write configuration: permission denied"
     assert paths.configuration_path.read_bytes() == previous_content
@@ -349,7 +350,7 @@ def test_configuration_user_path_failures_have_their_own_category(
     with pytest.raises(PatchHarborError) as captured:
         configuration_user_paths()
 
-    assert captured.value.exit_code is ExitCode.SOURCE_ERROR
+    assert exit_code_for_error(captured.value) is ExitCode.SOURCE_ERROR
     assert captured.value.error_kind is ErrorKind.CONFIGURATION_ERROR
     assert "required for configuration" in str(captured.value)
 
@@ -391,7 +392,7 @@ def test_configure_holds_registry_lock_through_publication_and_revalidates_snaps
     with pytest.raises(PatchHarborError) as captured:
         configure_exchange_directory(exchange)
 
-    assert captured.value.exit_code is ExitCode.REPOSITORY_ERROR
+    assert exit_code_for_error(captured.value) is ExitCode.REPOSITORY_ERROR
     assert captured.value.error_kind is ErrorKind.REGISTRY_ERROR
     assert str(captured.value) == (
         "repository registry changed while configuring exchange directory"

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from patchharbor.progress import activity
 
-from patchharbor.errors import ExitCode, PatchHarborError
+from patchharbor.errors import FailureReason, PatchHarborError
 from patchharbor.models import (
     BundlePayload,
     BundleScript,
@@ -33,7 +33,7 @@ def _artifact_source_error(
 ) -> PatchHarborError:
     return PatchHarborError(
         f"cannot read script source {artifact.display_name}: {detail}",
-        ExitCode.SOURCE_ERROR,
+        FailureReason.SOURCE_ERROR,
     )
 
 
@@ -43,7 +43,7 @@ def _zip_source_error(
 ) -> PatchHarborError:
     return PatchHarborError(
         f"cannot read ZIP archive {artifact.display_name}: {detail}",
-        ExitCode.SOURCE_ERROR,
+        FailureReason.SOURCE_ERROR,
     )
 
 
@@ -135,7 +135,7 @@ def _no_valid_zip_script(artifact: InputArtifact) -> PatchHarborError:
     return PatchHarborError(
         "no valid PatchHarbor scripts found in ZIP archive "
         f"{artifact.display_name}",
-        ExitCode.NO_VALID_SCRIPT,
+        FailureReason.NO_VALID_SCRIPT,
     )
 
 
@@ -153,7 +153,7 @@ def _try_direct_script(
     except ScriptFormatError as exc:
         return (
             None,
-            PatchHarborError(str(exc), ExitCode.NO_VALID_SCRIPT),
+            PatchHarborError(str(exc), FailureReason.NO_VALID_SCRIPT),
             True,
         )
 
@@ -243,5 +243,5 @@ def resolve_patch_bundle(
     raise PatchHarborError(
         "file is neither a UTF-8 PatchHarbor script nor a ZIP archive: "
         f"{artifact.display_name}",
-        ExitCode.NO_VALID_SCRIPT,
+        FailureReason.NO_VALID_SCRIPT,
     )

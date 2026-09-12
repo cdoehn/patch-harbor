@@ -4,7 +4,8 @@ import json
 
 import pytest
 
-from patchharbor.errors import ErrorKind, ExitCode, PatchHarborError
+from patchharbor.exit_status import ExitCode, exit_code_for_error
+from patchharbor.errors import ErrorKind, PatchHarborError
 from patchharbor.models import GitObjectFormat, GitObjectId, RepositoryId
 from patchharbor.patch_manifest import (
     PATCH_FORMAT_VERSION,
@@ -50,7 +51,7 @@ def _without(field: str) -> dict[str, object]:
 def _assert_package_error(payload: bytes) -> PatchHarborError:
     with pytest.raises(PatchHarborError) as captured:
         parse_patch_manifest(payload)
-    assert captured.value.exit_code is ExitCode.PATCH_PACKAGE_ERROR
+    assert exit_code_for_error(captured.value) is ExitCode.PATCH_PACKAGE_ERROR
     assert captured.value.error_kind is ErrorKind.PATCH_PACKAGE_ERROR
     return captured.value
 

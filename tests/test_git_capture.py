@@ -6,7 +6,8 @@ import pytest
 
 from patchharbor import git_capture
 import patchharbor.platform.filesystem as filesystem_module
-from patchharbor.errors import ErrorKind, ExitCode, PatchHarborError
+from patchharbor.exit_status import ExitCode, exit_code_for_error
+from patchharbor.errors import ErrorKind, PatchHarborError
 from patchharbor.models import RepositoryPath, RepositoryState
 from patchharbor.repository_state import capture_repository_state
 from tests.registration_support import create_repository, git
@@ -38,14 +39,14 @@ def _untracked_records(repository: Path):
 def _assert_repository_capture_error(
     captured: pytest.ExceptionInfo[PatchHarborError],
 ) -> None:
-    assert captured.value.exit_code is ExitCode.REPOSITORY_ERROR
+    assert exit_code_for_error(captured.value) is ExitCode.REPOSITORY_ERROR
     assert captured.value.error_kind is ErrorKind.REPOSITORY_RESOLUTION_ERROR
 
 
 def _assert_unsupported_repository_state(
     captured: pytest.ExceptionInfo[PatchHarborError],
 ) -> None:
-    assert captured.value.exit_code is ExitCode.UNSUPPORTED_REPOSITORY_STATE
+    assert exit_code_for_error(captured.value) is ExitCode.UNSUPPORTED_REPOSITORY_STATE
     assert captured.value.error_kind is ErrorKind.UNSUPPORTED_REPOSITORY_STATE
 
 

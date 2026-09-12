@@ -11,7 +11,8 @@ import patchharbor.application as script_application
 import patchharbor.temporary_resources as temporary_resources
 from patchharbor.application import run_script_path
 from patchharbor.bundles import resolve_patch_bundle
-from patchharbor.errors import ExitCode, PatchHarborError
+from patchharbor.exit_status import ExitCode, exit_code_for_error
+from patchharbor.errors import PatchHarborError
 from patchharbor.output import OutputTargets
 from patchharbor.resource_policy import ResourcePolicy
 from patchharbor.sources import file_input_artifact, stdin_input_artifact
@@ -55,7 +56,7 @@ def test_direct_file_resolution_rejects_hard_budget(
     with pytest.raises(PatchHarborError) as raised:
         resolve_patch_bundle(file_input_artifact(source), policy=policy)
 
-    assert raised.value.exit_code is ExitCode.SOURCE_ERROR
+    assert exit_code_for_error(raised.value) is ExitCode.SOURCE_ERROR
     assert "resource limit exceeded" in str(raised.value)
     assert "exceeds 3 bytes" in str(raised.value)
 
@@ -105,7 +106,7 @@ def test_stdin_budget_failure_removes_secure_temporary_artifact(
         with stdin_input_artifact(BytesIO(b"1234"), policy=policy):
             raise AssertionError("oversized input must not be yielded")
 
-    assert raised.value.exit_code is ExitCode.SOURCE_ERROR
+    assert exit_code_for_error(raised.value) is ExitCode.SOURCE_ERROR
     assert "resource limit exceeded" in str(raised.value)
     assert not tuple(tmp_path.glob("patchharbor-input-*"))
 
@@ -148,7 +149,7 @@ def test_direct_reader_rechecks_budget_after_artifact_creation(
     with pytest.raises(PatchHarborError) as raised:
         resolve_patch_bundle(artifact, policy=policy)
 
-    assert raised.value.exit_code is ExitCode.SOURCE_ERROR
+    assert exit_code_for_error(raised.value) is ExitCode.SOURCE_ERROR
     assert "resource limit exceeded" in str(raised.value)
 
 

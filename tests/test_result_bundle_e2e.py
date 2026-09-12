@@ -22,7 +22,8 @@ import patchharbor.result_bundle_capture as result_bundle_capture_module
 import patchharbor.result_bundle_publication as result_bundle_publication_module
 from patchharbor.cli import main as cli_main
 from patchharbor.configuration import load_configuration
-from patchharbor.errors import ExitCode, PatchHarborError
+from patchharbor.exit_status import ExitCode, exit_code_for_error
+from patchharbor.errors import PatchHarborError
 from patchharbor.platform.filesystem import MetadataSyncStatus
 from patchharbor.result_bundle import create_manual_result_bundle
 from patchharbor.user_paths import registration_user_paths
@@ -913,7 +914,7 @@ def test_manual_bundle_rejects_repository_change_during_capture(
             output_directory=output_directory,
         )
 
-    assert captured.value.exit_code == ExitCode.RESULT_BUNDLE_ERROR
+    assert exit_code_for_error(captured.value) == ExitCode.RESULT_BUNDLE_ERROR
     assert output_directory.is_dir()
     assert tuple(output_directory.iterdir()) == ()
 
@@ -996,7 +997,7 @@ def test_manual_bundle_leaves_no_published_or_temporary_file_after_failure(
             output_directory=output_directory,
         )
 
-    assert captured.value.exit_code == ExitCode.RESULT_BUNDLE_ERROR
+    assert exit_code_for_error(captured.value) == ExitCode.RESULT_BUNDLE_ERROR
     assert output_directory.is_dir()
     assert tuple(output_directory.iterdir()) == ()
 
@@ -1127,7 +1128,7 @@ def test_manual_bundle_rejects_exchange_configuration_retargeted_during_capture(
     with pytest.raises(PatchHarborError) as captured:
         create_manual_result_bundle(repository)
 
-    assert captured.value.exit_code == ExitCode.RESULT_BUNDLE_ERROR
+    assert exit_code_for_error(captured.value) == ExitCode.RESULT_BUNDLE_ERROR
     assert captured.value.error_kind.value == "configuration_error"
     assert str(captured.value) == (
         "exchange directory changed during Result Bundle preparation"
@@ -1159,7 +1160,7 @@ def test_manual_bundle_rejects_output_directory_retargeted_during_capture(
             output_directory=output_directory,
         )
 
-    assert captured.value.exit_code == ExitCode.RESULT_BUNDLE_ERROR
+    assert exit_code_for_error(captured.value) == ExitCode.RESULT_BUNDLE_ERROR
     assert not tuple(other.glob("*_Result_*.zip"))
     assert tuple(moved_directory.iterdir()) == ()
 
@@ -1198,7 +1199,7 @@ def test_manual_bundle_holds_and_releases_lock_when_publication_fails(
             output_directory=output_directory,
         )
 
-    assert captured.value.exit_code == ExitCode.RESULT_BUNDLE_ERROR
+    assert exit_code_for_error(captured.value) == ExitCode.RESULT_BUNDLE_ERROR
     assert observed == [int(ExitCode.REPOSITORY_BUSY)]
     assert tuple(output_directory.iterdir()) == ()
     assert probe_repository_lock(repo_id, environment) == 0

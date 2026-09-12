@@ -7,7 +7,9 @@ import zipfile
 
 import pytest
 
-from patchharbor.errors import ExitCode, PatchHarborError
+from patchharbor.exit_status import ExitCode, exit_code_for_error
+from patchharbor.errors import FailureReason
+from patchharbor.errors import PatchHarborError
 import patchharbor.application as script_application
 from patchharbor.application import discover_directory_candidates, run_script_path
 import patchharbor.bundles as script_bundles
@@ -79,7 +81,7 @@ def test_zip_without_scripts_is_rejected_even_with_binary_payloads(
     with pytest.raises(PatchHarborError) as raised:
         _run_path(archive_path, tmp_path)
 
-    assert raised.value.exit_code is ExitCode.NO_VALID_SCRIPT
+    assert exit_code_for_error(raised.value) is ExitCode.NO_VALID_SCRIPT
     assert str(raised.value).startswith("no valid PatchHarbor scripts found")
 
 
@@ -117,7 +119,7 @@ def test_zip_rejects_links_and_special_entries_before_any_script_runs(
     with pytest.raises(PatchHarborError) as raised:
         _run_path(archive_path, tmp_path)
 
-    assert raised.value.exit_code is ExitCode.SOURCE_ERROR
+    assert exit_code_for_error(raised.value) is ExitCode.SOURCE_ERROR
     assert "unsupported entry type" in str(raised.value)
     assert executed == []
 
@@ -141,7 +143,7 @@ def test_zip_rejects_directory_entries_with_content_before_execution(
     with pytest.raises(PatchHarborError) as raised:
         _run_path(archive_path, tmp_path)
 
-    assert raised.value.exit_code is ExitCode.SOURCE_ERROR
+    assert exit_code_for_error(raised.value) is ExitCode.SOURCE_ERROR
     assert executed == []
 
 
@@ -180,7 +182,7 @@ def test_zip_rejects_unsafe_member_paths_before_execution(
     with pytest.raises(PatchHarborError) as raised:
         _run_path(archive_path, tmp_path)
 
-    assert raised.value.exit_code is ExitCode.SOURCE_ERROR
+    assert exit_code_for_error(raised.value) is ExitCode.SOURCE_ERROR
     assert "invalid PatchBundle" in str(raised.value)
     assert executed == []
     assert not (tmp_path / "safe.bin").exists()
@@ -208,7 +210,7 @@ def test_zip_rejects_original_backslash_name_after_host_normalization(
     with pytest.raises(PatchHarborError) as raised:
         _run_path(archive_path, tmp_path)
 
-    assert raised.value.exit_code is ExitCode.SOURCE_ERROR
+    assert exit_code_for_error(raised.value) is ExitCode.SOURCE_ERROR
     assert "invalid PatchBundle" in str(raised.value)
 
 
@@ -238,7 +240,7 @@ def test_zip_rejects_duplicate_and_ambiguous_member_trees(
     with pytest.raises(PatchHarborError) as raised:
         _run_path(archive_path, tmp_path)
 
-    assert raised.value.exit_code is ExitCode.SOURCE_ERROR
+    assert exit_code_for_error(raised.value) is ExitCode.SOURCE_ERROR
     assert "invalid PatchBundle" in str(raised.value)
 
 
@@ -259,7 +261,7 @@ def test_bundle_write_failure_prevents_every_script_execution(
     def fail_payload_write(*args: object, **kwargs: object) -> None:
         raise PatchHarborError(
             "cannot write bundle file 'payload.txt': denied",
-            ExitCode.PAYLOAD_PREPARATION_ERROR,
+            FailureReason.PAYLOAD_PREPARATION_ERROR,
         )
 
     monkeypatch.setattr(
@@ -276,7 +278,7 @@ def test_bundle_write_failure_prevents_every_script_execution(
     with pytest.raises(PatchHarborError) as raised:
         _run_path(archive_path, tmp_path)
 
-    assert raised.value.exit_code is ExitCode.PAYLOAD_PREPARATION_ERROR
+    assert exit_code_for_error(raised.value) is ExitCode.PAYLOAD_PREPARATION_ERROR
     assert executed == []
 
 
@@ -321,7 +323,7 @@ def test_zip_resource_budgets_fail_before_execution(
     with pytest.raises(PatchHarborError) as raised:
         _run_path(archive_path, tmp_path, resource_policy=policy)
 
-    assert raised.value.exit_code is ExitCode.SOURCE_ERROR
+    assert exit_code_for_error(raised.value) is ExitCode.SOURCE_ERROR
     assert "resource limit exceeded" in str(raised.value)
 
 
@@ -434,7 +436,7 @@ def test_zip_live_bytes_use_the_same_policy_as_preflight(
     with pytest.raises(PatchHarborError) as raised:
         _run_path(archive_path, tmp_path, resource_policy=policy)
 
-    assert raised.value.exit_code is ExitCode.SOURCE_ERROR
+    assert exit_code_for_error(raised.value) is ExitCode.SOURCE_ERROR
     assert error_fragment in str(raised.value)
     assert executed == []
     assert not (tmp_path / "payload.bin").exists()
@@ -499,7 +501,7 @@ def test_compressed_zip_bomb_like_payload_is_rejected_before_execution(
             resource_policy=policy,
         )
 
-    assert raised.value.exit_code is ExitCode.SOURCE_ERROR
+    assert exit_code_for_error(raised.value) is ExitCode.SOURCE_ERROR
     assert "resource limit exceeded" in str(raised.value)
     assert "uncompressed data" in str(raised.value)
     assert executed == []

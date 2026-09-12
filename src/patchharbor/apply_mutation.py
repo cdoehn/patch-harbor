@@ -11,7 +11,7 @@ from patchharbor.progress import activity
 from patchharbor.apply_preflight import PreparedPatchPackage
 from patchharbor.apply_repository import SafeResolvedRepository
 from patchharbor.errors import (
-    ExitCode,
+    FailureReason,
     PatchHarborError,
     state_mismatch_error,
 )
@@ -81,19 +81,19 @@ class ApplyMutationResult:
         if self.failure_kind is MutationFailureKind.STATE_MISMATCH:
             if (
                 self.error is None
-                or self.error.exit_code is not ExitCode.STATE_MISMATCH
+                or self.error.reason is not FailureReason.STATE_MISMATCH
             ):
-                raise ValueError("state mismatch requires exit code 9")
+                raise ValueError("state mismatch requires its semantic failure reason")
         elif self.failure_kind in {
             MutationFailureKind.UNSAFE_TARGET,
             MutationFailureKind.WRITE_FAILURE,
         }:
             if (
                 self.error is None
-                or self.error.exit_code
-                is not ExitCode.PAYLOAD_PREPARATION_ERROR
+                or self.error.reason
+                is not FailureReason.PAYLOAD_PREPARATION_ERROR
             ):
-                raise ValueError("payload mutation failures require exit code 6")
+                raise ValueError("payload mutation failures require a payload failure reason")
 
     @property
     def success(self) -> bool:

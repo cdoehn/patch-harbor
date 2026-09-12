@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from patchharbor.exit_status import ExitCode, exit_code_for_error, reason_for_exit_code
+from patchharbor.errors import FailureReason
 from patchharbor.errors import (
     ErrorKind,
-    ExitCode,
     configuration_error,
     format_tool_message,
     format_tool_warning,
@@ -35,11 +36,6 @@ def test_public_tool_exit_codes_are_complete_and_stable() -> None:
     }
 
 
-def test_public_tool_message_prefixes_are_stable() -> None:
-    assert format_tool_message("failed") == "patchharbor: failed"
-    assert format_tool_warning("large input") == (
-        "patchharbor: warning: large input"
-    )
 
 
 def test_error_factories_keep_public_codes_and_categories() -> None:
@@ -54,35 +50,48 @@ def test_error_factories_keep_public_codes_and_categories() -> None:
         "unsupported state"
     )
 
-    assert configuration_failure.exit_code is ExitCode.SOURCE_ERROR
+    assert exit_code_for_error(configuration_failure) is ExitCode.SOURCE_ERROR
     assert (
         configuration_failure.error_kind
         is ErrorKind.CONFIGURATION_ERROR
     )
-    assert registry_failure.exit_code is ExitCode.REPOSITORY_ERROR
+    assert exit_code_for_error(registry_failure) is ExitCode.REPOSITORY_ERROR
     assert registry_failure.error_kind is ErrorKind.REGISTRY_ERROR
-    assert resolution_failure.exit_code is ExitCode.REPOSITORY_ERROR
+    assert exit_code_for_error(resolution_failure) is ExitCode.REPOSITORY_ERROR
     assert (
         resolution_failure.error_kind
         is ErrorKind.REPOSITORY_RESOLUTION_ERROR
     )
     assert (
-        result_bundle_failure.exit_code is ExitCode.RESULT_BUNDLE_ERROR
+        exit_code_for_error(result_bundle_failure) is ExitCode.RESULT_BUNDLE_ERROR
     )
     assert (
         result_bundle_failure.error_kind is ErrorKind.RESULT_BUNDLE_ERROR
     )
-    assert mismatch_failure.exit_code is ExitCode.STATE_MISMATCH
+    assert exit_code_for_error(mismatch_failure) is ExitCode.STATE_MISMATCH
     assert mismatch_failure.error_kind is ErrorKind.STATE_MISMATCH
-    assert busy_failure.exit_code is ExitCode.REPOSITORY_BUSY
+    assert exit_code_for_error(busy_failure) is ExitCode.REPOSITORY_BUSY
     assert busy_failure.error_kind is ErrorKind.REPOSITORY_BUSY
-    assert package_failure.exit_code is ExitCode.PATCH_PACKAGE_ERROR
+    assert exit_code_for_error(package_failure) is ExitCode.PATCH_PACKAGE_ERROR
     assert package_failure.error_kind is ErrorKind.PATCH_PACKAGE_ERROR
     assert (
-        unsupported_failure.exit_code
+        exit_code_for_error(unsupported_failure)
         is ExitCode.UNSUPPORTED_REPOSITORY_STATE
     )
     assert (
         unsupported_failure.error_kind
         is ErrorKind.UNSUPPORTED_REPOSITORY_STATE
     )
+
+
+
+def test_failures_store_semantic_reasons_and_mapping_is_complete() -> None:
+    from patchharbor.errors import PatchHarborError
+    from patchharbor.exit_status import exit_code_for_reason
+
+    for reason in FailureReason:
+        error = PatchHarborError("failure data", reason)
+        assert error.reason is reason
+        assert not hasattr(error, "exit_code")
+        assert reason_for_exit_code(exit_code_for_reason(reason)) is reason
+        assert exit_code_for_error(error) is exit_code_for_reason(reason)

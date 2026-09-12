@@ -9,7 +9,7 @@ from patchharbor.progress import activity
 
 from patchharbor.bundle_paths import BundlePathError, normalize_bundle_path
 from patchharbor.bundle_handoff import BundleHandoff, split_patch_handoff
-from patchharbor.errors import ExitCode, PatchHarborError, patch_package_error
+from patchharbor.errors import FailureReason, PatchHarborError, patch_package_error
 from patchharbor.models import BundlePayload
 from patchharbor.patch_manifest import (
     PATCH_MANIFEST_NAME,
@@ -51,7 +51,7 @@ class ValidatedPatchPackage:
 def _unsafe_patch_zip(path: Path, detail: object) -> PatchHarborError:
     return PatchHarborError(
         f"unsafe or unreadable patch ZIP {path}: {detail}",
-        ExitCode.SOURCE_ERROR,
+        FailureReason.SOURCE_ERROR,
     )
 
 

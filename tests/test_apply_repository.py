@@ -26,8 +26,9 @@ from patchharbor.application import (
 )
 from patchharbor.apply_mutation import ApplyMutationGate
 from patchharbor.apply_repository import safely_resolved_repository
+from patchharbor.exit_status import ExitCode, exit_code_for_error
+from patchharbor.errors import FailureReason
 from patchharbor.errors import (
-    ExitCode,
     PatchHarborError,
     unsupported_repository_state_error,
 )
@@ -241,7 +242,7 @@ def test_state_mismatch_publishes_while_repository_lock_is_held(
             output_directory=output_directory,
         )
 
-    assert captured.value.exit_code == ExitCode.STATE_MISMATCH
+    assert exit_code_for_error(captured.value) == ExitCode.STATE_MISMATCH
     assert observed_lock_codes == [int(ExitCode.REPOSITORY_BUSY)]
     assert probe_repository_lock(str(context.repo_id), environment) == 0
     bundles = tuple(output_directory.glob("*_Result_*.zip"))
@@ -306,7 +307,7 @@ def test_successful_primary_outcome_becomes_exit_eleven_when_bundle_fails(
         )
 
     report = captured.value.run_report
-    assert captured.value.exit_code is ExitCode.RESULT_BUNDLE_ERROR
+    assert exit_code_for_error(captured.value) is ExitCode.RESULT_BUNDLE_ERROR
     assert report is not None
     assert report.primary_result.kind is PrimaryResultKind.DRY_RUN_SUCCESS
     assert report.result_bundle.status is ResultBundleStatus.FAILED
@@ -340,7 +341,7 @@ def test_primary_failure_keeps_its_exit_code_when_bundle_also_fails(
         )
 
     report = captured.value.run_report
-    assert captured.value.exit_code is ExitCode.INTERPRETER_ERROR
+    assert exit_code_for_error(captured.value) is ExitCode.INTERPRETER_ERROR
     assert report is not None
     assert report.primary_result.kind is PrimaryResultKind.VALIDATION_ERROR
     assert report.result_bundle.status is ResultBundleStatus.FAILED
@@ -387,13 +388,13 @@ def test_apply_result_matrix_preserves_emergency_execution_diagnostics(
         execution = ScriptExecutionResult.exited(23, execution_output)
     elif scenario == "timeout":
         execution = ScriptExecutionResult.failed(
-            PatchHarborError("timed out", ExitCode.TIMEOUT),
+            PatchHarborError("timed out", FailureReason.TIMEOUT),
             entrypoint_started=True,
             output=execution_output,
         )
     else:
         execution = ScriptExecutionResult.failed(
-            PatchHarborError("interrupted", ExitCode.INTERRUPTED),
+            PatchHarborError("interrupted", FailureReason.INTERRUPTED),
             entrypoint_started=True,
             output=execution_output,
         )
@@ -422,7 +423,7 @@ def test_apply_result_matrix_preserves_emergency_execution_diagnostics(
 
     assert (captured_error is not None) is raises_error
     if captured_error is not None:
-        assert int(captured_error.exit_code) == expected_exit
+        assert int(exit_code_for_error(captured_error)) == expected_exit
     assert report.primary_result.kind is expected_kind
     assert report.process_exit_code == expected_exit
     assert report.result_bundle.status is ResultBundleStatus.FAILED
@@ -461,13 +462,13 @@ def test_apply_removes_private_resources_after_every_process_outcome(
         execution = ScriptExecutionResult.exited(23, b"failed\n")
     elif scenario == "timeout":
         execution = ScriptExecutionResult.failed(
-            PatchHarborError("timed out", ExitCode.TIMEOUT),
+            PatchHarborError("timed out", FailureReason.TIMEOUT),
             entrypoint_started=True,
             output=b"timeout\n",
         )
     else:
         execution = ScriptExecutionResult.failed(
-            PatchHarborError("interrupted", ExitCode.INTERRUPTED),
+            PatchHarborError("interrupted", FailureReason.INTERRUPTED),
             entrypoint_started=True,
             output=b"interrupted\n",
         )
@@ -485,7 +486,7 @@ def test_apply_removes_private_resources_after_every_process_outcome(
         )
     except PatchHarborError as error:
         assert scenario in {"timeout", "interrupted"}
-        assert error.exit_code in {ExitCode.TIMEOUT, ExitCode.INTERRUPTED}
+        assert exit_code_for_error(error) in {ExitCode.TIMEOUT, ExitCode.INTERRUPTED}
 
     assert tuple(private_temp.iterdir()) == ()
 
@@ -610,7 +611,7 @@ def test_preflight_failure_bundles_before_releasing_repository_lock(
         )
 
     report = captured.value.run_report
-    assert captured.value.exit_code is ExitCode.INTERPRETER_ERROR
+    assert exit_code_for_error(captured.value) is ExitCode.INTERPRETER_ERROR
     assert report is not None
     assert report.result_bundle.path is not None
     assert observed_lock_codes == [int(ExitCode.REPOSITORY_BUSY)]
@@ -667,7 +668,7 @@ def test_repository_change_after_preflight_is_bundled_without_payload_write(
         apply_patch_package(package, output_directory=output_directory)
 
     report = captured.value.run_report
-    assert captured.value.exit_code is ExitCode.STATE_MISMATCH
+    assert exit_code_for_error(captured.value) is ExitCode.STATE_MISMATCH
     assert report is not None
     assert report.context is not None
     if change_kind == "base_commit":
@@ -740,7 +741,7 @@ def test_second_capture_failure_is_bundled_before_releasing_repository_lock(
         )
 
     report = captured.value.run_report
-    assert captured.value.exit_code is ExitCode.UNSUPPORTED_REPOSITORY_STATE
+    assert exit_code_for_error(captured.value) is ExitCode.UNSUPPORTED_REPOSITORY_STATE
     assert report is not None
     assert report.result_bundle.status is ResultBundleStatus.CREATED
     assert report.primary_result.entrypoint_started is False
@@ -792,7 +793,7 @@ def test_parent_replaced_after_second_context_is_rejected_before_staging(
         apply_patch_package(package, output_directory=output_directory)
 
     report = captured.value.run_report
-    assert captured.value.exit_code is ExitCode.PAYLOAD_PREPARATION_ERROR
+    assert exit_code_for_error(captured.value) is ExitCode.PAYLOAD_PREPARATION_ERROR
     assert report is not None
     assert report.primary_result.entrypoint_started is False
     assert report.result_bundle.status is ResultBundleStatus.CREATED
@@ -862,7 +863,7 @@ def test_payload_write_failure_keeps_partial_files_without_starting_entrypoint(
         )
 
     report = captured.value.run_report
-    assert captured.value.exit_code is ExitCode.PAYLOAD_PREPARATION_ERROR
+    assert exit_code_for_error(captured.value) is ExitCode.PAYLOAD_PREPARATION_ERROR
     assert report is not None
     assert report.process_exit_code == int(ExitCode.PAYLOAD_PREPARATION_ERROR)
     assert report.primary_result.kind is PrimaryResultKind.VALIDATION_ERROR
@@ -914,7 +915,7 @@ def test_process_start_failure_bundles_without_claiming_entrypoint_start(
         return ScriptExecutionResult.failed(
             PatchHarborError(
                 "cannot start script interpreter",
-                ExitCode.INTERPRETER_ERROR,
+                FailureReason.INTERPRETER_ERROR,
             ),
             output=b"",
             entrypoint_started=False,
@@ -933,7 +934,7 @@ def test_process_start_failure_bundles_without_claiming_entrypoint_start(
         )
 
     report = captured.value.run_report
-    assert captured.value.exit_code is ExitCode.INTERPRETER_ERROR
+    assert exit_code_for_error(captured.value) is ExitCode.INTERPRETER_ERROR
     assert report is not None
     assert report.process_exit_code == int(ExitCode.INTERPRETER_ERROR)
     assert report.primary_result.kind is PrimaryResultKind.VALIDATION_ERROR
@@ -1084,7 +1085,7 @@ def test_entrypoint_preflight_rejects_invalid_scripts_without_repository_files(
             output_directory=tmp_path / "results",
         )
 
-    assert captured.value.exit_code is expected_exit
+    assert exit_code_for_error(captured.value) is expected_exit
     assert tuple(private_temp.iterdir()) == ()
     assert not (repository / "run.sh").exists()
     assert not (repository / "files" / "payload.bin").exists()
@@ -1109,7 +1110,7 @@ def test_interpreter_availability_is_checked_before_private_writes(
     def missing_interpreter(_script_text: str) -> object:
         raise PatchHarborError(
             "interpreter unavailable",
-            ExitCode.INTERPRETER_ERROR,
+            FailureReason.INTERPRETER_ERROR,
         )
 
     monkeypatch.setattr(
@@ -1137,7 +1138,7 @@ def test_interpreter_availability_is_checked_before_private_writes(
             output_directory=tmp_path / "results",
         )
 
-    assert captured.value.exit_code is ExitCode.INTERPRETER_ERROR
+    assert exit_code_for_error(captured.value) is ExitCode.INTERPRETER_ERROR
     assert private_writes == []
     assert tuple(private_temp.iterdir()) == ()
     assert not (repository / "files" / "payload.bin").exists()

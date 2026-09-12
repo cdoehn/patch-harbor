@@ -5,7 +5,8 @@ from pathlib import Path
 import pytest
 
 from patchharbor import repository_state
-from patchharbor.errors import ErrorKind, ExitCode, PatchHarborError
+from patchharbor.exit_status import ExitCode, exit_code_for_error
+from patchharbor.errors import ErrorKind, PatchHarborError
 from patchharbor.git_capture import read_head_object_id
 from patchharbor.models import RepositoryPath
 from patchharbor.repository_paths import RepositoryRelativePath
@@ -56,7 +57,7 @@ def test_reusable_state_capture_applies_the_unsupported_state_guard(
     with pytest.raises(PatchHarborError) as captured:
         _capture(repository)
 
-    assert captured.value.exit_code is ExitCode.UNSUPPORTED_REPOSITORY_STATE
+    assert exit_code_for_error(captured.value) is ExitCode.UNSUPPORTED_REPOSITORY_STATE
     assert captured.value.error_kind is ErrorKind.UNSUPPORTED_REPOSITORY_STATE
 
 
@@ -89,7 +90,7 @@ def test_consistent_snapshot_rejects_a_repository_change_during_capture(
     with pytest.raises(PatchHarborError) as captured:
         capture_consistent_repository_snapshot(resolved)
 
-    assert captured.value.exit_code is ExitCode.REPOSITORY_ERROR
+    assert exit_code_for_error(captured.value) is ExitCode.REPOSITORY_ERROR
     assert captured.value.error_kind is ErrorKind.REPOSITORY_RESOLUTION_ERROR
 
     monkeypatch.setattr(

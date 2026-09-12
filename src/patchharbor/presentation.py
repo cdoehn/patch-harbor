@@ -12,7 +12,7 @@ from time import monotonic
 from typing import TextIO
 import unicodedata
 
-from patchharbor.errors import ExitCode, PatchHarborError
+from patchharbor.errors import FailureReason, PatchHarborError
 from patchharbor.models import DirectoryCandidate
 from patchharbor.identifier_presentation import shorten_identifier
 from patchharbor.progress import (
@@ -554,7 +554,7 @@ def select_directory_candidate(
         if not value:
             raise PatchHarborError(
                 "no script selected",
-                ExitCode.USAGE_ERROR,
+                FailureReason.USAGE_ERROR,
             )
 
         if value.isascii() and value.isdecimal():

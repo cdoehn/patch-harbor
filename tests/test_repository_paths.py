@@ -5,7 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from patchharbor.errors import ErrorKind, ExitCode, PatchHarborError
+from patchharbor.exit_status import ExitCode, exit_code_for_error
+from patchharbor.errors import ErrorKind, PatchHarborError
 from patchharbor.git_capture import read_head_object_id
 from patchharbor.models import RepositoryPath
 from patchharbor.repository_paths import (
@@ -20,7 +21,7 @@ def _assert_unsupported(callable_object) -> None:
     with pytest.raises(PatchHarborError) as captured:
         callable_object()
 
-    assert captured.value.exit_code is ExitCode.UNSUPPORTED_REPOSITORY_STATE
+    assert exit_code_for_error(captured.value) is ExitCode.UNSUPPORTED_REPOSITORY_STATE
     assert captured.value.error_kind is ErrorKind.UNSUPPORTED_REPOSITORY_STATE
 
 

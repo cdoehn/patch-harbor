@@ -10,7 +10,8 @@ import zipfile
 
 import pytest
 
-from patchharbor.errors import ExitCode
+from patchharbor.exit_status import ExitCode
+
 from patchharbor.patch_manifest import PATCH_FORMAT_VERSION, PATCH_MARKER
 from patchharbor.state_fingerprint import FINGERPRINT_ALGORITHM
 from tests.platform_support import (
@@ -303,6 +304,7 @@ import sys
 import threading
 
 from patchharbor.application import apply_patch_package, resolve_patch_package
+from patchharbor.exit_status import ExitCode
 from patchharbor.errors import PatchHarborError
 from patchharbor.output import OutputTargets
 from patchharbor.run_report import RunReport

@@ -162,6 +162,7 @@ with repository_lock(registration_user_paths(), repo_id):
 _REPOSITORY_LOCK_PROBE_PROGRAM = r"""
 import sys
 
+from patchharbor.exit_status import exit_code_for_error
 from patchharbor.errors import PatchHarborError
 from patchharbor.models import RepositoryId
 from patchharbor.locks import repository_lock
@@ -174,7 +175,7 @@ try:
     ):
         pass
 except PatchHarborError as exc:
-    raise SystemExit(int(exc.exit_code))
+    raise SystemExit(int(exit_code_for_error(exc)))
 """
 
 
@@ -253,6 +254,7 @@ with registry_lock(registration_user_paths()):
 
 
 _REGISTRY_LOCK_PROBE_PROGRAM = r"""
+from patchharbor.exit_status import exit_code_for_error
 from patchharbor.errors import PatchHarborError
 from patchharbor.locks import registry_lock
 from patchharbor.user_paths import registration_user_paths
@@ -261,7 +263,7 @@ try:
     with registry_lock(registration_user_paths()):
         pass
 except PatchHarborError as exc:
-    raise SystemExit(int(exc.exit_code))
+    raise SystemExit(int(exit_code_for_error(exc)))
 """
 
 

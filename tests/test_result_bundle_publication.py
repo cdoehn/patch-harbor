@@ -9,7 +9,8 @@ import pytest
 
 import patchharbor.result_bundle_publication as publication_module
 from patchharbor.bundle_handoff import BundleHandoff
-from patchharbor.errors import ExitCode, PatchHarborError
+from patchharbor.exit_status import ExitCode, exit_code_for_error
+from patchharbor.errors import PatchHarborError
 from patchharbor.platform.filesystem import FileSystemOperationError
 from patchharbor.result_bundle_publication import (
     ResultBundlePublication,
@@ -80,7 +81,7 @@ def test_publication_preserves_a_temporary_file_it_did_not_create(
     with pytest.raises(PatchHarborError) as captured:
         _publish_empty_bundle(final_path)
 
-    assert captured.value.exit_code == ExitCode.RESULT_BUNDLE_ERROR
+    assert exit_code_for_error(captured.value) == ExitCode.RESULT_BUNDLE_ERROR
     assert publication.temporary_path.read_bytes() == b"owned by another process"
     assert not final_path.exists()
 
@@ -108,7 +109,7 @@ def test_publication_cleans_its_temporary_zip_after_replace_failure(
     with pytest.raises(PatchHarborError) as captured:
         _publish_empty_bundle(final_path)
 
-    assert captured.value.exit_code == ExitCode.RESULT_BUNDLE_ERROR
+    assert exit_code_for_error(captured.value) == ExitCode.RESULT_BUNDLE_ERROR
     assert not publication.temporary_path.exists()
     assert not final_path.exists()
 
@@ -148,7 +149,7 @@ def test_reserved_publication_never_overwrites_a_replaced_temporary_file(
     with pytest.raises(PatchHarborError) as captured:
         _publish(publication)
 
-    assert captured.value.exit_code == ExitCode.RESULT_BUNDLE_ERROR
+    assert exit_code_for_error(captured.value) == ExitCode.RESULT_BUNDLE_ERROR
     assert publication.temporary_path.read_bytes() == b"replacement"
     assert not final_path.exists()
     release_result_bundle_publication(publication)
@@ -171,6 +172,7 @@ def test_result_digest_is_pinned_before_atomic_publication(tmp_path: Path) -> No
 
 @pytest.mark.parametrize("failure", ["write-error", "edited-bytes", "replaced-file"])
 def test_receipt_failure_or_late_edit_never_publishes_success(tmp_path: Path, failure: str) -> None:
+    from patchharbor.exit_status import ExitCode, exit_code_for_error
     from patchharbor.errors import patch_package_error
     final_path = tmp_path / "result.zip"
     publication = prepare_result_bundle_publication(final_path, run_id=UUID("12345678-1234-4234-8234-123456789abc"))

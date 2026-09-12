@@ -40,7 +40,7 @@ from patchharbor.configuration import (
 )
 from patchharbor.errors import (
     ErrorKind,
-    ExitCode,
+    FailureReason,
     PatchHarborError,
     configuration_error,
     patch_package_error,
@@ -782,7 +782,7 @@ def dry_run_patch_package(
             mutation_gate,
             primary_outcome=ApplyPrimaryOutcome.dry_run_success(),
         )
-        if report.process_exit_code != 0:
+        if report.completion_tool_error is not None:
             raise report.reported_error()
         return report
 
@@ -899,7 +899,7 @@ def _complete_entrypoint_execution(
 
     if execution.patchharbor_error is not None:
         raise report.reported_error()
-    if primary_outcome.result.success and report.process_exit_code != 0:
+    if primary_outcome.result.success and report.completion_tool_error is not None:
         raise report.reported_error()
     return report
 
@@ -1206,7 +1206,7 @@ def _run_selected_candidate(
     if candidate.path.is_symlink() or not candidate.path.is_file():
         raise PatchHarborError(
             f"selected script is no longer available: {candidate.display_name}",
-            ExitCode.SOURCE_ERROR,
+            FailureReason.SOURCE_ERROR,
         )
 
     return run_input_artifact(
@@ -1244,19 +1244,19 @@ def run_script_path(
     if not candidates:
         raise PatchHarborError(
             f"no PatchHarbor scripts found in directory {path}",
-            ExitCode.NO_VALID_SCRIPT,
+            FailureReason.NO_VALID_SCRIPT,
         )
     if len(candidates) == 1:
         selected = candidates[0]
     elif select_candidate is None:
         raise PatchHarborError(
             "multiple scripts found; an explicit candidate selector is required",
-            ExitCode.USAGE_ERROR,
+            FailureReason.USAGE_ERROR,
         )
     else:
         selected = select_candidate(candidates)
         if selected not in candidates:
-            raise PatchHarborError("selector returned an unknown candidate", ExitCode.USAGE_ERROR)
+            raise PatchHarborError("selector returned an unknown candidate", FailureReason.USAGE_ERROR)
     activity("SELECT", f"Selected manual candidate: {selected.display_name}", "success")
     return _run_selected_candidate(
         selected,

@@ -9,7 +9,8 @@ import pytest
 from patchharbor.application import configure_bundle_suffix, configure_exchange_directory
 from patchharbor.bundle_names import append_bundle_suffix, validate_bundle_suffix
 from patchharbor.configuration import load_configuration, write_exchange_directory
-from patchharbor.errors import ErrorKind, PatchHarborError, ExitCode
+from patchharbor.exit_status import ExitCode
+from patchharbor.errors import ErrorKind, PatchHarborError
 from patchharbor.user_paths import registration_user_paths
 from tests.registration_support import set_isolated_user_environment
 

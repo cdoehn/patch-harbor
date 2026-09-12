@@ -7,7 +7,8 @@ import subprocess
 import pytest
 
 from patchharbor import git_commands
-from patchharbor.errors import ErrorKind, ExitCode, PatchHarborError
+from patchharbor.exit_status import ExitCode, exit_code_for_error
+from patchharbor.errors import ErrorKind, PatchHarborError
 from tests.registration_support import create_repository, git
 
 
@@ -77,7 +78,7 @@ def test_git_failures_share_one_repository_error_category(
     with pytest.raises(PatchHarborError) as captured:
         git_commands.run_git_bytes("status", cwd=tmp_path.resolve())
 
-    assert captured.value.exit_code is ExitCode.REPOSITORY_ERROR
+    assert exit_code_for_error(captured.value) is ExitCode.REPOSITORY_ERROR
     assert captured.value.error_kind is ErrorKind.REPOSITORY_RESOLUTION_ERROR
 
 
@@ -117,7 +118,7 @@ def test_malformed_boolean_config_is_a_repository_error(tmp_path: Path) -> None:
             "feature.enabled",
         )
 
-    assert captured.value.exit_code is ExitCode.REPOSITORY_ERROR
+    assert exit_code_for_error(captured.value) is ExitCode.REPOSITORY_ERROR
     assert captured.value.error_kind is ErrorKind.REPOSITORY_RESOLUTION_ERROR
 
 
@@ -130,4 +131,4 @@ def test_nul_record_parser_preserves_path_bytes_and_rejects_truncation() -> None
     with pytest.raises(PatchHarborError) as captured:
         git_commands.nul_records(b"not-terminated", "paths")
 
-    assert captured.value.exit_code is ExitCode.REPOSITORY_ERROR
+    assert exit_code_for_error(captured.value) is ExitCode.REPOSITORY_ERROR

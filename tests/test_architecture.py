@@ -519,3 +519,16 @@ def test_archive_proofs_and_files_do_not_import_execution_or_cli() -> None:
     assert "patchharbor.platform.archive" not in _project_imports(
         modules["patchharbor.archive_evidence"]
     )
+
+
+def test_domain_errors_and_application_do_not_depend_on_cli_statuses() -> None:
+    modules = _runtime_modules()
+    graph = _dependency_graph()
+    for module in ("patchharbor.application", "patchharbor.errors", "patchharbor.execution",
+                   "patchharbor.apply_mutation", "patchharbor.sources"):
+        assert not graph[module] & {"patchharbor.exit_status", "patchharbor.cli"}
+        tree = ast.parse(modules[module].read_text(encoding="utf-8"))
+        assert not any(isinstance(n, ast.Attribute) and n.attr == "process_exit_code"
+                       for n in ast.walk(tree))
+    assert "patchharbor.exit_status" in graph["patchharbor.cli"]
+    assert "patchharbor.exit_status" in graph["patchharbor.run_report"]

@@ -7,7 +7,9 @@ from uuid import UUID
 
 import pytest
 
-from patchharbor.errors import ErrorKind, ExitCode, PatchHarborError
+from patchharbor.exit_status import ExitCode, exit_code_for_error
+from patchharbor.errors import FailureReason
+from patchharbor.errors import ErrorKind, PatchHarborError
 from patchharbor.models import (
     GitObjectFormat,
     GitObjectId,
@@ -170,7 +172,7 @@ def test_run_report_redacts_secret_environment_values(
         warnings=(f"warning contains {secret}",),
         primary_result=PrimaryResult.tool_failure(
             kind=PrimaryResultKind.EXECUTION_ERROR,
-            patchharbor_error_code=11,
+            failure_reason=FailureReason.RESULT_BUNDLE_ERROR,
         ),
         result_bundle=ResultBundleResult.failed(
             f"bundle error contains {secret}"
@@ -196,7 +198,7 @@ def test_run_report_redacts_secret_environment_values(
         (
             PatchHarborError(
                 "mismatch",
-                ExitCode.STATE_MISMATCH,
+                FailureReason.STATE_MISMATCH,
                 error_kind=ErrorKind.STATE_MISMATCH,
             ),
             PrimaryResultKind.STATE_MISMATCH,
@@ -204,7 +206,7 @@ def test_run_report_redacts_secret_environment_values(
         (
             PatchHarborError(
                 "busy",
-                ExitCode.REPOSITORY_BUSY,
+                FailureReason.REPOSITORY_BUSY,
                 error_kind=ErrorKind.REPOSITORY_BUSY,
             ),
             PrimaryResultKind.REPOSITORY_BUSY,
@@ -212,7 +214,7 @@ def test_run_report_redacts_secret_environment_values(
         (
             PatchHarborError(
                 "repository",
-                ExitCode.REPOSITORY_ERROR,
+                FailureReason.REPOSITORY_ERROR,
                 error_kind=ErrorKind.REPOSITORY_RESOLUTION_ERROR,
             ),
             PrimaryResultKind.REPOSITORY_ERROR,
@@ -220,21 +222,21 @@ def test_run_report_redacts_secret_environment_values(
         (
             PatchHarborError(
                 "invalid entrypoint",
-                ExitCode.NO_VALID_SCRIPT,
+                FailureReason.NO_VALID_SCRIPT,
             ),
             PrimaryResultKind.VALIDATION_ERROR,
         ),
         (
             PatchHarborError(
                 "cannot read package",
-                ExitCode.SOURCE_ERROR,
+                FailureReason.SOURCE_ERROR,
             ),
             PrimaryResultKind.VALIDATION_ERROR,
         ),
         (
             PatchHarborError(
                 "execution",
-                ExitCode.EXECUTION_ERROR,
+                FailureReason.EXECUTION_ERROR,
             ),
             PrimaryResultKind.EXECUTION_ERROR,
         ),
@@ -248,8 +250,8 @@ def test_apply_primary_outcome_maps_tool_errors_once(
 
     assert outcome.result.kind is expected_kind
     assert outcome.result.success is False
-    assert outcome.result.patchharbor_error_code == int(error.exit_code)
-    assert outcome.result.process_exit_code == int(error.exit_code)
+    assert outcome.result.patchharbor_error_code == int(exit_code_for_error(error))
+    assert outcome.result.process_exit_code == int(exit_code_for_error(error))
 
 
 @pytest.mark.parametrize(
@@ -265,7 +267,7 @@ def test_apply_primary_outcome_maps_tool_errors_once(
             RunOperation.BUNDLE,
             PrimaryResult.tool_failure(
                 kind=PrimaryResultKind.REPOSITORY_ERROR,
-                patchharbor_error_code=int(ExitCode.REPOSITORY_ERROR),
+                failure_reason=FailureReason.REPOSITORY_ERROR,
             ),
             ResultBundleStatus.FAILED,
             int(ExitCode.RESULT_BUNDLE_ERROR),
@@ -316,7 +318,7 @@ def test_apply_primary_outcome_maps_tool_errors_once(
             RunOperation.APPLY,
             PrimaryResult.tool_failure(
                 kind=PrimaryResultKind.VALIDATION_ERROR,
-                patchharbor_error_code=int(ExitCode.INTERPRETER_ERROR),
+                failure_reason=FailureReason.INTERPRETER_ERROR,
             ),
             ResultBundleStatus.FAILED,
             int(ExitCode.INTERPRETER_ERROR),
@@ -341,13 +343,13 @@ def test_apply_primary_outcome_models_entrypoint_exit_timeout_and_interrupt() ->
     timeout = ApplyPrimaryOutcome.from_execution_result(
         entrypoint_started=True,
         entrypoint_exit_code=None,
-        patchharbor_error=PatchHarborError("timed out", ExitCode.TIMEOUT),
+        patchharbor_error=PatchHarborError("timed out", FailureReason.TIMEOUT),
     )
     interrupted = ApplyPrimaryOutcome.from_execution_result(
         entrypoint_started=True,
         entrypoint_exit_code=None,
         patchharbor_error=PatchHarborError(
-            "interrupted", ExitCode.INTERRUPTED
+            "interrupted", FailureReason.INTERRUPTED
         ),
     )
 
@@ -387,7 +389,7 @@ def test_execution_result_keeps_entrypoint_tool_and_process_codes_separate() -> 
         entrypoint_started=False,
         entrypoint_exit_code=None,
         patchharbor_error=PatchHarborError(
-            "cannot start interpreter", ExitCode.INTERPRETER_ERROR
+            "cannot start interpreter", FailureReason.INTERPRETER_ERROR
         ),
     )
 
@@ -411,7 +413,7 @@ def test_execution_result_keeps_entrypoint_tool_and_process_codes_separate() -> 
             entrypoint_started=True,
             entrypoint_exit_code=23,
             patchharbor_error=PatchHarborError(
-                "tool failure", ExitCode.EXECUTION_ERROR
+                "tool failure", FailureReason.EXECUTION_ERROR
             ),
         )
 
@@ -421,7 +423,7 @@ def test_primary_result_rejects_conflated_process_codes() -> None:
         PrimaryResult(
             kind=PrimaryResultKind.ENTRYPOINT_EXIT,
             success=False,
-            patchharbor_error_code=int(ExitCode.INTERPRETER_ERROR),
+            failure_reason=FailureReason.INTERPRETER_ERROR,
             entrypoint_started=True,
             entrypoint_exit_code=int(ExitCode.INTERPRETER_ERROR),
         )
@@ -429,7 +431,7 @@ def test_primary_result_rejects_conflated_process_codes() -> None:
         PrimaryResult(
             kind=PrimaryResultKind.TIMEOUT,
             success=False,
-            patchharbor_error_code=int(ExitCode.TIMEOUT),
+            failure_reason=FailureReason.TIMEOUT,
             entrypoint_started=False,
             timed_out=True,
         )
@@ -468,7 +470,7 @@ def test_manual_bundle_report_rejects_execution_or_created_failure(
             primary_result=PrimaryResult(
                 kind=PrimaryResultKind.SUCCESS,
                 success=True,
-                patchharbor_error_code=None,
+                failure_reason=None,
                 entrypoint_started=True,
                 entrypoint_exit_code=0,
             ),
@@ -485,7 +487,7 @@ def test_manual_bundle_report_rejects_execution_or_created_failure(
             warnings=(),
             primary_result=PrimaryResult.tool_failure(
                 kind=PrimaryResultKind.REPOSITORY_ERROR,
-                patchharbor_error_code=8,
+                failure_reason=FailureReason.REPOSITORY_ERROR,
             ),
             result_bundle=ResultBundleResult.created(tmp_path / "invalid.zip"),
         )
@@ -539,7 +541,7 @@ def test_resolved_apply_report_cannot_leave_bundle_unattempted(
             warnings=(),
             primary_result=PrimaryResult.tool_failure(
                 kind=PrimaryResultKind.STATE_MISMATCH,
-                patchharbor_error_code=9,
+                failure_reason=FailureReason.STATE_MISMATCH,
             ),
             result_bundle=ResultBundleResult.not_attempted(
                 "repository has already been resolved"
@@ -557,7 +559,7 @@ def test_apply_report_is_single_source_for_completion_representations(
     emergency_path.mkdir()
     primary_error = PatchHarborError(
         "repository state changed",
-        ExitCode.STATE_MISMATCH,
+        FailureReason.STATE_MISMATCH,
         error_kind=ErrorKind.STATE_MISMATCH,
     )
     outcome = ApplyPrimaryOutcome.from_tool_error(primary_error)
@@ -592,7 +594,7 @@ def test_apply_report_is_single_source_for_completion_representations(
         "emergency_diagnostics_path": str(emergency_path.resolve()),
     }
     assert envelope["process_exit_code"] == int(ExitCode.STATE_MISMATCH)
-    assert reported_error.exit_code is ExitCode.STATE_MISMATCH
+    assert exit_code_for_error(reported_error) is ExitCode.STATE_MISMATCH
     assert reported_error.error_kind is ErrorKind.STATE_MISMATCH
     assert reported_error.run_report is report
 
@@ -658,7 +660,7 @@ def test_bundle_failure_becomes_effective_error_only_after_primary_success(
         ExitCode.RESULT_BUNDLE_ERROR
     )
     assert envelope["process_exit_code"] == int(ExitCode.RESULT_BUNDLE_ERROR)
-    assert error.exit_code is ExitCode.RESULT_BUNDLE_ERROR
+    assert exit_code_for_error(error) is ExitCode.RESULT_BUNDLE_ERROR
     assert error.error_kind is ErrorKind.RESULT_BUNDLE_ERROR
 
 @pytest.mark.parametrize(
@@ -675,7 +677,7 @@ def test_apply_report_rejects_partial_repository_resolution(
     outcome = ApplyPrimaryOutcome.from_tool_error(
         PatchHarborError(
             "repository resolution failed",
-            ExitCode.REPOSITORY_ERROR,
+            FailureReason.REPOSITORY_ERROR,
             error_kind=ErrorKind.REPOSITORY_RESOLUTION_ERROR,
         )
     )
@@ -746,3 +748,28 @@ def test_apply_result_reports_dry_run_without_execution(tmp_path: Path) -> None:
     }
     assert report.as_run_document()["execution_present"] is False
     json.dumps(result, allow_nan=False)
+
+
+
+def test_reserved_child_statuses_are_not_reclassified_as_tool_errors() -> None:
+    for code in (2, 7, 11, 124, 130):
+        outcome = ApplyPrimaryOutcome.from_execution_result(
+            entrypoint_started=True, entrypoint_exit_code=code, patchharbor_error=None,
+        )
+        assert outcome.result.kind is PrimaryResultKind.ENTRYPOINT_EXIT
+        assert outcome.result.failure_reason is None
+        assert outcome.tool_error is None
+        assert outcome.result.process_exit_code == code
+
+
+def test_core_outcomes_store_reasons_not_numeric_tool_statuses() -> None:
+    from dataclasses import fields
+    from patchharbor.run_report import RunToolError
+
+    assert "patchharbor_error_code" not in {field.name for field in fields(PrimaryResult)}
+    assert "patchharbor_error_code" not in {field.name for field in fields(RunToolError)}
+    failure = ApplyPrimaryOutcome.from_tool_error(
+        PatchHarborError("missing source", FailureReason.SOURCE_ERROR)
+    )
+    assert failure.result.failure_reason is FailureReason.SOURCE_ERROR
+    assert failure.tool_error.reason is FailureReason.SOURCE_ERROR

@@ -48,6 +48,7 @@ EXPECTED_RUNTIME_FILES = {
     "patchharbor/configuration.py",
     "patchharbor/context_output.py",
     "patchharbor/errors.py",
+    "patchharbor/exit_status.py",
     "patchharbor/execution.py",
     "patchharbor/exchange.py",
     "patchharbor/exchange_paths.py",

@@ -11,7 +11,8 @@ from patchharbor.patch_package import (
     resolve_patch_package,
     validate_patch_package,
 )
-from patchharbor.errors import ExitCode, PatchHarborError
+from patchharbor.exit_status import ExitCode, exit_code_for_error
+from patchharbor.errors import PatchHarborError
 from patchharbor.patch_manifest import PATCH_FORMAT_VERSION, PATCH_MARKER
 from patchharbor.resource_policy import ResourcePolicy
 from patchharbor.state_fingerprint import FINGERPRINT_ALGORITHM
@@ -76,7 +77,7 @@ def _assert_source_error(path: Path, policy: ResourcePolicy | None = None) -> No
             path,
             resource_policy=policy or ResourcePolicy(),
         )
-    assert captured.value.exit_code is ExitCode.SOURCE_ERROR
+    assert exit_code_for_error(captured.value) is ExitCode.SOURCE_ERROR
 
 
 def _nested_zip_bytes() -> bytes:
@@ -174,7 +175,7 @@ def test_archive_safety_is_checked_before_manifest_roles(
     with pytest.raises(PatchHarborError) as captured:
         resolve_patch_package(package_path)
 
-    assert captured.value.exit_code is ExitCode.SOURCE_ERROR
+    assert exit_code_for_error(captured.value) is ExitCode.SOURCE_ERROR
 
 
 
@@ -216,7 +217,7 @@ def test_manifest_entrypoint_must_reference_one_regular_entry(
     with pytest.raises(PatchHarborError) as captured:
         resolve_patch_package(package_path)
 
-    assert captured.value.exit_code is ExitCode.PATCH_PACKAGE_ERROR
+    assert exit_code_for_error(captured.value) is ExitCode.PATCH_PACKAGE_ERROR
 
 
 def test_package_accepts_exact_resource_boundaries(tmp_path: Path) -> None:

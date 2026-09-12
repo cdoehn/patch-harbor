@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from patchharbor.errors import ExitCode, PatchHarborError
+from patchharbor.exit_status import ExitCode, exit_code_for_error
+from patchharbor.errors import PatchHarborError
 from patchharbor.git_objects import (
     BaseTreeEntry,
     parse_base_tree_entries,
@@ -86,7 +87,7 @@ def test_batch_blob_response_rejects_protocol_mismatches(response: bytes) -> Non
     with pytest.raises(PatchHarborError) as captured:
         parse_batch_blob_response(response, (entry,))
 
-    assert captured.value.exit_code is ExitCode.RESULT_BUNDLE_ERROR
+    assert exit_code_for_error(captured.value) is ExitCode.RESULT_BUNDLE_ERROR
 
 
 @pytest.mark.parametrize(
@@ -102,4 +103,4 @@ def test_base_tree_rejects_unsupported_or_ambiguous_entries(record: bytes) -> No
     with pytest.raises(PatchHarborError) as captured:
         parse_base_tree_entries(record, GitObjectFormat.SHA1)
 
-    assert captured.value.exit_code is ExitCode.RESULT_BUNDLE_ERROR
+    assert exit_code_for_error(captured.value) is ExitCode.RESULT_BUNDLE_ERROR

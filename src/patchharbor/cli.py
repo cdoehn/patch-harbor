@@ -27,10 +27,10 @@ from patchharbor.application import (
 )
 from patchharbor.context_output import context_json_result, write_context_block
 from patchharbor.errors import (
-    ExitCode,
     PatchHarborError,
     format_tool_message,
 )
+from patchharbor.exit_status import ExitCode, exit_code_for_error
 from patchharbor.execution import DEFAULT_TIMEOUT_SECONDS
 from patchharbor.identifier_presentation import shorten_identifier
 from patchharbor.json_document import serialize_json_document
@@ -502,7 +502,7 @@ def _configure_exchange_directory_command(
             )
     except PatchHarborError as exc:
         print(format_tool_message(str(exc)), file=stderr)
-        return int(exc.exit_code)
+        return int(exit_code_for_error(exc))
 
     _write_configuration(
         configuration_path,
@@ -531,7 +531,7 @@ def _configure_bundle_suffix_command(
             configuration_path, configuration = configure_bundle_suffix(suffix)
     except PatchHarborError as exc:
         print(format_tool_message(str(exc)), file=stderr)
-        return int(exc.exit_code)
+        return int(exit_code_for_error(exc))
     _write_configuration(
         configuration_path,
         configuration.exchange_directory,
@@ -556,7 +556,7 @@ def _configure_archive_directory_command(
             configuration_path, configuration = configure_archive_directory(name)
     except PatchHarborError as exc:
         print(format_tool_message(str(exc)), file=stderr)
-        return int(exc.exit_code)
+        return int(exit_code_for_error(exc))
     _write_configuration(
         configuration_path, configuration.exchange_directory,
         bundle_suffix=configuration.bundle_suffix,
@@ -581,7 +581,7 @@ def _configure_show_command(
             configuration_path, configuration = shared_configuration()
     except PatchHarborError as exc:
         print(format_tool_message(str(exc)), file=stderr)
-        return int(exc.exit_code)
+        return int(exit_code_for_error(exc))
 
     _write_configuration(
         configuration_path,
@@ -614,7 +614,7 @@ def _register_command(
             )
     except PatchHarborError as exc:
         print(format_tool_message(str(exc)), file=stderr)
-        return int(exc.exit_code)
+        return int(exit_code_for_error(exc))
 
     write_context_block(context, stdout)
     return 0
@@ -642,7 +642,7 @@ def _json_envelope(
         structured_error = {
             "kind": error.error_kind.value,
             "message": sanitize_structured_text(str(error)),
-            "patchharbor_error_code": int(error.exit_code),
+            "patchharbor_error_code": int(exit_code_for_error(error)),
             "emergency_diagnostics_path": physical_absolute_path_text(
                 emergency_path
             ),
@@ -688,7 +688,7 @@ def _registry_list_command(
         ):
             result = registered_repositories()
     except PatchHarborError as exc:
-        exit_code = int(exc.exit_code)
+        exit_code = int(exit_code_for_error(exc))
         if json_output:
             _write_json_document(
                 _json_envelope(
@@ -741,7 +741,7 @@ def _context_command(
         ):
             context = repository_context(path or Path.cwd())
     except PatchHarborError as exc:
-        exit_code = int(exc.exit_code)
+        exit_code = int(exit_code_for_error(exc))
         if json_output:
             _write_json_document(
                 _json_envelope(
@@ -843,7 +843,7 @@ def _bundle_command(
                 path or Path.cwd(), output_directory=output_directory,
             )
     except PatchHarborError as exc:
-        exit_code = int(exc.exit_code)
+        exit_code = int(exit_code_for_error(exc))
         if json_output:
             _write_json_document(
                 _json_envelope(
@@ -1064,7 +1064,7 @@ def _unregister_command(
             )
     except PatchHarborError as exc:
         print(format_tool_message(str(exc)), file=stderr)
-        return int(exc.exit_code)
+        return int(exit_code_for_error(exc))
 
     print(f"repo_id: {shorten_identifier(repo_id)}", file=stdout)
     print(f"repository_path: {repository_path}", file=stdout)
@@ -1106,7 +1106,7 @@ def _execute_request(
             None,
         )
     except PatchHarborError as exc:
-        return int(exc.exit_code), str(exc)
+        return int(exit_code_for_error(exc)), str(exc)
 
 
 def _run_command(

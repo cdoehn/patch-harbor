@@ -380,3 +380,10 @@ Keine Änderung der Mutation, Recovery, Rohlogs oder JSON-Verträge.
 Konkrete Konsolenparameter durch unveränderliche Ereignisse ersetzt, vollständige
 Kennungen bis zur UI-Grenze erhalten, implizite stdout-Ausgabe entfernt und
 interaktive Verzeichnisauswahl aus Core in den CLI-Adapter verschoben.
+
+
+### OFF-PLAN COMPACT-CORE / 3 — Fehlergründe statt CLI-Status im Core
+
+Fachliche FailureReason-Daten und neutrale Ergebnisentscheidungen; eine gemeinsame
+kompatible Zahlenabbildung für CLI und vorhandene JSON-/Result-Serializer.
+Skript-Exitcodes, Prioritäten, Replay-/Recovery-Daten und Versionsnummer unverändert.

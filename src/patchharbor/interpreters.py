@@ -6,7 +6,7 @@ from codecs import BOM_UTF8
 from dataclasses import dataclass
 from pathlib import Path
 
-from patchharbor.errors import ExitCode, PatchHarborError
+from patchharbor.errors import FailureReason, PatchHarborError
 from patchharbor.platform.runtime import find_executable, is_windows
 
 
@@ -76,7 +76,7 @@ def select_interpreter(
         requested = first_line[2:] or "<empty>"
         raise PatchHarborError(
             f"unsupported script interpreter in shebang: {requested}",
-            ExitCode.INTERPRETER_ERROR,
+            FailureReason.INTERPRETER_ERROR,
         )
     return interpreter
 
@@ -87,7 +87,7 @@ def resolve_interpreter(spec: InterpreterSpec) -> str:
     if executable_path is None:
         raise PatchHarborError(
             f"script interpreter not found: {spec.executable}",
-            ExitCode.INTERPRETER_ERROR,
+            FailureReason.INTERPRETER_ERROR,
         )
     return executable_path
 

@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from patchharbor.errors import FailureReason
 from patchharbor.errors import PatchHarborError
 from patchharbor.exchange_state import (
     ExchangeApplyStatus,
@@ -291,7 +292,7 @@ def test_identity_verification_failure_does_not_consume_the_record(
     merge_exchange_classifications(paths, (record,))
 
     def fail_verification() -> None:
-        raise PatchHarborError("changed", 10)
+        raise PatchHarborError("changed", FailureReason.PATCH_PACKAGE_ERROR)
 
     with pytest.raises(PatchHarborError, match="changed"):
         mark_exchange_apply_started(

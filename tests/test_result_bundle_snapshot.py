@@ -8,7 +8,8 @@ import zipfile
 import pytest
 
 from patchharbor.bundle_handoff import BundleHandoff
-from patchharbor.errors import ExitCode, PatchHarborError
+from patchharbor.exit_status import ExitCode, exit_code_for_error
+from patchharbor.errors import PatchHarborError
 from patchharbor.models import GitObjectFormat, GitObjectId
 from patchharbor.result_bundle_snapshot import build_result_bundle_snapshot
 from patchharbor.result_bundle_writer import write_result_bundle
@@ -131,7 +132,7 @@ def test_snapshot_reuses_repository_path_validation(path: bytes) -> None:
             untracked_entries=((path, b"100644", b"secret"),),
         )
 
-    assert captured.value.exit_code == ExitCode.UNSUPPORTED_REPOSITORY_STATE
+    assert exit_code_for_error(captured.value) == ExitCode.UNSUPPORTED_REPOSITORY_STATE
 
 
 def test_snapshot_rejects_casefold_collisions_across_sources() -> None:
@@ -145,7 +146,7 @@ def test_snapshot_rejects_casefold_collisions_across_sources() -> None:
             untracked_entries=((b"README.TXT", b"100644", b"local"),),
         )
 
-    assert captured.value.exit_code == ExitCode.UNSUPPORTED_REPOSITORY_STATE
+    assert exit_code_for_error(captured.value) == ExitCode.UNSUPPORTED_REPOSITORY_STATE
 
 
 def test_snapshot_rejects_non_regular_file_modes() -> None:
@@ -157,4 +158,4 @@ def test_snapshot_rejects_non_regular_file_modes() -> None:
             untracked_entries=((b"link", b"120000", b"target"),),
         )
 
-    assert captured.value.exit_code == ExitCode.RESULT_BUNDLE_ERROR
+    assert exit_code_for_error(captured.value) == ExitCode.RESULT_BUNDLE_ERROR

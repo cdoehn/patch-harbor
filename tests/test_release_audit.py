@@ -33,6 +33,7 @@ EXPECTED_CORE_RUNTIME_FILES = {
     "configuration.py",
     "context_output.py",
     "errors.py",
+    "exit_status.py",
     "execution.py",
     "exchange.py",
     "exchange_paths.py",

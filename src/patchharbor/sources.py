@@ -11,7 +11,7 @@ from typing import TextIO
 
 from patchharbor.progress import activity
 
-from patchharbor.errors import ExitCode, PatchHarborError
+from patchharbor.errors import FailureReason, PatchHarborError
 from patchharbor.models import DirectoryCandidate, InputArtifact
 from patchharbor.platform.errors import describe_os_error
 from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY, ResourcePolicy
@@ -29,7 +29,7 @@ def _input_limit_error(
         "resource limit exceeded "
         f"(input artifact {display_name!r} exceeds "
         f"{policy.max_input_artifact_bytes} bytes)",
-        ExitCode.SOURCE_ERROR,
+        FailureReason.SOURCE_ERROR,
     )
 
 
@@ -90,7 +90,7 @@ def stdin_input_artifact(
                 raise PatchHarborError(
                     "cannot read script source standard input: "
                     f"{describe_os_error(exc) if isinstance(exc, OSError) else exc}",
-                    ExitCode.SOURCE_ERROR,
+                    FailureReason.SOURCE_ERROR,
                 ) from exc
             finally:
                 if descriptor is not None:
@@ -99,7 +99,7 @@ def stdin_input_artifact(
             if bytes_written == 0:
                 raise PatchHarborError(
                     "no script input received",
-                    ExitCode.USAGE_ERROR,
+                    FailureReason.USAGE_ERROR,
                 )
 
             activity("SOURCE", f"Prepared standard input: {bytes_written} bytes", "success")
@@ -113,7 +113,7 @@ def stdin_input_artifact(
         raise PatchHarborError(
             "cannot read script source standard input: "
             f"{describe_os_error(exc)}",
-            ExitCode.SOURCE_ERROR,
+            FailureReason.SOURCE_ERROR,
         ) from exc
 
 
@@ -126,7 +126,7 @@ def list_directory_entries(directory: Path) -> tuple[DirectoryCandidate, ...]:
         raise PatchHarborError(
             f"cannot read script source directory {directory}: "
             f"{describe_os_error(exc)}",
-            ExitCode.SOURCE_ERROR,
+            FailureReason.SOURCE_ERROR,
         ) from exc
 
     candidates: list[DirectoryCandidate] = []

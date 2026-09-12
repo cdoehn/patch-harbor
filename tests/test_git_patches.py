@@ -4,7 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from patchharbor.errors import ErrorKind, ExitCode, PatchHarborError
+from patchharbor.exit_status import ExitCode, exit_code_for_error
+from patchharbor.errors import ErrorKind, PatchHarborError
 from patchharbor.git_patches import capture_change_patches
 from patchharbor.models import GitObjectFormat, GitObjectId, RepositoryPath
 
@@ -19,5 +20,5 @@ def test_patch_capture_failure_is_a_result_bundle_error(tmp_path: Path) -> None:
     with pytest.raises(PatchHarborError) as captured:
         capture_change_patches(repository, base_commit)
 
-    assert captured.value.exit_code is ExitCode.RESULT_BUNDLE_ERROR
+    assert exit_code_for_error(captured.value) is ExitCode.RESULT_BUNDLE_ERROR
     assert captured.value.error_kind is ErrorKind.RESULT_BUNDLE_ERROR

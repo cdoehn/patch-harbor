@@ -3163,3 +3163,20 @@ Interaktive Dateiauswahl gehört zur CLI; Application akzeptiert nur eine expliz
 Auswahlfunktion und prüft deren Ergebnis gegen die angebotenen Kandidaten.
 Mehrere Kandidaten ohne Auswahlfunktion ergeben einen Fehler statt eines Prompts.
 Noch keine öffentliche Python-API und keine neue Versionsnummer.
+
+
+## 31. Fachliche Fehler und kompatible Statuscodes (OFF-PLAN COMPACT-CORE)
+
+PatchHarborError enthält einen FailureReason statt eines CLI-Exitcodes.
+PrimaryResult und RunToolError speichern ebenfalls fachliche Fehlergründe;
+Application trifft keine Entscheidungen anhand von process_exit_code.
+
+Die zentrale reine Abbildung in exit_status.py bedient CLI und die bestehenden
+JSON-/Result-Serializer. Die Zahlen bleiben in allen bisherigen maschinenlesbaren
+Formaten erhalten, auch bei Aufrufen ohne CLI. Diese Serialisierungsgrenze ist
+kein zweiter fachlicher Kontrollfluss. Die bestehende Abschlusspriorität bleibt:
+Primärfehler behalten Vorrang; ausschließlich eine erfolgreiche Primäraktion mit
+fehlgeschlagenem Result ergibt den bisherigen Result-Bundle-Fehlerstatus.
+Native Skript-Exitcodes sind Prozessdaten, keine PatchHarbor-Fehlerkategorien.
+Insbesondere darf ein Skript-Exit 124 oder 130 nicht als Tool-Timeout bzw.
+Tool-Unterbrechung umgedeutet werden. Version und öffentliche CLI bleiben gleich.

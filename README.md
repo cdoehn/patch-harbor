@@ -581,3 +581,11 @@ the CLI. Unknown choices are rejected before a file is executed.
 
 These are internal boundaries, **not** a supported `patchharbor.api` release.
 The future public API is planned separately for 1.2.0.
+
+
+Tool failures internally carry a `FailureReason`, not a CLI exit number.
+`exit_status.py` is the shared compatibility adapter used by the CLI and the
+existing JSON/Result serializers. Numeric schemas and exit priorities remain
+unchanged. Child-process exit codes remain actual process data, including values
+such as 124 or 130; they are not mistaken for PatchHarbor timeout/interruption.
+The Application makes decisions from semantic outcomes, not serialized statuses.

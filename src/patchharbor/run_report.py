@@ -12,7 +12,10 @@ from time import monotonic
 from typing import Mapping
 from uuid import UUID, uuid4
 
-from patchharbor.errors import ErrorKind, ExitCode, PatchHarborError
+from patchharbor.errors import ErrorKind, FailureReason, PatchHarborError
+from patchharbor.exit_status import (
+    completed_process_exit_code, exit_code_for_reason, primary_process_exit_code,
+)
 from patchharbor.models import RepositoryContext, RepositoryId, RepositoryPath
 
 
@@ -52,9 +55,9 @@ class PrimaryResultKind(str, Enum):
     @classmethod
     def for_tool_error(cls, error: PatchHarborError) -> PrimaryResultKind:
         """Map one tool failure to its stable primary-result category."""
-        if error.exit_code is ExitCode.TIMEOUT:
+        if error.reason is FailureReason.TIMEOUT:
             return cls.TIMEOUT
-        if error.exit_code is ExitCode.INTERRUPTED:
+        if error.reason is FailureReason.INTERRUPTED:
             return cls.INTERRUPTED
         if error.error_kind is ErrorKind.STATE_MISMATCH:
             return cls.STATE_MISMATCH
@@ -66,12 +69,12 @@ class PrimaryResultKind(str, Enum):
             ErrorKind.UNSUPPORTED_REPOSITORY_STATE,
         }:
             return cls.REPOSITORY_ERROR
-        if error.exit_code in {
-            ExitCode.SOURCE_ERROR,
-            ExitCode.NO_VALID_SCRIPT,
-            ExitCode.INTERPRETER_ERROR,
-            ExitCode.PAYLOAD_PREPARATION_ERROR,
-            ExitCode.PATCH_PACKAGE_ERROR,
+        if error.reason in {
+            FailureReason.SOURCE_ERROR,
+            FailureReason.NO_VALID_SCRIPT,
+            FailureReason.INTERPRETER_ERROR,
+            FailureReason.PAYLOAD_PREPARATION_ERROR,
+            FailureReason.PATCH_PACKAGE_ERROR,
         }:
             return cls.VALIDATION_ERROR
         return cls.EXECUTION_ERROR
@@ -91,26 +94,24 @@ class RunToolError:
 
     kind: ErrorKind
     message: str
-    patchharbor_error_code: int
+    reason: FailureReason
 
     def __post_init__(self) -> None:
-        code = self.patchharbor_error_code
-        if isinstance(code, bool) or not isinstance(code, int):
-            raise ValueError("PatchHarbor error code must be an integer")
-        try:
-            ExitCode(code)
-        except ValueError as exc:
-            raise ValueError(
-                "PatchHarbor error code is not owned by PatchHarbor"
-            ) from exc
+        if not isinstance(self.reason, FailureReason):
+            raise ValueError("tool failure requires a FailureReason")
         object.__setattr__(self, "message", sanitize_structured_text(self.message))
+
+    @property
+    def patchharbor_error_code(self) -> int:
+        """Compatibility value for JSON/Result serialization, not Core logic."""
+        return int(exit_code_for_reason(self.reason))
 
     @classmethod
     def from_error(cls, error: PatchHarborError) -> RunToolError:
         return cls(
             kind=error.error_kind,
             message=str(error),
-            patchharbor_error_code=int(error.exit_code),
+            reason=error.reason,
         )
 
     @classmethod
@@ -118,7 +119,7 @@ class RunToolError:
         return cls(
             kind=ErrorKind.RESULT_BUNDLE_ERROR,
             message=message,
-            patchharbor_error_code=int(ExitCode.RESULT_BUNDLE_ERROR),
+            reason=FailureReason.RESULT_BUNDLE_ERROR,
         )
 
     def as_document(
@@ -143,7 +144,7 @@ class RunToolError:
         bundle = report.result_bundle
         return PatchHarborError(
             self.message,
-            ExitCode(self.patchharbor_error_code),
+            self.reason,
             error_kind=self.kind,
             emergency_diagnostics_path=bundle.emergency_diagnostics_path,
             emergency_diagnostics_failed=(
@@ -294,7 +295,7 @@ class PrimaryResult:
 
     kind: PrimaryResultKind
     success: bool
-    patchharbor_error_code: int | None
+    failure_reason: FailureReason | None
     entrypoint_started: bool = False
     entrypoint_exit_code: int | None = None
     timed_out: bool = False
@@ -309,17 +310,14 @@ class PrimaryResult:
             self.interrupted, bool
         ):
             raise ValueError("process terminal flags must be boolean")
-        for name, value in (
-            ("PatchHarbor error code", self.patchharbor_error_code),
-            ("entrypoint exit code", self.entrypoint_exit_code),
-        ):
-            if value is not None and (
-                isinstance(value, bool) or not isinstance(value, int)
-            ):
-                raise ValueError(f"{name} must be an integer")
+        if self.failure_reason is not None and not isinstance(self.failure_reason, FailureReason):
+            raise ValueError("primary tool failure requires a FailureReason")
+        value = self.entrypoint_exit_code
+        if value is not None and (isinstance(value, bool) or not isinstance(value, int)):
+            raise ValueError("entrypoint exit code must be an integer")
 
         if self.success:
-            if self.patchharbor_error_code is not None:
+            if self.failure_reason is not None:
                 raise ValueError("successful primary result cannot have a tool error")
             if self.timed_out or self.interrupted:
                 raise ValueError("successful primary result cannot be terminated")
@@ -334,7 +332,7 @@ class PrimaryResult:
             if (
                 not self.entrypoint_started
                 or self.entrypoint_exit_code in (None, 0)
-                or self.patchharbor_error_code is not None
+                or self.failure_reason is not None
                 or self.timed_out
                 or self.interrupted
             ):
@@ -345,7 +343,7 @@ class PrimaryResult:
             if (
                 not self.entrypoint_started
                 or self.entrypoint_exit_code is not None
-                or self.patchharbor_error_code != int(ExitCode.TIMEOUT)
+                or self.failure_reason != FailureReason.TIMEOUT
                 or not self.timed_out
                 or self.interrupted
             ):
@@ -356,7 +354,7 @@ class PrimaryResult:
             if (
                 not self.entrypoint_started
                 or self.entrypoint_exit_code is not None
-                or self.patchharbor_error_code != int(ExitCode.INTERRUPTED)
+                or self.failure_reason != FailureReason.INTERRUPTED
                 or self.timed_out
                 or not self.interrupted
             ):
@@ -365,7 +363,7 @@ class PrimaryResult:
 
         if (
             self.entrypoint_exit_code is not None
-            or self.patchharbor_error_code is None
+            or self.failure_reason is None
             or self.timed_out
             or self.interrupted
         ):
@@ -377,20 +375,21 @@ class PrimaryResult:
         return self.kind.value
 
     @property
+    def patchharbor_error_code(self) -> int | None:
+        """Existing numeric wire field; internal state keeps the semantic reason."""
+        return (None if self.failure_reason is None
+                else int(exit_code_for_reason(self.failure_reason)))
+
+    @property
     def process_exit_code(self) -> int:
-        """Return the primary process exit implied by this result."""
-        if self.entrypoint_exit_code is not None:
-            return self.entrypoint_exit_code
-        if self.patchharbor_error_code is not None:
-            return self.patchharbor_error_code
-        return 0
+        return primary_process_exit_code(self)
 
     @classmethod
     def success_result(cls) -> PrimaryResult:
         return cls(
             kind=PrimaryResultKind.SUCCESS,
             success=True,
-            patchharbor_error_code=None,
+            failure_reason=None,
         )
 
     @classmethod
@@ -398,7 +397,7 @@ class PrimaryResult:
         return cls(
             kind=PrimaryResultKind.DRY_RUN_SUCCESS,
             success=True,
-            patchharbor_error_code=None,
+            failure_reason=None,
         )
 
     @classmethod
@@ -406,7 +405,7 @@ class PrimaryResult:
         return cls(
             kind=PrimaryResultKind.SUCCESS,
             success=True,
-            patchharbor_error_code=None,
+            failure_reason=None,
             entrypoint_started=True,
             entrypoint_exit_code=0,
         )
@@ -420,7 +419,7 @@ class PrimaryResult:
         return cls(
             kind=PrimaryResultKind.ENTRYPOINT_EXIT,
             success=False,
-            patchharbor_error_code=None,
+            failure_reason=None,
             entrypoint_started=True,
             entrypoint_exit_code=exit_code,
         )
@@ -430,7 +429,7 @@ class PrimaryResult:
         return cls(
             kind=PrimaryResultKind.TIMEOUT,
             success=False,
-            patchharbor_error_code=int(ExitCode.TIMEOUT),
+            failure_reason=FailureReason.TIMEOUT,
             entrypoint_started=True,
             timed_out=True,
         )
@@ -440,7 +439,7 @@ class PrimaryResult:
         return cls(
             kind=PrimaryResultKind.INTERRUPTED,
             success=False,
-            patchharbor_error_code=int(ExitCode.INTERRUPTED),
+            failure_reason=FailureReason.INTERRUPTED,
             entrypoint_started=True,
             interrupted=True,
         )
@@ -450,24 +449,24 @@ class PrimaryResult:
         cls,
         *,
         kind: PrimaryResultKind,
-        patchharbor_error_code: int,
+        failure_reason: FailureReason,
     ) -> PrimaryResult:
         return cls(
             kind=kind,
             success=False,
-            patchharbor_error_code=patchharbor_error_code,
+            failure_reason=failure_reason,
         )
 
     @classmethod
     def from_tool_error(cls, error: PatchHarborError) -> PrimaryResult:
         """Create the structured primary result for one tool failure."""
-        if error.exit_code is ExitCode.TIMEOUT:
+        if error.reason is FailureReason.TIMEOUT:
             return cls.timeout_result()
-        if error.exit_code is ExitCode.INTERRUPTED:
+        if error.reason is FailureReason.INTERRUPTED:
             return cls.interrupted_result()
         return cls.tool_failure(
             kind=PrimaryResultKind.for_tool_error(error),
-            patchharbor_error_code=int(error.exit_code),
+            failure_reason=error.reason,
         )
 
     def as_document(self) -> dict[str, object]:
@@ -492,28 +491,6 @@ class PrimaryResult:
         }
 
 
-def completed_process_exit_code(
-    *,
-    operation: RunOperation,
-    primary_result: PrimaryResult,
-    result_bundle_status: ResultBundleStatus,
-) -> int:
-    """Apply the public completion priority without storing a duplicate code."""
-    if operation is RunOperation.BUNDLE:
-        return (
-            0
-            if primary_result.success
-            and result_bundle_status is ResultBundleStatus.CREATED
-            else int(ExitCode.RESULT_BUNDLE_ERROR)
-        )
-    if (
-        primary_result.success
-        and result_bundle_status is ResultBundleStatus.FAILED
-    ):
-        return int(ExitCode.RESULT_BUNDLE_ERROR)
-    return primary_result.process_exit_code
-
-
 @dataclass(frozen=True, slots=True)
 class ApplyPrimaryOutcome:
     """One primary apply outcome before Result-Bundle publication."""
@@ -522,17 +499,17 @@ class ApplyPrimaryOutcome:
     tool_error: RunToolError | None = None
 
     def __post_init__(self) -> None:
-        if self.result.patchharbor_error_code is None:
+        if self.result.failure_reason is None:
             if self.tool_error is not None:
                 raise ValueError("non-tool primary result cannot carry a tool error")
         else:
             if self.tool_error is None:
                 raise ValueError("tool primary result requires immutable error data")
             if (
-                self.tool_error.patchharbor_error_code
-                != self.result.patchharbor_error_code
+                self.tool_error.reason
+                != self.result.failure_reason
             ):
-                raise ValueError("primary tool error and process exit codes disagree")
+                raise ValueError("primary tool failure reasons disagree")
 
     @classmethod
     def success(cls) -> ApplyPrimaryOutcome:
@@ -555,7 +532,7 @@ class ApplyPrimaryOutcome:
         return cls(
             result=PrimaryResult.timeout_result(),
             tool_error=RunToolError.from_error(
-                PatchHarborError("entrypoint timed out", ExitCode.TIMEOUT)
+                PatchHarborError("entrypoint timed out", FailureReason.TIMEOUT)
             ),
         )
 
@@ -564,7 +541,7 @@ class ApplyPrimaryOutcome:
         return cls(
             result=PrimaryResult.interrupted_result(),
             tool_error=RunToolError.from_error(
-                PatchHarborError("entrypoint interrupted", ExitCode.INTERRUPTED)
+                PatchHarborError("entrypoint interrupted", FailureReason.INTERRUPTED)
             ),
         )
 
@@ -573,19 +550,19 @@ class ApplyPrimaryOutcome:
         cls,
         *,
         kind: PrimaryResultKind,
-        exit_code: int,
+        reason: FailureReason,
         message: str = "PatchHarbor tool failure",
         error_kind: ErrorKind = ErrorKind.TOOL_ERROR,
     ) -> ApplyPrimaryOutcome:
         return cls(
             result=PrimaryResult.tool_failure(
                 kind=kind,
-                patchharbor_error_code=exit_code,
+                failure_reason=reason,
             ),
             tool_error=RunToolError(
                 kind=error_kind,
                 message=message,
-                patchharbor_error_code=exit_code,
+                reason=reason,
             ),
         )
 
@@ -611,14 +588,14 @@ class ApplyPrimaryOutcome:
                 raise ValueError(
                     "tool failure cannot also carry an entrypoint exit code"
                 )
-            if patchharbor_error.exit_code is ExitCode.INTERRUPTED:
+            if patchharbor_error.reason is FailureReason.INTERRUPTED:
                 if not entrypoint_started:
                     raise ValueError("interruption requires a started entrypoint")
                 return cls(
                     result=PrimaryResult.interrupted_result(),
                     tool_error=RunToolError.from_error(patchharbor_error),
                 )
-            if patchharbor_error.exit_code is ExitCode.TIMEOUT:
+            if patchharbor_error.reason is FailureReason.TIMEOUT:
                 if not entrypoint_started:
                     raise ValueError("timeout requires a started entrypoint")
                 return cls(
@@ -629,7 +606,7 @@ class ApplyPrimaryOutcome:
                 result=PrimaryResult(
                     kind=PrimaryResultKind.for_tool_error(patchharbor_error),
                     success=False,
-                    patchharbor_error_code=int(patchharbor_error.exit_code),
+                    failure_reason=patchharbor_error.reason,
                     entrypoint_started=entrypoint_started,
                 ),
                 tool_error=RunToolError.from_error(patchharbor_error),
@@ -774,8 +751,8 @@ class RunReport:
                 raise ValueError(
                     "safe Apply repository resolution requires one complete context"
                 )
-            error_code = self.primary_result.patchharbor_error_code
-            if error_code is None:
+            failure_reason = self.primary_result.failure_reason
+            if failure_reason is None:
                 if self.primary_tool_error is not None:
                     raise ValueError(
                         "non-tool Apply primary result cannot carry a tool error"
@@ -785,14 +762,14 @@ class RunReport:
                     raise ValueError(
                         "Apply tool failure requires immutable primary error data"
                     )
-                if self.primary_tool_error.patchharbor_error_code != error_code:
+                if self.primary_tool_error.reason != failure_reason:
                     raise ValueError(
-                        "Apply primary result and tool-error code disagree"
+                        "Apply primary result and tool failure reason disagree"
                     )
                 expected_kind = PrimaryResultKind.for_tool_error(
                     PatchHarborError(
                         self.primary_tool_error.message,
-                        ExitCode(error_code),
+                        failure_reason,
                         error_kind=self.primary_tool_error.kind,
                     )
                 )
@@ -878,6 +855,12 @@ class RunReport:
     def execution_present(self) -> bool:
         """An execution log exists only after an entrypoint actually started."""
         return self.primary_result.entrypoint_started
+
+    @property
+    def success(self) -> bool:
+        """Semantic completion, independent of any command-line status mapping."""
+        return (self.primary_result.success
+                and self.result_bundle.status is not ResultBundleStatus.FAILED)
 
     @property
     def process_exit_code(self) -> int:
@@ -981,7 +964,7 @@ class RunReport:
         return {
             "output_version": 1,
             "command": "apply",
-            "success": self.process_exit_code == 0,
+            "success": self.success,
             "result": self.apply_result(),
             "error": self.error_document(),
             "process_exit_code": self.process_exit_code,
