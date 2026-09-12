@@ -7,7 +7,8 @@ from datetime import datetime
 from pathlib import Path
 from enum import Enum
 import os
-from threading import RLock
+from threading import Event, RLock, Thread
+from time import monotonic
 from typing import Protocol, TextIO
 import unicodedata
 
@@ -18,6 +19,42 @@ _COLORS = {
     "heading": "\x1b[1;34m", "message": "\x1b[1;35m",
     "detail": "\x1b[2m",
 }
+
+# Per-file successes are still technical details. Severity alone must not turn
+# hundreds of ZIP/Git/file operations into normal-mode records.
+_DETAIL_PHASES = frozenset({
+    "GIT", "ZIP", "RESULT-ZIP", "OPEN", "SHA256", "FILE", "WRITE", "TARGET",
+    "MKDIR", "MANIFEST", "HANDOFF", "PREPARE", "IDENTIFY", "CACHE", "STATE",
+    "RESERVE", "VERIFY", "SYNC", "RECEIPT", "LOCK", "PATCH", "MATCH", "REPLAY",
+})
+_COMPACT_RESULTS = frozenset({
+    "SCAN", "ARCHIVE", "RECOVERY", "SNAPSHOT", "PUBLISH", "PAYLOAD", "SELECT",
+    "BINDING", "RECHECK", "DRY-RUN", "PACKAGE", "SCRIPT", "EXEC", "RESULT",
+    "BUNDLE", "SOURCE",
+})
+_WORK_LABELS = {
+    "GIT": ("STATE", "Check repository state"),
+    "ZIP": ("PACKAGE", "Inspect package contents"),
+    "RESULT-ZIP": ("RESULT", "Write Result Bundle"),
+    "WRITE": ("PAYLOAD", "Write payload files"),
+    "TARGET": ("PAYLOAD", "Validate payload targets"),
+    "OPEN": ("INPUT", "Read and identify input"),
+}
+_DOT_INTERVAL = 0.8
+
+
+def _compact_visible(phase: str, level: str) -> bool:
+    """One global policy for all human activity, never for script output."""
+    if level in {"error", "warning", "message"}:
+        return True
+    if phase in _DETAIL_PHASES:
+        return False
+    return (
+        level == "heading"
+        or (level == "success" and phase in _COMPACT_RESULTS)
+        or (phase in {"CONTEXT", "LOG"} and level != "detail")
+    )
+
 
 class PresentedStatus(str, Enum):
     """Presentation-only completion state chosen by the application boundary."""
@@ -252,13 +289,17 @@ class _ChildTextFilter:
 class _ConsoleTextStream:
     """A sink for either incremental child text or complete warning messages."""
 
-    def __init__(self, console: StreamingConsole, *, warning: bool = False) -> None:
+    def __init__(self, console: StreamingConsole, *, warning: bool = False,
+                 selection: bool = False) -> None:
         self._console = console
         self._warning = warning
+        self._selection = selection
         self._filter = _ChildTextFilter()
 
     def write(self, text: str) -> int:
-        if self._warning:
+        if self._selection:
+            self._console.write_selection(self._filter.feed(text))
+        elif self._warning:
             self._console.activity("WARN", text.rstrip("\n"), "warning")
         else:
             self._console.write_child(self._filter.feed(text))
@@ -272,19 +313,74 @@ class StreamingConsole:
     """Write complete chronological records and live child chunks to one stream."""
 
     def __init__(self, stream: TextIO, *, color_enabled: bool,
-                 plain: bool = False, child_output: TextIO | None = None) -> None:
+                 plain: bool = False, child_output: TextIO | None = None,
+                 verbose: bool = False) -> None:
         self._stream = stream
         self._child_output = child_output
         self._color = (color_enabled and not plain and _stream_is_terminal(stream)
                        and "NO_COLOR" not in os.environ
                        and os.environ.get("TERM") != "dumb")
         self._plain = plain
+        self._verbose = verbose
+        self._progress_line_open = False
+        self._executing = False
+        self._last_dot = monotonic()
+        self._stop = Event()
+        self._heartbeat: Thread | None = None
         self._lock = RLock()
         self._started = False
         self._child_line_open = False
         self._closed = False
         self.child_stream = _ConsoleTextStream(self)
+        self.selection_stream = _ConsoleTextStream(self, selection=True)
         self.warning_stream = _ConsoleTextStream(self, warning=True)
+        if not verbose:
+            self._heartbeat = Thread(
+                target=self._pulse, name="patchharbor-console-progress", daemon=True,
+            )
+            self._heartbeat.start()
+
+    def _pulse(self) -> None:
+        # Waiting is presentation-only. It never reads a repository or Exchange
+        # file and can neither grant permission nor delay a Core operation.
+        while not self._stop.wait(_DOT_INTERVAL):
+            with self._lock:
+                now = monotonic()
+                if (self._closed or not self._progress_line_open
+                        or self._executing or now - self._last_dot < _DOT_INTERVAL):
+                    continue
+                try:
+                    self._write(self._paint(".", "info"))
+                    self._last_dot = monotonic()
+                except Exception:
+                    # Optional progress cannot kill a running patch. Required
+                    # output/log writes retain their normal error handling.
+                    self._stop.set()
+                    return
+
+    def _end_progress_line(self) -> None:
+        if self._progress_line_open:
+            self._write("\n")
+            self._progress_line_open = False
+
+    def _record(self, phase: str, message: str, level: str, *, ongoing: bool) -> None:
+        self._end_progress_line()
+        prefix = "\n" if self._child_line_open else ""
+        self._child_line_open = False
+        symbol = "" if self._plain else {
+            "success": "✓ ", "warning": "! ", "error": "✗ ",
+            "heading": "◆ ", "message": "◆ ",
+        }.get(level, "› ")
+        label = _sanitize_line(phase)
+        stamp = datetime.now().strftime("%H:%M:%S")
+        rendered = [
+            self._paint(f"[{stamp}] {symbol}{label:<8} {line}", level)
+            for line in _sanitize_lines(message)
+        ]
+        self._write(prefix + "\n".join(rendered) + (" " if ongoing else "\n"))
+        self._progress_line_open = ongoing
+        # Never catch up with a burst of dots after a stalled writer.
+        self._last_dot = monotonic()
 
     @property
     def started(self) -> bool:
@@ -313,26 +409,30 @@ class StreamingConsole:
             if self._closed:
                 return
             self._started = True
-            prefix = "\n" if self._child_line_open else ""
-            self._child_line_open = False
-            symbol = "" if self._plain else {
-                "success": "✓ ", "warning": "! ", "error": "✗ ",
-                "heading": "◆ ", "message": "◆ ",
-            }.get(level, "› ")
-            label = _sanitize_line(phase)
-            stamp = datetime.now().strftime("%H:%M:%S")
-            lines = _sanitize_lines(message)
-            rendered = []
-            for line in lines:
-                text = f"[{stamp}] {symbol}{label:<8} {line}"
-                rendered.append(self._paint(text, level))
-            self._write(prefix + "\n".join(rendered) + "\n")
+            if phase == "EXEC":
+                # Child stdout/stderr is a separate, lossless stream. Do not
+                # append heartbeat characters to prompts or script output.
+                self._executing = True
+            elif level == "heading" and phase not in {"SCRIPT", "MESSAGE"}:
+                self._executing = False
+            if not self._verbose and not _compact_visible(phase, level):
+                if not self._progress_line_open and not self._executing:
+                    label, text = _WORK_LABELS.get(phase, ("WORK", "Process request"))
+                    self._record(label, text, "info", ongoing=True)
+                return
+            self._record(
+                phase, message, level,
+                ongoing=(not self._verbose and level == "heading"
+                         and phase not in {"EXEC", "SCRIPT", "MESSAGE", "REPO"}),
+            )
 
     def write_child(self, text: str) -> None:
         with self._lock:
             if self._closed or not text:
                 return
             self._started = True
+            self._executing = True
+            self._end_progress_line()
             if self._child_output is not None:
                 self._child_output.write(text)
                 self._child_output.flush()
@@ -345,6 +445,20 @@ class StreamingConsole:
                 parts.append(part)
                 self._child_line_open = not part.endswith("\n")
             self._write("".join(parts))
+
+    def write_selection(self, text: str) -> None:
+        """Keep an interactive selection prompt clear of heartbeat characters."""
+        with self._lock:
+            if self._closed or not text:
+                return
+            self._executing = True
+            self._end_progress_line()
+            if self._child_output is not None:
+                self._child_output.write(text)
+                self._child_output.flush()
+            else:
+                self._write(text)
+                self._child_line_open = not text.endswith("\n")
 
     def flush(self) -> None:
         with self._lock:
@@ -392,10 +506,18 @@ class StreamingConsole:
             self.activity("BUNDLE", str(completion.result_path), "success")
 
     def close(self) -> None:
-        with self._lock:
-            if self._closed:
-                return
-            self._closed = True
-            if self._child_line_open:
-                self._write("\n")
-                self._child_line_open = False
+        self._stop.set()
+        try:
+            with self._lock:
+                if self._closed:
+                    return
+                self._closed = True
+                self._end_progress_line()
+                if self._child_line_open:
+                    self._write("\n")
+                    self._child_line_open = False
+        finally:
+            if self._heartbeat is not None:
+                # No output occurs after close returns; never join under the
+                # writer lock, which the heartbeat may be about to acquire.
+                self._heartbeat.join()

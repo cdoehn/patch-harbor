@@ -168,5 +168,4 @@ def apply_payload_mutation(
             error=error,
         )
 
-    activity("PAYLOAD", "All payload files written", "success")
     return ApplyMutationResult.succeeded(current_context)

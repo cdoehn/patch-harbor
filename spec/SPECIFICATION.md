@@ -3125,3 +3125,23 @@ Ein Erfolg darf erst nach Prüfung von `run.json`, Git-Zustand und erwartetem Co
 - Der fortgeführte manuelle Runner behält seine Datei-, Ordner-, Pipe-, ZIP-, Interpreter-, Prozess-, TUI-, Logging- und Ressourcenverträge.
 - PatchHarbor ist keine Sandbox; nur vertrauenswürdige Pakete dürfen ausgeführt werden.
 - Ubuntu 24.04, Ubuntu 26.04 und echte Windows-Runner bleiben blockierende Release-Gates.
+
+
+## 29. Kompakte Standardkonsole (OFF-PLAN COMPACT-CORE)
+
+Diese Ergänzung ersetzt ausschließlich ältere Vorgaben zur standardmäßig
+vollständigen Detailausgabe. Alle realen Sicherheitsprüfungen bleiben gleich.
+Die normale Ausgabe von Apply, fs run und Bundle zeigt zusammengefasste
+Arbeitsschritte und Ergebnisse. Die zentrale Präsentationspolitik unterdrückt
+Einzelmeldungen von Git, ZIP, SHA, Payload-Dateien und Result-ZIP-Dateien.
+`--verbose`/`-v` zeigt die vollständige Detailspur; Emittern ist der Modus unbekannt.
+
+Bei laufenden internen Arbeiten werden Punkte angehängt, frühestens alle
+0,8 Sekunden, ohne nachholende Punktserie, Carriage Return, Cursorsteuerung oder
+Neuzeichnen. Der Präsentationsgeber untersucht keine Dateien und entscheidet
+keine Core-Aktion. Warnungen, Fehler und Phasenwechsel beenden offene Punktzeilen.
+MESSAGE-Blöcke und Skriptausgaben bleiben vollständig; Punkte werden niemals in
+Skriptausgabe oder Rohlogs eingefügt. JSON bleibt ohne menschliche Zusatzdaten.
+Farben, kurze menschliche Kennungen und vorhandene Exitcode-Verträge bleiben.
+Kleine bisher kompakte Konfigurations-/Kontextbefehle erhalten Detailbeobachtung
+nur bei --verbose. Es werden keine automatisierten Konsolenausgabetests ergänzt.

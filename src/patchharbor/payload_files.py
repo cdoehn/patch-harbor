@@ -137,6 +137,7 @@ def write_bundle_payloads(
     if not payload_items:
         return
 
+    activity("PAYLOAD", f"Write {len(payload_items)} payload file(s)", "heading")
     for payload in payload_items:
         target = _resolve_payload_target(
             cwd,
@@ -148,3 +149,4 @@ def write_bundle_payloads(
             payload.content,
             label=f"bundle file {payload.relative_path!r}",
         )
+    activity("PAYLOAD", f"Wrote {len(payload_items)} payload file(s)", "success")

@@ -366,3 +366,10 @@ Danach folgen Registry mit Lock und atomarer Persistenz, normativer Fingerprint 
 ### Superseded by 1.1.0
 
 Die frühere Produktspezifikation war mit dem Commit-Plan kombiniert und enthielt zusätzliche inzwischen verworfene oder neu zugeordnete Zukunftspfade. Die neue 1.1.0-Spezifikation übernimmt alle fortgeltenden Verträge vollständig und ersetzt diese alte Produktbeschreibung.
+
+
+### OFF-PLAN COMPACT-CORE / 1 — kompakte Standardausgabe
+
+Zentrale Filterung aller technischen Dateisystem-, Git-, ZIP- und SHA-Meldungen;
+--verbose/-v für Details; angehängte Punkte frühestens alle 0,8 Sekunden.
+Keine Änderung der Mutation, Recovery, Rohlogs oder JSON-Verträge.

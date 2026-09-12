@@ -70,6 +70,18 @@ class _ExactArgumentParser(argparse.ArgumentParser):
     def __init__(self, *args: object, **kwargs: object) -> None:
         kwargs.setdefault("allow_abbrev", False)
         super().__init__(*args, **kwargs)
+        self.add_argument(
+            "-v", "--verbose", action="store_true", default=argparse.SUPPRESS,
+            help="show all internal file, ZIP, Git and state activity",
+        )
+        self.add_argument(
+            "--plain", action="store_true", default=argparse.SUPPRESS,
+            help="use undecorated, colorless output",
+        )
+        self.add_argument(
+            "--no-color", action="store_true", default=argparse.SUPPRESS,
+            help="disable console colors",
+        )
 
 
 def _positive_seconds(value: str) -> float:
@@ -357,16 +369,8 @@ def _build_parser() -> argparse.ArgumentParser:
             "Result Bundle"
         ),
     )
-    apply_parser.add_argument(
-        "--plain",
-        action="store_true",
-        help="use undecorated, colorless streaming output (all messages remain visible)",
-    )
-    apply_parser.add_argument(
-        "--no-color",
-        action="store_true",
-        help="disable colors in the streaming console",
-    )
+
+
     apply_parser.add_argument(
         "--json",
         action="store_true",
@@ -440,16 +444,8 @@ def _build_parser() -> argparse.ArgumentParser:
             f"(default: {DEFAULT_TIMEOUT_SECONDS:g})"
         ),
     )
-    run_parser.add_argument(
-        "--plain",
-        action="store_true",
-        help="use undecorated, colorless streaming output (all messages remain visible)",
-    )
-    run_parser.add_argument(
-        "--no-color",
-        action="store_true",
-        help="disable colors in the streaming console",
-    )
+
+
     run_parser.add_argument(
         "--log",
         action="store_true",
@@ -491,11 +487,18 @@ def _configure_exchange_directory_command(
     *,
     stdout: TextIO,
     stderr: TextIO,
+    verbose: bool = False,
+    force_plain: bool = False,
+    no_color: bool = False,
 ) -> int:
     try:
-        configuration_path, configuration = configure_exchange_directory(
-            directory
-        )
+        with _console_scope(
+            stdout, stderr=stderr, enabled=verbose,
+            color_enabled=not no_color, plain=force_plain, verbose=verbose,
+        ):
+            configuration_path, configuration = configure_exchange_directory(
+                directory
+            )
     except PatchHarborError as exc:
         print(format_tool_message(str(exc)), file=stderr)
         return int(exc.exit_code)
@@ -515,9 +518,16 @@ def _configure_bundle_suffix_command(
     *,
     stdout: TextIO,
     stderr: TextIO,
+    verbose: bool = False,
+    force_plain: bool = False,
+    no_color: bool = False,
 ) -> int:
     try:
-        configuration_path, configuration = configure_bundle_suffix(suffix)
+        with _console_scope(
+            stdout, stderr=stderr, enabled=verbose,
+            color_enabled=not no_color, plain=force_plain, verbose=verbose,
+        ):
+            configuration_path, configuration = configure_bundle_suffix(suffix)
     except PatchHarborError as exc:
         print(format_tool_message(str(exc)), file=stderr)
         return int(exc.exit_code)
@@ -533,9 +543,16 @@ def _configure_bundle_suffix_command(
 
 def _configure_archive_directory_command(
     name: str, *, stdout: TextIO, stderr: TextIO,
+    verbose: bool = False,
+    force_plain: bool = False,
+    no_color: bool = False,
 ) -> int:
     try:
-        configuration_path, configuration = configure_archive_directory(name)
+        with _console_scope(
+            stdout, stderr=stderr, enabled=verbose,
+            color_enabled=not no_color, plain=force_plain, verbose=verbose,
+        ):
+            configuration_path, configuration = configure_archive_directory(name)
     except PatchHarborError as exc:
         print(format_tool_message(str(exc)), file=stderr)
         return int(exc.exit_code)
@@ -551,9 +568,16 @@ def _configure_show_command(
     *,
     stdout: TextIO,
     stderr: TextIO,
+    verbose: bool = False,
+    force_plain: bool = False,
+    no_color: bool = False,
 ) -> int:
     try:
-        configuration_path, configuration = shared_configuration()
+        with _console_scope(
+            stdout, stderr=stderr, enabled=verbose,
+            color_enabled=not no_color, plain=force_plain, verbose=verbose,
+        ):
+            configuration_path, configuration = shared_configuration()
     except PatchHarborError as exc:
         print(format_tool_message(str(exc)), file=stderr)
         return int(exc.exit_code)
@@ -574,12 +598,19 @@ def _register_command(
     new_id: bool,
     stdout: TextIO,
     stderr: TextIO,
+    verbose: bool = False,
+    force_plain: bool = False,
+    no_color: bool = False,
 ) -> int:
     try:
-        context = register_repository(
-            path or Path.cwd(),
-            new_id=new_id,
-        )
+        with _console_scope(
+            stdout, stderr=stderr, enabled=verbose,
+            color_enabled=not no_color, plain=force_plain, verbose=verbose,
+        ):
+            context = register_repository(
+                path or Path.cwd(),
+                new_id=new_id,
+            )
     except PatchHarborError as exc:
         print(format_tool_message(str(exc)), file=stderr)
         return int(exc.exit_code)
@@ -645,9 +676,16 @@ def _registry_list_command(
     json_output: bool,
     stdout: TextIO,
     stderr: TextIO,
+    verbose: bool = False,
+    force_plain: bool = False,
+    no_color: bool = False,
 ) -> int:
     try:
-        result = registered_repositories()
+        with _console_scope(
+            stdout, stderr=stderr, enabled=verbose and not json_output,
+            color_enabled=not no_color, plain=force_plain, verbose=verbose,
+        ):
+            result = registered_repositories()
     except PatchHarborError as exc:
         exit_code = int(exc.exit_code)
         if json_output:
@@ -691,9 +729,16 @@ def _context_command(
     json_output: bool,
     stdout: TextIO,
     stderr: TextIO,
+    verbose: bool = False,
+    force_plain: bool = False,
+    no_color: bool = False,
 ) -> int:
     try:
-        context = repository_context(path or Path.cwd())
+        with _console_scope(
+            stdout, stderr=stderr, enabled=verbose and not json_output,
+            color_enabled=not no_color, plain=force_plain, verbose=verbose,
+        ):
+            context = repository_context(path or Path.cwd())
     except PatchHarborError as exc:
         exit_code = int(exc.exit_code)
         if json_output:
@@ -787,9 +832,12 @@ def _bundle_command(
     json_output: bool,
     stdout: TextIO,
     stderr: TextIO,
+    verbose: bool = False,
+    force_plain: bool = False,
+    no_color: bool = False,
 ) -> int:
     try:
-        with _console_scope(stdout, stderr=stderr, enabled=not json_output, color_enabled=True):
+        with _console_scope(stdout, stderr=stderr, enabled=not json_output, color_enabled=not no_color, plain=force_plain, verbose=verbose):
             result = bundle_repository(
                 path or Path.cwd(), output_directory=output_directory,
             )
@@ -858,6 +906,7 @@ def _console_scope(
     stdout: TextIO, *, enabled: bool, color_enabled: bool,
     stderr: TextIO | None = None,
     plain: bool = False,
+    verbose: bool = False,
 ) -> Iterator[StreamingConsole | None]:
     """Start observation before discovery and release it on every exit path."""
     try:
@@ -868,7 +917,7 @@ def _console_scope(
         StreamingConsole(
             stdout if terminal or stderr is None else stderr,
             color_enabled=color_enabled and terminal, plain=plain,
-            child_output=None if terminal else stdout,
+            child_output=None if terminal else stdout, verbose=verbose,
         ) if enabled else None
     )
     try:
@@ -914,6 +963,7 @@ def _apply_command(
     automatic: bool,
     stdout: TextIO,
     stderr: TextIO,
+    verbose: bool = False,
 ) -> int:
     visible_stdout = stdout if json_output else SanitizedTextStream(stdout)
     visible_stderr = SanitizedTextStream(stderr)
@@ -923,6 +973,7 @@ def _apply_command(
         enabled=not json_output,
         color_enabled=not no_color,
         plain=force_plain,
+        verbose=verbose,
     ) as console:
         output = _output_targets_for_presentation(
             visible_stdout=visible_stdout,
@@ -998,12 +1049,19 @@ def _unregister_command(
     *,
     stdout: TextIO,
     stderr: TextIO,
+    verbose: bool = False,
+    force_plain: bool = False,
+    no_color: bool = False,
 ) -> int:
     try:
-        repo_id, repository_path = unregister_repository(
-            selector,
-            cwd=Path.cwd(),
-        )
+        with _console_scope(
+            stdout, stderr=stderr, enabled=verbose,
+            color_enabled=not no_color, plain=force_plain, verbose=verbose,
+        ):
+            repo_id, repository_path = unregister_repository(
+                selector,
+                cwd=Path.cwd(),
+            )
     except PatchHarborError as exc:
         print(format_tool_message(str(exc)), file=stderr)
         return int(exc.exit_code)
@@ -1031,7 +1089,7 @@ def _execute_request(
                     cwd=cwd,
                     timeout_seconds=timeout_seconds,
                     selection_input=stdin,
-                    selection_output=stdout,
+                    selection_output=(stdout if console is None else console.selection_stream),
                     output=output,
                     presentation=console,
                 ),
@@ -1062,6 +1120,7 @@ def _run_command(
     stdin: TextIO,
     stdout: TextIO,
     stderr: TextIO,
+    verbose: bool = False,
 ) -> int:
     if path is None and stdin.isatty():
         parser.error("PATH is required when standard input is a terminal")
@@ -1078,6 +1137,7 @@ def _run_command(
         enabled=True,
         color_enabled=not no_color,
         plain=force_plain,
+        verbose=verbose,
     ) as console:
         try:
             with log_context as run_log:
@@ -1178,6 +1238,9 @@ def main(
 
     parser = _build_parser()
     args = parser.parse_args(argv)
+    for option in ("verbose", "plain", "no_color"):
+        if not hasattr(args, option):
+            setattr(args, option, False)
 
     if (
         args.command == "apply"
@@ -1194,6 +1257,7 @@ def main(
             args.directory,
             stdout=actual_stdout,
             stderr=actual_stderr,
+            verbose=args.verbose, force_plain=args.plain, no_color=args.no_color,
         )
 
     if args.command == "configure" and args.configure_command == "bundle-suffix":
@@ -1207,6 +1271,7 @@ def main(
             "" if args.clear else args.suffix,
             stdout=actual_stdout,
             stderr=actual_stderr,
+            verbose=args.verbose, force_plain=args.plain, no_color=args.no_color,
         )
     if args.command == "configure" and args.configure_command == "archive-dir":
         if (args.name is None) == (not args.clear):
@@ -1214,11 +1279,13 @@ def main(
             return int(ExitCode.USAGE_ERROR)
         return _configure_archive_directory_command(
             "" if args.clear else args.name, stdout=actual_stdout, stderr=actual_stderr,
+            verbose=args.verbose, force_plain=args.plain, no_color=args.no_color,
         )
     if args.command == "configure" and args.configure_command == "show":
         return _configure_show_command(
             stdout=actual_stdout,
             stderr=actual_stderr,
+            verbose=args.verbose, force_plain=args.plain, no_color=args.no_color,
         )
 
     if args.command == "register":
@@ -1227,6 +1294,7 @@ def main(
             new_id=args.new_id,
             stdout=actual_stdout,
             stderr=actual_stderr,
+            verbose=args.verbose, force_plain=args.plain, no_color=args.no_color,
         )
 
     if args.command == "registry" and args.registry_command == "list":
@@ -1234,6 +1302,7 @@ def main(
             json_output=args.json_output,
             stdout=actual_stdout,
             stderr=actual_stderr,
+            verbose=args.verbose, force_plain=args.plain, no_color=args.no_color,
         )
 
     if args.command == "unregister":
@@ -1241,6 +1310,7 @@ def main(
             args.repository_or_repo_id,
             stdout=actual_stdout,
             stderr=actual_stderr,
+            verbose=args.verbose, force_plain=args.plain, no_color=args.no_color,
         )
 
     if args.command == "context":
@@ -1249,6 +1319,7 @@ def main(
             json_output=args.json_output,
             stdout=actual_stdout,
             stderr=actual_stderr,
+            verbose=args.verbose, force_plain=args.plain, no_color=args.no_color,
         )
 
     if args.command == "bundle":
@@ -1258,6 +1329,8 @@ def main(
             json_output=args.json_output,
             stdout=actual_stdout,
             stderr=actual_stderr,
+            verbose=getattr(args, "verbose", False),
+            force_plain=args.plain, no_color=args.no_color,
         )
 
     if args.command == "apply":
@@ -1272,6 +1345,7 @@ def main(
             automatic=args.automatic,
             stdout=actual_stdout,
             stderr=actual_stderr,
+            verbose=getattr(args, "verbose", False),
         )
 
     if args.command == "fs" and args.fs_command == "run":
@@ -1285,6 +1359,7 @@ def main(
             stdin=actual_stdin,
             stdout=actual_stdout,
             stderr=actual_stderr,
+            verbose=getattr(args, "verbose", False),
         )
 
     parser.error("unsupported command")

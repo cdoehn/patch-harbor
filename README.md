@@ -425,36 +425,36 @@ repair old upgrade attempts that never recorded these proofs. A still-running
 older executable also does not gain the new receipt protocol by changing files:
 reinstall the current version before subsequent Apply runs.
 
-### Verbose streaming console
+### Compact console and verbose diagnostics
 
-Normal `apply`, `bundle` and `fs run` requests now use an append-only console,
-not a fixed dashboard. Colors, phase labels and timestamps remain; existing
-lines are never redrawn. Identifiers still use six characters plus `…` in human
-output, while JSON, manifests, state, logs and security comparisons retain their
-full values. `--no-color`, `NO_COLOR` and `TERM=dumb` disable terminal colors;
-`--plain` uses simple colorless labels.
+Normal `apply`, `fs run` and `bundle` output shows important phases, results,
+warnings and errors. File reads/writes, ZIP members, SHA checks and individual
+Git queries are grouped instead of printed line by line. A running internal
+operation appends **at most one dot every 0.8 seconds** to its current line.
+There is no carriage return, cursor movement, redraw or catch-up burst. Fast
+operations need no dots; completion or another visible message ends the line.
 
-Progress starts before patch selection. It describes every inspected Exchange
-entry and its real outcome, content-based identification or reuse of a verified
-classification, state binding, recovery, archival decisions, payload validation
-and writes, process execution and Result Bundle creation. Skipped files include
-the reason. No extra file reads or safety decisions are introduced just to
-produce messages. ZIP entries read into memory are described as reads, not as
-files extracted to disk.
+Use `--verbose` (or `-v`) to show the complete technical activity stream:
 
-All parsed `MESSAGE` blocks are shown in full before their script starts. Child
-output is forwarded as chunks arrive, including progress without a newline;
-PatchHarbor cannot force the child to flush its own buffers. In interactive
-terminals everything forms one chronological console. With redirected stdout
-or `--plain`, child text stays on stdout and human diagnostics go to stderr.
-JSON mode remains machine-only. Untrusted terminal controls are removed from
-visible text; raw execution logs keep the original bytes.
+```sh
+patchharbor apply --verbose
+patchharbor bundle --verbose
+patchharbor --verbose context
+patchharbor fs run --verbose generated.sh
+```
 
-The extra internal progress is **console-only**: it does not alter the raw
-`logs/execution.log` or add entries to the Result ZIP/recovery proof format.
-Display wording, colors, symbols, order, shortening and layout have no automated
-UI tests. Functional checks still cover selection, validation, mutation, process
-lifecycle, byte-exact logs, JSON, replay/recovery and Result Bundles.
+The option works before or after the command. `--plain` and `--no-color` only
+change decoration, not detail selection. Colors and short human-readable IDs
+remain. `--json` suppresses both human activity and dots even with `--verbose`;
+its machine schema, complete identifiers and exit statuses do not change.
+
+`MESSAGE` blocks and live script stdout/stderr are **never filtered by verbosity**.
+Dots stop while child output is active and are never inserted into raw logs.
+Library calls without an observer remain silent. Small configuration/context
+commands keep their existing compact summaries; `--verbose` enables their
+internal activity too. Use verbose mode for individual scan rejection reasons.
+There are no automated tests of console text, colors, symbols or dot formatting;
+functional data, error, recovery and process tests remain in place.
 
 ### Explicit path overrides
 
