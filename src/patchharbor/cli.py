@@ -41,6 +41,7 @@ from patchharbor.presentation import (
     PresentedStatus,
     SanitizedTextStream,
     StreamingConsole,
+    select_directory_candidate,
 )
 from patchharbor.progress import observe_activity
 from patchharbor.run_log import temporary_run_log
@@ -921,7 +922,7 @@ def _console_scope(
         ) if enabled else None
     )
     try:
-        with observe_activity(None if console is None else console.activity):
+        with observe_activity(None if console is None else console.observe):
             if console is not None:
                 console.activity("PATCHHARBOR", "Starting request", "heading")
             yield console
@@ -988,7 +989,6 @@ def _apply_command(
                 timeout_seconds=timeout_seconds,
                 output_directory=output_directory,
                 output=output,
-                presentation=console,
                 automatic=automatic,
             )
         except OSError as exc:
@@ -1088,11 +1088,12 @@ def _execute_request(
                     path,
                     cwd=cwd,
                     timeout_seconds=timeout_seconds,
-                    selection_input=stdin,
-                    selection_output=(stdout if console is None else console.selection_stream),
+                    select_candidate=lambda candidates: select_directory_candidate(
+                        candidates, input_stream=stdin,
+                        output_stream=(stdout if console is None else console.selection_stream),
+                    ),
                     output=output,
-                    presentation=console,
-                ),
+                    ),
                 None,
             )
         return (
@@ -1101,7 +1102,6 @@ def _execute_request(
                 cwd=cwd,
                 timeout_seconds=timeout_seconds,
                 output=output,
-                presentation=console,
             ),
             None,
         )

@@ -373,3 +373,10 @@ Die frühere Produktspezifikation war mit dem Commit-Plan kombiniert und enthiel
 Zentrale Filterung aller technischen Dateisystem-, Git-, ZIP- und SHA-Meldungen;
 --verbose/-v für Details; angehängte Punkte frühestens alle 0,8 Sekunden.
 Keine Änderung der Mutation, Recovery, Rohlogs oder JSON-Verträge.
+
+
+### OFF-PLAN COMPACT-CORE / 2 — neutrale Application-Beobachtung
+
+Konkrete Konsolenparameter durch unveränderliche Ereignisse ersetzt, vollständige
+Kennungen bis zur UI-Grenze erhalten, implizite stdout-Ausgabe entfernt und
+interaktive Verzeichnisauswahl aus Core in den CLI-Adapter verschoben.

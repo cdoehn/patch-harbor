@@ -48,8 +48,6 @@ def _run_path(
         path,
         cwd=cwd,
         timeout_seconds=timeout_seconds,
-        selection_input=StringIO(),
-        selection_output=StringIO(),
         resource_policy=resource_policy,
     )
 

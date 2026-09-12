@@ -567,3 +567,17 @@ secret detection.
 The installed `patchharbor --help`, `patchharbor COMMAND --help`, and
 `patchharbor-watcher --help` screens are the complete user-facing CLI reference.
 Only implemented commands and options are shown there.
+
+
+### Internal preparation for the Python API
+
+Application workflows now publish immutable, request-local facts through
+`progress.py`. Repository and script records carry full data; only the CLI
+adapter knows colors, shortening or verbosity. Observation is optional and
+cannot authorize mutation or override recovery checks. Child output is separate
+and requires an explicitly supplied `OutputTargets`; the default is silent.
+Directory selection is an explicit callback, with the interactive menu owned by
+the CLI. Unknown choices are rejected before a file is executed.
+
+These are internal boundaries, **not** a supported `patchharbor.api` release.
+The future public API is planned separately for 1.2.0.

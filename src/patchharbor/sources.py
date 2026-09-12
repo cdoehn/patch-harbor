@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from contextlib import contextmanager
-from dataclasses import dataclass
 from io import DEFAULT_BUFFER_SIZE
 import os
 from pathlib import Path
@@ -13,7 +12,7 @@ from typing import TextIO
 from patchharbor.progress import activity
 
 from patchharbor.errors import ExitCode, PatchHarborError
-from patchharbor.models import InputArtifact
+from patchharbor.models import DirectoryCandidate, InputArtifact
 from patchharbor.platform.errors import describe_os_error
 from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY, ResourcePolicy
 from patchharbor.temporary_resources import (
@@ -118,18 +117,6 @@ def stdin_input_artifact(
         ) from exc
 
 
-@dataclass(frozen=True)
-class DirectoryCandidate:
-    """Stable display and sorting data for one regular directory entry."""
-
-    path: Path
-    modified_ns: int
-
-    @property
-    def display_name(self) -> str:
-        return self.path.name
-
-
 def list_directory_entries(directory: Path) -> tuple[DirectoryCandidate, ...]:
     """Scan once and return sorted regular non-symlink files."""
     activity("SCAN", f"Scan manual input directory: {directory}", "heading")
@@ -168,41 +155,3 @@ def list_directory_entries(directory: Path) -> tuple[DirectoryCandidate, ...]:
             ),
         )
     )
-
-
-def select_directory_candidate(
-    candidates: tuple[DirectoryCandidate, ...],
-    *,
-    input_stream: TextIO,
-    output_stream: TextIO,
-) -> DirectoryCandidate:
-    """Choose exactly one candidate without accessing the filesystem."""
-    if len(candidates) == 1:
-        activity("SELECT", f"Only valid manual candidate: {candidates[0].display_name}", "success")
-        return candidates[0]
-
-    for index, candidate in enumerate(candidates, start=1):
-        print(f"{index} {candidate.display_name}", file=output_stream)
-
-    count = len(candidates)
-    while True:
-        print(
-            f"Select [1-{count}]: ",
-            end="",
-            file=output_stream,
-            flush=True,
-        )
-        value = input_stream.readline().strip()
-        if not value:
-            raise PatchHarborError(
-                "no script selected",
-                ExitCode.USAGE_ERROR,
-            )
-
-        if value.isascii() and value.isdecimal():
-            index = int(value) - 1
-            if 0 <= index < count:
-                activity("SELECT", f"Selected manual candidate: {candidates[index].display_name}", "success")
-                return candidates[index]
-
-        print(f"Enter 1-{count}.", file=output_stream)

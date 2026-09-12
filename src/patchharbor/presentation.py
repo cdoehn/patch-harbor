@@ -9,8 +9,16 @@ from enum import Enum
 import os
 from threading import Event, RLock, Thread
 from time import monotonic
-from typing import Protocol, TextIO
+from typing import TextIO
 import unicodedata
+
+from patchharbor.errors import ExitCode, PatchHarborError
+from patchharbor.models import DirectoryCandidate
+from patchharbor.identifier_presentation import shorten_identifier
+from patchharbor.progress import (
+    ActivityEvent, PackageFile, ProgressEvent, RepositoryResolved,
+    RequestStarted, ScriptPrepared,
+)
 
 _RESET = "\x1b[0m"
 _COLORS = {
@@ -87,39 +95,6 @@ class PresentedCompletion:
             raise ValueError("presented error requires a detail")
         if self.status is not PresentedStatus.ERROR and self.detail is not None:
             raise ValueError("only a presented error may carry a detail")
-
-
-@dataclass(frozen=True, slots=True)
-class PresentedFile:
-    """One transferred file shown without exposing its content."""
-
-    name: str
-    size_bytes: int
-    kind: str
-
-
-class ConsolePresentation(Protocol):
-    """Presentation only: the application supplies already-decided facts."""
-
-    @property
-    def started(self) -> bool: ...
-
-    def begin_request(self, *, source_name: str,
-                      bundle_files: tuple[PresentedFile, ...], script_total: int,
-                      warnings: tuple[str, ...] = (),
-                      repository_name: str | None = None,
-                      repository_context: str | None = None) -> None: ...
-
-    def update_repository(self, *, repository_name: str,
-                          repository_context: str | None) -> None: ...
-
-    def begin_script(self, *, script_name: str, script_index: int,
-                     script_total: int, messages: tuple[tuple[str, str], ...],
-                     warnings: tuple[str, ...]) -> None: ...
-
-    def finish(self, completion: PresentedCompletion) -> None: ...
-
-    def close(self) -> None: ...
 
 
 def _skip_control_string(text: str, index: int) -> int:
@@ -464,8 +439,39 @@ class StreamingConsole:
         with self._lock:
             self._stream.flush()
 
+    def observe(self, event: ProgressEvent) -> None:
+        """Adapt neutral Core facts to the selected human presentation."""
+        if isinstance(event, ActivityEvent):
+            message = event.message
+            for identifier in event.identifiers:
+                message = message.replace(identifier, shorten_identifier(identifier))
+            self.activity(event.phase, message, event.level)
+        elif isinstance(event, RequestStarted):
+            self.begin_request(
+                source_name=event.source_name, bundle_files=event.files,
+                script_total=event.script_total, warnings=event.warnings,
+            )
+            if event.requested_repo_id is not None:
+                self.activity("CONTEXT", f"repo_id: {shorten_identifier(event.requested_repo_id)}")
+        elif isinstance(event, RepositoryResolved):
+            context = event.context
+            self.update_repository(
+                repository_name=str(context.repository_path),
+                repository_context=(
+                    f"repo_id: {shorten_identifier(context.repo_id)} · "
+                    f"base: {shorten_identifier(context.base_commit)} · "
+                    f"state: {shorten_identifier(context.state_fingerprint)}"
+                ),
+            )
+        elif isinstance(event, ScriptPrepared):
+            self.begin_script(
+                script_name=event.name, script_index=event.index,
+                script_total=event.total, messages=event.messages,
+                warnings=event.warnings,
+            )
+
     def begin_request(self, *, source_name: str,
-                      bundle_files: tuple[PresentedFile, ...], script_total: int,
+                      bundle_files: tuple[PackageFile, ...], script_total: int,
                       warnings: tuple[str, ...] = (),
                       repository_name: str | None = None,
                       repository_context: str | None = None) -> None:
@@ -521,3 +527,39 @@ class StreamingConsole:
                 # No output occurs after close returns; never join under the
                 # writer lock, which the heartbeat may be about to acquire.
                 self._heartbeat.join()
+
+
+def select_directory_candidate(
+    candidates: tuple[DirectoryCandidate, ...],
+    *,
+    input_stream: TextIO,
+    output_stream: TextIO,
+) -> DirectoryCandidate:
+    """Choose exactly one candidate without accessing the filesystem."""
+    if len(candidates) == 1:
+        return candidates[0]
+
+    for index, candidate in enumerate(candidates, start=1):
+        print(f"{index} {candidate.display_name}", file=output_stream)
+
+    count = len(candidates)
+    while True:
+        print(
+            f"Select [1-{count}]: ",
+            end="",
+            file=output_stream,
+            flush=True,
+        )
+        value = input_stream.readline().strip()
+        if not value:
+            raise PatchHarborError(
+                "no script selected",
+                ExitCode.USAGE_ERROR,
+            )
+
+        if value.isascii() and value.isdecimal():
+            index = int(value) - 1
+            if 0 <= index < count:
+                return candidates[index]
+
+        print(f"Enter 1-{count}.", file=output_stream)

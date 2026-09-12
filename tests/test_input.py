@@ -83,8 +83,6 @@ def test_direct_file_at_hard_budget_is_accepted(
         source,
         cwd=tmp_path,
         timeout_seconds=2,
-        selection_input=StringIO(),
-        selection_output=StringIO(),
         resource_policy=policy,
     )
 
@@ -178,8 +176,6 @@ def test_large_source_warning_reaches_plain_output(
         source,
         cwd=tmp_path,
         timeout_seconds=2,
-        selection_input=StringIO(),
-        selection_output=StringIO(),
         output=OutputTargets(
             visible_text_stream=StringIO(),
             warning_text_stream=warning_output,

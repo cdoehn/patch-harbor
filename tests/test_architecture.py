@@ -192,7 +192,6 @@ def test_application_is_the_only_core_workflow_orchestrator() -> None:
         "patchharbor.bundles",
         "patchharbor.execution",
         "patchharbor.exchange",
-        "patchharbor.presentation",
     }
     application_dependencies = graph["patchharbor.application"]
     assert workflow_boundaries <= application_dependencies
@@ -329,7 +328,14 @@ def test_runtime_responsibilities_follow_the_specified_boundaries() -> None:
 
     assert graph["patchharbor.parser"] == frozenset()
     assert graph["patchharbor.identifier_presentation"] == frozenset()
-    assert graph["patchharbor.presentation"] == frozenset()
+    assert graph["patchharbor.presentation"] <= {
+        "patchharbor.errors", "patchharbor.identifier_presentation",
+        "patchharbor.models", "patchharbor.progress",
+    }
+    assert not graph["patchharbor.application"] & {
+        "patchharbor.presentation", "patchharbor.identifier_presentation", "patchharbor.cli",
+    }
+    assert graph["patchharbor.progress"] == frozenset({"patchharbor.models"})
 
     for module, forbidden in forbidden_by_module.items():
         violations = _forbidden_dependencies(graph[module], forbidden)

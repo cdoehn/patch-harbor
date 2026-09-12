@@ -226,3 +226,15 @@ class RegistryListResult:
     """Structured result of resolving all mappings in one snapshot."""
 
     repositories: tuple[RegistryRepository, ...]
+
+
+@dataclass(frozen=True)
+class DirectoryCandidate:
+    """Stable display and sorting data for one regular directory entry."""
+
+    path: Path
+    modified_ns: int
+
+    @property
+    def display_name(self) -> str:
+        return self.path.name

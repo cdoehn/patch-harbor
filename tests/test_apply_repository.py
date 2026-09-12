@@ -143,16 +143,6 @@ def _complete_preflight(
         pass
 
 
-class _RecordingApplyPresentation:
-    def __init__(self) -> None:
-        self.repository: dict[str, object] | None = None
-        self.script: dict[str, object] | None = None
-
-    def update_repository(self, **values: object) -> None:
-        self.repository = values
-
-    def begin_script(self, **values: object) -> None:
-        self.script = values
 
 
 def test_safe_resolution_owns_output_reservation_and_repository_lock(
@@ -1054,45 +1044,6 @@ def test_private_entrypoint_uses_the_resolved_interpreter_suffix(
     assert tuple(private_temp.iterdir()) == ()
 
 
-def test_apply_preflight_presents_resolved_repository_and_entrypoint_messages(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    set_isolated_user_environment(monkeypatch, tmp_path / "user")
-    repository = create_repository(tmp_path / "repository")
-    context = register_repository(repository)
-    presentation = _RecordingApplyPresentation()
-    entrypoint = (
-        b"# PATCHHARBOR\n"
-        b"# PATCHHARBOR MESSAGE commit.last START\n"
-        b"# Apply presentation connected\n"
-        b"# PATCHHARBOR MESSAGE commit.last END\n"
-    )
-
-    with preflight_patch_package_repository(
-        _package(_manifest(context), entrypoint=entrypoint),
-        output_directory=tmp_path / "results",
-        presentation=presentation,
-    ):
-        pass
-
-    assert presentation.repository is not None
-    assert presentation.repository["repository_name"] == str(repository.resolve())
-    repository_context = presentation.repository["repository_context"]
-    assert isinstance(repository_context, str)
-    assert f"repo_id: {str(context.repo_id)[:6]}…" in repository_context
-    assert f"base: {str(context.base_commit)[:6]}…" in repository_context
-    assert f"state: {context.state_fingerprint[:6]}…" in repository_context
-    assert str(context.repo_id) not in repository_context
-    assert str(context.base_commit) not in repository_context
-    assert context.state_fingerprint not in repository_context
-    assert presentation.script == {
-        "script_name": "run.sh",
-        "script_index": 1,
-        "script_total": 1,
-        "messages": (("commit.last", "Apply presentation connected"),),
-        "warnings": (),
-    }
 
 
 @pytest.mark.parametrize(
@@ -1190,3 +1141,24 @@ def test_interpreter_availability_is_checked_before_private_writes(
     assert private_writes == []
     assert tuple(private_temp.iterdir()) == ()
     assert not (repository / "files" / "payload.bin").exists()
+
+
+def test_preflight_emits_full_repository_and_script_facts(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from patchharbor.progress import RepositoryResolved, ScriptPrepared, observe_activity
+
+    set_isolated_user_environment(monkeypatch, tmp_path / "user")
+    repository = create_repository(tmp_path / "repository")
+    context = register_repository(repository)
+    entrypoint = (b"# PATCHHARBOR\n# PATCHHARBOR MESSAGE plan.one START\n"
+                  b"# Exact data for an observer\n# PATCHHARBOR MESSAGE plan.one END\n")
+    events = []
+    with observe_activity(events.append):
+        with preflight_patch_package_repository(
+            _package(_manifest(context), entrypoint=entrypoint),
+            output_directory=tmp_path / "results",
+        ):
+            pass
+    resolved = [event for event in events if isinstance(event, RepositoryResolved)]
+    scripts = [event for event in events if isinstance(event, ScriptPrepared)]
+    assert [event.context for event in resolved] == [context]
+    assert scripts == [ScriptPrepared("run.sh", 1, 1, (("plan.one", "Exact data for an observer"),), ())]

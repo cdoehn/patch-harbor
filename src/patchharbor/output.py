@@ -23,7 +23,7 @@ OUTPUT_READER_POLL_SECONDS = 0.05
 class OutputTargets:
     """The visible, live, and byte-exact destinations for one script."""
 
-    visible_text_stream: TextIO
+    visible_text_stream: TextIO | None = None
     live_text_stream: TextIO | None = None
     raw_output_stream: BinaryIO | None = None
     warning_text_stream: TextIO | None = None
@@ -46,7 +46,8 @@ class OutputTargets:
 
     def write_visible_lines(self, lines: tuple[str, ...]) -> None:
         """Write the bounded final view unless live streaming is active."""
-        if self.live_text_stream is not None or self.line_observer is not None:
+        if (self.visible_text_stream is None or self.live_text_stream is not None
+                or self.line_observer is not None):
             return
         for line in lines:
             self.visible_text_stream.write(line)

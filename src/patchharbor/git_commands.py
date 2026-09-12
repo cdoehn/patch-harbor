@@ -9,7 +9,6 @@ import subprocess
 from patchharbor.progress import activity
 
 from patchharbor.errors import PatchHarborError, repository_resolution_error
-from patchharbor.identifier_presentation import shorten_identifier
 
 
 _REDIRECTING_GIT_ENVIRONMENT = (
@@ -83,13 +82,12 @@ def run_git_bytes(
     accepted_returncodes: tuple[int, ...] = (0,),
 ) -> bytes:
     """Run one canonical Git query and return stdout unchanged."""
-    display_arguments = []
-    for argument in arguments:
-        head, separator, tail = argument.partition(":")
-        if len(head) in {16, 40, 64} and all(c in "0123456789abcdef" for c in head):
-            argument = shorten_identifier(head) + separator + tail
-        display_arguments.append(argument)
-    activity("GIT", "Query: git " + " ".join(display_arguments), "detail")
+    identifiers = tuple(
+        head for argument in arguments
+        if (len(head := argument.partition(":")[0]) in {16, 40, 64}
+            and all(character in "0123456789abcdef" for character in head))
+    )
+    activity("GIT", "Query: git " + " ".join(arguments), "detail", identifiers=identifiers)
     command = [*_CANONICAL_GIT_PREFIX, *arguments]
     try:
         completed = subprocess.run(

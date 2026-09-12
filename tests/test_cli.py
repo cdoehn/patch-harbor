@@ -145,13 +145,6 @@ def test_keyboard_interrupt_returns_130(
         path: Path,
         **options: object,
     ) -> int:
-        presentation = options["presentation"]
-        assert presentation is not None
-        presentation.begin_request(
-            source_name=str(path),
-            bundle_files=(),
-            script_total=1,
-        )
         raise KeyboardInterrupt
 
     monkeypatch.setattr(cli, "run_script_path", fake_run_script_path)
@@ -177,13 +170,6 @@ def test_unexpected_application_exception_propagates(
         path: Path,
         **options: object,
     ) -> int:
-        presentation = options["presentation"]
-        assert presentation is not None
-        presentation.begin_request(
-            source_name=str(path),
-            bundle_files=(),
-            script_total=1,
-        )
         raise RuntimeError("unexpected")
 
     monkeypatch.setattr(cli, "run_script_path", fake_run_script_path)

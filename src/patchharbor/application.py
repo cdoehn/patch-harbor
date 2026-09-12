@@ -9,7 +9,9 @@ from pathlib import Path
 import unicodedata
 from typing import TextIO
 
-from patchharbor.progress import activity
+from patchharbor.progress import (
+    PackageFile, RepositoryResolved, RequestStarted, ScriptPrepared, activity, emit,
+)
 
 from patchharbor.apply_mutation import (
     ApplyMutationGate,
@@ -71,7 +73,6 @@ from patchharbor.execution import (
     execute_prepared_script_with_log,
     execute_script_text,
 )
-from patchharbor.identifier_presentation import shorten_identifier
 from patchharbor.locks import registry_lock
 from patchharbor.models import (
     BundleScript,
@@ -95,7 +96,6 @@ from patchharbor.payload_files import (
     validate_bundle_payload_targets,
     write_bundle_payloads,
 )
-from patchharbor.presentation import ConsolePresentation, PresentedFile
 from patchharbor.registration import (
     list_registered_repositories,
     register_local_repository,
@@ -125,7 +125,6 @@ from patchharbor.sources import (
     DirectoryCandidate,
     file_input_artifact,
     list_directory_entries,
-    select_directory_candidate,
     stdin_input_artifact,
 )
 from patchharbor.user_paths import (
@@ -298,7 +297,7 @@ class DiscoveredExchangePatch:
                 directory=self.configuration.exchange_directory,
             )
 
-        activity("REPLAY", f"Record attempted run {shorten_identifier(run_id)} before mutation")
+        activity("REPLAY", f"Record attempted run {str(run_id)} before mutation", identifiers=(str(run_id),))
         mark_exchange_apply_started(
             self.paths,
             self.artifact.identity,
@@ -312,8 +311,8 @@ class DiscoveredExchangePatch:
     def publish_result_digest(self, run_id: str, digest: str) -> None:
         """Persist a byte-exact result receipt before its final publication."""
         assert self.artifact.selection is not None
-        activity("RECEIPT", f"Pin Result SHA-256 {shorten_identifier(digest)} "
-                 f"for run {shorten_identifier(run_id)} before publication")
+        activity("RECEIPT", f"Pin Result SHA-256 {str(digest)} "
+                 f"for run {str(run_id)} before publication", identifiers=(str(digest), str(run_id),))
         record_exchange_result_digest(
             self.paths, self.artifact.identity, self.artifact.selection,
             run_id=run_id, result_sha256=digest,
@@ -499,10 +498,10 @@ def discover_exchange_patch(
             continue
         if not selection.matches_context(context):
             activity("SKIP", f"{artifact.path.name}: repository state does not match "
-                     f"(expected base {shorten_identifier(selection.base_commit)}, "
-                     f"state {shorten_identifier(selection.state_fingerprint)}; "
-                     f"actual base {shorten_identifier(context.base_commit)}, "
-                     f"state {shorten_identifier(context.state_fingerprint)})", "detail")
+                     f"(expected base {str(selection.base_commit)}, "
+                     f"state {str(selection.state_fingerprint)}; "
+                     f"actual base {str(context.base_commit)}, "
+                     f"state {str(context.state_fingerprint)})", "detail", identifiers=(str(selection.base_commit), str(selection.state_fingerprint), str(context.base_commit), str(context.state_fingerprint),))
             continue
         if artifact.apply_status is not None and not (
             scope.allow_failed_retry
@@ -673,7 +672,6 @@ def preflight_patch_package_repository(
     session: RunSession | None = None,
     dry_run: bool = True,
     output: OutputTargets | None = None,
-    presentation: ConsolePresentation | None = None,
     before_mutation: Callable[[], None] | None = None,
 ) -> Iterator[ApplyMutationGate]:
     """Yield the explicit mutation gate while private inputs and locks live."""
@@ -697,18 +695,10 @@ def preflight_patch_package_repository(
             )
             raise report.reported_error() from error
 
-        if presentation is not None:
-            presentation.update_repository(
-                repository_name=str(resolved.repository),
-                repository_context=(
-                    f"repo_id: {shorten_identifier(resolved.repo_id)} · "
-                    f"base: {shorten_identifier(resolved.context.base_commit)} · "
-                    f"state: {shorten_identifier(resolved.context.state_fingerprint)}"
-                ),
-            )
+        emit(RepositoryResolved(resolved.context))
 
-        activity("BINDING", f"Compare full manifest binding: base {shorten_identifier(manifest.base_commit)}, "
-                 f"state {shorten_identifier(manifest.state_fingerprint)}")
+        activity("BINDING", f"Compare full manifest binding: base {str(manifest.base_commit)}, "
+                 f"state {str(manifest.state_fingerprint)}", identifiers=(str(manifest.base_commit), str(manifest.state_fingerprint),))
         if not resolved.matches_manifest_state(manifest):
             activity("BINDING", "Manifest and repository state differ; mutation refused", "error")
             error = state_mismatch_error(
@@ -751,17 +741,15 @@ def preflight_patch_package_repository(
             if output is not None:
                 output.write_warnings(prepared_package.warnings)
 
-            if presentation is not None:
-                presentation.begin_script(
-                    script_name=package.entrypoint.relative_path,
-                    script_index=1,
-                    script_total=1,
-                    messages=tuple(
-                        (message.name, message.text)
-                        for message in prepared_package.entrypoint.script.messages
-                    ),
-                    warnings=prepared_package.warnings,
-                )
+            emit(ScriptPrepared(
+                name=package.entrypoint.relative_path,
+                index=1, total=1,
+                messages=tuple(
+                    (message.name, message.text)
+                    for message in prepared_package.entrypoint.script.messages
+                ),
+                warnings=prepared_package.warnings,
+            ))
 
             yield ApplyMutationGate(
                 session=actual_session,
@@ -779,7 +767,6 @@ def dry_run_patch_package(
     output_directory: Path | None = None,
     output: OutputTargets | None = None,
     session: RunSession | None = None,
-    presentation: ConsolePresentation | None = None,
 ) -> RunReport:
     """Complete one safe dry-run and publish its unchanged Result Bundle."""
     actual_session = session or RunSession.start()
@@ -789,7 +776,6 @@ def dry_run_patch_package(
         session=actual_session,
         dry_run=True,
         output=output,
-        presentation=presentation,
     ) as mutation_gate:
         activity("DRY-RUN", "Validation complete; no payload write or entrypoint execution", "success")
         report = _complete_mutation_result_bundle(
@@ -925,7 +911,6 @@ def apply_patch_package(
     timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
     output: OutputTargets | None = None,
     session: RunSession | None = None,
-    presentation: ConsolePresentation | None = None,
     before_mutation: Callable[[], None] | None = None,
     publish_attempt_outcome: Callable[[bool, GitObjectId | None], None] | None = None,
     before_result_publication: Callable[[str], None] | None = None,
@@ -938,7 +923,6 @@ def apply_patch_package(
         session=actual_session,
         dry_run=False,
         output=output,
-        presentation=presentation,
         before_mutation=before_mutation,
     ) as mutation_gate:
         _require_payload_mutation(
@@ -970,7 +954,6 @@ def run_apply_path(
     timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
     output: OutputTargets | None = None,
     session: RunSession | None = None,
-    presentation: ConsolePresentation | None = None,
     automatic: bool = False,
 ) -> RunReport:
     """Run one Apply request through a single public application boundary."""
@@ -998,31 +981,18 @@ def run_apply_path(
             error=error,
         )
 
-    if presentation is not None:
-        presentation.begin_request(
-            source_name=str(selected_path),
-            repository_name="resolving…",
-            repository_context=(
-                f"repo_id: {shorten_identifier(package.manifest.repo_id)}"
-            ),
-            bundle_files=(
-                PresentedFile(
-                    name=package.entrypoint.relative_path,
-                    size_bytes=len(package.entrypoint.content),
-                    kind="entrypoint",
-                ),
-                *(
-                    PresentedFile(
-                        name=payload.relative_path,
-                        size_bytes=len(payload.content),
-                        kind="payload",
-                    )
-                    for payload in package.payloads
-                ),
-            ),
-            script_total=1,
-            warnings=package.warnings,
-        )
+    emit(RequestStarted(
+        source_name=str(selected_path),
+        requested_repo_id=str(package.manifest.repo_id),
+        files=(
+            PackageFile(package.entrypoint.relative_path,
+                        len(package.entrypoint.content), "entrypoint"),
+            *(PackageFile(payload.relative_path, len(payload.content), "payload")
+              for payload in package.payloads),
+        ),
+        script_total=1,
+        warnings=package.warnings,
+    ))
     if output is not None:
         output.write_warnings(package.warnings)
 
@@ -1033,7 +1003,6 @@ def run_apply_path(
                 output_directory=output_directory,
                 output=output,
                 session=actual_session,
-                presentation=presentation,
             )
         return apply_patch_package(
             package,
@@ -1041,7 +1010,6 @@ def run_apply_path(
             timeout_seconds=timeout_seconds,
             output=output,
             session=actual_session,
-            presentation=presentation,
             before_mutation=(
                 (lambda: discovered.publish_attempt(str(actual_session.run_id)))
                 if discovered is not None
@@ -1125,21 +1093,15 @@ def _execute_bundle_script(
     cwd: Path,
     timeout_seconds: float,
     output: OutputTargets | None = None,
-    presentation: ConsolePresentation | None = None,
 ) -> int:
     parsed_script = parse_script(bundle_script.text)
     script_warnings = parsed_script.warnings
-    if presentation is not None:
-        presentation.begin_script(
-            script_name=bundle_script.display_name,
-            script_index=script_index,
-            script_total=script_total,
-            messages=tuple(
-                (message.name, message.text)
-                for message in parsed_script.messages
-            ),
-            warnings=script_warnings,
-        )
+    emit(ScriptPrepared(
+        name=bundle_script.display_name,
+        index=script_index, total=script_total,
+        messages=tuple((message.name, message.text) for message in parsed_script.messages),
+        warnings=script_warnings,
+    ))
     if output is not None:
         output.write_warnings(script_warnings)
     return execute_script_text(
@@ -1156,25 +1118,16 @@ def run_input_artifact(
     cwd: Path,
     timeout_seconds: float,
     output: OutputTargets | None = None,
-    presentation: ConsolePresentation | None = None,
     resource_policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY,
 ) -> int:
     """Resolve and execute every script in one input artifact."""
     bundle = resolve_patch_bundle(artifact, policy=resource_policy)
-    if presentation is not None:
-        presentation.begin_request(
-            source_name=artifact.display_name,
-            bundle_files=tuple(
-                PresentedFile(
-                    name=payload.relative_path,
-                    size_bytes=len(payload.content),
-                    kind="bundle",
-                )
-                for payload in bundle.payloads
-            ),
-            script_total=len(bundle.scripts),
-            warnings=bundle.warnings,
-        )
+    emit(RequestStarted(
+        source_name=artifact.display_name,
+        files=tuple(PackageFile(payload.relative_path, len(payload.content), "bundle")
+                    for payload in bundle.payloads),
+        script_total=len(bundle.scripts), warnings=bundle.warnings,
+    ))
     if output is not None:
         output.write_warnings(bundle.warnings)
     write_bundle_payloads(bundle.payloads, cwd=cwd)
@@ -1188,7 +1141,6 @@ def run_input_artifact(
             cwd=cwd,
             timeout_seconds=timeout_seconds,
             output=output,
-            presentation=presentation,
         )
         if last_exit_code != 0:
             return last_exit_code
@@ -1201,7 +1153,6 @@ def run_standard_input(
     cwd: Path,
     timeout_seconds: float,
     output: OutputTargets | None = None,
-    presentation: ConsolePresentation | None = None,
     resource_policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY,
 ) -> int:
     """Own the temporary stdin artifact for exactly one runner request."""
@@ -1211,7 +1162,6 @@ def run_standard_input(
             cwd=cwd,
             timeout_seconds=timeout_seconds,
             output=output,
-            presentation=presentation,
             resource_policy=resource_policy,
         )
 
@@ -1251,7 +1201,6 @@ def _run_selected_candidate(
     cwd: Path,
     timeout_seconds: float,
     output: OutputTargets | None = None,
-    presentation: ConsolePresentation | None = None,
     resource_policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY,
 ) -> int:
     if candidate.path.is_symlink() or not candidate.path.is_file():
@@ -1265,7 +1214,6 @@ def _run_selected_candidate(
         cwd=cwd,
         timeout_seconds=timeout_seconds,
         output=output,
-        presentation=presentation,
         resource_policy=resource_policy,
     )
 
@@ -1275,10 +1223,8 @@ def run_script_path(
     *,
     cwd: Path,
     timeout_seconds: float,
-    selection_input: TextIO,
-    selection_output: TextIO,
+    select_candidate: Callable[[tuple[DirectoryCandidate, ...]], DirectoryCandidate] | None = None,
     output: OutputTargets | None = None,
-    presentation: ConsolePresentation | None = None,
     resource_policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY,
 ) -> int:
     """Run a script/ZIP file or select one from a directory."""
@@ -1288,7 +1234,6 @@ def run_script_path(
             cwd=cwd,
             timeout_seconds=timeout_seconds,
             output=output,
-            presentation=presentation,
             resource_policy=resource_policy,
         )
 
@@ -1301,16 +1246,22 @@ def run_script_path(
             f"no PatchHarbor scripts found in directory {path}",
             ExitCode.NO_VALID_SCRIPT,
         )
-    selected = select_directory_candidate(
-        candidates,
-        input_stream=selection_input,
-        output_stream=selection_output,
-    )
+    if len(candidates) == 1:
+        selected = candidates[0]
+    elif select_candidate is None:
+        raise PatchHarborError(
+            "multiple scripts found; an explicit candidate selector is required",
+            ExitCode.USAGE_ERROR,
+        )
+    else:
+        selected = select_candidate(candidates)
+        if selected not in candidates:
+            raise PatchHarborError("selector returned an unknown candidate", ExitCode.USAGE_ERROR)
+    activity("SELECT", f"Selected manual candidate: {selected.display_name}", "success")
     return _run_selected_candidate(
         selected,
         cwd=cwd,
         timeout_seconds=timeout_seconds,
         output=output,
-        presentation=presentation,
         resource_policy=resource_policy,
     )

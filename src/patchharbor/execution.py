@@ -6,7 +6,6 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, replace
 from pathlib import Path
-import sys
 from typing import BinaryIO
 
 from patchharbor.progress import activity
@@ -182,7 +181,7 @@ def execute_prepared_script_with_log(
     output: OutputTargets | None = None,
 ) -> ScriptExecutionResult:
     """Run one private script through the shared process lifecycle and log it."""
-    targets = output or OutputTargets(visible_text_stream=sys.stdout)
+    targets = output or OutputTargets()
     try:
         execution_log = execution_log_path.open("w+b")
     except OSError as exc:
@@ -294,7 +293,7 @@ def _control_process(
             ExitCode.INTERPRETER_ERROR,
         ) from exc
 
-    targets = output or OutputTargets(visible_text_stream=sys.stdout)
+    targets = output or OutputTargets()
     capture = ProcessOutputCapture(
         process_tree.output_stream,
         live_text_stream=targets.live_text_stream,

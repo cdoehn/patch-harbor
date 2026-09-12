@@ -8,7 +8,8 @@ import pytest
 
 from patchharbor.errors import ExitCode, PatchHarborError
 from patchharbor.application import discover_directory_candidates, run_script_path
-from patchharbor.sources import DirectoryCandidate, select_directory_candidate
+from patchharbor.models import DirectoryCandidate
+from patchharbor.presentation import select_directory_candidate
 
 
 REQUIRED_MARKER = "# PATCHHARBOR"
@@ -59,8 +60,6 @@ def test_selection_uses_candidate_data_without_rescanning(tmp_path: Path) -> Non
     )
 
     assert selected is candidates[1]
-    assert "first.sh" in output.getvalue()
-    assert "second.sh" in output.getvalue()
 
 
 class _DeletingInput(StringIO):
@@ -86,9 +85,20 @@ def test_disappeared_selected_file_has_a_clear_source_error(tmp_path: Path) -> N
             tmp_path,
             cwd=tmp_path,
             timeout_seconds=1,
-            selection_input=_DeletingInput(first),
-            selection_output=StringIO(),
+            select_candidate=lambda candidates: select_directory_candidate(
+                candidates, input_stream=_DeletingInput(first), output_stream=StringIO(),
+            ),
         )
 
     assert raised.value.exit_code is ExitCode.SOURCE_ERROR
     assert str(raised.value) == "selected script is no longer available: first.sh"
+
+
+@pytest.mark.parametrize("unknown", [False, True])
+def test_multiple_candidates_require_an_explicit_valid_choice(tmp_path: Path, unknown: bool) -> None:
+    _write_script(tmp_path / "first.sh")
+    _write_script(tmp_path / "second.sh")
+    selector = (lambda candidates: DirectoryCandidate(tmp_path / "outside.sh", 0)) if unknown else None
+    with pytest.raises(PatchHarborError) as raised:
+        run_script_path(tmp_path, cwd=tmp_path, timeout_seconds=1, select_candidate=selector)
+    assert raised.value.exit_code is ExitCode.USAGE_ERROR

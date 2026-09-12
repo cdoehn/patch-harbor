@@ -1,16 +1,58 @@
-"""Request-local observation only; no UI, I/O, decisions or global handlers.
+"""Request-local facts; no terminal, I/O, mutation decisions or global handlers.
 
-Core boundaries emit facts only after/before the corresponding real operation.
-An observer cannot grant permission or change a safety decision. CLI commands
-bind it for their lifetime; library callers are silent by default.
+These internal records deliberately carry complete identifiers and data. The
+CLI's observer owns text/shortening/verbosity. There is no public Python API yet.
 """
 from __future__ import annotations
 
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
+from dataclasses import dataclass
 
-ActivityObserver = Callable[[str, str, str], None]
+from patchharbor.models import RepositoryContext
+
+
+@dataclass(frozen=True, slots=True)
+class ActivityEvent:
+    phase: str
+    message: str
+    level: str = "info"
+    identifiers: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class PackageFile:
+    name: str
+    size_bytes: int
+    kind: str
+
+
+@dataclass(frozen=True, slots=True)
+class RequestStarted:
+    source_name: str
+    files: tuple[PackageFile, ...]
+    script_total: int
+    warnings: tuple[str, ...] = ()
+    requested_repo_id: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class RepositoryResolved:
+    context: RepositoryContext
+
+
+@dataclass(frozen=True, slots=True)
+class ScriptPrepared:
+    name: str
+    index: int
+    total: int
+    messages: tuple[tuple[str, str], ...]
+    warnings: tuple[str, ...] = ()
+
+
+ProgressEvent = ActivityEvent | RequestStarted | RepositoryResolved | ScriptPrepared
+ActivityObserver = Callable[[ProgressEvent], None]
 _observer: ContextVar[ActivityObserver | None] = ContextVar(
     "patchharbor_activity_observer", default=None,
 )
@@ -26,13 +68,20 @@ def observe_activity(observer: ActivityObserver | None) -> Iterator[None]:
         _observer.reset(token)
 
 
-def activity(phase: str, message: str, level: str = "info") -> None:
-    """Report a fact without allowing an optional observer to affect execution."""
+def emit(event: ProgressEvent) -> None:
+    """Publish immutable observations without granting permission to act."""
     observer = _observer.get()
     if observer is not None:
         try:
-            observer(phase, message, level)
+            observer(event)
         except Exception:
-            # Diagnostics must not turn a proven recovery, move, or publication
-            # into a partial operation. Required raw-log I/O keeps its own errors.
+            # Optional observers must not turn a proven recovery, move or
+            # publication into a failed/partial operation. Required raw-log I/O
+            # keeps its independent error handling. Never catch BaseException.
             pass
+
+
+def activity(phase: str, message: str, level: str = "info", *,
+             identifiers: tuple[str, ...] = ()) -> None:
+    """Report a real operation; shortening belongs only to its UI consumer."""
+    emit(ActivityEvent(phase, message, level, identifiers))

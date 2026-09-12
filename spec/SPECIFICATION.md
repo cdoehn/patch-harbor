@@ -2531,7 +2531,7 @@ Empfohlene Verantwortlichkeiten:
 - `interpreters.py` – Interpreter-Whitelist und feste Prozessargumente,
 - `execution.py` – temporäre Skriptdatei, Prozessstart, Timeout und Ergebnis,
 - `run_log.py` – vollständiger Run-Log und strukturierter Run-Bericht,
-- `presentation.py` – Plain-Ausgabe, TUI, Farben und Rolling Buffer,
+- `presentation.py` – kompakte/ausführliche Konsole und CLI-Adapter für neutrale Ereignisse,
 - `identifier_presentation.py` – zentrale Sechs-Zeichen-Darstellung technischer Kennungen,
 - `exchange.py` und `exchange_state.py` – stabile Inhaltsklassifikation, Exchange-Dateiidentität und persistenter Replay-Status einschließlich Run-ID, gepinnter Result-SHA und optionalem Abschlusscommit,
 - `exchange_recovery.py` – koordinierte Beweisprüfung unter Repository-/Registry-/State-Locks vor normaler Archivierung; keine PID-Heuristik und kein Rollback,
@@ -3145,3 +3145,21 @@ Skriptausgabe oder Rohlogs eingefügt. JSON bleibt ohne menschliche Zusatzdaten.
 Farben, kurze menschliche Kennungen und vorhandene Exitcode-Verträge bleiben.
 Kleine bisher kompakte Konfigurations-/Kontextbefehle erhalten Detailbeobachtung
 nur bei --verbose. Es werden keine automatisierten Konsolenausgabetests ergänzt.
+
+
+## 30. Neutrale Application-Beobachtung (OFF-PLAN COMPACT-CORE)
+
+Application kennt keine ConsolePresentation, PresentedFile oder Konsolenparameter.
+RequestStarted, RepositoryResolved und ScriptPrepared sind unveränderliche
+interne Fakten. Repository-Kennungen bleiben vollständig. Aktivitätsereignisse
+markieren Identifikatoren für die optionale Kürzung ausschließlich im UI-Adapter.
+Die CLI bindet den Beobachter an den Request; verschachtelte und parallele
+Aufrufe dürfen keinen Beobachterzustand verlieren oder teilen.
+
+Ein fehlender Beobachter ist still. Ein optionaler Beobachterfehler verändert
+keine Entscheidung; KeyboardInterrupt bleibt ausdrücklich nicht unterdrückt.
+Skriptausgabe erfordert ein explizites Ausgabeziel und wird unabhängig erfasst.
+Interaktive Dateiauswahl gehört zur CLI; Application akzeptiert nur eine explizite
+Auswahlfunktion und prüft deren Ergebnis gegen die angebotenen Kandidaten.
+Mehrere Kandidaten ohne Auswahlfunktion ergeben einen Fehler statt eines Prompts.
+Noch keine öffentliche Python-API und keine neue Versionsnummer.
