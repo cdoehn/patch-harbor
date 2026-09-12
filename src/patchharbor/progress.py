@@ -1,7 +1,8 @@
 """Request-local facts; no terminal, I/O, mutation decisions or global handlers.
 
 These internal records deliberately carry complete identifiers and data. The
-CLI's observer owns text/shortening/verbosity. There is no public Python API yet.
+CLI's observer owns text/shortening/verbosity. Public callers use the event
+exports and explicit observer parameter of patchharbor.api.
 """
 from __future__ import annotations
 

@@ -3162,7 +3162,8 @@ Skriptausgabe erfordert ein explizites Ausgabeziel und wird unabhängig erfasst.
 Interaktive Dateiauswahl gehört zur CLI; Application akzeptiert nur eine explizite
 Auswahlfunktion und prüft deren Ergebnis gegen die angebotenen Kandidaten.
 Mehrere Kandidaten ohne Auswahlfunktion ergeben einen Fehler statt eines Prompts.
-Noch keine öffentliche Python-API und keine neue Versionsnummer.
+Dieser Vorbereitungsstand führte noch keine öffentliche Python-API oder neue
+Versionsnummer ein; die additive Weiterentwicklung folgt in Abschnitt 32.
 
 
 ## 31. Fachliche Fehler und kompatible Statuscodes (OFF-PLAN COMPACT-CORE)
@@ -3180,3 +3181,12 @@ fehlgeschlagenem Result ergibt den bisherigen Result-Bundle-Fehlerstatus.
 Native Skript-Exitcodes sind Prozessdaten, keine PatchHarbor-Fehlerkategorien.
 Insbesondere darf ein Skript-Exit 124 oder 130 nicht als Tool-Timeout bzw.
 Tool-Unterbrechung umgedeutet werden. Version und öffentliche CLI bleiben gleich.
+
+
+## 32. Entwicklung der öffentlichen Python-API 1.2.0
+
+Der additive Vertrag steht in `planning/1.2.0/specification.md`; der Ablauf in
+`planning/1.2.0/commit-plan.md`, die Imports und Anwendungsbeispiele in
+`docs/python-api.md`. API und später CLI/Watcher verwenden dieselbe Application.
+Paketversion und bisherige Wire-Verträge bleiben bis zum Release-Schritt gleich.
+API-Ergebnisse verwenden vollständige Kennungen; keine Textausgabe wird geparst.

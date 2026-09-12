@@ -955,6 +955,7 @@ def run_apply_path(
     output: OutputTargets | None = None,
     session: RunSession | None = None,
     automatic: bool = False,
+    current_directory: Path | None = None,
 ) -> RunReport:
     """Run one Apply request through a single public application boundary."""
     actual_session = session or RunSession.start()
@@ -964,7 +965,9 @@ def run_apply_path(
             scope = (
                 _automatic_exchange_discovery_scope()
                 if automatic
-                else _manual_exchange_discovery_scope(Path.cwd())
+                else _manual_exchange_discovery_scope(
+                    Path.cwd() if current_directory is None else current_directory
+                )
             )
             discovered = discover_exchange_patch(scope, archive=not dry_run, output=output)
             selected_path = discovered.artifact.path

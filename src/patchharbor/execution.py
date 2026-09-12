@@ -171,6 +171,36 @@ def _execution_log_error(exc: OSError) -> PatchHarborError:
     )
 
 
+class _ExecutionLogTee:
+    """Keep the mandatory log complete even when an optional raw sink fails."""
+
+    def __init__(self, log: BinaryIO, caller: BinaryIO) -> None:
+        self.log = log
+        self.caller = caller
+        self.caller_error: Exception | None = None
+
+    def write(self, data: bytes) -> int:
+        written = self.log.write(data)
+        if written != len(data):
+            raise OSError("short write to execution log")
+        if self.caller_error is None:
+            try:
+                count = self.caller.write(data)
+                if count is not None and count != len(data):
+                    raise OSError("short write to caller raw output")
+            except Exception as exc:
+                self.caller_error = exc
+        return written
+
+    def flush(self) -> None:
+        self.log.flush()
+        if self.caller_error is None:
+            try:
+                self.caller.flush()
+            except Exception as exc:
+                self.caller_error = exc
+
+
 def execute_prepared_script_with_log(
     script_path: Path,
     *,
@@ -192,6 +222,10 @@ def execute_prepared_script_with_log(
         )
 
     result: ScriptExecutionResult | None = None
+    raw_destination = (
+        execution_log if targets.raw_output_stream is None
+        else _ExecutionLogTee(execution_log, targets.raw_output_stream)
+    )
     try:
         result = _run_staged_script(
             script_path,
@@ -201,12 +235,17 @@ def execute_prepared_script_with_log(
             timeout_seconds=timeout_seconds,
             output=replace(
                 targets,
-                raw_output_stream=execution_log,
+                raw_output_stream=raw_destination,
             ),
         )
 
         try:
             result = result.with_output(_read_execution_log(execution_log))
+            if isinstance(raw_destination, _ExecutionLogTee) and raw_destination.caller_error is not None:
+                result = result.with_cleanup_error(PatchHarborError(
+                    f"cannot write caller raw output: {raw_destination.caller_error}",
+                    FailureReason.EXECUTION_ERROR,
+                ))
         except OSError as exc:
             result = result.with_cleanup_error(_execution_log_error(exc))
     finally:

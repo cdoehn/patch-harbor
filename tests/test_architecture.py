@@ -16,6 +16,7 @@ PACKAGE_ROOTS = {
 
 ENTRYPOINT_MODULES = {
     "patchharbor.cli",
+    "patchharbor.api",
     "patchharbor_watcher",
     "patchharbor_watcher.cli",
 }
@@ -209,7 +210,7 @@ def test_application_is_the_only_core_workflow_orchestrator() -> None:
         for module, dependencies in graph.items()
         if "patchharbor.application" in dependencies
     }
-    assert application_users == {"patchharbor.cli"}
+    assert application_users == {"patchharbor.cli", "patchharbor.api"}
 
 
 def test_cli_composes_public_boundaries_without_domain_orchestration() -> None:
@@ -532,3 +533,18 @@ def test_domain_errors_and_application_do_not_depend_on_cli_statuses() -> None:
                        for n in ast.walk(tree))
     assert "patchharbor.exit_status" in graph["patchharbor.cli"]
     assert "patchharbor.exit_status" in graph["patchharbor.run_report"]
+
+
+def test_public_api_does_not_invoke_cli_or_duplicate_core_workflows() -> None:
+    graph = _dependency_graph()
+    dependencies = graph["patchharbor.api"]
+    assert "patchharbor.application" in dependencies
+    assert not _forbidden_dependencies(dependencies, {
+        "patchharbor.cli", "patchharbor.presentation", "patchharbor.exchange*",
+        "patchharbor.apply_*", "patchharbor.git_*", "patchharbor.registry",
+        "patchharbor_watcher*",
+    })
+    source = _runtime_modules()["patchharbor.api"].read_text(encoding="utf-8")
+    assert "os.chdir(" not in source
+    assert "sys.exit(" not in source
+    assert "subprocess" not in _import_roots(_runtime_modules()["patchharbor.api"])

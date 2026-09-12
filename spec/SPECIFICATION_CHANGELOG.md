@@ -387,3 +387,12 @@ interaktive Verzeichnisauswahl aus Core in den CLI-Adapter verschoben.
 Fachliche FailureReason-Daten und neutrale Ergebnisentscheidungen; eine gemeinsame
 kompatible Zahlenabbildung für CLI und vorhandene JSON-/Result-Serializer.
 Skript-Exitcodes, Prioritäten, Replay-/Recovery-Daten und Versionsnummer unverändert.
+
+
+## 1.2.0 Entwicklung – API-1 (noch kein Release)
+
+Öffentliche synchrone API als additive Fassade eingeführt. Repository/Run-Werte
+werden wiederverwendet, Bibliotheksaufrufe sind standardmäßig still. Explizite
+Streams, vollständige Ereignisse und Eingabeprüfung dokumentiert. Die
+obligatorische Result-Protokollierung bleibt von optionalen Rohsenken getrennt.
+Aktiver Plan: `planning/1.2.0/commit-plan.md`.

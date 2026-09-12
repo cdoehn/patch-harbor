@@ -589,3 +589,16 @@ existing JSON/Result serializers. Numeric schemas and exit priorities remain
 unchanged. Child-process exit codes remain actual process data, including values
 such as 124 or 130; they are not mistaken for PatchHarbor timeout/interruption.
 The Application makes decisions from semantic outcomes, not serialized statuses.
+
+
+## Python-Bibliothek – Entwicklung Richtung 1.2.0
+
+`from patchharbor import api` stellt Konfiguration, Registry, Kontext, Bundles,
+Apply/Dry-Run, den automatischen Einzelpoll und den expliziten Skriptrunner bereit.
+Die Aufrufe bleiben ohne explizite Streams/Beobachter still und liefern typisierte
+Resultate bzw. fachliche Fehler. Kein CLI-Subprozess ist erforderlich.
+
+Der vollständige Vertrag mit Beispielen steht in [docs/python-api.md](docs/python-api.md).
+[Plan](planning/1.2.0/commit-plan.md) und [Spec](planning/1.2.0/specification.md)
+trennen Bibliotheksgrenze, CLI, Watcher und den späteren Release-Schritt.
+Die Paketversion bleibt bis dahin 1.1.1; dies ist noch kein 1.2.0-Release.

@@ -650,3 +650,25 @@ def test_execution_plain_mode_streams_all_lines_without_bounded_replay(
         f"plain-{number}\n" for number in range(1, 13)
     )
     assert bounded_destination.getvalue() == ""
+
+
+@pytest.mark.parametrize("failure", ["write", "short-write", "flush"])
+def test_optional_raw_mirror_failure_keeps_recording_mandatory_log(failure: str) -> None:
+    class FailingRaw:
+        def write(self, data: bytes) -> int:
+            if failure == "write":
+                raise OSError("sink write failed")
+            return 0 if failure == "short-write" else len(data)
+
+        def flush(self) -> None:
+            if failure == "flush":
+                raise OSError("sink flush failed")
+
+    mandatory = io.BytesIO()
+    tee = execution._ExecutionLogTee(mandatory, FailingRaw())
+    for data in (b"first\n", b"second\n", b"final\x00\xff"):
+        assert tee.write(data) == len(data)
+        tee.flush()
+    assert mandatory.getvalue() == b"first\nsecond\nfinal\x00\xff"
+    assert isinstance(tee.caller_error, OSError)
+    assert not mandatory.closed
