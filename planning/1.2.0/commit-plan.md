@@ -16,7 +16,8 @@ Gates des jeweiligen Pakets. Keine automatische Rückabwicklung bei Teilfehlern.
 2. **API-2** – `refactor(cli): route all commands through public Python API`
    Gesamte Haupt-CLI über API führen, kompatible Darstellung/JSON/Exitcodes,
    fachliche Adapter- und Architekturgates, vollständige Suite vor Commit.
-   Status: offen.
+   Status: in diesem Schritt implementiert; Commit erst nach vollständiger lokaler
+   Suite. API-1 und API-2 bilden ein gemeinsames Zwei-Commit-Paket.
 3. **API-3** – `refactor(watcher): use public Python API`
    Watcher-Konfiguration und automatischen Poll migrieren; Prozess-/Signal-
    Verhalten und Betriebsprotokolle gesondert absichern.

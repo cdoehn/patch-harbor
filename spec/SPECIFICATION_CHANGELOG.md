@@ -396,3 +396,12 @@ werden wiederverwendet, Bibliotheksaufrufe sind standardmäßig still. Explizite
 Streams, vollständige Ereignisse und Eingabeprüfung dokumentiert. Die
 obligatorische Result-Protokollierung bleibt von optionalen Rohsenken getrennt.
 Aktiver Plan: `planning/1.2.0/commit-plan.md`.
+
+
+## 1.2.0 Entwicklung – API-2 (noch kein Release)
+
+Alle fachlichen Haupt-CLI-Aufrufe laufen über patchharbor.api. Der CLI-Adapter
+übergibt Beobachter und Streams explizit, ohne Application oder OutputTargets
+zu importieren. Bestehende JSON-/Result-Formate und Statuscodes bleiben erhalten.
+Nichtendliche CLI-Timeouts werden als ungültige Argumente abgewiesen. Der
+Watcher-Prozess-/Signalvertrag bleibt bis zum eigenen Schritt unverändert.

@@ -16,7 +16,6 @@ PACKAGE_ROOTS = {
 
 ENTRYPOINT_MODULES = {
     "patchharbor.cli",
-    "patchharbor.api",
     "patchharbor_watcher",
     "patchharbor_watcher.cli",
 }
@@ -210,13 +209,16 @@ def test_application_is_the_only_core_workflow_orchestrator() -> None:
         for module, dependencies in graph.items()
         if "patchharbor.application" in dependencies
     }
-    assert application_users == {"patchharbor.cli", "patchharbor.api"}
+    assert application_users == {"patchharbor.api"}
 
 
 def test_cli_composes_public_boundaries_without_domain_orchestration() -> None:
     dependencies = _dependency_graph()["patchharbor.cli"]
-    assert "patchharbor.application" in dependencies
+    assert "patchharbor.api" in dependencies
     forbidden = {
+        "patchharbor.application",
+        "patchharbor.output",
+        "patchharbor.progress",
         "patchharbor.apply_mutation",
         "patchharbor.apply_preflight",
         "patchharbor.apply_repository",

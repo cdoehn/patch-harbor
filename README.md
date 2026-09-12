@@ -602,3 +602,6 @@ Der vollständige Vertrag mit Beispielen steht in [docs/python-api.md](docs/pyth
 [Plan](planning/1.2.0/commit-plan.md) und [Spec](planning/1.2.0/specification.md)
 trennen Bibliotheksgrenze, CLI, Watcher und den späteren Release-Schritt.
 Die Paketversion bleibt bis dahin 1.1.1; dies ist noch kein 1.2.0-Release.
+
+Die Haupt-CLI verwendet bereits diese API für alle fachlichen Operationen.
+Der separate Watcher bleibt bis zu seinem eigenen Migrationsschritt unverändert.

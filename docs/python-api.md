@@ -135,9 +135,13 @@ child. Separate child stdout/stderr are not available from the current Core.
 `raw` receives the exact merged bytes. `warnings` is a separate text sink;
 `on_warning` receives warning strings. Sinks stay caller-owned and are not closed.
 They are flushed as data arrives; text/raw delivery can occur on the reader
-thread. A failed sink is an execution error, but a failed optional raw mirror
-cannot stop the mandatory Apply log from being recorded. No automatic unbounded
-`StringIO` buffer is allocated. Explicit sink contents are not console-sanitized.
+thread. Sink failures are reported under the existing execution-failure priority:
+a prior timeout, interruption or nonzero child exit keeps its primary status.
+A failed optional raw mirror cannot stop the mandatory Apply log from being
+recorded. No automatic unbounded
+`StringIO` buffer is allocated by the facade. Existing Core capture of Apply
+logs for the Result Bundle remains unchanged, so this is not a bounded-memory
+guarantee for an entire Apply. Explicit sink contents are not console-sanitized.
 
 `observer` receives `ActivityEvent`, `RequestStarted`, `RepositoryResolved`, and
 `ScriptPrepared`. Full identifiers are retained. `ScriptPrepared.messages`
@@ -180,3 +184,14 @@ and the events/callback aliases. Construct configuration/repository/run results
 only by calling operations; read their documented facts. Implementation imports
 and undocumented construction/serializer helpers are not an additional public
 extension surface. GUI, async, transport and plugin frameworks are out of scope.
+
+
+## CLI migration status
+
+The main `patchharbor` CLI now calls this API for every operation, including
+configuration, registry, context, bundles, Apply/Dry-Run, automatic Apply and
+fs-run. It passes its observer and sinks explicitly. JSON serializers,
+exit-code mapping, terminal styling, interactive selection and temporary `--log`
+files remain adapter concerns. The separate watcher still invokes that CLI in a
+subprocess until API-3; this already reaches the API indirectly without changing
+its process or stop semantics in this package.

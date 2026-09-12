@@ -5,36 +5,21 @@ from __future__ import annotations
 import argparse
 from collections.abc import Callable, Iterator, Sequence
 from contextlib import contextmanager, nullcontext
-from io import StringIO
+import math
 from pathlib import Path
 import sys
 from typing import Any, BinaryIO, TextIO
 
 from patchharbor import __version__
-from patchharbor.application import (
-    bundle_repository,
-    configure_archive_directory,
-    configure_bundle_suffix,
-    configure_exchange_directory,
-    register_repository,
-    registered_repositories,
-    repository_context,
-    run_apply_path,
-    run_script_path,
-    run_standard_input,
-    shared_configuration,
-    unregister_repository,
+import patchharbor.api as api
+from patchharbor.api import (
+    DEFAULT_TIMEOUT_SECONDS, PatchHarborError, ResultBundleStatus, RunReport,
 )
 from patchharbor.context_output import context_json_result, write_context_block
-from patchharbor.errors import (
-    PatchHarborError,
-    format_tool_message,
-)
+from patchharbor.errors import format_tool_message
 from patchharbor.exit_status import ExitCode, exit_code_for_error
-from patchharbor.execution import DEFAULT_TIMEOUT_SECONDS
 from patchharbor.identifier_presentation import shorten_identifier
 from patchharbor.json_document import serialize_json_document
-from patchharbor.output import OutputTargets
 from patchharbor.platform.errors import describe_os_error
 from patchharbor.presentation import (
     PresentedCompletion,
@@ -43,11 +28,8 @@ from patchharbor.presentation import (
     StreamingConsole,
     select_directory_candidate,
 )
-from patchharbor.progress import observe_activity
 from patchharbor.run_log import temporary_run_log
 from patchharbor.run_report import (
-    ResultBundleStatus,
-    RunReport,
     physical_absolute_path_text,
     sanitize_structured_text,
 )
@@ -90,8 +72,8 @@ def _positive_seconds(value: str) -> float:
         seconds = float(value)
     except ValueError as exc:
         raise argparse.ArgumentTypeError("must be a number") from exc
-    if seconds <= 0:
-        raise argparse.ArgumentTypeError("must be greater than zero")
+    if not math.isfinite(seconds) or seconds <= 0:
+        raise argparse.ArgumentTypeError("must be finite and greater than zero")
     return seconds
 
 
@@ -496,10 +478,11 @@ def _configure_exchange_directory_command(
         with _console_scope(
             stdout, stderr=stderr, enabled=verbose,
             color_enabled=not no_color, plain=force_plain, verbose=verbose,
-        ):
-            configuration_path, configuration = configure_exchange_directory(
-                directory
+        ) as console:
+            configuration = api.configure_exchange_directory(
+                directory, observer=_progress_observer(console),
             )
+            configuration_path = configuration.path
     except PatchHarborError as exc:
         print(format_tool_message(str(exc)), file=stderr)
         return int(exit_code_for_error(exc))
@@ -527,8 +510,9 @@ def _configure_bundle_suffix_command(
         with _console_scope(
             stdout, stderr=stderr, enabled=verbose,
             color_enabled=not no_color, plain=force_plain, verbose=verbose,
-        ):
-            configuration_path, configuration = configure_bundle_suffix(suffix)
+        ) as console:
+            configuration = api.configure_bundle_suffix(suffix, observer=_progress_observer(console))
+            configuration_path = configuration.path
     except PatchHarborError as exc:
         print(format_tool_message(str(exc)), file=stderr)
         return int(exit_code_for_error(exc))
@@ -552,8 +536,9 @@ def _configure_archive_directory_command(
         with _console_scope(
             stdout, stderr=stderr, enabled=verbose,
             color_enabled=not no_color, plain=force_plain, verbose=verbose,
-        ):
-            configuration_path, configuration = configure_archive_directory(name)
+        ) as console:
+            configuration = api.configure_archive_directory(name, observer=_progress_observer(console))
+            configuration_path = configuration.path
     except PatchHarborError as exc:
         print(format_tool_message(str(exc)), file=stderr)
         return int(exit_code_for_error(exc))
@@ -577,8 +562,9 @@ def _configure_show_command(
         with _console_scope(
             stdout, stderr=stderr, enabled=verbose,
             color_enabled=not no_color, plain=force_plain, verbose=verbose,
-        ):
-            configuration_path, configuration = shared_configuration()
+        ) as console:
+            configuration = api.configuration(observer=_progress_observer(console))
+            configuration_path = configuration.path
     except PatchHarborError as exc:
         print(format_tool_message(str(exc)), file=stderr)
         return int(exit_code_for_error(exc))
@@ -607,10 +593,9 @@ def _register_command(
         with _console_scope(
             stdout, stderr=stderr, enabled=verbose,
             color_enabled=not no_color, plain=force_plain, verbose=verbose,
-        ):
-            context = register_repository(
-                path or Path.cwd(),
-                new_id=new_id,
+        ) as console:
+            context = api.register(
+                path or Path.cwd(), new_id=new_id, observer=_progress_observer(console),
             )
     except PatchHarborError as exc:
         print(format_tool_message(str(exc)), file=stderr)
@@ -685,8 +670,8 @@ def _registry_list_command(
         with _console_scope(
             stdout, stderr=stderr, enabled=verbose and not json_output,
             color_enabled=not no_color, plain=force_plain, verbose=verbose,
-        ):
-            result = registered_repositories()
+        ) as console:
+            result = api.repositories(observer=_progress_observer(console))
     except PatchHarborError as exc:
         exit_code = int(exit_code_for_error(exc))
         if json_output:
@@ -738,8 +723,8 @@ def _context_command(
         with _console_scope(
             stdout, stderr=stderr, enabled=verbose and not json_output,
             color_enabled=not no_color, plain=force_plain, verbose=verbose,
-        ):
-            context = repository_context(path or Path.cwd())
+        ) as console:
+            context = api.context(path or Path.cwd(), observer=_progress_observer(console))
     except PatchHarborError as exc:
         exit_code = int(exit_code_for_error(exc))
         if json_output:
@@ -838,9 +823,10 @@ def _bundle_command(
     no_color: bool = False,
 ) -> int:
     try:
-        with _console_scope(stdout, stderr=stderr, enabled=not json_output, color_enabled=not no_color, plain=force_plain, verbose=verbose):
-            result = bundle_repository(
+        with _console_scope(stdout, stderr=stderr, enabled=not json_output, color_enabled=not no_color, plain=force_plain, verbose=verbose) as console:
+            result = api.bundle(
                 path or Path.cwd(), output_directory=output_directory,
+                observer=_progress_observer(console),
             )
     except PatchHarborError as exc:
         exit_code = int(exit_code_for_error(exc))
@@ -922,33 +908,33 @@ def _console_scope(
         ) if enabled else None
     )
     try:
-        with observe_activity(None if console is None else console.observe):
-            if console is not None:
-                console.activity("PATCHHARBOR", "Starting request", "heading")
-            yield console
+        if console is not None:
+            console.activity("PATCHHARBOR", "Starting request", "heading")
+        yield console
     finally:
         if console is not None:
             console.close()
 
 
-def _output_targets_for_presentation(
+def _progress_observer(console: StreamingConsole | None) -> api.ProgressObserver | None:
+    """Pass this invocation's presentation explicitly through the API boundary."""
+    return None if console is None else console.observe
+
+
+def _output_streams_for_presentation(
     *, visible_stdout: TextIO, visible_stderr: TextIO,
     console: StreamingConsole | None, suppress_visible_output: bool = False,
     raw_output_stream: BinaryIO | None = None,
     warning_observer: Callable[[str], None] | None = None,
-) -> OutputTargets:
+) -> api.OutputStreams:
     """Keep machine JSON and raw bytes separate from human streaming output."""
     if suppress_visible_output:
-        return OutputTargets(
-            visible_text_stream=StringIO(), raw_output_stream=raw_output_stream,
-            warning_observer=warning_observer,
-        )
-    return OutputTargets(
-        visible_text_stream=visible_stdout,
-        live_text_stream=visible_stdout if console is None else console.child_stream,
-        raw_output_stream=raw_output_stream,
-        warning_text_stream=visible_stderr if console is None else console.warning_stream,
-        warning_observer=warning_observer,
+        return api.OutputStreams(raw=raw_output_stream, on_warning=warning_observer)
+    return api.OutputStreams(
+        text=visible_stdout if console is None else console.child_stream,
+        raw=raw_output_stream,
+        warnings=visible_stderr if console is None else console.warning_stream,
+        on_warning=warning_observer,
     )
 
 
@@ -976,21 +962,25 @@ def _apply_command(
         plain=force_plain,
         verbose=verbose,
     ) as console:
-        output = _output_targets_for_presentation(
+        output = _output_streams_for_presentation(
             visible_stdout=visible_stdout,
             visible_stderr=visible_stderr,
             console=console,
             suppress_visible_output=json_output,
         )
         try:
-            report = run_apply_path(
-                path,
-                dry_run=dry_run,
-                timeout_seconds=timeout_seconds,
-                output_directory=output_directory,
-                output=output,
-                automatic=automatic,
-            )
+            if automatic:
+                report = api.apply_next(
+                    dry_run=dry_run, timeout=timeout_seconds,
+                    output_directory=output_directory, output=output,
+                    observer=_progress_observer(console),
+                )
+            else:
+                report = api.apply(
+                    path, dry_run=dry_run, timeout=timeout_seconds,
+                    output_directory=output_directory, output=output,
+                    observer=_progress_observer(console),
+                )
         except OSError as exc:
             operation = (
                 "cannot render terminal console"
@@ -1057,11 +1047,11 @@ def _unregister_command(
         with _console_scope(
             stdout, stderr=stderr, enabled=verbose,
             color_enabled=not no_color, plain=force_plain, verbose=verbose,
-        ):
-            repo_id, repository_path = unregister_repository(
-                selector,
-                cwd=Path.cwd(),
+        ) as console:
+            result = api.unregister(
+                selector, cwd=Path.cwd(), observer=_progress_observer(console),
             )
+            repo_id, repository_path = result.repo_id, result.repository_path
     except PatchHarborError as exc:
         print(format_tool_message(str(exc)), file=stderr)
         return int(exit_code_for_error(exc))
@@ -1078,33 +1068,20 @@ def _execute_request(
     timeout_seconds: float,
     stdin: TextIO,
     stdout: TextIO,
-    output: OutputTargets,
+    output: api.OutputStreams,
     console: StreamingConsole | None,
 ) -> tuple[int, str | None]:
     try:
-        if path is not None:
-            return (
-                run_script_path(
-                    path,
-                    cwd=cwd,
-                    timeout_seconds=timeout_seconds,
-                    select_candidate=lambda candidates: select_directory_candidate(
-                        candidates, input_stream=stdin,
-                        output_stream=(stdout if console is None else console.selection_stream),
-                    ),
-                    output=output,
-                    ),
-                None,
-            )
-        return (
-            run_standard_input(
-                stdin,
-                cwd=cwd,
-                timeout_seconds=timeout_seconds,
-                output=output,
+        result = api.run(
+            path if path is not None else stdin,
+            cwd=cwd, timeout=timeout_seconds,
+            select_candidate=lambda candidates: select_directory_candidate(
+                candidates, input_stream=stdin,
+                output_stream=(stdout if console is None else console.selection_stream),
             ),
-            None,
+            output=output, observer=_progress_observer(console),
         )
+        return result.exit_code, None
     except PatchHarborError as exc:
         return int(exit_code_for_error(exc)), str(exc)
 
@@ -1151,7 +1128,7 @@ def _run_command(
                         timeout_seconds=timeout_seconds,
                     )
 
-                output = _output_targets_for_presentation(
+                output = _output_streams_for_presentation(
                     visible_stdout=stdout,
                     visible_stderr=stderr,
                     console=console,

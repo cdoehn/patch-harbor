@@ -8,7 +8,6 @@ import pytest
 
 import patchharbor.cli as cli
 from patchharbor.cli import main
-from patchharbor.output import OutputTargets
 from patchharbor.run_report import ResultBundleStatus
 
 
@@ -86,14 +85,16 @@ def test_parameterless_apply_propagates_manual_or_automatic_origin(
     observed: list[tuple[Path | None, bool]] = []
     report = SimpleNamespace(warnings=())
 
-    def fake_run_apply_path(
-        path: Path | None,
-        **options: object,
-    ) -> object:
-        observed.append((path, bool(options["automatic"])))
+    def fake_apply(path=None, **options):
+        observed.append((path, False))
         return report
 
-    monkeypatch.setattr(cli, "run_apply_path", fake_run_apply_path)
+    def fake_apply_next(**options):
+        observed.append((None, True))
+        return report
+
+    monkeypatch.setattr(cli.api, "apply", fake_apply)
+    monkeypatch.setattr(cli.api, "apply_next", fake_apply_next)
     monkeypatch.setattr(
         cli,
         "_write_apply_completion",
@@ -147,7 +148,7 @@ def test_keyboard_interrupt_returns_130(
     ) -> int:
         raise KeyboardInterrupt
 
-    monkeypatch.setattr(cli, "run_script_path", fake_run_script_path)
+    monkeypatch.setattr(cli.api, "run", fake_run_script_path)
 
     result = main(
         ["fs", "run", "--no-color", str(tmp_path / "script.sh")],
@@ -172,7 +173,7 @@ def test_unexpected_application_exception_propagates(
     ) -> int:
         raise RuntimeError("unexpected")
 
-    monkeypatch.setattr(cli, "run_script_path", fake_run_script_path)
+    monkeypatch.setattr(cli.api, "run", fake_run_script_path)
 
     with pytest.raises(RuntimeError, match="unexpected"):
         main(
@@ -195,7 +196,7 @@ def test_output_os_error_returns_execution_error(
     ) -> int:
         raise PermissionError("native platform wording")
 
-    monkeypatch.setattr(cli, "run_script_path", fake_run_script_path)
+    monkeypatch.setattr(cli.api, "run", fake_run_script_path)
 
     result = main(
         ["fs", "run", "--plain", str(tmp_path / "script.sh")],
