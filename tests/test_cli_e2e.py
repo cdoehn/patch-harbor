@@ -636,11 +636,12 @@ def test_timeout_stops_the_complete_child_process_tree(
         encoding="utf-8",
     )
 
+    timeout_seconds = "10.0" if os.name == "nt" else "1.5"
     completed = _run_patchharbor(
         script_path,
         tmp_path,
         "--timeout",
-        "1.5",
+        timeout_seconds,
     )
     child_pid: int | None = None
     grandchild_pid: int | None = None
