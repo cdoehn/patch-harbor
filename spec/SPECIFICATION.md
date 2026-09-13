@@ -2744,7 +2744,7 @@ Mindestens zusätzlich zu prüfen sind:
 - Spezifikation ist fachlicher Vertrag, Commit-Plan ist die geplante Zerlegung; Scope-Erweiterungen werden nicht stillschweigend vorgenommen,
 - blockierende Widersprüche erzeugen die standardisierte STOP-Ausgabe und kein Patch-Paket,
 - nicht blockierende Auffälligkeiten erzeugen die standardisierte WARNING-Ausgabe,
-- die schmale Patch-Bereit-UI beginnt und endet exakt mit `🟩🟩 PATCH BEREIT 🟩🟩`,
+- pro Patch-Auftrag gibt es eine finale Auslieferung mit genau einer grünen Bereitschaftszeile und einer kanonischen ZIP,
 - `PATCH BEREIT` erscheint erst, wenn genau ein herunterladbares Patch-Paket tatsächlich erzeugt wurde,
 - vor lokaler Ausführung werden geplante Tests nicht fälschlich als erfolgreich dargestellt,
 - zurückgegebene `logs/run.json` und `logs/execution.log` werden für Erfolg oder Reparatur ausgewertet,
@@ -3024,9 +3024,52 @@ Nach der Codezeile folgen höchstens eine kurze Erklärung und eine konkrete ben
 
 ### 26.8 Verbindliche schmale Patch-Bereit-UI
 
-Die Patch-Bereit-Ausgabe ist smartphone-tauglich, verwendet keine Tabelle und folgt immer derselben Reihenfolge. Sie beginnt und endet exakt mit derselben grünen Zeile. Die letzte Zeile der gesamten Antwort ist die zweite `PATCH BEREIT`-Zeile.
+Verwende eine smartphone-taugliche, schmale Darstellung ohne Tabelle.
+Pro Patch-Auftrag gibt es genau eine finale Auslieferung und genau eine
+kanonische ZIP. Die Antwort beginnt einmal mit der grünen Bereitschaftszeile;
+es gibt keine zweite Bereitschaftszeile am Ende und keine zweite Fertigmeldung.
+Entwürfe und interne Neubauten werden nicht als fertig angekündigt.
 
-Verbindliches Beispiel für einen Plan-Commit:
+Vor der finalen Antwort gilt diese Reihenfolge:
+
+1. Paket vollständig erstellen, tatsächlich öffnen und validieren. Erst danach
+   die kanonische ZIP festlegen: Dateiname, Größe und vollständige SHA-256.
+   Ab jetzt weder neu packen noch je Kanal eine andere Fassung erzeugen.
+2. Einen existierenden Chat-Download-Link zu genau dieser Datei vorbereiten.
+   Kein Link wird aus einem Dateinamen oder einer früheren Behauptung erfunden.
+3. Verfügbare, autorisierte Google-Drive-Werkzeuge prüfen. Wenn möglich dieselbe
+   byteidentische Datei privat in `PatchHarbor-Backups/Patches` sichern; einen
+   passenden vorhandenen Ordner wiederverwenden. Keine öffentliche Freigabe
+   und keine fremden Empfänger ohne Auftrag. Den echten zurückgegebenen Link
+   bereitstellen. Ein Backup nur nach bestätigtem Upload melden; Bytegleichheit
+   nur nach SHA-256-Abgleich durch Rücklesen oder Anbieter-Prüfsumme behaupten.
+4. Verfügbare Gmail-Werkzeuge prüfen und die eigene Empfängeradresse aus dem
+   angemeldeten Konto auflösen, nicht aus Erinnerung erraten. Dieselbe ZIP an
+   den Benutzer selbst senden, mit Dateiname, SHA-256 und vorhandenem Drive-Link.
+   Verhindern Größen- oder Dateitypgrenzen den Anhang, stattdessen den bestätigten
+   Drive-Link mit Dateiname und SHA-256 mailen. Keine Schutzgrenze umgehen.
+   Ohne nutzbaren Anhang oder Drive-Link den Mail-Backup-Schritt als fehlgeschlagen
+   bzw. nicht verfügbar kennzeichnen; eine reine Statusmail ist kein Backup.
+5. Erst danach genau eine finale Antwort mit den getrennten Statusangaben
+   `Chat-Link`, `Drive-Backup`, `E-Mail` und der vollständigen `SHA-256` ausgeben.
+   Zulässige Statusangaben: `OK`, `nicht verfügbar`, `fehlgeschlagen` oder
+   `unbestätigt`, jeweils mit kurzem Grund. Bei E-Mail Anhang oder Link nennen;
+   beim Drive-Backup den tatsächlich erreichten Prüfumfang nennen.
+
+Backups sind Best Effort: Fehler oder fehlende Werkzeuge bei Drive/Gmail machen
+einen gültigen Patch nicht ungültig und lösen keinen Neubau aus. Erfolg nur
+nach bestätigtem Tool-Ergebnis melden. Bei unklarem Upload-/Sendestatus zunächst
+nachsehen, ob genau diese Datei bzw. Mail schon existiert; nicht blind doppelt
+hochladen oder senden. Keine Fassung überschreiben oder als gleichzeitig gültige
+Alternative ausliefern. Ein später benötigter erneuter Link verwendet dieselbe
+verifizierte ZIP aus dem Backup, keinen stillschweigenden Neubau.
+
+Chat-Link, Drive-Link und E-Mail beziehen sich auf dieselbe Datei, nicht auf
+mehrere Patches. Ein Drive-Link darf zusätzlich zum Chat-Link stehen.
+Die Sicherung wird vom externen Chat ausgeführt, nicht vom PatchHarbor-Core,
+Watcher oder Entrypoint. Sie ist keine CI-Freigabe und setzt keinen Release-Tag.
+
+Beispiel für einen Plan-Commit (Platzhalter nie als echte Nachweise ausgeben):
 
 ```text
 🟩🟩 PATCH BEREIT 🟩🟩
@@ -3059,18 +3102,25 @@ Noch offen:
 11 Plan-Commits
 
 [Patch herunterladen](sandbox:/pfad/zum/patch.zip)
-🟩🟩 PATCH BEREIT 🟩🟩
+Chat-Link: OK
+Drive-Backup: nicht verfügbar – kein verbundenes Werkzeug
+E-Mail: nicht verfügbar – kein verbundenes Werkzeug
+SHA-256: <vollständige Prüfsumme der finalen ZIP>
 ```
 
-Verbindliche Variationen:
+Verbindliche Regeln:
 
-- Bei `FIX` stehen in den drei grünen Detailzeilen `FIX`, `<PLAN-ID>-FIX<n>` und die unveränderte Planposition.
-- Bei `OFF-PLAN` stehen dort `OFF-PLAN`, die frei gewählte Kennung und `-- / <Gesamtzahl>` beziehungsweise `-- / --`.
-- Der Abschnitt `Änderungen` besitzt fünf bis zehn kurze Zeilen.
-- Der Abschnitt `Tests` nennt nur tatsächlich im Paket vorgesehene Prüfungen.
-- Es gibt genau einen Download-Link zu genau einer Patch-Datei.
-- Lange Commit-Messages oder Pfade dürfen umbrechen; keine Informationszeile wird künstlich zu einer breiten Einzeile gezwungen.
+- Bei `FIX` lauten die drei grünen Detailzeilen `FIX`,
+  `<PLAN-ID>-FIX<n>` und die unveränderte Planposition.
+- Bei `OFF-PLAN` lauten sie `OFF-PLAN`, die frei gewählte Kennung und
+  `-- / <Gesamtzahl>` beziehungsweise `-- / --`.
+- Zeige Commit-Message, tatsächlich verwendeten Plan- und Spezifikationspfad.
+- `Änderungen` enthält fünf bis zehn kurze Zeilen, `Tests` nur tatsächlich im
+  Paket vorgesehene Prüfungen, `Noch offen` die verbleibenden Plan-Commits.
+- Lange Pfade, Commit-Messages und Prüfsummen dürfen umbrechen.
 - `PATCH BEREIT` erscheint erst, wenn die verlinkte Datei tatsächlich existiert.
+- Behaupte vor dem Apply nicht, dass die im Patch vorgesehenen Tests schon grün
+  seien.
 
 ### 26.9 Auswertung nach lokalem Apply
 
@@ -3123,7 +3173,8 @@ Ein Erfolg darf erst nach Prüfung von `run.json`, Git-Zustand und erwartetem Co
 - Der Chat prüft Plan, Spezifikation und realen Repository-Zustand gegeneinander und fragt bei blockierenden Widersprüchen nach.
 - `PLAN`, `FIX` und `OFF-PLAN` sind feste Commit-Arten; Fixes verwenden `<ID>-FIX<n>` und verändern den Plan-Zähler nicht.
 - Blockierende Situationen verwenden eine standardisierte rote STOP-Ausgabe, nicht blockierende Auffälligkeiten eine gelbe WARNING-Ausgabe.
-- Ein fertiges Patch-Paket wird oben und als letzte Zeile mit `🟩🟩 PATCH BEREIT 🟩🟩` angezeigt.
+- Ein fertiges Patch-Paket wird genau einmal mit einer grünen Bereitschaftszeile ausgeliefert; es gibt keine Wiederholung am Antwortende.
+- Der externe Chat versucht zusätzlich private Drive- und E-Mail-Backups derselben ZIP, bestätigt nur nachgewiesene Ergebnisse und nennt die vollständige SHA-256; der Core bleibt netzwerkfrei.
 - `PATCH BEREIT` darf erst erscheinen, wenn genau eine herunterladbare Patch-Datei tatsächlich vorhanden ist.
 - Ein Chat-Patch soll die zur Änderung passenden Projekttests mit einer plattformgerechten Timeout-Strategie ausführen und bei Testfehler ohne Commit enden; im dokumentierten Pixel-/Termux-Workflow verwendet das Commit-Skript keinen künstlichen Einzeltest- oder Gesamtsuite-Timeout. PatchHarbor selbst bewertet die Tests nicht und führt keinen Rollback durch.
 - Nach Erfolg oder Fehler erzeugt PatchHarbor soweit möglich ein Result Bundle mit realem Repository-Zustand sowie `run.json` und `execution.log`.

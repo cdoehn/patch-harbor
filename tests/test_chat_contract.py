@@ -111,7 +111,7 @@ def test_chat_contract_is_canonical_versioned_and_compact() -> None:
     assert not raw.startswith(b"\xef\xbb\xbf")
     assert b"\r" not in raw
     assert raw.endswith(b"\n")
-    assert len(raw) <= 28 * 1024
+    assert len(raw) <= 32 * 1024
     assert all(line.rstrip() == line for line in document.splitlines())
     assert (PROJECT_ROOT / ".gitattributes").read_text(encoding="utf-8") == (
         "/CHAT_INSTRUCTIONS.md text eol=lf\n"
@@ -298,59 +298,41 @@ def test_chat_and_spec_share_commit_warning_stop_and_ui_contracts() -> None:
     assert chat_ui[0] == spec_ui[0]
 
 
-def test_patch_ready_ui_is_narrow_ordered_and_download_safe() -> None:
+def test_patch_delivery_contract_is_single_artifact_and_backup_safe() -> None:
+    # Check the handoff contract, not console text, colors, layout or timing.
     document = _text(CHAT_PATH)
-    ui_section = _section(
-        document,
-        EXPECTED_HEADINGS[10],
-        EXPECTED_HEADINGS[11],
-    )
-    (ui,) = _fenced_blocks(ui_section, "text")
-    lines = ui.splitlines()
+    delivery = _section(document, EXPECTED_HEADINGS[10], EXPECTED_HEADINGS[11])
+    compact = _normalise_space(delivery)
+    (example,) = _fenced_blocks(delivery, "text")
 
-    assert lines[0] == PATCH_READY
-    assert lines[-1] == PATCH_READY
-    assert ui.count(PATCH_READY) == 2
-    assert max(len(line) for line in lines) <= 60
-    assert lines[2:5] == ["🟩 PLAN", "🟩 1.a.W", "🟩 1 / 12"]
-
-    labels = ["Commit:", "Plan:", "Spec:", "Änderungen:", "Tests:", "Noch offen:"]
-    label_positions = [lines.index(label) for label in labels]
-    assert label_positions == sorted(label_positions)
-
-    changes_start = lines.index("Änderungen:") + 1
-    tests_start = lines.index("Tests:")
-    changes = [
-        line
-        for line in lines[changes_start:tests_start]
-        if line.startswith("• ")
-    ]
-    assert 5 <= len(changes) <= 10
-
-    tests_end = lines.index("Noch offen:")
-    planned_tests = [
-        line
-        for line in lines[tests_start + 1 : tests_end]
-        if line.startswith("• ")
-    ]
-    assert planned_tests
-    assert not re.search(
-        r"Tests?.*(erfolgreich|grün)",
-        ui,
-        flags=re.IGNORECASE,
-    )
-
-    links = re.findall(r"\[([^\]]+)\]\(([^)]+)\)", ui)
-    assert links == [
-        ("Patch herunterladen", "sandbox:/pfad/zum/patch.zip")
-    ]
-    assert "Es gibt genau einen Download-Link zu genau einer Patch-Datei." in (
-        ui_section
-    )
-    assert (
-        "`PATCH BEREIT` erscheint erst, wenn die verlinkte Datei tatsächlich "
-        "existiert."
-    ) in ui_section
+    assert example.count(PATCH_READY) == 1
+    assert "genau eine finale Auslieferung" in compact
+    assert "genau eine kanonische ZIP" in compact
+    assert "keine zweite Fertigmeldung" in compact
+    assert "erst danach" in compact.lower()
+    assert "nicht blind doppelt" in compact
+    assert "keinen Neubau" in compact
+    for field in ("Chat-Link", "Drive-Backup", "E-Mail", "SHA-256"):
+        assert field in example
+    for safeguard in (
+        "PatchHarbor-Backups/Patches",
+        "byteidentische Datei privat",
+        "Keine öffentliche Freigabe",
+        "Rücklesen oder Anbieter-Prüfsumme",
+        "Empfängeradresse aus dem angemeldeten Konto",
+        "Größen- oder Dateitypgrenzen",
+        "Keine Schutzgrenze umgehen",
+        "eine reine Statusmail ist kein Backup",
+        "Best Effort",
+        "nach bestätigtem Tool-Ergebnis",
+        "nicht vom PatchHarbor-Core",
+        "setzt keinen Release-Tag",
+    ):
+        assert safeguard in compact
+    # Missing integrations are explicit; the example promises no imaginary backup.
+    assert "Drive-Backup: nicht verfügbar" in example
+    assert "E-Mail: nicht verfügbar" in example
+    assert "Ein Drive-Link darf zusätzlich zum Chat-Link stehen" in compact
 
 
 def test_chat_contract_carries_retry_filename_and_identifier_presentation() -> None:

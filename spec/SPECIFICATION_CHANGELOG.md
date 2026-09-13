@@ -23,6 +23,20 @@ erfordert vollständige lokale Prüfungen und grüne externe CI.
 - Version und Chat-Vertrag auf 1.2.0. Paketformat, SHA-/Fingerprint-, Replay-,
   Recovery-, Archiv- und CLI-Verträge bleiben kompatibel. Kein automatischer Tag.
 
+### Abschließender Chat-Auslieferungsvertrag (OFF-PLAN) – 2026-09-13
+
+- Genau eine finale Auslieferung mit einer kanonischen ZIP und nur einer grünen
+  Bereitschaftszeile; die bisherige doppelte Kopf-/Fußzeile entfällt.
+- Erst nach Paketvalidierung Dateiname, Größe und vollständige SHA-256 festlegen;
+  Chat-Link sowie, soweit verfügbar, private byteidentische Drive- und
+  Gmail-Sicherung. Anhängegrenzen führen zum bestätigten Drive-Link statt
+  zu einer anderen Paketfassung. Keine erfundenen Links oder Erfolgsnachweise.
+- Backup- und Versandfehler sind nicht blockierend; unbestätigte Vorgänge zuerst
+  prüfen, nicht doppelt ausliefern. Generierte Bundle-Anleitungen übernehmen
+  den Vertrag aus derselben kanonischen Vorlage.
+- Nur Dokumentation und Dokumentprüfungen ändern sich. Core, API, Paketformat,
+  Version 1.2.0 und Plan-Zähler bleiben unverändert; kein automatischer Tag.
+
 ## [1.1.1] – 2026-08-28
 
 **Status:** Freigegeben und vollständig umgesetzt; der abgeschlossene Plan liegt unter `planning/1.1.1/commit-plan.md`.
