@@ -26,7 +26,7 @@ _RELEASE_INPUT_FILES = (
     "README.md",
     "pyproject.toml",
 )
-_RELEASE_INPUT_TREES = ("src",)
+_RELEASE_INPUT_TREES = ("src", "docs")
 _FORBIDDEN_STAGED_ROOTS = {"build", "dist"}
 _FORBIDDEN_STAGED_PARTS = {"__pycache__"}
 _FORBIDDEN_STAGED_SUFFIXES = {".pyc", ".pyo"}

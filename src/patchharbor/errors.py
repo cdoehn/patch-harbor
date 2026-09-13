@@ -11,7 +11,7 @@ WARNING_PREFIX = f"{TOOL_PREFIX} warning:"
 
 
 class FailureReason(str, Enum):
-    """Internal failure reasons independent of CLI status numbers."""
+    """Semantic failure reasons independent of CLI status numbers."""
 
     USAGE_ERROR = "usage_error"
     NO_VALID_SCRIPT = "no_valid_script"

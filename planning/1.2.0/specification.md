@@ -3,7 +3,7 @@
 Basis: sauberer Snapshot `62020dab617d54925c8dd0ac192aaff685cda0f3`.
 Dieser additive Vertrag ergänzt `spec/SPECIFICATION.md`. Alle bestehenden
 Paket-, SHA-, Fingerprint-, Replay-, Recovery-, Archiv-, CLI- und JSON-Verträge
-bleiben erhalten. Die Versionsanhebung erfolgt erst im Release-Schritt.
+bleiben erhalten. Die Version 1.2.0 wird im abschließenden Release-Schritt gesetzt.
 
 ## API-1: Bibliotheksgrenze
 
@@ -53,3 +53,16 @@ Signalhandler, Poll-Warteverhalten und Prozessgruppen werden nicht umgebaut.
 Öffentliche API-Kompatibilität abschließend auditieren, Beispiele/Dokumentation
 und Releasespezifikation konsistent abschließen, Version 1.2.0 anheben und alle
 Release-Gates prüfen. Keine vorzeitigen Tags oder Veröffentlichungen.
+
+Der öffentliche Import bleibt `from patchharbor import api`; keine parallele
+Top-Level-Fassade. Dokumentierte Aufrufe, Ergebnisfelder und Fehlersemantik sind
+ab 1.2.0 unterstützt. Private Implementierungsimporte und diagnostische Texte
+sind keine Stabilitätszusage. Annotierte Pakete enthalten `py.typed`; Wheel/sdist
+führen API-Dokumentation mit. API und Watcher müssen auch nach Installation eines
+Wheels außerhalb des Checkouts funktionieren, einschließlich automatischem Apply,
+korrektem Rohlog und Result-Bundle. CLI/JSON-Schemata und Python >=3.12 bleiben.
+
+Vor dem Abschluss laufen alle funktionalen, Sicherheits-, Packaging- und
+Plattform-Gates. Reine UI-Ausgaben werden nicht neu getestet. Der Planstatus sagt
+nur aus, welche Änderungen implementiert sind; lokale Ausführung und CI bestätigen
+erst danach den konkreten Release-Commit. Kein automatischer Release-Tag.

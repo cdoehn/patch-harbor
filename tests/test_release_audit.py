@@ -157,7 +157,7 @@ def test_release_entry_point_and_runtime_dependency_contract_are_exact() -> None
     }
     assert project["dependencies"] == []
     assert configuration["tool"]["setuptools"]["data-files"] == {
-        "share/patchharbor": ["CHAT_INSTRUCTIONS.md"]
+        "share/patchharbor": ["CHAT_INSTRUCTIONS.md", "docs/python-api.md"]
     }
 
     build_source = (
@@ -182,6 +182,9 @@ def test_release_documents_exist_at_their_canonical_paths() -> None:
         PROJECT_ROOT / "planning" / "1.1.0" / "commit-plan-cleanup.md",
         PROJECT_ROOT / "planning" / "1.1.0" / "commit-plan.md",
         PROJECT_ROOT / "planning" / "1.1.1" / "commit-plan.md",
+        PROJECT_ROOT / "planning" / "1.2.0" / "commit-plan.md",
+        PROJECT_ROOT / "planning" / "1.2.0" / "specification.md",
+        PROJECT_ROOT / "docs" / "python-api.md",
     }
 
     assert all(path.is_file() for path in expected_documents)
@@ -338,7 +341,7 @@ def test_watcher_is_only_shared_configuration_lifecycle_and_core_apply() -> None
         assert not (WATCHER_PACKAGE_ROOT / removed).exists()
 
 
-def test_v111_release_state_is_complete_and_versioned() -> None:
+def test_v120_release_retains_completed_v111_history() -> None:
     from patchharbor import __version__
 
     plan = (
@@ -356,11 +359,11 @@ def test_v111_release_state_is_complete_and_versioned() -> None:
     chat = (PROJECT_ROOT / "CHAT_INSTRUCTIONS.md").read_text(encoding="utf-8")
     readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
 
-    assert __version__ == "1.1.1"
-    assert 'RELEASE_VERSION = "1.1.1"' in packaging
-    assert "**Produktversion:** `1.1.1`<br>" in specification
-    assert "**Vertragsversion:** 1.1.1<br>" in chat
-    assert "PatchHarbor 1.1.1" in readme
+    assert __version__ == "1.2.0"
+    assert 'RELEASE_VERSION = "1.2.0"' in packaging
+    assert "**Produktversion:** `1.2.0`<br>" in specification
+    assert "**Vertragsversion:** 1.2.0<br>" in chat
+    assert "PatchHarbor 1.2.0" in readme
     assert (
         "**Planstatus:** 12 / 12 Plan-Commits umgesetzt; "
         "Plan abgeschlossen; 0 Plan-Commits offen.<br>"

@@ -1,9 +1,13 @@
-# PatchHarbor Python API (development toward 1.2.0)
+# PatchHarbor 1.2.0 – public Python API
 
 Use `from patchharbor import api`. This is the only supported public Python
 namespace; implementation modules remain internal. The documented names and
-value fields form the proposed 1.2.0 compatibility surface. The package remains
-1.1.1 during development; the compatibility/release gate is a separate step.
+value fields form the supported 1.2.0 compatibility surface. Within the 1.x
+series, fixes and compatible additions preserve existing documented calls and
+result semantics; breaking changes to this surface require a major version.
+Additional enum values or diagnostic event wording must not be treated as an
+exhaustive state machine. Private modules and undocumented helpers remain free
+to evolve.
 There are no new runtime dependencies. Install PatchHarbor into the Python
 environment of the calling program; installing the CLI with a tool manager does
 not install it into every other Python environment.
@@ -25,7 +29,7 @@ print(report.success, report.result_bundle.status)
 
 | Python | CLI operation | Returned value |
 | --- | --- | --- |
-| `configuration()` | `configure show` | `ConfigurationResult` |
+| `configuration(revalidate=False)` | `configure show` | `ConfigurationResult` |
 | `configure_exchange_directory(directory)` | `configure exchange-directory` | `ConfigurationResult` |
 | `configure_bundle_suffix(suffix)` | `configure bundle-suffix` | `ConfigurationResult` |
 | `configure_archive_directory(name)` | `configure archive-dir` | `ConfigurationResult` |
@@ -187,7 +191,7 @@ and undocumented construction/serializer helpers are not an additional public
 extension surface. GUI, async, transport and plugin frameworks are out of scope.
 
 
-## CLI migration status
+## CLI and Watcher integration
 
 The main `patchharbor` CLI now calls this API for every operation, including
 configuration, registry, context, bundles, Apply/Dry-Run, automatic Apply and
@@ -198,7 +202,7 @@ for startup and runs a private worker that calls `apply_next()` directly, preser
 its process and stop semantics.
 
 
-## Watcher process boundary (API-3)
+## Watcher process boundary
 
 `configuration(revalidate=True)` preserves the startup recheck of the loaded
 physical Exchange directory. The default remains `False`; ordinary reads still
@@ -217,3 +221,33 @@ or signal handlers. The parent still stops between polls and waits for an active
 poll; existing OS/group/service signal delivery and Core process-tree cleanup
 remain responsible for interruption of that poll. This is not an in-process
 asynchronous or cancellable API.
+
+
+## Installation and scope of support
+
+Use Python 3.12 or newer. For an application that imports PatchHarbor, install the
+repository or built wheel into that application's own environment, for example:
+
+```bash
+python -m venv .venv
+.venv/bin/python -m pip install /path/to/patch-harbor
+.venv/bin/python -c "from patchharbor import api; print(api.DEFAULT_TIMEOUT_SECONDS)"
+```
+
+On Windows, use `.venv\Scripts\python.exe` instead. A `uv tool` or `pipx`
+installation isolates CLI applications; it does not make their imports available
+in an unrelated Python interpreter. No import-time registration, configuration
+write, console initialization or network access is performed by the API.
+
+The distribution includes inline annotations (`patchharbor/py.typed`) and a copy
+of this document at `share/patchharbor/python-api.md`. Import public types from
+`patchharbor.api`, even when their defining module is internal. New optional
+parameters and additional result fields may be added compatibly. The stable
+contract does not promise diagnostic prose, event ordering, concurrent mutations
+of the same repository, or an asynchronous cancellation interface. Existing Core
+locks and safety checks remain authoritative.
+
+Release verification covers direct Python calls, CLI/API parity, the separate
+Watcher worker, actual script output and Result Bundles, plus installed-wheel
+imports and execution. The full platform release gates still determine whether
+a particular release commit is ready to use; this document is not a CI receipt.

@@ -57,5 +57,8 @@ version = { attr = "patchharbor.__version__" }
 where = ["src"]
 include = ["patchharbor", "patchharbor.*", "patchharbor_watcher", "patchharbor_watcher.*"]
 
+[tool.setuptools.package-data]
+patchharbor = ["py.typed"]
+
 [tool.setuptools.data-files]
-"share/patchharbor" = ["CHAT_INSTRUCTIONS.md"]
+"share/patchharbor" = ["CHAT_INSTRUCTIONS.md", "docs/python-api.md"]

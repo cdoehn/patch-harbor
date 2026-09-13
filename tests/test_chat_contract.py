@@ -118,8 +118,8 @@ def test_chat_contract_is_canonical_versioned_and_compact() -> None:
         "/README.md text eol=lf\n"
     )
     assert document.startswith(
-        "# PatchHarbor 1.1.1 – Chat-Initialisierung\n\n"
-        "**Vertragsversion:** 1.1.1<br>\n"
+        "# PatchHarbor 1.2.0 – Chat-Initialisierung\n\n"
+        "**Vertragsversion:** 1.2.0<br>\n"
         f"**Patch-Paketmarker:** `{PATCH_MARKER}`<br>\n"
         f"**Patch-Paketformat:** `{PATCH_FORMAT_VERSION}`<br>\n"
         "**Result-Bundle-Marker:** `patch-harbor-result-bundle`<br>\n"

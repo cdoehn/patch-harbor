@@ -1,23 +1,26 @@
 # PatchHarbor – Spezifikation
 
 **Dateiname:** `SPECIFICATION.md`<br>
-**Produktversion:** `1.1.1`<br>
-**Spezifikationsstand:** 2026-08-28<br>
-**Status:** Verbindliche, freigegebene Produktspezifikation für PatchHarbor 1.1.1<br>
+**Produktversion:** `1.2.0`<br>
+**Spezifikationsstand:** 2026-09-13<br>
+**Status:** Verbindliche, freigegebene Produktspezifikation für PatchHarbor 1.2.0; Release-Freigabe nach grünen Gates<br>
 **Projektname:** `PatchHarbor`<br>
 **Kommando:** `patchharbor`<br>
 **Skriptmarker:** `# PATCHHARBOR`<br>
 **Patch-Paketmarker:** `patch-harbor`
 
-Der abgeschlossene Umsetzungs- und Commit-Plan ist von dieser Produktspezifikation getrennt und liegt unter `planning/1.1.1/commit-plan.md`. Die abgeschlossenen Pläne für 1.0.0 und 1.1.0 bleiben als historische Umsetzungsgrundlage erhalten. Änderungen am Produktziel werden in `spec/SPECIFICATION_CHANGELOG.md` dokumentiert.
+Der Umsetzungs- und Commit-Plan ist von dieser Produktspezifikation getrennt und liegt unter `planning/1.2.0/commit-plan.md`. Die abgeschlossenen Pläne für 1.0.0, 1.1.0 und 1.1.1 bleiben als historische Umsetzungsgrundlage erhalten. Änderungen am Produktziel werden in `spec/SPECIFICATION_CHANGELOG.md` dokumentiert.
 
 ---
 
-## 1. Zweck, Gültigkeit und Verhältnis zu 1.1.0
+## 1. Zweck, Gültigkeit und Verhältnis zu 1.1.1
 
-Dieses Dokument beschreibt das vollständige verbindliche Produktziel von PatchHarbor 1.1.1.
+Dieses Dokument beschreibt das vollständige verbindliche Produktziel von PatchHarbor 1.2.0.
 
-Es übernimmt die in 1.1.0 implementierten Produktverträge vollständig und ergänzt sie um zwei zusammengehörige Bedienverbesserungen:
+Es übernimmt die Produktverträge des stabilen 1.1.1-Stands und ergänzt die
+öffentliche synchrone Python-API. Haupt-CLI und Watcher verwenden dieselben
+API-/Application-Pfade. Details des additiven API-Vertrags stehen in Abschnitt 32
+und `planning/1.2.0/specification.md`. Die bisherigen Eigenschaften bleiben erhalten:
 
 - eine allgemeine benutzerspezifische `config.json` mit genau einem gemeinsamen `exchange_directory`,
 - denselben Exchange-Ordner als standardisierte Übergabestelle für Patch-Pakete und PatchHarbor Result Bundles,
@@ -27,7 +30,7 @@ Es übernimmt die in 1.1.0 implementierten Produktverträge vollständig und erg
 - die versionierte Datei `CHAT_INSTRUCTIONS.md` zur Initialisierung eines neuen Entwicklungs-Chats,
 - eine verbindliche schmale Chat-Oberfläche für `PLAN`, `FIX`, `OFF-PLAN`, `WARNING`, `STOP` und fertige Patch-Pakete.
 
-PatchHarbor 1.1.1 führt keine Netzwerk-, Chat-, Commit-Plan- oder Journalfunktion in den Core ein. `CHAT_INSTRUCTIONS.md` ist eine ausgelieferte Vorlage für passive Bundle-Begleitdokumentation und einen externen Chat; der Exchange-Ordner ist eine lokale Dateisystemgrenze.
+PatchHarbor 1.2.0 führt keine Netzwerk-, Chat-, Commit-Plan- oder Journalfunktion in den Core ein. `CHAT_INSTRUCTIONS.md` ist eine ausgelieferte Vorlage für passive Bundle-Begleitdokumentation und einen externen Chat; der Exchange-Ordner ist eine lokale Dateisystemgrenze.
 
 Für nicht produktiv genutzte 1.1.0-Entwicklungsstände wird kein Migrationscode für `watcher.json`, `paths.json` oder andere frühere interne Pfaddokumente bereitgestellt. 1.1.1 verwendet ausschließlich den neuen Vertrag. Das ist eine bewusste Projektentscheidung und kein stiller Fallback.
 
@@ -2520,7 +2523,9 @@ Das Python-Paket bleibt so flach wie sinnvoll.
 
 Empfohlene Verantwortlichkeiten:
 
-- `cli.py` – argparse und öffentliche Befehle,
+- `cli.py` – argparse, Aufrufe der öffentlichen API und Darstellung,
+- `api.py` – unterstützte synchrone Bibliotheksgrenze zur Application,
+- `api_types.py` – wiederverwendete öffentliche Ergebnis-, Stream- und Ereignistypen,
 - `application.py` – Orchestrierung genau eines Auftrags einschließlich manueller beziehungsweise automatischer Repository-Scope-Wahl und deterministischer Kandidatenauswahl,
 - `sources.py` – Datei, Ordner und STDIN als neutrales `InputArtifact`,
 - `bundles.py` – manuelle direkte Skripte und ZIP-Container zu `PatchBundle`s auflösen,
@@ -2545,13 +2550,14 @@ Empfohlene Verantwortlichkeiten:
 - `patch_manifest.py` – `patch.json` und Schema,
 - `result_bundle.py` – vollständiges Result Bundle und atomare Veröffentlichung,
 - `models.py` – kleine unveränderliche Datenträger,
-- `errors.py` – Tool-Fehler und Exit-Codes,
+- `errors.py` – fachliche Tool-Fehler und semantische Fehlergründe,
+- `exit_status.py` – gemeinsame Abbildung in kompatible CLI-/JSON-Statuszahlen,
 - `platform/` – notwendige Linux- und Windows-Grenzen,
-- separater Watcher-Einstiegspunkt – Ordnerbeobachtung und Aufruf der öffentlichen Core-Schnittstelle.
+- separater Watcher-Einstiegspunkt – Konfiguration über API, Poll-Lebenszyklus und privater API-Worker in einem eigenen Prozess.
 
 Abhängigkeitsregeln:
 
-- `cli` komponiert ausschließlich öffentliche Anwendungsgrenzen.
+- `cli` ruft für Fachoperationen ausschließlich `api` auf; `api` delegiert an `application`.
 - `application` ist der einzige fachliche Orchestrator eines Auftrags.
 - `sources` kennt weder ZIP-Regeln noch Parser, Git oder Execution.
 - `bundles` klassifiziert und beschreibt Inhalte, schreibt aber keine Nutzdateien.
@@ -3183,10 +3189,28 @@ Insbesondere darf ein Skript-Exit 124 oder 130 nicht als Tool-Timeout bzw.
 Tool-Unterbrechung umgedeutet werden. Version und öffentliche CLI bleiben gleich.
 
 
-## 32. Entwicklung der öffentlichen Python-API 1.2.0
+## 32. Öffentliche Python-API 1.2.0
 
 Der additive Vertrag steht in `planning/1.2.0/specification.md`; der Ablauf in
 `planning/1.2.0/commit-plan.md`, die Imports und Anwendungsbeispiele in
-`docs/python-api.md`. API und später CLI/Watcher verwenden dieselbe Application.
-Paketversion und bisherige Wire-Verträge bleiben bis zum Release-Schritt gleich.
-API-Ergebnisse verwenden vollständige Kennungen; keine Textausgabe wird geparst.
+`docs/python-api.md`. Die öffentliche synchrone API, die Haupt-CLI und der Watcher
+verwenden dieselbe Application. Die Paketversion ist 1.2.0; alle bestehenden
+Wire-Verträge, CLI-Exitcodes, Paketmarker und Fingerprints bleiben unverändert.
+API-Ergebnisse verwenden vollständige Kennungen; keine Konsolentexte werden geparst.
+
+`patchharbor.api` ist der unterstützte Import-Namensraum. Die dokumentierten
+Operationen, Rückgabefakten und Fehlersemantik bleiben innerhalb 1.x kompatibel;
+private Module und diagnostische Texte sind kein öffentlicher Erweiterungsvertrag.
+Standardaufrufe sind still. Fachliche Resultate und Exceptions werden wiederverwendet;
+explizite OutputStreams und request-lokale Beobachter sind unabhängig von der CLI.
+
+Der Watcher liest `api.configuration(revalidate=True)` und startet pro Poll
+weiterhin einen separaten Prozess, der `api.apply_next()` direkt aufruft.
+Signal-/Stop-Verhalten, automatische Nichtwiederholung fehlgeschlagener Identitäten,
+Replay, Recovery, Auswahl und Result-Publikation bleiben unverändert.
+
+Wheel und sdist enthalten die API, ihren Typing-Marker und API-Dokumentation.
+Release-Gates prüfen API-Verträge, installierte Artefakte, CLI, Watcher und bestehende
+Sicherheits-/Plattformfunktionen. Konsolendarstellung wird nicht neu getestet.
+Tags oder Veröffentlichungen folgen nicht automatisch aus der Versionsanhebung;
+der neue Commit benötigt weiterhin die vollständige lokale und externe CI-Freigabe.

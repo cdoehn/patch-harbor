@@ -1,4 +1,4 @@
-"""Synchronous Python facade for PatchHarbor (1.2.0 development contract).
+"""Synchronous Python facade for PatchHarbor (public since 1.2.0).
 
 Import with ``from patchharbor import api``. Library requests are silent unless
 an observer or output sinks are supplied. No CLI invocation, process-wide chdir,

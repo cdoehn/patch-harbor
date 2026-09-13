@@ -62,7 +62,7 @@ The CLI is the recommended way to write this file. Direct editing is allowed,
 but missing, additional, duplicate, or invalid fields are rejected. The path is
 stored as a physically resolved absolute directory. The Exchange directory may
 not equal, contain, or be inside any registered repository. `watcher.json` and
-`paths.json` are not configuration sources in PatchHarbor 1.1.1.
+`paths.json` are not configuration sources in PatchHarbor 1.2.0.
 
 The flat Exchange directory may contain patch packages, Result Bundles, old
 packages, and unrelated files together. PatchHarbor identifies content rather
@@ -488,7 +488,7 @@ Use manual mode on Termux. PatchHarbor does not treat the Android background
 process lifecycle as a reliable systemd service environment. Download the patch
 ZIP into the configured Exchange directory and run `patchharbor apply` manually;
 reusing the previous shell command is sufficient. No Termux-specific watcher
-support is claimed by PatchHarbor 1.1.1.
+support is claimed by PatchHarbor 1.2.0.
 
 Functional CLI test helpers have no default subprocess deadline; slow Git or
 shared storage must not turn a correct scan into an arbitrary 20-second failure.
@@ -569,7 +569,7 @@ The installed `patchharbor --help`, `patchharbor COMMAND --help`, and
 Only implemented commands and options are shown there.
 
 
-### Internal preparation for the Python API
+### Application and public API boundaries
 
 Application workflows now publish immutable, request-local facts through
 `progress.py`. Repository and script records carry full data; only the CLI
@@ -579,8 +579,9 @@ and requires an explicitly supplied `OutputTargets`; the default is silent.
 Directory selection is an explicit callback, with the interactive menu owned by
 the CLI. Unknown choices are rejected before a file is executed.
 
-These are internal boundaries, **not** a supported `patchharbor.api` release.
-The future public API is planned separately for 1.2.0.
+The public `patchharbor.api` facade uses these boundaries in version 1.2.0.
+Library callers supply `api.OutputStreams` and receive structured results.
+The main CLI and the Watcher use the same API; neither duplicates Core decisions.
 
 
 Tool failures internally carry a `FailureReason`, not a CLI exit number.
@@ -591,7 +592,7 @@ such as 124 or 130; they are not mistaken for PatchHarbor timeout/interruption.
 The Application makes decisions from semantic outcomes, not serialized statuses.
 
 
-## Python-Bibliothek – Entwicklung Richtung 1.2.0
+## Python-Bibliothek – PatchHarbor 1.2.0
 
 `from patchharbor import api` stellt Konfiguration, Registry, Kontext, Bundles,
 Apply/Dry-Run, den automatischen Einzelpoll und den expliziten Skriptrunner bereit.
@@ -600,11 +601,16 @@ Resultate bzw. fachliche Fehler. Kein CLI-Subprozess ist erforderlich.
 
 Der vollständige Vertrag mit Beispielen steht in [docs/python-api.md](docs/python-api.md).
 [Plan](planning/1.2.0/commit-plan.md) und [Spec](planning/1.2.0/specification.md)
-trennen Bibliotheksgrenze, CLI, Watcher und den späteren Release-Schritt.
-Die Paketversion bleibt bis dahin 1.1.1; dies ist noch kein 1.2.0-Release.
+dokumentieren die vier umgesetzten Schritte: Bibliotheksgrenze, CLI, Watcher
+und Release. `patchharbor.api` ist die unterstützte öffentliche Python-Schnittstelle
+ab 1.2.0; alle anderen Implementierungsimporte bleiben intern.
 
-Die Haupt-CLI verwendet bereits diese API für alle fachlichen Operationen.
-Der separate Watcher bleibt bis zu seinem eigenen Migrationsschritt unverändert.
+Die Haupt-CLI verwendet die API für alle fachlichen Operationen. Der Watcher
+verwendet sie für die Konfiguration und im separaten Prozess jedes Apply-Polls.
+Eine CLI-Installation mit `uv tool` stellt das Modul nicht automatisch in anderen
+Python-Umgebungen bereit. Zum Importieren muss PatchHarbor in der Umgebung des
+aufrufenden Python-Programms installiert sein. Das Wheel enthält `py.typed` und
+die API-Dokumentation; neue Runtime-Abhängigkeiten gibt es nicht.
 
 
 ### Watcher als API-Verbraucher (API-3)
@@ -614,4 +620,4 @@ Der Watcher liest die gemeinsame Konfiguration über
 Prozess derselben Installation; dessen privater Worker ruft `api.apply_next()`
 direkt auf, nicht mehr den CLI-Parser. Betriebs-JSON, globaler Scope, Replay und
 Failed-Retry-Schutz bleiben erhalten. Die Prozess-/Signalgrenze und der Linux-
-Servicevertrag bleiben unverändert. Die Paketversion wird erst in API-4 angehoben.
+Servicevertrag bleiben unverändert. Die Paketversion ist 1.2.0.

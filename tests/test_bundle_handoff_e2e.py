@@ -75,7 +75,7 @@ def test_manual_bundle_embeds_current_environment_without_touching_repository(tm
     assert data["repository_name"] == repository.name
     assert data["exchange_directory"] == data["output_directory"] == str(exchange)
     assert data["runtime"]["python_version"]
-    assert data["runtime"]["patchharbor_version"] == "1.1.1"
+    assert data["runtime"]["patchharbor_version"] == "1.2.0"
     assert data["filename_timezone"] == "UTC"
     assert data["filename_schemas"]["Patch"].endswith(".zip<bundle_suffix>")
     assert git(repository, "status", "--porcelain").stdout == ""

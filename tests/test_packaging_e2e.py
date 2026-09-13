@@ -23,8 +23,9 @@ from tests.registration_support import isolated_user_environment
 pytestmark = pytest.mark.packaging
 
 MAX_WHEEL_BYTES = 256 * 1024
-RELEASE_VERSION = "1.1.1"
+RELEASE_VERSION = "1.2.0"
 EXPECTED_RUNTIME_FILES = {
+    "patchharbor/py.typed",
     "patchharbor/__init__.py",
     "patchharbor/application.py",
     "patchharbor/api.py",
@@ -343,6 +344,14 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
             release_source / "CHAT_INSTRUCTIONS.md"
         ).read_bytes()
 
+        api_data_name = (
+            f"patchharbor-{RELEASE_VERSION}.data/data/share/patchharbor/python-api.md"
+        )
+        assert wheel.read(api_data_name) == (
+            release_source / "docs" / "python-api.md"
+        ).read_bytes()
+        assert wheel.read("patchharbor/py.typed") == b""
+
         entry_points_name = next(
             name for name in names if name.endswith(".dist-info/entry_points.txt")
         )
@@ -379,6 +388,10 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
             f"{root}/README.md",
             f"{root}/pyproject.toml",
             f"{root}/src/patchharbor/cli.py",
+            f"{root}/src/patchharbor/api.py",
+            f"{root}/src/patchharbor/api_types.py",
+            f"{root}/src/patchharbor/py.typed",
+            f"{root}/docs/python-api.md",
             f"{root}/src/patchharbor_watcher/__init__.py",
             f"{root}/src/patchharbor_watcher/loop.py",
             f"{root}/src/patchharbor_watcher/cli.py",
@@ -761,3 +774,47 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
         environment=runtime_environment,
     )
     assert legacy_watcher.returncode == 2
+
+    # Exercise the PUBLIC API and the private one-shot worker from the installed
+    # interpreter, outside the checkout and without PYTHONPATH. CLI parsing is
+    # not involved in either operation. This detects missing wheel modules/data.
+    installed_python = (
+        pipx_home / "venvs" / "patchharbor" /
+        native_value("bin/python", "Scripts/python.exe")
+    )
+    assert installed_python.is_file()
+    worker_repository = _create_release_repository(tmp_path / "worker-repository")
+    library = _run(
+        [
+            str(installed_python), "-c",
+            "import json, pathlib, sys; from patchharbor import api, __version__; "
+            "assert __version__ == '1.2.0'; "
+            "assert 'patchharbor.cli' not in sys.modules; "
+            "assert 'patchharbor.presentation' not in sys.modules; "
+            "assert pathlib.Path(api.__file__).resolve().is_relative_to(pathlib.Path(sys.prefix).resolve()); "
+            "api.configuration(revalidate=True); "
+            "c = api.register(sys.argv[1]); "
+            "assert api.context(sys.argv[1]) == c; "
+            "print(json.dumps({'repo_id': str(c.repo_id), 'base_commit': str(c.base_commit), "
+            "'state_fingerprint': c.state_fingerprint}))",
+            str(worker_repository),
+        ], cwd=empty_workdir, environment=runtime_environment,
+    )
+    assert library.returncode == 0, library.stdout + library.stderr
+    worker_context = json.loads(library.stdout)
+    worker_package = exchange_directory / "installed-worker-patch.zip"
+    worker_entrypoint = _write_release_patch_package(worker_package, worker_context)
+    worker = _run(
+        [str(installed_python), "-m", "patchharbor_watcher.worker"],
+        cwd=empty_workdir, environment=runtime_environment,
+    )
+    worker_result = _successful_json_result(worker)
+    assert worker_result["repo_id"] == worker_context["repo_id"]
+    assert worker_result["primary_result"]["entrypoint_exit_code"] == 0
+    assert (worker_repository / "nested" / "release.bin").read_bytes() == b"\x00release-payload\xff"
+    assert (worker_repository / "release-applied.txt").read_text(encoding="utf-8") == "entrypoint-ok"
+    assert not (worker_repository / worker_entrypoint).exists()
+    with zipfile.ZipFile(worker_result["result_bundle"]["path"]) as result_archive:
+        assert b"installed-apply" in result_archive.read("logs/execution.log")
+        installed_handoff = json.loads(result_archive.read("environment.json"))
+        assert installed_handoff["runtime"]["patchharbor_version"] == RELEASE_VERSION

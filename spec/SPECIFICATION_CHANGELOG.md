@@ -1,11 +1,27 @@
 # PatchHarbor – Spezifikations-Changelog
 
 **Dateiname:** `SPECIFICATION_CHANGELOG.md`<br>
-**Stand:** 2026-09-11
+**Stand:** 2026-09-13
 
 Dieses Dokument protokolliert Änderungen am verbindlichen Produktziel. Es ist kein Git-Commit-Log und ersetzt nicht die getrennten Umsetzungspläne unter `planning/`.
 
 ---
+
+## [1.2.0] – 2026-09-13
+
+**Status:** API-1 bis API-4 implementiert; Release-Freigabe des konkreten Commits
+erfordert vollständige lokale Prüfungen und grüne externe CI.
+
+- Unterstützte synchrone Python-API unter `patchharbor.api`: Konfiguration,
+  Registry, Kontext, Bundles, Apply/Dry-Run, automatischer Poll und Skriptrunner.
+- Haupt-CLI und Watcher verwenden dieselbe API. Der Watcher behält einen separaten
+  Prozess pro Poll; keine neue Signal-, Retry- oder Prozessgruppenlogik.
+- Standardmäßig stille Bibliothek, explizite Streams und neutrale Beobachter,
+  vollständige IDs sowie unveränderte Result-, Fehler- und Wire-Semantik.
+- API-Vertrags- und installierte Wheel-/Worker-Tests, mitgelieferte Dokumentation
+  und `py.typed`; weiterhin keine Runtime-Abhängigkeiten und Python >=3.12.
+- Version und Chat-Vertrag auf 1.2.0. Paketformat, SHA-/Fingerprint-, Replay-,
+  Recovery-, Archiv- und CLI-Verträge bleiben kompatibel. Kein automatischer Tag.
 
 ## [1.1.1] – 2026-08-28
 
