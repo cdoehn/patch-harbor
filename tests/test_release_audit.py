@@ -92,6 +92,7 @@ EXPECTED_WATCHER_RUNTIME_FILES = {
     "lifecycle.py",
     "loop.py",
     "systemd_linux.py",
+    "worker.py",
 }
 
 
@@ -313,11 +314,13 @@ def test_watcher_is_only_shared_configuration_lifecycle_and_core_apply() -> None
     )
     readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
 
-    assert "load_configuration" in cli_source
-    assert "revalidate_exchange_directory" in cli_source
+    assert "api.configuration(revalidate=True)" in cli_source
+    worker_source = (WATCHER_PACKAGE_ROOT / "worker.py").read_text(encoding="utf-8")
+    assert "api.apply_next()" in worker_source
+    assert "patchharbor.cli" not in worker_source
     assert "run_shared_exchange_watcher" in cli_source
     assert "delegate_to_automatic_apply" in cli_source
-    assert '"apply", "--json", "--automatic"' in boundary_source
+    assert '"patchharbor_watcher.worker"' in boundary_source
     assert "delegate_to_apply" not in boundary_source
     assert "scan_exchange_directory" not in loop_source
     assert "ExchangeFileIdentity" not in loop_source

@@ -8,12 +8,7 @@ from pathlib import Path
 import sys
 from typing import TextIO
 
-from patchharbor.configuration import (
-    load_configuration,
-    revalidate_exchange_directory,
-)
-from patchharbor.errors import PatchHarborError
-from patchharbor.user_paths import configuration_user_paths
+import patchharbor.api as api
 from patchharbor_watcher.apply_boundary import delegate_to_automatic_apply
 from patchharbor_watcher.lifecycle import (
     WatcherStopController,
@@ -24,10 +19,7 @@ from patchharbor_watcher.loop import run_shared_exchange_watcher
 
 def _load_exchange_directory() -> Path:
     """Load the one shared Core Exchange directory for watcher startup."""
-    configuration = revalidate_exchange_directory(
-        load_configuration(configuration_user_paths())
-    )
-    return configuration.exchange_directory
+    return api.configuration(revalidate=True).exchange_directory
 
 
 def _install_systemd_user_unit() -> Path:
@@ -117,7 +109,7 @@ def main(
             )
     except KeyboardInterrupt:
         return 130
-    except (PatchHarborError, OSError, RuntimeError, ValueError) as exc:
+    except (api.PatchHarborError, OSError, RuntimeError, ValueError) as exc:
         print(f"patchharbor-watcher: {exc}", file=actual_stderr)
         return 1
     return 130 if stop_controller.was_interrupted() else 0

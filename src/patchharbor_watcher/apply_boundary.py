@@ -1,4 +1,4 @@
-"""Public subprocess boundary used by the separate PatchHarbor Watcher."""
+"""Private worker-process transport for the separate PatchHarbor Watcher."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ import sys
 from typing import NoReturn
 
 
-DEFAULT_APPLY_COMMAND = (sys.executable, "-m", "patchharbor.cli")
+DEFAULT_APPLY_COMMAND = (sys.executable, "-m", "patchharbor_watcher.worker")
 
 
 @dataclass(frozen=True, slots=True)
@@ -48,8 +48,12 @@ def delegate_to_automatic_apply(
     apply_command: Sequence[str] = DEFAULT_APPLY_COMMAND,
     environment: Mapping[str, str] | None = None,
 ) -> ApplyCompletion:
-    """Ask Core to discover and process one shared Exchange candidate."""
-    arguments = [*apply_command, "apply", "--json", "--automatic"]
+    """Run one API worker with the existing process and signal boundary.
+
+    No new session, process group, timeout, retry, or shell is introduced. The
+    worker (not this transport) calls api.apply_next; it receives no CLI flags.
+    """
+    arguments = list(apply_command)
     completed = subprocess.run(
         arguments,
         check=False,

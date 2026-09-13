@@ -18,6 +18,7 @@ ENTRYPOINT_MODULES = {
     "patchharbor.cli",
     "patchharbor_watcher",
     "patchharbor_watcher.cli",
+    "patchharbor_watcher.worker",
 }
 FORBIDDEN_SCOPE_MODULE_PARTS = {
     "clipboard",
@@ -393,7 +394,7 @@ def test_platform_specific_mechanics_stay_inside_platform_package() -> None:
         assert platform_detail not in git_capture_source
 
 
-def test_watcher_is_separate_and_uses_only_the_public_apply_process_boundary() -> None:
+def test_watcher_uses_public_api_with_an_isolated_worker_boundary() -> None:
     graph = _dependency_graph()
     core_modules = {
         module for module in graph if module.startswith("patchharbor.")
@@ -409,11 +410,9 @@ def test_watcher_is_separate_and_uses_only_the_public_apply_process_boundary() -
         )
 
     allowed_shared_core_boundaries = {
-        "patchharbor.configuration",
-        "patchharbor.errors",
+        "patchharbor.api",
         "patchharbor.platform.paths",
         "patchharbor.platform.filesystem",
-        "patchharbor.user_paths",
     }
     for module in watcher_modules:
         core_dependencies = {
@@ -448,10 +447,11 @@ def test_watcher_is_separate_and_uses_only_the_public_apply_process_boundary() -
     ):
         assert forbidden_core_detail not in watcher_loop_source
         assert forbidden_core_detail not in watcher_cli_source
-    assert (
-        'arguments = [*apply_command, "apply", "--json", "--automatic"]'
-        in watcher_boundary_source
-    )
+    assert graph["patchharbor_watcher.worker"] == frozenset({"patchharbor.api"})
+    assert "patchharbor.api" in graph["patchharbor_watcher.cli"]
+    assert "patchharbor_watcher.worker" in watcher_boundary_source
+    for module in watcher_modules:
+        assert "patchharbor.cli" not in _runtime_modules()[module].read_text(encoding="utf-8")
     assert "delegate_to_automatic_apply" in watcher_cli_source
     assert "delegate_to_apply" not in watcher_boundary_source
     assert "os.scandir" not in watcher_loop_source

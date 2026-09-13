@@ -405,3 +405,13 @@ Alle fachlichen Haupt-CLI-Aufrufe laufen über patchharbor.api. Der CLI-Adapter
 zu importieren. Bestehende JSON-/Result-Formate und Statuscodes bleiben erhalten.
 Nichtendliche CLI-Timeouts werden als ungültige Argumente abgewiesen. Der
 Watcher-Prozess-/Signalvertrag bleibt bis zum eigenen Schritt unverändert.
+
+
+## 2026-09-13 – API-3: Watcher über öffentliche Python-API
+
+Watcher-Startup nutzt die API mit derselben physischen Konfigurationsnachprüfung.
+Der beibehaltene Einzelprozess pro Poll ruft `api.apply_next()` ohne CLI-Parser
+auf und transportiert das bestehende Apply-JSON. Keine Änderungen an Scan,
+Replay, Recovery, Locks, Result-Erzeugung, Signalen oder Serviceinstallation.
+Fachliche Worker-, Konfigurations-, Prozessgrenzen- und Packaging-Prüfungen
+begleiten die Migration; keine neuen Tests der Konsolendarstellung.

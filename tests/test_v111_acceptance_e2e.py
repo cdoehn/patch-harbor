@@ -407,7 +407,6 @@ def test_v111_acceptance_watcher_delegates_to_real_apply_once(
 
     def delegate():
         return delegate_to_automatic_apply(
-            apply_command=(sys.executable, "-m", "patchharbor.cli"),
             environment=apply_environment,
         )
 

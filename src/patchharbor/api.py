@@ -105,10 +105,19 @@ def _configuration_result(result: tuple[Path, _application.UserConfiguration]) -
     )
 
 
-def configuration(*, observer: ProgressObserver | None = None) -> ConfigurationResult:
-    """Read the existing shared user configuration; do not create defaults."""
+def configuration(
+    *, revalidate: bool = False, observer: ProgressObserver | None = None,
+) -> ConfigurationResult:
+    """Read validated user configuration; never create defaults.
+
+    With revalidate=True, recheck the loaded physical Exchange target immediately
+    before returning it (the watcher startup contract). This does not reserve the
+    directory: each subsequent operation still performs its own safety checks.
+    """
+    if not isinstance(revalidate, bool):
+        raise TypeError("revalidate must be boolean")
     with _observe_activity(_observer(observer)):
-        return _configuration_result(_application.shared_configuration())
+        return _configuration_result(_application.shared_configuration(revalidate=revalidate))
 
 
 def configure_exchange_directory(

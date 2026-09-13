@@ -95,6 +95,7 @@ EXPECTED_RUNTIME_FILES = {
     "patchharbor_watcher/lifecycle.py",
     "patchharbor_watcher/apply_boundary.py",
     "patchharbor_watcher/systemd_linux.py",
+    "patchharbor_watcher/worker.py",
     "patchharbor/zip_payloads.py",
     "patchharbor/platform/__init__.py",
     "patchharbor/platform/errors.py",
@@ -384,6 +385,7 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
             f"{root}/src/patchharbor_watcher/lifecycle.py",
             f"{root}/src/patchharbor_watcher/apply_boundary.py",
             f"{root}/src/patchharbor_watcher/systemd_linux.py",
+            f"{root}/src/patchharbor_watcher/worker.py",
         ):
             assert required in names
         for forbidden in (

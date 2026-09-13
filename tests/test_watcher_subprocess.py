@@ -18,7 +18,7 @@ def test_default_apply_boundary_uses_the_current_installation() -> None:
     assert DEFAULT_APPLY_COMMAND == (
         sys.executable,
         "-m",
-        "patchharbor.cli",
+        "patchharbor_watcher.worker",
     )
 
 
@@ -42,7 +42,7 @@ raise SystemExit(9)
 
     assert completion.process_exit_code == 9
     assert completion.apply_result == {
-        "argv": ["apply", "--json", "--automatic"]
+        "argv": []
     }
     assert completion.invalid_response_text is None
 

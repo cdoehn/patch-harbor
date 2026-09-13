@@ -39,11 +39,14 @@ Return, vollständige MESSAGE-Blöcke und bisherige JSON-Schemata bleiben erhalt
 
 ## API-3: Watcher
 
-Separater Schritt: öffentliche API für automatische Verarbeitung und geteilte
+Öffentliche API für automatische Verarbeitung und geteilte
 Konfiguration verwenden. Den heutigen Subprozess-/Signal-/Abbruchvertrag vorher
 explizit abgleichen und funktional prüfen. Failed-Retry, Replay, globaler Scope,
 Betriebsprotokolle und Linux-Serviceverhalten bleiben erhalten. Keine eigene
-Scan- oder Apply-Logik im Watcher.
+Scan- oder Apply-Logik im Watcher. Pro Poll bleibt ein eigener Prozess erhalten;
+`patchharbor_watcher.worker` ruft `api.apply_next()` direkt auf und verwendet
+das bestehende Apply-JSON-Protokoll. Startup nutzt `api.configuration(revalidate=True)`.
+Signalhandler, Poll-Warteverhalten und Prozessgruppen werden nicht umgebaut.
 
 ## API-4: Release
 

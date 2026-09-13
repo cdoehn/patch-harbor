@@ -605,3 +605,13 @@ Die Paketversion bleibt bis dahin 1.1.1; dies ist noch kein 1.2.0-Release.
 
 Die Haupt-CLI verwendet bereits diese API für alle fachlichen Operationen.
 Der separate Watcher bleibt bis zu seinem eigenen Migrationsschritt unverändert.
+
+
+### Watcher als API-Verbraucher (API-3)
+
+Der Watcher liest die gemeinsame Konfiguration über
+`api.configuration(revalidate=True)`. Jeder automatische Poll bleibt ein eigener
+Prozess derselben Installation; dessen privater Worker ruft `api.apply_next()`
+direkt auf, nicht mehr den CLI-Parser. Betriebs-JSON, globaler Scope, Replay und
+Failed-Retry-Schutz bleiben erhalten. Die Prozess-/Signalgrenze und der Linux-
+Servicevertrag bleiben unverändert. Die Paketversion wird erst in API-4 angehoben.

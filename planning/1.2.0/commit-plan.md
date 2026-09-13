@@ -21,7 +21,7 @@ Gates des jeweiligen Pakets. Keine automatische Rückabwicklung bei Teilfehlern.
 3. **API-3** – `refactor(watcher): use public Python API`
    Watcher-Konfiguration und automatischen Poll migrieren; Prozess-/Signal-
    Verhalten und Betriebsprotokolle gesondert absichern.
-   Status: offen.
+   Status: implementiert im API-3-Schritt; Commit erst nach lokalem Gate.
 4. **API-4** – `release: finalize public Python API for 1.2.0`
    API-Audit, Dokumentation, Versionsanhebung und vollständige Release-Gates.
    Status: offen.

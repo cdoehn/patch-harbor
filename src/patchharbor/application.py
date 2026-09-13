@@ -215,10 +215,20 @@ def configure_archive_directory(name: str) -> tuple[Path, UserConfiguration]:
         return paths.configuration_path, write_prepared_configuration(paths, configuration)
 
 
-def shared_configuration() -> tuple[Path, UserConfiguration]:
-    """Return the currently persisted shared user configuration."""
+def shared_configuration(
+    *, revalidate: bool = False,
+) -> tuple[Path, UserConfiguration]:
+    """Return shared configuration, optionally rechecking its physical target.
+
+    Watcher startup previously performed this second check itself. Keeping it
+    here gives API consumers the same check without importing configuration
+    internals or changing ordinary configuration-show behavior.
+    """
     paths = configuration_user_paths()
-    return paths.configuration_path, load_configuration(paths)
+    configuration = load_configuration(paths)
+    if revalidate:
+        configuration = revalidate_exchange_directory(configuration)
+    return paths.configuration_path, configuration
 
 
 def resolve_patch_package(

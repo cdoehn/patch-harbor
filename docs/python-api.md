@@ -69,7 +69,8 @@ is a discovery scope, not an extra target constraint that could be ignored.
 `apply_next()` performs exactly one global automatic poll. It never retries a
 failed identity; the existing Core owns selection, replay, lock, revalidation,
 recovery and publication together. No separate select-then-apply token or stale
-validated package is exposed. The watcher is not migrated in this package.
+validated package is exposed. The watcher uses this operation in a separate
+worker process for each poll; the library itself never starts a polling loop.
 
 Dry-run still produces a Result Bundle when a repository can be safely resolved;
 it neither writes payload files nor executes, consumes replay or archives. API
@@ -192,6 +193,27 @@ The main `patchharbor` CLI now calls this API for every operation, including
 configuration, registry, context, bundles, Apply/Dry-Run, automatic Apply and
 fs-run. It passes its observer and sinks explicitly. JSON serializers,
 exit-code mapping, terminal styling, interactive selection and temporary `--log`
-files remain adapter concerns. The separate watcher still invokes that CLI in a
-subprocess until API-3; this already reaches the API indirectly without changing
-its process or stop semantics in this package.
+files remain adapter concerns. The separate watcher now calls `configuration(revalidate=True)`
+for startup and runs a private worker that calls `apply_next()` directly, preserving
+its process and stop semantics.
+
+
+## Watcher process boundary (API-3)
+
+`configuration(revalidate=True)` preserves the startup recheck of the loaded
+physical Exchange directory. The default remains `False`; ordinary reads still
+validate the configured directory and do not create a missing one. Revalidation
+is no reservation: automatic Apply rechecks state, locks and filesystem objects
+at its own existing mutation boundary.
+
+Each watcher poll starts the current installation's Python interpreter with
+`-m patchharbor_watcher.worker`. That private worker calls `api.apply_next()`
+without visible output sinks or observers and serializes the returned report
+using the existing Apply JSON envelope. The operational log schema, deduplication
+of idle/error records, global repository scope and automatic no-retry policy
+are unchanged. Raw script output remains in the Result Bundle, not in the JSON
+pipe. There are no new services, runtime dependencies, CLI flags, process groups,
+or signal handlers. The parent still stops between polls and waits for an active
+poll; existing OS/group/service signal delivery and Core process-tree cleanup
+remain responsible for interruption of that poll. This is not an in-process
+asynchronous or cancellable API.
