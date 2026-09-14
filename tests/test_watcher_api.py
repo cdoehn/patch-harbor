@@ -13,7 +13,7 @@ from patchharbor import application
 from patchharbor_watcher import cli as watcher_cli
 from patchharbor_watcher import worker
 from tests.platform_support import create_symlink_or_skip
-from tests.registration_support import set_isolated_user_environment
+from tests.registration_support import create_repository, set_isolated_user_environment
 
 
 @pytest.mark.parametrize("code", [0, 10, 11, 23, 124, 130])
@@ -52,81 +52,79 @@ def test_worker_never_disguises_unexpected_errors_as_idle(monkeypatch, failure):
         worker.main(stdout=StringIO(), stderr=StringIO())
 
 
-def test_watcher_startup_uses_only_public_configuration_recheck(monkeypatch, tmp_path):
+def test_watcher_startup_validates_registry_not_global_configuration(monkeypatch):
     calls = []
-    def configuration(**kwargs):
-        calls.append(kwargs)
-        return api.ConfigurationResult(tmp_path / "config.json", tmp_path, "", "Archive")
-    monkeypatch.setattr(api, "configuration", configuration)
-    assert watcher_cli._load_exchange_directory() == tmp_path
-    assert calls == [{"revalidate": True}]
+    monkeypatch.setattr(api, "repositories", lambda: calls.append("registry") or ())
+    monkeypatch.setattr(api, "configuration", lambda **kw: pytest.fail("global configuration read"))
+    monkeypatch.setattr(watcher_cli, "run_repository_watcher", lambda **kw: calls.append("loop"))
+    assert watcher_cli.main([], stdout=StringIO(), stderr=StringIO()) == 0
+    assert calls == ["registry", "loop"]
 
 
 @pytest.mark.parametrize("revalidate", [False, True])
-def test_configuration_facade_preserves_explicit_recheck_option(monkeypatch, tmp_path, revalidate):
+def test_configuration_facade_preserves_repository_and_recheck(monkeypatch, tmp_path, revalidate):
     calls = []
     settings = SimpleNamespace(exchange_directory=tmp_path, bundle_suffix="", archive_directory="Archive")
-    def shared(**kwargs):
-        calls.append(kwargs)
+    def local(repository, **kwargs):
+        calls.append((repository, kwargs))
         return tmp_path / "config.json", settings
-    monkeypatch.setattr(application, "shared_configuration", shared)
-    assert api.configuration(revalidate=revalidate).exchange_directory == tmp_path
-    assert calls == [{"revalidate": revalidate}]
+    monkeypatch.setattr(application, "repository_configuration", local)
+    assert api.configuration(tmp_path, revalidate=revalidate).exchange_directory == tmp_path
+    assert calls == [(tmp_path, {"revalidate": revalidate})]
 
 
 @pytest.mark.parametrize("value", [None, 1, "yes", object()])
 def test_configuration_recheck_requires_boolean_before_core(monkeypatch, value):
-    def forbidden(**kwargs):
-        pytest.fail("invalid options must not reach Core")
-    monkeypatch.setattr(application, "shared_configuration", forbidden)
+    monkeypatch.setattr(application, "repository_configuration", lambda *a, **kw: pytest.fail("invalid options reached Core"))
     with pytest.raises(TypeError):
         api.configuration(revalidate=value)
 
 
-def test_application_rechecks_loaded_configuration_without_reimplementation(monkeypatch, tmp_path):
+def test_application_rechecks_loaded_local_configuration(monkeypatch, tmp_path):
+    set_isolated_user_environment(monkeypatch, tmp_path / "user")
+    repo = create_repository(tmp_path / "repo")
+    api.register(repo)
+    api.configure_exchange_directory(tmp_path / "exchange", repository=repo)
     calls = []
-    settings = object()
-    paths = SimpleNamespace(configuration_path=tmp_path / "config.json")
-    monkeypatch.setattr(application, "configuration_user_paths", lambda: paths)
-    monkeypatch.setattr(application, "load_configuration", lambda received: settings)
-    def recheck(received):
-        assert received is settings
-        calls.append(received)
-        return received
+    original = application.revalidate_exchange_directory
+    def recheck(settings):
+        calls.append(settings)
+        return original(settings)
     monkeypatch.setattr(application, "revalidate_exchange_directory", recheck)
-    assert application.shared_configuration() == (paths.configuration_path, settings)
+    application.repository_configuration(repo)
     assert calls == []
-    assert application.shared_configuration(revalidate=True) == (paths.configuration_path, settings)
-    assert calls == [settings]
+    application.repository_configuration(repo, revalidate=True)
+    assert len(calls) == 1
 
 
 def test_recheck_rejects_target_replacement_between_load_and_use(monkeypatch, tmp_path):
     set_isolated_user_environment(monkeypatch, tmp_path / "user")
+    repo = create_repository(tmp_path / "repo")
+    api.register(repo)
     exchange = tmp_path / "exchange"
-    api.configure_exchange_directory(exchange)
+    api.configure_exchange_directory(exchange, repository=repo)
     replacement = tmp_path / "replacement"
     replacement.mkdir()
     original_load = application.load_configuration
-
-    def replace_after_load(paths):
-        settings = original_load(paths)
+    def replace_after_load(paths, **kwargs):
+        settings = original_load(paths, **kwargs)
         exchange.rename(tmp_path / "old-exchange")
         create_symlink_or_skip(exchange, replacement, target_is_directory=True)
         return settings
-
     monkeypatch.setattr(application, "load_configuration", replace_after_load)
     with pytest.raises(api.PatchHarborError) as captured:
-        api.configuration(revalidate=True)
+        api.configuration(repo, revalidate=True)
     assert captured.value.error_kind is api.ErrorKind.CONFIGURATION_ERROR
     assert list(replacement.iterdir()) == []
 
 
-def test_watcher_configuration_validation_never_creates_missing_exchange(monkeypatch, tmp_path):
+def test_watcher_validation_never_creates_missing_exchange(monkeypatch, tmp_path):
     set_isolated_user_environment(monkeypatch, tmp_path / "user")
+    repo = create_repository(tmp_path / "repo")
+    api.register(repo)
     exchange = tmp_path / "exchange"
-    api.configure_exchange_directory(exchange)
+    api.configure_exchange_directory(exchange, repository=repo)
     exchange.rmdir()
-    with pytest.raises(api.PatchHarborError) as captured:
-        watcher_cli._load_exchange_directory()
-    assert captured.value.error_kind is api.ErrorKind.CONFIGURATION_ERROR
+    report = api.apply_next()
+    assert report.process_exit_code != 0
     assert not exchange.exists()

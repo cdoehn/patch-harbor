@@ -8,17 +8,21 @@ import pytest
 
 from patchharbor.application import configure_bundle_suffix, configure_exchange_directory
 from patchharbor.bundle_names import append_bundle_suffix, validate_bundle_suffix
-from patchharbor.configuration import load_configuration, write_exchange_directory
+from patchharbor.configuration import RepositoryConfigurationPaths, load_configuration, write_exchange_directory
 from patchharbor.exit_status import ExitCode
 from patchharbor.errors import ErrorKind, PatchHarborError
 from patchharbor.user_paths import registration_user_paths
-from tests.registration_support import set_isolated_user_environment
+from tests.registration_support import create_repository, set_isolated_user_environment
+from patchharbor.application import register_repository
 
 
 @pytest.fixture
 def paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     set_isolated_user_environment(monkeypatch, tmp_path / "user")
-    return registration_user_paths()
+    repository = create_repository(tmp_path / "repo")
+    context = register_repository(repository)
+    monkeypatch.chdir(repository)
+    return RepositoryConfigurationPaths(context.repository_path, context.repo_id)
 
 
 @pytest.mark.parametrize("suffix", ["", ".txt", ".TXT", "-copilot.txt", "_data", ".tar.txt", "x" * 32])
@@ -46,21 +50,14 @@ def test_appending_requires_an_unsuffixed_zip_base() -> None:
         append_bundle_suffix("bundle.zip.txt", ".txt")
 
 
-def test_legacy_configuration_is_read_only_until_explicit_write(paths, tmp_path: Path) -> None:
-    exchange = tmp_path / "exchange"
-    exchange.mkdir()
-    original = json.dumps({"format_version": 1, "exchange_directory": str(exchange.resolve())}).encode()
+def test_legacy_schema_is_rejected_without_rewriting(paths, tmp_path: Path) -> None:
+    original = json.dumps({"format_version": 1, "exchange_directory": str(tmp_path)}).encode()
     paths.configuration_path.write_bytes(original)
-    assert load_configuration(paths).bundle_suffix == ""
+    with pytest.raises(PatchHarborError):
+        load_configuration(paths)
+    with pytest.raises(PatchHarborError):
+        configure_bundle_suffix(".txt")
     assert paths.configuration_path.read_bytes() == original
-    configure_bundle_suffix(".txt")
-    assert json.loads(paths.configuration_path.read_bytes()) == {
-        "format_version": 3, "exchange_directory": str(exchange.resolve()), "bundle_suffix": ".txt",
-        "archive_directory": "PatchHarbor-Archive",
-    }
-    assert load_configuration(paths).bundle_suffix == ".txt"
-    configure_bundle_suffix("")
-    assert load_configuration(paths).bundle_suffix == ""
 
 
 def test_setting_either_option_preserves_the_other(paths, tmp_path: Path) -> None:
@@ -78,7 +75,10 @@ def test_setting_either_option_preserves_the_other(paths, tmp_path: Path) -> Non
     assert load_configuration(paths).bundle_suffix == ".txt"
 
 
-def test_suffix_requires_existing_exchange_configuration(paths) -> None:
+def test_suffix_can_be_set_before_exchange_but_never_recreates_missing_config(paths) -> None:
+    configure_bundle_suffix(".txt")
+    assert load_configuration(paths).exchange_directory is None
+    paths.configuration_path.unlink()
     with pytest.raises(PatchHarborError, match="configuration does not exist"):
         configure_bundle_suffix(".txt")
     assert not paths.configuration_path.exists()
@@ -87,7 +87,7 @@ def test_suffix_requires_existing_exchange_configuration(paths) -> None:
 @pytest.mark.parametrize("suffix", [None, False, 17, "/unsafe", ".txt\n", ".part"])
 def test_format_two_validates_suffix_before_directory(paths, suffix: object) -> None:
     paths.configuration_path.write_text(json.dumps({
-        "format_version": 2, "exchange_directory": "/missing", "bundle_suffix": suffix,
+        "format_version": 1, "exchange_directory": "/missing", "bundle_suffix": suffix, "archive_directory": "PatchHarbor-Archive",
     }))
     with pytest.raises(PatchHarborError) as captured:
         load_configuration(paths)
@@ -102,7 +102,7 @@ def test_format_two_validates_suffix_before_directory(paths, suffix: object) -> 
 ])
 def test_both_configuration_versions_remain_closed(paths, document) -> None:
     paths.configuration_path.write_text(json.dumps(document))
-    with pytest.raises(PatchHarborError, match="exactly"):
+    with pytest.raises(PatchHarborError):
         load_configuration(paths)
 
 

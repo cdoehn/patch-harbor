@@ -1,4 +1,4 @@
-"""Physical separation policy for the shared exchange directory and repositories."""
+"""Physical separation policy for Exchange directories and repositories."""
 
 from __future__ import annotations
 
@@ -59,7 +59,7 @@ def require_repository_outside_exchange(
     if _paths_overlap(
         exchange_directory,
         repository,
-        exchange_must_exist=True,
+        exchange_must_exist=False,
         repository_must_exist=True,
     ):
         raise ExchangePathPolicyError(

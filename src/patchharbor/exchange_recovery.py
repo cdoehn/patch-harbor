@@ -12,8 +12,9 @@ from patchharbor.progress import activity
 from patchharbor.archive_evidence import ArchiveEvidence, parse_archive_evidence
 from patchharbor.archive_git import is_ancestor, is_proven_result_state
 from patchharbor.configuration import (
-    UserConfiguration, load_configuration, revalidate_exchange_directory,
+    RepositoryConfiguration, load_configuration, revalidate_exchange_directory,
 )
+from patchharbor.configuration_context import configuration_paths_for_id
 from patchharbor.errors import PatchHarborError
 from patchharbor.exchange import (
     ExchangeArtifact, ExchangeArtifactKind, ExchangeScanError,
@@ -67,8 +68,8 @@ def _proven_result(
 
 
 def recover_exchange_artifacts(
-    artifacts: tuple[ExchangeArtifact, ...], *, configuration: UserConfiguration,
-    paths: RegistrationUserPaths, repository_id: RepositoryId | None,
+    artifacts: tuple[ExchangeArtifact, ...], *, configuration: RepositoryConfiguration,
+    paths: RegistrationUserPaths, repository_id: RepositoryId,
 ) -> tuple[ExchangeArtifact, ...]:
     """Repair only this scan's scope before archival, even when archival is off.
 
@@ -83,7 +84,7 @@ def recover_exchange_artifacts(
             record.apply_status is ExchangeApplyStatus.ATTEMPTED
             and record.attempt_run_id is not None and record.result_sha256 is not None
             and record.manifest is not None
-            and (repository_id is None or record.manifest.repo_id == repository_id)
+            and record.manifest.repo_id == repository_id
         ))
         if not pending:
             activity("RECOVERY", "No in-scope attempted entries with pinned Result evidence", "detail")
@@ -94,9 +95,10 @@ def recover_exchange_artifacts(
             if artifact.kind is ExchangeArtifactKind.RESULT_BUNDLE:
                 results.setdefault(artifact.identity.sha256, []).append(artifact)
         with registry_lock(paths):
-            if revalidate_exchange_directory(load_configuration(paths)) != configuration:
-                return artifacts
             registry = load_registry(paths)
+            local = configuration_paths_for_id(repository_id, registry)
+            if revalidate_exchange_directory(load_configuration(local)) != configuration:
+                return artifacts
             require_exchange_outside_registry(configuration.exchange_directory, registry,
                                               exchange_must_exist=True)
         changed = False
@@ -137,7 +139,7 @@ def recover_exchange_artifacts(
                         with registry_lock(paths):
                             def verify_evidence() -> None:
                                 if (load_registry(paths) != registry
-                                    or revalidate_exchange_directory(load_configuration(paths)) != configuration
+                                    or revalidate_exchange_directory(load_configuration(local)) != configuration
                                     or inspect_repository(context.repository_path.value) != context.repository_path):
                                     raise ValueError("recovery repository/configuration changed")
                                 require_local_repository_identity(context.repository_path, selected_id)
@@ -153,7 +155,7 @@ def recover_exchange_artifacts(
                                 )
                                 if observed != context or not _proven_result(record, evidence, observed):
                                     raise ValueError("recovery Git/state proof changed")
-                                if (load_registry(paths) != registry or load_configuration(paths) != configuration):
+                                if (load_registry(paths) != registry or load_configuration(local) != configuration):
                                     raise ValueError("recovery registration/configuration changed")
                                 require_local_repository_identity(context.repository_path, selected_id)
 

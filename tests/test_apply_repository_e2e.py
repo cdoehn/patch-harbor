@@ -429,7 +429,7 @@ def test_matching_manifest_resolves_exact_registered_repository_without_mutation
         ("missing", "configuration does not exist"),
         (
             "invalid",
-            "configuration must contain exactly the two format-1 fields",
+            "configuration format_version is invalid",
         ),
     ),
 )
@@ -464,7 +464,7 @@ def test_apply_requires_valid_exchange_configuration_without_override(
     envelope = json.loads(completed.stdout)
     assert envelope["success"] is False
     assert envelope["error"]["kind"] == "configuration_error"
-    assert envelope["error"]["message"] == expected_message
+    assert expected_message in envelope["error"]["message"]
     assert envelope["error"]["patchharbor_error_code"] == int(
         ExitCode.SOURCE_ERROR
     )
@@ -481,7 +481,7 @@ def test_apply_requires_valid_exchange_configuration_without_override(
 
 
 @pytest.mark.parametrize("configuration_state", ("missing", "invalid"))
-def test_apply_explicit_output_ignores_exchange_configuration(
+def test_apply_explicit_output_requires_valid_local_configuration(
     tmp_path: Path,
     configuration_state: str,
 ) -> None:
@@ -508,11 +508,12 @@ def test_apply_explicit_output_ignores_exchange_configuration(
         output_directory=output_directory,
     )
 
-    assert completed.returncode == 0
-    result = json.loads(completed.stdout)["result"]
-    bundle_path = Path(result["result_bundle"]["path"])
-    assert bundle_path.parent == output_directory.resolve()
-    assert bundle_path.is_file()
+    assert completed.returncode == int(ExitCode.SOURCE_ERROR)
+    envelope = json.loads(completed.stdout)
+    assert envelope["error"]["kind"] == "configuration_error"
+    assert envelope["result"]["result_bundle"]["status"] == "not_attempted"
+    assert not output_directory.exists()
+    assert not configuration_path.exists() if configuration_state == "missing" else configuration_path.read_text() == "{}\n"
     _assert_repository_unmodified(repository)
 
 

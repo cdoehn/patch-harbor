@@ -308,6 +308,10 @@ def _create_repository_with_copied_identity(
     copied_identity.write_bytes(
         (source / ".patchharbor" / "id").read_bytes()
     )
+    (copied_identity.parent / "config.json").write_bytes(
+        (source / ".patchharbor" / "config.json").read_bytes()
+    )
+    local_exclude_path(copied).write_bytes(local_exclude_path(source).read_bytes())
     return copied
 
 
@@ -371,22 +375,26 @@ def test_register_rejects_a_copied_identity_while_both_paths_exist(
     assert _registered_id(copied) == repo_id
 
 
-def test_register_replaces_a_lost_identity_and_removes_the_old_path_mapping(
+def test_register_does_not_repair_a_lost_identity_or_replace_its_mapping(
     tmp_path: Path,
 ) -> None:
     repository = create_repository(tmp_path / "repository")
     registered = run_cli(repository, "register")
     assert registered.returncode == 0
     old_id = _registered_id(repository)
+    config_path = repository / ".patchharbor" / "config.json"
+    config_before = config_path.read_bytes()
+    registry_before = _registry_path().read_bytes()
     (repository / ".patchharbor" / "id").unlink()
 
     completed = run_cli(repository, "register")
 
-    assert completed.returncode == 0
-    new_id = _registered_id(repository)
-    assert new_id != old_id
+    assert completed.returncode == 8
+    assert not (repository / ".patchharbor" / "id").exists()
+    assert config_path.read_bytes() == config_before
+    assert _registry_path().read_bytes() == registry_before
     assert _registry_repositories() == {
-        new_id: str(repository.resolve()),
+        old_id: str(repository.resolve()),
     }
 
 

@@ -9,6 +9,7 @@ from pathlib import Path
 
 from patchharbor.progress import activity
 
+from patchharbor.configuration_context import configuration_paths_for_id
 from patchharbor.errors import repository_resolution_error
 from patchharbor.locks import (
     registry_lock,
@@ -143,7 +144,7 @@ def safely_resolved_repository(
             target = prepare_result_bundle_target(
                 output_directory,
                 initial_registry,
-                paths,
+                configuration_paths_for_id(manifest.repo_id, initial_registry),
                 filename=result_bundle_filename(
                     session,
                     repository_name=expected_repository.value.name,
@@ -183,7 +184,7 @@ def safely_resolved_repository(
                 locked_path,
                 manifest.repo_id,
             )
-            revalidate_result_bundle_target(target, locked_registry, paths)
+            revalidate_result_bundle_target(target, locked_registry)
 
         activity("STATE", f"Capture locked repository context: {locked_repository}")
         snapshot = capture_consistent_repository_snapshot(locked_repository)

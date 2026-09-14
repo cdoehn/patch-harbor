@@ -22,7 +22,7 @@ def workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     repository = create_repository(tmp_path / "repo")
     context = api.register(repository)
     exchange = tmp_path / "exchange"
-    api.configure_exchange_directory(exchange)
+    api.configure_exchange_directory(exchange, repository=repository)
     return repository, context, exchange
 
 
@@ -49,9 +49,9 @@ def test_repository_configuration_and_bundle_are_structured_and_silent(
     repo, original, exchange = workspace
     assert api.context(repo) == original
     assert api.repositories().repositories[0].status is api.RegistryStatus.OK
-    assert api.configuration().exchange_directory == exchange.resolve()
-    assert api.configure_bundle_suffix(".txt").bundle_suffix == ".txt"
-    assert api.configure_archive_directory("").archive_directory == ""
+    assert api.configuration(repo).exchange_directory == exchange.resolve()
+    assert api.configure_bundle_suffix(".txt", repository=repo).bundle_suffix == ".txt"
+    assert api.configure_archive_directory("", repository=repo).archive_directory == ""
     bundled = api.bundle(repo)
     assert bundled.context == original
     assert bundled.path.exists() and bundled.path.name.endswith(".zip.txt")
@@ -142,6 +142,7 @@ def test_repository_argument_scopes_manual_discovery_without_chdir(workspace, tm
     repo, context, exchange = workspace
     other = create_repository(tmp_path / "other")
     other_context = api.register(other)
+    api.configure_exchange_directory(exchange, repository=other)
     write_package(exchange / "local.zip", context)
     write_package(exchange / "foreign.zip", other_context)
     os.utime(exchange / "local.zip", ns=(1000000, 1000000))

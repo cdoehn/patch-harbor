@@ -30,13 +30,15 @@ from patchharbor.exchange_recovery import recover_exchange_artifacts
 from patchharbor.bundle_names import validate_bundle_suffix
 from patchharbor.bundles import resolve_patch_bundle
 from patchharbor.configuration import (
-    UserConfiguration,
+    RepositoryConfiguration, RepositoryConfigurationPaths,
     load_configuration,
-    load_configuration_if_present,
     prepare_exchange_directory,
     resolve_exchange_directory_candidate,
     revalidate_exchange_directory,
     write_prepared_configuration,
+)
+from patchharbor.configuration_context import (
+    configuration_paths_for_id, configuration_paths_for_repository,
 )
 from patchharbor.errors import (
     ErrorKind,
@@ -73,13 +75,13 @@ from patchharbor.execution import (
     execute_prepared_script_with_log,
     execute_script_text,
 )
-from patchharbor.locks import registry_lock
+from patchharbor.locks import registry_lock, repository_lock
 from patchharbor.models import (
     BundleScript,
     GitObjectId,
     InputArtifact,
     RegistryListResult,
-    RegistrySnapshot,
+    RegistrySnapshot, RegistryStatus,
     RepositoryContext,
     RepositoryId,
     RepositoryPath,
@@ -102,6 +104,7 @@ from patchharbor.registration import (
     unregister_local_repository,
 )
 from patchharbor.registry import load_registry
+from patchharbor.repository import registered_repository_status
 from patchharbor.repository_state import (
     capture_consistent_repository_snapshot,
     repository_context_from_snapshot,
@@ -149,86 +152,84 @@ def _require_exchange_configuration_allowed(
         raise configuration_error(str(exc)) from exc
 
 
-def configure_exchange_directory(path: Path) -> tuple[Path, UserConfiguration]:
-    """Persist one registry-safe shared exchange directory under the global lock."""
+def _change_repository_configuration(
+    repository: Path,
+    change: Callable[[RepositoryConfigurationPaths, RepositoryConfiguration, RegistrySnapshot], RepositoryConfiguration],
+) -> tuple[Path, RepositoryConfiguration]:
+    """Serialize local setting updates with registration and running Apply."""
     paths = configuration_user_paths()
-    candidate = resolve_exchange_directory_candidate(path)
     with registry_lock(paths):
         expected_registry = load_registry(paths)
-        _require_exchange_configuration_allowed(
-            candidate,
-            expected_registry,
-            exchange_must_exist=False,
-        )
-        configuration = prepare_exchange_directory(paths, path)
-        _require_exchange_configuration_allowed(
-            configuration.exchange_directory,
-            expected_registry,
-            exchange_must_exist=True,
-        )
-
-        current_registry = load_registry(paths)
-        if current_registry != expected_registry:
-            raise registry_error(
-                "repository registry changed while configuring exchange directory"
-            )
-        configuration = revalidate_exchange_directory(configuration)
-        _require_exchange_configuration_allowed(
-            configuration.exchange_directory,
-            current_registry,
-            exchange_must_exist=True,
-        )
-        return (
-            paths.configuration_path,
-            write_prepared_configuration(paths, configuration),
-        )
+        local = configuration_paths_for_repository(repository, expected_registry)
+        with repository_lock(paths, local.repo_id):
+            previous = load_configuration(local, validate_directory=False)
+            updated = change(local, previous, expected_registry)
+            if load_registry(paths) != expected_registry:
+                raise registry_error("repository registry changed while configuring exchange directory")
+            if configuration_paths_for_repository(repository, expected_registry) != local:
+                raise repository_resolution_error("repository identity changed while configuring")
+            if load_configuration(local, validate_directory=False) != previous:
+                raise configuration_error("repository configuration changed while configuring")
+            if updated.exchange_directory is not None:
+                revalidate_exchange_directory(updated)
+                _require_exchange_configuration_allowed(
+                    updated.exchange_directory, expected_registry, exchange_must_exist=True,
+                )
+            return local.configuration_path, write_prepared_configuration(local, updated)
 
 
-def configure_bundle_suffix(suffix: str) -> tuple[Path, UserConfiguration]:
-    """Update only the suffix, under the shared registry/configuration lock."""
+def configure_exchange_directory(
+    path: Path, *, repository: Path = Path("."),
+) -> tuple[Path, RepositoryConfiguration]:
+    """Persist the current (or explicitly selected API) repository's Exchange."""
+    def change(local, previous, registry):
+        candidate = resolve_exchange_directory_candidate(path)
+        _require_exchange_configuration_allowed(candidate, registry, exchange_must_exist=False)
+        return prepare_exchange_directory(local, path)
+    return _change_repository_configuration(repository, change)
+
+
+def configure_bundle_suffix(
+    suffix: str, *, repository: Path = Path("."),
+) -> tuple[Path, RepositoryConfiguration]:
+    """Change this repository's suffix, including before Exchange is configured."""
     try:
         suffix = validate_bundle_suffix(suffix)
     except ValueError as exc:
         raise configuration_error(str(exc)) from exc
-    paths = configuration_user_paths()
-    with registry_lock(paths):
-        configuration = replace(load_configuration(paths), bundle_suffix=suffix)
-        registry = load_registry(paths)
-        _require_exchange_configuration_allowed(
-            configuration.exchange_directory, registry, exchange_must_exist=True,
-        )
-        return paths.configuration_path, write_prepared_configuration(paths, configuration)
+    return _change_repository_configuration(
+        repository, lambda local, previous, registry: replace(previous, bundle_suffix=suffix),
+    )
 
 
-def configure_archive_directory(name: str) -> tuple[Path, UserConfiguration]:
-    """Persist one archive child name using the existing shared config workflow."""
+def configure_archive_directory(
+    name: str, *, repository: Path = Path("."),
+) -> tuple[Path, RepositoryConfiguration]:
+    """Change this repository's archive child name; empty means disabled."""
     try:
         name = validate_archive_directory(name)
     except ValueError as exc:
         raise configuration_error(str(exc)) from exc
+    return _change_repository_configuration(
+        repository, lambda local, previous, registry: replace(previous, archive_directory=name),
+    )
+
+
+def repository_configuration(
+    repository: Path = Path("."), *, revalidate: bool = False,
+) -> tuple[Path, RepositoryConfiguration]:
+    """Read only the selected registered repository's valid local settings."""
     paths = configuration_user_paths()
     with registry_lock(paths):
-        configuration = replace(load_configuration(paths), archive_directory=name)
-        _require_exchange_configuration_allowed(
-            configuration.exchange_directory, load_registry(paths), exchange_must_exist=True,
-        )
-        return paths.configuration_path, write_prepared_configuration(paths, configuration)
-
-
-def shared_configuration(
-    *, revalidate: bool = False,
-) -> tuple[Path, UserConfiguration]:
-    """Return shared configuration, optionally rechecking its physical target.
-
-    Watcher startup previously performed this second check itself. Keeping it
-    here gives API consumers the same check without importing configuration
-    internals or changing ordinary configuration-show behavior.
-    """
-    paths = configuration_user_paths()
-    configuration = load_configuration(paths)
-    if revalidate:
-        configuration = revalidate_exchange_directory(configuration)
-    return paths.configuration_path, configuration
+        registry = load_registry(paths)
+        local = configuration_paths_for_repository(repository, registry)
+        configuration = load_configuration(local, validate_directory=False)
+        if revalidate:
+            revalidate_exchange_directory(configuration)
+            _require_exchange_configuration_allowed(
+                configuration.exchange_directory, registry, exchange_must_exist=True,
+            )
+        return local.configuration_path, configuration
 
 
 def resolve_patch_package(
@@ -268,7 +269,8 @@ class DiscoveredExchangePatch:
     artifact: ExchangeArtifact
     package: ValidatedPatchPackage
     paths: RegistrationUserPaths
-    configuration: UserConfiguration
+    configuration: RepositoryConfiguration
+    configuration_paths: RepositoryConfigurationPaths
     retry_failed: bool = False
     explicitly_selected: bool = False
 
@@ -296,7 +298,7 @@ class DiscoveredExchangePatch:
 
         def verify_identity() -> None:
             current_configuration = revalidate_exchange_directory(
-                load_configuration(self.paths)
+                load_configuration(self.configuration_paths)
             )
             if current_configuration != self.configuration:
                 raise configuration_error(
@@ -351,27 +353,22 @@ class DiscoveredExchangePatch:
 
 def _revalidate_exchange_discovery(
     paths: RegistrationUserPaths,
-    expected_configuration: UserConfiguration,
+    expected_settings: dict[RepositoryId, tuple[RepositoryConfigurationPaths, RepositoryConfiguration]],
     expected_registry: RegistrySnapshot,
 ) -> None:
-    current_configuration = revalidate_exchange_directory(
-        load_configuration(paths)
-    )
-    if current_configuration != expected_configuration:
-        raise configuration_error(
-            "exchange directory changed during automatic patch discovery"
-        )
     with registry_lock(paths):
         current_registry = load_registry(paths)
         if current_registry != expected_registry:
-            raise registry_error(
-                "repository registry changed during automatic patch discovery"
+            raise registry_error("repository registry changed during automatic patch discovery")
+        for repo_id, (local, expected) in expected_settings.items():
+            if configuration_paths_for_id(repo_id, current_registry) != local:
+                raise repository_resolution_error("repository identity changed during discovery")
+            current = revalidate_exchange_directory(load_configuration(local))
+            if current != expected:
+                raise configuration_error("repository configuration changed during automatic patch discovery")
+            _require_exchange_configuration_allowed(
+                current.exchange_directory, current_registry, exchange_must_exist=True,
             )
-        _require_exchange_configuration_allowed(
-            current_configuration.exchange_directory,
-            current_registry,
-            exchange_must_exist=True,
-        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -429,6 +426,7 @@ def _select_exchange_candidate(
         key=lambda artifact: (
             -artifact.mtime_ns,
             *_candidate_filename_key(artifact),
+            str(artifact.path),
         ),
     )
 
@@ -460,35 +458,54 @@ def discover_exchange_patch(
     """Return the newest eligible package inside one selection scope."""
     activity("DISCOVER", "Load Exchange configuration and repository registry", "heading")
     paths = configuration_user_paths()
-    configuration = revalidate_exchange_directory(load_configuration(paths))
+    settings: dict[RepositoryId, tuple[RepositoryConfigurationPaths, RepositoryConfiguration]] = {}
+    groups: dict[Path, list[RepositoryId]] = {}
     with registry_lock(paths):
         registry = load_registry(paths)
-        _require_exchange_configuration_allowed(
-            configuration.exchange_directory,
-            registry,
-            exchange_must_exist=True,
-        )
+        for mapping in registry.repositories:
+            scoped = scope.repository_context
+            if scoped is not None and mapping.repo_id != scoped.repo_id:
+                continue
+            if scoped is None and registered_repository_status(
+                mapping.repository_path, mapping.repo_id,
+            ) is RegistryStatus.MISSING:
+                continue
+            local = configuration_paths_for_id(mapping.repo_id, registry)
+            configuration = load_configuration(local)
+            if configuration.exchange_directory is None and scoped is None:
+                # Freshly registered but not configured yet: it has no watched directory.
+                activity("DISCOVER", f"Repository has no Exchange configured: {mapping.repository_path}", "warning")
+                continue
+            revalidate_exchange_directory(configuration)
+            _require_exchange_configuration_allowed(
+                configuration.exchange_directory, registry, exchange_must_exist=True,
+            )
+            settings[mapping.repo_id] = local, configuration
+            groups.setdefault(configuration.exchange_directory, []).append(mapping.repo_id)
+        if scope.repository_context is not None and scope.repository_context.repo_id not in settings:
+            raise repository_resolution_error("current repository is no longer registered")
 
-    try:
-        artifacts = scan_exchange_directory(
-            configuration.exchange_directory,
-            paths=paths,
-        )
-    except ExchangeScanError as exc:
-        raise configuration_error("cannot scan exchange directory") from exc
-
-    if archive:
-        artifacts = recover_exchange_artifacts(
-            artifacts, configuration=configuration, paths=paths,
-            repository_id=(scope.repository_context.repo_id if scope.repository_context else None),
-        )
-        maintenance = archive_exchange_artifacts(
-            artifacts, configuration=configuration, paths=paths,
-            repository_id=(scope.repository_context.repo_id if scope.repository_context else None),
-        )
-        artifacts = maintenance.remaining
-        if output is not None:
-            output.write_warnings(maintenance.warnings)
+    found: list[ExchangeArtifact] = []
+    # Shared physical paths are scanned once. Maintenance is still strictly per repo.
+    for directory in sorted(groups, key=str):
+        try:
+            artifacts = scan_exchange_directory(directory, paths=paths)
+        except ExchangeScanError as exc:
+            raise configuration_error(f"cannot scan exchange directory: {directory}") from exc
+        if archive:
+            for repo_id in groups[directory]:
+                local, configuration = settings[repo_id]
+                artifacts = recover_exchange_artifacts(
+                    artifacts, configuration=configuration, paths=paths, repository_id=repo_id,
+                )
+                maintenance = archive_exchange_artifacts(
+                    artifacts, configuration=configuration, paths=paths, repository_id=repo_id,
+                )
+                artifacts = maintenance.remaining
+                if output is not None:
+                    output.write_warnings(maintenance.warnings)
+        found.extend(artifacts)
+    artifacts = tuple(found)
 
     matches: list[ExchangeArtifact] = []
     contexts: dict[RepositoryId, RepositoryContext | None] = {}
@@ -502,6 +519,10 @@ def discover_exchange_patch(
         selection = artifact.selection
         if selection is None:
             raise RuntimeError("Patch Package artifact has no selection data")
+        target_settings = settings.get(selection.repo_id)
+        if target_settings is None or artifact.path.parent != target_settings[1].exchange_directory:
+            activity("SKIP", f"{artifact.path.name}: not in its repository's configured Exchange", "detail")
+            continue
         context = _context_for_exchange_candidate(selection, scope, contexts)
         if context is None:
             activity("SKIP", f"{artifact.path.name}: repository outside scope or unavailable", "detail")
@@ -522,7 +543,7 @@ def discover_exchange_patch(
         activity("MATCH", f"{artifact.path.name}: eligible, mtime_ns={artifact.mtime_ns}", "success")
         matches.append(artifact)
 
-    _revalidate_exchange_discovery(paths, configuration, registry)
+    _revalidate_exchange_discovery(paths, settings, registry)
 
     if not matches:
         activity("SELECT", "No eligible patch remains after content, scope, state and replay checks", "warning")
@@ -537,11 +558,12 @@ def discover_exchange_patch(
     artifact = _select_exchange_candidate(matches)
     activity("SELECT", f"Selected newest eligible patch: {artifact.path.name} "
              f"from {len(matches)} match(es); mtime_ns={artifact.mtime_ns}", "success")
+    assert artifact.selection is not None
+    local, configuration = settings[artifact.selection.repo_id]
     package = materialize_exchange_patch(
-        artifact,
-        directory=configuration.exchange_directory,
+        artifact, directory=configuration.exchange_directory,
     )
-    _revalidate_exchange_discovery(paths, configuration, registry)
+    _revalidate_exchange_discovery(paths, settings, registry)
     context = contexts.get(package.manifest.repo_id)
     if context is None or not _manifest_matches_context(package.manifest, context):
         raise patch_package_error(
@@ -552,6 +574,7 @@ def discover_exchange_patch(
         package=package,
         paths=paths,
         configuration=configuration,
+        configuration_paths=local,
         retry_failed=(artifact.apply_status is ExchangeApplyStatus.FAILED),
     )
 
@@ -559,26 +582,22 @@ def discover_exchange_patch(
 def _maintain_explicit_exchange(
     package: ValidatedPatchPackage, path: Path, *, output: OutputTargets | None,
 ) -> DiscoveredExchangePatch | None:
-    """Maintain this explicit target's scope without ever archiving the chosen ZIP.
-
-    Track direct Exchange packages in the same lifecycle ledger, but an explicit
-    path remains a deliberate selection and bypasses automatic retry filtering.
-    No configuration/scan is required for packages outside Exchange.
-    """
+    """Optional maintenance for the manifest's repository, never for the CWD."""
     try:
         paths = configuration_user_paths()
-        configuration = load_configuration_if_present(paths)
-        if configuration is None:
-            return None
         with registry_lock(paths):
+            registry = load_registry(paths)
+            local = configuration_paths_for_id(package.manifest.repo_id, registry)
+            configuration = load_configuration(local)
+            if configuration.exchange_directory is None:
+                return None
             _require_exchange_configuration_allowed(
-                configuration.exchange_directory, load_registry(paths), exchange_must_exist=True,
+                configuration.exchange_directory, registry, exchange_must_exist=True,
             )
         selected = path.resolve(strict=True)
         artifacts = scan_exchange_directory(configuration.exchange_directory, paths=paths)
         artifacts = recover_exchange_artifacts(
-            artifacts, configuration=configuration, paths=paths,
-            repository_id=package.manifest.repo_id,
+            artifacts, configuration=configuration, paths=paths, repository_id=package.manifest.repo_id,
         )
         maintenance = archive_exchange_artifacts(
             artifacts, configuration=configuration, paths=paths,
@@ -591,32 +610,35 @@ def _maintain_explicit_exchange(
                 materialized = materialize_exchange_patch(artifact, directory=configuration.exchange_directory)
                 if materialized != package:
                     return None
-                return DiscoveredExchangePatch(artifact, package, paths, configuration,
-                                               explicitly_selected=True)
+                return DiscoveredExchangePatch(
+                    artifact, package, paths, configuration, local, explicitly_selected=True,
+                )
     except (PatchHarborError, ExchangeScanError, OSError, ValueError):
-        # Optional maintenance must not impose discovery on the explicit API.
+        # Mandatory config validation happens in the target preflight; never bypass it.
         pass
     return None
 
 
 def _maintain_bundle_exchange(path: Path) -> None:
-    """Archive only this registered repository before creating a fresh bundle."""
+    """Maintain only the selected repository before creating its Result Bundle."""
     try:
         paths = configuration_user_paths()
-        configuration = load_configuration_if_present(paths)
-        if configuration is None:
-            return
-        context = capture_repository_context(path)
         with registry_lock(paths):
+            registry = load_registry(paths)
+            local = configuration_paths_for_repository(path, registry)
+            configuration = load_configuration(local)
+            if configuration.exchange_directory is None:
+                return
             _require_exchange_configuration_allowed(
-                configuration.exchange_directory, load_registry(paths), exchange_must_exist=True,
+                configuration.exchange_directory, registry, exchange_must_exist=True,
             )
         artifacts = scan_exchange_directory(configuration.exchange_directory, paths=paths)
         artifacts = recover_exchange_artifacts(
-            artifacts, configuration=configuration, paths=paths, repository_id=context.repo_id,
+            artifacts, configuration=configuration, paths=paths, repository_id=local.repo_id,
         )
-        archive_exchange_artifacts(artifacts, configuration=configuration, paths=paths,
-                                   repository_id=context.repo_id)
+        archive_exchange_artifacts(
+            artifacts, configuration=configuration, paths=paths, repository_id=local.repo_id,
+        )
     except (PatchHarborError, ExchangeScanError, OSError, ValueError):
         pass
 
@@ -1068,7 +1090,9 @@ def register_repository(
 
 def repository_context(path: Path) -> RepositoryContext:
     """Return the current reproducible context of one registered repository."""
-    return capture_repository_context(path)
+    context = capture_repository_context(path)
+    load_configuration(RepositoryConfigurationPaths(context.repository_path, context.repo_id), validate_directory=False)
+    return context
 
 
 def bundle_repository(

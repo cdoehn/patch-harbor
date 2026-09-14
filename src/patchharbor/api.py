@@ -97,7 +97,7 @@ def _output(value: OutputStreams | None) -> _OutputTargets | None:
     )
 
 
-def _configuration_result(result: tuple[Path, _application.UserConfiguration]) -> ConfigurationResult:
+def _configuration_result(result: tuple[Path, _application.RepositoryConfiguration]) -> ConfigurationResult:
     path, settings = result
     return ConfigurationResult(
         path, settings.exchange_directory, settings.bundle_suffix,
@@ -106,9 +106,9 @@ def _configuration_result(result: tuple[Path, _application.UserConfiguration]) -
 
 
 def configuration(
-    *, revalidate: bool = False, observer: ProgressObserver | None = None,
+    repository: PathInput = ".", *, revalidate: bool = False, observer: ProgressObserver | None = None,
 ) -> ConfigurationResult:
-    """Read validated user configuration; never create defaults.
+    """Read a registered repository's local settings; never create defaults.
 
     With revalidate=True, recheck the loaded physical Exchange target immediately
     before returning it (the watcher startup contract). This does not reserve the
@@ -116,37 +116,41 @@ def configuration(
     """
     if not isinstance(revalidate, bool):
         raise TypeError("revalidate must be boolean")
+    path = _path(repository, "repository")
     with _observe_activity(_observer(observer)):
-        return _configuration_result(_application.shared_configuration(revalidate=revalidate))
+        return _configuration_result(_application.repository_configuration(path, revalidate=revalidate))
 
 
 def configure_exchange_directory(
-    directory: PathInput, *, observer: ProgressObserver | None = None,
+    directory: PathInput, *, repository: PathInput = ".", observer: ProgressObserver | None = None,
 ) -> ConfigurationResult:
-    """Safely prepare and persist the shared Exchange directory."""
+    """Persist only the selected registered repository's Exchange directory."""
     path = _path(directory, "directory")
+    target = _path(repository, "repository")
     with _observe_activity(_observer(observer)):
-        return _configuration_result(_application.configure_exchange_directory(path))
+        return _configuration_result(_application.configure_exchange_directory(path, repository=target))
 
 
 def configure_bundle_suffix(
-    suffix: str, *, observer: ProgressObserver | None = None,
+    suffix: str, *, repository: PathInput = ".", observer: ProgressObserver | None = None,
 ) -> ConfigurationResult:
     """Set the literal suffix after .zip; an empty string clears it."""
     if not isinstance(suffix, str):
         raise TypeError("suffix must be text")
+    target = _path(repository, "repository")
     with _observe_activity(_observer(observer)):
-        return _configuration_result(_application.configure_bundle_suffix(suffix))
+        return _configuration_result(_application.configure_bundle_suffix(suffix, repository=target))
 
 
 def configure_archive_directory(
-    name: str, *, observer: ProgressObserver | None = None,
+    name: str, *, repository: PathInput = ".", observer: ProgressObserver | None = None,
 ) -> ConfigurationResult:
     """Set the single archive child name; an empty string disables archival."""
     if not isinstance(name, str):
         raise TypeError("archive directory name must be text")
+    target = _path(repository, "repository")
     with _observe_activity(_observer(observer)):
-        return _configuration_result(_application.configure_archive_directory(name))
+        return _configuration_result(_application.configure_archive_directory(name, repository=target))
 
 
 def register(
@@ -253,7 +257,7 @@ def apply_next(
     timeout: float = DEFAULT_TIMEOUT_SECONDS, output: OutputStreams | None = None,
     observer: ProgressObserver | None = None,
 ) -> RunReport:
-    """One global automatic Exchange poll, never retrying a failed identity.
+    """One automatic poll of all repository-configured Exchange directories, never retrying a failed identity.
 
 This is not a polling loop. The watcher/larger orchestrator owns that lifecycle.
 The existing automatic Core path performs selection, revalidation, mutation and

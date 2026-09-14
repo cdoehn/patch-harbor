@@ -13,6 +13,8 @@ import patchharbor.exchange_archive as maintenance
 import patchharbor.platform.archive as platform_archive
 import patchharbor.repository_state as repository_state
 from patchharbor.configuration import load_configuration
+from patchharbor.configuration_context import configuration_paths_for_id
+from patchharbor.registry import load_registry
 from patchharbor.exchange import scan_exchange_directory
 from patchharbor.models import RepositoryId
 from patchharbor.user_paths import configuration_user_paths
@@ -28,17 +30,29 @@ def _inputs(env, exchange, monkeypatch):
     for name, value in env.items():
         monkeypatch.setenv(name, value)
     paths = configuration_user_paths()
-    configuration = load_configuration(paths)
+    registry = load_registry(paths)
+    local = configuration_paths_for_id(registry.repositories[0].repo_id, registry)
+    configuration = load_configuration(local)
     artifacts = scan_exchange_directory(exchange, paths=paths)
     return paths, configuration, artifacts
 
 
 def _maintain(inputs, repo_id):
-    paths, configuration, artifacts = inputs
-    return maintenance.archive_exchange_artifacts(
-        artifacts, configuration=configuration, paths=paths,
-        repository_id=RepositoryId(repo_id) if repo_id is not None else None,
+    paths, _, artifacts = inputs
+    registry = load_registry(paths)
+    ids = (RepositoryId(repo_id),) if repo_id is not None else tuple(
+        mapping.repo_id for mapping in registry.repositories
     )
+    archived, warnings = [], []
+    for identity in ids:
+        settings = load_configuration(configuration_paths_for_id(identity, registry))
+        outcome = maintenance.archive_exchange_artifacts(
+            artifacts, configuration=settings, paths=paths, repository_id=identity,
+        )
+        artifacts = outcome.remaining
+        archived.extend(outcome.archived)
+        warnings.extend(outcome.warnings)
+    return maintenance.ArchiveMaintenance(tuple(artifacts), tuple(archived), tuple(warnings))
 
 
 def _count_captures(monkeypatch):

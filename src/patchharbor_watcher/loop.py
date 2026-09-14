@@ -6,8 +6,6 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
 import json
-import os
-from pathlib import Path
 import time
 from typing import TextIO
 
@@ -116,7 +114,6 @@ def _completion_signature(
 
 
 def _write_operational_record(
-    exchange_directory: Path,
     outcome: WatcherPollOutcome,
     completion: ApplyCompletion,
     stream: TextIO,
@@ -129,7 +126,7 @@ def _write_operational_record(
             if outcome is WatcherPollOutcome.APPLIED
             else "automatic_apply_failed"
         ),
-        "exchange_directory": os.fspath(exchange_directory),
+        "scope": "registered_repositories",
         "process_exit_code": completion.process_exit_code,
         "apply_response_is_json_object": completion.apply_result is not None,
         "apply_result": completion.apply_result,
@@ -142,7 +139,6 @@ def _write_operational_record(
 
 def _write_lifecycle_record(
     event: str,
-    exchange_directory: Path,
     poll_interval_seconds: float,
     stream: TextIO,
 ) -> None:
@@ -150,7 +146,7 @@ def _write_lifecycle_record(
         _canonical_json(
             {
                 "event": event,
-                "exchange_directory": os.fspath(exchange_directory),
+                "scope": "registered_repositories",
                 "poll_interval_seconds": poll_interval_seconds,
             }
         )
@@ -159,8 +155,7 @@ def _write_lifecycle_record(
     stream.flush()
 
 
-def poll_shared_exchange_once(
-    exchange_directory: Path,
+def poll_repositories_once(
     event_state: SharedWatcherEventState,
     *,
     delegate: Callable[[], ApplyCompletion],
@@ -168,7 +163,7 @@ def poll_shared_exchange_once(
     error_stream: TextIO,
     stop_requested: Callable[[], bool] = _never_stop,
 ) -> WatcherPollOutcome | None:
-    """Ask Core once to discover and apply one shared Exchange package."""
+    """Ask Core once to refresh all local settings and apply one eligible package."""
     if stop_requested():
         return None
     completion = delegate()
@@ -176,7 +171,6 @@ def poll_shared_exchange_once(
     signature = _completion_signature(outcome, completion)
     if event_state.should_publish(signature):
         _write_operational_record(
-            exchange_directory,
             outcome,
             completion,
             log_stream,
@@ -199,8 +193,7 @@ def poll_shared_exchange_once(
     return outcome
 
 
-def run_shared_exchange_watcher(
-    exchange_directory: Path,
+def run_repository_watcher(
     *,
     delegate: Callable[[], ApplyCompletion],
     poll_interval_seconds: float = 1.0,
@@ -212,21 +205,15 @@ def run_shared_exchange_watcher(
     """Poll the public automatic-Apply boundary until a stop is requested."""
     if poll_interval_seconds <= 0:
         raise ValueError("poll interval must be greater than zero")
-    directory = exchange_directory.expanduser().resolve(strict=True)
-    if not directory.is_dir():
-        raise NotADirectoryError(os.fspath(directory))
-
     event_state = SharedWatcherEventState()
     _write_lifecycle_record(
         "watcher_started",
-        directory,
         poll_interval_seconds,
         log_stream,
     )
     try:
         while not stop_requested():
-            poll_shared_exchange_once(
-                directory,
+            poll_repositories_once(
                 event_state,
                 delegate=delegate,
                 log_stream=log_stream,
@@ -239,7 +226,6 @@ def run_shared_exchange_watcher(
     finally:
         _write_lifecycle_record(
             "watcher_stopped",
-            directory,
             poll_interval_seconds,
             log_stream,
         )

@@ -49,6 +49,7 @@ EXPECTED_RUNTIME_FILES = {
     "patchharbor/bundles.py",
     "patchharbor/cli.py",
     "patchharbor/configuration.py",
+    "patchharbor/configuration_context.py",
     "patchharbor/context_output.py",
     "patchharbor/errors.py",
     "patchharbor/exit_status.py",
@@ -526,7 +527,7 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
         help_outputs[help_arguments] = " ".join(help_result.stdout.split())
 
     assert "Register local Git repository instances" in help_outputs[("--help",)]
-    assert "one user-specific config.json" in help_outputs[("configure", "--help")]
+    assert ".patchharbor/config.json" in help_outputs[("configure", "--help")]
     assert "committed HEAD" in help_outputs[("register", "--help")]
     assert "current working directory to one registered repository" in (
         help_outputs[("apply", "--help")]
@@ -548,7 +549,7 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
     )
     assert watcher_help.returncode == 0
     watcher_help_text = " ".join(watcher_help.stdout.split())
-    assert "PatchHarbor config.json" in watcher_help_text
+    assert "Exchange directories of all registered repositories" in watcher_help_text
     assert "patchharbor configure exchange-directory DIRECTORY" in (
         watcher_help_text
     )
@@ -659,7 +660,7 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
             "exchange-directory",
             str(exchange_directory),
         ],
-        cwd=empty_workdir,
+        cwd=repository,
         environment=runtime_environment,
     )
     assert configured_exchange.returncode == 0
@@ -792,12 +793,13 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
             "assert 'patchharbor.cli' not in sys.modules; "
             "assert 'patchharbor.presentation' not in sys.modules; "
             "assert pathlib.Path(api.__file__).resolve().is_relative_to(pathlib.Path(sys.prefix).resolve()); "
-            "api.configuration(revalidate=True); "
             "c = api.register(sys.argv[1]); "
+            "api.configure_exchange_directory(sys.argv[2], repository=sys.argv[1]); "
+            "api.configuration(sys.argv[1], revalidate=True); "
             "assert api.context(sys.argv[1]) == c; "
             "print(json.dumps({'repo_id': str(c.repo_id), 'base_commit': str(c.base_commit), "
             "'state_fingerprint': c.state_fingerprint}))",
-            str(worker_repository),
+            str(worker_repository), str(exchange_directory),
         ], cwd=empty_workdir, environment=runtime_environment,
     )
     assert library.returncode == 0, library.stdout + library.stderr

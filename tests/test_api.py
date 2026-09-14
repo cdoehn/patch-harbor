@@ -175,7 +175,7 @@ def test_invalid_observer_output_or_switch_is_rejected(kwargs: dict) -> None:
 
 def test_configuration_result_contains_persisted_settings(monkeypatch, tmp_path) -> None:
     settings = SimpleNamespace(exchange_directory=tmp_path, bundle_suffix=".txt", archive_directory="Archive")
-    monkeypatch.setattr(application, "shared_configuration", lambda **kwargs: (tmp_path / "config.json", settings))
+    monkeypatch.setattr(application, "repository_configuration", lambda *args, **kwargs: (tmp_path / "config.json", settings))
     result = api.configuration()
     assert result == api.ConfigurationResult(tmp_path / "config.json", tmp_path, ".txt", "Archive")
 

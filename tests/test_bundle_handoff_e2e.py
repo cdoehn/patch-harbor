@@ -109,7 +109,7 @@ def test_fresh_configuration_and_explicit_output_are_not_confused(tmp_path: Path
 
 
 @pytest.mark.parametrize("configuration", ["absent", "malformed"])
-def test_explicit_output_recovers_without_inventing_exchange(tmp_path: Path, configuration: str) -> None:
+def test_explicit_output_rejects_missing_or_corrupt_local_configuration(tmp_path: Path, configuration: str) -> None:
     environment, _ = _configure_user(tmp_path)
     repository = create_repository(tmp_path / "repository")
     _register_context(repository, environment)
@@ -119,10 +119,11 @@ def test_explicit_output_recovers_without_inventing_exchange(tmp_path: Path, con
     else:
         config_path.write_text("invalid config")
     output = tmp_path / "recovery"
-    _, data = _bundle(repository, environment, "--output-dir", str(output))
-    assert data["exchange_directory"] is None
-    assert data["output_directory"] == str(output.resolve())
-    assert data["bundle_suffix"] == ""
+    completed = run_cli(repository, "bundle", "--json", "--output-dir", str(output), environment_overrides=environment)
+    assert completed.returncode != 0
+    assert json.loads(completed.stdout)["error"]["kind"] == "configuration_error"
+    assert not output.exists()
+    assert not config_path.exists() if configuration == "absent" else config_path.read_text() == "invalid config"
 
 
 @pytest.mark.parametrize("automatic", [False, True])
@@ -184,7 +185,7 @@ def test_explicit_foreign_repo_uses_target_facts_and_metadata_is_not_payload(tmp
 def test_watcher_regenerates_local_handoff_and_does_not_loop(tmp_path: Path) -> None:
     from io import StringIO
     from patchharbor_watcher.apply_boundary import delegate_to_automatic_apply
-    from patchharbor_watcher.loop import SharedWatcherEventState, WatcherPollOutcome, poll_shared_exchange_once
+    from patchharbor_watcher.loop import SharedWatcherEventState, WatcherPollOutcome, poll_repositories_once
     from tests.platform_support import project_environment
 
     environment, exchange = _configure_user(tmp_path)
@@ -198,19 +199,18 @@ def test_watcher_regenerates_local_handoff_and_does_not_loop(tmp_path: Path) -> 
         return delegate_to_automatic_apply(environment=apply_environment)
     state = SharedWatcherEventState()
     before = set(exchange.glob("*_Result_*.zip"))
-    assert poll_shared_exchange_once(exchange, state, delegate=delegate, log_stream=StringIO(), error_stream=StringIO()) is WatcherPollOutcome.ERROR
+    assert poll_repositories_once(state, delegate=delegate, log_stream=StringIO(), error_stream=StringIO()) is WatcherPollOutcome.ERROR
     after = set(exchange.glob("*_Result_*.zip"))
     (result,) = after - before
     data = _read_result(result)
     assert data["repository_path"] == str(repository.resolve())
     assert data["run_id"] != initial["run_id"]
-    assert poll_shared_exchange_once(exchange, state, delegate=delegate, log_stream=StringIO(), error_stream=StringIO()) is WatcherPollOutcome.WAITING
+    assert poll_repositories_once(state, delegate=delegate, log_stream=StringIO(), error_stream=StringIO()) is WatcherPollOutcome.WAITING
     assert set(exchange.glob("*_Result_*.zip")) == after
     assert git(repository, "status", "--porcelain").stdout == ""
 
 
 def test_configuration_change_during_handoff_is_revalidated(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    from patchharbor.application import configure_bundle_suffix
     environment, exchange = _configure_user(tmp_path)
     repository = create_repository(tmp_path / "repository")
     _register_context(repository, environment)
@@ -219,7 +219,11 @@ def test_configuration_change_during_handoff_is_revalidated(tmp_path: Path, monk
     real_capture = result_handoff_module.capture_runtime_environment
     def capture_and_change():
         observed = real_capture()
-        configure_bundle_suffix(".txt")
+        # A direct external edit bypasses the cooperative repository lock.
+        path = user_configuration_path(environment, repository)
+        settings = json.loads(path.read_bytes())
+        settings["bundle_suffix"] = ".txt"
+        path.write_text(json.dumps(settings))
         return observed
     monkeypatch.setattr(result_handoff_module, "capture_runtime_environment", capture_and_change)
     with pytest.raises(PatchHarborError, match="bundle suffix changed"):

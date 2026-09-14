@@ -10,6 +10,7 @@ from pathlib import Path
 from uuid import UUID
 
 from patchharbor.archive_git import completed_commit_for_context
+from patchharbor.configuration_context import configuration_paths_for_id
 from patchharbor.errors import (
     FailureReason,
     PatchHarborError,
@@ -349,7 +350,7 @@ def create_apply_result_bundle(
         if execution_log is not None:
             _write_execution_log(run_directory, execution_log)
         captured = capture_result_bundle(repository, repo_id)
-        revalidate_result_bundle_target(target, registry_snapshot, paths)
+        revalidate_result_bundle_target(target, registry_snapshot)
         report = _apply_report(
             session=session,
             dry_run=dry_run,
@@ -361,7 +362,7 @@ def create_apply_result_bundle(
             result_bundle=ResultBundleResult.created(target.final_path),
         )
         handoff = create_result_handoff(report, target)
-        revalidate_result_bundle_target(target, registry_snapshot, paths)
+        revalidate_result_bundle_target(target, registry_snapshot)
         _write_run_document(run_directory, report)
         manifest = _manifest_document(
             report=report, snapshot=captured.bundle_snapshot,
@@ -469,7 +470,7 @@ def create_manual_result_bundle(
                 target = prepare_result_bundle_target(
                     output_directory,
                     registry_snapshot,
-                    paths,
+                    configuration_paths_for_id(repo_id, registry_snapshot),
                     filename=filename,
                 )
                 repository_scope.enter_context(repository_lock(paths, repo_id))
@@ -485,10 +486,10 @@ def create_manual_result_bundle(
                     raise repository_resolution_error(
                         "repository identity changed while acquiring its lock"
                     )
-                revalidate_result_bundle_target(target, locked_registry, paths)
+                revalidate_result_bundle_target(target, locked_registry)
 
             captured = capture_result_bundle(locked_repository, locked_id)
-            revalidate_result_bundle_target(target, locked_registry, paths)
+            revalidate_result_bundle_target(target, locked_registry)
             context = captured.context
             bundle_snapshot = captured.bundle_snapshot
             report = RunReport(
@@ -503,7 +504,7 @@ def create_manual_result_bundle(
                 result_bundle=ResultBundleResult.created(target.final_path),
             )
             handoff = create_result_handoff(report, target)
-            revalidate_result_bundle_target(target, locked_registry, paths)
+            revalidate_result_bundle_target(target, locked_registry)
             _write_run_document(run_directory, report)
             publication = prepare_result_bundle_publication(
                 target.final_path,

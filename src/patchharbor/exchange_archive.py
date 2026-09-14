@@ -11,8 +11,9 @@ from patchharbor.archive_evidence import ArchiveEvidence, parse_archive_evidence
 from patchharbor.archive_files import archive_verified_file
 from patchharbor.archive_git import is_proven_obsolete
 from patchharbor.configuration import (
-    UserConfiguration, load_configuration, revalidate_exchange_directory,
+    RepositoryConfiguration, load_configuration, revalidate_exchange_directory,
 )
+from patchharbor.configuration_context import configuration_paths_for_id
 from patchharbor.errors import PatchHarborError
 from patchharbor.exchange import (
     ExchangeArtifact, ExchangeArtifactKind, ExchangeScanError, read_exchange_artifact_content,
@@ -54,12 +55,12 @@ class ArchiveMaintenance:
 def archive_exchange_artifacts(
     artifacts: tuple[ExchangeArtifact, ...],
     *,
-    configuration: UserConfiguration,
+    configuration: RepositoryConfiguration,
     paths: RegistrationUserPaths,
-    repository_id: RepositoryId | None,
+    repository_id: RepositoryId,
     excluded_paths: frozenset[Path] = frozenset(),
 ) -> ArchiveMaintenance:
-    """Maintain only the selected repository scope; None is the global watcher."""
+    """Maintain exactly one repository; shared-directory callers invoke each scope."""
     activity("ARCHIVE", "Evaluate conservative Exchange archival", "heading")
     if not configuration.archive_directory:
         activity("ARCHIVE", "Disabled by configuration; no files moved", "detail")
@@ -69,9 +70,10 @@ def archive_exchange_artifacts(
     warnings: list[str] = []
     try:
         with registry_lock(paths):
-            if revalidate_exchange_directory(load_configuration(paths)) != configuration:
-                return ArchiveMaintenance(artifacts)
             registry = load_registry(paths)
+            local = configuration_paths_for_id(repository_id, registry)
+            if revalidate_exchange_directory(load_configuration(local)) != configuration:
+                return ArchiveMaintenance(artifacts)
             require_exchange_outside_registry(
                 configuration.exchange_directory, registry, exchange_must_exist=True,
             )
@@ -101,7 +103,7 @@ def archive_exchange_artifacts(
                     activity("KEEP", f"{artifact.path.name}: {reason}", "detail")
                     continue
                 # A known foreign binding cannot belong to the manual scope.
-                if (repository_id is not None and artifact.selection is not None
+                if (artifact.selection is not None
                     and artifact.selection.repo_id != repository_id):
                     activity("KEEP", f"{artifact.path.name}: outside repository scope", "detail")
                     continue
@@ -118,7 +120,7 @@ def archive_exchange_artifacts(
                         activity("KEEP", f"{artifact.path.name}: binding changed", "detail")
                         continue
                     selected_id = evidence.selection.repo_id
-                    if repository_id is not None and selected_id != repository_id:
+                    if selected_id != repository_id:
                         activity("KEEP", f"{artifact.path.name}: outside repository scope", "detail")
                         continue
                     candidates.setdefault(selected_id, []).append((artifact, evidence))
@@ -147,7 +149,7 @@ def archive_exchange_artifacts(
                                         # AFTER the final full-file hash, never a
                                         # reused context or cached ancestry proof.
                                         if (load_registry(paths) != registry
-                                            or revalidate_exchange_directory(load_configuration(paths)) != configuration
+                                            or revalidate_exchange_directory(load_configuration(local)) != configuration
                                             or inspect_repository(context.repository_path.value) != context.repository_path):
                                             raise ValueError("archival repository or configuration changed")
                                         require_local_repository_identity(context.repository_path, selected_id)
@@ -162,7 +164,7 @@ def archive_exchange_artifacts(
                                         # Also detect non-cooperating identity or
                                         # configuration changes during Git reads.
                                         if (load_registry(paths) != registry
-                                            or load_configuration(paths) != configuration):
+                                            or load_configuration(local) != configuration):
                                             raise ValueError("archival registration or configuration changed")
                                         require_local_repository_identity(context.repository_path, selected_id)
 

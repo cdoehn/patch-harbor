@@ -33,6 +33,7 @@ EXPECTED_CORE_RUNTIME_FILES = {
     "bundles.py",
     "cli.py",
     "configuration.py",
+    "configuration_context.py",
     "context_output.py",
     "errors.py",
     "exit_status.py",
@@ -131,7 +132,7 @@ def test_automatic_apply_discovery_stays_in_the_core_application_boundary() -> N
     assert "scan_exchange_directory" not in cli_source
 
 
-def test_result_bundle_defaults_use_shared_configuration_not_legacy_paths() -> None:
+def test_result_bundle_defaults_use_local_configuration_not_legacy_paths() -> None:
     target_source = (
         CORE_PACKAGE_ROOT / "result_bundle_target.py"
     ).read_text(encoding="utf-8")
@@ -306,7 +307,7 @@ def test_exchange_apply_lifecycle_is_core_owned_and_published_around_execution()
     )
 
 
-def test_watcher_is_only_shared_configuration_lifecycle_and_core_apply() -> None:
+def test_watcher_is_only_global_lifecycle_and_repository_aware_core_apply() -> None:
     cli_source = (WATCHER_PACKAGE_ROOT / "cli.py").read_text(encoding="utf-8")
     loop_source = (WATCHER_PACKAGE_ROOT / "loop.py").read_text(encoding="utf-8")
     boundary_source = (WATCHER_PACKAGE_ROOT / "apply_boundary.py").read_text(
@@ -317,11 +318,12 @@ def test_watcher_is_only_shared_configuration_lifecycle_and_core_apply() -> None
     )
     readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
 
-    assert "api.configuration(revalidate=True)" in cli_source
+    assert "api.repositories()" in cli_source
+    assert "api.configuration(" not in cli_source
     worker_source = (WATCHER_PACKAGE_ROOT / "worker.py").read_text(encoding="utf-8")
     assert "api.apply_next()" in worker_source
     assert "patchharbor.cli" not in worker_source
-    assert "run_shared_exchange_watcher" in cli_source
+    assert "run_repository_watcher" in cli_source
     assert "delegate_to_automatic_apply" in cli_source
     assert '"patchharbor_watcher.worker"' in boundary_source
     assert "delegate_to_apply" not in boundary_source

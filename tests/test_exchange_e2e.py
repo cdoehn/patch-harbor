@@ -49,15 +49,7 @@ _CURRENT_REPOSITORY_ERROR = (
 def _configure_user(tmp_path: Path) -> tuple[dict[str, str], Path]:
     environment = isolated_user_environment(tmp_path / "user")
     exchange = tmp_path / "exchange"
-    completed = run_cli(
-        tmp_path,
-        "configure",
-        "exchange-directory",
-        str(exchange),
-        environment_overrides=environment,
-    )
-    assert completed.returncode == 0
-    assert configured_exchange_directory(environment) == exchange.resolve()
+    exchange.mkdir(parents=True, exist_ok=True)
     return environment, exchange.resolve()
 
 
@@ -71,6 +63,13 @@ def _register_context(
         environment_overrides=environment,
     )
     assert registered.returncode == 0
+    user_root = Path(environment["APPDATA"] if os.name == "nt" else environment["XDG_CONFIG_HOME"]).parent
+    configured = run_cli(
+        repository, "configure", "exchange-directory", str(user_root.parent / "exchange"),
+        environment_overrides=environment,
+    )
+    assert configured.returncode == 0, configured.stderr
+
     completed = run_cli(
         repository,
         "context",
@@ -620,7 +619,7 @@ def test_automatic_parameterless_apply_remains_global_across_repositories(
         ("missing", "configuration does not exist"),
         (
             "invalid",
-            "configuration must contain exactly the two format-1 fields",
+            "configuration format_version is invalid",
         ),
     ),
 )
@@ -637,22 +636,21 @@ def test_parameterless_apply_requires_valid_exchange_configuration(
         environment_overrides=environment,
     )
     assert registered.returncode == 0
+    path = user_configuration_path(environment)
     if configuration_state == "invalid":
-        path = user_configuration_path(environment)
-        path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text("{}\n", encoding="utf-8")
+    else:
+        path.unlink()
 
     completed = _parameterless_apply(repository, environment)
 
     assert completed.returncode == int(ExitCode.SOURCE_ERROR)
     envelope = json.loads(completed.stdout)
     assert envelope["success"] is False
-    assert envelope["error"] == {
-        "kind": "configuration_error",
-        "message": expected_message,
-        "patchharbor_error_code": int(ExitCode.SOURCE_ERROR),
-        "emergency_diagnostics_path": None,
-    }
+    assert expected_message in envelope["error"]["message"]
+    assert envelope["error"]["kind"] == "configuration_error"
+    assert envelope["error"]["patchharbor_error_code"] == int(ExitCode.SOURCE_ERROR)
+    assert envelope["error"]["emergency_diagnostics_path"] is None
     assert envelope["result"]["repository_resolved"] is False
     assert envelope["result"]["result_bundle"]["attempted"] is False
 

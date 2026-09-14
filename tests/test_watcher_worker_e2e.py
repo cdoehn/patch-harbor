@@ -27,7 +27,7 @@ def _prepare(tmp_path, monkeypatch, posix_body, windows_body):
     repository = create_repository(tmp_path / "repo")
     context = api.register(repository)
     exchange = tmp_path / "exchange"
-    api.configure_exchange_directory(exchange)
+    api.configure_exchange_directory(exchange, repository=repository)
     entrypoint = native_value("run.sh", "run.ps1")
     package = exchange / "worker-package.zip"
     with zipfile.ZipFile(package, "w") as archive:

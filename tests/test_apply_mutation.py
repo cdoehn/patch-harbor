@@ -13,7 +13,7 @@ from patchharbor.apply_mutation import (
     MutationFailureKind,
     apply_payload_mutation,
 )
-from patchharbor.configuration import write_exchange_directory
+from patchharbor.configuration import RepositoryConfigurationPaths, write_exchange_directory
 from patchharbor.exit_status import ExitCode, exit_code_for_error
 from patchharbor.errors import FailureReason
 from patchharbor.errors import PatchHarborError, patch_package_error
@@ -58,9 +58,9 @@ def _package(
     )
 
 
-def _configure_exchange(tmp_path: Path) -> None:
+def _configure_exchange(tmp_path: Path, context: RepositoryContext) -> None:
     write_exchange_directory(
-        registration_user_paths(),
+        RepositoryConfigurationPaths(context.repository_path, context.repo_id),
         tmp_path / "exchange",
     )
 
@@ -70,9 +70,9 @@ def test_mutation_boundary_rechecks_and_writes_while_repository_is_locked(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     set_isolated_user_environment(monkeypatch, tmp_path / "user")
-    _configure_exchange(tmp_path)
     repository = create_repository(tmp_path / "repository")
     context = register_repository(repository)
+    _configure_exchange(tmp_path, context)
     payload = BundlePayload("files/payload.bin", b"payload")
     package = _package(context, payloads=(payload,))
     observed_lock_codes: list[int] = []
@@ -111,9 +111,9 @@ def test_mutation_boundary_reports_changed_state_without_payload_write(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     set_isolated_user_environment(monkeypatch, tmp_path / "user")
-    _configure_exchange(tmp_path)
     repository = create_repository(tmp_path / "repository")
     context = register_repository(repository)
+    _configure_exchange(tmp_path, context)
     package = _package(
         context,
         payloads=(BundlePayload("payload.bin", b"payload"),),
@@ -146,9 +146,9 @@ def test_mutation_boundary_keeps_target_and_write_failures_distinct(
     expected_kind: MutationFailureKind,
 ) -> None:
     set_isolated_user_environment(monkeypatch, tmp_path / "user")
-    _configure_exchange(tmp_path)
     repository = create_repository(tmp_path / "repository")
     context = register_repository(repository)
+    _configure_exchange(tmp_path, context)
     package = _package(
         context,
         payloads=(BundlePayload("payload.bin", b"payload"),),
@@ -183,9 +183,9 @@ def test_attempt_publication_runs_after_state_check_and_before_payload_write(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     set_isolated_user_environment(monkeypatch, tmp_path / "user")
-    _configure_exchange(tmp_path)
     repository = create_repository(tmp_path / "repository")
     context = register_repository(repository)
+    _configure_exchange(tmp_path, context)
     target = repository / "payload.bin"
     observations: list[tuple[bool, int]] = []
 
@@ -221,9 +221,9 @@ def test_failed_attempt_publication_prevents_every_repository_write(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     set_isolated_user_environment(monkeypatch, tmp_path / "user")
-    _configure_exchange(tmp_path)
     repository = create_repository(tmp_path / "repository")
     context = register_repository(repository)
+    _configure_exchange(tmp_path, context)
     target = repository / "payload.bin"
 
     def fail_attempt_publication() -> None:
@@ -253,9 +253,9 @@ def test_state_mismatch_prevents_attempt_publication(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     set_isolated_user_environment(monkeypatch, tmp_path / "user")
-    _configure_exchange(tmp_path)
     repository = create_repository(tmp_path / "repository")
     context = register_repository(repository)
+    _configure_exchange(tmp_path, context)
     publications: list[bool] = []
     package = _package(
         context,

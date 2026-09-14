@@ -10,8 +10,8 @@ from patchharbor_watcher.apply_boundary import ApplyCompletion
 from patchharbor_watcher.loop import (
     SharedWatcherEventState,
     WatcherPollOutcome,
-    poll_shared_exchange_once,
-    run_shared_exchange_watcher,
+    poll_repositories_once,
+    run_repository_watcher,
 )
 
 
@@ -84,15 +84,13 @@ def test_shared_poll_delegates_to_core_and_deduplicates_idle_records(
         )
 
     state = SharedWatcherEventState()
-    first = poll_shared_exchange_once(
-        exchange,
+    first = poll_repositories_once(
         state,
         delegate=delegate,
         log_stream=log,
         error_stream=errors,
     )
-    second = poll_shared_exchange_once(
-        exchange,
+    second = poll_repositories_once(
         state,
         delegate=delegate,
         log_stream=log,
@@ -107,7 +105,7 @@ def test_shared_poll_delegates_to_core_and_deduplicates_idle_records(
     records = [json.loads(line) for line in log.getvalue().splitlines()]
     assert len(records) == 1
     assert records[0]["event"] == "waiting_for_exchange_patch"
-    assert records[0]["exchange_directory"] == str(exchange)
+    assert records[0]["scope"] == "registered_repositories"
     assert "input_path" not in records[0]
     assert errors.getvalue() == ""
 
@@ -145,8 +143,7 @@ def test_shared_poll_records_success_and_distinct_core_error(
     state = SharedWatcherEventState()
 
     outcomes = tuple(
-        poll_shared_exchange_once(
-            exchange,
+        poll_repositories_once(
             state,
             delegate=lambda: next(completions),
             log_stream=log,
@@ -185,8 +182,7 @@ def test_repeated_identical_core_error_is_logged_once(
     state = SharedWatcherEventState()
 
     for _ in range(3):
-        assert poll_shared_exchange_once(
-            tmp_path,
+        assert poll_repositories_once(
             state,
             delegate=lambda: completion,
             log_stream=log,
@@ -226,8 +222,7 @@ def test_shared_watcher_publishes_lifecycle_and_stops_between_polls(
         waits += 1
         stopping = waits == 2
 
-    run_shared_exchange_watcher(
-        tmp_path,
+    run_repository_watcher(
         delegate=delegate,
         poll_interval_seconds=0.25,
         log_stream=log,
@@ -255,8 +250,7 @@ def test_delegate_exception_propagates_after_watcher_stopped_record(
         raise OSError("core process unavailable")
 
     with pytest.raises(OSError, match="core process unavailable"):
-        run_shared_exchange_watcher(
-            tmp_path,
+        run_repository_watcher(
             delegate=fail,
             log_stream=log,
             error_stream=StringIO(),

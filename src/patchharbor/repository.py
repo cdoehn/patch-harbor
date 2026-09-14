@@ -36,6 +36,7 @@ class LocalRegistrationState:
     id_content: bytes | None
     exclude_path: Path
     exclude_content: bytes | None
+    configuration_content: bytes | None = None
 
 
 def _error(message: str) -> PatchHarborError:
@@ -251,6 +252,10 @@ def inspect_local_registration(
         id_content=id_content,
         exclude_path=exclude_path,
         exclude_content=exclude_content,
+        configuration_content=(
+            _read_optional_regular_file(internal / "config.json", description=".patchharbor/config.json")
+            if internal_existed else None
+        ),
     )
 
 
@@ -330,6 +335,7 @@ def restore_local_registration(state: LocalRegistrationState) -> None:
     """Best-effort restore of every local file changed during registration."""
     failures: list[BaseException] = []
     for path, content in (
+        (state.internal_directory / "config.json", state.configuration_content),
         (state.id_path, state.id_content),
         (state.exclude_path, state.exclude_content),
     ):

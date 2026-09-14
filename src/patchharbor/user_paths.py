@@ -24,11 +24,6 @@ class RegistrationUserPaths:
     lock_directory: Path
 
     @property
-    def configuration_path(self) -> Path:
-        """Return the shared PatchHarbor configuration document."""
-        return self.configuration_directory / "config.json"
-
-    @property
     def registry_path(self) -> Path:
         return self.configuration_directory / "registry.json"
 

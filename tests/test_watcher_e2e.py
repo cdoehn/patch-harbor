@@ -16,7 +16,7 @@ from patchharbor.state_fingerprint import FINGERPRINT_ALGORITHM
 from patchharbor_watcher.loop import (
     SharedWatcherEventState,
     WatcherPollOutcome,
-    poll_shared_exchange_once,
+    poll_repositories_once,
 )
 from patchharbor_watcher.apply_boundary import delegate_to_automatic_apply
 from tests.platform_support import (
@@ -114,8 +114,7 @@ def test_watcher_retries_after_core_repository_lock_is_released(
     )
     locked_log = StringIO()
     try:
-        locked = poll_shared_exchange_once(
-            exchange,
+        locked = poll_repositories_once(
             SharedWatcherEventState(),
             delegate=delegate,
             log_stream=locked_log,
@@ -135,8 +134,7 @@ def test_watcher_retries_after_core_repository_lock_is_released(
     assert locked_response["error"]["kind"] == "repository_busy"
     assert not (repository / "watcher-executed.txt").exists()
 
-    retried = poll_shared_exchange_once(
-        exchange,
+    retried = poll_repositories_once(
         SharedWatcherEventState(),
         delegate=delegate,
         log_stream=StringIO(),
@@ -236,8 +234,7 @@ def test_shared_watcher_delegates_discovery_identity_and_retry_to_core(
         )
 
     first_log = StringIO()
-    first = poll_shared_exchange_once(
-        exchange,
+    first = poll_repositories_once(
         SharedWatcherEventState(),
         delegate=delegate,
         log_stream=first_log,
@@ -271,8 +268,7 @@ def test_shared_watcher_delegates_discovery_identity_and_retry_to_core(
     assert matching_records[0]["apply_status"] == "succeeded"
 
     restart_log = StringIO()
-    second = poll_shared_exchange_once(
-        exchange,
+    second = poll_repositories_once(
         SharedWatcherEventState(),
         delegate=delegate,
         log_stream=restart_log,
@@ -360,15 +356,13 @@ def test_watcher_does_not_loop_after_a_failed_entrypoint(
     def delegate():
         return delegate_to_automatic_apply(environment=apply_environment)
 
-    first = poll_shared_exchange_once(
-        exchange,
+    first = poll_repositories_once(
         SharedWatcherEventState(),
         delegate=delegate,
         log_stream=StringIO(),
         error_stream=StringIO(),
     )
-    second = poll_shared_exchange_once(
-        exchange,
+    second = poll_repositories_once(
         SharedWatcherEventState(),
         delegate=delegate,
         log_stream=StringIO(),

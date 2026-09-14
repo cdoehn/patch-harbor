@@ -13,7 +13,7 @@ from tests.platform_support import PROJECT_ROOT
 
 
 OPERATIONS = {
-    "configuration": (),
+    "configuration": ("repository",),
     "configure_exchange_directory": ("directory",),
     "configure_bundle_suffix": ("suffix",),
     "configure_archive_directory": ("name",),

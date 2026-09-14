@@ -13,8 +13,8 @@ from patchharbor.errors import (
     repository_resolution_error,
 )
 from patchharbor.configuration import (
-    UserConfiguration,
-    load_configuration_if_present,
+    RepositoryConfiguration,
+    RepositoryConfigurationPaths, initialize_configuration, load_configuration,
 )
 from patchharbor.exchange_paths import (
     ExchangePathPolicyError,
@@ -94,7 +94,7 @@ class _RegistrationObservation:
 
     repository: RepositoryPath
     registry_state: RegistryFileState
-    configuration: UserConfiguration | None
+    configuration: RepositoryConfiguration | None
     local_id: RepositoryId | None
     local_state: LocalRegistrationState
 
@@ -175,9 +175,9 @@ def _plan_identity_transition(
 
 def _require_registration_exchange_allowed(
     repository: RepositoryPath,
-    configuration: UserConfiguration | None,
+    configuration: RepositoryConfiguration | None,
 ) -> None:
-    if configuration is None:
+    if configuration is None or configuration.exchange_directory is None:
         return
     try:
         require_repository_outside_exchange(
@@ -194,9 +194,30 @@ def _observe_registration(
 ) -> _RegistrationObservation:
     repository = inspect_repository(path)
     registry_state = load_registry_state(paths)
-    configuration = load_configuration_if_present(paths)
-    _require_registration_exchange_allowed(repository, configuration)
     local_id, local_state = inspect_local_registration(repository)
+    # A pre-existing identity or mapping is never an implicit migration trigger.
+    if local_id is None:
+        if local_state.configuration_content is not None or any(
+            m.repository_path == repository for m in registry_state.snapshot.repositories
+        ):
+            raise repository_resolution_error("local repository identity is missing; manual setup is required")
+        configuration = None
+    else:
+        configuration = load_configuration(
+            RepositoryConfigurationPaths(repository, local_id), validate_directory=False,
+        )
+    _require_registration_exchange_allowed(repository, configuration)
+    # Preserve the separation rule for ALL configured repositories, not just self.
+    for mapping in registry_state.snapshot.repositories:
+        if mapping.repository_path == repository:
+            continue
+        if registered_repository_status(mapping.repository_path, mapping.repo_id) is not RegistryStatus.OK:
+            continue
+        other = load_configuration(
+            RepositoryConfigurationPaths(mapping.repository_path, mapping.repo_id),
+            validate_directory=False,
+        )
+        _require_registration_exchange_allowed(repository, other)
     return _RegistrationObservation(
         repository=repository,
         registry_state=registry_state,
@@ -210,7 +231,10 @@ def _revalidate_registration_exchange(
     paths: RegistrationUserPaths,
     expected: _RegistrationObservation,
 ) -> None:
-    current = load_configuration_if_present(paths)
+    observed = _observe_registration(paths, expected.repository.value)
+    current = observed.configuration
+    if observed.local_id != expected.local_id or observed.local_state != expected.local_state:
+        raise repository_resolution_error("local registration changed while registering repository")
     if current != expected.configuration:
         raise repository_resolution_error(
             "exchange configuration changed while registering repository"
@@ -247,6 +271,10 @@ def _commit_identity_transition(
             transition.local_state,
             transition.repo_id,
         )
+        if transition.local_state.id_content is None:
+            initialize_configuration(RepositoryConfigurationPaths(
+                RepositoryPath(transition.local_state.internal_directory.parent), transition.repo_id,
+            ))
         write_registry(paths, transition.next_snapshot)
     except BaseException as primary_error:
         try:

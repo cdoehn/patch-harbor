@@ -488,14 +488,16 @@ def test_registration_rejects_exchange_overlap_in_both_directions(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from patchharbor.configuration import write_exchange_directory
+    from patchharbor import api
 
     set_isolated_user_environment(monkeypatch, tmp_path / "user")
     paths = registration_user_paths()
 
     outer_repository = create_repository(tmp_path / "outer-repository")
     exchange_inside_repository = outer_repository / "exchange"
-    write_exchange_directory(paths, exchange_inside_repository)
+    owner = create_repository(tmp_path / "owner")
+    api.register(owner)
+    api.configure_exchange_directory(exchange_inside_repository, repository=owner)
 
     with pytest.raises(PatchHarborError) as inside_captured:
         register_local_repository(outer_repository)
@@ -507,9 +509,8 @@ def test_registration_rejects_exchange_overlap_in_both_directions(
     )
     assert not (outer_repository / ".patchharbor").exists()
 
-    paths.configuration_path.unlink()
     exchange = tmp_path / "exchange-root"
-    write_exchange_directory(paths, exchange)
+    api.configure_exchange_directory(exchange, repository=owner)
     nested_repository = create_repository(exchange / "nested-repository")
 
     with pytest.raises(PatchHarborError) as outer_captured:
@@ -550,4 +551,4 @@ def test_registration_does_not_read_legacy_paths_json_as_exchange_configuration(
     assert (repository / ".patchharbor" / "id").read_text(
         encoding="ascii"
     ) == f"{repo_id}\n"
-    assert not paths.configuration_path.exists()
+    assert not (paths.configuration_directory / "config.json").exists()

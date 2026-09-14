@@ -91,17 +91,23 @@ def test_invalid_archive_cli_keeps_configuration_and_downloads(tmp_path, name):
     assert not list(exchange.iterdir())
 
 
-def test_config_migrates_v2_preserving_suffix_and_name_across_setters(tmp_path):
+def test_legacy_config_is_rejected_without_migration(tmp_path):
     env, exchange, repo, _ = _world(tmp_path)
     path = user_configuration_path(env)
     path.write_text(json.dumps({"format_version": 2, "exchange_directory": str(exchange), "bundle_suffix": ".txt"}))
     original = path.read_bytes()
-    shown = run_cli(repo, "configure", "show", environment_overrides=env)
-    assert "archive_directory: PatchHarbor-Archive" in shown.stdout
-    assert path.read_bytes() == original
+    for args in [("show",), ("archive-dir", ".Archive"), ("exchange-directory", str(exchange))]:
+        assert run_cli(repo, "configure", *args, environment_overrides=env).returncode != 0
+        assert path.read_bytes() == original
+
+
+def test_local_setters_preserve_other_repository_settings(tmp_path):
+    env, exchange, repo, _ = _world(tmp_path)
+    path = user_configuration_path(env)
+    assert run_cli(repo, "configure", "bundle-suffix", ".txt", environment_overrides=env).returncode == 0
     assert run_cli(repo, "configure", "archive-dir", ".Archive", environment_overrides=env).returncode == 0
     document = json.loads(path.read_bytes())
-    assert document["format_version"] == 3
+    assert document["format_version"] == 1
     assert document["bundle_suffix"] == ".txt"
     assert run_cli(repo, "configure", "exchange-directory", str(exchange), environment_overrides=env).returncode == 0
     assert run_cli(repo, "configure", "bundle-suffix", "--clear", environment_overrides=env).returncode == 0

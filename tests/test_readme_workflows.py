@@ -181,10 +181,10 @@ def test_core_help_explains_the_documented_exchange_workflow() -> None:
 
     assert "Register local Git repository instances" in top_help
     assert "patchharbor configure exchange-directory DIRECTORY" in top_help
-    assert "one user-specific config.json" in configure_help
-    assert "global per user" in configure_help
-    assert "persist the shared Exchange directory in config.json" in exchange_help
-    assert "active config.json path" in show_help
+    assert ".patchharbor/config.json" in configure_help
+    assert "may be shared by repositories" in configure_help
+    assert "persist the repository Exchange directory in config.json" in exchange_help
+    assert "active repository config.json path" in show_help
     assert "committed HEAD" in register_help
     assert "does not configure the Exchange directory" in register_help
     assert "success summary shortens technical identifiers" in register_help
@@ -218,11 +218,11 @@ def test_core_help_explains_the_documented_exchange_workflow() -> None:
     assert "default: 10800" in apply_help
 
 
-def test_watcher_help_explains_shared_config_systemd_and_termux_boundary() -> None:
+def test_watcher_help_explains_repository_config_systemd_and_termux_boundary() -> None:
     help_text = _compact(build_watcher_parser().format_help())
 
     assert "parameterless automatic Apply mode" in help_text
-    assert "shared Exchange directory from PatchHarbor config.json" in help_text
+    assert "Exchange directories of all registered repositories" in help_text
     assert "patchharbor configure exchange-directory DIRECTORY" in help_text
     assert "installer does not enable or start it" in help_text
     assert "manual 'patchharbor apply' on Termux/Android" in help_text

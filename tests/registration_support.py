@@ -69,18 +69,26 @@ def isolated_user_environment(root: Path) -> dict[str, str]:
     }
 
 
-def user_configuration_path(environment: dict[str, str]) -> Path:
-    """Return the isolated shared config.json path for one test environment."""
+def legacy_user_configuration_path(environment: dict[str, str]) -> Path:
+    """Only used to assert that obsolete global settings have no effect."""
     if os.name == "nt":
         return Path(environment["APPDATA"]) / "PatchHarbor" / "config.json"
     return Path(environment["XDG_CONFIG_HOME"]) / "patchharbor" / "config.json"
 
 
-def configured_exchange_directory(environment: dict[str, str]) -> Path:
-    """Read the canonical exchange directory from one test config.json."""
-    document = json.loads(
-        user_configuration_path(environment).read_text(encoding="utf-8")
-    )
+def user_configuration_path(environment: dict[str, str], repository: Path | None = None) -> Path:
+    """Locate local test settings; never emulate a global configuration file."""
+    if repository is None:
+        registry = legacy_user_configuration_path(environment).with_name("registry.json")
+        document = json.loads(registry.read_text(encoding="utf-8"))
+        mappings = document["repositories"]
+        assert len(mappings) == 1, "multi-repository tests must select their config explicitly"
+        repository = Path(next(iter(mappings.values())))
+    return repository / ".patchharbor" / "config.json"
+
+
+def configured_exchange_directory(environment: dict[str, str], repository: Path | None = None) -> Path:
+    document = json.loads(user_configuration_path(environment, repository).read_text(encoding="utf-8"))
     return Path(document["exchange_directory"])
 
 
@@ -96,17 +104,20 @@ def exchange_state_path(environment: dict[str, str]) -> Path:
 def write_exchange_configuration(
     environment: dict[str, str],
     directory: Path,
+    repository: Path,
 ) -> Path:
-    """Create one exact format-1 exchange configuration for subprocess tests."""
+    """Write one complete local schema for a registered test repository."""
     directory.mkdir(parents=True, exist_ok=True)
     canonical = directory.resolve()
-    path = user_configuration_path(environment)
+    path = user_configuration_path(environment, repository)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
         json.dumps(
             {
                 "exchange_directory": str(canonical),
                 "format_version": 1,
+                "bundle_suffix": "",
+                "archive_directory": "PatchHarbor-Archive",
             },
             ensure_ascii=False,
             allow_nan=False,

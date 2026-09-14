@@ -8,11 +8,11 @@ import pytest
 from tests.registration_support import (
     isolated_user_environment,
     set_isolated_user_environment,
-    write_exchange_configuration,
+    legacy_user_configuration_path,
 )
 
 
-def test_cli_runs_only_the_shared_exchange_watcher(
+def test_cli_runs_the_global_repository_watcher(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -21,20 +21,17 @@ def test_cli_runs_only_the_shared_exchange_watcher(
     environment = isolated_user_environment(tmp_path / "user")
     for name, value in environment.items():
         monkeypatch.setenv(name, value)
-    exchange = write_exchange_configuration(environment, tmp_path / "exchange")
     observed: dict[str, object] = {}
 
-    def fake_run_shared_exchange_watcher(
-        exchange_directory: Path,
+    def fake_run_repository_watcher(
         **options: object,
     ) -> None:
-        observed["exchange_directory"] = exchange_directory
         observed.update(options)
 
     monkeypatch.setattr(
         watcher_cli,
-        "run_shared_exchange_watcher",
-        fake_run_shared_exchange_watcher,
+        "run_repository_watcher",
+        fake_run_repository_watcher,
     )
     stdout = StringIO()
     stderr = StringIO()
@@ -44,7 +41,6 @@ def test_cli_runs_only_the_shared_exchange_watcher(
         stdout=stdout,
         stderr=stderr,
     ) == 0
-    assert observed["exchange_directory"] == exchange
     assert observed["poll_interval_seconds"] == 0.25
     assert observed["delegate"] is watcher_cli.delegate_to_automatic_apply
     assert callable(observed["stop_requested"])
@@ -53,31 +49,31 @@ def test_cli_runs_only_the_shared_exchange_watcher(
     assert observed["error_stream"] is stderr
 
 
-@pytest.mark.parametrize("configuration_state", ("missing", "invalid"))
-def test_cli_rejects_missing_or_invalid_shared_configuration(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    configuration_state: str,
-) -> None:
+@pytest.mark.parametrize("legacy_state", ("missing", "invalid"))
+def test_watcher_ignores_legacy_global_configuration(tmp_path, monkeypatch, legacy_state):
     from patchharbor_watcher import cli as watcher_cli
+    env = set_isolated_user_environment(monkeypatch, tmp_path / "user")
+    env = isolated_user_environment(tmp_path / "user")
+    old = legacy_user_configuration_path(env)
+    if legacy_state == "invalid":
+        old.parent.mkdir(parents=True, exist_ok=True)
+        old.write_bytes(b"not-json")
+    calls = []
+    monkeypatch.setattr(watcher_cli, "run_repository_watcher", lambda **kwargs: calls.append(kwargs))
+    assert watcher_cli.main([], stdout=StringIO(), stderr=StringIO()) == 0
+    assert len(calls) == 1
+    assert "exchange_directory" not in calls[0]
+    assert old.read_bytes() == b"not-json" if legacy_state == "invalid" else not old.exists()
 
+
+def test_watcher_rejects_invalid_registry_without_starting_loop(tmp_path, monkeypatch):
+    from patchharbor_watcher import cli as watcher_cli
+    from patchharbor.user_paths import registration_user_paths
     set_isolated_user_environment(monkeypatch, tmp_path / "user")
-    if configuration_state == "invalid":
-        from patchharbor.user_paths import configuration_user_paths
-
-        configuration_user_paths().configuration_path.write_text(
-            "{}\n",
-            encoding="utf-8",
-        )
-    stderr = StringIO()
-
-    assert watcher_cli.main([], stdout=StringIO(), stderr=stderr) == 1
-    assert "patchharbor-watcher:" in stderr.getvalue()
-    assert (
-        "configuration does not exist" in stderr.getvalue()
-        if configuration_state == "missing"
-        else "configuration must contain exactly" in stderr.getvalue()
-    )
+    paths = registration_user_paths()
+    paths.registry_path.write_bytes(b"invalid")
+    monkeypatch.setattr(watcher_cli, "run_repository_watcher", lambda **kw: pytest.fail("loop started"))
+    assert watcher_cli.main([], stdout=StringIO(), stderr=StringIO()) == 1
 
 
 @pytest.mark.parametrize(

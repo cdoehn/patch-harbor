@@ -1,402 +1,191 @@
+"""Repository-local persistence and safety contracts (no presentation tests)."""
 from __future__ import annotations
 
 import errno
 import json
-import os
 from pathlib import Path
 
 import pytest
 
-import patchharbor.platform.filesystem as filesystem_module
+from patchharbor import api
 from patchharbor.configuration import (
-    UserConfiguration,
-    load_configuration,
+    RepositoryConfiguration, RepositoryConfigurationPaths, load_configuration,
     write_exchange_directory,
 )
-from patchharbor.exit_status import ExitCode, exit_code_for_error
 from patchharbor.errors import ErrorKind, PatchHarborError
-from patchharbor.user_paths import (
-    RegistrationUserPaths,
-    configuration_user_paths,
-    registration_user_paths,
+from patchharbor.registry import load_registry
+from patchharbor.user_paths import registration_user_paths
+from tests.platform_support import project_environment
+from tests.registration_support import (
+    create_repository, probe_registry_lock, probe_repository_lock,
+    set_isolated_user_environment,
 )
-from tests.registration_support import set_isolated_user_environment
 
 
-def _isolated_paths(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> RegistrationUserPaths:
+@pytest.fixture
+def local(tmp_path, monkeypatch):
     set_isolated_user_environment(monkeypatch, tmp_path / "user")
-    return registration_user_paths()
+    repo = create_repository(tmp_path / "repo")
+    context = api.register(repo)
+    monkeypatch.chdir(repo)
+    return RepositoryConfigurationPaths(context.repository_path, context.repo_id)
 
 
-def _assert_configuration_error(
-    paths: RegistrationUserPaths,
-    *,
-    message: str,
-) -> PatchHarborError:
-    with pytest.raises(PatchHarborError) as captured:
-        load_configuration(paths)
-    assert exit_code_for_error(captured.value) is ExitCode.SOURCE_ERROR
-    assert captured.value.error_kind is ErrorKind.CONFIGURATION_ERROR
-    assert str(captured.value) == message
-    return captured.value
+def document(exchange=None, **changes):
+    return {"format_version": 1, "exchange_directory": exchange,
+            "bundle_suffix": "", "archive_directory": "PatchHarbor-Archive", **changes}
 
 
-def _write_document(
-    paths: RegistrationUserPaths,
-    document: object,
-) -> None:
-    paths.configuration_path.write_text(
-        json.dumps(document, ensure_ascii=False) + "\n",
-        encoding="utf-8",
-    )
+def test_registration_initializes_local_defaults_without_exchange(local):
+    assert load_configuration(local) == RepositoryConfiguration()
+    assert json.loads(local.configuration_path.read_bytes()) == document()
+    assert not (registration_user_paths().configuration_directory / "config.json").exists()
 
 
-def test_shared_configuration_round_trips_direct_file_edits(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    paths = _isolated_paths(tmp_path, monkeypatch)
-    first_exchange = tmp_path / "first" / "exchange"
-
-    written = write_exchange_directory(paths, first_exchange)
-
-    assert written == UserConfiguration(first_exchange.resolve())
-    assert first_exchange.is_dir()
-    assert json.loads(paths.configuration_path.read_text(encoding="utf-8")) == {
-        "exchange_directory": str(first_exchange.resolve()),
-        "format_version": 3,
-        "bundle_suffix": "",
-        "archive_directory": "PatchHarbor-Archive",
-    }
-
-    second_exchange = tmp_path / "second-exchange"
-    second_exchange.mkdir()
-    _write_document(
-        paths,
-        {
-            "exchange_directory": str(second_exchange.resolve()),
-            "format_version": 1,
-        },
-    )
-
-    loaded = load_configuration(paths)
-
-    assert loaded == UserConfiguration(second_exchange.resolve())
+def test_settings_round_trip_with_exact_new_schema(local, tmp_path):
+    first = tmp_path / "first" / "exchange"
+    assert write_exchange_directory(local, first) == RepositoryConfiguration(first.resolve())
+    persisted = local.configuration_path.read_bytes()
+    assert json.loads(persisted) == document(str(first.resolve()))
+    assert persisted.endswith(b"\n")
+    second = tmp_path / "second"
+    second.mkdir()
+    local.configuration_path.write_text(json.dumps(document(str(second))))
+    assert load_configuration(local).exchange_directory == second.resolve()
+    assert not list(local.configuration_directory.glob(".patchharbor-*.tmp"))
 
 
-def test_written_configuration_is_exact_utf8_with_one_lf(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    paths = _isolated_paths(tmp_path, monkeypatch)
-    exchange_directory = tmp_path / "Übergabe"
-
-    configuration = write_exchange_directory(paths, exchange_directory)
-
-    expected = (
-        json.dumps(
-            {
-                "exchange_directory": str(exchange_directory.resolve()),
-                "format_version": 3,
-                "bundle_suffix": "",
-        "archive_directory": "PatchHarbor-Archive",
-            },
-            ensure_ascii=False,
-            allow_nan=False,
-            separators=(",", ":"),
-        )
-        + "\n"
-    ).encode("utf-8")
-    assert configuration.exchange_directory == exchange_directory.resolve()
-    assert paths.configuration_path.read_bytes() == expected
-    assert not tuple(paths.configuration_directory.glob(".patchharbor-*.tmp"))
-
-
-def test_exchange_directory_is_physically_canonicalized(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    paths = _isolated_paths(tmp_path, monkeypatch)
-    physical_directory = tmp_path / "physical"
-    physical_directory.mkdir()
+def test_physical_exchange_alias_is_canonicalized(local, tmp_path):
+    physical = tmp_path / "physical"
+    physical.mkdir()
     alias = tmp_path / "alias"
     try:
-        alias.symlink_to(physical_directory, target_is_directory=True)
+        alias.symlink_to(physical, target_is_directory=True)
     except OSError as exc:
-        pytest.skip(f"directory symlinks are unavailable: {exc}")
-
-    written = write_exchange_directory(paths, alias)
-    _write_document(
-        paths,
-        {
-            "exchange_directory": str(alias),
-            "format_version": 1,
-        },
-    )
-    loaded = load_configuration(paths)
-
-    assert written.exchange_directory == physical_directory.resolve()
-    assert loaded.exchange_directory == physical_directory.resolve()
+        pytest.skip(f"symlinks unavailable: {exc}")
+    assert write_exchange_directory(local, alias).exchange_directory == physical.resolve()
+    local.configuration_path.write_text(json.dumps(document(str(alias))))
+    assert load_configuration(local).exchange_directory == physical.resolve()
 
 
-@pytest.mark.parametrize(
-    ("document", "message"),
-    [
-        (
-            {"format_version": 1},
-            "configuration must contain exactly the two format-1 fields",
-        ),
-        (
-            {
-                "exchange_directory": "/missing",
-                "format_version": 1,
-                "future_field": True,
-            },
-            "configuration must contain exactly the two format-1 fields",
-        ),
-        (
-            {"exchange_directory": "/missing", "format_version": True},
-            "configuration format_version is invalid",
-        ),
-        (
-            {"exchange_directory": "/missing", "format_version": 1.0},
-            "configuration format_version is invalid",
-        ),
-        (
-            {"exchange_directory": "/missing", "format_version": 4},
-            "configuration format_version is invalid",
-        ),
-        (
-            {"exchange_directory": 7, "format_version": 1},
-            "configuration exchange_directory is invalid",
-        ),
-        (
-            {"exchange_directory": "relative/exchange", "format_version": 1},
-            "exchange directory must be an absolute path",
-        ),
-    ],
-    ids=(
-        "missing-field",
-        "unknown-field-before-path",
-        "boolean-version-before-path",
-        "float-version-before-path",
-        "unsupported-version-before-path",
-        "path-type-before-path",
-        "relative-path",
-    ),
-)
-def test_closed_schema_rejects_distinct_direct_edits(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    document: object,
-    message: str,
-) -> None:
-    paths = _isolated_paths(tmp_path, monkeypatch)
-    _write_document(paths, document)
-
-    _assert_configuration_error(paths, message=message)
+@pytest.mark.parametrize("value", [
+    {}, {"format_version": 1}, {"format_version": 1, "exchange_directory": "/old"},
+    document(future=True), document(format_version=True), document(format_version=1.0),
+    document(format_version=2), document(format_version=3), document(exchange_directory=7),
+    document(exchange_directory=""), document(exchange_directory="relative"),
+    document(exchange_directory="/bad\x00path"), document(bundle_suffix="../x"),
+    document(archive_directory="../archive"), document(archive_directory=None),
+])
+def test_invalid_schema_is_never_rewritten(local, tmp_path, value):
+    original = json.dumps(value).encode()
+    local.configuration_path.write_bytes(original)
+    candidate = tmp_path / "not-created"
+    for operation in (lambda: load_configuration(local),
+                      lambda: api.configure_exchange_directory(candidate),
+                      lambda: api.register(local.repository.value)):
+        with pytest.raises(PatchHarborError):
+            operation()
+        assert local.configuration_path.read_bytes() == original
+    assert not candidate.exists()
 
 
-@pytest.mark.parametrize(
-    ("content", "message"),
-    [
-        (
-            b"\xef\xbb\xbf{}",
-            "configuration must be UTF-8 without a BOM",
-        ),
-        (b"\xff", "configuration is not valid UTF-8"),
-        (b"[]\n", "configuration must contain one JSON object"),
-        (
-            b'{"format_version":1,"format_version":1}\n',
-            "configuration is not one valid JSON object",
-        ),
-        (
-            b'{"format_version":NaN}\n',
-            "configuration is not one valid JSON object",
-        ),
-        (
-            b'{"format_version":1}{}',
-            "configuration is not one valid JSON object",
-        ),
-    ],
-    ids=(
-        "bom",
-        "invalid-utf8",
-        "non-object",
-        "duplicate-key",
-        "non-finite-number",
-        "trailing-document",
-    ),
-)
-def test_json_contract_rejects_ambiguous_direct_edits(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    content: bytes,
-    message: str,
-) -> None:
-    paths = _isolated_paths(tmp_path, monkeypatch)
-    paths.configuration_path.write_bytes(content)
-
-    _assert_configuration_error(paths, message=message)
+@pytest.mark.parametrize("content", [
+    b"\xef\xbb\xbf{}", b"\xff", b"[]", b'{"format_version":1,"format_version":1}',
+    b'{"format_version":NaN}', b'{"format_version":1}{}', b"{broken",
+])
+def test_ambiguous_json_is_rejected_without_repair(local, content):
+    local.configuration_path.write_bytes(content)
+    with pytest.raises(PatchHarborError) as caught:
+        load_configuration(local)
+    assert caught.value.error_kind is ErrorKind.CONFIGURATION_ERROR
+    assert local.configuration_path.read_bytes() == content
 
 
-def test_direct_configuration_requires_an_existing_directory(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    paths = _isolated_paths(tmp_path, monkeypatch)
-    missing_directory = tmp_path / "missing"
-    _write_document(
-        paths,
-        {
-            "exchange_directory": str(missing_directory.resolve()),
-            "format_version": 1,
-        },
-    )
-
-    _assert_configuration_error(
-        paths,
-        message="exchange directory does not exist",
-    )
-
-    regular_file = tmp_path / "regular-file"
-    regular_file.write_text("not a directory", encoding="utf-8")
-    _write_document(
-        paths,
-        {
-            "exchange_directory": str(regular_file.resolve()),
-            "format_version": 1,
-        },
-    )
-
-    _assert_configuration_error(
-        paths,
-        message="exchange directory is not a directory",
-    )
+def test_direct_exchange_requires_existing_directory(local, tmp_path):
+    missing = tmp_path / "missing"
+    local.configuration_path.write_text(json.dumps(document(str(missing))))
+    with pytest.raises(PatchHarborError):
+        load_configuration(local)
+    assert not missing.exists()
+    missing.write_text("file")
+    with pytest.raises(PatchHarborError):
+        load_configuration(local)
+    assert missing.read_text() == "file"
 
 
-def test_configure_rejects_relative_path_without_side_effects(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    paths = _isolated_paths(tmp_path, monkeypatch)
-    relative_directory = Path("relative-exchange")
-
-    with pytest.raises(PatchHarborError) as captured:
-        write_exchange_directory(paths, relative_directory)
-
-    assert exit_code_for_error(captured.value) is ExitCode.SOURCE_ERROR
-    assert captured.value.error_kind is ErrorKind.CONFIGURATION_ERROR
-    assert str(captured.value) == "exchange directory must be an absolute path"
-    assert not paths.configuration_path.exists()
-    assert not relative_directory.exists()
+def test_relative_update_preserves_config_and_does_not_create_directory(local):
+    before = local.configuration_path.read_bytes()
+    with pytest.raises(PatchHarborError):
+        write_exchange_directory(local, Path("relative"))
+    assert local.configuration_path.read_bytes() == before
+    assert not Path("relative").exists()
 
 
-def test_configuration_target_is_checked_before_exchange_creation(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    paths = _isolated_paths(tmp_path, monkeypatch)
-    paths.configuration_path.mkdir()
-    exchange_directory = tmp_path / "not-created"
-
-    with pytest.raises(PatchHarborError) as captured:
-        write_exchange_directory(paths, exchange_directory)
-
-    assert exit_code_for_error(captured.value) is ExitCode.SOURCE_ERROR
-    assert captured.value.error_kind is ErrorKind.CONFIGURATION_ERROR
-    assert str(captured.value) == "configuration must be a regular file"
-    assert not exchange_directory.exists()
+def test_missing_config_is_not_recreated_by_any_update(local, tmp_path):
+    local.configuration_path.unlink()
+    for operation in (lambda: api.configure_exchange_directory(tmp_path / "exchange"),
+                      lambda: api.configure_bundle_suffix(".txt"),
+                      lambda: api.configure_archive_directory("Archive"),
+                      lambda: api.configuration(), lambda: api.register(local.repository.value)):
+        with pytest.raises(PatchHarborError):
+            operation()
+        assert not local.configuration_path.exists()
+    assert not (tmp_path / "exchange").exists()
 
 
-def test_atomic_replace_failure_preserves_previous_configuration(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    paths = _isolated_paths(tmp_path, monkeypatch)
-    first_exchange = tmp_path / "first"
-    write_exchange_directory(paths, first_exchange)
-    previous_content = paths.configuration_path.read_bytes()
-    second_exchange = tmp_path / "second"
-
-    def reject_replace(_source: object, _target: object) -> None:
-        raise OSError(errno.EACCES, "native platform wording")
-
-    monkeypatch.setattr(filesystem_module.os, "replace", reject_replace)
-
-    with pytest.raises(PatchHarborError) as captured:
-        write_exchange_directory(paths, second_exchange)
-
-    assert exit_code_for_error(captured.value) is ExitCode.SOURCE_ERROR
-    assert captured.value.error_kind is ErrorKind.CONFIGURATION_ERROR
-    assert str(captured.value) == "cannot write configuration: permission denied"
-    assert paths.configuration_path.read_bytes() == previous_content
-    assert second_exchange.is_dir()
-    assert not tuple(paths.configuration_directory.glob(".patchharbor-*.tmp"))
+def test_nonregular_config_rejected_before_exchange_creation(local, tmp_path):
+    local.configuration_path.unlink()
+    local.configuration_path.mkdir()
+    with pytest.raises(PatchHarborError):
+        write_exchange_directory(local, tmp_path / "not-created")
+    assert not (tmp_path / "not-created").exists()
 
 
-def test_configuration_user_path_failures_have_their_own_category(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    if os.name == "nt":
-        monkeypatch.delenv("APPDATA", raising=False)
-        monkeypatch.delenv("LOCALAPPDATA", raising=False)
-    else:
-        monkeypatch.delenv("HOME", raising=False)
-
-    with pytest.raises(PatchHarborError) as captured:
-        configuration_user_paths()
-
-    assert exit_code_for_error(captured.value) is ExitCode.SOURCE_ERROR
-    assert captured.value.error_kind is ErrorKind.CONFIGURATION_ERROR
-    assert "required for configuration" in str(captured.value)
+def test_atomic_replace_failure_preserves_previous_bytes(local, tmp_path, monkeypatch):
+    import patchharbor.platform.filesystem as filesystem
+    write_exchange_directory(local, tmp_path / "first")
+    before = local.configuration_path.read_bytes()
+    def reject(*args):
+        raise OSError(errno.EACCES, "native wording")
+    monkeypatch.setattr(filesystem.os, "replace", reject)
+    with pytest.raises(PatchHarborError) as caught:
+        write_exchange_directory(local, tmp_path / "second")
+    assert caught.value.error_kind is ErrorKind.CONFIGURATION_ERROR
+    assert local.configuration_path.read_bytes() == before
+    assert not list(local.configuration_directory.glob(".patchharbor-*.tmp"))
 
 
-def test_configure_holds_registry_lock_through_publication_and_revalidates_snapshot(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    from patchharbor.application import configure_exchange_directory
-    from patchharbor.models import RepositoryId, RepositoryPath
+def test_configure_holds_both_locks_through_publication(local, tmp_path, monkeypatch):
+    import patchharbor.application as application
+    original = application.write_prepared_configuration
+    calls = []
+    def publish(paths, settings):
+        env = project_environment()
+        assert probe_registry_lock(env) != 0
+        assert probe_repository_lock(str(local.repo_id), env) != 0
+        calls.append(paths)
+        return original(paths, settings)
+    monkeypatch.setattr(application, "write_prepared_configuration", publish)
+    api.configure_exchange_directory(tmp_path / "exchange")
+    assert calls == [local]
+
+
+def test_registry_change_during_update_is_rejected(local, tmp_path, monkeypatch):
+    import patchharbor.application as application
     from patchharbor.registry import registry_snapshot
-    from tests.platform_support import project_environment
-    from tests.registration_support import probe_registry_lock
+    original = application.load_registry
+    count = 0
+    def changing(paths):
+        nonlocal count
+        count += 1
+        return original(paths) if count == 1 else registry_snapshot({})
+    before = local.configuration_path.read_bytes()
+    monkeypatch.setattr(application, "load_registry", changing)
+    with pytest.raises(PatchHarborError) as caught:
+        api.configure_exchange_directory(tmp_path / "exchange")
+    assert caught.value.error_kind is ErrorKind.REGISTRY_ERROR
+    assert local.configuration_path.read_bytes() == before
 
-    paths = _isolated_paths(tmp_path, monkeypatch)
-    exchange = tmp_path / "exchange"
-    expected_snapshot = registry_snapshot({})
-    changed_snapshot = registry_snapshot(
-        {
-            RepositoryId.new(): RepositoryPath(
-                (tmp_path / "unrelated-repository").resolve()
-            )
-        }
-    )
-    observed_calls = 0
 
-    def changing_registry(_paths: RegistrationUserPaths):
-        nonlocal observed_calls
-        observed_calls += 1
-        if observed_calls == 1:
-            return expected_snapshot
-        assert probe_registry_lock(project_environment()) == int(
-            ExitCode.REPOSITORY_ERROR
-        )
-        return changed_snapshot
-
-    monkeypatch.setattr("patchharbor.application.load_registry", changing_registry)
-
-    with pytest.raises(PatchHarborError) as captured:
-        configure_exchange_directory(exchange)
-
-    assert exit_code_for_error(captured.value) is ExitCode.REPOSITORY_ERROR
-    assert captured.value.error_kind is ErrorKind.REGISTRY_ERROR
-    assert str(captured.value) == (
-        "repository registry changed while configuring exchange directory"
-    )
-    assert observed_calls == 2
-    assert exchange.is_dir()
-    assert not paths.configuration_path.exists()
+def test_global_config_path_is_not_exposed_by_user_paths(local):
+    assert not hasattr(registration_user_paths(), "configuration_path")

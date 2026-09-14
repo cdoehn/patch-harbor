@@ -7,11 +7,11 @@ from pathlib import Path
 
 from patchharbor.bundle_names import append_bundle_suffix
 from patchharbor.configuration import (
-    UserConfiguration,
-    load_configuration_if_present,
+    RepositoryConfigurationPaths,
     load_configuration,
     revalidate_exchange_directory,
 )
+from patchharbor.configuration_context import configuration_paths_for_id
 from patchharbor.errors import (
     PatchHarborError,
     configuration_error,
@@ -27,7 +27,6 @@ from patchharbor.platform.paths import (
     is_physically_within,
     physically_canonicalize,
 )
-from patchharbor.user_paths import RegistrationUserPaths
 
 
 @dataclass(frozen=True, slots=True)
@@ -39,6 +38,7 @@ class ResultBundleTarget:
     uses_exchange_directory: bool
     bundle_suffix: str = ""
     exchange_directory: Path | None = None
+    configuration_paths: RepositoryConfigurationPaths | None = None
 
     def __post_init__(self) -> None:
         if self.final_path.parent != self.directory:
@@ -86,41 +86,28 @@ def _require_directory(path: Path) -> None:
         raise result_bundle_error("Result Bundle path is not a directory")
 
 
-def _explicit_output_configuration(paths: RegistrationUserPaths) -> UserConfiguration | None:
-    """Keep explicit output usable without a usable Exchange configuration."""
-    try:
-        configuration = load_configuration_if_present(paths, validate_directory=False)
-    except PatchHarborError:
-        # Explicit output has historically remained a recovery path even when
-        # config.json is malformed. Never guess or apply an invalid suffix.
-        return None
-    return configuration
-
-
 def _requested_result_directory(
     requested_directory: Path | None,
-    paths: RegistrationUserPaths,
+    paths: RepositoryConfigurationPaths,
 ) -> tuple[Path, bool, str, Path | None]:
+    # An explicit destination can bypass an unset/unavailable Exchange, never
+    # a missing/corrupt configuration document or another repository's settings.
+    configuration = load_configuration(paths, validate_directory=False)
     if requested_directory is not None:
-        configuration = _explicit_output_configuration(paths)
-        return (
-            requested_directory, False,
-            configuration.bundle_suffix if configuration is not None else "",
-            configuration.exchange_directory if configuration is not None else None,
-        )
-
-    configuration = revalidate_exchange_directory(load_configuration(paths))
+        return requested_directory, False, configuration.bundle_suffix, configuration.exchange_directory
+    revalidate_exchange_directory(configuration)
+    assert configuration.exchange_directory is not None
     return configuration.exchange_directory, True, configuration.bundle_suffix, configuration.exchange_directory
 
 
 def prepare_result_bundle_target(
     requested_directory: Path | None,
     snapshot: RegistrySnapshot,
-    paths: RegistrationUserPaths,
+    paths: RepositoryConfigurationPaths,
     *,
     filename: str,
 ) -> ResultBundleTarget:
-    """Resolve one explicit target or the configured shared Exchange target."""
+    """Resolve output using only the target repository's local settings."""
     directory_request, uses_exchange_directory, bundle_suffix, exchange_directory = _requested_result_directory(
         requested_directory,
         paths,
@@ -164,6 +151,7 @@ def prepare_result_bundle_target(
             uses_exchange_directory=uses_exchange_directory,
             bundle_suffix=bundle_suffix,
             exchange_directory=exchange_directory,
+            configuration_paths=paths,
         )
     except PatchHarborError:
         raise
@@ -176,10 +164,12 @@ def prepare_result_bundle_target(
 def revalidate_result_bundle_target(
     target: ResultBundleTarget,
     snapshot: RegistrySnapshot,
-    paths: RegistrationUserPaths,
 ) -> None:
     """Reject a target whose physical directory or configuration changed."""
     try:
+        paths = target.configuration_paths
+        if paths is None or configuration_paths_for_id(paths.repo_id, snapshot) != paths:
+            raise configuration_error("Result Bundle target has no valid repository configuration binding")
         current = physically_canonicalize(target.directory, must_exist=True)
         if current != target.directory:
             raise result_bundle_error(
@@ -205,9 +195,9 @@ def revalidate_result_bundle_target(
                 directory_must_exist=True,
             )
         else:
-            configuration = _explicit_output_configuration(paths)
-            suffix = configuration.bundle_suffix if configuration is not None else ""
-            exchange = configuration.exchange_directory if configuration is not None else None
+            configuration = load_configuration(paths, validate_directory=False)
+            suffix = configuration.bundle_suffix
+            exchange = configuration.exchange_directory
             if suffix != target.bundle_suffix:
                 raise configuration_error(
                     "bundle suffix changed during Result Bundle preparation"

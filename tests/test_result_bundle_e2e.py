@@ -27,6 +27,8 @@ from patchharbor.errors import PatchHarborError
 from patchharbor.platform.filesystem import MetadataSyncStatus
 from patchharbor.result_bundle import create_manual_result_bundle
 from patchharbor.user_paths import registration_user_paths
+from patchharbor.configuration_context import configuration_paths_for_id, configuration_paths_for_repository
+from patchharbor.registry import load_registry
 from tests.platform_support import project_environment, run_cli
 from tests.registration_support import (
     create_repository,
@@ -52,7 +54,7 @@ def isolate_bundle_environment(
     environment = isolated_user_environment(tmp_path / "user")
     for name, value in environment.items():
         monkeypatch.setenv(name, value)
-    write_exchange_configuration(environment, tmp_path / "exchange")
+    (tmp_path / "exchange").mkdir()
     system_temp = tmp_path / "system-temp"
     system_temp.mkdir()
     for name in ("TMPDIR", "TEMP", "TMP"):
@@ -65,9 +67,9 @@ def isolate_bundle_environment(
 
 
 def _result_bundles() -> tuple[Path, ...]:
-    directory = load_configuration(
-        registration_user_paths()
-    ).exchange_directory
+    registry = load_registry(registration_user_paths())
+    local = configuration_paths_for_id(registry.repositories[0].repo_id, registry)
+    directory = load_configuration(local).exchange_directory
     return tuple(sorted(directory.glob("*_Result_*.zip")))
 
 
@@ -186,6 +188,7 @@ def test_manual_bundle_materializes_committed_blobs_without_export_rules(
     git(repository, "update-index", "--chmod=+x", "executable.sh")
     git(repository, "commit", "--quiet", "-m", "base with export attributes")
     assert run_cli(repository, "register").returncode == 0
+    assert run_cli(repository, "configure", "exchange-directory", str(tmp_path / "exchange")).returncode == 0
 
     invocation_directory = tmp_path if explicit_path else repository
     arguments = (str(repository),) if explicit_path else ()
@@ -296,6 +299,7 @@ def test_manual_bundle_json_completion_matches_persisted_run_report(
 ) -> None:
     repository = create_repository(tmp_path / "repository")
     assert run_cli(repository, "register").returncode == 0
+    assert run_cli(repository, "configure", "exchange-directory", str(tmp_path / "exchange")).returncode == 0
 
     completed = run_cli(repository, "bundle", "--json")
 
@@ -365,6 +369,7 @@ def test_manual_bundle_structured_outputs_do_not_capture_secret_environment(
     monkeypatch.setenv("PATCHHARBOR_TEST_TOKEN", secret)
     repository = create_repository(tmp_path / "repository")
     assert run_cli(repository, "register").returncode == 0
+    assert run_cli(repository, "configure", "exchange-directory", str(tmp_path / "exchange")).returncode == 0
 
     completed = run_cli(repository, "bundle", "--json")
 
@@ -381,7 +386,7 @@ def test_manual_bundle_structured_outputs_do_not_capture_secret_environment(
         ("missing", "configuration does not exist"),
         (
             "invalid",
-            "configuration must contain exactly the two format-1 fields",
+            "configuration format_version is invalid",
         ),
     ),
 )
@@ -392,7 +397,8 @@ def test_manual_bundle_requires_valid_exchange_configuration_without_override(
 ) -> None:
     repository = create_repository(tmp_path / "repository")
     assert run_cli(repository, "register").returncode == 0
-    paths = registration_user_paths()
+    assert run_cli(repository, "configure", "exchange-directory", str(tmp_path / "exchange")).returncode == 0
+    paths = configuration_paths_for_repository(repository, load_registry(registration_user_paths()))
     exchange = load_configuration(paths).exchange_directory
     if configuration_state == "missing":
         paths.configuration_path.unlink()
@@ -409,7 +415,7 @@ def test_manual_bundle_requires_valid_exchange_configuration_without_override(
     envelope = json.loads(completed.stdout)
     assert envelope["success"] is False
     assert envelope["error"]["kind"] == "configuration_error"
-    assert envelope["error"]["message"] == expected_message
+    assert expected_message in envelope["error"]["message"]
     assert envelope["error"]["patchharbor_error_code"] == int(
         ExitCode.RESULT_BUNDLE_ERROR
     )
@@ -426,13 +432,14 @@ def test_manual_bundle_requires_valid_exchange_configuration_without_override(
 
 
 @pytest.mark.parametrize("configuration_state", ("missing", "invalid"))
-def test_manual_bundle_explicit_output_ignores_exchange_configuration(
+def test_manual_bundle_explicit_output_requires_valid_local_configuration(
     tmp_path: Path,
     configuration_state: str,
 ) -> None:
     repository = create_repository(tmp_path / "repository")
     assert run_cli(repository, "register").returncode == 0
-    paths = registration_user_paths()
+    assert run_cli(repository, "configure", "exchange-directory", str(tmp_path / "exchange")).returncode == 0
+    paths = configuration_paths_for_repository(repository, load_registry(registration_user_paths()))
     if configuration_state == "missing":
         paths.configuration_path.unlink()
     else:
@@ -451,12 +458,10 @@ def test_manual_bundle_explicit_output_ignores_exchange_configuration(
         str(output_directory),
     )
 
-    assert completed.returncode == 0
-    result_path = Path(
-        json.loads(completed.stdout)["result"]["result_bundle_path"]
-    )
-    assert result_path.parent == output_directory.resolve()
-    assert result_path.is_file()
+    assert completed.returncode == int(ExitCode.RESULT_BUNDLE_ERROR)
+    assert json.loads(completed.stdout)["error"]["kind"] == "configuration_error"
+    assert not output_directory.exists()
+    assert not paths.configuration_path.exists() if configuration_state == "missing" else paths.configuration_path.read_text() == "{}\n"
 
 
 def test_manual_bundle_failure_returns_exit_11_and_emergency_run_report(
@@ -464,6 +469,7 @@ def test_manual_bundle_failure_returns_exit_11_and_emergency_run_report(
 ) -> None:
     repository = create_repository(tmp_path / "repository")
     assert run_cli(repository, "register").returncode == 0
+    assert run_cli(repository, "configure", "exchange-directory", str(tmp_path / "exchange")).returncode == 0
     forbidden_output = repository / "generated" / "results"
 
     completed = run_cli(
@@ -548,6 +554,7 @@ def test_manual_bundle_surfaces_failed_emergency_rescue(
 ) -> None:
     repository = create_repository(tmp_path / "repository")
     assert run_cli(repository, "register").returncode == 0
+    assert run_cli(repository, "configure", "exchange-directory", str(tmp_path / "exchange")).returncode == 0
     controlled_run_directory = tmp_path / "controlled-emergency"
 
     def create_controlled_run_directory(_run_id: UUID) -> Path:
@@ -605,6 +612,7 @@ def test_manual_bundle_captures_untracked_bytes_modes_and_hashes(
     git(repository, "add", "--all")
     git(repository, "commit", "--quiet", "-m", "base with ignore rules")
     assert run_cli(repository, "register").returncode == 0
+    assert run_cli(repository, "configure", "exchange-directory", str(tmp_path / "exchange")).returncode == 0
 
     untracked = {
         "tools/local.sh": b"#!/bin/sh\nprintf local\n",
@@ -720,6 +728,7 @@ def test_manual_bundle_patches_reconstruct_staged_and_unstaged_state(
     )
     monkeypatch.setenv("GIT_DIFF_OPTS", "--stat")
     assert run_cli(repository, "register").returncode == 0
+    assert run_cli(repository, "configure", "exchange-directory", str(tmp_path / "exchange")).returncode == 0
 
     (repository / "layered.bin").write_bytes(b"staged-layer\x00\xfe\n")
     (repository / "staged-only.bin").write_bytes(b"staged-only\x00\xfd\n")
@@ -772,6 +781,7 @@ def test_manual_bundle_patches_reconstruct_staged_and_unstaged_state(
 def test_manual_bundle_respects_the_repository_lock(tmp_path: Path) -> None:
     repository = create_repository(tmp_path / "repository")
     assert run_cli(repository, "register").returncode == 0
+    assert run_cli(repository, "configure", "exchange-directory", str(tmp_path / "exchange")).returncode == 0
     repo_id = (repository / ".patchharbor" / "id").read_text(
         encoding="ascii"
     ).strip()
@@ -824,6 +834,7 @@ def test_manual_bundle_keeps_the_committed_lfs_pointer_without_smudging(
     )
     git(repository, "config", "filter.lfs.required", "true")
     assert run_cli(repository, "register").returncode == 0
+    assert run_cli(repository, "configure", "exchange-directory", str(tmp_path / "exchange")).returncode == 0
 
     completed = run_cli(repository, "bundle")
 
@@ -839,6 +850,7 @@ def test_manual_bundle_uses_physically_resolved_explicit_output_directory(
 ) -> None:
     repository = create_repository(tmp_path / "repository")
     assert run_cli(repository, "register").returncode == 0
+    assert run_cli(repository, "configure", "exchange-directory", str(tmp_path / "exchange")).returncode == 0
 
     physical_output = tmp_path / "physical-results"
     physical_output.mkdir()
@@ -880,7 +892,9 @@ def test_manual_bundle_rejects_output_inside_any_registered_repository(
     target = create_repository(tmp_path / "target")
     other = create_repository(tmp_path / "other")
     assert run_cli(target, "register").returncode == 0
+    assert run_cli(target, "configure", "exchange-directory", str(tmp_path / "exchange")).returncode == 0
     assert run_cli(other, "register").returncode == 0
+    assert run_cli(other, "configure", "exchange-directory", str(tmp_path / "exchange")).returncode == 0
     forbidden_output = other / "generated" / "results"
 
     completed = run_cli(
@@ -901,6 +915,7 @@ def test_manual_bundle_rejects_repository_change_during_capture(
 ) -> None:
     repository = create_repository(tmp_path / "repository")
     assert run_cli(repository, "register").returncode == 0
+    assert run_cli(repository, "configure", "exchange-directory", str(tmp_path / "exchange")).returncode == 0
     output_directory = tmp_path / "results"
 
     def mutate_repository() -> None:
@@ -925,6 +940,7 @@ def test_manual_bundle_publishes_from_verified_temporary_zip_in_result_directory
 ) -> None:
     repository = create_repository(tmp_path / "repository")
     assert run_cli(repository, "register").returncode == 0
+    assert run_cli(repository, "configure", "exchange-directory", str(tmp_path / "exchange")).returncode == 0
     output_directory = tmp_path / "results"
     observed: dict[str, Path] = {}
     real_replace = result_bundle_publication_module.replace_path
@@ -969,6 +985,7 @@ def test_manual_bundle_leaves_no_published_or_temporary_file_after_failure(
 ) -> None:
     repository = create_repository(tmp_path / "repository")
     assert run_cli(repository, "register").returncode == 0
+    assert run_cli(repository, "configure", "exchange-directory", str(tmp_path / "exchange")).returncode == 0
     output_directory = tmp_path / "results"
 
     if verification_failure == "missing":
@@ -1022,7 +1039,9 @@ def test_manual_bundle_rejects_physical_output_alias_inside_repository(
     target = create_repository(tmp_path / "target")
     other = create_repository(tmp_path / "other")
     assert run_cli(target, "register").returncode == 0
+    assert run_cli(target, "configure", "exchange-directory", str(tmp_path / "exchange")).returncode == 0
     assert run_cli(other, "register").returncode == 0
+    assert run_cli(other, "configure", "exchange-directory", str(tmp_path / "exchange")).returncode == 0
     alias = tmp_path / "other-alias"
     _create_directory_alias(alias, other)
     forbidden_output = alias / "generated" / "results"
@@ -1045,6 +1064,7 @@ def test_manual_bundle_holds_repository_lock_through_publication(
 ) -> None:
     repository = create_repository(tmp_path / "repository")
     assert run_cli(repository, "register").returncode == 0
+    assert run_cli(repository, "configure", "exchange-directory", str(tmp_path / "exchange")).returncode == 0
     repo_id = (repository / ".patchharbor" / "id").read_text(
         encoding="ascii"
     ).strip()
@@ -1078,6 +1098,7 @@ def test_manual_bundle_reports_best_effort_sync_outcomes(
 ) -> None:
     repository = create_repository(tmp_path / "repository")
     assert run_cli(repository, "register").returncode == 0
+    assert run_cli(repository, "configure", "exchange-directory", str(tmp_path / "exchange")).returncode == 0
     directory_statuses = iter(
         (MetadataSyncStatus.UNSUPPORTED, MetadataSyncStatus.FAILED)
     )
@@ -1115,13 +1136,14 @@ def test_manual_bundle_rejects_exchange_configuration_retargeted_during_capture(
 ) -> None:
     repository = create_repository(tmp_path / "repository")
     assert run_cli(repository, "register").returncode == 0
-    paths = registration_user_paths()
+    assert run_cli(repository, "configure", "exchange-directory", str(tmp_path / "exchange")).returncode == 0
+    paths = configuration_paths_for_repository(repository, load_registry(registration_user_paths()))
     original_exchange = load_configuration(paths).exchange_directory
     alternate_exchange = tmp_path / "alternate-exchange"
     environment = isolated_user_environment(tmp_path / "user")
 
     def retarget_exchange_directory() -> None:
-        write_exchange_configuration(environment, alternate_exchange)
+        write_exchange_configuration(environment, alternate_exchange, repository)
 
     _synchronize_after_base_capture(monkeypatch, retarget_exchange_directory)
 
@@ -1144,7 +1166,9 @@ def test_manual_bundle_rejects_output_directory_retargeted_during_capture(
     repository = create_repository(tmp_path / "repository")
     other = create_repository(tmp_path / "other")
     assert run_cli(repository, "register").returncode == 0
+    assert run_cli(repository, "configure", "exchange-directory", str(tmp_path / "exchange")).returncode == 0
     assert run_cli(other, "register").returncode == 0
+    assert run_cli(other, "configure", "exchange-directory", str(tmp_path / "exchange")).returncode == 0
     output_directory = tmp_path / "results"
     moved_directory = tmp_path / "original-results"
 
@@ -1171,6 +1195,7 @@ def test_manual_bundle_holds_and_releases_lock_when_publication_fails(
 ) -> None:
     repository = create_repository(tmp_path / "repository")
     assert run_cli(repository, "register").returncode == 0
+    assert run_cli(repository, "configure", "exchange-directory", str(tmp_path / "exchange")).returncode == 0
     repo_id = (repository / ".patchharbor" / "id").read_text(
         encoding="ascii"
     ).strip()

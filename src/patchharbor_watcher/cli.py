@@ -14,12 +14,7 @@ from patchharbor_watcher.lifecycle import (
     WatcherStopController,
     installed_stop_signals,
 )
-from patchharbor_watcher.loop import run_shared_exchange_watcher
-
-
-def _load_exchange_directory() -> Path:
-    """Load the one shared Core Exchange directory for watcher startup."""
-    return api.configuration(revalidate=True).exchange_directory
+from patchharbor_watcher.loop import run_repository_watcher
 
 
 def _install_systemd_user_unit() -> Path:
@@ -49,10 +44,10 @@ def _build_parser() -> argparse.ArgumentParser:
         allow_abbrev=False,
         description=(
             "Continuously invoke PatchHarbor's parameterless automatic Apply "
-            "mode for the shared Exchange directory from PatchHarbor config.json."
+            "mode across the Exchange directories of all registered repositories."
         ),
         epilog=(
-            "Configure Exchange first with 'patchharbor configure "
+            "Register each repository and configure its Exchange with 'patchharbor configure "
             "exchange-directory DIRECTORY'. Run in the foreground or install "
             "the optional Linux systemd user unit; the installer does not "
             "enable or start it. Use manual 'patchharbor apply' on "
@@ -63,7 +58,7 @@ def _build_parser() -> argparse.ArgumentParser:
         "--install-systemd-user-unit",
         action="store_true",
         help=(
-            "install the Linux systemd user unit after Exchange is configured; "
+            "install the Linux systemd user unit; "
             "do not enable or start it"
         ),
     )
@@ -83,7 +78,7 @@ def main(
     stdout: TextIO | None = None,
     stderr: TextIO | None = None,
 ) -> int:
-    """Install or run the thin shared-Exchange watcher."""
+    """Install or run the global trigger for repository-local Exchange settings."""
     parser = _build_parser()
     arguments = parser.parse_args(argv)
     actual_stdout = sys.stdout if stdout is None else stdout
@@ -91,15 +86,14 @@ def main(
     stop_controller = WatcherStopController()
 
     try:
-        exchange_directory = _load_exchange_directory()
+        api.repositories()  # Validate the registry; Core refreshes settings on every poll.
         if arguments.install_systemd_user_unit:
             unit_path = _install_systemd_user_unit()
             print(unit_path, file=actual_stdout)
             return 0
 
         with installed_stop_signals(stop_controller):
-            run_shared_exchange_watcher(
-                exchange_directory,
+            run_repository_watcher(
                 delegate=delegate_to_automatic_apply,
                 poll_interval_seconds=arguments.poll_interval,
                 log_stream=actual_stdout,

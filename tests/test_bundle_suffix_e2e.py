@@ -14,7 +14,7 @@ from patchharbor.errors import PatchHarborError
 from patchharbor.exchange import classify_exchange_artifact, ExchangeArtifactKind
 from patchharbor.result_bundle import create_manual_result_bundle
 from patchharbor_watcher.apply_boundary import delegate_to_automatic_apply
-from patchharbor_watcher.loop import SharedWatcherEventState, poll_shared_exchange_once, WatcherPollOutcome
+from patchharbor_watcher.loop import SharedWatcherEventState, poll_repositories_once, WatcherPollOutcome
 from tests.platform_support import native_script, native_value, project_environment, run_cli
 from tests.registration_support import create_repository, user_configuration_path
 from tests.test_exchange_e2e import _configure_user, _register_context, _manifest, _write_package
@@ -82,7 +82,7 @@ def test_bundle_and_clear_use_persisted_suffix_across_processes(tmp_path: Path, 
 
 @pytest.mark.parametrize("arguments", [(), (".txt", "--clear"), ("--suffix", ".txt")])
 def test_configure_rejects_ambiguous_or_missing_suffix_argument(tmp_path: Path, arguments) -> None:
-    environment, _ = _configure_user(tmp_path)
+    repository, environment, _, _ = _configured(tmp_path)
     path = user_configuration_path(environment)
     previous = path.read_bytes()
     completed = run_cli(tmp_path, "configure", "bundle-suffix", *arguments, environment_overrides=environment)
@@ -156,13 +156,13 @@ def test_watcher_accepts_suffixed_patch_but_does_not_loop_after_failure(tmp_path
         return delegate_to_automatic_apply(environment=apply_environment)
     state = SharedWatcherEventState()
     first_log = StringIO()
-    first = poll_shared_exchange_once(exchange, state, delegate=delegate, log_stream=first_log, error_stream=StringIO())
+    first = poll_repositories_once(state, delegate=delegate, log_stream=first_log, error_stream=StringIO())
     assert first is WatcherPollOutcome.ERROR
     assert json.loads(first_log.getvalue())["process_exit_code"] == 23
     bundles = tuple(exchange.glob("*_Result_*.zip.txt"))
     assert len(bundles) == 1
     _assert_result(bundles[0], ".txt")
-    second = poll_shared_exchange_once(exchange, state, delegate=delegate, log_stream=StringIO(), error_stream=StringIO())
+    second = poll_repositories_once(state, delegate=delegate, log_stream=StringIO(), error_stream=StringIO())
     assert second is WatcherPollOutcome.WAITING
     assert tuple(exchange.glob("*_Result_*.zip.txt")) == bundles
 
@@ -179,7 +179,11 @@ def test_suffix_change_during_capture_never_publishes_inconsistent_name(
     original = capture_module.capture_base_bundle_entries
     def capture_then_change(*args, **kwargs):
         captured = original(*args, **kwargs)
-        configure_bundle_suffix(".data")
+        # Simulate a non-cooperating external edit while the bundle holds its lock.
+        path = user_configuration_path(environment, repository)
+        settings = json.loads(path.read_bytes())
+        settings["bundle_suffix"] = ".data"
+        path.write_text(json.dumps(settings))
         return captured
     monkeypatch.setattr(capture_module, "capture_base_bundle_entries", capture_then_change)
     with pytest.raises(PatchHarborError, match="bundle suffix changed"):

@@ -87,7 +87,7 @@ def _build_parser() -> argparse.ArgumentParser:
             "explicit scripts and ZIP PatchBundles."
         ),
         epilog=(
-            "Configure the shared Exchange directory once with "
+            "Configure the repository Exchange directory once with "
             "'patchharbor configure exchange-directory DIRECTORY'. "
             "Use 'patchharbor COMMAND --help' for one command's complete "
             "options."
@@ -107,13 +107,13 @@ def _build_parser() -> argparse.ArgumentParser:
 
     configure_parser = commands.add_parser(
         "configure",
-        help="configure shared PatchHarbor user settings",
+        help="configure the current repository settings",
         description=(
-            "Manage the one user-specific config.json shared by Result "
+            "Manage this repository's .patchharbor/config.json for Result "
             "Bundles, automatic Apply discovery, and the optional watcher."
         ),
         epilog=(
-            "The Exchange directory is global per user and must not overlap "
+            "Exchange directories may be shared by repositories but must not overlap "
             "any registered repository."
         ),
     )
@@ -124,10 +124,10 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     exchange_directory_parser = configure_commands.add_parser(
         "exchange-directory",
-        help="set the shared exchange directory",
+        help="set the repository exchange directory",
         description=(
             "Create when necessary, validate, physically resolve, and "
-            "persist the shared Exchange directory in config.json."
+            "persist the repository Exchange directory in config.json."
         ),
     )
     exchange_directory_parser.add_argument(
@@ -167,9 +167,9 @@ def _build_parser() -> argparse.ArgumentParser:
     archive_parser.add_argument("--clear", action="store_true", help="disable automatic archival")
     configure_commands.add_parser(
         "show",
-        help="show the shared PatchHarbor configuration",
+        help="show the current repository configuration",
         description=(
-            "Show the active config.json path and the canonical shared "
+            "Show the active repository config.json path and the canonical "
             "Exchange directory, bundle suffix and archive directory (empty when disabled)."
         ),
     )
@@ -453,14 +453,14 @@ def _build_parser() -> argparse.ArgumentParser:
 
 def _write_configuration(
     configuration_path: Path,
-    exchange_directory: Path,
+    exchange_directory: Path | None,
     *,
     bundle_suffix: str,
     archive_directory: str,
     stdout: TextIO,
 ) -> None:
     print(f"configuration_path: {configuration_path}", file=stdout)
-    print(f"exchange_directory: {exchange_directory}", file=stdout)
+    print(f"exchange_directory: {exchange_directory if exchange_directory is not None else 'not configured'}", file=stdout)
     print(f"bundle_suffix: {bundle_suffix}", file=stdout)
     print(f"archive_directory: {archive_directory}", file=stdout)
 

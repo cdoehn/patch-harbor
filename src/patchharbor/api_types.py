@@ -32,10 +32,10 @@ CandidateSelector = Callable[[tuple[DirectoryCandidate, ...]], DirectoryCandidat
 
 @dataclass(frozen=True, slots=True)
 class ConfigurationResult:
-    """Persisted user configuration, including its physical configuration file."""
+    """Persisted repository-local configuration, including its physical configuration file."""
 
     path: Path
-    exchange_directory: Path
+    exchange_directory: Path | None
     bundle_suffix: str
     archive_directory: str
 

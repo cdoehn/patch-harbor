@@ -1,4 +1,4 @@
-"""Read and write PatchHarbor's shared user configuration."""
+"""Strict repository-local configuration; no global fallback or migration."""
 
 from __future__ import annotations
 
@@ -21,26 +21,41 @@ from patchharbor.platform.filesystem import (
     read_stable_regular_file,
 )
 from patchharbor.platform.paths import physically_canonicalize
-from patchharbor.user_paths import RegistrationUserPaths
+from patchharbor.models import RepositoryId, RepositoryPath
+from patchharbor.repository import require_local_repository_identity
 
 
-_FORMAT_VERSION = 3
-_LEGACY_CONFIGURATION_FIELDS = frozenset(
-    {
-        "exchange_directory",
-        "format_version",
-    }
-)
-
-_VERSION_2_FIELDS = _LEGACY_CONFIGURATION_FIELDS | {"bundle_suffix"}
-_CONFIGURATION_FIELDS = _VERSION_2_FIELDS | {"archive_directory"}
+_FORMAT_VERSION = 1
+_CONFIGURATION_FIELDS = frozenset({
+    "format_version", "exchange_directory", "bundle_suffix", "archive_directory",
+})
 
 
 @dataclass(frozen=True)
-class UserConfiguration:
-    """One loaded shared PatchHarbor configuration."""
+class RepositoryConfigurationPaths:
+    """A local config location bound to one already resolved repository identity."""
 
-    exchange_directory: Path
+    repository: RepositoryPath
+    repo_id: RepositoryId
+
+    @property
+    def configuration_directory(self) -> Path:
+        return self.repository.value / ".patchharbor"
+
+    @property
+    def configuration_path(self) -> Path:
+        return self.configuration_directory / "config.json"
+
+    def require_identity(self) -> None:
+        # Also rejects linked metadata directories and a missing local exclude.
+        require_local_repository_identity(self.repository, self.repo_id)
+
+
+@dataclass(frozen=True)
+class RepositoryConfiguration:
+    """One repository's settings; Exchange may be unset after registration."""
+
+    exchange_directory: Path | None = None
     bundle_suffix: str = ""
     archive_directory: str = DEFAULT_ARCHIVE_DIRECTORY
 
@@ -146,7 +161,7 @@ def _canonical_exchange_directory(
 
 def _parse_configuration(
     content: bytes, *, validate_directory: bool = True,
-) -> UserConfiguration:
+) -> RepositoryConfiguration:
     if content.startswith(b"\xef\xbb\xbf"):
         raise _error("configuration must be UTF-8 without a BOM")
     try:
@@ -165,38 +180,30 @@ def _parse_configuration(
 
     if type(document) is not dict:
         raise _error("configuration must contain one JSON object")
-    # Diagnose a missing version using the legacy closed-field contract.
-    # The exact field-set check below still rejects a missing version.
-    format_version = document.get("format_version", 1)
-    if type(format_version) is not int or format_version not in {1, 2, _FORMAT_VERSION}:
+    format_version = document.get("format_version")
+    if type(format_version) is not int or format_version != _FORMAT_VERSION:
         raise _error("configuration format_version is invalid")
-    expected_fields = (
-        {1: _LEGACY_CONFIGURATION_FIELDS, 2: _VERSION_2_FIELDS,
-         3: _CONFIGURATION_FIELDS}[format_version]
-    )
-    if set(document) != expected_fields:
-        fields_description = {1: "two format-1", 2: "three format-2",
-                              3: "four format-3"}[format_version]
-        raise _error(
-            f"configuration must contain exactly the {fields_description} fields"
-        )
+    if set(document) != _CONFIGURATION_FIELDS:
+        raise _error("configuration must contain exactly the four format-1 fields")
     try:
-        bundle_suffix = validate_bundle_suffix(document.get("bundle_suffix", ""))
+        bundle_suffix = validate_bundle_suffix(document["bundle_suffix"])
         archive_directory = validate_archive_directory(
-            document.get("archive_directory", DEFAULT_ARCHIVE_DIRECTORY)
+            document["archive_directory"]
         )
     except ValueError as exc:
         raise _error(str(exc)) from exc
 
     exchange_directory = document["exchange_directory"]
-    if type(exchange_directory) is not str:
+    if exchange_directory is not None and (type(exchange_directory) is not str or not exchange_directory or "\x00" in exchange_directory):
         raise _error("configuration exchange_directory is invalid")
 
-    return UserConfiguration(
+    return RepositoryConfiguration(
         exchange_directory=(
-            _canonical_exchange_directory(Path(exchange_directory), create=False)
-            if validate_directory
-            else _absolute_exchange_directory(Path(exchange_directory))
+            None if exchange_directory is None else (
+                _canonical_exchange_directory(Path(exchange_directory), create=False)
+                if validate_directory
+                else _absolute_exchange_directory(Path(exchange_directory))
+            )
         ),
         bundle_suffix=bundle_suffix,
         archive_directory=archive_directory,
@@ -204,11 +211,12 @@ def _parse_configuration(
 
 
 def load_configuration_if_present(
-    paths: RegistrationUserPaths,
+    paths: RepositoryConfigurationPaths,
     *,
     validate_directory: bool = True,
-) -> UserConfiguration | None:
-    """Load config; directory validation may be deferred for explicit output/repair."""
+) -> RepositoryConfiguration | None:
+    """Load local settings; never interpret any user-global configuration."""
+    paths.require_identity()
     if _configuration_file_kind(paths.configuration_path) is PathKind.MISSING:
         return None
 
@@ -228,9 +236,14 @@ def load_configuration_if_present(
 
 
 def revalidate_exchange_directory(
-    configuration: UserConfiguration,
-) -> UserConfiguration:
+    configuration: RepositoryConfiguration,
+) -> RepositoryConfiguration:
     """Require the persisted physical target to remain the same directory."""
+    if configuration.exchange_directory is None:
+        raise _error(
+            "repository has no exchange directory; run "
+            "'patchharbor configure exchange-directory DIRECTORY' in this repository"
+        )
     current = _canonical_exchange_directory(
         configuration.exchange_directory,
         create=False,
@@ -240,10 +253,11 @@ def revalidate_exchange_directory(
     return configuration
 
 
-def _encoded_configuration(configuration: UserConfiguration) -> bytes:
+def _encoded_configuration(configuration: RepositoryConfiguration) -> bytes:
     return serialize_json_document(
         {
-            "exchange_directory": str(configuration.exchange_directory),
+            "exchange_directory": (str(configuration.exchange_directory)
+                                   if configuration.exchange_directory is not None else None),
             "format_version": _FORMAT_VERSION,
             "bundle_suffix": configuration.bundle_suffix,
             "archive_directory": configuration.archive_directory,
@@ -252,30 +266,31 @@ def _encoded_configuration(configuration: UserConfiguration) -> bytes:
 
 
 def prepare_exchange_directory(
-    paths: RegistrationUserPaths,
+    paths: RepositoryConfigurationPaths,
     requested_directory: Path,
-) -> UserConfiguration:
+) -> RepositoryConfiguration:
     """Create and physically canonicalize an exchange directory for publication."""
     absolute_directory = _absolute_exchange_directory(requested_directory)
-    previous = load_configuration_if_present(paths, validate_directory=False)
-    return UserConfiguration(
+    previous = load_configuration(paths, validate_directory=False)
+    return RepositoryConfiguration(
         exchange_directory=_canonical_exchange_directory(
             absolute_directory,
             create=True,
         ),
-        bundle_suffix=previous.bundle_suffix if previous is not None else "",
-        archive_directory=(previous.archive_directory if previous is not None
-                           else DEFAULT_ARCHIVE_DIRECTORY),
+        bundle_suffix=previous.bundle_suffix,
+        archive_directory=previous.archive_directory,
     )
 
 
 def write_prepared_configuration(
-    paths: RegistrationUserPaths,
-    configuration: UserConfiguration,
-) -> UserConfiguration:
+    paths: RepositoryConfigurationPaths,
+    configuration: RepositoryConfiguration,
+) -> RepositoryConfiguration:
     """Atomically publish one already prepared and revalidated configuration."""
-    _configuration_file_kind(paths.configuration_path)
-    revalidate_exchange_directory(configuration)
+    # Existing valid local settings are mandatory, even for an explicit update.
+    load_configuration(paths, validate_directory=False)
+    if configuration.exchange_directory is not None:
+        revalidate_exchange_directory(configuration)
     try:
         atomic_replace_bytes(
             paths.configuration_path,
@@ -290,9 +305,9 @@ def write_prepared_configuration(
 
 
 def write_exchange_directory(
-    paths: RegistrationUserPaths,
+    paths: RepositoryConfigurationPaths,
     requested_directory: Path,
-) -> UserConfiguration:
+) -> RepositoryConfiguration:
     """Create, canonicalize, and atomically persist one exchange directory."""
     return write_prepared_configuration(
         paths,
@@ -300,9 +315,29 @@ def write_exchange_directory(
     )
 
 
-def load_configuration(paths: RegistrationUserPaths) -> UserConfiguration:
-    """Load one strictly validated and usable format-1, format-2 or format-3 configuration."""
-    configuration = load_configuration_if_present(paths)
+def initialize_configuration(paths: RepositoryConfigurationPaths) -> None:
+    """Create defaults only as part of a fresh registration transaction.
+
+    The registration coordinator holds the registry lock and restores its local
+    snapshot on failure. This is never called for an existing local identity.
+    """
+    paths.require_identity()
+    if _configuration_file_kind(paths.configuration_path) is not PathKind.MISSING:
+        raise _error("configuration already exists; refusing to overwrite it")
+    try:
+        atomic_replace_bytes(paths.configuration_path, _encoded_configuration(RepositoryConfiguration()))
+    except FileSystemOperationError as exc:
+        raise _error(f"cannot initialize configuration: {describe_os_error(exc.cause)}") from exc
+
+
+def load_configuration(
+    paths: RepositoryConfigurationPaths, *, validate_directory: bool = True,
+) -> RepositoryConfiguration:
+    """Require a valid local format-1 document; never create or repair one."""
+    configuration = load_configuration_if_present(paths, validate_directory=validate_directory)
     if configuration is None:
-        raise _error("configuration does not exist")
+        raise _error(
+            f"repository configuration does not exist: {paths.configuration_path}; "
+            "manual setup is required (no automatic migration or repair)"
+        )
     return configuration

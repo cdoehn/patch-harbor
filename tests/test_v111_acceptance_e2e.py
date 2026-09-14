@@ -18,7 +18,7 @@ from patchharbor_watcher.apply_boundary import delegate_to_automatic_apply
 from patchharbor_watcher.loop import (
     SharedWatcherEventState,
     WatcherPollOutcome,
-    poll_shared_exchange_once,
+    poll_repositories_once,
 )
 from tests.platform_support import (
     native_script,
@@ -410,15 +410,13 @@ def test_v111_acceptance_watcher_delegates_to_real_apply_once(
             environment=apply_environment,
         )
 
-    first = poll_shared_exchange_once(
-        exchange,
+    first = poll_repositories_once(
         SharedWatcherEventState(),
         delegate=delegate,
         log_stream=log_stream,
         error_stream=error_stream,
     )
-    second = poll_shared_exchange_once(
-        exchange,
+    second = poll_repositories_once(
         SharedWatcherEventState(),
         delegate=delegate,
         log_stream=StringIO(),
