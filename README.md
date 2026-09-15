@@ -24,58 +24,121 @@ wheel also carries it under its shared `share/patchharbor/` data directory.
 Every new Result Bundle embeds a freshly rendered copy of that template plus
 local environment data. The original repository file is never overwritten.
 
-## One-time user setup
+## Repository-local setup
 
-PatchHarbor uses one shared Exchange directory per operating-system user. It is
-not configured per repository, and `patchharbor register` never asks for it.
-Configure and inspect it with:
+Each registered local repository owns **all of its PatchHarbor settings** in
+`.patchharbor/config.json`, next to its `.patchharbor/id`. There is no global
+Exchange setting and no global fallback. Only the registry (repository UUID to
+physical repository path), locks and technical replay/runtime state are shared
+per operating-system user; they are not a second configuration store.
+
+Register first, then run the configuration command **from inside that repository**:
 
 ```bash
+cd /path/to/repository
+patchharbor register
 patchharbor configure exchange-directory ~/Downloads
 patchharbor configure show
 ```
 
-On Linux, the default configuration path is:
-
-```text
-${XDG_CONFIG_HOME:-$HOME/.config}/patchharbor/config.json
-```
-
-On Windows, it is:
-
-```text
-%APPDATA%\PatchHarbor\config.json
-```
-
-Format 3 is a closed JSON schema with exactly these fields:
+All `configure` commands resolve the current working directory to its registered
+Git repository. Subdirectories work too. Outside a repository, in an unregistered
+repository, or with missing/invalid local metadata, the command fails without
+creating or repairing a configuration. `register` never asks for an Exchange
+path: a genuinely fresh registration creates this complete local Format-1 file:
 
 ```json
 {
-  "exchange_directory": "/absolute/path/to/exchange",
-  "format_version": 3,
+  "format_version": 1,
+  "exchange_directory": null,
   "bundle_suffix": "",
   "archive_directory": "PatchHarbor-Archive"
 }
 ```
 
-The CLI is the recommended way to write this file. Direct editing is allowed,
-but missing, additional, duplicate, or invalid fields are rejected. The path is
-stored as a physically resolved absolute directory. The Exchange directory may
-not equal, contain, or be inside any registered repository. `watcher.json` and
-`paths.json` are not configuration sources in PatchHarbor 1.2.0.
+This is a **new repository-local schema**, not the old global Format 1.
+All four fields are required; additional, duplicate or invalid fields, BOMs and
+unsupported versions are rejected. `null` means registration is complete but
+no Exchange directory has been chosen. It is not a missing configuration file.
+`configure show` can display this state. Suffix and archive preferences can be
+set before Exchange is chosen; operations needing Exchange fail until it is set.
+
+The Exchange argument must be absolute (the shell expands `~/Downloads`).
+The setter creates the directory if needed and stores its physically resolved
+absolute path. It may not equal, contain, or be inside **any** registered
+repository. Setters update the existing valid document atomically and preserve
+all other settings. They never initialize a missing file.
+`.patchharbor/` is excluded through Git's local `info/exclude`, not through a
+change to the project's versioned `.gitignore`. It is not committed or included
+as repository files in Result Bundles. A dot-prefixed name is hidden on Linux;
+PatchHarbor does not set a Windows Hidden attribute.
+
+### Shared or separate Exchange directories
+
+Both are supported, with settings remaining independent:
+
+```bash
+cd /path/to/repository-a
+patchharbor configure exchange-directory ~/Downloads
+cd /path/to/repository-b
+patchharbor configure exchange-directory ~/Downloads
+cd /path/to/repository-c
+patchharbor configure exchange-directory ~/Downloads/Repository-C
+```
+
+All three repositories must already be registered. A and B share a physical
+folder; C uses another one. The watcher scans each distinct physical Exchange
+folder once per poll. Manifest `repo_id`, not the filename or another project's
+preferences, determines ownership. Automatic discovery accepts a package only
+from its target repository's configured Exchange. An explicit `apply PATCH_ZIP`
+can read a package elsewhere, but still uses its manifest target's settings.
 
 The flat Exchange directory may contain patch packages, Result Bundles, old
 packages, and unrelated files together. PatchHarbor identifies content rather
 than relying on filenames. Conservative automatic archival moves only bundles
 with complete obsolescence proofs into a direct child folder; nothing is deleted.
-Other downloads and unprovable bundles remain untouched.
+Other downloads and unprovable bundles remain untouched. Shared Exchange folders
+may have different suffix and archive preferences for each repository.
+
+### Manual upgrade from global configuration
+
+This is an intentional breaking change in the 1.2.0 development line, with
+**no migration code, no automatic repair and no dual reading**. Earlier global
+configuration formats are not accepted as local configuration formats.
+An old `${XDG_CONFIG_HOME:-$HOME/.config}/patchharbor/config.json` on Linux or
+`%APPDATA%\PatchHarbor\config.json` on Windows is ignored, even when it exists.
+`watcher.json` and `paths.json` are not configuration sources either.
+
+Finish any running Apply and stop the watcher before changing the installation
+or editing local metadata. Update the CLI and watcher together. Keep the central
+registry, `.patchharbor/id`, Git's local exclusion and the replay ledger; do not
+delete locks or replay records to work around a configuration error.
+
+For each **already registered** repository whose local config is missing, create
+`.patchharbor/config.json` deliberately in an editor using the four-field JSON
+above. Do not overwrite an existing valid file and do not copy an old global
+JSON document wholesale. A damaged file requires deliberate manual correction;
+`register`, `register --new-id` and `configure` are not repair commands.
+Then, from that repository, run `configure exchange-directory` with the intended
+absolute path and set any suffix/archive preference. These may be read manually
+from the old settings, but the application never imports them. `configure show`
+displays only that repository's values. Repeat for every local checkout.
+
+For genuinely new repositories and ordinary Git clones, use the normal
+`register` then `configure` workflow instead. A clone does not inherit ignored
+metadata. `unregister` removes only the registry mapping: ID, config and the
+local exclusion stay intact. Re-registering reuses them. After moving the entire
+local repository, re-register at the new path; the old registered path must no
+longer exist. A copied identity at two existing paths is a conflict, not a move.
+A deliberate `register --new-id` can give the copy its own ID when its retained
+local metadata is valid; it does not reset its settings.
 
 ### Conservative automatic Exchange archival
 
 The default archive is **`PatchHarbor-Archive`**, directly inside the configured
 Exchange directory. It is created on demand during normal Apply discovery,
 Watcher scans, or manual bundle creation. No separate cleanup command is needed.
-Configure its single folder name through the existing configuration interface:
+Configure its single folder name from the owning repository:
 
 ```bash
 patchharbor configure archive-dir PatchHarbor-Archive
@@ -87,8 +150,8 @@ A leading dot uses normal Linux hidden-file semantics. On Windows it is simply
 part of the name; PatchHarbor does not set a Hidden attribute. Absolute paths,
 path separators, `.`/`..`, traversal and non-portable names are rejected. The
 name supports 1–128 ASCII letters, digits, dots, underscores and hyphens, but no
-trailing dot or Windows reserved device name. Disable all automatic archival
-with either of these equivalent settings (existing archive files are retained):
+trailing dot or Windows reserved device name. Disable automatic archival for
+this repository with either setting (existing archive files are retained):
 
 ```bash
 patchharbor configure archive-dir --clear
@@ -134,15 +197,15 @@ cached across scans or reused in place of this final check.
 
 ### Optional bundle filename suffix
 
-Configure a suffix once, using the same shared configuration as the Exchange
-path. For example, to append `.txt` **after** the existing `.zip` extension:
+Configure a suffix for the current registered repository, using its local
+configuration. For example, append `.txt` **after** the `.zip` extension:
 
 ```bash
 patchharbor configure bundle-suffix .txt
 patchharbor configure show
 ```
 
-All newly generated Result Bundles then use
+All newly generated Result Bundles for this repository then use
 `<Repository>_Result_<HHMMSS>_<MMDD>_<ID6>.zip.txt`, including manual `bundle`,
 automatic Apply results (success, failure, dry-run), Watcher results, and explicit
 `--output-dir` targets. There is no suffix argument on `apply` or `bundle`.
@@ -157,13 +220,13 @@ no dot is inserted automatically. It may contain at most 32 ASCII letters,
 digits, dots, underscores or hyphens, must include a letter or digit, and must
 not contain `..` or end with a dot. Paths, whitespace, control characters and
 incomplete-download endings such as `.part`, `.tmp` or `.crdownload` are rejected.
-Set the Exchange directory before configuring the suffix. Changing either
-setting preserves the other and the archive setting. Reads accept existing closed
-Format-1 files as an empty suffix and Format-2 files with their existing suffix.
-Both use the default archive name without rewriting the file. The next
-configuration write atomically migrates to Format 3. Older versions cannot read
-Format-3 configuration or the new Format-4 replay state. Upgrade all installed
-PatchHarbor entrypoints after this change; do not delete the replay ledger.
+Suffix and archive preferences may be set while Exchange is still `null`.
+Once an Exchange path is stored, setters revalidate it. An unavailable old path
+can be replaced deliberately with `configure exchange-directory`, preserving the
+other preferences; this is an explicit setting change, not automatic repair.
+Reads and writes accept only the complete repository-local Format 1. The global
+Format-4 replay ledger is separate from this configuration schema and remains
+intact. Upgrade all installed PatchHarbor entrypoints together.
 
 Patch packages are created by the development chat, not by a new local command.
 The new Result Bundle's `context.json` carries `bundle_suffix` as optional
@@ -180,18 +243,19 @@ application can read it. The suffix setting never renames existing files. Old `.
 retry and the Watcher guard remain content-based and unchanged. Result Bundles
 are never executed as patches, regardless of their filename.
 
-Explicit `--output-dir` remains usable with missing or malformed configuration,
-as before; it then uses no suffix. A valid configured suffix is honored even if
-the configured Exchange directory is temporarily unavailable. With default
-Exchange output, invalid configuration remains an error. A suffix change during
-Result Bundle preparation is rejected rather than publishing inconsistent
-filename metadata.
+Explicit `--output-dir` can bypass an unset or unavailable Exchange directory,
+**not a missing or malformed local configuration**. It always uses the target
+repository's valid local suffix, never another project's settings or a default
+fallback. Default output requires an available Exchange directory. Result target
+preparation revalidates the local identity, Exchange value and suffix before
+publication; concurrent changes cause a controlled error.
 
 ## Initialize a repository
 
 A repository must be a local Git repository with a committed `HEAD`. Registration
-creates a local `.patchharbor/id` and a user-specific central mapping from its
-UUID to the physical repository path.
+creates a local `.patchharbor/id`, the complete `.patchharbor/config.json`
+with unset Exchange, and a user-specific central mapping from its UUID to the
+physical repository path. Existing identities require valid local metadata.
 
 ### New Git repository
 
@@ -202,6 +266,7 @@ cd /path/to/new-repository
 git init
 # Add the initial files and create the first Git commit.
 patchharbor register
+patchharbor configure exchange-directory ~/Downloads
 patchharbor bundle
 ```
 
@@ -210,13 +275,14 @@ patchharbor bundle
 ```bash
 cd /path/to/existing-repository
 patchharbor register
+patchharbor configure exchange-directory ~/Downloads
 patchharbor bundle
 ```
 
 ### Already registered repository
 
-Do not register it again. Create a fresh snapshot whenever the repository state
-changes:
+With a valid local configuration and Exchange path, no re-registration is
+needed. Create a fresh snapshot whenever the repository state changes:
 
 ```bash
 cd /path/to/registered-repository
@@ -307,10 +373,11 @@ for POSIX shells or PowerShell, explicitly labelled, and omitted when unknown.
 Only allowlisted fields are collected, not hostnames, IP addresses, user-name
 fields, hardware serial numbers, tokens or the complete environment. Required
 absolute paths may naturally contain a user name. Review bundles before sharing.
-An explicit output directory remains usable without valid configuration; then
-unavailable configuration is recorded as unknown rather than silently replaced
-by that output directory. `context.json`, `patch.json`, fingerprints and replay
-identities do not gain environment-dependent fields.
+An explicit output directory can bypass an unset or unavailable Exchange path,
+but never a missing or invalid repository-local configuration. The environment
+records the selected repository's configured values, not a substituted Exchange
+path inferred from the output directory. `context.json`, `patch.json`,
+fingerprints and replay identities do not gain environment-dependent fields.
 
 External chat-generated Patch packages carry the same passive documents under
 `PATCHHARBOR_META/CHAT_INSTRUCTIONS.md` and `PATCHHARBOR_META/environment.json`.
@@ -472,8 +539,10 @@ patchharbor apply --output-dir /path/to/results /path/to/patch.zip
 ```
 
 Supplying both an explicit `PATCH_ZIP` and explicit `--output-dir` also permits
-Apply without a valid Exchange configuration. Explicit output directories still
-must remain outside all registered repositories.
+Apply when the target repository's Exchange path is unset or unavailable. Its
+local configuration must nevertheless exist and validate; the target
+repository's configured suffix still applies. Explicit output directories must
+remain outside all registered repositories.
 
 The separate manual script runner is intentionally explicit and operates in the
 current working directory:
@@ -507,10 +576,11 @@ use the watcher's current working directory as a repository restriction. Unlike
 a deliberate manual Apply, this mode does not retry an unchanged failed package
 on later polls.
 
-Configure the shared Exchange directory first, then install the disabled systemd
-user unit:
+Register and configure each repository first. The following example configures
+one already registered repository, then installs the disabled systemd user unit:
 
 ```bash
+cd /path/to/registered-repository
 patchharbor configure exchange-directory ~/Downloads
 patchharbor-watcher --install-systemd-user-unit
 systemctl --user daemon-reload
@@ -528,8 +598,17 @@ journalctl --user -u patchharbor-watcher.service
 systemctl --user disable --now patchharbor-watcher.service
 ```
 
-The watcher uses the same `config.json`, package validation, persistent replay
-state, repository locks, and Result Bundle behavior as `patchharbor apply`. A
+Startup validates the central registry, not a configuration relative to the
+service's working directory. Every poll reloads the registered repositories'
+local settings through Core and scans distinct physical Exchange directories
+once. Valid repositories with `exchange_directory: null` and missing repository
+paths have no watched directory and are skipped. A missing/invalid config in an
+existing repository, conflicting identity or unavailable configured Exchange
+fails the poll without repair; it is not silently treated as an unconfigured repo.
+After manual correction the next poll reloads the settings.
+
+The watcher uses the same repository-local configuration, package validation,
+persistent replay state, repository locks and Result Bundle behavior as Core. A
 failed package remains available for a later manual Apply but is not immediately
 repeated by the watcher. Do not run the autonomous watcher and Repo Assist or
 another orchestrator for the same repositories at the same time.
@@ -559,7 +638,7 @@ presentation only; Exchange classification still uses validated content.
 
 Review a Result Bundle before sharing it. It can contain complete source code
 and secrets from non-ignored files. PatchHarbor excludes `.git`, the local
-`.patchharbor/id`, and ignored untracked files, but it does not perform general
+`.patchharbor/` directory, and ignored untracked files, but it does not perform general
 secret detection.
 
 ## Command reference
@@ -606,7 +685,8 @@ und Release. `patchharbor.api` ist die unterstützte öffentliche Python-Schnitt
 ab 1.2.0; alle anderen Implementierungsimporte bleiben intern.
 
 Die Haupt-CLI verwendet die API für alle fachlichen Operationen. Der Watcher
-verwendet sie für die Konfiguration und im separaten Prozess jedes Apply-Polls.
+verwendet sie zur Registry-Prüfung und im separaten Prozess jedes Apply-Polls;
+Core lädt dabei die repositorylokalen Einstellungen.
 Eine CLI-Installation mit `uv tool` stellt das Modul nicht automatisch in anderen
 Python-Umgebungen bereit. Zum Importieren muss PatchHarbor in der Umgebung des
 aufrufenden Python-Programms installiert sein. Das Wheel enthält `py.typed` und
@@ -615,8 +695,8 @@ die API-Dokumentation; neue Runtime-Abhängigkeiten gibt es nicht.
 
 ### Watcher als API-Verbraucher (API-3)
 
-Der Watcher liest die gemeinsame Konfiguration über
-`api.configuration(revalidate=True)`. Jeder automatische Poll bleibt ein eigener
+Der Watcher prüft beim Start die Registry über `api.repositories()`.
+Jeder automatische Poll liest die repositorylokalen Einstellungen frisch und bleibt ein eigener
 Prozess derselben Installation; dessen privater Worker ruft `api.apply_next()`
 direkt auf, nicht mehr den CLI-Parser. Betriebs-JSON, globaler Scope, Replay und
 Failed-Retry-Schutz bleiben erhalten. Die Prozess-/Signalgrenze und der Linux-

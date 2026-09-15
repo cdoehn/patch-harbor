@@ -3,8 +3,11 @@
 Use `from patchharbor import api`. This is the only supported public Python
 namespace; implementation modules remain internal. The documented names and
 value fields form the supported 1.2.0 compatibility surface. Within the 1.x
-series, fixes and compatible additions preserve existing documented calls and
-result semantics; breaking changes to this surface require a major version.
+series, fixes and compatible additions preserve documented calls and result
+semantics. Exception: this explicitly approved repository-local configuration
+revision of the 1.2.0 development line supersedes the earlier global-setting
+semantics. It has no migration or compatibility fallback; the method names stay,
+but configuration calls now require a registered target repository.
 Additional enum values or diagnostic event wording must not be treated as an
 exhaustive state machine. Private modules and undocumented helpers remain free
 to evolve.
@@ -29,10 +32,10 @@ print(report.success, report.result_bundle.status)
 
 | Python | CLI operation | Returned value |
 | --- | --- | --- |
-| `configuration(revalidate=False)` | `configure show` | `ConfigurationResult` |
-| `configure_exchange_directory(directory)` | `configure exchange-directory` | `ConfigurationResult` |
-| `configure_bundle_suffix(suffix)` | `configure bundle-suffix` | `ConfigurationResult` |
-| `configure_archive_directory(name)` | `configure archive-dir` | `ConfigurationResult` |
+| `configuration(repository=".", revalidate=False)` | `configure show` | `ConfigurationResult` |
+| `configure_exchange_directory(directory, repository=".")` | `configure exchange-directory` | `ConfigurationResult` |
+| `configure_bundle_suffix(suffix, repository=".")` | `configure bundle-suffix` | `ConfigurationResult` |
+| `configure_archive_directory(name, repository=".")` | `configure archive-dir` | `ConfigurationResult` |
 | `register(repository=".", new_id=False)` | `register` | `RepositoryContext` |
 | `unregister(selector, cwd=".")` | `unregister` | `UnregisterResult` |
 | `repositories()` | `registry list` | `RegistryListResult` |
@@ -57,9 +60,67 @@ The library never changes the process-wide current directory or environment.
 For concurrent callers use explicit absolute paths and do not change shared
 process environment/working directory while another call is active.
 
-An empty suffix clears it; an empty archive name disables archival. Registry
-operations use the existing user configuration and registry, not an independent
-API store. API calls do not install a watcher or implicitly register repositories.
+An empty suffix clears it; an empty archive name disables archival for the
+selected repository. Registry operations use the user-global registry, not an
+independent API store. API calls do not install a watcher or implicitly register
+repositories.
+
+## Repository-local configuration
+
+`configuration(repository=".", *, revalidate=False, observer=None)` accepts the
+repository as its first argument. The three setters accept `repository="."`
+as a **keyword-only** argument after their value; `observer` is also keyword-only.
+Omitting the repository resolves the caller's current working directory,
+including subdirectories, to one registered Git root. No process-wide `chdir`
+is needed. Outside a registered repository or with conflicting/missing local
+identity/configuration, calls raise `PatchHarborError`; none creates defaults.
+
+```python
+from pathlib import Path
+from patchharbor import api
+
+repo = Path("/absolute/path/to/repository")
+api.register(repo)  # genuine first registration, not a missing-config repair
+api.configure_bundle_suffix(".txt", repository=repo)
+api.configure_archive_directory("Archive-A", repository=repo)
+api.configure_exchange_directory(Path.home() / "Downloads", repository=repo)
+settings = api.configuration(repo, revalidate=True)
+print(settings.path, settings.exchange_directory)
+```
+
+`ConfigurationResult` has `path: Path`, `exchange_directory: Path | None`,
+`bundle_suffix: str`, and `archive_directory: str`. `path` is the selected
+repository's `.patchharbor/config.json`. Fresh registration creates the closed
+four-field local Format 1 (`format_version`, `exchange_directory`, `bundle_suffix`,
+`archive_directory`); Exchange is initially `None`, suffix empty and archive
+`PatchHarbor-Archive`. ID binding comes from `.patchharbor/id` plus the registry,
+not a duplicated `repo_id` field inside the config.
+
+Ordinary `configuration()` validates identity and the JSON schema but does not
+probe whether the stored Exchange directory is currently available. It can
+return `None` or an unavailable absolute Exchange path without changing it.
+`revalidate=True` additionally requires an existing physical Exchange directory
+and the separation policy against registered repositories. It does not create
+one or reserve it for later operations. Setters hold the registry lock before
+the target repository lock and publish the complete local document atomically.
+All other settings are preserved. Suffix/archive can be set before Exchange;
+when an Exchange value is present it is revalidated on writes. Only an explicit
+Exchange setter creates/replaces the requested directory setting.
+
+Multiple repositories may use the same Exchange directory while retaining
+different suffix/archive preferences. Bundle, Apply, Result publication and
+archival use the resolved target's settings. `output_directory` overrides only
+the result destination: unset/unavailable Exchange is permitted, but a missing
+or corrupt config is never bypassed. `environment.json` describes this target,
+not user-global preferences; `bundle_suffix` in Result `context.json` is filename
+metadata, not part of the state fingerprint or patch manifest.
+
+`unregister()` preserves ID, config and Git's local exclusion. Re-registering an
+intact instance reuses them; a real move requires the previous path to be absent.
+A normal Git clone lacks these ignored files and needs fresh registration plus
+configuration. Existing registered instances from the old version need manual
+local JSON setup as described in the README. No API call reads/imports the old
+global `config.json`, repairs missing metadata, or resets the replay ledger.
 
 ## Apply selection and safety
 
@@ -70,9 +131,13 @@ under the same existing state rules. An explicit patch selects by its manifest
 repo_id, not by cwd. Combining `patch` with `repository` is rejected: the latter
 is a discovery scope, not an extra target constraint that could be ignored.
 
-`apply_next()` performs exactly one global automatic poll. It never retries a
-failed identity; the existing Core owns selection, replay, lock, revalidation,
-recovery and publication together. No separate select-then-apply token or stale
+`apply_next()` performs exactly one global automatic poll across the registered
+repositories' locally configured Exchange directories. It reloads their settings
+and scans each distinct physical directory once. A package in another repository's
+Exchange is not eligible unless its own target uses that same directory. Only
+then do state/replay validation and newest-`mtime_ns` selection apply across all
+eligible candidates. It never retries a failed identity; Core owns selection,
+replay, lock, revalidation, recovery and publication together. No separate select-then-apply token or stale
 validated package is exposed. The watcher uses this operation in a separate
 worker process for each poll; the library itself never starts a polling loop.
 
@@ -197,18 +262,22 @@ The main `patchharbor` CLI now calls this API for every operation, including
 configuration, registry, context, bundles, Apply/Dry-Run, automatic Apply and
 fs-run. It passes its observer and sinks explicitly. JSON serializers,
 exit-code mapping, terminal styling, interactive selection and temporary `--log`
-files remain adapter concerns. The separate watcher now calls `configuration(revalidate=True)`
-for startup and runs a private worker that calls `apply_next()` directly, preserving
-its process and stop semantics.
+files remain adapter concerns. The separate watcher calls `repositories()` at
+startup and runs a private worker that calls `apply_next()` directly, preserving
+its process and stop semantics. It never requests a global configuration or
+resolves configuration against the service's current working directory.
 
 
 ## Watcher process boundary
 
-`configuration(revalidate=True)` preserves the startup recheck of the loaded
-physical Exchange directory. The default remains `False`; ordinary reads still
-validate the configured directory and do not create a missing one. Revalidation
-is no reservation: automatic Apply rechecks state, locks and filesystem objects
-at its own existing mutation boundary.
+Startup checks the registry only. Every `apply_next()` reloads local settings
+inside Core. Existing repositories with valid config and unset Exchange are
+skipped, as are missing registered repository paths. Invalid/missing local config
+in a live repository, conflicting identity, or an unavailable configured Exchange
+makes the poll fail before execution, without repair. A later poll sees deliberate
+manual corrections. An empty registry has no candidates, not a setup error.
+Revalidation is no reservation: automatic Apply rechecks configuration, state,
+locks and filesystem objects at its existing mutation boundary.
 
 Each watcher poll starts the current installation's Python interpreter with
 `-m patchharbor_watcher.worker`. That private worker calls `api.apply_next()`

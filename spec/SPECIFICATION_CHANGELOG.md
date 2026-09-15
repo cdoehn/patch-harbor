@@ -1,11 +1,50 @@
 # PatchHarbor – Spezifikations-Changelog
 
 **Dateiname:** `SPECIFICATION_CHANGELOG.md`<br>
-**Stand:** 2026-09-13
+**Stand:** 2026-09-15
 
 Dieses Dokument protokolliert Änderungen am verbindlichen Produktziel. Es ist kein Git-Commit-Log und ersetzt nicht die getrennten Umsetzungspläne unter `planning/`.
 
 ---
+
+## [1.2.0 / repositorylokale Konfiguration] – 2026-09-15
+
+**Status:** Bewusste OFF-PLAN-Vertragsänderung; technische Basis `4f64362`
+(REPO-CONFIG-1), Dokumentations-/Acceptance-Fortschreibung REPO-CONFIG-2.
+Version 1.2.0 und abgeschlossener API-Plan bleiben bei 4/4. Keine Release- oder
+CI-Freigabe allein durch diese Dokumentation.
+
+- Sämtliche Repository-Einstellungen ausschließlich in `.patchharbor/config.json`
+  neben `.patchharbor/id`; lokaler Git-Exclude statt versionierter `.gitignore`.
+- Neues geschlossenes lokales Format 1 mit vier Pflichtfeldern und erlaubtem
+  `exchange_directory: null` nach echter Erstregistrierung. Kein globaler
+  Konfigurationspfad, keine Übernahme alter Format-1/2/3-Dokumente.
+- Configure bindet an das aktuelle registrierte Repository, einschließlich
+  Unterverzeichnissen; API erlaubt ausdrückliche Auswahl per `repository`.
+  Normales Lesen prüft Schema/Identität, explizite Revalidierung auch den Exchange.
+- Keine Migration und keine automatische Reparatur. Bestehende Instanzen richten
+  die lokale Datei von Hand ein. Registry, lokale ID, Exclude und Replay bleiben
+  erhalten; kein Reset, kein Löschen von Locks oder Replay-Belegen.
+- Getrennte und geteilte Exchange-Pfade sind erlaubt. Core scannt jeden physischen
+  Ordner pro Poll einmal; Pakete müssen für automatische Auswahl im Exchange
+  ihres Zielrepositorys liegen. Suffix/Archivregeln bleiben unabhängig.
+- Watcher-Startup prüft Registry statt globaler Config, Worker lädt lokale Werte
+  pro Poll frisch. Unset Exchange und fehlende Repository-Pfade werden übersprungen;
+  beschädigte Config lebender Repositorys führt zum Fehler vor Ausführung.
+- `unregister` erhält lokale Daten; erneute Anmeldung und echter Umzug nutzen sie.
+  Git-Clone übernimmt keine ignorierten Metadaten und braucht Register/Configure.
+- Explizites Ausgabeziel übergeht nur unset/unavailable Exchange, nie fehlende
+  oder beschädigte Config. Result-/Chat-Begleitdaten gehören zum Zielrepository.
+- Frühere globale Konfigurationsaussagen bleiben nur als Changelog-Historie;
+  die Produktspezifikation verweist auf den aktuell verbindlichen lokalen Vertrag.
+- Spezifikation, README, API-Vertrag, Planungsspezifikation und Chat-Vorlage sind
+  abgeglichen. Abschließende Tests prüfen reale CLI-/API-/Watcher-/Archivabläufe;
+  alte README-/Help-Wortlautprüfungen werden durch Verhaltenstests ersetzt.
+- Paketmarker, Fingerprint, Replay-Format, Ergebnis-JSON, Produkt-Timeout,
+  Prozess-/Signalsicherheit und externe Backup-Verantwortung bleiben erhalten.
+
+Die folgenden Einträge dokumentieren historische Stände. Globale Konfiguration
+und ältere Config-Formate darin sind kein aktuell unterstützter Fallback.
 
 ## [1.2.0] – 2026-09-13
 

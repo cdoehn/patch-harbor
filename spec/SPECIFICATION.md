@@ -2,8 +2,8 @@
 
 **Dateiname:** `SPECIFICATION.md`<br>
 **Produktversion:** `1.2.0`<br>
-**Spezifikationsstand:** 2026-09-13<br>
-**Status:** Verbindliche, freigegebene Produktspezifikation für PatchHarbor 1.2.0; Release-Freigabe nach grünen Gates<br>
+**Spezifikationsstand:** 2026-09-15<br>
+**Status:** Verbindliche, freigegebene Produktspezifikation (fachlicher Vertrag) einschließlich repositorylokaler Konfiguration; keine Release-Freigabe des konkreten Commits ohne grüne Gates<br>
 **Projektname:** `PatchHarbor`<br>
 **Kommando:** `patchharbor`<br>
 **Skriptmarker:** `# PATCHHARBOR`<br>
@@ -19,11 +19,15 @@ Dieses Dokument beschreibt das vollständige verbindliche Produktziel von PatchH
 
 Es übernimmt die Produktverträge des stabilen 1.1.1-Stands und ergänzt die
 öffentliche synchrone Python-API. Haupt-CLI und Watcher verwenden dieselben
-API-/Application-Pfade. Details des additiven API-Vertrags stehen in Abschnitt 32
-und `planning/1.2.0/specification.md`. Die bisherigen Eigenschaften bleiben erhalten:
+API-/Application-Pfade. Details stehen in Abschnitt 32 und
+`planning/1.2.0/specification.md`. Die ausdrücklich beauftragte
+Konfigurationsrevision ersetzt den bisherigen globalen Konfigurationsvertrag:
 
-- eine allgemeine benutzerspezifische `config.json` mit genau einem gemeinsamen `exchange_directory`,
-- denselben Exchange-Ordner als standardisierte Übergabestelle für Patch-Pakete und PatchHarbor Result Bundles,
+- alle Repository-Einstellungen ausschließlich in `.patchharbor/config.json`,
+- eine globale Registry für lokale Identität und Pfad sowie globale technische
+  Locks und Laufzeit-/Replay-Zustände, aber keine globale Einstellungsebene,
+- pro Repository frei wählbare Exchange-Verzeichnisse; mehrere Repositorys dürfen
+  denselben physischen Ordner als Übergabe für Patch-Pakete und Result Bundles nutzen,
 - `patchharbor apply` ohne expliziten Dateipfad mit sicherer, nicht rekursiver und zustandsgebundener Paketauswahl,
 - `patchharbor bundle` und automatische Apply-Result-Bundles mit dem Exchange-Ordner als Standardziel,
 - eine gemeinsame Erkennungs- und Wiederverarbeitungsgrenze für Core und Watcher,
@@ -32,7 +36,12 @@ und `planning/1.2.0/specification.md`. Die bisherigen Eigenschaften bleiben erha
 
 PatchHarbor 1.2.0 führt keine Netzwerk-, Chat-, Commit-Plan- oder Journalfunktion in den Core ein. `CHAT_INSTRUCTIONS.md` ist eine ausgelieferte Vorlage für passive Bundle-Begleitdokumentation und einen externen Chat; der Exchange-Ordner ist eine lokale Dateisystemgrenze.
 
-Für nicht produktiv genutzte 1.1.0-Entwicklungsstände wird kein Migrationscode für `watcher.json`, `paths.json` oder andere frühere interne Pfaddokumente bereitgestellt. 1.1.1 verwendet ausschließlich den neuen Vertrag. Das ist eine bewusste Projektentscheidung und kein stiller Fallback.
+Es gibt keinen Migrationscode für alte globale `config.json`, `watcher.json`,
+`paths.json` oder frühere interne Pfaddokumente. Sie werden weder gelesen noch
+übernommen. Die lokale Formatversion 1 ist ein neues geschlossenes Schema und
+keine Fortsetzung des alten globalen Format-1/2/3-Lesers. Bestehende Registrierungen
+werden manuell eingerichtet (Abschnitt 4.3). Keine automatische Reparatur und
+kein stiller Fallback; Registry und technischer Replay-State bleiben erhalten.
 
 Die historischen Commit-Pläne bleiben unter `planning/1.0.0/` und `planning/1.1.0/` erhalten, sind aber kein normativer Teil dieses Dokuments.
 
@@ -81,8 +90,8 @@ PatchHarbor ist kein Testmanager, kein Commit-Manager, kein Build-System, kein C
 - stdout und stderr vollständig erfassen,
 - Exit-Code, Laufzeit, Warnings und Tool-Fehler dokumentieren,
 - ein vollständiges PatchHarbor Result Bundle erzeugen,
-- die gemeinsame Benutzerkonfiguration aus `config.json` lesen und sicher schreiben,
-- einen konfigurierten Exchange-Ordner als Standardübergabe in beide Richtungen verwenden,
+- repositorylokale Einstellungen aus `.patchharbor/config.json` identitätsgebunden lesen und sicher schreiben,
+- den für das betroffene Repository konfigurierten Exchange-Ordner als Standardübergabe in beide Richtungen verwenden,
 - bei manuellem parameterlosem `patchharbor apply` das aktuelle registrierte Repository bestimmen und ausschließlich dafür den neuesten zulässigen Kandidaten nach `mtime_ns` mit deterministischem Dateinamen-Tie-Breaker auswählen,
 - Patch-Pakete, Result Bundles und sonstige Dateien im Exchange-Ordner sicher voneinander unterscheiden,
 - einen maschinenlesbaren Ergebnisvertrag für Watcher, Repo Assist und einen späteren Orchestrator anbieten.
@@ -135,18 +144,28 @@ Der PatchHarbor Watcher ist eine separate dünne Komponente im PatchHarbor-Proje
 
 Er kann unter Linux als systemd-Service betrieben werden und:
 
-- den in der gemeinsamen `config.json` festgelegten Exchange-Ordner überwachen,
+- über Core die in den lokalen `.patchharbor/config.json` festgelegten Exchange-Verzeichnisse überwachen,
 - vollständig abgeschlossene Downloads erkennen,
 - offensichtliche temporäre Browserdateien ignorieren,
 - stabile Dateien über die öffentliche PatchHarbor-Core-Grenze klassifizieren und anwenden lassen,
 - Rückgabecode und strukturiertes Ergebnis protokollieren,
 - die ungeplante erneute Verarbeitung derselben unveränderten Datei verhindern.
 
-Der Watcher besitzt keine eigene Eingangsordner-Konfiguration. Er verwendet dieselbe `exchange_directory`-Einstellung, dieselbe Paketklassifikation und denselben persistenten Dateidentitätsvertrag wie der manuelle Aufruf `patchharbor apply` ohne Pfad.
+Der Watcher besitzt keine eigene Eingangsordner-Konfiguration. Startup prüft nur
+die Registry über `api.repositories()`, nicht eine Konfiguration relativ zum
+Service-Arbeitsverzeichnis. Jeder Poll ruft über einen privaten Worker
+`api.apply_next()` auf; Core lädt die lokalen Konfigurationen frisch und scannt
+jeden physisch eindeutigen Exchange-Ordner einmal. Paketklassifikation und
+persistenter Dateidentitätsvertrag sind dieselben wie beim manuellen Apply.
+Gültig registrierte Instanzen mit `exchange_directory: null` sowie fehlende
+Repository-Pfade werden übersprungen. Eine fehlende oder ungültige Konfiguration
+eines vorhandenen Repositorys, ein Identitätskonflikt oder ein nicht verfügbarer
+konfigurierter Exchange führt zum Poll-Fehler vor Ausführung; keine Reparatur
+und kein stilles Überspringen beschädigter Konfigurationen.
 
 Der Watcher implementiert keine eigene Repository-, Git-, Manifest-, Fingerprint-, Lock-, Ausführungs- oder Result-Bundle-Logik. Er darf Prüfungen des Core weder nachbauen noch umgehen.
 
-Der Watcher scannt den Exchange-Ordner nicht rekursiv und implementiert keine eigene Archivierungslogik. Sein globaler Core-Scan darf nach Abschnitt 16.2.1 nachweislich überholte Bundles in den konfigurierten Archiv-Unterordner verschieben. Sonstige Dateien und unklare Zustände bleiben liegen; unveränderte Nichtkandidaten und bereits verarbeitete Dateien werden nicht fortlaufend neu delegiert.
+Der Watcher lässt die Exchange-Verzeichnisse ausschließlich flach scannen und implementiert keine eigene Archivierungslogik. Sein globaler Core-Scan darf nach Abschnitt 16.2.1 nachweislich überholte Bundles in den konfigurierten Archiv-Unterordner verschieben. Sonstige Dateien und unklare Zustände bleiben liegen; unveränderte Nichtkandidaten und bereits verarbeitete Dateien werden nicht fortlaufend neu delegiert.
 
 ### 3.3 Repo Assist
 
@@ -230,34 +249,33 @@ Verbindliche CI-Plattformen:
 
 Ubuntu 24.04, Ubuntu 26.04 und der echte Windows-Runner sind normale blockierende Release-Gates. Eine Release-Freigabe ist nur zulässig, wenn alle verbindlichen Lanes grün sind. PowerShell 7 ist zusätzlich blockierend, sobald die entsprechende Lane im Release-Workflow aktiviert ist.
 
-### 4.3 Benutzerspezifische Verzeichnisse und `config.json`
+### 4.3 Repositorylokale Konfiguration und globale technische Zustände
 
-Unter Linux gelten standardmäßig:
-
-```text
-Konfigurationsverzeichnis: ${XDG_CONFIG_HOME:-$HOME/.config}/patchharbor/
-Konfigurationsdatei:       ${XDG_CONFIG_HOME:-$HOME/.config}/patchharbor/config.json
-Zustand:                   ${XDG_STATE_HOME:-$HOME/.local/state}/patchharbor/
-Exchange-Dateistatus:      ${XDG_STATE_HOME:-$HOME/.local/state}/patchharbor/exchange/
-Locks:                     ${XDG_STATE_HOME:-$HOME/.local/state}/patchharbor/locks/
-```
-
-Unter Windows gelten standardmäßig:
+Jede registrierte lokale Repository-Instanz besitzt ausschließlich:
 
 ```text
-Konfigurationsverzeichnis: %APPDATA%\PatchHarbor\
-Konfigurationsdatei:       %APPDATA%\PatchHarbor\config.json
-Zustand:                   %LOCALAPPDATA%\PatchHarbor\
-Exchange-Dateistatus:      %LOCALAPPDATA%\PatchHarbor\exchange\
-Locks:                     %LOCALAPPDATA%\PatchHarbor\locks\
+<Repository>/.patchharbor/id
+<Repository>/.patchharbor/config.json
 ```
 
-Die allgemeine Benutzerkonfiguration besitzt in Formatversion 3 exakt dieses geschlossene Schema:
+Alle Repository-Einstellungen liegen in dieser lokalen `config.json`, nicht im
+Exchange-Verzeichnis und nicht in einem Benutzer-Config-Fallback. Die Bindung
+entsteht durch Repository-Wurzel, lokale ID, lokale Git-Ausnahme und globale
+Registry. Keine zusätzliche `repo_id` und kein Repository-Pfad im Config-Dokument.
+Das vollständige `.patchharbor/` wird lokal über den von Git ermittelten
+`info/exclude` ausgeblendet; die versionierte `.gitignore` bleibt unverändert.
+Das Punktpräfix ist unter Linux versteckt; unter Windows wird kein Hidden-Attribut
+gesetzt. Beide Dateien und das lokale Verzeichnis müssen regulär sein, keine
+Symlinks/Junctions oder Sonderdateien.
+
+#### 4.3.1 Geschlossenes lokales Format 1
+
+Nur eine echte Erstregistrierung erzeugt diese Grundkonfiguration:
 
 ```json
 {
-  "exchange_directory": "/absoluter/pfad/zum/austauschordner",
-  "format_version": 3,
+  "format_version": 1,
+  "exchange_directory": null,
   "bundle_suffix": "",
   "archive_directory": "PatchHarbor-Archive"
 }
@@ -265,23 +283,41 @@ Die allgemeine Benutzerkonfiguration besitzt in Formatversion 3 exakt dieses ges
 
 Verbindliche Regeln:
 
-- unbekannte oder fehlende Felder werden abgelehnt,
-- `format_version` ist die Ganzzahl `3`,
-- `bundle_suffix` ist ein String; `""` deaktiviert das Suffix,
-- `archive_directory` ist ein einzelner portabler Ordnername innerhalb des Exchange-Ordners; Standard ist `PatchHarbor-Archive`, `""` deaktiviert die Archivierung vollständig,
-- ein gesetztes Suffix ist höchstens 32 ASCII-Zeichen lang, enthält nur Buchstaben, Ziffern, Punkte, Unterstriche und Bindestriche sowie mindestens einen Buchstaben oder eine Ziffer; `..`, abschließender Punkt, Pfade, Leerraum und Steuerzeichen sind unzulässig,
-- die Endungen `.crdownload`, `.download`, `.opdownload`, `.part`, `.partial` und `.tmp` sind ohne Beachtung der Groß-/Kleinschreibung unzulässig, damit fertige Bundles nicht als unvollständige Downloads ausgefiltert werden,
-- die bisherigen geschlossenen Formate 1 und 2 bleiben lesbar; Format 1 bedeutet ein leeres Suffix, beide verwenden ohne zusätzlichen Schreibvorgang den Standard-Archivnamen; der nächste Konfigurationsschreibvorgang migriert atomar nach Format 3,
-- `exchange_directory` ist ein absoluter Pfad,
-- der Pfad wird vor Speicherung und vor jeder Verwendung physisch kanonisiert,
-- der Pfad muss ein echtes Verzeichnis sein; Symlinks, Junctions und Elternpfade werden auf ihr tatsächliches Ziel aufgelöst,
-- die durch PatchHarbor geschriebene Datei ist UTF-8, endet mit LF und wird atomar ersetzt,
-- direkte Bearbeitung der Datei ist zulässig; ungültiger Inhalt führt zu einem klaren Konfigurationsfehler,
-- `watcher.json` und `paths.json` sind keine 1.1.1-Konfigurationsquellen und werden nicht migriert oder als Fallback gelesen.
+- exakt die vier genannten Felder; keine fehlenden, unbekannten oder doppelten
+  Schlüssel, kein BOM, keine nachgestellten Daten und keine nichtendlichen Zahlen;
+- `format_version` ist die Ganzzahl `1`, kein Boolean; andere Versionen werden
+  abgelehnt, auch alle alten globalen Formate;
+- `exchange_directory` ist `null` oder ein nichtleerer absoluter Pfadstring ohne
+  NUL; `null` bedeutet korrekt registriert, aber noch nicht konfiguriert;
+- `bundle_suffix` ist ein String, `""` deaktiviert das Suffix; ein gesetztes Suffix
+  besteht aus höchstens 32 ASCII-Buchstaben, Ziffern, Punkten, Unterstrichen oder
+  Bindestrichen und enthält mindestens einen Buchstaben oder eine Ziffer;
+  `..`, abschließender Punkt, Pfade, Leerraum und Steuerzeichen sind unzulässig;
+- `.crdownload`, `.download`, `.opdownload`, `.part`, `.partial` und `.tmp` sind
+  als Suffix-Endungen case-insensitiv verboten;
+- `archive_directory` ist ein portabler einzelner Ordnername direkt unter dem
+  Exchange, Standard `PatchHarbor-Archive`; `""` deaktiviert nur die Archivierung
+  dieses Repositorys. Keine absoluten Pfade, Trennzeichen, Traversal, Leerraum,
+  abschließenden Punkte oder reservierten Windows-Gerätenamen; zulässig sind
+  1–128 ASCII-Buchstaben, Ziffern, Punkte, Unterstriche und Bindestriche. Ein
+  führender Punkt ist erlaubt;
+- UTF-8 ohne BOM; Schreiber erzeugen abschließendes LF und ersetzen atomar im
+  lokalen Verzeichnis. Direkte manuelle Bearbeitung ist erlaubt, ungültige
+  Dokumente führen ohne Mutation zu einem Konfigurationsfehler.
 
-Die empfohlenen sicheren Benutzerbefehle lauten:
+Fehlende Konfiguration ist **nicht** gleich gültige Konfiguration mit `null`.
+Keine lesende Operation, kein Setter und keine erneute Registrierung darf eine
+fehlende oder beschädigte Konfiguration automatisch erzeugen/reparieren.
+Nur eine Erstanmeldung ohne bestehende ID oder Registry-Bindung initialisiert
+Defaults innerhalb ihrer Registrierungstransaktion.
+
+#### 4.3.2 Auswahl, Setter und Verwendung
+
+Normaler Einrichtungsablauf:
 
 ```bash
+cd /pfad/zum/repository
+patchharbor register
 patchharbor configure exchange-directory VERZEICHNIS
 patchharbor configure bundle-suffix .txt
 patchharbor configure bundle-suffix --clear
@@ -290,30 +326,105 @@ patchharbor configure archive-dir --clear
 patchharbor configure show
 ```
 
-`configure exchange-directory` legt das Zielverzeichnis bei Bedarf an, validiert es gegen die Registry und veröffentlicht anschließend die vollständige `config.json` atomar. Es erhält das bestehende Suffix auch bei Reparatur eines nicht mehr verfügbaren Exchange-Pfads. `configure bundle-suffix SUFFIX` setzt nur das Suffix, `configure bundle-suffix --clear` setzt es auf den leeren String; beide benötigen eine vorhandene gültige Exchange-Konfiguration und verwenden denselben globalen Registry-/Konfigurationslock. Fehlendes Argument oder gleichzeitiges Argument und `--clear` sind CLI-Fehler. `configure archive-dir NAME` setzt ausschließlich den Archivordnernamen, `--clear` oder ein leerer String deaktiviert die Archivierung. Absolute Pfade, Trennzeichen, Traversal, Leerraum, abschließende Punkte und reservierte Windows-Gerätenamen sind verboten; zulässig sind 1–128 ASCII-Buchstaben, Ziffern, Punkte, Unterstriche und Bindestriche. Ein führender Punkt bleibt erlaubt. Alle Setter erhalten die jeweils anderen Einstellungen. `configure show` zeigt Konfigurationspfad, kanonischen Exchange-Ordner, `bundle_suffix` und `archive_directory`. Die Datei bleibt die alleinige persistente Quelle.
+`VERZEICHNIS` muss absolut sein. Jeder `configure`-Aufruf ermittelt aus seinem
+aktuellen Arbeitsverzeichnis einschließlich Unterverzeichnissen die Git-Wurzel
+und prüft eine eindeutige Registrierung sowie gültige lokale Metadaten. Außerhalb
+eines Git-Repositorys oder ohne passende Registrierung wird abgebrochen, bevor
+ein Verzeichnis oder eine Config angelegt wird. Die Python-API kann das Repository
+explizit wählen (Abschnitt 32); eine CLI-Option für globale Einstellungen gibt es
+nicht.
 
-Das Suffix gilt benutzerspezifisch für alle neu erzeugten Bundles. Es wird ohne zusätzlichen Punkt unmittelbar hinter `.zip` angehängt. Weder `apply` noch `bundle` erhalten einen Suffix-Schalter. Die Suffix-Konfiguration benennt bestehende Dateien nicht um. Inhalt und Paketformat bleiben ZIP; eine fremde Anwendung muss diese Inhalte trotzdem unterstützen. Ältere PatchHarbor-Versionen verstehen Format-3-Konfigurationen und Format-4-Replay-State nicht.
+Setter halten zuerst den globalen Registry-Lock und danach den Repository-Lock.
+Sie validieren Identität, bisherige Konfiguration, Registry und Verzeichnis vor
+der atomaren Veröffentlichung erneut und erhalten die jeweils anderen Werte.
+`configure exchange-directory` erzeugt bei Bedarf den ausdrücklich gewählten
+Ordner und persistiert dessen physisch kanonischen absoluten Pfad. Ein nicht mehr
+verfügbarer alter Exchange kann ausdrücklich ersetzt werden; eine beschädigte
+JSON-Datei wird dadurch nicht repariert. Suffix/Archiv können schon bei `null`
+konfiguriert werden. Ist ein Exchange gesetzt, muss er bei diesen Settern weiter
+verfügbar und pfadpolitisch zulässig sein. Fehlendes Argument oder Argument plus
+`--clear` sind CLI-Fehler.
 
-Der Exchange-Ordner ist benutzerspezifisch und nicht repositoryspezifisch. `patchharbor register` fragt ihn nicht ab. Die Befehle `register`, `registry`, `unregister`, `context` und `fs run` benötigen keine Exchange-Konfiguration.
+`configure show` und normales `api.configuration()` prüfen Identität und Schema,
+zeigen aber auch `null` oder einen derzeit nicht verfügbaren gespeicherten Pfad.
+Sie erzeugen keine Verzeichnisse. `api.configuration(..., revalidate=True)`
+fordert zusätzlich einen verfügbaren physischen Exchange und dessen Trennung
+von registrierten Repositorys. Jede tatsächliche Verwendung prüft den Pfad erneut.
 
-Ohne `--output-dir` benötigen `bundle` sowie jeder Apply-Auftrag, der ein Result Bundle versucht, eine gültige Exchange-Konfiguration. `patchharbor apply` ohne `PATCH_ZIP` und der Watcher benötigen sie ebenfalls. Ein explizites `PATCH_ZIP` zusammen mit einem expliziten `--output-dir` bleibt auch ohne Exchange-Konfiguration möglich. Ein gültiges Suffix wird auch bei explizitem Ausgabeziel verwendet; hierfür ist die Existenz des konfigurierten Exchange-Verzeichnisses nicht erforderlich. Die bisherige explizite Wiederherstellungsmöglichkeit bei fehlender oder ungültiger Konfiguration bleibt erhalten und verwendet dann ein leeres Suffix. Der bei der Zielvorbereitung gelesene Suffixwert wird bis zur Veröffentlichung erneut geprüft; eine Änderung führt zum kontrollierten Fehler.
+`context` benötigt gültige lokale Konfiguration, aber keinen gesetzten Exchange.
+`registry list`, `unregister` und der unabhängige `fs run` benötigen keinen Exchange.
+Default-`bundle`, parameterloses Apply und Default-Result-Publikation benötigen
+hingegen einen verfügbaren Exchange des Zielrepositorys. Ein explizites
+`PATCH_ZIP` bestimmt das Repository ausschließlich per Manifest-ID. Ein explizites
+`--output-dir` übersteuert nur das Ausgabeziel: Es erlaubt einen nicht gesetzten
+oder nicht verfügbaren Exchange, niemals fehlende oder ungültige lokale Config.
+Der lokale Suffix bleibt wirksam; Identität, Exchange-Wert und Suffix werden vor
+Result-Veröffentlichung revalidiert.
 
-Für den Exchange-Ordner gelten verbindlich:
+Das Suffix wird bei neuen Bundles des betreffenden Repositorys unverändert direkt
+hinter `.zip` angehängt. Es benennt keine Bestandsdatei um und ändert weder
+ZIP-Inhalt noch `patch.json`, Fingerprint oder Replay. Kein Suffix-Schalter auf
+`apply`/`bundle`. Bundle-Begleitdaten beschreiben das konkrete Zielrepository.
 
-- Er darf weder identisch mit einer registrierten Repository-Wurzel noch innerhalb einer registrierten Repository-Instanz liegen.
-- Keine registrierte Repository-Wurzel darf innerhalb des Exchange-Ordners liegen.
-- Eine neue Konfiguration oder spätere Registrierung, die diese Grenzen verletzt, wird abgelehnt.
-- Er ist zugleich zulässiger Standard-Result-Ordner; die frühere Verbotsregel zwischen Watcher-Eingang und Result-Ordner entfällt ausdrücklich.
-- Patch-Pakete, Result Bundles und sonstige reguläre Dateien dürfen im selben flachen Verzeichnis liegen.
+Mehrere Repositorys dürfen denselben physischen Exchange verwenden; separate
+Ordner sind ebenso zulässig. Es gibt keine Eindeutigkeitsanforderung an diesen
+Pfad. Eigene Suffix-/Archivwerte bleiben unabhängig, auch im gemeinsamen Ordner.
+Für jeden Exchange gilt weiterhin: weder identisch mit noch innerhalb noch
+oberhalb irgendeiner registrierten Repository-Wurzel. Neu konfigurierte Pfade
+und spätere Registrierungen werden gegen diese Grenzen geprüft. Symlinks,
+Junctions und Elternpfade werden zum tatsächlichen Ziel aufgelöst. Patch-Pakete,
+Result Bundles und sonstige Dateien dürfen in derselben flachen Übergabe liegen.
 
-Für einen expliziten `--output-dir` gelten verbindlich:
+Ein expliziter `--output-dir` darf weder identisch mit noch innerhalb einer
+registrierten Repository-Wurzel liegen. Er darf dem Exchange entsprechen oder
+außerhalb davon liegen. Vor der ersten Repository-Änderung wird er sicher
+angelegt und auf Schreibbarkeit geprüft; temporäre Result-ZIPs entstehen direkt
+im endgültigen Ausgabeordner für dateisystemgleiche atomare Veröffentlichung.
 
-- Er darf weder identisch mit einer registrierten Repository-Wurzel noch innerhalb einer registrierten Repository-Instanz liegen.
-- Er darf dem Exchange-Ordner entsprechen oder außerhalb davon liegen.
-- Er muss vor der ersten Repository-Änderung sicher angelegt und auf Schreibbarkeit geprüft werden.
-- Die temporäre ZIP-Datei eines Result Bundles wird direkt in diesem endgültigen Ausgabeordner erzeugt, damit die Veröffentlichung über einen dateisystemgleichen atomaren Austausch möglich ist.
+#### 4.3.3 Globale Registry, Locks und Replay bleiben erhalten
 
-Der persistente Exchange-Dateistatus speichert nur technische Dateidentitäten und Verarbeitungszustände. Er ist kein Archiv, kein Journal und keine Sortierung der Exchange-Dateien.
+Unter Linux gelten standardmäßig:
+
+```text
+Registry:            ${XDG_CONFIG_HOME:-$HOME/.config}/patchharbor/registry.json
+Zustand:             ${XDG_STATE_HOME:-$HOME/.local/state}/patchharbor/
+Exchange-Dateistatus:${XDG_STATE_HOME:-$HOME/.local/state}/patchharbor/exchange/
+Locks:               ${XDG_STATE_HOME:-$HOME/.local/state}/patchharbor/locks/
+```
+
+Unter Windows gelten standardmäßig:
+
+```text
+Registry:            %APPDATA%\PatchHarbor\registry.json
+Zustand:             %LOCALAPPDATA%\PatchHarbor\
+Exchange-Dateistatus: %LOCALAPPDATA%\PatchHarbor\exchange\
+Locks:               %LOCALAPPDATA%\PatchHarbor\locks\
+```
+
+Die Registry verwaltet Identität und lokalen Pfad, keine Exchange-/Suffix-/
+Archiveinstellungen. Der gemeinsame Exchange-State verwaltet technische
+Dateiidentitäten und Replay-Belege über alle Ordner hinweg; er ist weder
+Konfiguration, Archiv, Journal noch Download-Sortierung. Bestehende Format-4-
+Replay-Verträge und lesbare alte Replay-Belege bleiben von der neuen lokalen
+Config-Formatversion unberührt. Keine Config-Reparatur bedeutet nicht, dass die
+bestehende beweisgebundene Attempt-Recovery aus 16.4.1 entfernt wird.
+
+#### 4.3.4 Bewusster manueller Versionswechsel
+
+Die alte globale `config.json` wird vollständig ignoriert, weder importiert,
+gelöscht noch verändert. Kein automatischer oder optionaler Migrationspfad,
+keine Übernahme alter Formatschemata, kein Lesen als Fallback. Dasselbe gilt für
+`watcher.json` und `paths.json`.
+
+Bestehende Registrierungen ohne lokale Konfiguration benötigen eine bewusste
+manuelle Anlage des vollständigen Dokuments aus 4.3.1. Anschließend wird im
+jeweiligen Repository `configure exchange-directory` ausgeführt; Suffix und
+Archivpräferenz werden ausdrücklich gewählt. Die bisherige ID, Registry, lokale
+Git-Ausnahme und Replay-Belege bleiben erhalten. Bereits gültige lokale Dateien
+werden nicht überschrieben. `register --new-id` ist keine Reparaturfunktion.
+Vor Installation/Handänderung aktive Applies abschließen und Watcher stoppen;
+CLI und Watcher gemeinsam auf denselben Stand bringen. Der README beschreibt
+diesen einmaligen Handablauf, keinen vom Programm ausgeführten Migrationscode.
 
 ### 4.4 Dokumentation und Chat-Initialisierung
 
@@ -322,14 +433,14 @@ Der persistente Exchange-Dateistatus speichert nur technische Dateidentitäten u
 - Die vollständige CLI-Bedienung steht in den argparse-Help-Screens.
 - Die Produktspezifikation beschreibt verbindliches Verhalten und die Verantwortungsgrenzen.
 - Die versionierte Root-Datei `CHAT_INSTRUCTIONS.md` beschreibt den vollständigen Vertrag für einen externen Entwicklungs-Chat.
-- Ein neuer Chat erhält `CHAT_INSTRUCTIONS.md` und das aktuelle PatchHarbor Result Bundle. Lokale Repository- oder Exchange-Pfade werden dem Chat nicht mitgeteilt und von ihm nicht benötigt.
+- Ein neuer Chat erhält die frisch generierten `CHAT_INSTRUCTIONS.md` und `environment.json` im aktuellen Result Bundle. Lokale Pfade dienen nur passenden Zielrechner-Beispielen, nie der Bindung; maßgeblich bleibt `context.json`.
 - Nicht implementierte Funktionen werden weder im README noch im Help-Screen oder in `CHAT_INSTRUCTIONS.md` als verfügbar dargestellt.
 
 Die standardisierten Chat-Statuszeilen aus `CHAT_INSTRUCTIONS.md` sind eine bewusst maschinenlesbare UI-Grenze und dürfen im Unterschied zu sonstigen Human-Texten exakt getestet werden.
 
 ## 5. Öffentliche CLI
 
-### 5.1 Sicherer Mehr-Repository-Pfad und Benutzerkonfiguration
+### 5.1 Sicherer Mehr-Repository-Pfad und lokale Konfiguration
 
 ```bash
 patchharbor configure exchange-directory VERZEICHNIS
@@ -350,6 +461,8 @@ Die Optionen sind pro Befehl verbindlich begrenzt:
 |---|---|
 | `patchharbor configure exchange-directory` | keine fachliche Zusatzoption |
 | `patchharbor configure show` | keine fachliche Zusatzoption |
+| `patchharbor configure bundle-suffix` | `--clear` statt Suffix |
+| `patchharbor configure archive-dir` | `--clear` statt Name |
 | `patchharbor register` | `--new-id` |
 | `patchharbor registry list` | `--json` |
 | `patchharbor unregister` | keine fachliche Zusatzoption |
@@ -371,7 +484,8 @@ patchharbor-watcher --install-systemd-user-unit
 patchharbor-watcher --poll-interval SEKUNDEN
 ```
 
-Er liest den Exchange-Ordner ausschließlich aus `config.json`.
+Er bezieht die Exchange-Verzeichnisse über Core ausschließlich aus den lokalen
+`.patchharbor/config.json` der registrierten Repositorys; kein globales Config-Lesen.
 
 `--json` und eine interaktive Terminaldarstellung schließen sich aus. Im JSON-Modus werden weder TUI-Sequenzen noch Farbcodes auf stdout ausgegeben. Nicht für einen Befehl aufgeführte Optionen werden von argparse abgelehnt.
 
@@ -1035,7 +1149,7 @@ Die zentrale Registry wird:
 - anschließend über einen atomaren Austausch ersetzt,
 - niemals durch stückweises direktes Überschreiben aktualisiert.
 
-Eine Operation meldet erst Erfolg, wenn lokale ID-Datei und zentrale Registry konsistent sind. Scheitert eine Teiloperation, versucht PatchHarbor den vorherigen Zustand wiederherzustellen und meldet bei verbleibender Inkonsistenz einen ausdrücklichen Registry-Fehler. Es wird kein scheinbarer Erfolg ausgegeben.
+Eine Operation meldet erst Erfolg, wenn lokale ID-Datei, lokale Konfiguration, Git-Ausnahme und zentrale Registry konsistent sind. Scheitert eine Teiloperation, versucht PatchHarbor den vorherigen Zustand wiederherzustellen und meldet bei verbleibender Inkonsistenz einen ausdrücklichen Registry-Fehler. Es wird kein scheinbarer Erfolg ausgegeben.
 
 ### 13.3 Registrierung
 
@@ -1049,16 +1163,20 @@ PatchHarbor führt unter dem globalen Registry-Lock mindestens aus:
 1. kanonischen Repository-Wurzelpfad bestimmen,
 2. prüfen, dass `HEAD` auf einen Commit auflösbar ist,
 3. prüfen, dass weder der Base-Baum von `HEAD` noch der Index einen Pfad mit dem reservierten Segment `.patchharbor` in beliebiger Groß-/Kleinschreibung enthält,
-4. prüfen, dass die neue Repository-Wurzel den konfigurierten Exchange-Ordner weder enthält noch in ihm liegt und mit ihm nicht identisch ist,
+4. prüfen, dass die neue Repository-Wurzel keinen Exchange eines gültig auflösbaren registrierten Repositorys enthält, darin liegt oder damit identisch ist,
 5. prüfen, dass ein vorhandener Pfad `.patchharbor` ein echtes reguläres Verzeichnis und weder Symlink noch Junction noch Datei ist,
 6. das lokale interne Verzeichnis andernfalls sicher anlegen,
-7. eine vorhandene lokale ID validieren oder eine UUID v4 erzeugen,
+7. vorhandene lokale ID und Konfiguration validieren; nur bei echter Erstanmeldung eine UUID v4 erzeugen,
 8. den vollständigen lokalen Pfad `.patchharbor/` über den von `git rev-parse --git-path info/exclude` gelieferten Exclude-Pfad aus der normalen Git-Statusanzeige ausnehmen,
 9. veraltete zentrale Zuordnungen desselben kanonischen Pfads entfernen,
-10. lokale ID-Datei und zentrale Registry konsistent und atomar aktualisieren,
+10. bei echter Erstanmeldung die lokale Format-1-Grundkonfiguration ohne Exchange anlegen; ID, Konfiguration, Git-Ausnahme und Registry konsistent veröffentlichen,
 11. eine gekürzte menschenlesbare Kontextzusammenfassung mit eindeutigem Verweis auf `patchharbor context --json` für vollständige Werte ausgeben.
 
 PatchHarbor verändert nicht ungefragt die gemeinsam versionierte `.gitignore`.
+Fehlende/ungültige lokale Metadaten einer bereits bekannten Instanz werden nicht
+repariert. Die Fehler-Rücknahme einer noch nicht abgeschlossenen frischen
+Registrierung erhält dagegen ihren bisherigen Transaktionsvertrag; sie ist keine
+Migration, kein Reparaturmodus und keine Rückabwicklung eines Apply.
 
 ### 13.4 Repository-ID
 
@@ -1092,10 +1210,11 @@ Das vollständige Verzeichnis:
 
 ist für lokale PatchHarbor-Daten reserviert.
 
-Für Version 1.1.1 enthält es mindestens:
+Für diesen 1.2.0-Stand enthält es mindestens:
 
 ```text
 .patchharbor/id
+.patchharbor/config.json
 ```
 
 Der Inhalt von `id` besteht ausschließlich aus der UUID und einem abschließenden Zeilenumbruch.
@@ -1104,19 +1223,24 @@ Verbindliche Regeln:
 
 - Kein Pfad unter `.patchharbor/` darf von Git getrackt sein.
 - `.patchharbor` selbst darf kein Symlink, keine Junction und kein anderer besonderer Dateityp sein.
-- Die ID-Datei muss eine reguläre Datei sein und wird atomar ersetzt.
+- ID und Konfiguration müssen reguläre Dateien sein und werden atomar geschrieben. Eine fehlende/ungültige Config bleibt bis zur manuellen Korrektur ein Fehler.
 - Das gesamte Verzeichnis wird lokal ausgeschlossen und nicht in Result Bundles aufgenommen.
 - Die Repository-ID selbst steht in den maschinenlesbaren Kontextdateien.
 
 ### 13.6 Idempotente Registrierung und Pfadänderungen
 
-Ist derselbe kanonische Pfad bereits mit derselben gültigen ID registriert, ist `patchharbor register` idempotent und gibt den bestehenden Kontext zurück.
+Ist derselbe kanonische Pfad bereits mit derselben gültigen ID und gültiger lokaler Konfiguration/Exclude registriert, ist `patchharbor register` idempotent und gibt den bestehenden Kontext zurück, ohne die Einstellungen zurückzusetzen.
 
 Ist eine ID einem anderen weiterhin vorhandenen Pfad zugeordnet, wird nicht geraten. Die Registrierung wird als Konflikt abgelehnt.
 
-Ist die ID-Datei mit dem Repository an einen neuen Pfad verschoben worden und der bisher registrierte Pfad existiert nicht mehr, darf `patchharbor register` die Zuordnung auf den neuen kanonischen Pfad aktualisieren.
+Ist das Repository einschließlich ID, Konfiguration und Git-Ausnahme an einen neuen Pfad verschoben worden und der bisher registrierte Pfad existiert nicht mehr, darf `patchharbor register` die Zuordnung auf den neuen kanonischen Pfad aktualisieren; die Einstellungen bleiben erhalten.
 
-Fehlt die lokale ID-Datei, erzeugt eine normale Registrierung eine neue UUID. Vor der neuen Zuordnung werden alle alten Registry-Einträge entfernt, deren kanonischer Pfad exakt dieser lokalen Instanz entspricht. Dadurch bleiben niemals zwei IDs für denselben kanonischen Pfad als erfolgreicher Zustand bestehen.
+Fehlt die lokale ID-Datei, obwohl eine lokale Konfiguration oder Registry-Bindung
+für diesen Pfad besteht, wird ohne automatische Neuerzeugung abgebrochen. Nur eine
+wirklich neue lokale Instanz erhält eine neue UUID und Defaults. Ein normaler
+Git-Clone übernimmt die ignorierten lokalen Dateien nicht und benötigt Register
+plus Configure. Es bleiben niemals zwei IDs für denselben kanonischen Pfad als
+erfolgreicher Zustand bestehen.
 
 ### 13.7 Minimale Registry-Verwaltung
 
@@ -1139,14 +1263,14 @@ vollständige kanonische UUID oder der exakte Repository-Pfad zu verwenden.
 patchharbor unregister REPOSITORY_OR_REPO_ID
 ```
 
-entfernt unter dem globalen Registry-Lock die zentrale Zuordnung. Soweit ein vorhandenes Repository betroffen ist, wird zusätzlich dessen Repository-Lock beachtet. Die lokale `.patchharbor/id` bleibt bestehen, damit ein verschobenes oder später erneut registriertes Repository seine Identität behalten kann.
+entfernt unter dem globalen Registry-Lock die zentrale Zuordnung. Soweit ein vorhandenes Repository betroffen ist, wird zusätzlich dessen Repository-Lock beachtet. Die lokale `.patchharbor/id`, `.patchharbor/config.json` und Git-Ausnahme bleiben bestehen, damit ein verschobenes oder später erneut registriertes Repository Identität und Einstellungen behält.
 
 ```bash
 patchharbor register --new-id [REPOSITORY]
 ```
 
 - erzeugt bewusst eine neue UUID,
-- ersetzt die lokale ID-Datei atomar,
+- ersetzt die lokale ID-Datei atomar, erhält aber eine vorhandene gültige lokale Konfiguration; keine Reparatur fehlender oder beschädigter Metadaten,
 - entfernt alte Zuordnungen genau dieses kanonischen Pfads,
 - verändert nicht die gültige Zuordnung eines anderen Pfads mit einer kopierten alten ID,
 - registriert die neue ID,
@@ -1666,26 +1790,33 @@ Beim manuellen Ursprung wird vor dem Exchange-Scan zuerst der Auswahlkontext bes
 
 Kann das aktuelle Arbeitsverzeichnis nicht genau einer registrierten Repository-Instanz zugeordnet werden, endet der manuelle Auftrag kontrolliert vor der Exchange-Auswahl. PatchHarbor darf dann kein Paket eines anderen registrierten Repositorys als Ersatz auswählen.
 
-Beim automatischen Ursprung wird kein Repository aus dem Arbeitsverzeichnis vorgegeben. Dieser Ursprung bleibt für den Watcher global und darf Pakete für alle registrierten Repository-Instanzen klassifizieren.
+Beim automatischen Ursprung wird kein Repository aus dem Arbeitsverzeichnis
+vorgegeben. Dieser Ursprung bleibt für den Watcher global. Unter dem Registry-Lock
+werden alle auflösbaren lokalen Konfigurationen gelesen. Physisch kanonisierte
+Exchange-Pfade werden zusammengefasst: ein flacher Scan pro eindeutigem Ordner,
+nicht pro Registry-Eintrag. Gültige `null`-Einstellungen und fehlende Repository-
+Pfade werden übersprungen; beschädigte Konfigurationen vorhandener Instanzen,
+Konflikte oder nicht verfügbare gesetzte Exchange-Verzeichnisse brechen den Poll
+vor Ausführung ab. Geänderte Einstellungen werden beim nächsten Poll neu geladen.
 
 Die anschließende gemeinsame Kandidatenklassifikation:
 
-1. lädt und validiert `config.json`,
-2. scannt genau die oberste Verzeichnisebene und niemals rekursiv,
+1. lädt und validiert die lokalen `.patchharbor/config.json` des jeweiligen manuellen oder automatischen Repository-Scopes,
+2. scannt pro physisch eindeutigem Exchange genau die oberste Verzeichnisebene und niemals rekursiv,
 3. berücksichtigt nur reguläre Dateien und folgt keinen Symlinks oder Junctions,
 4. ignoriert bekannte temporäre Browser-Downloads,
 5. ermittelt eine stabile Dateiaufnahme mit physisch kanonischem Pfad, vollständigem SHA-256-Inhalt und `mtime_ns`,
 6. verwendet für eine unveränderte Identität eine bereits sicher gespeicherte Inhaltsklassifikation, statt dieselbe Nichtkandidaten-Datei fortlaufend neu zu analysieren,
 7. unterscheidet anhand des tatsächlichen ZIP-Inhalts und nicht anhand von Dateiname oder Endung zwischen Patch-Paket, Result Bundle und sonstiger Datei,
 8. liest bei Patch-Kandidaten die Root-`patch.json` streng genug, um `repo_id`, Base-Commit und Fingerprint zu bestimmen,
-9. verwirft beim manuellen Ursprung jedes Paket, dessen `repo_id` nicht der bereits bestimmten aktuellen Repository-Instanz entspricht; beim automatischen Ursprung löst sie die jeweilige Paket-`repo_id` global über die Registry auf,
+9. verwirft beim manuellen Ursprung fremde `repo_id`; beim automatischen Ursprung löst sie die Manifest-ID über die Registry auf und akzeptiert das Paket nur, wenn dessen physischer Elternordner dem konfigurierten Exchange genau dieses Ziels entspricht,
 10. prüft unter der verbindlichen Registry-/Repository-Lock-Reihenfolge, ob Base-Commit, Fingerprint und Fingerprint-Algorithmus zum jeweiligen Repository-Kontext passen,
 11. berücksichtigt beim manuellen Ursprung sowohl noch nie gestartete als auch mit `failed` abgeschlossene Identitäten; beim automatischen Ursprung ausschließlich noch nie gestartete Identitäten; `attempted` und `succeeded` sind in beiden Fällen ausgeschlossen,
 12. bildet erst danach die Menge der vollständig passenden, repositoryzulässigen und replayzulässigen Kandidaten und wählt den höchsten `mtime_ns`.
 
 Der persistente Exchange-Dateistatus darf für unveränderte Dateien die Inhaltsklasse und bei Patch-Kandidaten die geprüften Manifest-Auswahldaten zwischenspeichern. Ein gültiger Patch-Kandidat, der lediglich zum derzeitigen Repository-Zustand nicht passt, wird bei einem späteren Scan erneut gegen den dann aktuellen Zustand geprüft. Dauerhaft inhaltsbedingt ungültige Pakete, Result Bundles und sonstige Nichtkandidaten müssen dagegen nicht erneut vollständig analysiert werden.
 
-`mtime_ns` ist ausschließlich die Rangfolge unter bereits vollständig validierten, repositoryzulässigen, state-kompatiblen und replayzulässigen Kandidaten. Ein neueres fremdes, state-inkompatibles oder bereits erfolgreich verarbeitetes Paket blockiert deshalb keinen älteren zulässigen Kandidaten. Teilen mehrere zulässige Kandidaten exakt denselben höchsten `mtime_ns`, entscheidet der lexikografisch kleinste Unicode-NFC-normalisierte Dateiname; sind auch die normalisierten Namen gleich, entscheidet der unveränderte Dateiname als letzter deterministischer Tie-Breaker. Die Auswahl hängt niemals von der Reihenfolge von `os.scandir()` ab. Der Dateiname ist keine Repository- oder State-Bindung und wird ausschließlich für diesen Gleichstand verwendet.
+`mtime_ns` ist ausschließlich die Rangfolge unter bereits vollständig validierten, repositoryzulässigen, state-kompatiblen und replayzulässigen Kandidaten. Ein neueres fremdes, state-inkompatibles oder bereits erfolgreich verarbeitetes Paket blockiert deshalb keinen älteren zulässigen Kandidaten. Teilen mehrere zulässige Kandidaten exakt denselben höchsten `mtime_ns`, entscheidet der lexikografisch kleinste Unicode-NFC-normalisierte Dateiname; sind auch die normalisierten Namen gleich, entscheidet der unveränderte Dateiname; bei gleichem Namen in unterschiedlichen Exchange-Verzeichnissen entscheidet zuletzt der vollständige Pfadstring deterministisch. Die Auswahl hängt niemals von der Reihenfolge von `os.scandir()` ab. Der Dateiname ist keine Repository- oder State-Bindung und wird ausschließlich für diesen Gleichstand verwendet.
 
 Kann eine einzelne reguläre Exchange-Datei während eines Scans nicht stabil oder nicht sicher gelesen werden, wird ausschließlich dieser Eintrag für den aktuellen Scan ignoriert. Ein solcher Einzelfehler darf die Klassifikation anderer Dateien und eines unabhängig lesbaren passenden Patch-Pakets nicht verhindern. Der Fehler „cannot scan exchange directory“ bleibt einem tatsächlichen Fehler beim Auflisten des konfigurierten Verzeichnisses vorbehalten.
 
@@ -1704,6 +1835,15 @@ Ein explizites `patchharbor apply PATCH_ZIP` übersteuert die parameterlose Ausw
 Die explizit ausgewählte Datei wird vor ihrer Ausführung nicht archiviert. Die optionale vorgeschaltete Exchange-Archivierung darf ausschließlich nachgewiesen überholte Bundles aus dem jeweiligen Repository-Scope verschieben; sie löscht keine Bundles. Wird unter demselben Pfad später anderer Inhalt abgelegt, entsteht wegen des neuen SHA-256 eine neue Dateidentität.
 
 ### 16.2.1 Nachweisbasierte Exchange-Archivierung
+
+Bei gemeinsamen Exchange-Verzeichnissen wird jedes validierte Bundle seinem
+Repository zugeordnet. Dessen `archive_directory` entscheidet, ob und in welchen
+direkten Unterordner es verschoben werden darf. Ein deaktiviertes Archiv eines
+Repositorys deaktiviert nicht andere; der Archivname eines anderen Repositorys
+darf nicht übernommen werden. Geteilte oder unterschiedliche Archivnamen sind
+zulässig. Frische Config-/Identitätsprüfung unmittelbar vor dem Verschieben
+bleibt Pflicht; kein Scan-Cache ersetzt diese Prüfung.
+
 
 Der Standardordner `PatchHarbor-Archive` ist ein direktes Kind des konfigurierten
 Exchange-Ordners und wird beim normalen Scan bei Bedarf angelegt. Es gibt keinen
@@ -1842,7 +1982,7 @@ UUID des Runs oder `null`) und `result_sha256` (vollständige kleingeschriebene
 SHA-256 des bestätigten Result-ZIPs oder `null`). Formate 1, 2 und 3 bleiben strikt
 lesbar; Lesen schreibt nicht. Der nächste Schreibvorgang migriert atomar. Fehlende
 Legacy-Beweise werden niemals ergänzt, geraten oder aus Dateinamen hergeleitet.
-Die Benutzerkonfiguration bleibt davon unabhängig auf Format 3.
+Die neue repositorylokale Konfiguration verwendet unabhängig davon ihr geschlossenes Format 1; Replay-Formatversionen sind kein Config-Migrationspfad.
 
 Die Patch-SHA entsteht aus denselben stabil eingelesenen ZIP-Bytes wie Parser,
 Entrypoint und Nutzdaten, nicht aus einem später separat geöffneten Download.
@@ -1908,7 +2048,7 @@ oder bei alten Runs ohne lokal verankerte Hashes bleibt die Reparatur aus.
 
 PatchHarbor lehnt vor der ersten Repository-Änderung unter anderem ab:
 
-- fehlende oder ungültige Exchange-Konfiguration, soweit kein vollständiger expliziter Pfad- und Ausgabeauftrag vorliegt,
+- fehlende oder ungültige lokale Konfiguration auch bei explizitem Patch-/Ausgabeauftrag; ein explizites Ausgabeziel übergeht nur einen unset/unavailable Exchange-Pfad,
 - beim manuellen parameterlosen Apply ein nicht eindeutig registriertes aktuelles Repository,
 - keinen passenden Kandidaten im jeweiligen manuellen oder automatischen Repository-Scope,
 - unbekannte oder widersprüchliche Repository-ID,
@@ -2133,7 +2273,7 @@ patchharbor bundle [REPOSITORY]
 
 ist die Bundle-Erzeugung selbst der primäre Auftrag.
 
-Ohne `--output-dir` wird im konfigurierten Exchange-Ordner veröffentlicht. Fehlt oder ist die Exchange-Konfiguration ungültig, endet der Auftrag klar mit Exit `11`. Ein explizites `--output-dir` übersteuert das Standardziel und ermöglicht den Auftrag ohne konfigurierte Exchange-Ausgabe.
+Ohne `--output-dir` wird im konfigurierten Exchange-Ordner veröffentlicht. Fehlt der benötigte Exchange oder ist die lokale Konfiguration ungültig, endet der Bundle-Auftrag klar mit Exit `11`. Ein explizites `--output-dir` übersteuert das Standardziel und erlaubt unset/unavailable Exchange, benötigt aber weiterhin gültige lokale Konfiguration.
 
 Ein Fehler führt zu Exit `11`. Es gibt keinen getrennten vorherigen Skript-Exit-Code.
 
@@ -2283,6 +2423,13 @@ zusätzlicher CLI-Befehl, keine Sidecar-Datei, kein nachträgliches Umschreiben
 alter Bundles. Der tatsächlich aufgelöste Repository-Kontext ist maßgeblich,
 nicht CWD eines Watchers oder eines explizit anders gerichteten Apply.
 
+`exchange_directory` und `bundle_suffix` in `environment.json` stammen aus der
+lokalen Konfiguration genau dieses Zielrepositorys; `output_directory` ist das
+tatsächliche Ausgabeziel und kann davon abweichen. Es sind keine globalen
+Benutzereinstellungen. Die ignorierte `.patchharbor/config.json` wird nicht als
+Snapshotdatei mitgeliefert. Die Begleitdaten bilden nicht zwingend sämtliche
+lokalen Einstellungen ab, insbesondere keinen vollständigen Archivvertrag.
+
 Die statische Root-`CHAT_INSTRUCTIONS.md` des PatchHarbor-Quellprojekts bleibt
 fachliche Vorlage. Bei Installation wird genau diese Version aus dem bestehenden
 `share/patchharbor`-Datenartefakt geladen, bei Quellbetrieb nur relativ zum
@@ -2311,8 +2458,8 @@ und enthält `captured_at`, `bundle_type`, `bundle_filename`, volle `run_id`,
 `filename_timezone: UTC` sowie `runtime`. Die Suffix- und Exchange-Angaben
 stammen aus derselben Zielvorbereitung wie der Dateiname und werden revalidiert.
 Ein explizites Ausgabeziel bleibt vom konfigurierten Exchange-Pfad getrennt;
-bei fehlender/defekter Konfiguration bleibt der bisherige Recovery-Pfad erhalten
-und unbekannte Angaben sind `null`. `context.json` und `context --json` bleiben
+fehlende/defekte lokale Konfigurationen werden auch damit nicht umgangen.
+Ein gültig nicht gesetzter Exchange und unbekannte Laufzeitangaben sind `null`. `context.json` und `context --json` bleiben
 hinsichtlich ihres bisherigen Vertrags unverändert.
 
 `runtime` enthält ausschließlich System, Distributions-ID/-Name/-Version,
@@ -2544,7 +2691,9 @@ Empfohlene Verantwortlichkeiten:
 - `archive_evidence.py` und `archive_git.py` – passive Bundle-Validierung und lesende Originalhistorien-Beweise,
 - `exchange_archive.py` – konservative Wartung des von `application` bestimmten Repository-Scopes,
 - `archive_files.py` und `platform/archive.py` – Kollisionsnamen und gepinnte No-Replace-Dateioperationen,
-- `registry.py` – zentrale Repository-Registrierung,
+- `registry.py` – zentrale Repository-Registrierung ohne Repository-Einstellungen,
+- `configuration_context.py` – Auflösung einer registrierten lokalen Config anhand Pfad oder ID,
+- `configuration.py` – geschlossenes lokales Format 1, Identitätsprüfung und atomare Persistenz,
 - `repository_state.py` – Base-Commit, kanonischer Fingerprint und Snapshot-Zustand,
 - `locks.py` – globale Registry-Sperre und exklusive Sperre pro Repository-ID,
 - `patch_manifest.py` – `patch.json` und Schema,
@@ -2553,7 +2702,7 @@ Empfohlene Verantwortlichkeiten:
 - `errors.py` – fachliche Tool-Fehler und semantische Fehlergründe,
 - `exit_status.py` – gemeinsame Abbildung in kompatible CLI-/JSON-Statuszahlen,
 - `platform/` – notwendige Linux- und Windows-Grenzen,
-- separater Watcher-Einstiegspunkt – Konfiguration über API, Poll-Lebenszyklus und privater API-Worker in einem eigenen Prozess.
+- separater Watcher-Einstiegspunkt – Registry-Prüfung über API, Poll-Lebenszyklus und privater API-Worker mit frischer Core-Konfiguration in einem eigenen Prozess.
 
 Abhängigkeitsregeln:
 
@@ -2565,7 +2714,7 @@ Abhängigkeitsregeln:
 - `payload_files` schreibt Dateien, steuert aber keine Execution.
 - `patch_manifest` kennt weder Git noch Execution.
 - `registry` kennt weder TUI noch ZIP-Inhalte.
-- `configuration` verwaltet ausschließlich `config.json` einschließlich Format-1/2-Leser und Format-3-Schreiber und kennt weder Git-Zustand noch Execution.
+- `configuration` verwaltet ausschließlich repositorylokales Format 1 und prüft die zugehörige lokale Identität, aber steuert weder Git-Zustandsaufnahme noch Execution. `configuration_context` löst gegen einen konsistenten Registry-Snapshot auf; kein globaler Config-Leser und kein Migrationspfad.
 - `bundle_names` enthält reine Validierung und Anfügen des Suffixes sowie die gemeinsame Erkennung temporärer Download-Namen; es liest keine Konfiguration und keine Dateien.
 - `platform.environment` erfasst ausschließlich freigegebene lokale Laufzeitfelder; `chat_instructions` lädt die installierte statische Vorlage und rendert passive Dokumentation. `bundle_handoff` modelliert und validiert optionale Patch-Begleitdaten; `result_bundle_handoff` komponiert Result-Begleitdaten. Keine dieser Schichten führt Chat-, Plan- oder Commit-Anweisungen aus.
 - `result_bundle_target` bindet das konfigurierte Suffix an das Ausgabeziel und revalidiert es; `result_bundle` übergibt denselben Wert als optionale Kontextmetadaten. Der Chat bleibt für die Benennung externer Patch-Pakete verantwortlich.
@@ -2699,11 +2848,18 @@ Mindestens zu erhalten und weiter zu testen sind:
 - Watcher delegiert stabile Exchange-Dateien ohne duplizierte Core-Logik,
 - konkurrierende autonome Watcher-, Repo-Assist- oder Orchestrator-Pfade werden für dieselben Repositories nicht gleichzeitig aktiviert.
 
-### 22.4 Neue Pflichtszenarien für 1.1.1
+### 22.4 Exchange-Pflichtszenarien einschließlich repositorylokaler Revision
 
 Mindestens zusätzlich zu prüfen sind:
 
-- exaktes geschlossenes `config.json`-Schema und atomare Veröffentlichung,
+- exaktes geschlossenes lokales Format 1 mit `null`-Exchange nach Erstanmeldung und atomarer Veröffentlichung,
+- Konfiguration nur im registrierten Repository, einschließlich CLI-/API-Aufruf aus Unterverzeichnissen,
+- getrennte und gemeinsam genutzte Exchange-Verzeichnisse mit unabhängigen Suffix-/Archivwerten,
+- automatischer Poll scannt physisch gleiche Ordner einmal, akzeptiert keine falsch abgelegten Pakete und lädt geänderte Konfigurationen frisch,
+- lokale Einstellungen bleiben bei Unregister, Wiederanmeldung und echtem Verschieben erhalten; Git-Clone beginnt neu,
+- alte globale Konfigurationen bleiben wirkungslos und unverändert; fehlende/ungültige lokale Dateien werden weder angelegt noch repariert,
+- explizite Ausgabe bei unset/unavailable Exchange bleibt zulässig, aber nicht bei beschädigter Config; Zielrepository bestimmt Begleitdaten,
+- konkrete Workflow-/Verhaltenstests statt neuer Dokumentations-, Help- oder Darstellungstests,
 - direkte gültige und ungültige Bearbeitung der Konfigurationsdatei,
 - Linux-, Termux-kompatible Linux- und Windows-Benutzerpfade,
 - `configure exchange-directory` und `configure show`,
@@ -2837,46 +2993,41 @@ Repo Assist dupliziert nicht die technische Snapshot-Logik von PatchHarbor.
 
 ---
 
-## 25. Fortschreibung von 1.1.0 auf 1.1.1
+## 25. Versionswechsel und abgeschlossene Entwicklungspläne
 
-### 25.1 Vorbereitender Initialisierungscommit
+### 25.1 Historie ist kein Konfigurations-Fallback
 
-Der erste 1.1.1-Commit ist ein Spezifikations-, Changelog-, Commit-Plan- und Dokumentstruktur-Audit-Commit ohne Produktionscodeänderung.
-
-Er:
-
-- setzt das vollständige Produktziel auf 1.1.1,
-- löst die frühere Trennung zwischen Watcher-Eingang und Result-Ordner zugunsten eines gemeinsamen Exchange-Ordners auf,
-- beschreibt `config.json`, automatische Paketauswahl und `CHAT_INSTRUCTIONS.md` vollständig,
-- korrigiert die Rolle von Repo Assist,
-- legt `planning/1.1.1/commit-plan.md` an,
-- aktualisiert `SPECIFICATION_CHANGELOG.md`,
-- erweitert den Release-Audit zunächst um die neue Planstruktur,
-- verändert weder Produktionscode noch Paketversion.
+Die abgeschlossenen Pläne unter `planning/1.1.1/` und der API-Plan unter
+`planning/1.2.0/commit-plan.md` dokumentieren ihre jeweiligen Implementierungsschritte.
+Sie werden durch die repositorylokale Revision nicht neu nummeriert oder als
+unerledigt markiert. Frühere Konfigurationsmodelle sind ausschließlich im
+`SPECIFICATION_CHANGELOG.md` als Historie beschrieben, nicht als parallel
+unterstützte Einstellungen. Für aktuelle Aufrufe gilt Abschnitt 4.3.
 
 ### 25.2 Keine Konfigurationsmigration
 
-Es gibt keine von PatchHarbor 1.1.0 produktiv verwalteten Repositories oder Installationen, deren alte Watcher-Konfiguration erhalten werden muss.
+Es gibt keinen automatischen oder optionalen Migrationscode für alte globale
+`config.json`, `watcher.json` oder `paths.json`, kein duales Lesen und keinen
+stillen Fallback auf einen früheren Standard-Result-Ordner. Die einzige Quelle
+für Repository-Einstellungen ist dessen `.patchharbor/config.json` im neuen
+lokalen Format 1. Registry und technische Replay-Zustände bleiben erhalten.
 
-Daher gilt verbindlich:
+Die Umstellung vorhandener Registrierungen erfolgt ausdrücklich von Hand nach
+4.3.4. Fehlende oder beschädigte lokale Dateien werden nicht repariert;
+`register`, `register --new-id` und `configure` sind keine Reparaturbefehle.
+Eine normale frische Registrierung erzeugt dagegen ihre Grundkonfiguration.
 
-- kein Migrationscode für `watcher.json`,
-- kein Migrationscode für `paths.json`,
-- kein duales Lesen alter und neuer Konfiguration,
-- kein stiller Fallback auf den früheren Standard-Result-Ordner,
-- die neue `config.json` ist ab ihrer Einführung die einzige persistente Benutzerkonfiguration für den Exchange-Ordner.
+### 25.3 Repositorylokale Revision in zwei OFF-PLAN-Aufträgen
 
-### 25.3 Umsetzungsblöcke
+REPO-CONFIG-1 stellt Persistenz, Registrierung, Configure, Bundle/Apply,
+Archivierung und Watcher technisch um. REPO-CONFIG-2 gleicht Spezifikation,
+README, Python-API-Vertrag, Planungsspezifikation und Chat-Anweisungen ab und
+sichert die vollständigen Benutzerabläufe mit Verhaltenstests.
 
-Die abgeschlossene Umsetzung folgte ausschließlich `planning/1.1.1/commit-plan.md` und umfasste:
-
-1. gemeinsame `config.json` und Exchange-Pfadpolitik,
-2. Result-Bundle-Ausgabe in den Exchange-Ordner,
-3. automatische zustandsgebundene Paketauswahl bei `apply` ohne Pfad,
-4. gemeinsame persistente Dateidentität und Wiederverarbeitungssperre,
-5. Umstellung des Watchers auf denselben Vertrag,
-6. `CHAT_INSTRUCTIONS.md` mit Workflow-, Plan-, Spec-, Test-, Commit- und UI-Regeln,
-7. README, Help, Akzeptanztests, Packaging und Release 1.1.1.
+Der abgeschlossene API-Plan bleibt bei 4/4. Die Konfigurationsrevision erzeugt
+weder automatisch einen Release-Tag noch eine Publikation. Der konkrete
+Apply-/Commit-Erfolg und externe CI benötigen eigene Nachweise; die
+Dokumentationsfortschreibung ist kein grünes Testergebnis.
 
 ## 26. Verbindlicher Chat-Initialisierungsvertrag
 
@@ -3079,7 +3230,7 @@ Beispiel für einen Plan-Commit (Platzhalter nie als echte Nachweise ausgeben):
 🟩 1 / 12
 
 Commit:
-feat(config): add shared exchange directory configuration
+feat(config): add repository-local exchange configuration
 
 Plan:
 planning/1.1.1/commit-plan.md
@@ -3088,11 +3239,11 @@ Spec:
 spec/SPECIFICATION.md
 
 Änderungen:
-• config.json einführen
-• exchange_directory speichern
-• configure-Befehle ergänzen
-• Linux-Pfad verwenden
-• Windows-Pfad verwenden
+• .patchharbor/config.json einführen
+• Repository-Einstellungen speichern
+• configure ans aktuelle Repository binden
+• geteilte Exchange-Ordner erlauben
+• lokale Git-Ausnahme erhalten
 
 Tests:
 • Config- und CLI-Tests
@@ -3154,8 +3305,8 @@ Ein Erfolg darf erst nach Prüfung von `run.json`, Git-Zustand und erwartetem Co
 - Primäres Auftragsergebnis und Result-Bundle-Ergebnis bleiben getrennt.
 - Result Bundles enthalten den vollständigen Base-Commit, staged und unstaged Patches, nicht ignorierte untracked Dateien, Kontext und Run-Logs, aber keine Git-Historie.
 - Result Bundles werden im endgültigen Ausgabeordner atomar veröffentlicht.
-- `config.json` ist die einzige Benutzerkonfiguration für `exchange_directory`, `bundle_suffix` und `archive_directory`; Formate 1/2 bleiben lesbar, neue Schreibvorgänge verwenden Format 3.
-- Der Exchange-Ordner ist eine gemeinsame flache Übergabestelle für Patch-Pakete, Result Bundles und sonstige Dateien.
+- `.patchharbor/config.json` ist die einzige Quelle aller Repository-Einstellungen: geschlossenes lokales Format 1, kein globaler Fallback, keine Migration, keine automatische Reparatur.
+- Jedes Repository wählt seinen Exchange; getrennte oder gemeinsam genutzte flache Übergaben sind zulässig, Suffix und Archivregeln bleiben repositorylokal.
 - Exchange-Ordner und registrierte Repositorys dürfen sich in keiner Richtung überlappen.
 - `bundle` und Apply-Result-Bundles verwenden ohne explizites `--output-dir` den Exchange-Ordner.
 - Ein manueller `apply` ohne `PATCH_ZIP` ist an das registrierte Repository des aktuellen Arbeitsverzeichnisses gebunden; Unterverzeichnisse werden zur Repository-Wurzel aufgelöst und fremde Repository-Pakete sind keine Kandidaten.
@@ -3166,7 +3317,7 @@ Ein Erfolg darf erst nach Prüfung von `run.json`, Git-Zustand und erwartetem Co
 - Patch- und Result-Dateinamen beginnen mit dem Repository-Namen, danach folgen `Patch` oder `Result`, UTC-Uhrzeit, Monat/Tag ohne Jahr und ID6.
 - Menschenlesbare technische Kennungen verwenden sechs Zeichen plus `…`; JSON, Manifeste, Logs, Persistenz und Sicherheitsvergleiche bleiben vollständig.
 - Die optionale Core-Archivierung verschiebt ausschließlich nachgewiesen überholte eigene Bundles in einen direkten Exchange-Unterordner; weder beliebige Ablageverwaltung noch endgültiges Löschen gehören dazu.
-- Der Watcher verwendet dieselbe `config.json`, Paketklassifikation und Dateidentität wie der Core.
+- Der Watcher verwendet über Core dieselben lokalen Konfigurationen, Paketklassifikation und Dateidentität; ein Scan je physischem Exchange pro Poll.
 - Das aktuelle Result Bundle enthält frisch erzeugte `CHAT_INSTRUCTIONS.md` und `environment.json` zur Initialisierung eines neuen Entwicklungs-Chats.
 - Repository-Pfad und Exchange-Pfad dienen nur Kommandozeilenbeispielen; sie ersetzen niemals die Repository-Bindung.
 - Die Spezifikation ist der fachliche Vertrag; der Commit-Plan ist die geplante Zerlegung.
@@ -3250,15 +3401,27 @@ Wire-Verträge, CLI-Exitcodes, Paketmarker und Fingerprints bleiben unverändert
 API-Ergebnisse verwenden vollständige Kennungen; keine Konsolentexte werden geparst.
 
 `patchharbor.api` ist der unterstützte Import-Namensraum. Die dokumentierten
-Operationen, Rückgabefakten und Fehlersemantik bleiben innerhalb 1.x kompatibel;
-private Module und diagnostische Texte sind kein öffentlicher Erweiterungsvertrag.
+Operationen, Rückgabefakten und Fehlersemantik bleiben grundsätzlich innerhalb
+1.x kompatibel. Die ausdrücklich beauftragte repositorylokale Revision dieser
+1.2.0-Entwicklung ersetzt jedoch die frühere globale Konfigurationssemantik ohne
+Fallback. Private Module und diagnostische Texte sind kein öffentlicher
+Erweiterungsvertrag.
 Standardaufrufe sind still. Fachliche Resultate und Exceptions werden wiederverwendet;
 explizite OutputStreams und request-lokale Beobachter sind unabhängig von der CLI.
 
-Der Watcher liest `api.configuration(revalidate=True)` und startet pro Poll
-weiterhin einen separaten Prozess, der `api.apply_next()` direkt aufruft.
-Signal-/Stop-Verhalten, automatische Nichtwiederholung fehlgeschlagener Identitäten,
-Replay, Recovery, Auswahl und Result-Publikation bleiben unverändert.
+`configuration(repository=".", *, revalidate=False)` liest die ausgewählte
+registrierte lokale Konfiguration. Die drei `configure_*`-Setter besitzen
+keyword-only `repository="."`. `ConfigurationResult.exchange_directory` ist
+`Path | None`; gewöhnliches Lesen prüft Schema/Identität, `revalidate=True`
+zusätzlich den verfügbaren physischen Exchange und die Registry-Pfadpolitik.
+Keine API-Funktion erzeugt fehlende lokale Metadaten außer echter Erstregistrierung.
+
+Der Watcher prüft beim Start `api.repositories()` und startet pro Poll weiterhin
+einen separaten Prozess, der `api.apply_next()` direkt aufruft. Core lädt lokale
+Konfigurationen frisch, fasst physisch gleiche Exchange-Pfade zusammen und
+wendet die Repository-/Verzeichnisbindung an. Signal-/Stop-Verhalten,
+automatische Nichtwiederholung fehlgeschlagener Identitäten, Replay und
+beweisgebundene Recovery bleiben unverändert.
 
 Wheel und sdist enthalten die API, ihren Typing-Marker und API-Dokumentation.
 Release-Gates prüfen API-Verträge, installierte Artefakte, CLI, Watcher und bestehende

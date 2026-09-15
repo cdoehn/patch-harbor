@@ -1,263 +1,178 @@
+"""Execute setup workflows; do not assert README, help or console wording."""
 from __future__ import annotations
 
-import argparse
 import json
 from pathlib import Path
-import re
+import zipfile
 
-from patchharbor.cli import _build_parser as build_core_parser
-from patchharbor_watcher.cli import _build_parser as build_watcher_parser
-from tests.platform_support import PROJECT_ROOT
+import pytest
 
+from patchharbor import api
+from patchharbor.user_paths import registration_user_paths
+from tests.platform_support import run_cli
+from tests.registration_support import (
+    create_repository, git, local_exclude_path, set_isolated_user_environment,
+)
 
-README_PATH = PROJECT_ROOT / "README.md"
-CHAT_PATH = PROJECT_ROOT / "CHAT_INSTRUCTIONS.md"
-
-
-def _readme() -> str:
-    return README_PATH.read_text(encoding="utf-8")
-
-
-def _compact(value: str) -> str:
-    return " ".join(value.split())
+pytestmark = [pytest.mark.e2e, pytest.mark.acceptance]
 
 
-def _fenced_blocks(document: str, language: str) -> tuple[str, ...]:
-    return tuple(
-        re.findall(
-            rf"^```{re.escape(language)}\n(.*?)\n```$",
-            document,
-            flags=re.MULTILINE | re.DOTALL,
-        )
-    )
+@pytest.fixture
+def repository(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    set_isolated_user_environment(monkeypatch, tmp_path / "user")
+    return create_repository(tmp_path / "repository")
 
 
-def _subparser(
-    parser: argparse.ArgumentParser,
-    *commands: str,
-) -> argparse.ArgumentParser:
-    current = parser
-    for command in commands:
-        action = next(
-            candidate
-            for candidate in current._actions
-            if isinstance(candidate, argparse._SubParsersAction)
-        )
-        current = action.choices[command]
-    return current
-
-
-def test_readme_is_canonical_and_documents_the_closed_global_configuration() -> None:
-    raw = README_PATH.read_bytes()
-    document = raw.decode("utf-8")
-
-    assert not raw.startswith(b"\xef\xbb\xbf")
-    assert b"\r" not in raw
-    assert raw.endswith(b"\n")
-    assert all(line.rstrip() == line for line in document.splitlines())
-    assert "one shared Exchange directory per operating-system user" in document
-    assert "not configured per repository" in document
-    assert "`patchharbor register` never asks for it" in document
-    assert "${XDG_CONFIG_HOME:-$HOME/.config}/patchharbor/config.json" in document
-    assert "%APPDATA%\\PatchHarbor\\config.json" in document
-    assert "patchharbor configure exchange-directory ~/Downloads" in document
-    assert "patchharbor configure show" in document
-    assert "`watcher.json` and\n`paths.json` are not configuration sources" in document
-
-    json_blocks = _fenced_blocks(document, "json")
-    assert len(json_blocks) == 1
-    assert json.loads(json_blocks[0]) == {
-        "exchange_directory": "/absolute/path/to/exchange",
-        "format_version": 3,
-        "bundle_suffix": "",
-        "archive_directory": "PatchHarbor-Archive",
-    }
-
-
-def test_readme_covers_all_repository_and_chat_initialization_cases() -> None:
-    document = _readme()
-
-    for heading in (
-        "### New Git repository",
-        "### Existing unregistered repository",
-        "### Already registered repository",
-        "## Initialize a new development chat",
+def test_register_configure_bundle_workflow_from_subdirectory(repository, tmp_path):
+    registered = run_cli(repository, "register")
+    assert registered.returncode == 0, registered.stderr
+    context = api.context(repository)
+    config = api.configuration(repository)
+    assert config.exchange_directory is None
+    assert config.path == repository / ".patchharbor" / "config.json"
+    assert not (repository / ".gitignore").exists()
+    assert git(repository, "check-ignore", ".patchharbor/config.json").returncode == 0
+    assert git(repository, "status", "--porcelain").stdout == ""
+    assert run_cli(repository, "configure", "show").returncode == 0
+    # A valid unset configuration is not sufficient for default publication.
+    assert run_cli(repository, "bundle", "--json").returncode != 0
+    nested = repository / "nested"
+    nested.mkdir()
+    exchange = tmp_path / "exchange"
+    for arguments in (
+        ("bundle-suffix", ".txt"), ("archive-dir", "Archive-A"),
+        ("exchange-directory", str(exchange)),
     ):
-        assert heading in document
-
-    assert "A repository must be a local Git repository with a committed `HEAD`" in (
-        document
-    )
-    assert "patchharbor register" in document
-    assert "patchharbor register --new-id" in document
-    assert "patchharbor registry list" in document
-    assert "patchharbor unregister REPOSITORY_OR_REPO_ID" in document
-    assert "the version-matching `CHAT_INSTRUCTIONS.md`" in document
-    assert "the newest Result Bundle produced by `patchharbor bundle`" in document
-    assert "These paths are informational" in document
-    assert "no extra command or separate" in document
-    assert "`logs/run.json`" in document
-    assert "`logs/execution.log`" in document
-    assert "including the context printed by `patchharbor register`" in document
-    assert "do not copy it into `patch.json`" in document
-    assert "`register` itself deliberately has no `--json` option" in document
-    assert "For standard chat initialization, upload that Result" in document
-    assert "`context.json` is the authoritative source" in document
-    assert "patchharbor registry list --json" in document
-    assert "six-character display prefix is never a valid repository selector" in (
-        _compact(document)
-    )
-
-    chat = CHAT_PATH.read_text(encoding="utf-8")
-    assert "Lokale Repository- und Exchange-Pfade" in chat
-    assert "niemals als Repository-Zuordnung" in chat
-    assert "local repository path or Exchange path" in document
+        changed = run_cli(nested, "configure", *arguments)
+        assert changed.returncode == 0, changed.stderr
+    result = run_cli(nested, "bundle", "--json")
+    assert result.returncode == 0, result.stderr
+    bundle = Path(json.loads(result.stdout)["result"]["result_bundle_path"])
+    assert bundle.parent == exchange and bundle.name.endswith(".zip.txt")
+    with zipfile.ZipFile(bundle) as archive:
+        environment = json.loads(archive.read("environment.json"))
+        assert environment["repository_context"]["repo_id"] == str(context.repo_id)
+        assert environment["exchange_directory"] == str(exchange)
+        assert environment["output_directory"] == str(exchange)
+        assert not any(".patchharbor" in Path(name).parts for name in archive.namelist())
+    assert api.context(repository) == context
 
 
-def test_readme_covers_manual_overrides_termux_and_watcher_workflows() -> None:
-    document = _readme()
-    compact = _compact(document)
+@pytest.mark.parametrize("shared", [False, True])
+def test_cli_configuration_of_another_repository_is_independent(repository, tmp_path, shared):
+    other = create_repository(tmp_path / "other")
+    api.register(repository)
+    api.register(other)
+    first = tmp_path / "exchange-a"
+    second = first if shared else tmp_path / "exchange-b"
+    for repo, exchange in ((repository, first), (other, second)):
+        assert run_cli(repo, "configure", "exchange-directory", str(exchange)).returncode == 0
+    before = api.configuration(other).path.read_bytes()
+    assert run_cli(repository, "configure", "bundle-suffix", ".A").returncode == 0
+    assert run_cli(repository, "configure", "archive-dir", "Archive-A").returncode == 0
+    assert api.configuration(other).path.read_bytes() == before
+    assert api.configuration(repository).bundle_suffix == ".A"
+    assert api.configuration(repository).archive_directory == "Archive-A"
+    assert not (registration_user_paths().configuration_directory / "config.json").exists()
 
+
+@pytest.mark.parametrize("location", ["outside", "unregistered"])
+def test_configure_never_initializes_repository_metadata(repository, tmp_path, location):
+    cwd = tmp_path if location == "outside" else repository
+    target = tmp_path / "must-not-be-created"
+    for arguments in (
+        ("show",), ("exchange-directory", str(target)),
+        ("bundle-suffix", ".txt"), ("archive-dir", "Archive"),
+    ):
+        assert run_cli(cwd, "configure", *arguments).returncode != 0
+    assert not target.exists()
+    assert not (cwd / ".patchharbor").exists()
+
+
+@pytest.mark.parametrize("damage", ["missing", "invalid"])
+def test_register_and_configure_do_not_repair_existing_metadata(repository, tmp_path, damage):
+    original = api.register(repository)
+    paths = registration_user_paths()
+    registry_bytes = paths.registry_path.read_bytes()
+    config = api.configuration(repository).path
+    id_bytes = config.with_name("id").read_bytes()
+    exclude_bytes = local_exclude_path(repository).read_bytes()
+    if damage == "missing":
+        config.unlink()
+    else:
+        config.write_bytes(b"not-json")
+    target = tmp_path / "must-not-be-created"
     for command in (
-        "patchharbor apply --dry-run",
-        "patchharbor apply\n",
-        "patchharbor bundle --output-dir /path/to/results /path/to/repository",
-        "patchharbor apply --dry-run --output-dir /path/to/results /path/to/patch.zip",
-        "patchharbor apply --output-dir /path/to/results /path/to/patch.zip",
-        "patchharbor fs run /path/to/script-or-bundle",
-        "patchharbor-watcher --install-systemd-user-unit",
-        "systemctl --user enable --now patchharbor-watcher.service",
-        "journalctl --user -u patchharbor-watcher.service",
+        ("register",), ("register", "--new-id"),
+        ("configure", "show"), ("configure", "exchange-directory", str(target)),
     ):
-        assert command in document
-
-    assert (
-        "first resolves the current working directory to exactly one registered "
-        "Git repository" in compact
-    )
-    assert "Calls from any subdirectory of that repository" in compact
-    assert "without scanning for a fallback package" in compact
-    assert "greatest nanosecond modification time (`mtime_ns`) wins" in compact
-    assert (
-        "Equal `mtime_ns` values use the lexicographically first filename after "
-        "Unicode NFC normalization" in compact
-    )
-    assert "newer foreign, state-mismatched, or replay-ineligible package" in compact
-    assert "Its selection scope remains global" in compact
-    assert "does not use the watcher's current working directory" in compact
-    assert "resolve another registered repository" in compact
-    assert "default timeout for one script or repository entrypoint is 10,800 seconds" in (
-        compact
-    )
-    assert "Use manual mode on Termux" in compact
-    assert "No Termux-specific watcher support is claimed" in compact
-    assert "patchharbor-watcher --configure" not in document
-    assert "input-directory argument" in document
-    assert "with complete obsolescence proofs" in compact
-    assert "nothing is deleted" in compact
-    assert "unsupported safe rename leaves the source in place" in compact
-    assert "A failed package can be retried by another deliberate manual" in compact
-    assert "is not immediately repeated by the watcher" in compact
-    assert "<Repository>_Patch_<HHMMSS>_<MMDD>_<ID6>.zip" in document
-    assert "<Repository>_Result_<HHMMSS>_<MMDD>_<ID6>.zip" in document
-    assert "first six characters plus `…`" in document
+        assert run_cli(repository, *command).returncode != 0
+        assert (not config.exists()) if damage == "missing" else config.read_bytes() == b"not-json"
+        assert config.with_name("id").read_bytes() == id_bytes
+        assert local_exclude_path(repository).read_bytes() == exclude_bytes
+        assert paths.registry_path.read_bytes() == registry_bytes
+    assert not target.exists()
+    assert str(original.repo_id).encode() in id_bytes
 
 
-def test_core_help_explains_the_documented_exchange_workflow() -> None:
-    parser = build_core_parser()
-    top_help = _compact(parser.format_help())
-    configure_help = _compact(_subparser(parser, "configure").format_help())
-    exchange_help = _compact(
-        _subparser(parser, "configure", "exchange-directory").format_help()
-    )
-    show_help = _compact(_subparser(parser, "configure", "show").format_help())
-    register_help = _compact(_subparser(parser, "register").format_help())
-    registry_list_help = _compact(
-        _subparser(parser, "registry", "list").format_help()
-    )
-    context_help = _compact(_subparser(parser, "context").format_help())
-    bundle_help = _compact(_subparser(parser, "bundle").format_help())
-    apply_help = _compact(_subparser(parser, "apply").format_help())
-
-    assert "Register local Git repository instances" in top_help
-    assert "patchharbor configure exchange-directory DIRECTORY" in top_help
-    assert ".patchharbor/config.json" in configure_help
-    assert "may be shared by repositories" in configure_help
-    assert "persist the repository Exchange directory in config.json" in exchange_help
-    assert "active repository config.json path" in show_help
-    assert "committed HEAD" in register_help
-    assert "does not configure the Exchange directory" in register_help
-    assert "success summary shortens technical identifiers" in register_help
-    assert "patchharbor context --json REPOSITORY" in register_help
-    assert "Register itself has no --json option" in register_help
-    assert "human-readable rows with shortened repository UUIDs" in (
-        registry_list_help
-    )
-    assert "Use --json for full repository UUIDs" in registry_list_help
-    assert "not accepted by unregister" in registry_list_help
-    assert "human-readable repository summary" in context_help
-    assert "six characters plus an ellipsis" in context_help
-    assert "Use --json for the complete repository UUID" in context_help
-    assert "shortened display is not machine input" in context_help
-    assert "staged and unstaged changes" in bundle_help
-    assert "non-ignored untracked regular files" in bundle_help
-    assert "Without --output-dir, publish in the configured Exchange directory" in (
-        bundle_help
-    )
-    assert "contain no Git history and may contain secrets" in bundle_help
-    assert (
-        "manual call without PATCH_ZIP resolves the current working directory "
-        "to one registered repository" in apply_help
-    )
-    assert "selects its newest eligible Exchange package by mtime_ns" in apply_help
-    assert "deterministic normalized-filename tie-breaker" in apply_help
-    assert "An explicit PATCH_ZIP bypasses parameterless discovery" in apply_help
-    assert "may resolve another registered repository through its repo_id" in apply_help
-    assert "watcher's internal automatic mode remains global" in apply_help
-    assert "earlier writes are not globally rolled back" in apply_help
-    assert "default: 10800" in apply_help
+def test_existing_registration_can_be_set_up_manually_without_global_import(repository, tmp_path):
+    original = api.register(repository)
+    paths = registration_user_paths()
+    legacy = paths.configuration_directory / "config.json"
+    old = json.dumps({"format_version": 3, "exchange_directory": str(tmp_path / "old"),
+                      "bundle_suffix": ".old", "archive_directory": "Old"}).encode()
+    legacy.write_bytes(old)
+    local = api.configuration(repository).path
+    local.unlink()  # simulate an existing registration from the old implementation
+    exchange = tmp_path / "new"
+    assert run_cli(repository, "configure", "exchange-directory", str(exchange)).returncode != 0
+    assert not exchange.exists() and not local.exists()
+    # Deliberate file creation represents the user's editor, not application migration.
+    local.write_text(json.dumps({"format_version": 1, "exchange_directory": None,
+                                "bundle_suffix": "", "archive_directory": "PatchHarbor-Archive"}) + "\n",
+                     encoding="utf-8")
+    assert run_cli(repository, "configure", "exchange-directory", str(exchange)).returncode == 0
+    assert api.configuration(repository).bundle_suffix == ""
+    assert api.configuration(repository).archive_directory == "PatchHarbor-Archive"
+    assert api.context(repository) == original
+    assert legacy.read_bytes() == old
+    assert not (tmp_path / "old").exists()
 
 
-def test_watcher_help_explains_repository_config_systemd_and_termux_boundary() -> None:
-    help_text = _compact(build_watcher_parser().format_help())
-
-    assert "parameterless automatic Apply mode" in help_text
-    assert "Exchange directories of all registered repositories" in help_text
-    assert "patchharbor configure exchange-directory DIRECTORY" in help_text
-    assert "installer does not enable or start it" in help_text
-    assert "manual 'patchharbor apply' on Termux/Android" in help_text
-    assert "--configure" not in help_text
-    assert "INPUT_DIRECTORY" not in help_text
-
-
-def test_archive_documentation_matches_fail_safe_configuration_and_scope() -> None:
-    document = _readme()
-    compact = _compact(document)
-    for command in (
-        "patchharbor configure archive-dir PatchHarbor-Archive",
-        "patchharbor configure archive-dir .PatchHarbor-Archive",
-        "patchharbor configure archive-dir --clear",
-        'patchharbor configure archive-dir ""',
-    ):
-        assert command in document
-    for rule in (
-        "a timestamp, filename or mere successful exit is never enough",
-        "legacy records without a completion receipt",
-        "the watcher remains global",
-        "dry-run never archives",
-        "the archive is never scanned recursively",
-        "no copy-and-delete fallback",
-        "does not set a hidden attribute",
-    ):
-        assert rule in compact.lower()
+def test_unregister_reregister_and_real_move_keep_local_preferences(repository, tmp_path):
+    original = api.register(repository)
+    api.configure_exchange_directory(tmp_path / "exchange", repository=repository)
+    api.configure_bundle_suffix(".keep", repository=repository)
+    local = api.configuration(repository).path
+    config_bytes = local.read_bytes()
+    id_bytes = local.with_name("id").read_bytes()
+    exclude_bytes = local_exclude_path(repository).read_bytes()
+    assert run_cli(repository, "unregister", str(original.repo_id)).returncode == 0
+    assert api.repositories().repositories == ()
+    assert local.read_bytes() == config_bytes
+    assert local.with_name("id").read_bytes() == id_bytes
+    assert local_exclude_path(repository).read_bytes() == exclude_bytes
+    assert run_cli(repository, "register").returncode == 0
+    moved = tmp_path / "moved"
+    repository.rename(moved)
+    assert run_cli(moved, "register").returncode == 0
+    assert api.context(moved).repo_id == original.repo_id
+    assert api.configuration(moved).path.read_bytes() == config_bytes
+    mappings = api.repositories().repositories
+    assert len(mappings) == 1 and mappings[0].repository_path.value == moved
 
 
-def test_spec_has_no_obsolete_blanket_archive_prohibition() -> None:
-    specification = (PROJECT_ROOT / "spec" / "SPECIFICATION.md").read_text(encoding="utf-8")
-    for obsolete in (
-        "keine Dateien im Exchange-Ordner archivieren",
-        "Er verschiebt, löscht, archiviert oder sortiert dort keine Datei",
-        "PatchHarbor verschiebt, löscht, archiviert oder sortiert Exchange-Dateien nicht",
-    ):
-        assert obsolete not in specification
-    assert "Nachweisbasierte Exchange-Archivierung" in specification
+def test_git_clone_needs_fresh_identity_and_exchange_setup(repository, tmp_path):
+    original = api.register(repository)
+    api.configure_exchange_directory(tmp_path / "exchange", repository=repository)
+    api.configure_bundle_suffix(".not-inherited", repository=repository)
+    clone = tmp_path / "clone"
+    git(tmp_path, "clone", "--quiet", str(repository), str(clone))
+    assert not (clone / ".patchharbor").exists()
+    assert run_cli(clone, "configure", "show").returncode != 0
+    assert run_cli(clone, "register").returncode == 0
+    assert api.context(clone).repo_id != original.repo_id
+    assert api.configuration(clone).exchange_directory is None
+    assert api.configuration(clone).bundle_suffix == ""
+    assert run_cli(clone, "configure", "exchange-directory", str(tmp_path / "clone-exchange")).returncode == 0
+    assert api.configuration(repository).bundle_suffix == ".not-inherited"

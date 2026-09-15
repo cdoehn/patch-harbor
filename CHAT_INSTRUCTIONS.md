@@ -52,6 +52,48 @@ patchharbor fs run QUELLE
 patchharbor-watcher
 ```
 
+### Repositorylokale Einstellungen
+
+Alle Repository-Einstellungen liegen ausschließlich in
+`<Repository>/.patchharbor/config.json`: `exchange_directory`, `bundle_suffix`
+und `archive_directory`. Global bleiben Registry, Locks und technischer
+Replay-/Laufzeitzustand, keine Benutzer-Fallback-Konfiguration.
+`configure` ermittelt sein Repository aus dem aktuellen Arbeitsverzeichnis,
+auch aus Unterverzeichnissen. Es benötigt eine eindeutige Registrierung und
+vorhandene gültige lokale ID, Konfiguration und Git-Ausnahme.
+
+Nur eine echte Erstanmeldung mit `register` erzeugt die lokale Grundkonfiguration
+im neuen geschlossenen Format 1: vier Felder `format_version: 1`,
+`exchange_directory: null`, `bundle_suffix: ""` und
+`archive_directory: "PatchHarbor-Archive"`. Danach muss der Benutzer pro Repository
+`configure exchange-directory` ausführen. Gültiges `null` ist kein beschädigtes
+Dokument. Die Setter erzeugen oder reparieren keine fehlenden Dateien; alte
+globale Konfigurationen werden weder migriert noch gelesen. Bestehende ältere
+Registrierungen benötigen die lokale Grundkonfiguration bewusst von Hand.
+Niemals dafür ID, Registry, Locks oder Replay-State löschen. `unregister`
+erhält ID und Konfiguration; erneutes Register nutzt sie. Ein Git-Clone erhält
+keine ignorierten Metadaten. Nach echtem Verschieben kann Register den Pfad
+aktualisieren, wenn der alte Pfad nicht mehr existiert.
+
+Mehrere Repositorys dürfen denselben Exchange-Ordner nutzen oder getrennte
+Ordner wählen. Der Watcher lädt pro Poll ihre lokalen Einstellungen über Core,
+scannt physisch identische Ordner nur einmal und ordnet Pakete per vollständiger
+`repo_id` zu. Automatische Auswahl akzeptiert nur Pakete im Exchange ihres
+Zielrepositorys. Suffix und Archivregeln gelten immer pro Zielrepository,
+auch bei gemeinsamem Exchange. Der Watcher überspringt gültig unkonfigurierte
+Instanzen und fehlende Repository-Pfade; beschädigte Konfigurationen lebender
+Repositorys führen zum Fehler, nicht zu stiller Reparatur.
+
+Ein explizites Ausgabeziel darf einen nicht gesetzten oder nicht verfügbaren
+Exchange umgehen, niemals eine fehlende oder ungültige lokale Konfiguration.
+Die Begleitdaten beschreiben nur die Einstellungen des konkreten Repositorys.
+`.patchharbor/` bleibt lokal per Git-Exclude ausgeblendet und fehlt im Snapshot;
+die vollständige ignorierte Konfiguration darf nicht aus Bundle-Metadaten
+rekonstruiert oder per Patch-Nutzdatei überschrieben werden. Insbesondere ist
+`archive_directory` nicht zwingend als Begleitdatum enthalten.
+
+### Apply, Watcher und Archivierung
+
 `bundle` veröffentlicht ohne explizites Ausgabeziel im konfigurierten
 Exchange-Ordner. Ein manueller parameterloser `apply` löst zuerst das aktuelle
 Arbeitsverzeichnis einschließlich Repository-Unterverzeichnissen auf und
@@ -292,7 +334,7 @@ an den Basisdateinamen an: `.txt` ergibt beispielsweise
 oder leerer String bedeutet kein Suffix. Maßgeblich sind diese Metadaten,
 nicht die Endung einer möglicherweise umbenannten Upload-Datei.
 
-Der Benutzer setzt es einmal per `patchharbor configure bundle-suffix .txt`,
+Der Benutzer setzt es im betreffenden Repository per `patchharbor configure bundle-suffix .txt`,
 löscht es per `patchharbor configure bundle-suffix --clear` und erzeugt danach
 ein frisches Result Bundle. `apply` und `bundle` benötigen keinen Schalter.
 Der Core erzeugt Result Bundles; du benennst externe Patch-Pakete entsprechend.
@@ -403,6 +445,16 @@ Für den dokumentierten Pixel-/Termux-Workflow gilt:
 - keine künstlichen Einzeltest-Timeouts,
 - kein künstlicher Gesamtsuite-Timeout,
 - fachlich notwendige interne Prozess- und Timeout-Tests bleiben unverändert.
+
+Für dieses PatchHarbor-Repository darf ohne vorhandene `uv.lock` kein
+`uv run --frozen` verwendet werden. Entwicklungsabhängigkeiten werden aus
+`.[dev]` in der lokalen `.venv` vorbereitet, ohne die produktive pipx-Installation
+zu verändern. Den vollständigen Lauf z. B. mit
+`PYTEST_ADDOPTS='' .venv/bin/python -m pytest -p no:timeout -q tests` starten.
+`--session-timeout=0` ist kein Abschalten der Frist und darf dafür nicht verwendet
+werden. Keine Tests zur Geschwindigkeit erzwingen; alle fachlichen Gates bleiben.
+Neue Tests prüfen Verhalten und maschinenlesbare Datenverträge, nicht
+README-/Spezifikationstexte, Help-Wortlaut, Farben oder Konsolenlayout.
 
 Erzeuge den Git-Commit erst, nachdem alle vorgesehenen Tests grün sind. Stage
 nur die beabsichtigten Pfade, prüfe den Commit-Inhalt und verwende exakt die in
@@ -537,7 +589,7 @@ Beispiel für einen Plan-Commit (Platzhalter nie als echte Nachweise ausgeben):
 🟩 1 / 12
 
 Commit:
-feat(config): add shared exchange directory configuration
+feat(config): add repository-local exchange configuration
 
 Plan:
 planning/1.1.1/commit-plan.md
@@ -546,11 +598,11 @@ Spec:
 spec/SPECIFICATION.md
 
 Änderungen:
-• config.json einführen
-• exchange_directory speichern
-• configure-Befehle ergänzen
-• Linux-Pfad verwenden
-• Windows-Pfad verwenden
+• .patchharbor/config.json einführen
+• Repository-Einstellungen speichern
+• configure ans aktuelle Repository binden
+• geteilte Exchange-Ordner erlauben
+• lokale Git-Ausnahme erhalten
 
 Tests:
 • Config- und CLI-Tests

@@ -111,7 +111,7 @@ def configuration(
     """Read a registered repository's local settings; never create defaults.
 
     With revalidate=True, recheck the loaded physical Exchange target immediately
-    before returning it (the watcher startup contract). This does not reserve the
+    before returning it (an explicit readiness check). This does not reserve the
     directory: each subsequent operation still performs its own safety checks.
     """
     if not isinstance(revalidate, bool):

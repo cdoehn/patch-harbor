@@ -1,9 +1,11 @@
 # PatchHarbor 1.2.0 – öffentliche Python-Schnittstelle
 
 Basis: sauberer Snapshot `62020dab617d54925c8dd0ac192aaff685cda0f3`.
-Dieser additive Vertrag ergänzt `spec/SPECIFICATION.md`. Alle bestehenden
-Paket-, SHA-, Fingerprint-, Replay-, Recovery-, Archiv-, CLI- und JSON-Verträge
-bleiben erhalten. Die Version 1.2.0 wird im abschließenden Release-Schritt gesetzt.
+Dieser API-Vertrag ergänzt `spec/SPECIFICATION.md`. Paket-, SHA-, Fingerprint-,
+Replay-, Recovery- und öffentliche Ergebnis-JSON-Verträge bleiben erhalten.
+Die unten beschriebene OFF-PLAN-Konfigurationsrevision ersetzt ausdrücklich den
+früheren globalen Konfigurationsvertrag; kein Kompatibilitäts-Fallback.
+Version 1.2.0 und der abgeschlossene API-Plan mit 4/4 bleiben unverändert.
 
 ## API-1: Bibliotheksgrenze
 
@@ -39,14 +41,17 @@ Return, vollständige MESSAGE-Blöcke und bisherige JSON-Schemata bleiben erhalt
 
 ## API-3: Watcher
 
-Öffentliche API für automatische Verarbeitung und geteilte
-Konfiguration verwenden. Den heutigen Subprozess-/Signal-/Abbruchvertrag vorher
-explizit abgleichen und funktional prüfen. Failed-Retry, Replay, globaler Scope,
-Betriebsprotokolle und Linux-Serviceverhalten bleiben erhalten. Keine eigene
-Scan- oder Apply-Logik im Watcher. Pro Poll bleibt ein eigener Prozess erhalten;
-`patchharbor_watcher.worker` ruft `api.apply_next()` direkt auf und verwendet
-das bestehende Apply-JSON-Protokoll. Startup nutzt `api.configuration(revalidate=True)`.
-Signalhandler, Poll-Warteverhalten und Prozessgruppen werden nicht umgebaut.
+Der Watcher prüft beim Start `api.repositories()`. Pro Poll bleibt ein eigener
+Prozess erhalten; `patchharbor_watcher.worker` ruft `api.apply_next()` direkt
+auf und verwendet das bestehende Apply-JSON-Protokoll. Core lädt die lokalen
+Konfigurationen aller registrierten Repositorys frisch und fasst physisch
+identische Exchange-Verzeichnisse zusammen. Kein cwd-basiertes
+`api.configuration()` im Watcher und keine eigene Scan-/Apply-Logik.
+Failed-Retry, Replay, globaler Repository-Scope, Betriebsprotokolle und
+Linux-Serviceverhalten bleiben erhalten. Signalhandler, Poll-Warteverhalten und
+Prozessgruppen werden nicht umgebaut. Gültig unkonfigurierte Instanzen und
+fehlende Repository-Pfade werden übersprungen; beschädigte Konfigurationen
+vorhandener Repositorys führen zum Poll-Fehler ohne Reparatur.
 
 ## API-4: Release
 
@@ -66,3 +71,42 @@ Vor dem Abschluss laufen alle funktionalen, Sicherheits-, Packaging- und
 Plattform-Gates. Reine UI-Ausgaben werden nicht neu getestet. Der Planstatus sagt
 nur aus, welche Änderungen implementiert sind; lokale Ausführung und CI bestätigen
 erst danach den konkreten Release-Commit. Kein automatischer Release-Tag.
+
+
+## Repositorylokale Konfiguration (OFF-PLAN REPO-CONFIG-1 / REPO-CONFIG-2)
+
+Die technische Umstellung ist im Ausgangscommit `4f64362` enthalten.
+REPO-CONFIG-2 schreibt den öffentlichen Vertrag fort und ergänzt abschließende
+Verhaltensprüfungen. Beide Aufträge verändern den API-Planzähler nicht.
+
+- Alle Einstellungen gehören in `.patchharbor/config.json`, gebunden durch die
+  benachbarte `.patchharbor/id` und die globale Registry. Neues geschlossenes
+  lokales Format 1 mit exakt `format_version`, `exchange_directory`,
+  `bundle_suffix`, `archive_directory`; Exchange darf nach Erstregistrierung
+  `null` sein. Kein Repository-Pfad und keine zweite ID im Config-Dokument.
+- Alle CLI-Configure-Aufrufe verwenden das aktuelle registrierte Repository.
+  `api.configuration(repository=".", *, revalidate=False)` und die drei Setter
+  mit keyword-only `repository="."` erlauben explizite Auswahl ohne `chdir`.
+  `ConfigurationResult.exchange_directory` ist `Path | None`.
+- Reines Lesen prüft Identität und Schema; `revalidate=True` zusätzlich den
+  verfügbaren Exchange und die Pfadpolitik. Setter sperren Registry vor
+  Repository, erhalten andere Werte und schreiben atomar. Fehlende/ungültige
+  lokale Dateien werden niemals automatisch angelegt oder repariert.
+- Nur echte Erstregistrierung erzeugt Defaults. `unregister` erhält lokale
+  Daten; erneute Registrierung und Verschieben verwenden sie. Git-Clone startet
+  neu. `.patchharbor/` bleibt über den lokalen Git-Exclude ausgeschlossen.
+- Austauschordner dürfen geteilt oder getrennt sein. Automatische Auswahl
+  akzeptiert ein Paket nur im konfigurierten Exchange seines Manifest-Ziels.
+  Expliziter Apply darf anderswo lesen; Result, Suffix und Archivierung verwenden
+  dennoch ausschließlich das Zielrepository. Ein explizites Ausgabeziel
+  übergeht nur unset/unavailable Exchange, nicht defekte lokale Konfiguration.
+- Kein Migrationscode für globale Config-Dateien, keine Übernahme alter Formate,
+  kein Fallback. Bestehende ältere Registrierungen werden manuell eingerichtet;
+  globale Registry, Locks und Replay-State bleiben technische Benutzerzustände.
+- Acceptance prüft echte CLI-/API-/Watcher-Workflows, getrennte/geteilte Ordner,
+  Suffix-/Archivbesitz, explizite Ausgabe, Umregistrierung und Fehler ohne
+  Reparatur. Keine neuen Text-/Darstellungs- oder Dokumentationstests.
+
+Normativer Gesamtvertrag: `spec/SPECIFICATION.md`, insbesondere 4.3, 13, 16 und
+32; Benutzerworkflow und manueller Versionswechsel: README; exakte API-Verwendung:
+`docs/python-api.md`. Testergebnisse und externe CI bleiben getrennte Nachweise.
