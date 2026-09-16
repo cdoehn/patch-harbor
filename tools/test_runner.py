@@ -40,6 +40,8 @@ def _parser(environment: Mapping[str, str]) -> argparse.ArgumentParser:
     mode.add_argument("--serial", action="store_true", help="Run the serial reference suite.")
     mode.add_argument("--workers", type=_workers,
                       help="Run with N xdist workers or auto (opt-in until final acceptance).")
+    parser.add_argument("--report", type=Path, help="Write a controller-owned JSON result.")
+    parser.add_argument("--reference", type=Path, help="Compare with a serial JSON result.")
     parser.add_argument("--durations", type=_nonnegative,
                         default=environment.get("PATCHHARBOR_TEST_DURATIONS", "10"))
     parser.add_argument("pytest_args", nargs=argparse.REMAINDER,
@@ -70,9 +72,16 @@ def prepare_invocation(
     parser = _parser(environment)
     args = parser.parse_args(argv)
     forwarded = _pytest_arguments(parser, args.pytest_args)
+    if args.reference and not args.report:
+        parser.error("--reference requires --report")
+    evidence = []
+    if args.report:
+        evidence = ["-p", "tools.test_evidence", "--ph-report", str(args.report.resolve())]
+        if args.reference:
+            evidence.extend(["--ph-reference", str(args.reference.resolve())])
     command = [python, "-m", "pytest", "-p", "no:timeout", "-q",
                f"--durations={args.durations}",
-               "-n", args.workers or "0", "--max-worker-restart=0", *forwarded]
+               "-n", args.workers or "0", "--max-worker-restart=0", *evidence, *forwarded]
     child_environment = dict(environment)
     child_environment["PYTEST_ADDOPTS"] = ""
     return command, child_environment

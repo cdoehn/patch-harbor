@@ -6,7 +6,7 @@ Basis: `0c439b1c6400bdb12921ebaa5216620c9a122cd0`.
 Dieser eigenständige Aufgabenplan verändert den abgeschlossenen
 `planning/1.2.0/commit-plan.md` (4/4) nicht.
 
-**Fortschritt nach erfolgreichem Commit dieses Zwischenstands: 6 / 15.**
+**Fortschritt nach erfolgreichem Commit dieses Zwischenstands: 7 / 15.**
 Bei einem Abbruch sind nur die tatsächlich entstandenen Git-Commits erledigt.
 Nicht committierte Fortschrittsangaben sind kein Erfolgsnachweis.
 
@@ -51,7 +51,7 @@ Ein abschließender Push/CI-Nachweis bleibt ein expliziter nachfolgender Vorgang
    Gemeinsame Isolation und subprocess-Testhilfen zusammenführen, ohne fachliche Änderungen. Abschließend vollständige Läufe seriell, -n 2 und -n 4.
 
 7. **TEST-PARALLEL.c.W** – `test(evidence): establish controller-owned result comparison`
-   Status: offen.
+   Status: implementiert, Commit nur nach Gate.
    Vorhandene pytest-Berichte nutzen; nur Controller schreibt gemeinsame Ergebnisse. Keine Evidence-Infrastruktur auf Vorrat.
 
 8. **TEST-PARALLEL.c.R** – `test(evidence): reject incomplete and crashed worker runs`
