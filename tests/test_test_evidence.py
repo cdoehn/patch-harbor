@@ -57,12 +57,13 @@ def test_comparison_ignores_arrival_order_but_checks_inputs():
     with pytest.raises(EvidenceError): equivalent(a, b)
 
 
-def invoke(suite: Path, report: Path, *, workers: str = "0", reference: Path | None = None):
+def invoke(suite: Path, report: Path | None, *, workers: str = "0", reference: Path | None = None):
     env = os.environ.copy()
     env["PYTEST_ADDOPTS"] = ""
     env["PYTHONPATH"] = os.pathsep.join([str(PROJECT_ROOT), str(PROJECT_ROOT / "src"), env.get("PYTHONPATH", "")])
     command = [sys.executable, "-m", "pytest", "-p", "no:timeout", "-p", "tools.test_evidence",
-               "-c", str(suite / "pytest.ini"), "--rootdir", str(suite), "--ph-report", str(report), "-q"]
+               "-c", str(suite / "pytest.ini"), "--rootdir", str(suite), "--ph-check", "-q"]
+    if report is not None: command += ["--ph-report", str(report)]
     if workers != "0": command += ["-n", workers, "--max-worker-restart=0"]
     if reference: command += ["--ph-reference", str(reference)]
     command += [str(suite)]
@@ -216,6 +217,25 @@ def test_collection_only_is_never_a_successful_runtime_report():
     result = example(); result["mode"] = "collection"; result["reports"] = []
     validate(result, collection_only=True)
     with pytest.raises(EvidenceError): validate(result)
+
+
+def test_check_without_persisted_report_still_rejects_missing_results(tmp_path):
+    config = """
+        import pytest
+        capture = None
+        def pytest_sessionstart(session):
+            global capture
+            capture = session.config.pluginmanager.getplugin('patchharbor-development-capture')
+        @pytest.hookimpl(wrapper=True)
+        def pytest_runtest_logreport(report):
+            yield
+            if report.when == 'call':
+                capture.document['reports'].pop()
+    """
+    suite = make_suite(tmp_path, "def test_ok(): pass\n", config)
+    result = invoke(suite, None)
+    assert result.returncode != 0
+    assert not list(tmp_path.glob("*.json"))
 
 
 def test_crashed_worker_without_output_still_has_a_rejected_completion():

@@ -139,3 +139,18 @@ def test_native_acceptance_matrix_allows_120_minutes() -> None:
         "  windows-powershell7-acceptance:", 1,
     )[0]
     assert "    timeout-minutes: 120\n" in matrix_job
+
+
+def test_ci_keeps_an_unconditional_blocking_full_serial_reference():
+    text = _workflow_text()
+    serial = text.split("  serial-reference:\n", 1)[1].split("  windows-powershell7-acceptance:\n", 1)[0]
+    assert "runs-on: ubuntu-24.04" in serial
+    assert "timeout-minutes: 120" in serial
+    assert "python tools/run_tests.py --serial" in serial
+    assert "--report" in serial
+    assert "--suite" not in serial
+    assert "continue-on-error" not in serial
+    assert "if-no-files-found: error" in serial
+    # Only artifact preservation is conditional, not the test/reference job.
+    assert serial.count("if:") == 1
+    assert "if: always()" in serial
