@@ -22,9 +22,24 @@ def _nonnegative(value: str) -> int:
     return result
 
 
+def _workers(value: str) -> str:
+    if value == "auto":
+        return value
+    try:
+        count = int(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("workers must be auto or a positive integer") from exc
+    if count < 1:
+        raise argparse.ArgumentTypeError("use --serial for the zero-worker reference")
+    return str(count)
+
+
 def _parser(environment: Mapping[str, str]) -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(allow_abbrev=False)
-    parser.add_argument("--serial", action="store_true", help="Run the serial reference suite.")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--serial", action="store_true", help="Run the serial reference suite.")
+    mode.add_argument("--workers", type=_workers,
+                      help="Run with N xdist workers or auto (opt-in until final acceptance).")
     parser.add_argument("--durations", type=_nonnegative,
                         default=environment.get("PATCHHARBOR_TEST_DURATIONS", "10"))
     parser.add_argument("pytest_args", nargs=argparse.REMAINDER,
@@ -56,7 +71,8 @@ def prepare_invocation(
     args = parser.parse_args(argv)
     forwarded = _pytest_arguments(parser, args.pytest_args)
     command = [python, "-m", "pytest", "-p", "no:timeout", "-q",
-               f"--durations={args.durations}", *forwarded]
+               f"--durations={args.durations}",
+               "-n", args.workers or "0", "--max-worker-restart=0", *forwarded]
     child_environment = dict(environment)
     child_environment["PYTEST_ADDOPTS"] = ""
     return command, child_environment

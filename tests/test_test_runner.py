@@ -130,3 +130,24 @@ def test_real_pytest_results_survive_launcher(tmp_path, body, config, status, ta
 def test_empty_collection_is_not_a_successful_suite(tmp_path) -> None:
     completed, _ = _real_suite(tmp_path, "# no test functions\n")
     assert completed.returncode == 5
+
+
+@pytest.mark.parametrize("arguments,count", [
+    ([], "0"), (["--serial"], "0"), (["--workers", "2"], "2"),
+    (["--workers", "4"], "4"), (["--workers", "auto"], "auto"),
+])
+def test_worker_selection_is_delegated_to_xdist(arguments, count) -> None:
+    command, environment = runner.prepare_invocation(arguments, environment={})
+    assert command[command.index("-n") + 1] == count
+    assert "--max-worker-restart=0" in command
+    assert environment["PYTEST_ADDOPTS"] == ""
+
+
+@pytest.mark.parametrize("arguments", [
+    ["--workers", "0"], ["--workers", "-2"], ["--workers", "oops"],
+    ["--serial", "--workers", "2"],
+])
+def test_invalid_worker_selection_is_a_usage_error(arguments) -> None:
+    with pytest.raises(SystemExit) as error:
+        runner.prepare_invocation(arguments, environment={})
+    assert error.value.code == 2
