@@ -11,7 +11,7 @@ import textwrap
 
 import pytest
 
-from tools.test_evidence import EvidenceError, equivalent, report_digest, validate
+from tools.test_results import EvidenceError, equivalent, report_digest, validate
 from tests.platform_support import PROJECT_ROOT
 
 
