@@ -15,15 +15,15 @@ import sys
 
 if __package__:
     from .test_results import EvidenceError, equivalent, validate
+    from .test_policy import PROJECT_ROOT as ROOT, MODE_VERIFICATION_MATRIX, process_exit_code
 else:
     from test_results import EvidenceError, equivalent, validate
+    from test_policy import PROJECT_ROOT as ROOT, MODE_VERIFICATION_MATRIX, process_exit_code
 
-ROOT = Path(__file__).resolve().parents[1]
 
 
 def verification_matrix() -> tuple[tuple[str, str], ...]:
-    return (("0", "0"), ("2", "0"), ("4", "0"), ("auto", "0"),
-            ("2", "1"), ("4", "42"), ("auto", "314159"))
+    return MODE_VERIFICATION_MATRIX
 
 
 def verify(outdir: Path, targets: list[str], *, python: str = sys.executable) -> int:
@@ -44,7 +44,7 @@ def verify(outdir: Path, targets: list[str], *, python: str = sys.executable) ->
         print(f"Verification: workers={workers}; PYTHONHASHSEED={seed}", flush=True)
         result = subprocess.run(command, cwd=ROOT, env=environment, check=False)
         if result.returncode:
-            return result.returncode if result.returncode > 0 else 128 - result.returncode
+            return process_exit_code(result.returncode)
         actual = json.loads(report.read_text(encoding="utf-8"))
         validate(actual)
         if reference is None:

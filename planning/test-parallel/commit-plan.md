@@ -6,7 +6,7 @@ Basis: `0c439b1c6400bdb12921ebaa5216620c9a122cd0`.
 Dieser eigenständige Aufgabenplan verändert den abgeschlossenen
 `planning/1.2.0/commit-plan.md` (4/4) nicht.
 
-**Fortschritt nach erfolgreichem Commit dieses Zwischenstands: 11 / 15.**
+**Fortschritt nach erfolgreichem Commit dieses Zwischenstands: 12 / 15.**
 Bei einem Abbruch sind nur die tatsächlich entstandenen Git-Commits erledigt.
 Nicht committierte Fortschrittsangaben sind kein Erfolgsnachweis.
 
@@ -71,7 +71,7 @@ Ein abschließender Push/CI-Nachweis bleibt ein expliziter nachfolgender Vorgang
    Komplette Serien für 0/2/4/auto mit mehreren Hash-Seeds; fachliche Inputs/IDs/Resultate vergleichen, keine Laufzeitversprechen.
 
 12. **TEST-PARALLEL.d.C** – `refactor(tests): finalize shared parallel test policy`
-   Status: offen.
+   Status: implementiert, Commit nur nach Gate.
    Policy konsolidieren: xdist verteilt; PatchHarbor entwickelt keinen Scheduler.
 
 13. **TEST-PARALLEL.e.W** – `ci(tests): use pytest-xdist in existing acceptance lanes`

@@ -9,7 +9,10 @@ from pathlib import Path
 import subprocess
 import sys
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if __package__:
+    from .test_policy import PROJECT_ROOT, DEFAULT_WORKERS, EVIDENCE_PLUGIN, process_exit_code
+else:
+    from test_policy import PROJECT_ROOT, DEFAULT_WORKERS, EVIDENCE_PLUGIN, process_exit_code
 
 
 def _nonnegative(value: str) -> int:
@@ -75,14 +78,14 @@ def prepare_invocation(
     forwarded = _pytest_arguments(parser, args.pytest_args)
     if args.reference and not args.report:
         parser.error("--reference requires --report")
-    evidence = ["-p", "tools.test_evidence", "--ph-check"]
+    evidence = ["-p", EVIDENCE_PLUGIN, "--ph-check"]
     if args.report:
         evidence.extend(["--ph-report", str(args.report.resolve())])
         if args.reference:
             evidence.extend(["--ph-reference", str(args.reference.resolve())])
     command = [python, "-m", "pytest", "-p", "no:timeout", "-q",
                f"--durations={args.durations}",
-               "-n", "0" if args.serial else args.workers or "auto", "--max-worker-restart=0", *evidence, *forwarded]
+               "-n", "0" if args.serial else args.workers or DEFAULT_WORKERS, "--max-worker-restart=0", *evidence, *forwarded]
     child_environment = dict(environment)
     child_environment["PYTEST_ADDOPTS"] = ""
     return command, child_environment
@@ -99,4 +102,4 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 3
     # POSIX Popen uses negative return codes for signals; don't turn SIGKILL
     # into an apparently unrelated exit 247 via SystemExit(-9).
-    return result.returncode if result.returncode >= 0 else 128 - result.returncode
+    return process_exit_code(result.returncode)
