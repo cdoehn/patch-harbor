@@ -10,6 +10,7 @@ import pytest
 
 from tools import test_runner as runner
 from tests.platform_support import PROJECT_ROOT
+from tests.pytest_support import run_development_tests
 
 
 def test_default_invokes_all_tests_in_a_fresh_process(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -96,12 +97,9 @@ def _real_suite(tmp_path: Path, body: str, *, config: str = "") -> tuple[subproc
     (suite / "test_example.py").write_text(textwrap.dedent(body), encoding="utf-8")
     (suite / "conftest.py").write_text(textwrap.dedent(config), encoding="utf-8")
     junit = tmp_path / "report.xml"
-    environment = os.environ.copy()
-    environment["PYTEST_ADDOPTS"] = "--lf -k a_test_that_does_not_exist --session-timeout=0"
-    completed = subprocess.run(
-        [sys.executable, str(PROJECT_ROOT / "tools" / "run_tests.py"), "--serial", "--",
-         str(suite), "--junitxml", str(junit)],
-        cwd=tmp_path, env=environment, text=True, capture_output=True, check=False,
+    completed = run_development_tests(
+        ["--serial", "--", str(suite), "--junitxml", str(junit)], cwd=tmp_path,
+        environment_overrides={"PYTEST_ADDOPTS": "--lf -k a_test_that_does_not_exist --session-timeout=0"},
     )
     return completed, junit
 

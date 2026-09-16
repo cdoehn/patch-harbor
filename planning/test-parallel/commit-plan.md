@@ -6,7 +6,7 @@ Basis: `0c439b1c6400bdb12921ebaa5216620c9a122cd0`.
 Dieser eigenständige Aufgabenplan verändert den abgeschlossenen
 `planning/1.2.0/commit-plan.md` (4/4) nicht.
 
-**Fortschritt nach erfolgreichem Commit dieses Zwischenstands: 5 / 15.**
+**Fortschritt nach erfolgreichem Commit dieses Zwischenstands: 6 / 15.**
 Bei einem Abbruch sind nur die tatsächlich entstandenen Git-Commits erledigt.
 Nicht committierte Fortschrittsangaben sind kein Erfolgsnachweis.
 
@@ -47,7 +47,7 @@ Ein abschließender Push/CI-Nachweis bleibt ein expliziter nachfolgender Vorgang
    Lokale Benutzer-/Git-/Tempdaten und Prozesszustand isolieren; Importzustand kontrollieren; Paketquellenkopien vor flüchtigen Dateien schützen. Vollständiger Vier-Worker-Lauf.
 
 6. **TEST-PARALLEL.b.C** – `refactor(tests): consolidate isolation and subprocess helpers`
-   Status: offen.
+   Status: implementiert, Commit nur nach Gate.
    Gemeinsame Isolation und subprocess-Testhilfen zusammenführen, ohne fachliche Änderungen. Abschließend vollständige Läufe seriell, -n 2 und -n 4.
 
 7. **TEST-PARALLEL.c.W** – `test(evidence): establish controller-owned result comparison`

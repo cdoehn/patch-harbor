@@ -4,14 +4,13 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
-import subprocess
-import sys
 import textwrap
 from xml.etree import ElementTree
 
 import pytest
 
 from tests.platform_support import PROJECT_ROOT
+from tests.pytest_support import run_development_tests
 
 
 @pytest.mark.parametrize("workers", ["2", "4"])
@@ -20,7 +19,7 @@ def test_real_workers_have_disjoint_files_registry_and_locks(tmp_path: Path, wor
     suite.mkdir()
     output = tmp_path / "records"
     output.mkdir()
-    (suite / "conftest.py").write_text('pytest_plugins = ["tests.conftest"]\n', encoding="utf-8")
+    (suite / "conftest.py").write_text('pytest_plugins = ["tests.isolation_support"]\n', encoding="utf-8")
     (suite / "test_workers.py").write_text(textwrap.dedent("""
         import json, os, pathlib
         import pytest
@@ -44,15 +43,14 @@ def test_real_workers_have_disjoint_files_registry_and_locks(tmp_path: Path, wor
             (pathlib.Path(os.environ['PH_TEST_RECORDS']) / f'{number}.json').write_text(json.dumps(record), encoding='utf-8')
     """), encoding="utf-8")
     report = tmp_path / "junit.xml"
-    environment = os.environ.copy()
-    environment["PH_TEST_RECORDS"] = str(output)
-    environment["GIT_DIR"] = str(tmp_path / "not-a-repository")
-    environment["GIT_TEMPLATE_DIR"] = str(tmp_path / "not-a-template")
-    environment["PYTHONPATH"] = os.pathsep.join((str(PROJECT_ROOT), str(PROJECT_ROOT / "src")))
-    completed = subprocess.run(
-        [sys.executable, str(PROJECT_ROOT / "tools" / "run_tests.py"),
-         "--workers", workers, "--", str(suite), "--junitxml", str(report)],
-        cwd=tmp_path, env=environment, text=True, capture_output=True, check=False,
+    completed = run_development_tests(
+        ["--workers", workers, "--", str(suite), "--junitxml", str(report)], cwd=tmp_path,
+        environment_overrides={
+            "PH_TEST_RECORDS": str(output),
+            "GIT_DIR": str(tmp_path / "not-a-repository"),
+            "GIT_TEMPLATE_DIR": str(tmp_path / "not-a-template"),
+            "PYTHONPATH": os.pathsep.join((str(PROJECT_ROOT), str(PROJECT_ROOT / "src"))),
+        },
     )
     assert completed.returncode == 0, completed.stdout + completed.stderr
     records = [json.loads(path.read_text(encoding="utf-8")) for path in output.glob("*.json")]

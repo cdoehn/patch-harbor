@@ -12,7 +12,7 @@ import types
 import pytest
 
 from patchharbor.user_paths import registration_user_paths
-from tests.conftest import ProcessStateLeak, assert_process_state_restored
+from tests.isolation_support import ProcessStateLeak, assert_process_state_restored
 from tests.registration_support import create_repository, git
 
 
