@@ -39,7 +39,7 @@ def _parser(environment: Mapping[str, str]) -> argparse.ArgumentParser:
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--serial", action="store_true", help="Run the serial reference suite.")
     mode.add_argument("--workers", type=_workers,
-                      help="Run with N xdist workers or auto (opt-in until final acceptance).")
+                      help="Run with N xdist workers; the default is auto.")
     parser.add_argument("--report", type=Path, help="Write a controller-owned JSON result.")
     parser.add_argument("--reference", type=Path, help="Compare with a serial JSON result.")
     parser.add_argument("--durations", type=_nonnegative,
@@ -74,14 +74,14 @@ def prepare_invocation(
     forwarded = _pytest_arguments(parser, args.pytest_args)
     if args.reference and not args.report:
         parser.error("--reference requires --report")
-    evidence = []
+    evidence = ["-p", "tools.test_evidence", "--ph-check"]
     if args.report:
-        evidence = ["-p", "tools.test_evidence", "--ph-report", str(args.report.resolve())]
+        evidence.extend(["--ph-report", str(args.report.resolve())])
         if args.reference:
             evidence.extend(["--ph-reference", str(args.reference.resolve())])
     command = [python, "-m", "pytest", "-p", "no:timeout", "-q",
                f"--durations={args.durations}",
-               "-n", args.workers or "0", "--max-worker-restart=0", *evidence, *forwarded]
+               "-n", "0" if args.serial else args.workers or "auto", "--max-worker-restart=0", *evidence, *forwarded]
     child_environment = dict(environment)
     child_environment["PYTEST_ADDOPTS"] = ""
     return command, child_environment

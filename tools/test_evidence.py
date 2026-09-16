@@ -44,6 +44,7 @@ def input_binding(root: Path = ROOT) -> dict:
 
 def pytest_addoption(parser):
     group = parser.getgroup("patchharbor-development-evidence")
+    group.addoption("--ph-check", action="store_true", default=False, help="Reject incomplete test runs without requiring a saved report.")
     group.addoption("--ph-report", default=None, help="Controller-owned development JSON report.")
     group.addoption("--ph-reference", default=None, help="Require equivalence with a serial JSON reference.")
 
@@ -51,7 +52,7 @@ def pytest_addoption(parser):
 def pytest_configure(config):
     if config.getoption("--ph-reference") and not config.getoption("--ph-report"):
         raise pytest.UsageError("--ph-reference requires --ph-report")
-    if config.getoption("--ph-report"):
+    if config.getoption("--ph-report") or config.getoption("--ph-check"):
         config.pluginmanager.register(Capture(config), "patchharbor-development-capture")
 
 
@@ -143,7 +144,11 @@ class Capture:
                 equivalent(json.loads(Path(reference).read_text(encoding="utf-8")), self.document)
         except (ValueError, KeyError, TypeError, OSError) as exc:
             self.document["errors"].append(str(exc))
+            terminal = self.config.pluginmanager.getplugin("terminalreporter")
+            if terminal is not None:
+                terminal.write_line(f"Test evidence rejected: {exc}", red=True)
             if session.exitstatus == 0:
                 session.exitstatus = pytest.ExitCode.TESTS_FAILED
         self.document["exitstatus"] = int(session.exitstatus)
-        write_report(Path(self.config.getoption("--ph-report")), self.document)
+        if self.config.getoption("--ph-report"):
+            write_report(Path(self.config.getoption("--ph-report")), self.document)

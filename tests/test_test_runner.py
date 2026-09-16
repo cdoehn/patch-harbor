@@ -131,7 +131,7 @@ def test_empty_collection_is_not_a_successful_suite(tmp_path) -> None:
 
 
 @pytest.mark.parametrize("arguments,count", [
-    ([], "0"), (["--serial"], "0"), (["--workers", "2"], "2"),
+    pytest.param([], "auto", id="arguments0-0"), (["--serial"], "0"), (["--workers", "2"], "2"),
     (["--workers", "4"], "4"), (["--workers", "auto"], "auto"),
 ])
 def test_worker_selection_is_delegated_to_xdist(arguments, count) -> None:
@@ -149,3 +149,18 @@ def test_invalid_worker_selection_is_a_usage_error(arguments) -> None:
     with pytest.raises(SystemExit) as error:
         runner.prepare_invocation(arguments, environment={})
     assert error.value.code == 2
+
+
+def test_normal_launcher_checks_completeness_without_a_persistent_report():
+    command, _ = runner.prepare_invocation([], environment={})
+    assert "tools.test_evidence" in command
+    assert "--ph-check" in command
+    assert "--ph-report" not in command
+
+
+def test_report_and_reference_are_explicit_child_arguments(tmp_path):
+    command, _ = runner.prepare_invocation(["--serial", "--report", str(tmp_path / "actual.json"),
+                                            "--reference", str(tmp_path / "reference.json")], environment={})
+    assert command[command.index("--ph-report") + 1] == str(tmp_path / "actual.json")
+    assert command[command.index("--ph-reference") + 1] == str(tmp_path / "reference.json")
+    assert command[command.index("-n") + 1] == "0"

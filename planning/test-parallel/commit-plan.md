@@ -6,7 +6,7 @@ Basis: `0c439b1c6400bdb12921ebaa5216620c9a122cd0`.
 Dieser eigenständige Aufgabenplan verändert den abgeschlossenen
 `planning/1.2.0/commit-plan.md` (4/4) nicht.
 
-**Fortschritt nach erfolgreichem Commit dieses Zwischenstands: 9 / 15.**
+**Fortschritt nach erfolgreichem Commit dieses Zwischenstands: 10 / 15.**
 Bei einem Abbruch sind nur die tatsächlich entstandenen Git-Commits erledigt.
 Nicht committierte Fortschrittsangaben sind kein Erfolgsnachweis.
 
@@ -63,7 +63,7 @@ Ein abschließender Push/CI-Nachweis bleibt ein expliziter nachfolgender Vorgang
    Nur tatsächlich benötigte Ergebnisaggregation von pytest-Hooks trennen.
 
 10. **TEST-PARALLEL.d.W** – `test(runner): enable parallel development runs by default`
-   Status: offen.
+   Status: implementiert, Commit nur nach Gate.
    Erst nach Parallelabnahme standardmäßig auto, explizit seriell weiterhin möglich.
 
 11. **TEST-PARALLEL.d.R** – `test(parallel): verify serial and worker-count equivalence`
