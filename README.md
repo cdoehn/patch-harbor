@@ -551,6 +551,38 @@ current working directory:
 patchharbor fs run /path/to/script-or-bundle
 ```
 
+## Development tests
+
+Install the `dev` extra in a development environment; no pytest dependency is
+added to the installed product. The shared launcher defaults to pytest-xdist:
+
+```bash
+python -m pip install -e '.[dev]'
+python tools/run_tests.py
+python tools/run_tests.py --workers 4
+python tools/run_tests.py --serial
+```
+
+`scripts/test.sh` bootstraps the local `.venv` and uses the same launcher.
+CI and Docker select the same named suites via `--suite`; a blocking CI lane
+retains the full serial reference. The launcher checks complete collection,
+worker completion and setup/call/teardown results even without a saved report.
+Only its controller can write an optional `--report` JSON file. Declared skips
+remain explicit, never counted as passed tests.
+
+For full serial/2/4/auto and hash-seed equivalence, use a fresh external directory:
+
+```bash
+python tools/verify_test_modes.py --outdir /tmp/patchharbor-mode-check-001
+```
+
+This executes seven full suites, retaining reports and stopping on any failed
+or incomplete run. Worker scheduling remains exclusively pytest-xdist's job.
+Raw `python -m pytest -n auto` is still available but does not automatically
+activate the launcher's extra completeness checks. See
+[development test contracts](docs/test-parallelism.md) for isolation, report
+bindings, deliberate failure probes and partial-test selection.
+
 ## Termux and Android
 
 Use manual mode on Termux. PatchHarbor does not treat the Android background

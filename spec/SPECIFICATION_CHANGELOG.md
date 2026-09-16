@@ -1,5 +1,21 @@
 # PatchHarbor – Spezifikations-Changelog
 
+## 2026-09-16 – TEST-PARALLEL: pytest-xdist als Entwicklungsstandard
+
+- Gemeinsamer pytest-Launcher für lokal, CI und Docker, standardmäßig xdist auto;
+  explizite Workerzahlen und vollständige serielle Referenz bleiben erhalten.
+- Controller-eigene Nachweise mit Inputbindung, Sammlungs-/Phasenprüfung und
+  Worker-Abschlussbelegen; neutrales Modell getrennt vom pytest-Adapter.
+- Vollvergleich 0/2/4/auto und zusätzlicher Hash-Seeds, einschließlich sichtbarer
+  Skips und Fehlernachweisen für verlorene Ergebnisse und abgestürzte Worker.
+- Bestehende Plattformmatrix unverändert; zusätzliche blockierende serielle CI.
+- Keine Runtime-Abhängigkeit, kein Produktscheduler, keine neuen Darstellungs-
+  oder Dokumentationstests und keine künstlichen Test-/Suitefristen.
+- 15 echte W/R/C-Zustände gemäß Aufgabenplan. Keine Versionsanhebung oder
+  automatische Veröffentlichung; erfolgreicher Apply und externe CI sind
+  weiterhin anhand der tatsächlich entstandenen Ergebnisse nachzuweisen.
+
+
 **Dateiname:** `SPECIFICATION_CHANGELOG.md`<br>
 **Stand:** 2026-09-15
 

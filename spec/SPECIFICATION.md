@@ -3428,3 +3428,34 @@ Release-Gates prüfen API-Verträge, installierte Artefakte, CLI, Watcher und be
 Sicherheits-/Plattformfunktionen. Konsolendarstellung wird nicht neu getestet.
 Tags oder Veröffentlichungen folgen nicht automatisch aus der Versionsanhebung;
 der neue Commit benötigt weiterhin die vollständige lokale und externe CI-Freigabe.
+
+
+## 33. Parallele Entwicklungstests (TEST-PARALLEL)
+
+Der Entwicklungsvertrag in `planning/test-parallel/specification.md` und der
+zugehörige W/R/C-Plan ergänzen diese Spezifikation, ohne den Produktvertrag 1.2.0
+zu verändern. pytest und pytest-xdist bleiben reine Entwicklungsabhängigkeiten.
+`tools/run_tests.py` verwendet standardmäßig xdist `auto`, unterstützt explizite
+Workerzahlen und `--serial`. `scripts/test.sh`, native CI und Docker verwenden
+seine gemeinsame Policy. Das Produkt führt keinen Testscheduler ein.
+
+Der Launcher prüft vollständige maschinenlesbare Ergebnisse im Controller,
+auch ohne persistierte Berichte. Ein optionaler JSON-Nachweis wird ausschließlich
+vom Controller atomar geschrieben. Sammlungen, Worker-Abschlussbelege und
+Testphasen werden vollständig geprüft; fehlende Ergebnisse, unterschiedliche
+Sammlungen, Worker-Abstürze und Setup-/Teardown-/Untertestfehler verhindern
+Erfolg. Skips bleiben explizit und werden bei Referenzvergleichen berücksichtigt.
+Collection-only ist kein bestandener Laufzeitnachweis.
+
+Der Vollvergleich führt seriell/2/4/auto und zusätzliche Hash-Seeds mit stabiler
+Quellen-/Interpreterbindung aus. Kein Ergebnisvergleich von Reihenfolge, Farbe,
+Layout, Dauer, Zeitstempel oder Worker-Zuteilung. Prozess- und Dateisolation ist
+Teil der Verhaltenstests. Keine neuen Darstellungs- oder Dokumentationstests.
+Eine zusätzliche blockierende serielle CI-Lane bleibt erhalten; die bisherigen
+OS-/Python-/PowerShell-Matrizen werden nicht reduziert.
+
+Keine zusätzlichen künstlichen Test-/Suite-Timeouts. Das äußere Apply-Limit,
+CI-Joblimits und fachliche Timeouttests bleiben eigenständige Verträge.
+Eine W/R/C-Patchfolge wendet jeden Zwischenstand einzeln an und committet ihn
+nur nach erfolgreichen Prüfungen. Bei Fehler bleiben vorherige Commits stehen.
+Weder ein erzeugtes Paket noch lokale Tests allein bedeuten externe CI-Freigabe.

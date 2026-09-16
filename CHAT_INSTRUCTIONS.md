@@ -315,7 +315,8 @@ Es gibt genau drei sichtbare Commit-Arten.
 
 Ein normaler Chat-Patch erzeugt nach grünen Tests genau einen Git-Commit der
 angezeigten Art. Bei roten Tests darf kein Commit entstehen. Eine Ausnahme ist
-nur ein ausdrücklich verlangter nicht committender Diagnoseauftrag.
+ein ausdrücklich verlangter Diagnoseauftrag oder eine beauftragte W/R/C-Folge
+nach Abschnitt 8.
 
 ## 7. Genau ein sicheres Patch-Paket erzeugen
 
@@ -450,7 +451,8 @@ Für dieses PatchHarbor-Repository darf ohne vorhandene `uv.lock` kein
 `uv run --frozen` verwendet werden. Entwicklungsabhängigkeiten werden aus
 `.[dev]` in der lokalen `.venv` vorbereitet, ohne die produktive pipx-Installation
 zu verändern. Den vollständigen Lauf z. B. mit
-`PYTEST_ADDOPTS='' .venv/bin/python -m pytest -p no:timeout -q tests` starten.
+`.venv/bin/python tools/run_tests.py` starten: xdist `auto`, Controller-Prüfung,
+kein pytest-timeout. Alternativ `--serial` oder `--workers 2` (bzw. 4).
 `--session-timeout=0` ist kein Abschalten der Frist und darf dafür nicht verwendet
 werden. Keine Tests zur Geschwindigkeit erzwingen; alle fachlichen Gates bleiben.
 Neue Tests prüfen Verhalten und maschinenlesbare Datenverträge, nicht
@@ -461,7 +463,17 @@ nur die beabsichtigten Pfade, prüfe den Commit-Inhalt und verwende exakt die in
 der UI angezeigte Commit-Message. Erhalte bereits vorhandene, nicht zum Auftrag
 gehörende staged, unstaged und untracked Änderungen. Verwende kein pauschales
 `git reset --hard` oder `git clean`, das Benutzeränderungen verlieren könnte.
-Bei einem Fehler entsteht kein Commit.
+Bei einem Fehler entsteht für den scheiternden Schritt kein Commit.
+
+Bei beauftragten W/R/C-Folgen entsteht jeder Zwischenstand einzeln:
+Änderung → Gate → Commit → nächster Schritt. Nicht zuerst den Endzustand
+installieren; Fehler erhalten frühere Commits. Plan und Spec stehen unter
+`planning/test-parallel/`. Der Scheduler ist ausschließlich pytest-xdist.
+
+Bei Parallelitätsänderungen prüft `tools/verify_test_modes.py --outdir NEUER_PFAD`
+sieben vollständige Läufe seriell/2/4/auto mit Hash-Seeds. Berichte gehören
+außerhalb der Quellen; geänderte Quellen benötigen eine neue Referenz.
+Vertrag: `docs/test-parallelism.md`.
 
 PatchHarbor führt anschließend automatisch den Result-Bundle-Versuch durch,
 sobald das Ziel-Repository sicher aufgelöst wurde. Deshalb darf der Entrypoint

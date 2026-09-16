@@ -72,7 +72,7 @@ aufgeräumt; keine verwaisten Lockhalter und keine pauschalen Benutzer-Löschung
 Temporäre pytest-Caches und lokale .patchharbor-Metadaten gehören nicht in
 parallel kopierte Packaging-Testquellen.
 
-## Ergebnisnachweise (Bundle 2)
+## Ergebnisnachweise
 
 Nur der pytest-Controller darf einen gemeinsamen Abschlussnachweis erzeugen;
 Worker schreiben isolierte Dateien oder liefern pytest-Reports zurück.
@@ -99,3 +99,40 @@ Automatisiert geprüft werden Verhalten, Datenverträge, Zustandsübergänge,
 Dateieffekte, Exitcodes, Fehlerfälle, Sicherheit, Wiederaufnahme, Idempotenz und
 Parallelität. Keine exakten Konsolentexte, Farben, Spinner, Layouts oder
 Dokumentation testen. Die Konsole darf weiterhin ausführlich und farbig sein.
+
+
+## Konkretisierung der Abschlussimplementation
+
+Der gemeinsame Launcher ist standardmäßig parallel und aktiviert stets
+`--ph-check`, auch ohne persistierten Bericht. `--report` und `--reference`
+sind explizite Entwicklungsoptionen. Die JSON-Nachweisversion 1 enthält getrennt
+Lauf-/Inputbindung, Workerlebenszyklus, Sammlungen, Collection-Skips und
+Setup-/Call-/Teardown-/Subtestberichte. Der Controller prüft Abschlussbelege
+jedes Workers einschließlich Berichtanzahl und Multimengenhash. Worker schreiben
+keine gemeinsame Datei. Adapter, neutrales Modell und atomare Speicherung sind
+separate Entwicklungsmodule unter `tools/`, keine öffentlichen Produkt-APIs.
+
+Deklarierte Skips bleiben als Skips sichtbar. Eine Vollabnahme darf keinen
+unerwarteten Ergebnis- oder Skip-Wechsel gegenüber der seriellen Referenz
+übersehen; ein Skip ist nie der Nachweis, dass der betreffende Test ausgeführt
+wurde. Fehlende Collection-, Phasen- oder Worker-Nachweise können nicht durch
+einen grünen pytest-Prozesscode kompensiert werden. Kein automatischer Retry.
+
+`tools/verify_test_modes.py` prüft in einem neuen externen Ordner sieben Läufe:
+0/2/4/auto mit Seed 0 und 2/4/auto mit Seeds 1/42/314159. Berichte eines Laufs
+sind an unveränderte Quellbytes, Interpreter und Frameworkversionen gebunden.
+Source-Wechsel erfordert eine neue Referenz. Jede gleichzeitige Controller-
+Instanz braucht einen eigenen Berichtpfad. Teilselektoren sind ausdrücklich
+möglich, werden aber nicht als vollständige Suite abgenommen.
+
+Benannte Suites werden in `tools/test_policy.py` zentral für lokal, CI und
+Docker definiert. Die bestehenden Plattform-Lanes verwenden sie parallel;
+Ubuntu 24.04/Python 3.12 liefert zusätzlich eine blockierende vollständige
+serielle CI-Referenz. Ergebnisartefakte dienen Diagnose, nicht dem Ersatz eines
+roten Jobstatus. Bestehende äußere Job-, Build- und Preflight-Grenzen bleiben;
+zusätzliche Test-/Suitefristen werden nicht eingeführt.
+
+Die Implementierung ist erst durch tatsächliche erfolgreiche Gates und Commits
+bestätigt, nicht durch eine vorab geschriebene Fortschrittszahl oder diesen Text.
+Externe CI-Freigabe und ein späterer Push sind separate, ausdrücklich beauftragte
+Vorgänge. Es gibt keine automatische Veröffentlichung oder Versionsanhebung.
