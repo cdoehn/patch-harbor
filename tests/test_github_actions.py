@@ -124,7 +124,7 @@ def test_pytest_groups_are_registered_and_assigned_to_public_suites() -> None:
 
 def test_local_test_runner_reports_slowest_tests_with_configurable_count(monkeypatch) -> None:
     import subprocess
-    from tools import run_tests as runner
+    from tools import test_runner as runner
 
     captured = []
     monkeypatch.setenv("PATCHHARBOR_TEST_DURATIONS", "7")

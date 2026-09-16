@@ -8,7 +8,7 @@ import sys
 
 import pytest
 
-from tools import run_tests as runner
+from tools import test_runner as runner
 from tests.platform_support import PROJECT_ROOT
 
 
