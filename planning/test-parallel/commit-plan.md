@@ -6,7 +6,7 @@ Basis: `0c439b1c6400bdb12921ebaa5216620c9a122cd0`.
 Dieser eigenständige Aufgabenplan verändert den abgeschlossenen
 `planning/1.2.0/commit-plan.md` (4/4) nicht.
 
-**Fortschritt nach erfolgreichem Commit dieses Zwischenstands: 12 / 15.**
+**Fortschritt nach erfolgreichem Commit dieses Zwischenstands: 13 / 15.**
 Bei einem Abbruch sind nur die tatsächlich entstandenen Git-Commits erledigt.
 Nicht committierte Fortschrittsangaben sind kein Erfolgsnachweis.
 
@@ -75,7 +75,7 @@ Ein abschließender Push/CI-Nachweis bleibt ein expliziter nachfolgender Vorgang
    Policy konsolidieren: xdist verteilt; PatchHarbor entwickelt keinen Scheduler.
 
 13. **TEST-PARALLEL.e.W** – `ci(tests): use pytest-xdist in existing acceptance lanes`
-   Status: offen.
+   Status: implementiert, Commit nur nach Gate.
    Bestehende Betriebssystem-/Python-/PowerShell-Gates beibehalten; CI und Docker auf zentralen Teststart umstellen.
 
 14. **TEST-PARALLEL.e.R** – `ci(tests): retain a blocking serial reference lane`

@@ -73,4 +73,4 @@ RUN rm -rf /tmp/patchharbor-dist \
     && python -m pip install --no-cache-dir --force-reinstall /tmp/patchharbor-dist/*.whl \
     && python -m pip check
 
-CMD ["python", "-m", "pytest", "-q", "--timeout=120", "tests"]
+CMD ["python", "tools/run_tests.py"]

@@ -164,3 +164,23 @@ def test_report_and_reference_are_explicit_child_arguments(tmp_path):
     assert command[command.index("--ph-report") + 1] == str(tmp_path / "actual.json")
     assert command[command.index("--ph-reference") + 1] == str(tmp_path / "reference.json")
     assert command[command.index("-n") + 1] == "0"
+
+
+@pytest.mark.parametrize("scope,targets", [
+    ("core", ["-m", "not e2e and not acceptance and not platform and not packaging", "tests"]),
+    ("e2e", ["-m", "e2e or acceptance", "tests"]),
+    ("platform", ["-m", "platform", "tests"]),
+    ("packaging", ["-m", "packaging", "tests"]),
+    ("windows", ["tests/test_windows_acceptance_e2e.py"]),
+])
+def test_ci_and_docker_scopes_use_the_same_launcher(scope, targets):
+    command, _ = runner.prepare_invocation(["--suite", scope], environment={})
+    assert command[-len(targets):] == targets
+    assert command[command.index("-n") + 1] == "auto"
+    assert "--ph-check" in command
+
+
+def test_named_scope_cannot_silently_be_replaced_by_passthrough():
+    with pytest.raises(SystemExit) as error:
+        runner.prepare_invocation(["--suite", "core", "--", "tests/test_one.py"], environment={})
+    assert error.value.code == 2

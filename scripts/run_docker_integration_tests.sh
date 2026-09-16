@@ -38,8 +38,6 @@ dockerfile="$repository_root/docker/Dockerfile.integration"
 image_tag="patchharbor-integration:ubuntu-${ubuntu_version//./-}"
 build_timeout_seconds="${PATCHHARBOR_DOCKER_BUILD_TIMEOUT_SECONDS:-2400}"
 preflight_timeout_seconds="${PATCHHARBOR_DOCKER_PREFLIGHT_TIMEOUT_SECONDS:-180}"
-suite_timeout_seconds="${PATCHHARBOR_DOCKER_SUITE_TIMEOUT_SECONDS:-2400}"
-test_timeout_seconds="${PATCHHARBOR_TEST_TIMEOUT_SECONDS:-120}"
 test_durations="${PATCHHARBOR_TEST_DURATIONS:-20}"
 default_log_root="${RUNNER_TEMP:-${TMPDIR:-/tmp}}/patchharbor-docker-integration"
 log_directory="${PATCHHARBOR_DOCKER_LOG_DIR:-$default_log_root/ubuntu-${ubuntu_version//./-}}"
@@ -94,8 +92,13 @@ run_logged() {
 
     local -a pipeline_status
     set +e
-    timeout --foreground "${timeout_seconds}s" "$@" 2>&1 | tee "$current_log"
-    pipeline_status=("${PIPESTATUS[@]}")
+    if [[ -n "$timeout_seconds" ]]; then
+        timeout --foreground "${timeout_seconds}s" "$@" 2>&1 | tee "$current_log"
+        pipeline_status=("${PIPESTATUS[@]}")
+    else
+        "$@" 2>&1 | tee "$current_log"
+        pipeline_status=("${PIPESTATUS[@]}")
+    fi
     set -e
     if (( pipeline_status[0] != 0 )); then
         return "${pipeline_status[0]}"
@@ -116,13 +119,9 @@ run_container() {
 run_pytest_gate() {
     local label="$1"
     local log_name="$2"
-    local marker_expression="$3"
-    run_container "$label" "$suite_timeout_seconds" "$log_name" \
-        python -m pytest -q \
-        --timeout="$test_timeout_seconds" \
-        --durations="$test_durations" \
-        -m "$marker_expression" \
-        tests
+    local suite="$3"
+    run_container "$label" "" "$log_name" \
+        python tools/run_tests.py --suite "$suite" --durations="$test_durations"
 }
 
 run_logged "image build" "$build_timeout_seconds" "00-build.log" \
@@ -139,10 +138,10 @@ run_container "environment preflight" "$preflight_timeout_seconds" \
 run_pytest_gate \
     "core and architecture tests" \
     "20-core-and-architecture.log" \
-    "not e2e and not acceptance and not platform and not packaging"
+    "core"
 run_pytest_gate \
     "E2E and acceptance tests" \
     "30-e2e-and-acceptance.log" \
-    "e2e or acceptance"
+    "e2e"
 run_pytest_gate "platform tests" "40-platform.log" "platform"
 run_pytest_gate "packaging tests" "50-packaging.log" "packaging"

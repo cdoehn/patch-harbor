@@ -135,18 +135,11 @@ def test_docker_runner_builds_once_and_runs_every_offline_gate_with_diagnostics(
     ]
 
     pytest_calls = run_calls[1:]
-    marker_expressions = [
-        call[max(index for index, value in enumerate(call) if value == "-m") + 1]
-        for call in pytest_calls
-    ]
-    assert marker_expressions == [
-        "not e2e and not acceptance and not platform and not packaging",
-        "e2e or acceptance",
-        "platform",
-        "packaging",
-    ]
-    assert all("--timeout=120" in call for call in pytest_calls)
+    scopes = [call[call.index("--suite") + 1] for call in pytest_calls]
+    assert scopes == ["core", "e2e", "platform", "packaging"]
+    assert all("tools/run_tests.py" in call for call in pytest_calls)
     assert all("--durations=20" in call for call in pytest_calls)
+    assert not any(value.startswith("--timeout") for call in pytest_calls for value in call)
 
     expected_logs = {
         "00-build.log",
@@ -291,9 +284,9 @@ def test_docker_integration_image_provides_a_deterministic_release_gate() -> Non
     assert "docker run --rm --init --network none --workdir /workspace" in runner
     assert "PATCHHARBOR_DOCKER_BUILD_TIMEOUT_SECONDS" in runner
     assert "PATCHHARBOR_DOCKER_PREFLIGHT_TIMEOUT_SECONDS" in runner
-    assert "PATCHHARBOR_DOCKER_SUITE_TIMEOUT_SECONDS" in runner
+    assert "PATCHHARBOR_DOCKER_SUITE_TIMEOUT_SECONDS" not in runner
     assert "PATCHHARBOR_DOCKER_LOG_DIR" in runner
-    assert "--timeout=\"$test_timeout_seconds\"" in runner
+    assert "test_timeout_seconds" not in runner
     assert "--durations=\"$test_durations\"" in runner
     assert "sleep " not in runner
     assert "retry" not in runner.lower()

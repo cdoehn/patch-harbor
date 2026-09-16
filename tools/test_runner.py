@@ -10,9 +10,9 @@ import subprocess
 import sys
 
 if __package__:
-    from .test_policy import PROJECT_ROOT, DEFAULT_WORKERS, EVIDENCE_PLUGIN, process_exit_code
+    from .test_policy import PROJECT_ROOT, DEFAULT_WORKERS, EVIDENCE_PLUGIN, SUITES, process_exit_code
 else:
-    from test_policy import PROJECT_ROOT, DEFAULT_WORKERS, EVIDENCE_PLUGIN, process_exit_code
+    from test_policy import PROJECT_ROOT, DEFAULT_WORKERS, EVIDENCE_PLUGIN, SUITES, process_exit_code
 
 
 def _nonnegative(value: str) -> int:
@@ -39,6 +39,7 @@ def _workers(value: str) -> str:
 
 def _parser(environment: Mapping[str, str]) -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(allow_abbrev=False)
+    parser.add_argument("--suite", choices=tuple(SUITES), default="all", help="Named local/CI acceptance scope.")
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--serial", action="store_true", help="Run the serial reference suite.")
     mode.add_argument("--workers", type=_workers,
@@ -75,7 +76,10 @@ def prepare_invocation(
     """Return a shell-free command and child-only environment; mutate neither."""
     parser = _parser(environment)
     args = parser.parse_args(argv)
-    forwarded = _pytest_arguments(parser, args.pytest_args)
+    if args.suite != "all" and args.pytest_args:
+        parser.error("a named suite cannot be combined with passthrough selection")
+    forwarded = (_pytest_arguments(parser, args.pytest_args) if args.pytest_args
+                 else list(SUITES[args.suite]))
     if args.reference and not args.report:
         parser.error("--reference requires --report")
     evidence = ["-p", EVIDENCE_PLUGIN, "--ph-check"]

@@ -61,15 +61,12 @@ def test_acceptance_workflow_uses_current_python_actions_and_grouped_suites() ->
     assert "uses: actions/setup-python@v7" in text
     assert 'python-version: "3.12"' in text
     assert 'python -m pip install --disable-pip-version-check -e ".[dev]"' in text
-    assert "Run core and architecture tests" in text
-    assert '-m "not e2e and not acceptance and not platform and not packaging"' in text
-    assert "Run E2E and acceptance tests" in text
-    assert '-m "e2e or acceptance"' in text
-    assert "Run platform tests" in text
-    assert '-m "platform"' in text
-    assert "Run packaging tests" in text
-    assert '-m "packaging"' in text
-    assert text.count("--durations=10") == 5
+    from tools.test_policy import SUITES
+    for scope in ("core", "e2e", "platform", "packaging", "windows"):
+        assert f"python tools/run_tests.py --suite {scope} --durations=10" in text
+        assert SUITES[scope]
+    assert "--timeout=" not in text
+
 
 
 def test_acceptance_workflow_requires_both_windows_powershell_variants() -> None:
@@ -85,7 +82,7 @@ def test_acceptance_workflow_requires_both_windows_powershell_variants() -> None
     assert "name: Release gate - Windows 2025 - PowerShell 7" in text
     assert "runs-on: windows-2025" in text
     assert "PATCHHARBOR_WINDOWS_ACCEPTANCE_ENGINE: pwsh" in text
-    assert "tests/test_windows_acceptance_e2e.py" in text
+    assert "--suite windows" in text
     assert "continue-on-error" not in text
 
 
