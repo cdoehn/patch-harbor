@@ -6,7 +6,7 @@ Basis: `0c439b1c6400bdb12921ebaa5216620c9a122cd0`.
 Dieser eigenständige Aufgabenplan verändert den abgeschlossenen
 `planning/1.2.0/commit-plan.md` (4/4) nicht.
 
-**Fortschritt nach erfolgreichem Commit dieses Zwischenstands: 1 / 15.**
+**Fortschritt nach erfolgreichem Commit dieses Zwischenstands: 2 / 15.**
 Bei einem Abbruch sind nur die tatsächlich entstandenen Git-Commits erledigt.
 Nicht committierte Fortschrittsangaben sind kein Erfolgsnachweis.
 
@@ -31,7 +31,7 @@ Ein abschließender Push/CI-Nachweis bleibt ein expliziter nachfolgender Vorgang
    Pytest ist bereits vorhanden. Ein zentraler Launcher und der vorhandene Bash-Einstieg verwenden den seriellen Referenzweg ohne künstliche Test-/Suitefrist. Vollständiger serieller Gate-Lauf.
 
 2. **TEST-PARALLEL.a.R** – `test(runner): harden invocation and failure propagation`
-   Status: offen.
+   Status: implementiert, Commit nur nach Gate.
    Umgebung, Argumente, fremdes CWD, echte Exitcodes und Setup-/Teardown-Fehler absichern. Kein stiller grüner Ersatzlauf.
 
 3. **TEST-PARALLEL.a.C** – `refactor(tests): separate launcher policy from process execution`
