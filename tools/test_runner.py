@@ -54,7 +54,8 @@ def _pytest_arguments(parser: argparse.ArgumentParser, arguments: list[str]) -> 
         arguments = arguments[1:]
     # Execution-mode options must not silently defeat --serial. This is a
     # developer interface, not a security sandbox for arbitrary pytest plugins.
-    forbidden = ("--numprocesses", "--dist", "--tx", "--looponfail")
+    forbidden = ("--numprocesses", "--dist", "--tx", "--looponfail", "--max-worker-restart",
+                 "--ph-report", "--ph-reference", "--ph-check")
     for argument in arguments:
         if (argument in ("-d", "-f") or argument.startswith("-n")
                 or any(argument == name or argument.startswith(name + "=") for name in forbidden)):
