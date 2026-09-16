@@ -6,7 +6,7 @@ Basis: `0c439b1c6400bdb12921ebaa5216620c9a122cd0`.
 Dieser eigenständige Aufgabenplan verändert den abgeschlossenen
 `planning/1.2.0/commit-plan.md` (4/4) nicht.
 
-**Fortschritt nach erfolgreichem Commit dieses Zwischenstands: 4 / 15.**
+**Fortschritt nach erfolgreichem Commit dieses Zwischenstands: 5 / 15.**
 Bei einem Abbruch sind nur die tatsächlich entstandenen Git-Commits erledigt.
 Nicht committierte Fortschrittsangaben sind kein Erfolgsnachweis.
 
@@ -43,7 +43,7 @@ Ein abschließender Push/CI-Nachweis bleibt ein expliziter nachfolgender Vorgang
    pytest-xdist ausschließlich als dev-Abhängigkeit; --workers 2/4/auto und --serial (-n 0), Standard vorläufig seriell. Vollständiger Zwei-Worker-Lauf.
 
 5. **TEST-PARALLEL.b.R** – `test(parallel): isolate filesystem and worker process state`
-   Status: offen.
+   Status: implementiert, Commit nur nach Gate.
    Lokale Benutzer-/Git-/Tempdaten und Prozesszustand isolieren; Importzustand kontrollieren; Paketquellenkopien vor flüchtigen Dateien schützen. Vollständiger Vier-Worker-Lauf.
 
 6. **TEST-PARALLEL.b.C** – `refactor(tests): consolidate isolation and subprocess helpers`

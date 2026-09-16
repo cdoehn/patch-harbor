@@ -161,6 +161,10 @@ def _copy_project_for_release(tmp_path: Path) -> Path:
         source_tree,
         ignore=shutil.ignore_patterns(
             ".git",
+            ".patchharbor",
+            ".pytest_cache",
+            ".mypy_cache",
+            ".ruff_cache",
             ".venv",
             "build",
             "dist",

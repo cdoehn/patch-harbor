@@ -33,7 +33,7 @@ def test_non_linux_action_rejects_systemd_without_loading_linux_module(
     for name, value in environment.items():
         monkeypatch.setenv(name, value)
 
-    sys.modules.pop("patchharbor_watcher.systemd_linux", None)
+    monkeypatch.delitem(sys.modules, "patchharbor_watcher.systemd_linux", raising=False)
     monkeypatch.setattr(watcher_cli.sys, "platform", "win32")
 
     assert watcher_cli.main(
