@@ -43,6 +43,7 @@ dev = [
 
 [tool.pytest.ini_options]
 addopts = "--strict-markers"
+testpaths = ["tests"]
 markers = [
   "acceptance: public cross-platform acceptance workflow",
   "e2e: end-to-end CLI behavior",

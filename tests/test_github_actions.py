@@ -122,11 +122,18 @@ def test_pytest_groups_are_registered_and_assigned_to_public_suites() -> None:
         assert f"pytestmark = pytest.mark.{marker}" in text
 
 
-def test_local_test_runner_reports_slowest_tests_with_configurable_count() -> None:
-    text = TEST_SCRIPT_PATH.read_text(encoding="utf-8")
+def test_local_test_runner_reports_slowest_tests_with_configurable_count(monkeypatch) -> None:
+    import subprocess
+    from tools import run_tests as runner
 
-    assert 'test_durations="${PATCHHARBOR_TEST_DURATIONS:-10}"' in text
-    assert '--durations="$test_durations"' in text
+    captured = []
+    monkeypatch.setenv("PATCHHARBOR_TEST_DURATIONS", "7")
+    def run(command, **kwargs):
+        captured.append(command)
+        return subprocess.CompletedProcess(command, 0)
+    monkeypatch.setattr(runner.subprocess, "run", run)
+    assert runner.main([]) == 0
+    assert "--durations=7" in captured[0]
 
 
 def test_native_acceptance_matrix_allows_120_minutes() -> None:
