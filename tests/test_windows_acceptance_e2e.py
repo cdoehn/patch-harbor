@@ -195,10 +195,28 @@ def test_windows_user_paths_json_and_repository_lock_are_native(
     repository = create_repository(tmp_path / "repository-ä")
     context = _register_context(repository, environment)
 
-    configuration = Path(environment["APPDATA"]) / "PatchHarbor"
+    user_configuration = Path(environment["APPDATA"]) / "PatchHarbor"
     state = Path(environment["LOCALAPPDATA"]) / "PatchHarbor"
-    assert (configuration / "registry.json").is_file()
-    assert (configuration / "config.json").is_file()
+    registry = json.loads((user_configuration / "registry.json").read_text(
+        encoding="utf-8"
+    ))
+    assert normalized_path(registry["repositories"][context["repo_id"]]) == (
+        normalized_path(repository)
+    )
+    # Only the registry is user-global. Settings belong to this repository,
+    # including under native Windows; do not recreate the obsolete global file.
+    local_configuration = repository / ".patchharbor" / "config.json"
+    stored_configuration = json.loads(local_configuration.read_text(encoding="utf-8"))
+    assert set(stored_configuration) == {
+        "format_version", "exchange_directory", "bundle_suffix", "archive_directory",
+    }
+    assert stored_configuration["format_version"] == 1
+    assert normalized_path(stored_configuration["exchange_directory"]) == (
+        normalized_path(Path(environment["APPDATA"]).parent / "exchange")
+    )
+    assert stored_configuration["bundle_suffix"] == ""
+    assert stored_configuration["archive_directory"] == "PatchHarbor-Archive"
+    assert not (user_configuration / "config.json").exists()
     assert (state / "locks").is_dir()
     assert normalized_path(context["repository_path"]) == normalized_path(
         repository
@@ -239,6 +257,8 @@ def test_windows_user_paths_json_and_repository_lock_are_native(
     bundle_path = Path(bundle_document["result"]["result_bundle_path"])
     assert bundle_path.parent.resolve() == (tmp_path / "benutzer-ä" / "exchange").resolve()
     assert bundle_path.is_file()
+    assert json.loads(local_configuration.read_text(encoding="utf-8")) == stored_configuration
+    assert not (user_configuration / "config.json").exists()
 
 
 def test_windows_junction_is_rejected_at_repository_boundary(

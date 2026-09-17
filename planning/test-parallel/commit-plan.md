@@ -85,3 +85,31 @@ Ein abschließender Push/CI-Nachweis bleibt ein expliziter nachfolgender Vorgang
 15. **TEST-PARALLEL.e.C** – `docs(tests): finalize parallel test workflow and CI contracts`
    Status: implementiert, Commit nur nach Gate.
    README, Spezifikation, Chat-Anweisungen, CI und Testdokumentation konsistent abschließen. Keine Dokumentations- oder Darstellungstests.
+
+
+## CI-Korrektur nach der lokalen Abnahme
+
+**TEST-PARALLEL.e.W-FIX1** –
+`Fix: align Windows acceptance with repository-local settings`
+
+Der CI-Lauf auf `9f63c06ce608c206cdc7841d06b69cc6f7600146`
+(`logs_95194121835.zip`) scheiterte in beiden Windows-Lanes an derselben
+veralteten Erwartung: `test_windows_user_paths_json_and_repository_lock_are_native`
+verlangte noch `%APPDATA%/PatchHarbor/config.json`. Seit der lokalen
+Konfigurationsumstellung liegt diese Datei unter `.patchharbor/config.json`
+im Repository; die Registry bleibt global. Kein nachgewiesener xdist-Race
+und kein Timeout. Die fünf Linux-/Docker-/Referenz-Lanes liefen erfolgreich.
+
+Der Fix prüft den vollständigen lokalen Settings-Vertrag, die globale
+Registry und das Ausbleiben einer neu erzeugten globalen Konfiguration.
+Die nativen Windows-Lock-, JSON-, Bundle- und Prozessprüfungen bleiben erhalten.
+Ein zusätzlicher plattformübergreifender CLI-Regressionstest prüft Unicode-Pfade,
+alle drei Einstellungen und Bundle-Ausgabe, jeweils ohne globale Config sowie
+mit einer bewusst ungültigen, unverändert zu erhaltenden Altdatei.
+
+Gate: gezielte Konfigurations-/Plattformprüfungen und vollständige Läufe seriell
+und mit automatischer Workerzahl einschließlich Ergebnisvergleich und Packaging.
+Ein lokaler Linux-Lauf ersetzt nicht die erneute native Windows-CI nach dem Push.
+Keine Änderung an Scheduler, Produktcode, Workflow, Testfiltern oder Timeouts.
+Der Planstand bleibt **15 / 15**; der Fix erzeugt genau einen zusätzlichen Commit
+und gilt erst nach erfolgreichem Apply als lokal bestätigt.
