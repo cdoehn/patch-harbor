@@ -54,6 +54,7 @@ EXPECTED_CORE_RUNTIME_FILES = {
     "patch_manifest.py",
     "patch_package.py",
     "payload_files.py",
+    "payload_modes.py",
     "presentation.py",
     "progress.py",
     "registration.py",

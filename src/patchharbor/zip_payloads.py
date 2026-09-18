@@ -15,6 +15,7 @@ from patchharbor.bundle_paths import (
     validate_bundle_member_paths,
 )
 from patchharbor.models import BundlePayload
+from patchharbor.payload_modes import validate_payload_mode
 from patchharbor.platform.errors import describe_os_error
 from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY, ResourcePolicy
 
@@ -44,6 +45,7 @@ class _ValidatedZipMember:
     entry: zipfile.ZipInfo
     relative_path: str
     is_directory: bool
+    unix_mode: int | None
 
 
 @dataclass(slots=True)
@@ -167,6 +169,17 @@ def _member_is_directory(entry: zipfile.ZipInfo) -> bool:
     return False
 
 
+def _member_unix_mode(entry: zipfile.ZipInfo, is_directory: bool) -> int | None:
+    # Non-Unix external attributes have host-specific meanings. Never infer
+    # executable permissions from a filename or the DOS archive flag.
+    if is_directory or entry.create_system != 3 or entry.external_attr >> 16 == 0:
+        return None
+    try:
+        return validate_payload_mode(stat.S_IMODE(entry.external_attr >> 16))
+    except ValueError as exc:
+        raise InvalidZipArchiveError(f"entry {entry.orig_filename!r}: {exc}") from exc
+
+
 def _validate_members(
     entries: list[zipfile.ZipInfo],
 ) -> tuple[_ValidatedZipMember, ...]:
@@ -188,6 +201,7 @@ def _validate_members(
             entry=entry,
             relative_path=relative_path,
             is_directory=is_directory,
+            unix_mode=_member_unix_mode(entry, is_directory),
         )
         for (entry, is_directory), relative_path in zip(
             member_kinds,
@@ -213,6 +227,7 @@ def _read_open_archive(
                 BundlePayload(
                     relative_path=member.relative_path,
                     content=budget.read_member(archive, member),
+                    unix_mode=member.unix_mode,
                 )
                 for member in members
                 if not member.is_directory

@@ -30,6 +30,7 @@ class BundlePayload:
 
     relative_path: str
     content: bytes
+    unix_mode: int | None = None
 
 
 @dataclass(frozen=True)

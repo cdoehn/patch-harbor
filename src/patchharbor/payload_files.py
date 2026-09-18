@@ -13,12 +13,16 @@ from patchharbor.bundle_paths import (
 )
 from patchharbor.errors import FailureReason, PatchHarborError
 from patchharbor.models import BundlePayload
+from patchharbor.payload_modes import (
+    DEFAULT_PAYLOAD_MODE, validate_existing_payload_mode, validate_payload_mode,
+)
 from patchharbor.platform.filesystem import (
     FileSystemOperationError,
     PathKind,
     atomic_replace_bytes,
     create_directory,
     path_kind,
+    regular_file_mode,
 )
 
 
@@ -55,10 +59,10 @@ def _kind_or_error(target: Path, *, label: str) -> PathKind:
         raise _target_error(label, exc.operation) from exc
 
 
-def _replace_bytes(target: Path, content: bytes, *, label: str) -> None:
+def _replace_bytes(target: Path, content: bytes, *, label: str, mode: int) -> None:
     try:
         activity("WRITE", f"Atomically write: {target} ({len(content)} bytes)")
-        atomic_replace_bytes(target, content)
+        atomic_replace_bytes(target, content, mode=mode)
         activity("WRITE", f"Written: {target}", "success")
     except FileSystemOperationError as exc:
         raise _write_error(label, exc.operation) from exc
@@ -98,6 +102,16 @@ def _resolve_payload_target(
     return final_target
 
 
+def _payload_mode(payload: BundlePayload, target: Path) -> int:
+    try:
+        bundled = (DEFAULT_PAYLOAD_MODE if payload.unix_mode is None
+                   else validate_payload_mode(payload.unix_mode))
+        existing = regular_file_mode(target)
+        return bundled if existing is None else validate_existing_payload_mode(existing)
+    except (ValueError, FileSystemOperationError) as exc:
+        raise _bundle_file_error(payload.relative_path, str(exc)) from exc
+
+
 def validate_bundle_payload_targets(
     payloads: Iterable[BundlePayload],
     *,
@@ -116,11 +130,12 @@ def validate_bundle_payload_targets(
         raise _bundle_file_error("<bundle>", exc) from exc
 
     for payload in payload_items:
-        _resolve_payload_target(
+        target = _resolve_payload_target(
             cwd,
             payload.relative_path,
             create_parents=False,
         )
+        _payload_mode(payload, target)
     return payload_items
 
 
@@ -148,5 +163,6 @@ def write_bundle_payloads(
             target,
             payload.content,
             label=f"bundle file {payload.relative_path!r}",
+            mode=_payload_mode(payload, target),
         )
     activity("PAYLOAD", f"Wrote {len(payload_items)} payload file(s)", "success")

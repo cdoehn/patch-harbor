@@ -70,6 +70,7 @@ EXPECTED_RUNTIME_FILES = {
     "patchharbor/patch_manifest.py",
     "patchharbor/patch_package.py",
     "patchharbor/payload_files.py",
+    "patchharbor/payload_modes.py",
     "patchharbor/presentation.py",
     "patchharbor/progress.py",
     "patchharbor/registration.py",
@@ -109,6 +110,24 @@ EXPECTED_RUNTIME_FILES = {
     "patchharbor/platform/runtime.py",
     "patchharbor/platform/windows.py",
 }
+
+
+def test_runtime_file_allowlist_matches_source_tree() -> None:
+    """Catch an incomplete release contract before the expensive build/install test.
+
+    Keep an explicit allowlist: deriving the expected wheel entries from whatever
+    a build happens to contain would silently accept accidentally shipped files.
+    The source-tree check is an additional guard, not a replacement for the exact
+    wheel inventory assertion below.
+    """
+    source_root = PROJECT_ROOT / "src"
+    runtime_files = {
+        path.relative_to(source_root).as_posix()
+        for package in ("patchharbor", "patchharbor_watcher")
+        for path in (source_root / package).rglob("*")
+        if path.is_file() and (path.suffix == ".py" or path.name == "py.typed")
+    }
+    assert runtime_files == EXPECTED_RUNTIME_FILES
 
 
 def _distribution_metadata_contract(
@@ -395,6 +414,7 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
             f"{root}/src/patchharbor/cli.py",
             f"{root}/src/patchharbor/api.py",
             f"{root}/src/patchharbor/api_types.py",
+            f"{root}/src/patchharbor/payload_modes.py",
             f"{root}/src/patchharbor/py.typed",
             f"{root}/docs/python-api.md",
             f"{root}/src/patchharbor_watcher/__init__.py",

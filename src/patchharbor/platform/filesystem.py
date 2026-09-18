@@ -105,8 +105,29 @@ def create_directory(path: Path) -> None:
         ) from exc
 
 
-def atomic_replace_bytes(target: Path, content: bytes) -> None:
-    """Write bytes beside the target and atomically replace the target."""
+def regular_file_mode(path: Path) -> int | None:
+    """Inspect a regular target without following links; None means absent/Windows."""
+    try:
+        metadata = path.lstat()
+    except FileNotFoundError:
+        return None
+    except OSError as exc:
+        raise FileSystemOperationError("cannot inspect target mode", exc) from exc
+    if not stat.S_ISREG(metadata.st_mode):
+        raise FileSystemOperationError(
+            "target is not a regular file", OSError(errno.EINVAL, "unsupported target")
+        )
+    return None if is_windows() else stat.S_IMODE(metadata.st_mode)
+
+
+def atomic_replace_bytes(
+    target: Path, content: bytes, *, mode: int | None = None,
+) -> None:
+    """Publish bytes atomically; optionally set POSIX mode before replacement.
+
+    No mode means the unchanged private temporary-file policy. Windows does
+    not emulate Unix permission bits or change ACLs based on ZIP metadata.
+    """
     staged_path: Path | None = None
     try:
         try:
@@ -119,6 +140,10 @@ def atomic_replace_bytes(target: Path, content: bytes) -> None:
             ) as handle:
                 staged_path = Path(handle.name)
                 handle.write(content)
+                handle.flush()
+                if mode is not None and not is_windows():
+                    os.fchmod(handle.fileno(), mode)
+                os.fsync(handle.fileno())
         except OSError as exc:
             raise FileSystemOperationError(
                 "cannot stage replacement",

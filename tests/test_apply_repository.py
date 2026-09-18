@@ -842,13 +842,13 @@ def test_payload_write_failure_keeps_partial_files_without_starting_entrypoint(
     )
     original_replace = payload_files_module.atomic_replace_bytes
 
-    def fail_second_write(target: Path, content: bytes) -> None:
+    def fail_second_write(target: Path, content: bytes, **options: object) -> None:
         if target.name == "second.bin":
             raise FileSystemOperationError(
                 "cannot replace target",
                 OSError(errno.EACCES, "simulated write failure"),
             )
-        original_replace(target, content)
+        original_replace(target, content, **options)
 
     monkeypatch.setattr(
         payload_files_module,
