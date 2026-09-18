@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable
+from dataclasses import dataclass
+from functools import partial
 from pathlib import Path
 
 from patchharbor.progress import activity
@@ -13,9 +15,7 @@ from patchharbor.bundle_paths import (
 )
 from patchharbor.errors import FailureReason, PatchHarborError
 from patchharbor.models import BundlePayload
-from patchharbor.payload_modes import (
-    DEFAULT_PAYLOAD_MODE, validate_existing_payload_mode, validate_payload_mode,
-)
+from patchharbor.payload_modes import select_payload_mode
 from patchharbor.platform.filesystem import (
     FileSystemOperationError,
     PathKind,
@@ -106,16 +106,22 @@ def _resolve_payload_target(
     return final_target
 
 
-def _payload_state_and_mode(
-    payload: BundlePayload, target: Path,
-) -> tuple[RegularFileState | None, int]:
+@dataclass(frozen=True, slots=True)
+class _PayloadTarget:
+    path: Path
+    state: RegularFileState | None
+    mode: int
+
+
+def _inspect_payload_target(
+    cwd: Path, payload: BundlePayload, *, create_parents: bool,
+) -> _PayloadTarget:
+    path = _resolve_payload_target(cwd, payload.relative_path, create_parents=create_parents)
     try:
-        bundled = (DEFAULT_PAYLOAD_MODE if payload.unix_mode is None
-                   else validate_payload_mode(payload.unix_mode))
-        state = regular_file_state(target)
-        mode = (bundled if state is None or state.mode is None
-                else validate_existing_payload_mode(state.mode))
-        return state, mode
+        select_payload_mode(payload.unix_mode, None)
+        state = regular_file_state(path)
+        mode = select_payload_mode(payload.unix_mode, None if state is None else state.mode)
+        return _PayloadTarget(path, state, mode)
     except (ValueError, FileSystemOperationError) as exc:
         raise _bundle_file_error(payload.relative_path, str(exc)) from exc
 
@@ -126,9 +132,8 @@ def _require_unchanged_target(
     # Re-resolve parents as well; a symlink/junction introduced during staging
     # must not redirect publication. This is a final observation, not an OS
     # compare-and-swap guarantee against hostile concurrent filesystem access.
-    target = _resolve_payload_target(cwd, payload.relative_path, create_parents=False)
-    state, _mode = _payload_state_and_mode(payload, target)
-    if state != expected:
+    target = _inspect_payload_target(cwd, payload, create_parents=False)
+    if target.state != expected:
         raise _bundle_file_error(payload.relative_path, "target changed during staging")
 
 
@@ -150,12 +155,7 @@ def validate_bundle_payload_targets(
         raise _bundle_file_error("<bundle>", exc) from exc
 
     for payload in payload_items:
-        target = _resolve_payload_target(
-            cwd,
-            payload.relative_path,
-            create_parents=False,
-        )
-        _payload_state_and_mode(payload, target)
+        _inspect_payload_target(cwd, payload, create_parents=False)
     return payload_items
 
 
@@ -174,17 +174,12 @@ def write_bundle_payloads(
 
     activity("PAYLOAD", f"Write {len(payload_items)} payload file(s)", "heading")
     for payload in payload_items:
-        target = _resolve_payload_target(
-            cwd,
-            payload.relative_path,
-            create_parents=True,
-        )
-        expected, mode = _payload_state_and_mode(payload, target)
+        target = _inspect_payload_target(cwd, payload, create_parents=True)
         _replace_bytes(
-            target,
+            target.path,
             payload.content,
             label=f"bundle file {payload.relative_path!r}",
-            mode=mode,
-            before_replace=lambda: _require_unchanged_target(cwd, payload, expected),
+            mode=target.mode,
+            before_replace=partial(_require_unchanged_target, cwd, payload, target.state),
         )
     activity("PAYLOAD", f"Wrote {len(payload_items)} payload file(s)", "success")

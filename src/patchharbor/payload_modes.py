@@ -25,3 +25,13 @@ def validate_payload_mode(mode: int) -> int:
     if mode & FORBIDDEN_PAYLOAD_BITS:
         raise ValueError(f"unsafe payload permissions: {mode:04o}")
     return mode
+
+
+def select_payload_mode(requested: int | None, existing: int | None) -> int:
+    """Validate the strict request, then preserve an existing ordinary rwx mode.
+
+    An unsafe request stays invalid even if an existing target would override it.
+    Existing group/other-write bits are local policy, not a new ZIP grant.
+    """
+    bundled = DEFAULT_PAYLOAD_MODE if requested is None else validate_payload_mode(requested)
+    return bundled if existing is None else validate_existing_payload_mode(existing)

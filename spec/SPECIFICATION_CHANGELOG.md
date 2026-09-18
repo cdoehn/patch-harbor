@@ -1,5 +1,15 @@
 # PatchHarbor – Spezifikations-Changelog
 
+## 2026-09-18 – POSIX-MODE: Bestandsrechte erhalten, Paketmodi strikt prüfen
+
+- Bestehende normale rwx-Rechte erhalten, einschließlich 0664/0666/0777; Sonderbits ablehnen.
+- ZIP/API-Modi zusätzlich ohne Gruppen-/Andere-Schreibrechte; Modus vor Ersetzung setzen.
+- Korrektur des vor Commit abgebrochenen 0664-Bootstraps; keine automatische Rechteänderung.
+- Private Core-Zustandsdateien und native Windows-Rechtepolitik getrennt halten.
+- Fehler-/Dry-Run-/Apply-Regressionen und verbindliche Core-vor-Entrypoint-Regel.
+- Drei echte W/R/C-Commits; keine Versionsanhebung oder Migration.
+- Lokale Vollsuite künftig parallel, serielle Referenz in CI; Ausnahme für dieses Bundle.
+
 ## 2026-09-16 – TEST-PARALLEL: pytest-xdist als Entwicklungsstandard
 
 - Gemeinsamer pytest-Launcher für lokal, CI und Docker, standardmäßig xdist auto;

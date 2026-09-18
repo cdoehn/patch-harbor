@@ -733,3 +733,25 @@ Prozess derselben Installation; dessen privater Worker ruft `api.apply_next()`
 direkt auf, nicht mehr den CLI-Parser. Betriebs-JSON, globaler Scope, Replay und
 Failed-Retry-Schutz bleiben erhalten. Die Prozess-/Signalgrenze und der Linux-
 Servicevertrag bleiben unverändert. Die Paketversion ist 1.2.0.
+
+
+### Repository payload permissions
+
+On POSIX, core payload replacement preserves existing ordinary rwx bits,
+including `0664`, `0666` and `0777`; this respects local policy without endorsing
+its security. Existing setuid, setgid and sticky bits are rejected. New files
+use safe explicit Unix ZIP permissions, or `0644` when absent; scripts use `0755`.
+ZIP/API modes reject special bits and group/other-write even for existing targets.
+Explicit `0600` is respected, not treated as missing. Checks precede mutation. The mode is set on the staged file before
+atomic publication. Private registry/config/state writes remain private.
+Windows keeps native permissions; no Unix ACL emulation is introduced.
+Ownership, ACLs and extended attributes are outside this contract. Previously
+affected `0600` files are not automatically broadened.
+
+Entrypoints should use actual existing core functions for payload publication,
+path validation, state and archives, rather than implementing parallel copies.
+`patchharbor.payload_files.write_bundle_payloads` is a low-level core boundary,
+not a replacement for registered/state-bound `apply`: it does not acquire the
+repository lock or perform the base/fingerprint gate. Reuse it only within an
+already controlled application/entrypoint context. See the
+[POSIX contract](planning/posix-mode/specification.md) and `CHAT_INSTRUCTIONS.md`.

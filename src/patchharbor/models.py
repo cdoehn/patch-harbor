@@ -26,7 +26,7 @@ class BundleScript:
 
 @dataclass(frozen=True)
 class BundlePayload:
-    """One byte-exact file carried by a ZIP PatchBundle."""
+    """One byte-exact payload and optional Unix permission bits (None: absent)."""
 
     relative_path: str
     content: bytes

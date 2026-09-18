@@ -349,3 +349,19 @@ def test_shared_existing_and_new_payload_have_distinct_mode_policies(tmp_path: P
     assert stat.S_IMODE(target.stat().st_mode) == 0o664
     assert stat.S_IMODE((tmp_path / "new.bin").stat().st_mode) == 0o644
     assert stat.S_IMODE((tmp_path / "executable.sh").stat().st_mode) == 0o755
+
+
+@pytest.mark.parametrize("requested,existing,wanted", (
+    (None, None, 0o644), (0o755, None, 0o755), (None, 0, 0),
+    (0o644, 0o664, 0o664), (0o600, 0o666, 0o666), (0o755, 0o777, 0o777),
+))
+def test_selection_preserves_observed_policy(requested, existing, wanted) -> None:
+    from patchharbor.payload_modes import select_payload_mode
+    assert select_payload_mode(requested, existing) == wanted
+
+
+@pytest.mark.parametrize("requested,existing", ((0o664, 0o644), (0o777, 0o666), (0o644, 0o4644)))
+def test_selection_does_not_cross_validation_boundaries(requested, existing) -> None:
+    from patchharbor.payload_modes import select_payload_mode
+    with pytest.raises(ValueError):
+        select_payload_mode(requested, existing)

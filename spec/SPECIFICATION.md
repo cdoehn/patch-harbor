@@ -3229,34 +3229,17 @@ Beispiel für einen Plan-Commit (Platzhalter nie als echte Nachweise ausgeben):
 🟩 1.a.W
 🟩 1 / 12
 
-Commit:
-feat(config): add repository-local exchange configuration
-
-Plan:
-planning/1.1.1/commit-plan.md
-
-Spec:
-spec/SPECIFICATION.md
-
-Änderungen:
-• .patchharbor/config.json einführen
-• Repository-Einstellungen speichern
-• configure ans aktuelle Repository binden
-• geteilte Exchange-Ordner erlauben
-• lokale Git-Ausnahme erhalten
-
-Tests:
-• Config- und CLI-Tests
-• vollständige Suite im Patch
-
-Noch offen:
-11 Plan-Commits
-
+Commit: <Message>
+Plan: <Pfad>
+Spec: <Pfad>
+Änderungen: <5–10 kurze Zeilen>
+Tests: <vorgesehene Gates>
+Noch offen: 11 Plan-Commits
 [Patch herunterladen](sandbox:/pfad/zum/patch.zip)
 Chat-Link: OK
 Drive-Backup: nicht verfügbar – kein verbundenes Werkzeug
 E-Mail: nicht verfügbar – kein verbundenes Werkzeug
-SHA-256: <vollständige Prüfsumme der finalen ZIP>
+SHA-256: <vollständige Prüfsumme>
 ```
 
 Verbindliche Regeln:
@@ -3459,3 +3442,50 @@ CI-Joblimits und fachliche Timeouttests bleiben eigenständige Verträge.
 Eine W/R/C-Patchfolge wendet jeden Zwischenstand einzeln an und committet ihn
 nur nach erfolgreichen Prüfungen. Bei Fehler bleiben vorherige Commits stehen.
 Weder ein erzeugtes Paket noch lokale Tests allein bedeuten externe CI-Freigabe.
+
+
+## 34. POSIX-Dateirechte bei Core-Payloads (POSIX-MODE)
+
+Verbindliche Details: `planning/posix-mode/specification.md`.
+`BundlePayload.unix_mode` transportiert optionale Unix-Berechtigungen aus
+ZIP-Metadaten (`create_system == 3`, High-Word von `external_attr`). Fehlende
+Unix-Metadaten ergeben bei neuen regulären Dateien 0644; sichere explizite Modi
+werden unverändert übernommen (0755 für ausführbare Dateien). Ein High-Word von
+0 bedeutet fehlende Metadaten; eine explizit typisierte reguläre Datei mit 0000
+ist davon verschieden. Explizite 0600-Werte sind gültig, kein Default-Indikator.
+
+Bei bestehenden POSIX-Dateien bleibt der aktuelle rwx-Modus erhalten, auch
+0664/0666/0777. Dies respektiert lokale Rechte, ohne sie als allgemein sicher
+zu bewerten. Bestandsmodi verbieten Sonderbits (07000); ZIP/API-Anfragen verbieten
+zusätzlich Gruppen-/Andere-Schreibrechte (07022), auch bei bestehenden Zielen.
+Beide prüfen Typ und Bitbereich. Keine automatische Reparatur, kein chmod-Sweep. Alle bekannten
+Ziel-/Modefehler werden vor der ersten Payload-Mutation geprüft, auch im Dry-Run;
+bei Mutation und vor Veröffentlichung wird frisch geprüft. Beobachtete Änderungen
+während des Stagings führen zum Abbruch. Der Lock schützt kooperierende Prozesse,
+nicht vor jeder denkbaren feindlichen Dateisystem-Race.
+
+Der Filesystem-Adapter schreibt privat neben dem Ziel, flush/fchmod/fsync erfolgen
+vor `os.replace`. Ein Mode-/Sync-/Replace-Fehler lässt diese Zieldatei unverändert;
+Staging-Reste werden aufgeräumt, soweit das Betriebssystem dies zulässt. Bereits
+erfolgreiche frühere Ersetzungen bleiben bei späterem Fehler erhalten. Keine
+paketweite Rollback-Garantie. Symlinks, Junctions, Sondertypen und unsichere Pfade
+bleiben verboten. Verzeichnis-Metadaten werden nicht als Dateipayload angewendet.
+
+Ohne expliziten Modus behält der atomare Writer seine private Rechtepolitik für
+Registry, Konfiguration und Laufzeitzustand. Windows validiert Paketmodi, bildet
+sie aber nicht auf native ACLs oder Read-only-Flags ab. Eigentümer, ACLs und
+Extended Attributes sind nicht Teil dieses Vertrags. Paketformat, Fingerprint
+und globale Locks bleiben unverändert. Git speichert nicht alle POSIX-Modi;
+bereits bestehendes 0600 wird deshalb nicht rückwirkend auf 0644 erweitert.
+
+Entrypoints prüfen und nutzen vorhandene Core-Funktionen für Payloads,
+Dateiersetzung, Pfadvalidierung, Registry/Zustand und Archive, statt diese selbst
+nachzubauen. Fehlende wiederverwendbare Infrastruktur wird im Core ergänzt;
+Tests/Commits und ihre Reihenfolge bleiben auftragsspezifische Orchestrierung.
+Beim Selbstupgrade nutzt das erste W ausschließlich eine private Kopie desselben
+W-Cores für seine Schreiboperationen, keine zweite Writer-Implementierung.
+
+Für nachfolgende lokale Entwicklungs-/Patchläufe läuft die Vollsuite nur parallel.
+Der vollständige serielle Referenzlauf gehört in CI. Die ausdrücklich bestätigte
+Ausnahme bleibt dieses bereits geplante POSIX-W/R/C-Bundle; der Launcher behält
+seine Referenzfunktion, CI-Workflows werden hierfür nicht geändert.

@@ -13,24 +13,15 @@ Result Bundle ein Patch-Paket für ein registriertes Repository erzeugst.
 
 ## 1. Deine Aufgabe und die Sicherheitsgrenze
 
-Du arbeitest als Entwicklungs-Chat oberhalb von PatchHarbor. PatchHarbor ist der
-kontrollierte lokale Runner und die sichere Brücke zwischen deinem Patch-Paket
-und genau einer registrierten lokalen Repository-Instanz in genau einem
-geprüften Zustand.
+Der Chat entwickelt; der lokale Runner bindet jedes Patch-Paket an genau eine
+registrierte Repository-Instanz und ihren geprüften Zustand.
 
-PatchHarbor kann insbesondere:
-
-- lokale Git-Repository-Instanzen mit einer UUID v4 registrieren,
-- Base-Commit und vollständigen Zustands-Fingerprint bestimmen,
-- sichere repositorygebundene ZIP-Patch-Pakete validieren,
-- genau ein registriertes Repository über `repo_id` auflösen,
-- Base-Commit und Fingerprint vor einer Mutation erneut prüfen,
-- sichere Nutzdateien bytegenau in Repository-Pfade schreiben,
-- genau einen geprüften Bash- oder PowerShell-Entrypoint ausführen,
-- stdout, stderr, Exit-Code, Laufzeit, Abbruch und Tool-Fehler erfassen,
-- nach einem Apply soweit möglich ein vollständiges Result Bundle erzeugen,
-- im Exchange-Ordner passende Pakete sicher filtern und das neueste nach `mtime_ns` wählen,
-- Result Bundles und sonstige Dateien sicher von Patch-Paketen unterscheiden.
+PatchHarbor registriert lokale Git-Instanzen per UUID v4, prüft Base-Commit und
+vollständigen Fingerprint, validiert sichere ZIP-Pakete, ordnet sie per repo_id
+zu und schreibt geprüfte Payloads vor genau einem Bash-/PowerShell-Entrypoint.
+Es erfasst stdout/stderr, Exit-Code, Laufzeit, Abbruch und Toolfehler, erzeugt
+Result Bundles und unterscheidet diese von Patch-Paketen. Exchange-Auswahl und
+Archivierung folgen den unten beschriebenen Regeln.
 
 Die für diesen Vertrag relevanten öffentlichen Befehle sind:
 
@@ -51,6 +42,29 @@ patchharbor apply --dry-run [PATCH_ZIP]
 patchharbor fs run QUELLE
 patchharbor-watcher
 ```
+
+### Vorhandenen Core nutzen
+
+Prüfe vor Entrypoint-Code die tatsächlich vorhandenen Core-/API-Funktionen.
+Nutze sie für Payload-Ausbringung, atomare Ersetzung, Pfad-/Sicherheitsprüfung,
+Repository-Zuordnung, Zustand und Archivierung statt eigener Nachbauten.
+Fehlende allgemeine Infrastruktur gehört bevorzugt als eigener geprüfter
+Schritt in den Core. Keine erfundene API, rekursiven apply/bundle-Aufrufe oder
+Umgehung der bestehenden Checks. Entrypoints orchestrieren auftragsspezifische
+Änderungen, Tests und Commits; sie sind kein zweiter PatchHarbor-Core.
+
+### POSIX-Payload-Modi
+
+Bestehende rwx-Modi bleiben erhalten, auch 0664/0666/0777. Das respektiert lokale
+Rechte, bewertet sie nicht als sicher. Setuid/setgid/sticky bleiben verboten.
+Neue Dateien: sichere Unix-ZIP-Modi, sonst 0644; Skripte explizit 0755.
+ZIP/API-Modi dürfen zusätzlich kein group-/other-write enthalten, auch bei
+bestehendem Ziel. Explizites 0600 ist nicht „fehlend“. Keine stille Reparatur.
+Der Core setzt den Modus vor atomarer Ersetzung; interne Dateien bleiben privat.
+Windows erhält keine Unix-ACL-Emulation. Bereits betroffene 0600-Dateien werden
+nicht automatisch auf 0644 verbreitert; Eigentümer/ACLs sind nicht abgedeckt.
+Beim Selbstupgrade den Writer aus einer privaten Kopie des Schritt-Cores
+laden. Kein eigener Writer, kein vorab installierter W/R/C-Endzustand.
 
 ### Repositorylokale Einstellungen
 
@@ -182,14 +196,12 @@ weiterhin unveränderter Repository-Inhalt, nicht die generierte Anleitung.
 Bei alten Bundles ohne Begleitdaten bleibt die separate versionsgleiche Vorlage
 zulässig. Fehlende Umgebungswerte niemals aus der Chat-Umgebung erfinden.
 
-Die Umgebungsdaten umfassen Repository-Name und -Pfad, konfiguriertes
-Exchange-Verzeichnis, tatsächliches Ausgabeziel, Suffix, Dateinamensschemata
-und UTC-Konvention sowie OS/Distribution, Kernel, Architektur, Python-, uv-
-und PatchHarbor-Version und konfigurierte Shell. `null` bedeutet unbekannt;
-die konfigurierte Shell ist kein Nachweis der tatsächlich laufenden Shell.
-Ubuntu in proot ist die Userland-Distribution, der Kernel kann vom Host stammen.
-Hostnamen, IP-Adressen, Seriennummern und vollständige Umgebungsvariablen werden
-nicht gesammelt. Erforderliche absolute Pfade können den Benutzernamen enthalten.
+`environment.json` enthält Zielpfade, Suffix/Dateinamenregeln und UTC-Konvention,
+OS/Userland, Kernel, Architektur, Python-, uv- und PatchHarbor-Version sowie die
+konfigurierte (nicht bewiesen aktive) Shell. Unbekanntes bleibt `null`.
+PRoot-Userland und Hostkernel können abweichen. Keine Hostnamen, IPs,
+Seriennummern oder vollständigen Prozessumgebungen sammeln; benötigte absolute
+Pfade können Benutzernamen enthalten.
 
 Prüfe vor jeder Änderung mindestens:
 
@@ -224,12 +236,9 @@ globale Rückabwicklung.
 
 ## 4. Zielversion, Commit-Plan und Spezifikation finden
 
-Bestimme zunächst die aktive Entwicklungszielversion aus eindeutigen
-Repository-Quellen. Eine noch nicht angehobene Paketversion ist kein
-Widerspruch, wenn der aktive Plan die Versionsanhebung ausdrücklich erst im
-Release-Commit vorsieht. Widersprechen sich mehrere plausible aktive
-Zielversionen tatsächlich, stoppe mit `PLAN_AMBIGUOUS` oder
-`PLAN_SPEC_CONFLICT`.
+Bestimme die aktive Zielversion aus dem Repository. Eine laut Plan erst zum
+Release erfolgende Versionsanhebung ist kein Widerspruch; tatsächlich
+widersprüchliche Zielversionen: `PLAN_AMBIGUOUS` oder `PLAN_SPEC_CONFLICT`.
 
 Suche den Commit- oder Implementation-Plan in dieser Reihenfolge:
 
@@ -264,9 +273,8 @@ werden, verwende `PLAN_POSITION_UNKNOWN`; rate nicht.
 
 ## 5. Spezifikation, Plan, Code und Auftrag abgleichen
 
-Die Spezifikation ist der fachliche Vertrag. Der Commit-Plan ist die geplante
-Zerlegung dieses Vertrags. Der reale Repository-Zustand zeigt, welche
-Voraussetzungen tatsächlich vorhanden sind.
+Die Spec definiert den Vertrag, der Plan seine Zerlegung; der Snapshot zeigt
+die tatsächlich vorhandenen Voraussetzungen.
 
 Prüfe vor der Patch-Erstellung:
 
@@ -277,15 +285,12 @@ Prüfe vor der Patch-Erstellung:
 - ob die Änderung innerhalb eines einzelnen fachlich geschlossenen Commits
   bleibt.
 
-Eine kleine, eindeutig commitbezogene und für die Korrektheit notwendige Lücke
-darfst du innerhalb desselben Scopes schließen. Zeige dafür die Warning
-`PLAN_SPEC_MINOR_DEVIATION`.
+Kleine notwendige Lücken im selben Commit-Scope schließen und als
+`PLAN_SPEC_MINOR_DEVIATION` melden.
 
-Eine merkliche Scope-Erweiterung, ein vorgezogener späterer Planpunkt, eine neue
-Architekturentscheidung oder ein fachlicher Widerspruch wird nicht
-stillschweigend umgesetzt. Erscheint eine Vorgabe falsch, unlogisch, unsicher
-oder unmöglich, stoppe mit einem passenden Code und stelle eine kurze konkrete
-Frage.
+Scope-Erweiterungen, vorgezogene Planpunkte, neue Architekturentscheidungen
+oder Widersprüche nicht still umsetzen. Bei falschen, unsicheren oder unmöglichen
+Vorgaben mit passendem Code stoppen und konkret nachfragen.
 
 ## 6. Commit-Art und Zähler
 
@@ -452,7 +457,8 @@ Für dieses PatchHarbor-Repository darf ohne vorhandene `uv.lock` kein
 `.[dev]` in der lokalen `.venv` vorbereitet, ohne die produktive pipx-Installation
 zu verändern. Den vollständigen Lauf z. B. mit
 `.venv/bin/python tools/run_tests.py` starten: xdist `auto`, Controller-Prüfung,
-kein pytest-timeout. Alternativ `--serial` oder `--workers 2` (bzw. 4).
+kein pytest-timeout. Lokal/Bundles: Vollsuite nur parallel (`--workers 2/4`
+optional); `--serial`-Vollreferenz nur in CI.
 `--session-timeout=0` ist kein Abschalten der Frist und darf dafür nicht verwendet
 werden. Keine Tests zur Geschwindigkeit erzwingen; alle fachlichen Gates bleiben.
 Neue Tests prüfen Verhalten und maschinenlesbare Datenverträge, nicht
@@ -470,9 +476,9 @@ Bei beauftragten W/R/C-Folgen entsteht jeder Zwischenstand einzeln:
 installieren; Fehler erhalten frühere Commits. Plan und Spec stehen unter
 `planning/test-parallel/`. Der Scheduler ist ausschließlich pytest-xdist.
 
-Bei Parallelitätsänderungen prüft `tools/verify_test_modes.py --outdir NEUER_PFAD`
-sieben vollständige Läufe seriell/2/4/auto mit Hash-Seeds. Berichte gehören
-außerhalb der Quellen; geänderte Quellen benötigen eine neue Referenz.
+Der Vollvergleich `tools/verify_test_modes.py --outdir NEUER_PFAD` enthält
+seriell/2/4/auto mit Hash-Seeds und gehört daher in CI, nicht in lokale Bundles.
+Berichte liegen außerhalb der Quellen; Quelländerungen brauchen neue Referenzen.
 Vertrag: `docs/test-parallelism.md`.
 
 PatchHarbor führt anschließend automatisch den Result-Bundle-Versuch durch,
@@ -591,7 +597,7 @@ mehrere Patches. Ein Drive-Link darf zusätzlich zum Chat-Link stehen.
 Die Sicherung wird vom externen Chat ausgeführt, nicht vom PatchHarbor-Core,
 Watcher oder Entrypoint. Sie ist keine CI-Freigabe und setzt keinen Release-Tag.
 
-Beispiel für einen Plan-Commit (Platzhalter nie als echte Nachweise ausgeben):
+Beispiel (Platzhalter sind keine Nachweise):
 
 ```text
 🟩🟩 PATCH BEREIT 🟩🟩
@@ -600,34 +606,17 @@ Beispiel für einen Plan-Commit (Platzhalter nie als echte Nachweise ausgeben):
 🟩 1.a.W
 🟩 1 / 12
 
-Commit:
-feat(config): add repository-local exchange configuration
-
-Plan:
-planning/1.1.1/commit-plan.md
-
-Spec:
-spec/SPECIFICATION.md
-
-Änderungen:
-• .patchharbor/config.json einführen
-• Repository-Einstellungen speichern
-• configure ans aktuelle Repository binden
-• geteilte Exchange-Ordner erlauben
-• lokale Git-Ausnahme erhalten
-
-Tests:
-• Config- und CLI-Tests
-• vollständige Suite im Patch
-
-Noch offen:
-11 Plan-Commits
-
+Commit: <Message>
+Plan: <Pfad>
+Spec: <Pfad>
+Änderungen: <5–10 kurze Zeilen>
+Tests: <vorgesehene Gates>
+Noch offen: 11 Plan-Commits
 [Patch herunterladen](sandbox:/pfad/zum/patch.zip)
 Chat-Link: OK
 Drive-Backup: nicht verfügbar – kein verbundenes Werkzeug
 E-Mail: nicht verfügbar – kein verbundenes Werkzeug
-SHA-256: <vollständige Prüfsumme der finalen ZIP>
+SHA-256: <vollständige Prüfsumme>
 ```
 
 Verbindliche Regeln:

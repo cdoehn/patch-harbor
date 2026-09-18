@@ -133,12 +133,6 @@ def regular_file_state(path: Path) -> RegularFileState | None:
     )
 
 
-def regular_file_mode(path: Path) -> int | None:
-    """Read the optional POSIX mode of one regular target."""
-    state = regular_file_state(path)
-    return None if state is None else state.mode
-
-
 def atomic_replace_bytes(
     target: Path, content: bytes, *, mode: int | None = None,
     before_replace: Callable[[], None] | None = None,
