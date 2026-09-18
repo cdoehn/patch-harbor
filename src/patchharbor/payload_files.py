@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from pathlib import Path
 
 from patchharbor.progress import activity
@@ -22,7 +22,8 @@ from patchharbor.platform.filesystem import (
     atomic_replace_bytes,
     create_directory,
     path_kind,
-    regular_file_mode,
+    RegularFileState,
+    regular_file_state,
 )
 
 
@@ -59,10 +60,13 @@ def _kind_or_error(target: Path, *, label: str) -> PathKind:
         raise _target_error(label, exc.operation) from exc
 
 
-def _replace_bytes(target: Path, content: bytes, *, label: str, mode: int) -> None:
+def _replace_bytes(
+    target: Path, content: bytes, *, label: str, mode: int,
+    before_replace: Callable[[], None],
+) -> None:
     try:
         activity("WRITE", f"Atomically write: {target} ({len(content)} bytes)")
-        atomic_replace_bytes(target, content, mode=mode)
+        atomic_replace_bytes(target, content, mode=mode, before_replace=before_replace)
         activity("WRITE", f"Written: {target}", "success")
     except FileSystemOperationError as exc:
         raise _write_error(label, exc.operation) from exc
@@ -102,14 +106,30 @@ def _resolve_payload_target(
     return final_target
 
 
-def _payload_mode(payload: BundlePayload, target: Path) -> int:
+def _payload_state_and_mode(
+    payload: BundlePayload, target: Path,
+) -> tuple[RegularFileState | None, int]:
     try:
         bundled = (DEFAULT_PAYLOAD_MODE if payload.unix_mode is None
                    else validate_payload_mode(payload.unix_mode))
-        existing = regular_file_mode(target)
-        return bundled if existing is None else validate_existing_payload_mode(existing)
+        state = regular_file_state(target)
+        mode = (bundled if state is None or state.mode is None
+                else validate_existing_payload_mode(state.mode))
+        return state, mode
     except (ValueError, FileSystemOperationError) as exc:
         raise _bundle_file_error(payload.relative_path, str(exc)) from exc
+
+
+def _require_unchanged_target(
+    cwd: Path, payload: BundlePayload, expected: RegularFileState | None,
+) -> None:
+    # Re-resolve parents as well; a symlink/junction introduced during staging
+    # must not redirect publication. This is a final observation, not an OS
+    # compare-and-swap guarantee against hostile concurrent filesystem access.
+    target = _resolve_payload_target(cwd, payload.relative_path, create_parents=False)
+    state, _mode = _payload_state_and_mode(payload, target)
+    if state != expected:
+        raise _bundle_file_error(payload.relative_path, "target changed during staging")
 
 
 def validate_bundle_payload_targets(
@@ -135,7 +155,7 @@ def validate_bundle_payload_targets(
             payload.relative_path,
             create_parents=False,
         )
-        _payload_mode(payload, target)
+        _payload_state_and_mode(payload, target)
     return payload_items
 
 
@@ -159,10 +179,12 @@ def write_bundle_payloads(
             payload.relative_path,
             create_parents=True,
         )
+        expected, mode = _payload_state_and_mode(payload, target)
         _replace_bytes(
             target,
             payload.content,
             label=f"bundle file {payload.relative_path!r}",
-            mode=_payload_mode(payload, target),
+            mode=mode,
+            before_replace=lambda: _require_unchanged_target(cwd, payload, expected),
         )
     activity("PAYLOAD", f"Wrote {len(payload_items)} payload file(s)", "success")

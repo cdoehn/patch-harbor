@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum, auto
 from hashlib import sha256
@@ -105,8 +106,16 @@ def create_directory(path: Path) -> None:
         ) from exc
 
 
-def regular_file_mode(path: Path) -> int | None:
-    """Inspect a regular target without following links; None means absent/Windows."""
+@dataclass(frozen=True, slots=True)
+class RegularFileState:
+    """Observed identity/change signature and optional native POSIX mode."""
+
+    signature: tuple[int, ...]
+    mode: int | None
+
+
+def regular_file_state(path: Path) -> RegularFileState | None:
+    """Capture one regular target without following links; None means absent."""
     try:
         metadata = path.lstat()
     except FileNotFoundError:
@@ -117,11 +126,22 @@ def regular_file_mode(path: Path) -> int | None:
         raise FileSystemOperationError(
             "target is not a regular file", OSError(errno.EINVAL, "unsupported target")
         )
-    return None if is_windows() else stat.S_IMODE(metadata.st_mode)
+    return RegularFileState(
+        signature=(metadata.st_dev, metadata.st_ino, metadata.st_mode,
+                   metadata.st_size, metadata.st_mtime_ns, metadata.st_ctime_ns),
+        mode=None if is_windows() else stat.S_IMODE(metadata.st_mode),
+    )
+
+
+def regular_file_mode(path: Path) -> int | None:
+    """Read the optional POSIX mode of one regular target."""
+    state = regular_file_state(path)
+    return None if state is None else state.mode
 
 
 def atomic_replace_bytes(
     target: Path, content: bytes, *, mode: int | None = None,
+    before_replace: Callable[[], None] | None = None,
 ) -> None:
     """Publish bytes atomically; optionally set POSIX mode before replacement.
 
@@ -150,6 +170,8 @@ def atomic_replace_bytes(
                 exc,
             ) from exc
 
+        if before_replace is not None:
+            before_replace()
         try:
             os.replace(staged_path, target)
         except OSError as exc:

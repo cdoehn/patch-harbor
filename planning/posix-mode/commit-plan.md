@@ -5,10 +5,10 @@ Approved scope: one bundle, three real consecutive W/R/C commits.
 Each state is applied and tested before its commit; stop on failure, keeping
 previous commits and the in-progress working tree. No destructive rollback.
 
-Progress after this tested commit: **1/3**.
+Progress after this tested commit: **2/3**.
 
 - [x] `POSIX-MODE.a.W` — `fix(apply): preserve POSIX modes for repository payloads`
-- [ ] `POSIX-MODE.a.R` — `security(apply): validate payload modes and reject unsafe permissions`
+- [x] `POSIX-MODE.a.R` — `security(apply): validate payload modes and reject unsafe permissions`
 - [ ] `POSIX-MODE.a.C` — `refactor(apply): centralize payload mode policy and core usage guidance`
 
 W establishes real payload-mode behavior. R hardens final publication against

@@ -159,6 +159,152 @@ def test_windows_boundary_does_not_emulate_posix_mode(tmp_path: Path, monkeypatc
     assert target.read_bytes() == b"new"
 
 
+@POSIX
+@pytest.mark.parametrize("operation", ("fchmod", "fsync", "replace"))
+@pytest.mark.parametrize("existing", (False, True))
+@pytest.mark.parametrize("existing_mode", (0o644, 0o664, 0o666, 0o777))
+def test_failed_publication_keeps_original_and_removes_stage(
+    tmp_path: Path, monkeypatch, operation: str, existing: bool, existing_mode: int,
+) -> None:
+    from patchharbor.payload_files import PayloadWriteError
+    target = tmp_path / "file.bin"
+    if existing:
+        target.write_bytes(b"original")
+        target.chmod(existing_mode)
+    def fail(*args, **kwargs):
+        raise PermissionError("injected filesystem failure")
+    monkeypatch.setattr(filesystem.os, operation, fail)
+    with pytest.raises(PayloadWriteError):
+        write_bundle_payloads((BundlePayload("file.bin", b"new", 0o755),), cwd=tmp_path)
+    if existing:
+        assert target.read_bytes() == b"original"
+        assert stat.S_IMODE(target.stat().st_mode) == existing_mode
+    else:
+        assert not target.exists()
+    assert not list(tmp_path.glob(".patchharbor-*.tmp"))
+
+
+@POSIX
+@pytest.mark.parametrize("change", ("safe_mode", "shared_mode", "special_mode", "content", "identity", "symlink"))
+def test_final_check_rejects_observed_target_changes(tmp_path: Path, monkeypatch, change: str) -> None:
+    target = tmp_path / "file.bin"
+    target.write_bytes(b"original")
+    target.chmod(0o644)
+    external = tmp_path / "outside.bin"
+    external.write_bytes(b"outside")
+    real_chmod = filesystem.os.fchmod
+    def change_during_staging(descriptor, mode):
+        real_chmod(descriptor, mode)
+        if change in ("safe_mode", "shared_mode", "special_mode"):
+            target.chmod({"safe_mode": 0o600, "shared_mode": 0o664, "special_mode": 0o4644}[change])
+        elif change == "content":
+            target.write_bytes(b"concurrent edit")
+        else:
+            target.unlink()
+            if change == "symlink":
+                target.symlink_to(external)
+            else:
+                target.write_bytes(b"different inode")
+    monkeypatch.setattr(filesystem.os, "fchmod", change_during_staging)
+    with pytest.raises(PayloadTargetError):
+        write_bundle_payloads((BundlePayload("file.bin", b"payload"),), cwd=tmp_path)
+    assert target.read_bytes() != b"payload"
+    assert external.read_bytes() == b"outside"
+    assert not list(tmp_path.glob(".patchharbor-*.tmp"))
+
+
+@POSIX
+def test_target_appearing_during_staging_is_not_overwritten(tmp_path: Path, monkeypatch) -> None:
+    target = tmp_path / "new.bin"
+    real_chmod = filesystem.os.fchmod
+    def create_other(descriptor, mode):
+        real_chmod(descriptor, mode)
+        target.write_bytes(b"other process")
+    monkeypatch.setattr(filesystem.os, "fchmod", create_other)
+    with pytest.raises(PayloadTargetError):
+        write_bundle_payloads((BundlePayload("new.bin", b"payload"),), cwd=tmp_path)
+    assert target.read_bytes() == b"other process"
+    assert not list(tmp_path.glob(".patchharbor-*.tmp"))
+
+
+@POSIX
+def test_inspection_failure_does_not_mutate_any_payload(tmp_path: Path, monkeypatch) -> None:
+    target = tmp_path / "first.bin"
+    target.write_bytes(b"old")
+    real_lstat = Path.lstat
+    def denied(path, *args, **kwargs):
+        if path == tmp_path / "second.bin":
+            raise PermissionError("cannot inspect")
+        return real_lstat(path, *args, **kwargs)
+    monkeypatch.setattr(Path, "lstat", denied)
+    with pytest.raises(PayloadTargetError):
+        write_bundle_payloads((BundlePayload("first.bin", b"new"),
+                               BundlePayload("second.bin", b"new")), cwd=tmp_path)
+    assert target.read_bytes() == b"old"
+    assert not list(tmp_path.glob(".patchharbor-*.tmp"))
+
+
+@POSIX
+def test_later_runtime_failure_keeps_prior_success(tmp_path: Path, monkeypatch) -> None:
+    from patchharbor.payload_files import PayloadWriteError
+    for name in ("first.bin", "second.bin"):
+        (tmp_path / name).write_bytes(b"old")
+        (tmp_path / name).chmod(0o644)
+    calls = 0
+    real_chmod = filesystem.os.fchmod
+    def fail_second(descriptor, mode):
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise PermissionError("second failed")
+        real_chmod(descriptor, mode)
+    monkeypatch.setattr(filesystem.os, "fchmod", fail_second)
+    with pytest.raises(PayloadWriteError):
+        write_bundle_payloads((BundlePayload("first.bin", b"new"),
+                               BundlePayload("second.bin", b"new")), cwd=tmp_path)
+    assert (tmp_path / "first.bin").read_bytes() == b"new"
+    assert (tmp_path / "second.bin").read_bytes() == b"old"
+    assert all(stat.S_IMODE((tmp_path / name).stat().st_mode) == 0o644
+               for name in ("first.bin", "second.bin"))
+    assert not list(tmp_path.glob(".patchharbor-*.tmp"))
+
+
+@POSIX
+def test_explicit_mode_is_not_weakened_by_umask(tmp_path: Path) -> None:
+    previous = os.umask(0o077)
+    try:
+        write_bundle_payloads((BundlePayload("new.bin", b"new"),), cwd=tmp_path)
+    finally:
+        os.umask(previous)
+    assert stat.S_IMODE((tmp_path / "new.bin").stat().st_mode) == 0o644
+
+
+@POSIX
+def test_explicit_zero_permissions_are_not_missing_metadata(tmp_path: Path) -> None:
+    target = tmp_path / "file.bin"
+    payloads = read_zip_payload_bytes(archive_bytes(0))
+    assert payloads[0].unix_mode == 0
+    try:
+        write_bundle_payloads(payloads, cwd=tmp_path)
+        assert stat.S_IMODE(target.stat().st_mode) == 0
+    finally:
+        if target.exists():
+            target.chmod(0o600)
+
+
+@POSIX
+def test_replacement_never_writes_through_existing_hardlink(tmp_path: Path) -> None:
+    outside = tmp_path / "outside.bin"
+    outside.write_bytes(b"old")
+    outside.chmod(0o644)
+    target = tmp_path / "file.bin"
+    os.link(outside, target)
+    write_bundle_payloads((BundlePayload("file.bin", b"new"),), cwd=tmp_path)
+    assert outside.read_bytes() == b"old"
+    assert target.read_bytes() == b"new"
+    assert not os.path.samefile(outside, target)
+
+
 def test_existing_policy_preserves_all_ordinary_bits_but_rejects_special_bits() -> None:
     for mode in range(0o1000):
         assert validate_existing_payload_mode(mode) == mode
