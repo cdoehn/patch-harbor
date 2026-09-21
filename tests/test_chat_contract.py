@@ -255,12 +255,8 @@ def test_chat_and_spec_share_commit_warning_stop_and_ui_contracts() -> None:
         "Eine blockierende Situation beginnt exakt mit:",
         maxsplit=1,
     )
-    warning_codes = set(
-        re.findall(r"^- `([A-Z0-9_]+)`", warning_part, flags=re.MULTILINE)
-    )
-    stop_codes = set(
-        re.findall(r"^- `([A-Z0-9_]+)`", stop_part, flags=re.MULTILINE)
-    )
+    warning_codes = set(re.findall(r"`([A-Z][A-Z0-9_]+)`", warning_part))
+    stop_codes = set(re.findall(r"`([A-Z][A-Z0-9_]+)`", stop_part))
     assert warning_codes == EXPECTED_WARNING_CODES
     assert stop_codes == EXPECTED_STOP_CODES
     for code in warning_codes | stop_codes:
@@ -308,13 +304,13 @@ def test_patch_delivery_contract_is_single_artifact_and_backup_safe() -> None:
 
     assert example.count(PATCH_READY) == 2
     assert "genau eine finale Auslieferung" in compact
-    assert "genau eine kanonische ZIP" in compact
+    assert "eine kanonische ZIP" in compact
     assert "keine zweite Bereitschaftszeile am Ende" not in compact
     assert BUNDLE_NUMBER in example
     assert example.splitlines()[-3:] == [
         PATCH_READY, BUNDLE_NUMBER, "[Patch herunterladen](sandbox:/pfad/zum/patch.zip)",
     ]
-    assert "Vor der finalen Antwort gilt" in delivery
+    assert "Vor der finalen Antwort:" in delivery
     assert "blind doppelt" in compact
     assert "nicht neu packen" in compact
     for field in ("Chat-Link", "Drive-Backup", "E-Mail", "SHA-256"):
@@ -324,12 +320,12 @@ def test_patch_delivery_contract_is_single_artifact_and_backup_safe() -> None:
         "byteidentische",
         "Keine öffentliche Freigabe",
         "Anbieter-Prüfsumme",
-        "eigene Adresse aus dem verbundenen Konto",
-        "Anhang nicht möglich",
+        "Gmail-Adresse aus dem verbundenen Konto",
+        "Anhangsgrenzen",
         "Schutzgrenzen nicht umgehen",
-        "eine reine Statusmail ist kein Backup",
+        "Statusmail allein ist kein Backup",
         "Best Effort",
-        "bestätigtem Upload",
+        "Tool-Bestätigung",
         "nicht im Core, Watcher oder Entrypoint",
         "Release-Tag",
     ):
@@ -338,7 +334,19 @@ def test_patch_delivery_contract_is_single_artifact_and_backup_safe() -> None:
     assert "Drive-Backup: nicht verfügbar" in example
     assert "E-Mail: nicht verfügbar" in example
     assert "allerletzte Zeile der gesamten Antwort" in compact
-    assert "Die Sicherung erfolgt im externen Chat" in compact
+    assert "Sicherung erfolgt im externen Chat" in compact
+
+
+def test_warning_and_stop_finish_without_creating_second_artifacts() -> None:
+    chat = _text(CHAT_PATH)
+    warnings = _section(chat, EXPECTED_HEADINGS[9], EXPECTED_HEADINGS[10])
+    compact = _normalise_space(warnings)
+    assert "wiederhole denselben gelben Block" in compact
+    assert "unmittelbar vor dem grünen Erfolgsblock" in compact
+    assert "keine neue Bundle-Nummer" in compact
+    assert "kein Patch-Link" in compact
+    assert "kein `PATCH BEREIT`" in compact
+    assert "rote Block bildet zusätzlich den Abschluss" in compact
 
 
 def test_bundle_number_is_shared_with_successful_entrypoint_only() -> None:
@@ -351,9 +359,11 @@ def test_bundle_number_is_shared_with_successful_entrypoint_only() -> None:
     for phrase in (
         "dreistellige",
         "zählt Bundles, nicht Commits",
-        "beginnt er bei `001`",
-        "Dieselbe ZIP behält",
-        "STOP ohne erzeugtes Bundle erhält keine Nummer",
+        "bei `001`",
+        "behält dieselbe Nummer",
+        "STOP ohne Bundle erhöht nichts",
+        "keinen zentralen oder transaktionalen Nummerngeber",
+        "kein STOP-Grund",
     ):
         assert phrase in compact
 

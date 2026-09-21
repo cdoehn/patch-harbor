@@ -14,3 +14,7 @@ Patch-Auslieferungen wiederholen ihren Status am Antwortende und kennzeichnen di
 - Der Entrypoint druckt dieselbe Nummer nur nach erfolgreichem Abschluss und sauberem Zielzustand.
 - Backupregeln bleiben unverändert Best Effort und verwenden dieselbe kanonische ZIP.
 - Tests prüfen den Anweisungsvertrag, nicht das Layout zukünftiger Produkt-CLI-Ausgaben.
+
+## Best-Effort-Nummernvergabe
+
+Die Nummernfolge benötigt ausdrücklich keine neue Infrastruktur. Kollisionen oder Fehlschätzungen zwischen unabhängigen Chats sind akzeptiert und dürfen weder State-Bindung noch Patch-Erzeugung blockieren. Maßgeblich bleibt allein die kanonische ZIP; dieselbe Datei behält bei jeder erneuten Ausgabe ihre einmal verwendete Nummer.

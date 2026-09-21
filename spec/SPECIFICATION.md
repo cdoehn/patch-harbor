@@ -3148,11 +3148,7 @@ Eine nicht blockierende Auffälligkeit beginnt exakt mit:
 CODE: <WARNING_CODE>
 ```
 
-Zulässige Warning-Codes sind mindestens:
-
-- `PLAN_SPEC_MINOR_DEVIATION` – eine kleine eindeutig commitbezogene Planlücke wird innerhalb des Scopes geschlossen,
-- `NON_BLOCKING_ASSUMPTION` – eine ausdrücklich benannte, sichere und nicht designprägende Annahme wird verwendet,
-- `REDUCED_TEST_SCOPE` – aus einem klar genannten Grund kann nur ein kleinerer als der normalerweise erforderliche Testumfang in den Patch aufgenommen werden.
+Zulässige Warning-Codes sind mindestens `PLAN_SPEC_MINOR_DEVIATION`, `NON_BLOCKING_ASSUMPTION` und `REDUCED_TEST_SCOPE` mit der bestehenden Bedeutung. Wird trotz Warnung ausgeliefert, wird derselbe gelbe Block unmittelbar vor dem grünen Abschlussblock aus 26.8 wiederholt.
 
 Eine blockierende Situation beginnt exakt mit:
 
@@ -3161,29 +3157,17 @@ Eine blockierende Situation beginnt exakt mit:
 CODE: <STOP_CODE>
 ```
 
-Zulässige Stop-Codes sind mindestens:
-
-- `PLAN_NOT_FOUND`,
-- `PLAN_AMBIGUOUS`,
-- `PLAN_POSITION_UNKNOWN`,
-- `SPEC_AMBIGUOUS`,
-- `PLAN_SPEC_CONFLICT`,
-- `REPOSITORY_STATE_INCOMPLETE`,
-- `REQUIREMENT_AMBIGUOUS`,
-- `UNSAFE_OR_IMPOSSIBLE`,
-- `PATCH_CREATION_FAILED`.
-
-Nach der Codezeile folgen höchstens eine kurze Erklärung und eine konkrete benötigte Entscheidung. Bei `STOP` wird kein Patch-Paket erzeugt und keine grüne `PATCH BEREIT`-Zeile ausgegeben.
+Zulässige Stop-Codes sind mindestens `PLAN_NOT_FOUND`, `PLAN_AMBIGUOUS`, `PLAN_POSITION_UNKNOWN`, `SPEC_AMBIGUOUS`, `PLAN_SPEC_CONFLICT`, `REPOSITORY_STATE_INCOMPLETE`, `REQUIREMENT_AMBIGUOUS`, `UNSAFE_OR_IMPOSSIBLE` und `PATCH_CREATION_FAILED`. Nach der Codezeile folgen höchstens eine kurze Erklärung und die benötigte Entscheidung. Bei STOP entsteht kein Patch-Bundle: keine neue Bundle-Nummer, kein Patch-Link und kein `PATCH BEREIT`. Der identische rote Block bildet zusätzlich den Abschluss der Antwort.
 
 ### 26.8 Verbindliche schmale Patch-Bereit-UI
 
-Pro Patch-Auftrag gibt es genau eine finale Auslieferung und genau eine kanonische ZIP. Eine erfolgreiche Antwort beginnt mit `🟩🟩 PATCH BEREIT 🟩🟩` und wiederholt diesen Balken im Abschlussblock; die Wiederholung ist keine zweite Auslieferung.
+Pro Auftrag gibt es genau eine finale Auslieferung und eine kanonische ZIP. Erfolgreiche Antworten beginnen mit `🟩🟩 PATCH BEREIT 🟩🟩` und wiederholen den Balken im Abschlussblock; die Wiederholung ist keine zweite Auslieferung.
 
-Jede neue kanonische ZIP erhält eine repositorybezogene, dreistellige `PATCHHARBOR-BUNDLE-NR`. Sie zählt Bundles, nicht Commits. Der externe Chat verwendet die nächste aus dem bekannten Verlauf ableitbare Nummer; ohne verlässliche Historie beginnt er bei `001`. Die Nummer wird erst mit der kanonischen ZIP vergeben, bleibt bei erneutem Link, Backup oder Versand derselben ZIP unverändert und wird bei einem STOP ohne Bundle nicht vergeben. Sie ist Handoff-Metadatum, keine Sicherheits- oder State-Bindung.
+Jede neu festgelegte kanonische ZIP erhält eine repositorybezogene dreistellige `PATCHHARBOR-BUNDLE-NR`; sie zählt Bundles, nicht Commits. Der externe Chat verwendet die nächste aus dem bekannten Verlauf ableitbare Nummer und beginnt ohne verlässliche Historie bei `001`. Er erhöht nur bei einer tatsächlich neuen kanonischen ZIP; erneuter Link, Download, Backup oder Versand derselben ZIP behält dieselbe Nummer. STOP ohne Bundle erhöht nichts und vergibt keine Nummer. Es gibt keinen zentralen oder transaktionalen Nummerngeber; parallele oder unabhängige Chats dürfen deshalb kollidieren oder eine Nummer falsch schätzen. Das ist akzeptiert, kein STOP-Grund und berührt keine Sicherheits-, State- oder Repository-Bindung.
 
-Vor der finalen Antwort gilt: ZIP vollständig erstellen, öffnen und validieren; danach Dateiname, Größe, Bundle-Nummer und SHA-256 festlegen und nicht mehr neu packen. Der Chat-Link verweist auf exakt diese Datei. Wenn autorisierte Drive-Werkzeuge verfügbar sind, wird dieselbe byteidentische ZIP privat unter `PatchHarbor-Backups/Patches` gesichert; keine öffentliche Freigabe. Upload-Erfolg darf nur nach Tool-Bestätigung, Bytegleichheit nur nach SHA-256-Rückprüfung oder geeigneter Anbieter-Prüfsumme behauptet werden. Die eigene Gmail-Adresse wird aus dem verbundenen Konto ermittelt; dieselbe ZIP wird dorthin gesendet, oder bei Anhangsgrenzen der bestätigte private Drive-Link mit Dateiname und SHA-256. Eine reine Statusmail ist kein Backup. Backupfehler sind Best Effort und machen einen ansonsten gültigen Patch nicht ungültig; unklaren Status prüfen und keine doppelten Uploads oder Mails erzeugen.
+Vor der finalen Antwort wird die ZIP vollständig erstellt, geöffnet und validiert; erst dann werden Dateiname, Größe, Nummer und SHA-256 festgelegt und die ZIP nicht mehr neu gepackt. Der Chat-Link verweist auf diese Datei. Autorisierte Drive-Werkzeuge sichern wenn möglich dieselbe byteidentische ZIP privat unter `PatchHarbor-Backups/Patches`; keine öffentliche Freigabe. Upload-Erfolg erfordert Tool-Bestätigung, Bytegleichheit SHA-256-Rückprüfung oder geeignete Anbieter-Prüfsumme. Die eigene Gmail-Adresse stammt aus dem verbundenen Konto; dieselbe ZIP wird gesendet oder bei Anhangsgrenzen der bestätigte private Drive-Link mit Dateiname und SHA-256. Eine reine Statusmail ist kein Backup. Backups sind Best Effort, unklarer Status wird geprüft und nicht blind doppelt versendet.
 
-`Chat-Link`, `Drive-Backup`, `E-Mail` und `SHA-256` stehen unmittelbar vor dem Abschlussblock. Chat-Link, Drive-Link und E-Mail beziehen sich auf dieselbe kanonische Datei. Die Sicherung erfolgt im externen Chat, nicht im Core, Watcher oder Entrypoint, und ist keine CI-Freigabe oder Release-Markierung.
+`Chat-Link`, `Drive-Backup`, `E-Mail` und `SHA-256` stehen unmittelbar vor dem Abschlussblock. Alle Kanäle beziehen sich auf dieselbe kanonische Datei. Die Sicherung erfolgt im externen Chat, nicht im Core, Watcher oder Entrypoint, und ist weder CI-Freigabe noch Release-Markierung.
 
 Beispiel (Platzhalter nie als echte Nachweise ausgeben):
 
@@ -3211,7 +3195,7 @@ PATCHHARBOR-BUNDLE-NR: 003
 [Patch herunterladen](sandbox:/pfad/zum/patch.zip)
 ```
 
-Verbindlich gelten die vorhandenen `FIX`-/`OFF-PLAN`-Detailzeilen, Commit-/Plan-/Spec-Angaben und die Beschränkung auf tatsächlich vorgesehene Tests. Der Erfolgsabschluss besteht exakt aus Bereitschaftsbalken, Bundle-Nummer und Patch-Link; der Patch-Link ist die allerletzte Zeile der gesamten Antwort. `PATCH BEREIT` darf erst nach Existenz der verlinkten Datei erscheinen.
+Bei `FIX` und `OFF-PLAN` bleiben die bestehenden Detailzeilen und Planpositionen. Commit, Plan und Spec werden genannt; Tests sind nur vorgesehene Gates. Der Erfolgsabschluss besteht genau aus Bereitschaftsbalken, Bundle-Nummer und Patch-Link. Der Patch-Link ist die allerletzte Zeile der gesamten Antwort.
 
 ### 26.9 Auswertung nach lokalem Apply
 

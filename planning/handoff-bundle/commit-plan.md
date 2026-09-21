@@ -1,6 +1,6 @@
 # HANDOFF-NR – Commit-Plan
 
-Status: 1/3
+Status: 2/3
 
 1. `HANDOFF-NR.a.W` – `docs(handoff): add numbered final delivery footer`
    - Bundle-Nummer, EntryPoint-Erfolgszeile und grünen Abschlussblock als funktionierenden Handoff-Vertrag einführen.
