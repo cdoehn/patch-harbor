@@ -25,6 +25,7 @@ README_PATH = PROJECT_ROOT / "README.md"
 PLAN_PATH = PROJECT_ROOT / "planning" / "1.1.1" / "commit-plan.md"
 PATCH_READY = "🟩🟩 PATCH BEREIT 🟩🟩"
 BUNDLE_NUMBER = "PATCHHARBOR-BUNDLE-NR: 003"
+PATCH_LINK = "[Patch herunterladen](sandbox:/pfad/zum/patch.zip)"
 WARNING_HEADER = "🟨🟨 PATCHHARBOR WARNUNG 🟨🟨\nCODE: <WARNING_CODE>"
 STOP_HEADER = "🟥🟥 PATCHHARBOR STOP 🟥🟥\nCODE: <STOP_CODE>"
 EXPECTED_WARNING_CODES = {
@@ -307,9 +308,7 @@ def test_patch_delivery_contract_is_single_artifact_and_backup_safe() -> None:
     assert "eine kanonische ZIP" in compact
     assert "keine zweite Bereitschaftszeile am Ende" not in compact
     assert BUNDLE_NUMBER in example
-    assert example.splitlines()[-3:] == [
-        PATCH_READY, BUNDLE_NUMBER, "[Patch herunterladen](sandbox:/pfad/zum/patch.zip)",
-    ]
+    assert example.splitlines()[-3:] == [PATCH_READY, BUNDLE_NUMBER, PATCH_LINK]
     assert "Vor der finalen Antwort:" in delivery
     assert "blind doppelt" in compact
     assert "nicht neu packen" in compact
@@ -335,6 +334,17 @@ def test_patch_delivery_contract_is_single_artifact_and_backup_safe() -> None:
     assert "E-Mail: nicht verfügbar" in example
     assert "allerletzte Zeile der gesamten Antwort" in compact
     assert "Sicherung erfolgt im externen Chat" in compact
+
+
+def test_delivery_contract_has_no_superseded_single_footer_rule() -> None:
+    chat = _text(CHAT_PATH)
+    spec = _text(SPEC_PATH)
+    for document in (chat, spec):
+        assert "keine zweite Bereitschaftszeile am Ende" not in document
+        assert "es gibt keine zweite Bereitschaftszeile" not in document
+    delivery = _section(chat, EXPECTED_HEADINGS[10], EXPECTED_HEADINGS[11])
+    assert delivery.count("PATCHHARBOR-BUNDLE-NR") >= 2
+    assert "allerletzte Zeile der gesamten Antwort" in delivery
 
 
 def test_warning_and_stop_finish_without_creating_second_artifacts() -> None:

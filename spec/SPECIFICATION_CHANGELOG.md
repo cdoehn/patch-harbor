@@ -1,5 +1,14 @@
 # PatchHarbor – Spezifikations-Changelog
 
+## 2026-09-21 – HANDOFF-NR: nummerierter Abschlussblock
+
+- Erfolgreiche Patch-Antworten wiederholen den grünen Statusbalken unten; der Patch-Link ist die letzte Antwortzeile.
+- Repositorybezogene dreistellige Bundle-Nummern sind bewusst Best Effort ohne neue Infrastruktur oder Sicherheitsbindung.
+- Dieselbe kanonische ZIP behält ihre Nummer bei erneutem Link/Backup/Versand; STOP vergibt keine Nummer.
+- Der Entrypoint meldet dieselbe Nummer nur nach vollständigem Erfolg und sauberem Zielzustand.
+- Warning-/STOP-Abschluss und bestehende Drive-/Gmail-Sicherungsregeln bleiben verbindlich.
+- Drei W/R/C-Vertragscommits; kein neues Paketformat, keine Runtime-Abhängigkeit und keine Migration.
+
 ## 2026-09-18 – POSIX-MODE: Bestandsrechte erhalten, Paketmodi strikt prüfen
 
 - Bestehende normale rwx-Rechte erhalten, einschließlich 0664/0666/0777; Sonderbits ablehnen.

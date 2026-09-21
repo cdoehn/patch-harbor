@@ -18,3 +18,7 @@ Patch-Auslieferungen wiederholen ihren Status am Antwortende und kennzeichnen di
 ## Best-Effort-Nummernvergabe
 
 Die Nummernfolge benötigt ausdrücklich keine neue Infrastruktur. Kollisionen oder Fehlschätzungen zwischen unabhängigen Chats sind akzeptiert und dürfen weder State-Bindung noch Patch-Erzeugung blockieren. Maßgeblich bleibt allein die kanonische ZIP; dieselbe Datei behält bei jeder erneuten Ausgabe ihre einmal verwendete Nummer.
+
+## Abschluss
+
+Der Vertrag ist abgeschlossen, sobald Chat und Produktspezifikation dieselben Warning-/STOP-/Erfolgsregeln tragen, die direkte Vertragsprüfung widersprüchliche Altformulierungen ausschließt und alle bestehenden State-, Payload- und Backup-Sicherheitsregeln unverändert bleiben.
