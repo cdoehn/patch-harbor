@@ -24,6 +24,7 @@ SPEC_PATH = PROJECT_ROOT / "spec" / "SPECIFICATION.md"
 README_PATH = PROJECT_ROOT / "README.md"
 PLAN_PATH = PROJECT_ROOT / "planning" / "1.1.1" / "commit-plan.md"
 PATCH_READY = "🟩🟩 PATCH BEREIT 🟩🟩"
+BUNDLE_NUMBER = "PATCHHARBOR-BUNDLE-NR: 003"
 WARNING_HEADER = "🟨🟨 PATCHHARBOR WARNUNG 🟨🟨\nCODE: <WARNING_CODE>"
 STOP_HEADER = "🟥🟥 PATCHHARBOR STOP 🟥🟥\nCODE: <STOP_CODE>"
 EXPECTED_WARNING_CODES = {
@@ -305,34 +306,56 @@ def test_patch_delivery_contract_is_single_artifact_and_backup_safe() -> None:
     compact = _normalise_space(delivery)
     (example,) = _fenced_blocks(delivery, "text")
 
-    assert example.count(PATCH_READY) == 1
+    assert example.count(PATCH_READY) == 2
     assert "genau eine finale Auslieferung" in compact
     assert "genau eine kanonische ZIP" in compact
-    assert "keine zweite Fertigmeldung" in compact
-    assert "erst danach" in compact.lower()
-    assert "nicht blind doppelt" in compact
-    assert "keinen Neubau" in compact
+    assert "keine zweite Bereitschaftszeile am Ende" not in compact
+    assert BUNDLE_NUMBER in example
+    assert example.splitlines()[-3:] == [
+        PATCH_READY, BUNDLE_NUMBER, "[Patch herunterladen](sandbox:/pfad/zum/patch.zip)",
+    ]
+    assert "Vor der finalen Antwort gilt" in delivery
+    assert "blind doppelt" in compact
+    assert "nicht neu packen" in compact
     for field in ("Chat-Link", "Drive-Backup", "E-Mail", "SHA-256"):
         assert field in example
     for safeguard in (
         "PatchHarbor-Backups/Patches",
-        "byteidentische Datei privat",
+        "byteidentische",
         "Keine öffentliche Freigabe",
-        "Rücklesen oder Anbieter-Prüfsumme",
-        "Empfängeradresse aus dem angemeldeten Konto",
-        "Größen- oder Dateitypgrenzen",
-        "Keine Schutzgrenze umgehen",
+        "Anbieter-Prüfsumme",
+        "eigene Adresse aus dem verbundenen Konto",
+        "Anhang nicht möglich",
+        "Schutzgrenzen nicht umgehen",
         "eine reine Statusmail ist kein Backup",
         "Best Effort",
-        "nach bestätigtem Tool-Ergebnis",
-        "nicht vom PatchHarbor-Core",
-        "setzt keinen Release-Tag",
+        "bestätigtem Upload",
+        "nicht im Core, Watcher oder Entrypoint",
+        "Release-Tag",
     ):
         assert safeguard in compact
     # Missing integrations are explicit; the example promises no imaginary backup.
     assert "Drive-Backup: nicht verfügbar" in example
     assert "E-Mail: nicht verfügbar" in example
-    assert "Ein Drive-Link darf zusätzlich zum Chat-Link stehen" in compact
+    assert "allerletzte Zeile der gesamten Antwort" in compact
+    assert "Die Sicherung erfolgt im externen Chat" in compact
+
+
+def test_bundle_number_is_shared_with_successful_entrypoint_only() -> None:
+    chat = _text(CHAT_PATH)
+    execution = _section(chat, EXPECTED_HEADINGS[7], EXPECTED_HEADINGS[8])
+    delivery = _section(chat, EXPECTED_HEADINGS[10], EXPECTED_HEADINGS[11])
+    assert "PATCHHARBOR-BUNDLE-NR: <NNN> | APPLIED SUCCESSFULLY" in execution
+    assert "Bei einem Fehler darf diese Zeile niemals erscheinen" in execution
+    compact = _normalise_space(delivery)
+    for phrase in (
+        "dreistellige",
+        "zählt Bundles, nicht Commits",
+        "beginnt er bei `001`",
+        "Dieselbe ZIP behält",
+        "STOP ohne erzeugtes Bundle erhält keine Nummer",
+    ):
+        assert phrase in compact
 
 
 def test_chat_contract_carries_retry_filename_and_identifier_presentation() -> None:

@@ -3137,6 +3137,8 @@ Das Paket:
 
 Vor dem lokalen Apply darf die UI nur die im Patch vorgesehenen Tests nennen. Sie darf diese Tests nicht als erfolgreich darstellen. Erst ein zurückgegebenes Result Bundle mit erfolgreichem Run-Bericht erlaubt eine Erfolgsaussage.
 
+Die kanonische Patch-ZIP erhält bei ihrer finalen Festlegung eine dreistellige `PATCHHARBOR-BUNDLE-NR`. Der Entrypoint verwendet exakt dieselbe Nummer und gibt erst nach allen Änderungen, Tests, Commits und der Prüfung des sauberen Zielzustands als seine letzte eigene Erfolgszeile `PATCHHARBOR-BUNDLE-NR: <NNN> | APPLIED SUCCESSFULLY` aus. Bei einem fehlgeschlagenen Apply darf diese Zeile nicht erscheinen; nach ihr darf PatchHarbor selbst noch Snapshot- und Result-Bundle-Meldungen ausgeben.
+
 ### 26.7 Standardisierte Warning- und Stop-Ausgaben
 
 Eine nicht blockierende Auffälligkeit beginnt exakt mit:
@@ -3175,52 +3177,15 @@ Nach der Codezeile folgen höchstens eine kurze Erklärung und eine konkrete ben
 
 ### 26.8 Verbindliche schmale Patch-Bereit-UI
 
-Verwende eine smartphone-taugliche, schmale Darstellung ohne Tabelle.
-Pro Patch-Auftrag gibt es genau eine finale Auslieferung und genau eine
-kanonische ZIP. Die Antwort beginnt einmal mit der grünen Bereitschaftszeile;
-es gibt keine zweite Bereitschaftszeile am Ende und keine zweite Fertigmeldung.
-Entwürfe und interne Neubauten werden nicht als fertig angekündigt.
+Pro Patch-Auftrag gibt es genau eine finale Auslieferung und genau eine kanonische ZIP. Eine erfolgreiche Antwort beginnt mit `🟩🟩 PATCH BEREIT 🟩🟩` und wiederholt diesen Balken im Abschlussblock; die Wiederholung ist keine zweite Auslieferung.
 
-Vor der finalen Antwort gilt diese Reihenfolge:
+Jede neue kanonische ZIP erhält eine repositorybezogene, dreistellige `PATCHHARBOR-BUNDLE-NR`. Sie zählt Bundles, nicht Commits. Der externe Chat verwendet die nächste aus dem bekannten Verlauf ableitbare Nummer; ohne verlässliche Historie beginnt er bei `001`. Die Nummer wird erst mit der kanonischen ZIP vergeben, bleibt bei erneutem Link, Backup oder Versand derselben ZIP unverändert und wird bei einem STOP ohne Bundle nicht vergeben. Sie ist Handoff-Metadatum, keine Sicherheits- oder State-Bindung.
 
-1. Paket vollständig erstellen, tatsächlich öffnen und validieren. Erst danach
-   die kanonische ZIP festlegen: Dateiname, Größe und vollständige SHA-256.
-   Ab jetzt weder neu packen noch je Kanal eine andere Fassung erzeugen.
-2. Einen existierenden Chat-Download-Link zu genau dieser Datei vorbereiten.
-   Kein Link wird aus einem Dateinamen oder einer früheren Behauptung erfunden.
-3. Verfügbare, autorisierte Google-Drive-Werkzeuge prüfen. Wenn möglich dieselbe
-   byteidentische Datei privat in `PatchHarbor-Backups/Patches` sichern; einen
-   passenden vorhandenen Ordner wiederverwenden. Keine öffentliche Freigabe
-   und keine fremden Empfänger ohne Auftrag. Den echten zurückgegebenen Link
-   bereitstellen. Ein Backup nur nach bestätigtem Upload melden; Bytegleichheit
-   nur nach SHA-256-Abgleich durch Rücklesen oder Anbieter-Prüfsumme behaupten.
-4. Verfügbare Gmail-Werkzeuge prüfen und die eigene Empfängeradresse aus dem
-   angemeldeten Konto auflösen, nicht aus Erinnerung erraten. Dieselbe ZIP an
-   den Benutzer selbst senden, mit Dateiname, SHA-256 und vorhandenem Drive-Link.
-   Verhindern Größen- oder Dateitypgrenzen den Anhang, stattdessen den bestätigten
-   Drive-Link mit Dateiname und SHA-256 mailen. Keine Schutzgrenze umgehen.
-   Ohne nutzbaren Anhang oder Drive-Link den Mail-Backup-Schritt als fehlgeschlagen
-   bzw. nicht verfügbar kennzeichnen; eine reine Statusmail ist kein Backup.
-5. Erst danach genau eine finale Antwort mit den getrennten Statusangaben
-   `Chat-Link`, `Drive-Backup`, `E-Mail` und der vollständigen `SHA-256` ausgeben.
-   Zulässige Statusangaben: `OK`, `nicht verfügbar`, `fehlgeschlagen` oder
-   `unbestätigt`, jeweils mit kurzem Grund. Bei E-Mail Anhang oder Link nennen;
-   beim Drive-Backup den tatsächlich erreichten Prüfumfang nennen.
+Vor der finalen Antwort gilt: ZIP vollständig erstellen, öffnen und validieren; danach Dateiname, Größe, Bundle-Nummer und SHA-256 festlegen und nicht mehr neu packen. Der Chat-Link verweist auf exakt diese Datei. Wenn autorisierte Drive-Werkzeuge verfügbar sind, wird dieselbe byteidentische ZIP privat unter `PatchHarbor-Backups/Patches` gesichert; keine öffentliche Freigabe. Upload-Erfolg darf nur nach Tool-Bestätigung, Bytegleichheit nur nach SHA-256-Rückprüfung oder geeigneter Anbieter-Prüfsumme behauptet werden. Die eigene Gmail-Adresse wird aus dem verbundenen Konto ermittelt; dieselbe ZIP wird dorthin gesendet, oder bei Anhangsgrenzen der bestätigte private Drive-Link mit Dateiname und SHA-256. Eine reine Statusmail ist kein Backup. Backupfehler sind Best Effort und machen einen ansonsten gültigen Patch nicht ungültig; unklaren Status prüfen und keine doppelten Uploads oder Mails erzeugen.
 
-Backups sind Best Effort: Fehler oder fehlende Werkzeuge bei Drive/Gmail machen
-einen gültigen Patch nicht ungültig und lösen keinen Neubau aus. Erfolg nur
-nach bestätigtem Tool-Ergebnis melden. Bei unklarem Upload-/Sendestatus zunächst
-nachsehen, ob genau diese Datei bzw. Mail schon existiert; nicht blind doppelt
-hochladen oder senden. Keine Fassung überschreiben oder als gleichzeitig gültige
-Alternative ausliefern. Ein später benötigter erneuter Link verwendet dieselbe
-verifizierte ZIP aus dem Backup, keinen stillschweigenden Neubau.
+`Chat-Link`, `Drive-Backup`, `E-Mail` und `SHA-256` stehen unmittelbar vor dem Abschlussblock. Chat-Link, Drive-Link und E-Mail beziehen sich auf dieselbe kanonische Datei. Die Sicherung erfolgt im externen Chat, nicht im Core, Watcher oder Entrypoint, und ist keine CI-Freigabe oder Release-Markierung.
 
-Chat-Link, Drive-Link und E-Mail beziehen sich auf dieselbe Datei, nicht auf
-mehrere Patches. Ein Drive-Link darf zusätzlich zum Chat-Link stehen.
-Die Sicherung wird vom externen Chat ausgeführt, nicht vom PatchHarbor-Core,
-Watcher oder Entrypoint. Sie ist keine CI-Freigabe und setzt keinen Release-Tag.
-
-Beispiel für einen Plan-Commit (Platzhalter nie als echte Nachweise ausgeben):
+Beispiel (Platzhalter nie als echte Nachweise ausgeben):
 
 ```text
 🟩🟩 PATCH BEREIT 🟩🟩
@@ -3235,26 +3200,18 @@ Spec: <Pfad>
 Änderungen: <5–10 kurze Zeilen>
 Tests: <vorgesehene Gates>
 Noch offen: 11 Plan-Commits
-[Patch herunterladen](sandbox:/pfad/zum/patch.zip)
+
 Chat-Link: OK
 Drive-Backup: nicht verfügbar – kein verbundenes Werkzeug
 E-Mail: nicht verfügbar – kein verbundenes Werkzeug
 SHA-256: <vollständige Prüfsumme>
+
+🟩🟩 PATCH BEREIT 🟩🟩
+PATCHHARBOR-BUNDLE-NR: 003
+[Patch herunterladen](sandbox:/pfad/zum/patch.zip)
 ```
 
-Verbindliche Regeln:
-
-- Bei `FIX` lauten die drei grünen Detailzeilen `FIX`,
-  `<PLAN-ID>-FIX<n>` und die unveränderte Planposition.
-- Bei `OFF-PLAN` lauten sie `OFF-PLAN`, die frei gewählte Kennung und
-  `-- / <Gesamtzahl>` beziehungsweise `-- / --`.
-- Zeige Commit-Message, tatsächlich verwendeten Plan- und Spezifikationspfad.
-- `Änderungen` enthält fünf bis zehn kurze Zeilen, `Tests` nur tatsächlich im
-  Paket vorgesehene Prüfungen, `Noch offen` die verbleibenden Plan-Commits.
-- Lange Pfade, Commit-Messages und Prüfsummen dürfen umbrechen.
-- `PATCH BEREIT` erscheint erst, wenn die verlinkte Datei tatsächlich existiert.
-- Behaupte vor dem Apply nicht, dass die im Patch vorgesehenen Tests schon grün
-  seien.
+Verbindlich gelten die vorhandenen `FIX`-/`OFF-PLAN`-Detailzeilen, Commit-/Plan-/Spec-Angaben und die Beschränkung auf tatsächlich vorgesehene Tests. Der Erfolgsabschluss besteht exakt aus Bereitschaftsbalken, Bundle-Nummer und Patch-Link; der Patch-Link ist die allerletzte Zeile der gesamten Antwort. `PATCH BEREIT` darf erst nach Existenz der verlinkten Datei erscheinen.
 
 ### 26.9 Auswertung nach lokalem Apply
 
