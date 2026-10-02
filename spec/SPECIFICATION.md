@@ -1,21 +1,21 @@
 # PatchHarbor – Spezifikation
 
 **Dateiname:** `SPECIFICATION.md`<br>
-**Produktversion:** `1.2.0`<br>
-**Spezifikationsstand:** 2026-09-15<br>
+**Produktversion:** `1.2.1`<br>
+**Spezifikationsstand:** 2026-10-02<br>
 **Status:** Verbindliche, freigegebene Produktspezifikation (fachlicher Vertrag) einschließlich repositorylokaler Konfiguration; keine Release-Freigabe des konkreten Commits ohne grüne Gates<br>
 **Projektname:** `PatchHarbor`<br>
 **Kommando:** `patchharbor`<br>
 **Skriptmarker:** `# PATCHHARBOR`<br>
 **Patch-Paketmarker:** `patch-harbor`
 
-Der Umsetzungs- und Commit-Plan ist von dieser Produktspezifikation getrennt und liegt unter `planning/1.2.0/commit-plan.md`. Die abgeschlossenen Pläne für 1.0.0, 1.1.0 und 1.1.1 bleiben als historische Umsetzungsgrundlage erhalten. Änderungen am Produktziel werden in `spec/SPECIFICATION_CHANGELOG.md` dokumentiert.
+Der aktuelle Umsetzungs- und Release-Plan liegt unter `planning/1.2.1/commit-plan.md`. Die abgeschlossenen Pläne für 1.0.0, 1.1.0, 1.1.1 und 1.2.0 bleiben als historische Umsetzungsgrundlage erhalten. Änderungen am Produktziel werden in `spec/SPECIFICATION_CHANGELOG.md` dokumentiert.
 
 ---
 
 ## 1. Zweck, Gültigkeit und Verhältnis zu 1.1.1
 
-Dieses Dokument beschreibt das vollständige verbindliche Produktziel von PatchHarbor 1.2.0.
+Dieses Dokument beschreibt das vollständige verbindliche Produktziel von PatchHarbor 1.2.1.
 
 Es übernimmt die Produktverträge des stabilen 1.1.1-Stands und ergänzt die
 öffentliche synchrone Python-API. Haupt-CLI und Watcher verwenden dieselben
@@ -34,7 +34,7 @@ Konfigurationsrevision ersetzt den bisherigen globalen Konfigurationsvertrag:
 - die versionierte Datei `CHAT_INSTRUCTIONS.md` zur Initialisierung eines neuen Entwicklungs-Chats,
 - eine verbindliche schmale Chat-Oberfläche für `PLAN`, `FIX`, `OFF-PLAN`, `WARNING`, `STOP` und fertige Patch-Pakete.
 
-PatchHarbor 1.2.0 führt keine Netzwerk-, Chat-, Commit-Plan- oder Journalfunktion in den Core ein. `CHAT_INSTRUCTIONS.md` ist eine ausgelieferte Vorlage für passive Bundle-Begleitdokumentation und einen externen Chat; der Exchange-Ordner ist eine lokale Dateisystemgrenze.
+PatchHarbor 1.2.1 führt keine Netzwerk-, Chat-, Commit-Plan- oder Journalfunktion in den Core ein. `CHAT_INSTRUCTIONS.md` ist eine ausgelieferte Vorlage für passive Bundle-Begleitdokumentation und einen externen Chat; der Exchange-Ordner ist eine lokale Dateisystemgrenze.
 
 Es gibt keinen Migrationscode für alte globale `config.json`, `watcher.json`,
 `paths.json` oder frühere interne Pfaddokumente. Sie werden weder gelesen noch
@@ -1210,7 +1210,7 @@ Das vollständige Verzeichnis:
 
 ist für lokale PatchHarbor-Daten reserviert.
 
-Für diesen 1.2.0-Stand enthält es mindestens:
+Für diesen 1.2.1-Stand enthält es mindestens:
 
 ```text
 .patchharbor/id
@@ -3332,7 +3332,7 @@ Tool-Unterbrechung umgedeutet werden. Version und öffentliche CLI bleiben gleic
 Der additive Vertrag steht in `planning/1.2.0/specification.md`; der Ablauf in
 `planning/1.2.0/commit-plan.md`, die Imports und Anwendungsbeispiele in
 `docs/python-api.md`. Die öffentliche synchrone API, die Haupt-CLI und der Watcher
-verwenden dieselbe Application. Die Paketversion ist 1.2.0; alle bestehenden
+verwenden dieselbe Application. Die Paketversion ist 1.2.1; alle bestehenden
 Wire-Verträge, CLI-Exitcodes, Paketmarker und Fingerprints bleiben unverändert.
 API-Ergebnisse verwenden vollständige Kennungen; keine Konsolentexte werden geparst.
 

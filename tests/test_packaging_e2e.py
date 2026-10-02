@@ -23,7 +23,7 @@ from tests.registration_support import isolated_user_environment
 pytestmark = pytest.mark.packaging
 
 MAX_WHEEL_BYTES = 256 * 1024
-RELEASE_VERSION = "1.2.0"
+RELEASE_VERSION = "1.2.1"
 EXPECTED_RUNTIME_FILES = {
     "patchharbor/py.typed",
     "patchharbor/__init__.py",
@@ -813,7 +813,7 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
         [
             str(installed_python), "-c",
             "import json, pathlib, sys; from patchharbor import api, __version__; "
-            "assert __version__ == '1.2.0'; "
+            "assert __version__ == '1.2.1'; "
             "assert 'patchharbor.cli' not in sys.modules; "
             "assert 'patchharbor.presentation' not in sys.modules; "
             "assert pathlib.Path(api.__file__).resolve().is_relative_to(pathlib.Path(sys.prefix).resolve()); "

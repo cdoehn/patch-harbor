@@ -589,7 +589,7 @@ Use manual mode on Termux. PatchHarbor does not treat the Android background
 process lifecycle as a reliable systemd service environment. Download the patch
 ZIP into the configured Exchange directory and run `patchharbor apply` manually;
 reusing the previous shell command is sufficient. No Termux-specific watcher
-support is claimed by PatchHarbor 1.2.0.
+support is claimed by PatchHarbor 1.2.1.
 
 Functional CLI test helpers have no default subprocess deadline; slow Git or
 shared storage must not turn a correct scan into an arbitrary 20-second failure.
@@ -690,7 +690,7 @@ and requires an explicitly supplied `OutputTargets`; the default is silent.
 Directory selection is an explicit callback, with the interactive menu owned by
 the CLI. Unknown choices are rejected before a file is executed.
 
-The public `patchharbor.api` facade uses these boundaries in version 1.2.0.
+The public `patchharbor.api` facade uses these boundaries in version 1.2.1.
 Library callers supply `api.OutputStreams` and receive structured results.
 The main CLI and the Watcher use the same API; neither duplicates Core decisions.
 
@@ -703,7 +703,7 @@ such as 124 or 130; they are not mistaken for PatchHarbor timeout/interruption.
 The Application makes decisions from semantic outcomes, not serialized statuses.
 
 
-## Python-Bibliothek – PatchHarbor 1.2.0
+## Python-Bibliothek – PatchHarbor 1.2.1
 
 `from patchharbor import api` stellt Konfiguration, Registry, Kontext, Bundles,
 Apply/Dry-Run, den automatischen Einzelpoll und den expliziten Skriptrunner bereit.
@@ -732,7 +732,7 @@ Jeder automatische Poll liest die repositorylokalen Einstellungen frisch und ble
 Prozess derselben Installation; dessen privater Worker ruft `api.apply_next()`
 direkt auf, nicht mehr den CLI-Parser. Betriebs-JSON, globaler Scope, Replay und
 Failed-Retry-Schutz bleiben erhalten. Die Prozess-/Signalgrenze und der Linux-
-Servicevertrag bleiben unverändert. Die Paketversion ist 1.2.0.
+Servicevertrag bleiben unverändert. Die Paketversion ist 1.2.1.
 
 
 ### Repository payload permissions

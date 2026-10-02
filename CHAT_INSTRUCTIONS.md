@@ -1,6 +1,6 @@
-# PatchHarbor 1.2.0 – Chat-Initialisierung
+# PatchHarbor 1.2.1 – Chat-Initialisierung
 
-**Vertragsversion:** 1.2.0<br>
+**Vertragsversion:** 1.2.1<br>
 **Patch-Paketmarker:** `patch-harbor`<br>
 **Patch-Paketformat:** `1`<br>
 **Result-Bundle-Marker:** `patch-harbor-result-bundle`<br>

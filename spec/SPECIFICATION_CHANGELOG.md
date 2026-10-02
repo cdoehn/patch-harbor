@@ -1,5 +1,19 @@
 # PatchHarbor – Spezifikations-Changelog
 
+## [1.2.1] – 2026-10-02
+
+**Status:** Entwicklungs-Chat-Vertrag bereinigt und Release 1.2.1 vorbereitet.
+
+- Generische Chat-Instructions leiten Tests aus Zielprojekt und Nutzerauftrag ab;
+  PatchHarbor Core definiert keine fachliche Teststrategie.
+- Ein Bundle darf standardmäßig einen oder mehrere fachlich geschlossene Commits
+  enthalten; W/R/C ist nur bei ausdrücklicher Projekt-/Auftragsvorgabe Pflicht.
+- Zwischenstände werden real nacheinander hergestellt, geprüft und committed;
+  Teilerfolg bleibt sichtbar und erzeugt keine Gesamt-Erfolgsmeldung.
+- Paketformat, State-Bindung, Sicherheitsprüfungen, Bundle-Nummer und genau eine
+  kanonische ZIP bleiben unverändert.
+- Paket- und Vertragsversion werden auf 1.2.1 angehoben; Release-Tag `v1.2.1`.
+
 ## 2026-09-21 – HANDOFF-NR: nummerierter Abschlussblock
 
 - Erfolgreiche Patch-Antworten wiederholen den grünen Statusbalken unten; der Patch-Link ist die letzte Antwortzeile.
@@ -36,7 +50,7 @@
 
 
 **Dateiname:** `SPECIFICATION_CHANGELOG.md`<br>
-**Stand:** 2026-09-15
+**Stand:** 2026-10-02
 
 Dieses Dokument protokolliert Änderungen am verbindlichen Produktziel. Es ist kein Git-Commit-Log und ersetzt nicht die getrennten Umsetzungspläne unter `planning/`.
 
