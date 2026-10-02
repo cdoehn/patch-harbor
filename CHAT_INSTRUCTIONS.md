@@ -271,57 +271,50 @@ Bestimme den Fortschritt ausschließlich aus dem gefundenen Plan und dem realen
 Repository-Zustand. Kann die erreichte Planposition nicht eindeutig bestimmt
 werden, verwende `PLAN_POSITION_UNKNOWN`; rate nicht.
 
-## 5. Spezifikation, Plan, Code und Auftrag abgleichen
+## 5. Spezifikation, Plan, Projektregeln und Auftrag abgleichen
 
-Die Spec definiert den Vertrag, der Plan seine Zerlegung; der Snapshot zeigt
-die tatsächlich vorhandenen Voraussetzungen.
+Prüfe vor der Umsetzung Spec, Plan, Snapshot und die tatsächlich verfügbaren
+Regeln des Zielprojekts: aktuelle Nutzeranweisungen, mitgegebene/verfügbare
+`AGENTS.md` sowie verbindlich referenzierte Entwicklungs- und Testvorgaben.
+Explizite Nutzeranweisungen haben Vorrang vor dieser generischen Vorlage.
+Ignorierte lokale Regeln sind nicht automatisch im Result enthalten; erfinde
+fehlende Inhalte nicht.
 
-Prüfe vor der Patch-Erstellung:
+Ein Bundle darf standardmäßig einen oder mehrere fachlich abgegrenzte Commits
+enthalten. Wähle innerhalb des Auftrags nach Eignung, Abhängigkeiten und sinnvoll
+beherrschbarer Größe eine passende Folge. Mehrere Commits brauchen allein wegen
+ihrer Anzahl keine Genehmigung. Nutzerangaben zu Anzahl oder Umfang bleiben
+maßgeblich. Jeder Commit muss ein fachlich geschlossener, testbarer Zwischenstand
+sein; die Gesamtfolge bleibt im beauftragten Scope. Mehrere Commits erweitern
+weder Scope noch Testpolicy.
 
-- ob Kennung, Commit-Message und Scope zum nächsten Plan-Schritt passen,
-- ob die Commit-Beschreibung die zugehörigen Spec-Anforderungen abdeckt,
-- ob der Code die vorausgesetzten früheren Schritte tatsächlich enthält,
-- ob die Benutzeraufgabe eindeutig und technisch sinnvoll ist,
-- ob die Änderung innerhalb eines einzelnen fachlich geschlossenen Commits
-  bleibt.
+Kleine notwendige Lücken im selben Commit-Scope als
+`PLAN_SPEC_MINOR_DEVIATION` melden. Scope-Erweiterungen, vorgezogene Planpunkte,
+neue Architekturentscheidungen oder Widersprüche nicht still umsetzen; eine
+wesentliche unauflösbare Unklarheit gezielt klären oder stoppen.
 
-Kleine notwendige Lücken im selben Commit-Scope schließen und als
-`PLAN_SPEC_MINOR_DEVIATION` melden.
+## 6. Commit-Arten und Zähler
 
-Scope-Erweiterungen, vorgezogene Planpunkte, neue Architekturentscheidungen
-oder Widersprüche nicht still umsetzen. Bei falschen, unsicheren oder unmöglichen
-Vorgaben mit passendem Code stoppen und konkret nachfragen.
-
-## 6. Commit-Art und Zähler
-
-Es gibt genau drei sichtbare Commit-Arten.
+Ordne **jeden Commit** einzeln einer der drei sichtbaren Arten zu.
 
 ### `PLAN`
-
-- Übernimm Kennung, Commitposition und Commit-Message exakt aus dem Plan.
-- Zeige den Zähler als `aktuelle Position / Gesamtzahl`.
-- Aktualisiere den Planfortschritt im selben Commit, falls der Plan dies
-  vorsieht.
+- Kennung, Position und Commit-Message exakt aus dem Plan übernehmen.
+- Zähler `aktuelle Position / Gesamtzahl`; Planfortschritt ggf. im Commit pflegen.
 
 ### `FIX`
-
-- Ein Fix gehört zu genau einem Plan-Commit.
-- Verwende `<PLAN-ID>-FIX<n>`, beginnend mit `FIX1`.
-- Die Commit-Message beginnt mit `Fix:` und beschreibt die konkrete Reparatur.
-- Ein Fix erhöht weder Gesamtzahl noch erreichte Position der Plan-Commits.
-- Zeige in der UI die unveränderte Planposition.
+- Gehört zu genau einem Plan-Commit; `<PLAN-ID>-FIX<n>` ab `FIX1`.
+- Commit-Message beginnt mit `Fix:`.
+- Erhöht weder Gesamtzahl noch erreichte Planposition; zeige diese unverändert.
 
 ### `OFF-PLAN`
+- Kurze Kennung und passende Commit-Message; `OFF-PLAN` sichtbar zeigen.
+- Plan-Zähler unverändert; mit Plan `-- / <Gesamtzahl>`, sonst `-- / --`.
 
-- Wähle eine kurze sinnvolle Kennung und Commit-Message.
-- Zeige `OFF-PLAN` unübersehbar.
-- Verändere den Plan-Zähler nicht.
-- Existiert ein Plan, zeige `-- / <Gesamtzahl>`; andernfalls `-- / --`.
-
-Ein normaler Chat-Patch erzeugt nach grünen Tests genau einen Git-Commit der
-angezeigten Art. Bei roten Tests darf kein Commit entstehen. Eine Ausnahme ist
-ein ausdrücklich verlangter Diagnoseauftrag oder eine beauftragte W/R/C-Folge
-nach Abschnitt 8.
+Ein Bundle darf einen oder mehrere solcher Commits enthalten; mehrere Commits
+brauchen keine W/R/C-Ausnahme. Wenn Projekt oder Auftrag W/R/C verlangen, bleiben
+W, R und C getrennte echte Zwischenstände mit eigenen Prüfungen und Commits;
+auch mehrere Folgen dürfen in einem Bundle liegen. W/R/C ist kein allgemeiner
+Default.
 
 ## 7. Genau ein sicheres Patch-Paket erzeugen
 
@@ -387,7 +380,7 @@ Das Paket enthält genau einen in `patch.json` referenzierten Entrypoint. Dieser
 - enthält als exakten Skriptmarker `# PATCHHARBOR`,
 - wird von PatchHarbor außerhalb des Repositorys privat bereitgestellt,
 - läuft mit dem Ziel-Repository als aktuellem Arbeitsverzeichnis,
-- führt die vorgesehenen Prüfungen und den Git-Commit aus,
+- führt die vorgesehenen Prüfungen und die beauftragte Git-Commitfolge aus,
 - beendet sich bei einem Fehler mit einem von null verschiedenen Exit-Code,
 - ruft nicht selbst `patchharbor bundle` auf.
 
@@ -440,85 +433,67 @@ ZIP-Gesamtdaten und höchstens 1.000 ZIP-Einträge.
 Nimm nur Dateien auf, die für den Auftrag notwendig sind. Prüfe im Entrypoint
 vor dem Commit, dass keine unerwarteten Repository-Dateien verändert wurden.
 
-## 8. Tests, Commit und lokale Ausführung
+## 8. Projektprüfungen, Commitfolge und lokale Ausführung
 
-Der Entrypoint führt die zur Änderung passenden Tests aus. Bei breitem,
-riskantem oder schichtenübergreifendem Scope führt er zusätzlich die vollständige
-Projektsuite aus.
+PatchHarbor Core legt keine fachliche Teststrategie des Zielprojekts fest. Nutze
+dessen tatsächlich geltende Regeln und den Nutzerauftrag für Testbefehle/-arten,
+Vollsuite oder Auswahl, parallel/seriell und Reihenfolge, Worker, Plattformen,
+CI-Auslöser, Oracles, Ausschlüsse und Ergebnisnachweise. Fehlen konkrete Befehle,
+leite angemessene Prüfungen aus Testinfrastruktur und Auftrag ab und benenne sie.
+Starte GitHub-CI nicht allein aufgrund eines PatchHarbor-Defaults.
 
-Für den dokumentierten Pixel-/Termux-Workflow gilt:
+> Vor jedem Commit müssen alle für genau diesen Zwischenstand vorgeschriebenen
+> Prüfungen erfolgreich abgeschlossen sein. Die Prüfungen bestimmt das
+> Zielprojekt; PatchHarbor Core bestimmt keine fachliche Teststrategie.
 
-- keine künstlichen Einzeltest-Timeouts,
-- kein künstlicher Gesamtsuite-Timeout,
-- fachlich notwendige interne Prozess- und Timeout-Tests bleiben unverändert.
+Commitfolgen entstehen tatsächlich nacheinander:
 
-Für dieses PatchHarbor-Repository darf ohne vorhandene `uv.lock` kein
-`uv run --frozen` verwendet werden. Entwicklungsabhängigkeiten werden aus
-`.[dev]` in der lokalen `.venv` vorbereitet, ohne die produktive pipx-Installation
-zu verändern. Den vollständigen Lauf z. B. mit
-`.venv/bin/python tools/run_tests.py` starten: xdist `auto`, Controller-Prüfung,
-kein pytest-timeout. Lokal/Bundles: Vollsuite nur parallel (`--workers 2/4`
-optional); `--serial`-Vollreferenz nur in CI.
-`--session-timeout=0` ist kein Abschalten der Frist und darf dafür nicht verwendet
-werden. Keine Tests zur Geschwindigkeit erzwingen; alle fachlichen Gates bleiben.
-Neue Tests prüfen Verhalten und maschinenlesbare Datenverträge, nicht
-README-/Spezifikationstexte, Help-Wortlaut, Farben oder Konsolenlayout.
+```text
+Änderung Zustand 1 → vorgeschriebene Prüfungen → Commit 1
+Änderung Zustand 2 → vorgeschriebene Prüfungen → Commit 2
+→ …
+```
 
-Erzeuge den Git-Commit erst, nachdem alle vorgesehenen Tests grün sind. Stage
-nur die beabsichtigten Pfade, prüfe den Commit-Inhalt und verwende exakt die in
-der UI angezeigte Commit-Message. Erhalte bereits vorhandene, nicht zum Auftrag
-gehörende staged, unstaged und untracked Änderungen. Verwende kein pauschales
-`git reset --hard` oder `git clean`, das Benutzeränderungen verlieren könnte.
-Bei einem Fehler entsteht für den scheiternden Schritt kein Commit.
+Installiere nicht zuerst den Endzustand und erzeuge danach nur nominelle
+Zwischencommits. Core bringt reguläre Paket-Nutzdateien bereits vor dem
+Entrypoint aus; nutze für gestufte Änderungen vorhandene sichere Mechanismen,
+ohne zweiten Payload-Writer. Bei rotem Gate kein Commit für diesen Zustand und
+keine nächste Änderungsphase. Muss die Projektpolicy weitere Prüfungen desselben
+Zustands ausführen, führe sie trotzdem aus. Frühere erfolgreiche Commits und der
+tatsächliche Arbeitszustand bleiben erhalten; kein globaler Rollback.
 
-Bei beauftragten W/R/C-Folgen entsteht jeder Zwischenstand einzeln:
-Änderung → Gate → Commit → nächster Schritt. Nicht zuerst den Endzustand
-installieren; Fehler erhalten frühere Commits. Plan und Spec stehen unter
-`planning/test-parallel/`. Der Scheduler ist ausschließlich pytest-xdist.
+Stage nur beabsichtigte Pfade, prüfe den Commit-Inhalt, erhalte fremde staged,
+unstaged und untracked Änderungen und verwende kein pauschales `reset --hard`
+oder `clean`.
 
-Der Vollvergleich `tools/verify_test_modes.py --outdir NEUER_PFAD` enthält
-seriell/2/4/auto mit Hash-Seeds und gehört daher in CI, nicht in lokale Bundles.
-Berichte liegen außerhalb der Quellen; Quelländerungen brauchen neue Referenzen.
-Vertrag: `docs/test-parallelism.md`.
-
-Die kanonische Patch-ZIP erhält bei ihrer finalen Festlegung eine dreistellige
-`PATCHHARBOR-BUNDLE-NR`. Der Entrypoint verwendet exakt dieselbe Nummer und gibt
-erst nach allen vorgesehenen Änderungen, Tests, Commits und einer abschließenden
-Prüfung des sauberen Zielzustands als seine letzte eigene Erfolgszeile aus:
+Die kanonische ZIP trägt eine dreistellige `PATCHHARBOR-BUNDLE-NR`, unabhängig
+von ihrer Commitanzahl. Der Entrypoint verwendet dieselbe Nummer und gibt erst
+nach der **gesamten** Folge, allen Abschlussprüfungen und sauberem Zielzustand
+als letzte eigene Erfolgszeile aus:
 
 ```text
 PATCHHARBOR-BUNDLE-NR: <NNN> | APPLIED SUCCESSFULLY
 ```
 
-Bei einem Fehler darf diese Zeile niemals erscheinen. Danach darf PatchHarbor
-selbst noch Snapshot- und Result-Bundle-Meldungen ausgeben.
+Bei einem Fehler darf diese Zeile niemals erscheinen. Bei Teilerfolg ebenfalls
+nicht. Danach darf PatchHarbor Snapshot-/Result-Meldungen ausgeben. Der Entrypoint ruft nicht
+rekursiv `patchharbor bundle` auf.
 
-PatchHarbor führt anschließend automatisch den Result-Bundle-Versuch durch,
-sobald das Ziel-Repository sicher aufgelöst wurde. Deshalb darf der Entrypoint
-`patchharbor bundle` nicht rekursiv aufrufen.
-
-Vor dem lokalen Apply darfst du nur nennen, welche Tests im Paket vorgesehen
-sind. Behaupte nicht, sie seien bereits erfolgreich. Erst ein zurückgegebenes
-Result Bundle mit erfolgreichem `logs/run.json`, passendem Git-Zustand und dem
-erwarteten Commit erlaubt eine Erfolgsaussage.
+Vor Apply nur vorgesehene Tests und Commits nennen, nicht als erfolgreich
+behaupten. Tatsächliche Ergebnisse erst aus dem zurückgegebenen Result ableiten.
 
 ## 9. Result Bundle nach Apply auswerten
 
-Unterscheide nach Rückgabe eines Result Bundles mindestens:
+Unterscheide vollständigen Erfolg, Teilerfolg, Entrypoint-/Testfehler,
+PatchHarbor-Toolfehler, fehlgeschlagenes Result Bundle und Ablehnung vor Mutation.
+Prüfe `logs/run.json`, `logs/execution.log`, `context.json`, Snapshot und die
+erwartete geordnete Commitfolge. Bei mehreren Commits nenne nachweisbare Kennungen,
+Messages und relevante Planpositionen in Reihenfolge; Teilerfolg ist kein
+Gesamterfolg.
 
-- erfolgreicher Apply und erfolgreicher Commit,
-- fehlgeschlagener Entrypoint oder Test,
-- PatchHarbor-Toolfehler,
-- erfolgreicher Primärauftrag mit fehlgeschlagenem Result Bundle,
-- Mismatch oder andere Ablehnung vor Mutation.
-
-Prüfe insbesondere `logs/run.json`, `logs/execution.log`, `context.json`, den
-aktuellen Snapshot und den erwarteten Commit. Bei einem Fehler beschreibe kurz:
-
-- die konkrete Ursache,
-- den tatsächlich zurückgebliebenen Repository-Zustand,
-- ob ein Commit entstanden ist,
-- den nächsten sinnvollen `FIX`- oder `OFF-PLAN`-Schritt.
+Bei Fehlern kurz Ursache, tatsächlichen Repository-Zustand, bereits entstandene
+Commits, nicht committeden Schritt und den nächsten sinnvollen `FIX`- oder
+`OFF-PLAN`-Schritt nennen.
 
 ## 10. Standardisierte Warning- und STOP-Ausgaben
 
@@ -596,12 +571,12 @@ Beispiel (Platzhalter sind keine Nachweise):
 🟩 1.a.W
 🟩 1 / 12
 
-Commit: <Message>
+Commits: <geordnete Folge aus Kennung, Message und ggf. Planposition>
 Plan: <Pfad>
 Spec: <Pfad>
 Änderungen: <5–10 kurze Zeilen>
-Tests: <vorgesehene Gates>
-Noch offen: 11 Plan-Commits
+Tests: <vorgesehene projektbezogene Gates je Zwischenstand>
+Noch offen: <verbleibende Plan-Commits>
 
 Chat-Link: OK
 Drive-Backup: nicht verfügbar – kein verbundenes Werkzeug
@@ -615,8 +590,10 @@ PATCHHARBOR-BUNDLE-NR: 003
 
 Verbindlich: Bei `FIX` bleiben `FIX`, `<PLAN-ID>-FIX<n>` und die Planposition;
 bei `OFF-PLAN` `OFF-PLAN`, Kennung und `-- / <Gesamtzahl>` bzw. `-- / --`. Zeige
-Commit, Plan und Spec; `Änderungen` fünf bis zehn kurze Zeilen, `Tests` nur
-vorgesehene Gates, `Noch offen` verbleibende Plan-Commits. Erfolgsabschluss:
+bei mehreren Commits die geordnete Folge mit Kennungen, Commit-Messages und
+relevanten Planpositionen kompakt; bei einem Commit entsprechend nur diesen.
+Zeige Plan und Spec; `Änderungen` fünf bis zehn kurze Zeilen, `Tests` nur
+vorgesehene projektbezogene Gates, `Noch offen` verbleibende Plan-Commits. Erfolgsabschluss:
 genau Bereitschaftsbalken, Bundle-Nummer, Patch-Link. Der Patch-Link ist die
 allerletzte Zeile der gesamten Antwort; danach folgt nichts. `PATCH BEREIT` erst
 nach Existenz der Datei; vor Apply keine vorgesehenen Tests als grün behaupten.

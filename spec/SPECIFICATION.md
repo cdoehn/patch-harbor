@@ -3084,60 +3084,78 @@ Ist keine Spezifikation vorhanden, zeigt die UI `Spec: nicht vorhanden` und arbe
 
 Der verwendete Plan- und Spezifikationspfad wird in jeder Patch-Bereit-Ausgabe angezeigt. Kann die bereits erreichte Planposition nicht eindeutig bestimmt werden, gilt `PLAN_POSITION_UNKNOWN`; der Chat rät nicht.
 
-### 26.4 Verhältnis von Spezifikation, Plan und Repository
+### 26.4 Verhältnis von Spezifikation, Plan, Projektregeln und Repository
 
-Die Spezifikation ist der fachliche Vertrag. Der Commit-Plan ist die vorgesehene Zerlegung dieses Vertrags. Der reale Repository-Zustand entscheidet, welche Voraussetzungen bereits tatsächlich vorhanden sind.
+Die Spezifikation ist der fachliche Vertrag, ein vorhandener Plan die vorgesehene
+Zerlegung und der reale Repository-Zustand die tatsächliche Voraussetzung. Der
+Entwicklungs-Chat berücksichtigt zusätzlich aktuelle ausdrückliche
+Nutzeranweisungen, verfügbare `AGENTS.md` und verbindlich referenzierte
+Projektregeln. Explizite Nutzeranweisungen haben Vorrang vor der generischen
+PatchHarbor-Vorlage. Nicht verfügbare ignorierte lokale Regeln werden nicht
+erfunden.
 
-Vor der Patch-Erstellung gleicht der Chat die konkrete Commit-Beschreibung mit den zugehörigen Spezifikationsabschnitten und dem Code ab.
+Ein Bundle darf standardmäßig einen oder mehrere fachlich abgegrenzte Commits
+enthalten. Jeder einzelne Commit bildet einen fachlich geschlossenen,
+prüfbaren Zwischenstand; die gesamte Folge bleibt im beauftragten Scope.
+Mehrere Commits brauchen allein wegen ihrer Anzahl keine Sondergenehmigung und
+ändern weder Scope noch Testpolicy.
 
-- Eine kleine, eindeutig zum Commit gehörende und für dessen Korrektheit notwendige Lücke darf im selben Commit geschlossen werden. Sie wird als Warning sichtbar gemacht.
-- Eine merkliche Scope-Erweiterung, ein vorgezogener späterer Planpunkt, eine neue Architekturentscheidung oder ein fachlicher Widerspruch wird nicht stillschweigend umgesetzt.
-- Erscheint eine Vorgabe technisch falsch, unlogisch, unsicher oder unmöglich, stoppt der Chat mit einem passenden Code und einer kurzen konkreten Frage.
+Kleine notwendige Lücken im selben Commit-Scope dürfen mit sichtbarer Warning
+geschlossen werden. Scope-Erweiterung, vorgezogener Planpunkt, neue
+Architekturentscheidung oder Widerspruch werden nicht still umgesetzt.
 
 ### 26.5 Commit-Arten und Zähler
 
-Es gibt genau drei sichtbare Commit-Arten:
+`PLAN`, `FIX` und `OFF-PLAN` werden pro Commit nach dem bestehenden Vertrag
+zugeordnet. Plan-Commits übernehmen Kennung, Position und Message aus dem Plan;
+`FIX` verwendet `<PLAN-ID>-FIX<n>` und erhöht den Planfortschritt nicht;
+`OFF-PLAN` verändert den Plan-Zähler ebenfalls nicht und zeigt mit vorhandenem
+Plan `-- / <Gesamtzahl>`, ohne Plan `-- / --`.
 
-`PLAN`
+Ein Bundle darf einen oder mehrere dieser Commits enthalten. Mehrere Commits
+setzen keine W/R/C-Ausnahme voraus. Verlangt Projekt oder Auftrag W/R/C, bleiben
+W, R und C getrennte echte Zustände mit den jeweils vorgeschriebenen Prüfungen
+und eigenem Commit; W/R/C ist kein allgemeiner Default.
 
-- Kennung, Commitposition und Commit-Message werden exakt aus dem ausgewählten Plan übernommen.
-- Der Plan-Zähler zeigt `aktuelle Position / Gesamtzahl`.
+### 26.6 Patch-Paket-, Prüf- und Commitfolgevertrag des Chats
 
-`FIX`
+Der Chat erzeugt genau eine herunterladbare ZIP im bestehenden sicheren
+PatchHarbor-Paketformat mit genau einer Root-`patch.json` und genau einem
+manifestierten Entrypoint. Paketformat, anfängliche State-Bindung und Core-
+Sicherheitsprüfungen bleiben unverändert.
+Der Patch-Dateiname folgt `<Repository>_Patch_<HHMMSS>_<MMDD>_<ID6>.zip`;
+Result Bundles folgen `<Repository>_Result_<HHMMSS>_<MMDD>_<ID6>.zip`.
 
-- Ein Fix gehört zu genau einem Plan-Commit.
-- Seine Kennung lautet `<PLAN-ID>-FIX<n>`, beginnend mit `FIX1`.
-- Seine Commit-Message beginnt mit `Fix:` und beschreibt die konkrete Reparatur.
-- Ein Fix erhöht weder Gesamtzahl noch erreichte Position der Plan-Commits.
+PatchHarbor Core bestimmt keine fachliche Teststrategie des Zielprojekts. Der
+Chat leitet Testbefehle und Testarten, Vollsuite oder Auswahl, parallel/seriell
+und Reihenfolge, Worker, Plattformen, CI-Auslöser, Oracles, Ausschlüsse und
+Ergebnisnachweise aus den tatsächlich geltenden Projektregeln und dem
+Nutzerauftrag ab. Fehlen konkrete Befehle, werden angemessene Prüfungen aus der
+vorhandenen Testinfrastruktur und dem Auftrag abgeleitet und benannt. GitHub-CI
+wird nicht allein aufgrund eines generischen PatchHarbor-Defaults gestartet.
 
-`OFF-PLAN`
+Vor jedem Commit müssen alle für genau diesen Zwischenstand vorgeschriebenen
+Prüfungen erfolgreich abgeschlossen sein. Eine Commitfolge stellt die Zustände
+real nacheinander her: Änderung → vorgeschriebene Prüfungen → Commit → nächster
+Zustand. Ein Endzustand darf nicht vorab installiert und anschließend nur
+nominell in mehrere Commits zerlegt werden. Reguläre Paket-Nutzdateien können vom
+Core bereits vor dem Entrypoint ausgebracht sein; gestufte Änderungen verwenden
+vorhandene sichere Mechanismen und keinen zweiten Payload-Writer.
 
-- Der Chat darf eine kurze sinnvolle Kennung und Commit-Message frei wählen.
-- `OFF-PLAN` muss unübersehbar angezeigt werden.
-- Ein Off-Plan-Commit verändert den Plan-Zähler nicht.
-- Existiert ein Plan, zeigt die UI `-- / <Gesamtzahl>`; existiert keiner, zeigt sie `-- / --`.
+Bei einem Prüfungsfehler entsteht kein Commit für den betroffenen Zustand und es
+beginnt keine weitere Änderungsphase. Muss die Projektpolicy weitere Prüfungen
+desselben Zustands ausführen, bleiben diese vorgeschrieben. Bereits erfolgreiche
+Commits und der tatsächliche Arbeitszustand werden nicht global zurückgerollt.
 
-Ein Chat-Patch erzeugt nach grünen Tests genau einen Git-Commit der angezeigten Art, sofern der Benutzer nicht ausdrücklich einen nicht committenden Diagnoseauftrag verlangt. Bei roten Tests entsteht kein Commit.
+Vor Apply werden nur vorgesehene Tests und Commits beschrieben. Tatsächlicher
+Erfolg wird erst aus dem zurückgegebenen Result abgeleitet.
 
-### 26.6 Patch-Paket- und Testvertrag des Chats
-
-Der Chat erzeugt genau eine herunterladbare ZIP-Datei im sicheren PatchHarbor-Paketformat. Er liefert keine parallele Shell-Datei, keinen zweiten Patch und keine alternative manuelle Änderungsanleitung. Der Dateiname folgt `<Repository>_Patch_<HHMMSS>_<MMDD>_<ID6>.zip` mit UTC-Uhrzeit, Monat/Tag ohne Jahr und den ersten sechs Zeichen einer Paket-UUID ohne `…`.
-
-Das Paket:
-
-- enthält genau eine Root-`patch.json`,
-- verwendet unverändert `repo_id`, Base-Commit, Fingerprint und Algorithmus aus dem aktuellen Result Bundle,
-- enthält genau einen manifestierten Entrypoint mit dem Pflichtmarker `# PATCHHARBOR`,
-- enthält nur die für den Auftrag notwendigen sicheren Nutzdateien,
-- führt die zur Änderung passenden Tests mit einer plattformgerechten Timeout-Strategie aus,
-- verwendet im dokumentierten Pixel-/Termux-Workflow keinen künstlichen Einzeltest- oder Gesamtsuite-Timeout; fachlich notwendige interne Prozess- und Timeout-Tests bleiben bestehen,
-- verwendet bei breitem oder riskantem Scope die vollständige Testsuite,
-- erzeugt den vorgesehenen Git-Commit erst nach grünen Tests,
-- ruft nicht selbst `patchharbor bundle` auf.
-
-Vor dem lokalen Apply darf die UI nur die im Patch vorgesehenen Tests nennen. Sie darf diese Tests nicht als erfolgreich darstellen. Erst ein zurückgegebenes Result Bundle mit erfolgreichem Run-Bericht erlaubt eine Erfolgsaussage.
-
-Die kanonische Patch-ZIP erhält bei ihrer finalen Festlegung eine dreistellige `PATCHHARBOR-BUNDLE-NR`. Der Entrypoint verwendet exakt dieselbe Nummer und gibt erst nach allen Änderungen, Tests, Commits und der Prüfung des sauberen Zielzustands als seine letzte eigene Erfolgszeile `PATCHHARBOR-BUNDLE-NR: <NNN> | APPLIED SUCCESSFULLY` aus. Bei einem fehlgeschlagenen Apply darf diese Zeile nicht erscheinen; nach ihr darf PatchHarbor selbst noch Snapshot- und Result-Bundle-Meldungen ausgeben.
+Die kanonische ZIP erhält eine dreistellige `PATCHHARBOR-BUNDLE-NR`; sie bezeichnet
+genau eine ZIP unabhängig von ihrer Commitanzahl. Der Entrypoint verwendet
+dieselbe Nummer und gibt erst nach der gesamten vorgesehenen Commitfolge, allen
+Abschlussprüfungen und sauberem Zielzustand seine letzte eigene Erfolgszeile
+`PATCHHARBOR-BUNDLE-NR: <NNN> | APPLIED SUCCESSFULLY` aus. Bei Fehler oder
+Teilerfolg darf sie nicht erscheinen.
 
 ### 26.7 Standardisierte Warning- und Stop-Ausgaben
 
@@ -3148,7 +3166,10 @@ Eine nicht blockierende Auffälligkeit beginnt exakt mit:
 CODE: <WARNING_CODE>
 ```
 
-Zulässige Warning-Codes sind mindestens `PLAN_SPEC_MINOR_DEVIATION`, `NON_BLOCKING_ASSUMPTION` und `REDUCED_TEST_SCOPE` mit der bestehenden Bedeutung. Wird trotz Warnung ausgeliefert, wird derselbe gelbe Block unmittelbar vor dem grünen Abschlussblock aus 26.8 wiederholt.
+Zulässige Warning-Codes sind mindestens `PLAN_SPEC_MINOR_DEVIATION`,
+`NON_BLOCKING_ASSUMPTION` und `REDUCED_TEST_SCOPE`. Wird trotz Warnung
+ausgeliefert, wird derselbe gelbe Block unmittelbar vor dem grünen Abschluss
+wiederholt.
 
 Eine blockierende Situation beginnt exakt mit:
 
@@ -3157,57 +3178,48 @@ Eine blockierende Situation beginnt exakt mit:
 CODE: <STOP_CODE>
 ```
 
-Zulässige Stop-Codes sind mindestens `PLAN_NOT_FOUND`, `PLAN_AMBIGUOUS`, `PLAN_POSITION_UNKNOWN`, `SPEC_AMBIGUOUS`, `PLAN_SPEC_CONFLICT`, `REPOSITORY_STATE_INCOMPLETE`, `REQUIREMENT_AMBIGUOUS`, `UNSAFE_OR_IMPOSSIBLE` und `PATCH_CREATION_FAILED`. Nach der Codezeile folgen höchstens eine kurze Erklärung und die benötigte Entscheidung. Bei STOP entsteht kein Patch-Bundle: keine neue Bundle-Nummer, kein Patch-Link und kein `PATCH BEREIT`. Der identische rote Block bildet zusätzlich den Abschluss der Antwort.
+Zulässige Stop-Codes sind mindestens `PLAN_NOT_FOUND`, `PLAN_AMBIGUOUS`,
+`PLAN_POSITION_UNKNOWN`, `SPEC_AMBIGUOUS`, `PLAN_SPEC_CONFLICT`,
+`REPOSITORY_STATE_INCOMPLETE`, `REQUIREMENT_AMBIGUOUS`, `UNSAFE_OR_IMPOSSIBLE`
+und `PATCH_CREATION_FAILED`. Bei STOP entsteht kein Patch-Bundle: keine neue
+Bundle-Nummer, kein Patch-Link und kein `PATCH BEREIT`; der rote Block bildet
+den Abschluss.
 
 ### 26.8 Verbindliche schmale Patch-Bereit-UI
 
-Pro Auftrag gibt es genau eine finale Auslieferung und eine kanonische ZIP. Erfolgreiche Antworten beginnen mit `🟩🟩 PATCH BEREIT 🟩🟩` und wiederholen den Balken im Abschlussblock; die Wiederholung ist keine zweite Auslieferung.
+Pro Auftrag gibt es genau eine finale Auslieferung und eine kanonische ZIP.
+Erfolgreiche Antworten beginnen mit `🟩🟩 PATCH BEREIT 🟩🟩` und wiederholen den
+Balken im Abschlussblock; die Wiederholung ist keine zweite Auslieferung.
 
-Jede neu festgelegte kanonische ZIP erhält eine repositorybezogene dreistellige `PATCHHARBOR-BUNDLE-NR`; sie zählt Bundles, nicht Commits. Der externe Chat verwendet die nächste aus dem bekannten Verlauf ableitbare Nummer und beginnt ohne verlässliche Historie bei `001`. Er erhöht nur bei einer tatsächlich neuen kanonischen ZIP; erneuter Link, Download, Backup oder Versand derselben ZIP behält dieselbe Nummer. STOP ohne Bundle erhöht nichts und vergibt keine Nummer. Es gibt keinen zentralen oder transaktionalen Nummerngeber; parallele oder unabhängige Chats dürfen deshalb kollidieren oder eine Nummer falsch schätzen. Das ist akzeptiert, kein STOP-Grund und berührt keine Sicherheits-, State- oder Repository-Bindung.
+Jede neue kanonische ZIP erhält eine repositorybezogene dreistellige
+`PATCHHARBOR-BUNDLE-NR`; sie zählt Bundles, nicht Commits. Ohne verlässliche
+Historie beginnt der externe Chat bei `001`; unabhängige Chats dürfen kollidieren.
+Die Nummer ist Handoff-Metadatum, keine Sicherheits- oder State-Bindung.
 
-Vor der finalen Antwort wird die ZIP vollständig erstellt, geöffnet und validiert; erst dann werden Dateiname, Größe, Nummer und SHA-256 festgelegt und die ZIP nicht mehr neu gepackt. Der Chat-Link verweist auf diese Datei. Autorisierte Drive-Werkzeuge sichern wenn möglich dieselbe byteidentische ZIP privat unter `PatchHarbor-Backups/Patches`; keine öffentliche Freigabe. Upload-Erfolg erfordert Tool-Bestätigung, Bytegleichheit SHA-256-Rückprüfung oder geeignete Anbieter-Prüfsumme. Die eigene Gmail-Adresse stammt aus dem verbundenen Konto; dieselbe ZIP wird gesendet oder bei Anhangsgrenzen der bestätigte private Drive-Link mit Dateiname und SHA-256. Eine reine Statusmail ist kein Backup. Backups sind Best Effort, unklarer Status wird geprüft und nicht blind doppelt versendet.
+Bei mehreren Commits nennt die Übergabe ihre geordnete Folge mit Kennungen,
+Commit-Messages und relevanten Planpositionen kompakt. Vor Apply sind Tests und
+Commits als vorgesehen zu kennzeichnen; Teilerfolg wird nach Apply nicht als
+Gesamterfolg dargestellt.
 
-`Chat-Link`, `Drive-Backup`, `E-Mail` und `SHA-256` stehen unmittelbar vor dem Abschlussblock. Alle Kanäle beziehen sich auf dieselbe kanonische Datei. Die Sicherung erfolgt im externen Chat, nicht im Core, Watcher oder Entrypoint, und ist weder CI-Freigabe noch Release-Markierung.
+Vor der finalen Antwort wird die ZIP erstellt, geöffnet und validiert; erst dann
+werden Dateiname, Größe, Nummer und SHA-256 festgelegt. Autorisierte Drive- und
+Gmail-Backups verwenden dieselbe kanonische ZIP und bleiben Best Effort. Die
+Sicherung erfolgt im externen Chat, nicht in Core, Watcher oder Entrypoint.
 
-Beispiel (Platzhalter nie als echte Nachweise ausgeben):
-
-```text
-🟩🟩 PATCH BEREIT 🟩🟩
-
-🟩 PLAN
-🟩 1.a.W
-🟩 1 / 12
-
-Commit: <Message>
-Plan: <Pfad>
-Spec: <Pfad>
-Änderungen: <5–10 kurze Zeilen>
-Tests: <vorgesehene Gates>
-Noch offen: 11 Plan-Commits
-
-Chat-Link: OK
-Drive-Backup: nicht verfügbar – kein verbundenes Werkzeug
-E-Mail: nicht verfügbar – kein verbundenes Werkzeug
-SHA-256: <vollständige Prüfsumme>
-
-🟩🟩 PATCH BEREIT 🟩🟩
-PATCHHARBOR-BUNDLE-NR: 003
-[Patch herunterladen](sandbox:/pfad/zum/patch.zip)
-```
-
-Bei `FIX` und `OFF-PLAN` bleiben die bestehenden Detailzeilen und Planpositionen. Commit, Plan und Spec werden genannt; Tests sind nur vorgesehene Gates. Der Erfolgsabschluss besteht genau aus Bereitschaftsbalken, Bundle-Nummer und Patch-Link. Der Patch-Link ist die allerletzte Zeile der gesamten Antwort.
+`Chat-Link`, `Drive-Backup`, `E-Mail` und `SHA-256` stehen unmittelbar vor dem
+Abschlussblock. Der Erfolgsabschluss besteht aus Bereitschaftsbalken,
+Bundle-Nummer und Patch-Link; der Patch-Link ist die allerletzte Zeile der
+Antwort.
 
 ### 26.9 Auswertung nach lokalem Apply
 
-Nach Rückgabe eines Result Bundles unterscheidet der Chat mindestens:
-
-- erfolgreicher Apply und erfolgreicher Commit,
-- fehlgeschlagener Entrypoint oder Test,
-- PatchHarbor-Toolfehler,
-- erfolgreicher Primärauftrag mit fehlgeschlagenem Result Bundle,
-- Mismatch oder andere Ablehnung vor Mutation.
-
-Ein Erfolg darf erst nach Prüfung von `run.json`, Git-Zustand und erwartetem Commit bestätigt werden. Bei einem Fehler beschreibt der Chat knapp die Ursache, den tatsächlich zurückgebliebenen Zustand und den nächsten sinnvollen `FIX`- oder `OFF-PLAN`-Schritt.
+Nach Rückgabe eines Results unterscheidet der Chat vollständigen Erfolg,
+Teilerfolg, Entrypoint-/Testfehler, PatchHarbor-Toolfehler, fehlgeschlagenes
+Result Bundle und Ablehnung vor Mutation. Er prüft Logs, Snapshot und die
+erwartete geordnete Commitfolge. Bei mehreren Commits nennt er die nachweisbar
+entstandenen Commits in Reihenfolge. Bei Teilerfolg bleibt der Gesamtauftrag
+fehlgeschlagen; Ursache, verbleibender Zustand, nicht committedes Element und
+nächster sinnvoller `FIX`-/`OFF-PLAN`-Schritt werden knapp angegeben.
 
 ---
 

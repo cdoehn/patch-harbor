@@ -247,18 +247,18 @@ def test_v111_commit_plan_has_one_consistent_consolidated_sequence() -> None:
     specification = (
         PROJECT_ROOT / "spec" / "SPECIFICATION.md"
     ).read_text(encoding="utf-8")
-    assert "🟩 1 / 12" in specification
-    assert "11 Plan-Commits" in specification
-    assert "🟩 1 / 33" not in specification
-    assert "32 Plan-Commits" not in specification
     assert "`OFF-PLAN` `PLAN12`" in plan
     assert "ohne künstliche Einzeltest- oder Gesamtsuite-Timeouts" in plan
     assert "patchharbor bundle --output-dir \"$HOME/Downloads\"" in plan
-    assert (
-        "verwendet im dokumentierten Pixel-/Termux-Workflow keinen "
-        "künstlichen Einzeltest- oder Gesamtsuite-Timeout"
-    ) in specification
-    assert "führt die zur Änderung passenden Tests mit harten Timeouts aus" not in specification
+
+    # Historical 1.1.1 plan details stay in that plan; the generic chat contract
+    # must no longer hard-code one project's Pixel/timeout/test-runner policy.
+    generic_start = specification.index("### 26.6 ")
+    generic_end = specification.index("### 26.7 ", generic_start)
+    generic_contract = specification[generic_start:generic_end]
+    assert "Pixel-/Termux-Workflow" not in generic_contract
+    assert "künstlichen Einzeltest- oder Gesamtsuite-Timeout" not in generic_contract
+    assert "PatchHarbor Core bestimmt keine fachliche Teststrategie" in generic_contract
 
 
 def test_exchange_apply_lifecycle_is_core_owned_and_published_around_execution() -> None:

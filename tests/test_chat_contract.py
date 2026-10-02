@@ -49,10 +49,10 @@ EXPECTED_HEADINGS = [
     "## 2. Erforderliche Eingaben",
     "## 3. Result Bundle vollständig auswerten",
     "## 4. Zielversion, Commit-Plan und Spezifikation finden",
-    "## 5. Spezifikation, Plan, Code und Auftrag abgleichen",
-    "## 6. Commit-Art und Zähler",
+    "## 5. Spezifikation, Plan, Projektregeln und Auftrag abgleichen",
+    "## 6. Commit-Arten und Zähler",
     "## 7. Genau ein sicheres Patch-Paket erzeugen",
-    "## 8. Tests, Commit und lokale Ausführung",
+    "## 8. Projektprüfungen, Commitfolge und lokale Ausführung",
     "## 9. Result Bundle nach Apply auswerten",
     "## 10. Standardisierte Warning- und STOP-Ausgaben",
     "## 11. Verbindliche schmale Patch-Bereit-UI",
@@ -269,31 +269,33 @@ def test_chat_and_spec_share_commit_warning_stop_and_ui_contracts() -> None:
         "FIX",
         "OFF-PLAN",
     ]
-    for fragment in (
-        "<PLAN-ID>-FIX<n>",
-        "Ein Fix erhöht weder Gesamtzahl noch erreichte Position",
-        "-- / <Gesamtzahl>",
-        "-- / --",
-    ):
+    for fragment in ("<PLAN-ID>-FIX<n>", "-- / <Gesamtzahl>", "-- / --"):
         assert fragment in commit_section
         assert fragment in specification
-    assert "Verändere den Plan-Zähler nicht" in commit_section
-    assert "Ein Off-Plan-Commit verändert den Plan-Zähler nicht" in specification
+    assert "Erhöht weder Gesamtzahl noch erreichte Planposition" in commit_section
+    assert "erhöht den Planfortschritt nicht" in specification
+    assert "Plan-Zähler unverändert" in commit_section
 
-    chat_ui = _fenced_blocks(
-        _section(chat, EXPECTED_HEADINGS[10], EXPECTED_HEADINGS[11]),
-        "text",
+    # The product spec and the chat contract must agree on semantics, not on a
+    # human-facing Markdown example or console layout.
+    chat_ui = _normalise_space(
+        _section(chat, EXPECTED_HEADINGS[10], EXPECTED_HEADINGS[11])
     )
-    spec_ui = _fenced_blocks(
+    spec_ui = _normalise_space(
         _section(
             specification,
             "### 26.8 Verbindliche schmale Patch-Bereit-UI",
             "### 26.9 Auswertung nach lokalem Apply",
-        ),
-        "text",
+        )
     )
-    assert len(chat_ui) == len(spec_ui) == 1
-    assert chat_ui[0] == spec_ui[0]
+    for fragment in (
+        "eine kanonische ZIP",
+        "PATCHHARBOR-BUNDLE-NR",
+        "zählt Bundles, nicht Commits",
+        "Patch-Link ist die allerletzte Zeile",
+    ):
+        assert fragment in chat_ui
+        assert fragment in spec_ui
 
 
 def test_patch_delivery_contract_is_single_artifact_and_backup_safe() -> None:
@@ -376,6 +378,55 @@ def test_bundle_number_is_shared_with_successful_entrypoint_only() -> None:
         "kein STOP-Grund",
     ):
         assert phrase in compact
+
+
+def test_generic_chat_contract_delegates_test_policy_and_allows_commit_sequences() -> None:
+    chat = _text(CHAT_PATH)
+    compact = _normalise_space(chat)
+    execution = _normalise_space(
+        _section(chat, EXPECTED_HEADINGS[7], EXPECTED_HEADINGS[8])
+    )
+    commit_rules = _normalise_space(
+        _section(chat, EXPECTED_HEADINGS[4], EXPECTED_HEADINGS[6])
+    )
+
+    for required in (
+        "Explizite Nutzeranweisungen haben Vorrang",
+        "`AGENTS.md`",
+        "Ein Bundle darf standardmäßig einen oder mehrere fachlich abgegrenzte Commits enthalten",
+        "Mehrere Commits brauchen allein wegen ihrer Anzahl keine Genehmigung",
+        "Mehrere Commits erweitern weder Scope noch Testpolicy",
+        "PatchHarbor Core legt keine fachliche Teststrategie",
+        "Vor jedem Commit müssen alle für genau diesen Zwischenstand vorgeschriebenen",
+        "Installiere nicht zuerst den Endzustand",
+        "Teilerfolg",
+    ):
+        assert required in compact
+
+    for project_specific_default in (
+        "Pixel-/Termux-Workflow",
+        "uv run --frozen",
+        ".[dev]",
+        "xdist `auto`",
+        "Lokal/Bundles: Vollsuite nur parallel",
+        "--serial`-Vollreferenz nur in CI",
+        "planning/test-parallel/",
+        "docs/test-parallelism.md",
+        "seriell/2/4/auto mit Hash-Seeds",
+    ):
+        assert project_specific_default not in execution
+
+    assert "genau einen Git-Commit" not in commit_rules
+    assert "Eine Ausnahme ist" not in commit_rules
+
+
+def test_canonical_template_path_and_renderer_remain_the_handoff_source() -> None:
+    source = _text(PROJECT_ROOT / "src" / "patchharbor" / "chat_instructions.py")
+    packaging = _text(PROJECT_ROOT / "pyproject.toml")
+    assert "source_template = module.parents[2] / CHAT_INSTRUCTIONS_NAME" in source
+    assert '"share/patchharbor" = ["CHAT_INSTRUCTIONS.md", "docs/python-api.md"]' in packaging
+    assert "load_chat_template()" in source
+    assert "render_chat_handoff" in source
 
 
 def test_chat_contract_carries_retry_filename_and_identifier_presentation() -> None:
