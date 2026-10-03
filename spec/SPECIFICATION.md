@@ -2,16 +2,16 @@
 
 **Dateiname:** `SPECIFICATION.md`<br>
 **Produktversion:** `1.2.1`<br>
-**Spezifikationsstand:** 2026-10-03 · RIV-Integration Revision 4<br>
+**Spezifikationsstand:** 2026-10-03 · RIV-Integration Revision 5<br>
 **Status:** Verbindliche, freigegebene Produktspezifikation für den Bestandsvertrag 1.2.1; keine Release-Freigabe des konkreten Commits ohne grüne Gates.<br>
-**RIV-Status:** Paketprüfung (1.a) durch Apply bestätigt; Bindungsmodi (1.b) im Entwicklungsstand, Runtime und Result-Format 2 weiterhin geplant. Keine Release-Freigabe.<br>
+**RIV-Status:** Paketprüfung und Bindungsmodi (1.a/1.b) durch Apply bestätigt; Runtime-Bereitstellung (1.c.W) im Entwicklungsstand. Runtime-Robustheit und Result-Format 2 folgen. Keine Release-Freigabe.<br>
 **Projektname:** `PatchHarbor`<br>
 **Kommando:** `patchharbor`<br>
 **Skriptmarker:** `# PATCHHARBOR`<br>
 **Patch-Paketmarker:** `patch-harbor`
 
 Der aktive Entwicklungsplan für Runtime / Inspect / Validate (RIV) liegt unter
-`planning/runtime-inspect-validate/commit-plan.md`: 6 von 18 Schritten vorbereitet; 1.a angewendet, 1.b-Apply-Nachweis folgt.
+`planning/runtime-inspect-validate/commit-plan.md`: 7 von 18 Schritten vorbereitet; 1.a/1.b angewendet, 1.c.W-Apply-Nachweis folgt.
 Die Zielversion dieser Erweiterung wird gesondert festgelegt; die vorhandene
 Paketversion bleibt 1.2.1. Die abgeschlossenen Pläne unter `planning/1.2.1/`,
 `planning/1.2.0/`, `planning/1.1.1/`, `planning/1.1.0/` und `planning/1.0.0/`
@@ -3444,11 +3444,14 @@ Die frühere serielle CI-Lane wurde durch CI-MANUAL-1 abgelöst. Verbindlich ist
 Linux-/Windows-/PowerShell-/Docker-Gates bleiben erhalten. Der Modusverifier
 ist ein explizites Diagnosewerkzeug und kein automatisch gestarteter CI-Schritt.
 
-Für jeden später zu committenden Zustand führt der Entrypoint im Apply-Repository
-zuerst `.venv/bin/python tools/run_tests.py --suite all` und nach dessen Erfolg
-`.venv/bin/python tools/run_tests.py --suite all --serial` vollständig aus.
-Erst nach beiden grünen Gates entsteht der Commit. Dies gilt auch für reine
-Dokumentationscommits und jeden einzelnen W/R/C-Zustand. Diagnosebundles mit null
+Die Nutzeranweisung vom 3. Oktober 2026 ersetzt die frühere doppelte Prüfung
+vor jedem Zwischencommit: Development führt ausschließlich parallele Tests aus.
+Im Apply prüft `.venv/bin/python tools/run_tests.py --suite all` jeden
+Zwischenstand vor seinem Commit. Nur am Bundle-Ende läuft auf dem unveränderten
+Endstand die vollständige Suite zuerst mit `--serial`, danach parallel.
+Dieser abschließende parallele Lauf erfüllt zugleich das Commit-Gate des
+letzten Zustands. Erst danach erfolgen der letzte Commit und der einzige Push.
+Dies gilt auch für Dokumentations- und W/R/C-Commits. Diagnosebundles mit null
 Commits folgen dem beauftragten Prüfumfang gemäß 26.5.
 
 Keine zusätzlichen künstlichen Test-/Suite-Timeouts. Das äußere Apply-Limit,
@@ -3501,8 +3504,9 @@ W-Cores für seine Schreiboperationen, keine zweite Writer-Implementierung.
 
 Die frühere Testzuordnung des POSIX-W/R/C-Auftrags ist historisch. Für aktuelle
 PatchHarbor-Entwicklung gelten Abschnitt 33 und `docs/test-parallelism.md`:
-vor jedem Apply-Commit vollständige Suite parallel, anschließend vollständig
-seriell; GitHub-CI wird ausschließlich manuell gestartet.
+Development ausschließlich parallel; Apply-Zwischenstände parallel, nur am
+Bundle-Ende vollständig seriell und parallel vor letztem Commit/Push.
+GitHub-CI wird ausschließlich manuell gestartet.
 
 
 ## 35. Erweiterungsziel und Geltungsbereich
@@ -3511,7 +3515,8 @@ seriell; GitHub-CI wird ausschließlich manuell gestartet.
 Exchange-Revision 2**. **Basis:** PatchHarbor-Quellstand 1.2.1 aus dem Result
 `patchharbor-apply_Result_073436_1003_116272.zip`, Commit
 `68dba9216b72dc0b6441df83f49c9047b8b038b9`. **Status:** schrittweise in Umsetzung; Paketprüfung gemäß
-1.a/1.b vorhanden, Runtime und Format 2 noch nicht implementiert oder freigegeben. Die nächste Release-Versionsnummer
+1.a/1.b vorhanden, Runtime-Bereitstellung 1.c.W im Dateistand vorbereitet;
+Format 2 und die Runtime-Gesamtfreigabe folgen. Die nächste Release-Versionsnummer
 wird gesondert festgelegt; 1.2.1 bezeichnet bereits den vorhandenen Quellstand.
 Das Result nennt separat die ausführende Engine 1.2.0; dies ist keine abweichende
 Quellversion. Herkunft und vollständige Bindung stehen im RIV-Plan.
@@ -3683,7 +3688,13 @@ Drei Identitäten bleiben getrennt: `distribution_version` für die Paketversion
 
 Ein Quellcommit wird nur angegeben, wenn belegt, und ersetzt keine Inhaltsprüfung. Die Herkunft besagt Zuordnung zum erzeugenden Werkzeug, nicht eine digitale Signatur oder Releasefreigabe. Vor Benutzung werden Inventar, Reproduktionsbeschreibung und vorliegende Ressourcen konsistent geprüft; ein Hash derselben untrusted Quelle beweist keinen Absender.
 
-Diese konkrete Bereitstellungsrichtung ist ein Entwurf, **noch kein bestandener Packaging-Nachweis**. Vor Result-Integration ist der echte Roundtrip gemäß Abschnitt 38.5 nachzuweisen. Abweichungen dürfen technische Details vereinfachen, aber nicht heimlich ein normales Cache-abhängiges oder netzabhängiges Bundle verlangen.
+Der Dateistand 1.c.W konkretisiert dies durch `build_backend.py`,
+`runtime_wheel.py` und den request-lokalen `RuntimeProvider`. Der Build ergänzt
+das Transport-Wheel um `_runtime`-Paketressourcen; Source-/sdist-Builds verwenden
+denselben Backend-Vertrag. Der Provider ist noch nicht mit Result-Writern verbunden.
+Der genaue zyklusfreie Algorithmus steht in `docs/runtime-artifact.md`.
+Vor Result-Integration bleiben GATE-RUNTIME und der Roundtrip gemäß 38.5 erforderlich;
+eine Linux-Abnahme behauptet keine Windows- oder Releasefreigabe.
 
 ### 38.4 Selbstupdate, Vorlage und rekursionsfreie Wiederverwendung
 
@@ -3899,8 +3910,9 @@ Ein Bundle darf null, einen oder mehrere Commit-Schritte enthalten, einschließl
 mehrerer echter W/R/C-Folgen. Die Anzahl allein erfordert keine Sondergenehmigung.
 Paketgrenzen dürfen innerhalb des Auftrags zusammengelegt oder geteilt werden,
 sofern Tests und Fehleranalyse beherrschbar bleiben. Jeder Commit entsteht im
-Apply-Repository erst nach vollständiger paralleler und anschließender
-vollständiger serieller Suite für genau diesen Zustand (Abschnitt 33).
+Apply-Repository erst nach seiner vollständigen parallelen Suite. Nur der letzte
+Zustand benötigt zusätzlich die serielle Suite am Bundle-Ende; Reihenfolge
+seriell, parallel, letzter Commit, Push gemäß Abschnitt 33.
 Development erzeugt keine Git-Commits. Erst nach allen erfolgreichen Phasen,
 Commits und Abschlussprüfungen führt der Apply-Entrypoint genau einen normalen
 Push auf den bestätigten Zielbranch aus. Diagnosebundles mit null Commits

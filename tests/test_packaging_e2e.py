@@ -22,7 +22,7 @@ from tests.registration_support import isolated_user_environment
 
 pytestmark = pytest.mark.packaging
 
-MAX_WHEEL_BYTES = 256 * 1024
+MAX_WHEEL_BYTES = 384 * 1024
 RELEASE_VERSION = "1.2.1"
 EXPECTED_RUNTIME_FILES = {
     "patchharbor/py.typed",
@@ -85,6 +85,8 @@ EXPECTED_RUNTIME_FILES = {
     "patchharbor/result_bundle_publication.py",
     "patchharbor/result_bundle_snapshot.py",
     "patchharbor/result_reader.py",
+    "patchharbor/runtime_artifact.py",
+    "patchharbor/runtime_wheel.py",
     "patchharbor/result_bundle_target.py",
     "patchharbor/result_bundle_writer.py",
     "patchharbor/locks.py",
@@ -343,8 +345,15 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
             name
             for name in names
             if name.startswith(("patchharbor/", "patchharbor_watcher/"))
+            and not name.startswith("patchharbor/_runtime/")
         }
         assert runtime_files == EXPECTED_RUNTIME_FILES
+        assert {name for name in names if name.startswith("patchharbor/_runtime/")} == {
+            "patchharbor/_runtime/recipe.json", "patchharbor/_runtime/CHAT_INSTRUCTIONS.md",
+            "patchharbor/_runtime/python-api.md", "patchharbor/_runtime/metadata/METADATA",
+            "patchharbor/_runtime/metadata/WHEEL", "patchharbor/_runtime/metadata/entry_points.txt",
+            "patchharbor/_runtime/metadata/top_level.txt", "patchharbor/_runtime/metadata/licenses/LICENSE",
+        }
         assert "patchharbor/input.py" not in names
         assert "patchharbor/files.py" not in names
 
@@ -414,6 +423,8 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
             f"{root}/LICENSE",
             f"{root}/README.md",
             f"{root}/pyproject.toml",
+            f"{root}/build_backend.py",
+            f"{root}/MANIFEST.in",
             f"{root}/src/patchharbor/cli.py",
             f"{root}/src/patchharbor/api.py",
             f"{root}/src/patchharbor/api_types.py",
@@ -430,7 +441,6 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
         ):
             assert required in names
         for forbidden in (
-            f"{root}/MANIFEST.in",
             f"{root}/scripts/",
             f"{root}/tests/",
             f"{root}/planning/",

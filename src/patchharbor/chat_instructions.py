@@ -23,6 +23,11 @@ def _template_path() -> Path:
         source_template = module.parents[2] / CHAT_INSTRUCTIONS_NAME
         if source_template.is_file():
             return source_template
+    # Prepared wheels keep canonical data next to this exact producer's code.
+    # Missing/corrupt prepared resources must not select a different install.
+    resources = module.parent / "_runtime"
+    if resources.exists():
+        return resources / CHAT_INSTRUCTIONS_NAME
     try:
         distribution = metadata.distribution("patchharbor")
         matches = tuple(

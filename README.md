@@ -571,17 +571,20 @@ added to the installed product. The shared launcher defaults to pytest-xdist:
 python -m pip install -e '.[dev]'
 python tools/run_tests.py
 python tools/run_tests.py --workers 4
-python tools/run_tests.py --serial
 ```
 
 `scripts/test.sh` bootstraps the local `.venv` and uses the same launcher.
-CI and Docker select the same named suites via `--suite`; a blocking CI lane
-retains the full serial reference. The launcher checks complete collection,
+Development runs parallel tests only. Apply checks each intermediate commit
+with the full parallel suite. Only at bundle end does the final unchanged state
+run the full serial suite followed by the full parallel suite, before its commit
+and the single final push. CI is started manually; CI and Docker select the same
+named suites via `--suite`. The launcher checks complete collection,
 worker completion and setup/call/teardown results even without a saved report.
 Only its controller can write an optional `--report` JSON file. Declared skips
 remain explicit, never counted as passed tests.
 
-For full serial/2/4/auto and hash-seed equivalence, use a fresh external directory:
+The explicit serial/2/4/auto equivalence diagnostic is outside ordinary local
+development and Apply gates. When separately requested, use a fresh directory:
 
 ```bash
 python tools/verify_test_modes.py --outdir /tmp/patchharbor-mode-check-001
@@ -593,6 +596,10 @@ Raw `python -m pytest -n auto` is still available but does not automatically
 activate the launcher's extra completeness checks. See
 [development test contracts](docs/test-parallelism.md) for isolation, report
 bindings, deliberate failure probes and partial-test selection.
+
+The prepared [canonical runtime](docs/runtime-artifact.md) can reproduce its
+wheel offline from a normal installation. Result embedding follows in the next
+RIV stages; an unavailable wheel still requires the established handoff method.
 
 ## Termux and Android
 

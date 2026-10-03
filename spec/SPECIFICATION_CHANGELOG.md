@@ -1,5 +1,23 @@
 # PatchHarbor – Spezifikations-Changelog
 
+## 2026-10-03 – RIV 1.c.W: vorbereitete kanonische Wheel-Runtime
+
+**Dateistand:** 1.c.W; 7/18 vorbereitet, 1.a/1.b durch tatsächliche Apply-Results
+bestätigt. Neue Apply-Basis: `c04ed7ad7907ad20c8a2c05fabc7cfe50bd76094` aus
+`patchharbor-apply_Result_171842_1003_c2008e.zip`. Neuer Commit erst im Apply.
+
+- PEP-517-Backend ergänzt vorbereitete Paketressourcen auch für Source/sdist.
+- Interner Provider prüft Inventar, Profil, Grenzen und Inhalts-SHA, erzeugt
+  zyklusfreie kanonische ZIP_STORED-Bytes und bindet die statische Vorlage.
+- Paketressourcen bevorzugt; Legacy-share-Fallback für bisherige Installationen.
+- Funktionale Installationstests mit entfernten Quellen/Caches und drei
+  bytegleichen kanonischen Generationen; keine Prosa-/Darstellungstests.
+- Neue Nutzer-Testregel dauerhaft in Plan, Spec und Testdokumentation:
+  Development nur parallel; Apply-Zwischenstände parallel; allein am Bundle-Ende
+  seriell und parallel vor letztem Commit und einzigem Push.
+- Ein Commit in Bundle 005; 1.c.R/C und GATE-RUNTIME-Gesamtfreigabe folgen.
+  Result-Format bleibt 1, Paketversion 1.2.1. Kein Tag oder CI-Start.
+
 ## 2026-10-03 – RIV 1.b: explizite Referenz- und Repositorybindung
 
 **Dateistand:** 1.b.W, 1.b.R, 1.b.C; 6/18 vorbereitet.

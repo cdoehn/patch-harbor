@@ -1,9 +1,9 @@
-# PatchHarbor – RIV-Implementierungsplan, Repository-Revision 4
+# PatchHarbor – RIV-Implementierungsplan, Repository-Revision 5
 ## Inspect / Validate über API und CLI · Offline-Runtime · Result-Format 2 · Chat-Handoff
 
 **Stand:** 3. Oktober 2026. **Status:** aktive Entwicklung;
-**6 von 18 Umsetzungsschritten im Dateistand vorbereitet**. Nächster Schritt: `1.c.W`.
-P0 und 1.a sind durch echte Apply-Results bestätigt; neue 1.b-Commits erst im nächsten Result.
+**7 von 18 Umsetzungsschritten im Dateistand vorbereitet**. Nächster Schritt: `1.c.R`.
+P0, 1.a und 1.b sind durch echte Apply-Results bestätigt; 1.c.W erst im nächsten Result.
 **Bereich:** RIV (Runtime / Inspect / Validate). **Paketbasis:** 1.2.1.
 **Zielversion:** gesondert festzulegen; keine Versionsanhebung oder Releasefreigabe durch Dokumentation.
 
@@ -74,6 +74,26 @@ Vor jedem Apply-Commit volle Suite parallel, danach seriell; ein finaler Push.
 Lokale Belege je Zustand: `exchange/reports/patchharbor-riv-004-<PLAN-ID>-parallel.json`
 und `-serial.json` (erst nach tatsächlichem Lauf). Kein Versionswechsel, Tag oder CI-Start.
 
+**P1b nachgewiesen / Basis für Bundle 005:**
+`patchharbor-apply_Result_171842_1003_c2008e.zip`, SHA-256
+`4dd0396f3447873e73572a7dde8468fcbcfac5bc373e3a6a097240addeb1ddc2`.
+Echter Apply von Bundle 004: W je 1.736, R/C je 1.870 bestanden, jeweils
+5 Skips in paralleler und serieller Suite; drei Commits, finaler Push, sauber.
+Die 227 Base-Dateien stimmen bytegenau mit Development überein.
+Vollständige neue Bindung: repo_id `e7a93d72-62dc-4759-97e8-6bf6cdf10e90`,
+base_commit `c04ed7ad7907ad20c8a2c05fabc7cfe50bd76094`,
+state_fingerprint `7c9d2a24e397e0e5`, fingerprint_algorithm `patchharbor-state-v1`.
+
+**P2a / Bundle 005:** ein Commit `1.c.W`. Der neue Build-/Installationsweg
+bildet eine eigene Paketgrenze vor 1.c.R/C, gemäß den flexiblen Grenzen in 2.2.
+Kein vorweg installierter R/C-Endzustand. Runtime bleibt vom Result-Writer getrennt.
+Die Nutzerregel vom 3. Oktober 2026 ersetzt alle früheren seriellen
+Zwischen-Gates: Development nur parallel; Apply-Zwischenstände parallel;
+nur am Bundle-Ende seriell und parallel vor letztem Commit/Push (7.2).
+Die Beschreibungen zu Bundle 003/004 oben dokumentieren deren historische Gates.
+Lokaler Nachweis: `exchange/reports/patchharbor-riv-005-1.c.W-parallel.json`.
+Kein Development-Commit, keine Versionsanhebung, kein Tag und kein CI-Start.
+
 **Repositoryrollen:** Development unter
 `/home/christian/Codex/patchharbor/patchharbor-codex` erzeugt und prüft Dateistände
 und die finale ZIP, ohne Git-Commits oder Push. Das unabhängige Apply-Repository
@@ -112,7 +132,7 @@ bei abweichender Development-Wurzel `CWD_MISMATCH`, keine Änderung.
 
 Jeder Zwischenstand wird wirklich hergestellt, getestet und erst dann committed. Ein finaler Working Tree mit künstlich aufgeteiltem Staging ist kein WRC-Nachweis. Commit-IDs werden nach dem Commit aus Git übernommen, nicht im eigenen Commit vorweg erfunden.
 
-### 2.1 Commitübersicht – 6/18 vorbereitet, davon 3 durch Apply bestätigt
+### 2.1 Commitübersicht – 7/18 vorbereitet, davon 6 durch Apply bestätigt
 
 | Nr. | Kennung | Commit-Subject | Voraussetzung | Paket |
 |---:|---|---|---|---|
@@ -284,7 +304,7 @@ Argumenttypen und gegenseitige Fehlerprioritäten im öffentlichen Vertrag festz
 
 #### 1.b.W – 4/18: `feat(validate): compare reference and repository bindings`
 
-**Status:** im Dateistand umgesetzt; Apply-Nachweis im nächsten Result. **Abhängigkeit:** 1.a.C. **Spec:** 36.1/36.3/36.4, 37.2–37.3.
+**Status:** angewendet und gepusht, Commit `c747f34728e5971cef46a757b76713771c24ddc2`; Nachweis Bundle-004-Result. **Abhängigkeit:** 1.a.C. **Spec:** 36.1/36.3/36.4, 37.2–37.3.
 
 **Ergebnis:** Beide ausdrücklichen Bindungsmodi funktionieren in einem sicheren minimalen Durchstich.
 
@@ -300,7 +320,7 @@ In der API repository und reference_bundle ergänzen, gegenseitig ausschließen 
 
 #### 1.b.R – 5/18: `fix(validate): preserve readonly state across binding failures`
 
-**Status:** im Dateistand umgesetzt; Apply-Nachweis im nächsten Result. **Abhängigkeit:** 1.b.W. **Spec:** 37 vollständig, 36.3/36.4.
+**Status:** angewendet und gepusht, Commit `0db90229eb588d37922b9376418f84057e2a7466`; Nachweis Bundle-004-Result. **Abhängigkeit:** 1.b.W. **Spec:** 37 vollständig, 36.3/36.4.
 
 **Ergebnis:** Alle zulässigen Referenz-/Fehlervarianten und die enge Read-only-Grenze sind abgesichert.
 
@@ -316,7 +336,7 @@ Registrierungswechsel und konkurrierende Änderungen während der Aufnahme siche
 
 #### 1.b.C – 6/18: `refactor(validate): separate result integrity from evidence policy`
 
-**Status:** im Dateistand umgesetzt; Apply-Nachweis im nächsten Result. **Abhängigkeit:** 1.b.R. **Spec:** 37.2, 39.3, 41.2.
+**Status:** angewendet und gepusht, Commit `c04ed7ad7907ad20c8a2c05fabc7cfe50bd76094`; Nachweis Bundle-004-Result. **Abhängigkeit:** 1.b.R. **Spec:** 37.2, 39.3, 41.2.
 
 **Ergebnis:** Allgemeine Integrität und strengere Archiv-/Recovery-Policy sind explizit getrennt.
 
@@ -334,7 +354,7 @@ API- und JSON-Vertragsdokumentation konsolidieren. Gezielte Kontrolltests sicher
 
 #### 1.c.W – 7/18: `feat(runtime): materialize canonical wheel from packaged resources`
 
-**Status:** offen. **Abhängigkeit:** 1.b.C; D-01-Entwurf konkretisiert. **Spec:** 38.1–38.5.
+**Status:** im Dateistand umgesetzt; Apply-Nachweis im nächsten Result. **Abhängigkeit:** 1.b.C; D-01-Entwurf konkretisiert. **Spec:** 38.1–38.5.
 
 **Ergebnis:** Eine Standardinstallation kann ohne Quelldownload oder Installer-Cache offline ein passendes Runtime-Wheel bereitstellen.
 
@@ -614,36 +634,41 @@ Bereits vorhandene Darstellungs-/Dokumenttests nicht nebenbei massenhaft lösche
 
 Aktuelles Result, Kontext, vollständige Bindung, Manifest, relevante Deltas, Logs und kanonische Chat-Anweisung lesen. Vollständigen Quellumfang prüfen. Vorhandene menschliche Änderungen nicht überschreiben. Neue vorgeschlagene Pfade am realen Repository prüfen. Die Dokument-SHA aus dieser Revision ist keine gültige Bindung an einen irgendwann späteren Arbeitsstand.
 
-### 7.2 Vor jedem Commit
+### 7.2 Lokale Tests und Apply-Commit-Gates
 
-Development stellt jeden Zwischenstand tatsächlich her und prüft ihn lokal,
-ohne einen Commit zu erzeugen. Für jeden später zu committenden Zielzustand
-muss der Apply-Entrypoint erneut diese beiden vollständigen Gates in genau
-dieser Reihenfolge erfolgreich ausführen:
+Development stellt jeden Zwischenstand tatsächlich her und prüft ihn
+**ausschließlich parallel**, ohne einen Commit zu erzeugen:
 
 ```sh
 .venv/bin/python tools/run_tests.py --suite all
-.venv/bin/python tools/run_tests.py --suite all --serial
 ```
 
-Der zweite Lauf folgt nach erfolgreichem ersten Lauf, der Commit erst nach
-beiden. Dies gilt für W, R, C und Dokumentationscommits einschließlich P0.
-Die in Abschnitt 5 genannten funktionalen Gruppen beschreiben den fachlichen
-Prüffokus und sind keine Erlaubnis, die Vollsuite nur am Paketende auszuführen.
-Zusätzliche Bereichs-/Plattformnachweise bleiben gemäß dem jeweiligen Schritt
-erforderlich. Ein Lauf auf dem späteren Gesamtstand prüft keinen früheren W.
+Im Apply muss jeder Zwischenzustand vor seinem Commit dieselbe vollständige
+parallele Suite erfolgreich durchlaufen. Nur am Bundle-Ende wird der letzte
+Zustand zuerst seriell, danach parallel geprüft:
 
-Python-Syntax und `git diff --check` prüfen; ausschließlich im Apply-Entrypoint
-die vorgesehenen Pfade stagen und Indexbytes mit dem geprüften Inhalt abgleichen.
-Tests verwenden isolierte Fixtures und temporäre Testrepositorys; produktive
-Registry, Replay-State und Exchange sind kein Testmaterial. Ein fehlendes
-Werkzeug oder eine fehlende Plattform ist kein grüner Nachweis. Bei Fehler kein
-Commit dieses Zustands und keine nächste Änderungsphase; frühere erfolgreiche
-Commits und Diagnosebelege bleiben erhalten. Development-Tests ersetzen die
-erneuten Apply-Gates nicht.
+```sh
+.venv/bin/python tools/run_tests.py --suite all --serial
+.venv/bin/python tools/run_tests.py --suite all
+```
 
-Bei Diagnosebundles mit null Commits richtet sich der Prüfumfang nach dem
-Auftrag; es gibt keine commitbedingte Vollsuite, kein Staging und keinen Push.
+Der letzte parallele Lauf erfüllt zugleich das Commit-Gate dieses Zustands.
+Die Quellen bleiben zwischen den Endgates und dem letzten Commit unverändert.
+Kein redundanter paralleler Vorlauf für den letzten Zustand. Die Nutzeranweisung
+vom 3. Oktober 2026 ersetzt serielle Gates vor jedem Zwischencommit.
+Zusätzliche funktionale Bereichs-/Plattformnachweise bleiben erforderlich;
+ein Test des Endstands prüft keinen früheren W-Zustand.
+
+Python-Syntax und `git diff --check` prüfen. Nur der Apply-Entrypoint staged die
+vorgesehenen Pfade und vergleicht Indexbytes mit dem geprüften Inhalt. Tests
+verwenden isolierte Fixtures; produktive Registry, Replay-State und Exchange
+sind kein Testmaterial. Bei Fehler kein Commit dieses Zustands und keine nächste
+Phase; frühere erfolgreiche Commits bleiben erhalten. Ein fehlendes Werkzeug
+oder eine fehlende Plattform ist kein grüner Nachweis. Development ersetzt
+weder die Apply-Gates noch CI.
+
+Diagnosebundles mit null Commits behalten ihren auftragsbezogenen Prüfumfang;
+keine commitbedingte Vollsuite, kein Staging und kein Push.
 
 ### 7.3 Vor Paketpush
 

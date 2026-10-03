@@ -503,7 +503,7 @@ def test_chat_contract_remains_documentation_not_runtime_orchestration() -> None
         for path in package_root.rglob("*.py"):
             source = path.read_text(encoding="utf-8")
             for term in forbidden_runtime_terms:
-                if term == "CHAT_INSTRUCTIONS.md" and path.name == "bundle_handoff.py":
+                if term == "CHAT_INSTRUCTIONS.md" and path.name in {"bundle_handoff.py", "runtime_wheel.py"}:
                     continue  # Passive output file roles, not workflow execution.
                 assert term not in source, f"{term!r} leaked into {path}"
 

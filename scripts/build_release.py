@@ -25,6 +25,8 @@ _RELEASE_INPUT_FILES = (
     "LICENSE",
     "README.md",
     "pyproject.toml",
+    "build_backend.py",
+    "MANIFEST.in",
 )
 _RELEASE_INPUT_TREES = ("src", "docs")
 _FORBIDDEN_STAGED_ROOTS = {"build", "dist"}

@@ -69,6 +69,8 @@ EXPECTED_CORE_RUNTIME_FILES = {
     "result_bundle_publication.py",
     "result_bundle_snapshot.py",
     "result_reader.py",
+    "runtime_artifact.py",
+    "runtime_wheel.py",
     "result_bundle_target.py",
     "result_bundle_writer.py",
     "locks.py",
@@ -174,7 +176,8 @@ def test_release_entry_point_and_runtime_dependency_contract_are_exact() -> None
     assert ".data/data/share/patchharbor/CHAT_INSTRUCTIONS.md" in (
         build_source
     )
-    assert not (PROJECT_ROOT / "MANIFEST.in").exists()
+    assert configuration["build-system"]["build-backend"] == "build_backend"
+    assert configuration["build-system"]["backend-path"] == ["."]
 
 
 def test_release_documents_exist_at_their_canonical_paths() -> None:

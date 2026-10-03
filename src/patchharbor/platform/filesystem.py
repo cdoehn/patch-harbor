@@ -42,6 +42,10 @@ class UnsupportedFileTypeError(RuntimeError):
     """A path at a regular-file boundary has an unsupported type."""
 
 
+class FileReadLimitExceeded(ValueError):
+    """A bounded file read exceeded its input budget, including during growth."""
+
+
 @dataclass(frozen=True, slots=True)
 class StableRegularFile:
     """Byte-exact content and portable executable state of one stable file."""
@@ -267,13 +271,18 @@ def _read_stable_regular_file(
     retained_content_limit: int | None,
     calculate_sha256: bool,
     allow_path_identity_fallback: bool,
+    max_bytes: int | None = None,
 ) -> tuple[bytes | None, bool, int, int, str | None]:
     initial_metadata = _regular_path_metadata(path)
+    if max_bytes is not None and initial_metadata.st_size > max_bytes:
+        raise FileReadLimitExceeded("regular file exceeds read budget")
 
     flags = os.O_RDONLY
     flags |= getattr(os, "O_BINARY", 0)
     flags |= getattr(os, "O_CLOEXEC", 0)
     flags |= getattr(os, "O_NOFOLLOW", 0)
+    if max_bytes is not None:
+        flags |= getattr(os, "O_NONBLOCK", 0)
 
     descriptor: int | None = None
     try:
@@ -300,8 +309,11 @@ def _read_stable_regular_file(
         size = 0
         with os.fdopen(descriptor, "rb", closefd=True) as handle:
             descriptor = None
-            while chunk := handle.read(1024 * 1024):
+            while chunk := handle.read(1024 * 1024 if max_bytes is None else
+                                       min(1024 * 1024, max_bytes - size + 1)):
                 size += len(chunk)
+                if max_bytes is not None and size > max_bytes:
+                    raise FileReadLimitExceeded("regular file grew beyond read budget")
                 if hasher is not None:
                     hasher.update(chunk)
                 if retained is not None:
@@ -356,6 +368,19 @@ def read_stable_regular_file(path: Path) -> StableRegularFile:
     if content is None:
         raise RuntimeError("unlimited stable file read discarded its content")
     return StableRegularFile(content=content, executable=executable)
+
+
+def read_stable_regular_file_bounded(path: Path, *, max_bytes: int) -> StableRegularFile:
+    """Reuse native identity/race checks, reading at most budget + one byte."""
+    if type(max_bytes) is not int or max_bytes < 0:
+        raise ValueError("max_bytes must be a non-negative integer")
+    content, executable, _size, _mtime, _digest = _read_stable_regular_file(
+        path, retained_content_limit=None, calculate_sha256=False,
+        allow_path_identity_fallback=False, max_bytes=max_bytes,
+    )
+    if content is None:
+        raise RuntimeError("bounded read discarded retained content")
+    return StableRegularFile(content, executable)
 
 
 def read_stable_regular_file_with_sha256(

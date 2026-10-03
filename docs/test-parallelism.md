@@ -1,7 +1,9 @@
 # Entwicklungstests mit pytest-xdist
 
 Plan: `planning/test-parallel/commit-plan.md` (15 echte W/R/C-Zwischenstände).
-Vertrag: `planning/test-parallel/specification.md`.
+Historischer Vertrag: `planning/test-parallel/specification.md`.
+Aktuelle Nutzerregel vom 3. Oktober 2026: Development ausschließlich parallel;
+Apply-Zwischenstände parallel, nur am Bundle-Ende seriell und parallel.
 
 ## Teststart
 
@@ -11,10 +13,8 @@ In der Entwicklungs-venv die deklarierten Abhängigkeiten installieren:
 python -m pip install -e '.[dev]'
 python tools/run_tests.py
 python tools/run_tests.py --workers 4
-python tools/run_tests.py --serial
 python tools/run_tests.py --workers 2 -- tests/test_configuration.py
 ```
-
 Ohne Modusargument verwendet der Launcher **auto**, unverändert an xdist
 weitergegeben. `--serial` verwendet `-n 0`; feste positive Workerzahlen bleiben
 wählbar. `scripts/test.sh` richtet die lokale `.venv` ein und delegiert an
@@ -57,7 +57,8 @@ Prozess-/Locktests bleiben erhalten; es wird kein echter systemd-Dienst gestarte
 ## Controller-Nachweise
 
 Jeder Launcher-Lauf aktiviert die Vollständigkeitsprüfung, auch ohne gespeicherte
-Datei. Eine persistente JSON-Datei ist optional:
+Datei. Eine persistente JSON-Datei ist optional. Development benötigt nur den
+parallelen Bericht; das Vergleichspaar gehört ans Apply-Bundle-Ende:
 
 ```sh
 python tools/run_tests.py --serial --report /tmp/ph-serial.json
@@ -89,7 +90,9 @@ Die Vergleichsbindung umfasst Quellbytes sowie Python-, Betriebssystem-, pytest-
 und xdist-Version und die ausgewählte Windows-Engine. Quellen dürfen während
 eines Laufs nicht wechseln. Lauf-ID, Zeit, Reihenfolge und Worker-Zuteilung
 werden dagegen nicht fachlich verglichen. Ein Quellenwechsel erfordert eine
-neue serielle Referenz, auch wenn nur Dokumentation geändert wurde.
+neue serielle Referenz, auch wenn nur Dokumentation geändert wurde. Development
+führt keine seriellen Referenzläufe aus und vergleicht seinen neuen parallelen
+Bericht nicht mit einem veralteten seriellen Stand.
 
 ## Vollständige Modusabnahme
 
@@ -97,6 +100,7 @@ neue serielle Referenz, auch wenn nur Dokumentation geändert wurde.
 python tools/verify_test_modes.py --outdir /tmp/ph-mode-check-001
 ```
 
+Dieser Modusvergleich ist kein Development- oder reguläres Apply-Gate.
 Das Ziel darf noch nicht existieren. Nacheinander laufen vollständige Suites:
 seriell, zwei, vier und auto Worker mit Hash-Seed 0; danach zwei Worker mit Seed 1,
 vier mit Seed 42 und auto mit Seed 314159. Alle Berichte werden mit derselben
@@ -120,22 +124,24 @@ PowerShell- und Docker-Gates bleiben blockierend und verwenden die parallele
 Runner-Policy. Keine optionalen Tests, kein continue-on-error und keine stillen
 Retries.
 
-Im lokalen Apply-Entrypoint muss jeder zu committende Zielzustand zuerst die
-vollständige parallele Suite und anschließend die vollständige serielle Suite
-erfolgreich durchlaufen:
+Im Development läuft jeder Zwischenstand ausschließlich parallel. Im lokalen
+Apply-Entrypoint läuft vor jedem Zwischencommit die vollständige parallele Suite.
+Nur der letzte Zustand am Bundle-Ende durchläuft diese beiden vollständigen
+Gates auf unveränderten Quellen, vor dem letzten Commit:
 
 ```sh
-.venv/bin/python tools/run_tests.py --suite all
 .venv/bin/python tools/run_tests.py --suite all --serial
+.venv/bin/python tools/run_tests.py --suite all
 ```
 
-Der parallele Lauf verwendet die Default-Worker-Policy `auto`. Erst nach beiden
-grünen Läufen entsteht der Commit. Dieses OFF-PLAN-Migrationsbundle pusht danach
-genau einmal normal auf `dev`, ohne Tag oder Force-Push. Ein Pushfehler erhält
-den erfolgreichen lokalen Commit. Diese Policy ersetzt die frühere Zuordnung
-der seriellen Vollreferenz zu GitHub in den historischen TEST-PARALLEL- und
-POSIX-MODE-Vorgaben; der Modusverifier bleibt als explizites Diagnosewerkzeug
-verfügbar und wird vom Acceptance-Workflow nicht gestartet.
+Der abschließende parallele Lauf verwendet `auto` und erfüllt zugleich das
+Commit-Gate des letzten Zustands; ein zusätzlicher identischer Vorlauf ist nicht
+erforderlich. Erst nach beiden grünen Endgates entstehen letzter Commit und
+genau ein normaler Push auf den bestätigten Zielbranch, ohne Tag oder Force-Push.
+Ein Pushfehler erhält die erfolgreichen lokalen Commits. Diagnosebundles mit
+null Commits haben auftragsbezogene Prüfungen und keinen Push. Diese Nutzerregel
+ersetzt serielle Tests vor jedem Zwischencommit. CI und Modusverifier starten
+weiterhin nicht automatisch.
 
 Funktionale Tests prüfen auch ausführbare CI-/Docker-Verträge, nicht den Wortlaut
 der Dokumentation oder die Konsolendarstellung. Ein erzeugtes Patchpaket, ein
