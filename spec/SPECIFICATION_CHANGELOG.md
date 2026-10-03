@@ -1,5 +1,36 @@
 # PatchHarbor – Spezifikations-Changelog
 
+## 2026-10-03 – RIV-DOCS-1: Spezifikation und aktiven Entwicklungsplan integrieren
+
+**Status:** Dokumentationsvorbereitung; RIV-Featurefortschritt 0/18.
+Paketversion bleibt 1.2.1; keine Feature-, Runtime-, Apply- oder Releasefreigabe
+durch diesen Eintrag. Tatsächliche Apply-Commits und Tests belegt das Result.
+
+- Exchange-Revision 2 auf dem aktuellen sauberen Result-Stand
+  `68dba9216b72dc0b6441df83f49c9047b8b038b9` integriert. Vollständige Bindung,
+  Result-SHA und ursprüngliche Dokumenthashes stehen im neuen Plan.
+- `spec/SPECIFICATION.md` bleibt die einzige normative Gesamtspezifikation.
+  Bestehende Kapitel 33/34 bleiben erhalten; RIV belegt 35–41. Geplante
+  API-/CLI-Prüfungen, Runtime und Result-Format 2 sind als unimplementiert markiert.
+- Aktiver Plan: `planning/runtime-inspect-validate/commit-plan.md`; sechs
+  echte W/R/C-Gruppen, zunächst 18 Schritte in vier flexiblen Feature-Paketen.
+  Diese Dokumentübernahme ist P0 / OFF-PLAN außerhalb der 18 Schritte.
+- Verpflichtender bisheriger Entwicklungs-/Übergabeweg bei fehlendem oder
+  nicht funktionsfähigem Wheel. Ausfallgrund und Prüfumfang sichtbar; keine
+  erfundene native Prüfung. Runtime-only-Defekt und ungültige Repositorybasis
+  bleiben unterscheidbar. Der Fallback ersetzt nicht die Runtime-Featureabnahme.
+- Bundles unterstützen null, einen oder mehrere Commits. Diagnosebundles
+  sammeln beauftragte Ergebnisse über Result/Logs ohne Commit, Push, Tag oder
+  Implementierungsfortschritt. Mehrere echte Commitzustände sind normal erlaubt.
+- Repositorylokale Konfiguration, generische 1.2.1-Chatregeln und POSIX-Vertrag
+  erhalten. Überholte Test-/CI-Aussagen der Hauptspezifikation an CI-MANUAL-1
+  angeglichen: vor jedem Apply-Commit Vollsuite parallel, danach seriell;
+  Acceptance-CI ausschließlich manuell. Keine neuen Prosa-/Darstellungstests.
+- Development bereitet geprüfte Zustände und genau eine Patch-ZIP vor.
+  Ausschließlich der Apply-Entrypoint committet und pusht nach vollständigem
+  Erfolg einmal normal auf den bestätigten Branch; Diagnosebundles pushen nicht.
+  Keine automatische Versionsanhebung, kein Tag und kein automatischer CI-Start.
+
 ## [1.2.1] – 2026-10-02
 
 **Status:** Entwicklungs-Chat-Vertrag bereinigt und Release 1.2.1 vorbereitet.

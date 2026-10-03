@@ -2,20 +2,32 @@
 
 **Dateiname:** `SPECIFICATION.md`<br>
 **Produktversion:** `1.2.1`<br>
-**Spezifikationsstand:** 2026-10-02<br>
-**Status:** Verbindliche, freigegebene Produktspezifikation (fachlicher Vertrag) einschließlich repositorylokaler Konfiguration; keine Release-Freigabe des konkreten Commits ohne grüne Gates<br>
+**Spezifikationsstand:** 2026-10-03 · RIV-Integration Revision 3<br>
+**Status:** Verbindliche, freigegebene Produktspezifikation für den Bestandsvertrag 1.2.1; keine Release-Freigabe des konkreten Commits ohne grüne Gates.<br>
+**RIV-Status:** Geplante Erweiterung in Abschnitten 35–41; deren Funktionen sind noch nicht implementiert oder freigegeben.<br>
 **Projektname:** `PatchHarbor`<br>
 **Kommando:** `patchharbor`<br>
 **Skriptmarker:** `# PATCHHARBOR`<br>
 **Patch-Paketmarker:** `patch-harbor`
 
-Der aktuelle Umsetzungs- und Release-Plan liegt unter `planning/1.2.1/commit-plan.md`. Die abgeschlossenen Pläne für 1.0.0, 1.1.0, 1.1.1 und 1.2.0 bleiben als historische Umsetzungsgrundlage erhalten. Änderungen am Produktziel werden in `spec/SPECIFICATION_CHANGELOG.md` dokumentiert.
+Der aktive Entwicklungsplan für Runtime / Inspect / Validate (RIV) liegt unter
+`planning/runtime-inspect-validate/commit-plan.md`: 0 von 18 Umsetzungsschritten.
+Die Zielversion dieser Erweiterung wird gesondert festgelegt; die vorhandene
+Paketversion bleibt 1.2.1. Die abgeschlossenen Pläne unter `planning/1.2.1/`,
+`planning/1.2.0/`, `planning/1.1.1/`, `planning/1.1.0/` und `planning/1.0.0/`
+bleiben historische Grundlagen. Die Dokumentübernahme `RIV-DOCS-1` liegt außerhalb
+der 18 RIV-Umsetzungsschritte. Änderungen am Produktziel stehen in
+`spec/SPECIFICATION_CHANGELOG.md`.
 
 ---
 
 ## 1. Zweck, Gültigkeit und Verhältnis zu 1.1.1
 
-Dieses Dokument beschreibt das vollständige verbindliche Produktziel von PatchHarbor 1.2.1.
+Dieses Dokument beschreibt den Bestandsvertrag von PatchHarbor 1.2.1 und das
+geplante Produktziel der RIV-Erweiterung in Abschnitten 35–41. Die Erweiterung
+aktiviert durch ihre Dokumentation weder neue Kommandos noch Result-Format 2.
+Ihre Querverweise ergänzen die jeweils betroffenen Basisabschnitte; unbetroffene
+Bestandsverträge einschließlich repositorylokaler Konfiguration bleiben erhalten.
 
 Es übernimmt die Produktverträge des stabilen 1.1.1-Stands und ergänzt die
 öffentliche synchrone Python-API. Haupt-CLI und Watcher verwenden dieselben
@@ -439,6 +451,8 @@ diesen einmaligen Handablauf, keinen vom Programm ausgeführten Migrationscode.
 Die standardisierten Chat-Statuszeilen aus `CHAT_INSTRUCTIONS.md` sind eine bewusst maschinenlesbare UI-Grenze und dürfen im Unterschied zu sonstigen Human-Texten exakt getestet werden.
 
 ## 5. Öffentliche CLI
+
+Geplante additive Kommandos `inspect` und `validate`: Abschnitt 36.4; noch nicht implementiert.
 
 ### 5.1 Sicherer Mehr-Repository-Pfad und lokale Konfiguration
 
@@ -2279,6 +2293,10 @@ Ein Fehler führt zu Exit `11`. Es gibt keinen getrennten vorherigen Skript-Exit
 
 ## 19. PatchHarbor Result Bundle
 
+Dieser Basisabschnitt beschreibt den vorhandenen Format-1-Vertrag. Die geplante
+Erweiterung in Abschnitt 39 führt Reader 1/2 vor Writer 2 ein; sie aktiviert
+durch diese Dokumentübernahme noch kein neues Ausgabeformat.
+
 ### 19.1 Zweck
 
 Das PatchHarbor Result Bundle ist die vollständige portable Darstellung des aktuellen lokalen Repository-Zustands ohne `.git`-Historie.
@@ -2414,6 +2432,10 @@ Die geschlossene CLI-Antwort von `context --json` bleibt unverändert; bei einer
 separaten Kontextübergabe muss die Dateinamenpräferenz zusätzlich genannt werden.
 
 ### 19.6a Frische Chat-Anweisungen und Umgebungsdaten
+
+Für den RIV-Zielstand ergänzt 38.4 die request-lokale Fixierung von Erzeuger,
+Runtime und statischer Vorlage vor einer möglichen Mutation. Die dynamischen
+Resultdaten werden weiterhin frisch aus dem tatsächlichen Lauf ergänzt.
 
 Jede neue Result-Bundle-Veröffentlichung enthält genau eine Root-Datei
 `CHAT_INSTRUCTIONS.md` und `environment.json`: manuelles Bundle, Apply-Erfolg,
@@ -3033,6 +3055,11 @@ Dokumentationsfortschreibung ist kein grünes Testergebnis.
 
 ### 26.1 Initialisierung eines neuen Chats
 
+Für den RIV-Zielstand gilt zusätzlich Abschnitt 40: verfügbare geeignete Runtime
+bevorzugen, bei fehlendem oder nicht funktionsfähigem Wheel den bisherigen
+Entwicklungs- und Übergabeablauf verbindlich verwenden. Die technische
+Aktivierung der neuen Anleitung erfolgt erst in Plan-Schritt 1.f.
+
 Die ausgelieferte Root-Datei `CHAT_INSTRUCTIONS.md` ist die versionsgebundene Handlungsanweisung für einen externen Entwicklungs-Chat.
 
 Ein neuer Chat erhält mindestens:
@@ -3064,7 +3091,13 @@ Ignorierte Dateien sind nicht Teil des Result Bundles. Benötigt die Aufgabe zwi
 
 Der Chat bestimmt zunächst die aktuelle Zielversion aus eindeutigen Repository-Quellen wie Paketmetadaten, Versionsdatei, aktiver Spezifikation und versionsbezogenem Planning-Verzeichnis. Widersprechen sich plausible aktuelle Versionsquellen, stoppt er.
 
-Für den Commit-Plan gilt diese Reihenfolge:
+Für diese RIV-Entwicklung ist ausdrücklich
+`planning/runtime-inspect-validate/commit-plan.md` aktiv. Der abgeschlossene
+1.2.1-Plan wird nicht wegen der noch unveränderten Paketversion erneut gewählt.
+Allgemein hat ein ausdrücklich benannter aktiver Plan Vorrang vor der folgenden
+Suche; historische oder abgeschlossene Pläne gelten nicht als aktive Kandidaten.
+
+Für den Commit-Plan gilt sonst diese Reihenfolge:
 
 1. `planning/<version>/commit-plan.md`,
 2. `planning/<version>/implementation-plan.md`,
@@ -3094,7 +3127,7 @@ Projektregeln. Explizite Nutzeranweisungen haben Vorrang vor der generischen
 PatchHarbor-Vorlage. Nicht verfügbare ignorierte lokale Regeln werden nicht
 erfunden.
 
-Ein Bundle darf standardmäßig einen oder mehrere fachlich abgegrenzte Commits
+Ein Bundle darf null, einen oder mehrere fachlich abgegrenzte Commits
 enthalten. Jeder einzelne Commit bildet einen fachlich geschlossenen,
 prüfbaren Zwischenstand; die gesamte Folge bleibt im beauftragten Scope.
 Mehrere Commits brauchen allein wegen ihrer Anzahl keine Sondergenehmigung und
@@ -3112,10 +3145,23 @@ zugeordnet. Plan-Commits übernehmen Kennung, Position und Message aus dem Plan;
 `OFF-PLAN` verändert den Plan-Zähler ebenfalls nicht und zeigt mit vorhandenem
 Plan `-- / <Gesamtzahl>`, ohne Plan `-- / --`.
 
-Ein Bundle darf einen oder mehrere dieser Commits enthalten. Mehrere Commits
-setzen keine W/R/C-Ausnahme voraus. Verlangt Projekt oder Auftrag W/R/C, bleiben
+Ein Bundle darf null, einen oder mehrere dieser Commits enthalten. Mehrere
+Commits setzen keine W/R/C-Ausnahme voraus. Verlangt Projekt oder Auftrag W/R/C, bleiben
 W, R und C getrennte echte Zustände mit den jeweils vorgeschriebenen Prüfungen
 und eigenem Commit; W/R/C ist kein allgemeiner Default.
+
+Ein reines Diagnosebundle hat ausdrücklich null Commits. Es führt die beauftragten
+Diagnosekommandos aus und liefert deren Ausgaben über die vorhandenen Run- und
+Execution-Logs sowie den tatsächlichen Snapshot im regulären Result zurück.
+Es erzeugt keinen Commit, Push oder Tag und erhöht den Planfortschritt nicht.
+Null Commits sind in diesem Modus kein Fehler. Prüfumfang und Erfolgskriterien
+bestimmen Auftrag und Projektregeln; ein fehlender Commit verlangt keine
+künstliche Vollsuite. Zusätzliche Diagnose-Dateien werden nur ausdrücklich
+beauftragt und über die bestehenden Snapshot-/Logwege erfasst; es entsteht kein
+automatischer allgemeiner Artefaktsammler im Core. Paketformat, vollständige
+Bindung, Sicherheitsprüfung und die bestehenden Replay-/Recovery-Regeln gelten
+auch hier. Ohne Abschlusscommit wird kein solcher Nachweis erfunden und die
+konservative Archivierung nicht aufgeweicht.
 
 ### 26.6 Patch-Paket-, Prüf- und Commitfolgevertrag des Chats
 
@@ -3155,7 +3201,9 @@ genau eine ZIP unabhängig von ihrer Commitanzahl. Der Entrypoint verwendet
 dieselbe Nummer und gibt erst nach der gesamten vorgesehenen Commitfolge, allen
 Abschlussprüfungen und sauberem Zielzustand seine letzte eigene Erfolgszeile
 `PATCHHARBOR-BUNDLE-NR: <NNN> | APPLIED SUCCESSFULLY` aus. Bei Fehler oder
-Teilerfolg darf sie nicht erscheinen.
+Teilerfolg darf sie nicht erscheinen. Bei null vorgesehenen Commits tritt der
+vollständig geprüfte Diagnoseauftrag an die Stelle der Commitfolge; die
+Abschlussprüfung berücksichtigt den ausdrücklich erlaubten Diagnoseumfang.
 
 ### 26.7 Standardisierte Warning- und Stop-Ausgaben
 
@@ -3220,6 +3268,9 @@ erwartete geordnete Commitfolge. Bei mehreren Commits nennt er die nachweisbar
 entstandenen Commits in Reihenfolge. Bei Teilerfolg bleibt der Gesamtauftrag
 fehlgeschlagen; Ursache, verbleibender Zustand, nicht committedes Element und
 nächster sinnvoller `FIX`-/`OFF-PLAN`-Schritt werden knapp angegeben.
+Bei einem Diagnosebundle wird die erwartete Anzahl null bestätigt und der
+Diagnosebefund anhand der tatsächlichen Logs ausgewertet; ein Befund darf
+fachliche Probleme zeigen, ohne einen nicht beauftragten Commit zu verlangen.
 
 ---
 
@@ -3260,7 +3311,7 @@ nächster sinnvoller `FIX`-/`OFF-PLAN`-Schritt werden knapp angegeben.
 - Der Chat prüft Plan, Spezifikation und realen Repository-Zustand gegeneinander und fragt bei blockierenden Widersprüchen nach.
 - `PLAN`, `FIX` und `OFF-PLAN` sind feste Commit-Arten; Fixes verwenden `<ID>-FIX<n>` und verändern den Plan-Zähler nicht.
 - Blockierende Situationen verwenden eine standardisierte rote STOP-Ausgabe, nicht blockierende Auffälligkeiten eine gelbe WARNING-Ausgabe.
-- Ein fertiges Patch-Paket wird genau einmal mit einer grünen Bereitschaftszeile ausgeliefert; es gibt keine Wiederholung am Antwortende.
+- Ein fertiges Patch-Paket wird genau einmal ausgeliefert; der Abschlussbalken gemäß 26.8 wiederholt nur die Kennzeichnung derselben kanonischen ZIP.
 - Der externe Chat versucht zusätzlich private Drive- und E-Mail-Backups derselben ZIP, bestätigt nur nachgewiesene Ergebnisse und nennt die vollständige SHA-256; der Core bleibt netzwerkfrei.
 - `PATCH BEREIT` darf erst erscheinen, wenn genau eine herunterladbare Patch-Datei tatsächlich vorhanden ist.
 - Ein Chat-Patch soll die zur Änderung passenden Projekttests mit einer plattformgerechten Timeout-Strategie ausführen und bei Testfehler ohne Commit enden; im dokumentierten Pixel-/Termux-Workflow verwendet das Commit-Skript keinen künstlichen Einzeltest- oder Gesamtsuite-Timeout. PatchHarbor selbst bewertet die Tests nicht und führt keinen Rollback durch.
@@ -3387,8 +3438,18 @@ Der Vollvergleich führt seriell/2/4/auto und zusätzliche Hash-Seeds mit stabil
 Quellen-/Interpreterbindung aus. Kein Ergebnisvergleich von Reihenfolge, Farbe,
 Layout, Dauer, Zeitstempel oder Worker-Zuteilung. Prozess- und Dateisolation ist
 Teil der Verhaltenstests. Keine neuen Darstellungs- oder Dokumentationstests.
-Eine zusätzliche blockierende serielle CI-Lane bleibt erhalten; die bisherigen
-OS-/Python-/PowerShell-Matrizen werden nicht reduziert.
+Die frühere serielle CI-Lane wurde durch CI-MANUAL-1 abgelöst. Verbindlich ist
+`docs/test-parallelism.md`: GitHub-Acceptance ausschließlich manuell per
+`workflow_dispatch`, ohne zusätzlichen seriellen Volltestlauf. Die vorhandenen
+Linux-/Windows-/PowerShell-/Docker-Gates bleiben erhalten. Der Modusverifier
+ist ein explizites Diagnosewerkzeug und kein automatisch gestarteter CI-Schritt.
+
+Für jeden später zu committenden Zustand führt der Entrypoint im Apply-Repository
+zuerst `.venv/bin/python tools/run_tests.py --suite all` und nach dessen Erfolg
+`.venv/bin/python tools/run_tests.py --suite all --serial` vollständig aus.
+Erst nach beiden grünen Gates entsteht der Commit. Dies gilt auch für reine
+Dokumentationscommits und jeden einzelnen W/R/C-Zustand. Diagnosebundles mit null
+Commits folgen dem beauftragten Prüfumfang gemäß 26.5.
 
 Keine zusätzlichen künstlichen Test-/Suite-Timeouts. Das äußere Apply-Limit,
 CI-Joblimits und fachliche Timeouttests bleiben eigenständige Verträge.
@@ -3438,7 +3499,449 @@ Tests/Commits und ihre Reihenfolge bleiben auftragsspezifische Orchestrierung.
 Beim Selbstupgrade nutzt das erste W ausschließlich eine private Kopie desselben
 W-Cores für seine Schreiboperationen, keine zweite Writer-Implementierung.
 
-Für nachfolgende lokale Entwicklungs-/Patchläufe läuft die Vollsuite nur parallel.
-Der vollständige serielle Referenzlauf gehört in CI. Die ausdrücklich bestätigte
-Ausnahme bleibt dieses bereits geplante POSIX-W/R/C-Bundle; der Launcher behält
-seine Referenzfunktion, CI-Workflows werden hierfür nicht geändert.
+Die frühere Testzuordnung des POSIX-W/R/C-Auftrags ist historisch. Für aktuelle
+PatchHarbor-Entwicklung gelten Abschnitt 33 und `docs/test-parallelism.md`:
+vor jedem Apply-Commit vollständige Suite parallel, anschließend vollständig
+seriell; GitHub-CI wird ausschließlich manuell gestartet.
+
+
+## 35. Erweiterungsziel und Geltungsbereich
+
+**Stand:** 3. Oktober 2026, **Repository-Integration Revision 3 auf Grundlage der
+Exchange-Revision 2**. **Basis:** PatchHarbor-Quellstand 1.2.1 aus dem Result
+`patchharbor-apply_Result_073436_1003_116272.zip`, Commit
+`68dba9216b72dc0b6441df83f49c9047b8b038b9`. **Status:** geplante Erweiterung,
+noch nicht implementiert oder freigegeben. Die nächste Release-Versionsnummer
+wird gesondert festgelegt; 1.2.1 bezeichnet bereits den vorhandenen Quellstand.
+Das Result nennt separat die ausführende Engine 1.2.0; dies ist keine abweichende
+Quellversion. Herkunft und vollständige Bindung stehen im RIV-Plan.
+
+PatchHarbor erhält lesende Funktionen zum Untersuchen und Validieren sicherer Patch-Pakete. Beide Funktionen sind über die öffentliche Python-API und die CLI verfügbar. Neue Result-Bundles enthalten standardmäßig eine passende, offline installierbare PatchHarbor-Runtime. Die Chat-Anweisungen beschreiben deren sichere Bereitstellung und bevorzugte Nutzung.
+
+Die bestehenden Apply-, Fingerprint-, Replay-, Recovery-, Prozess-, Archivierungs- und Auslieferungsverträge bleiben erhalten. Diese Erweiterung macht aus PatchHarbor weder eine Sandbox noch einen Paketmanager oder einen Netzwerkdienst. GitHub-, Drive- und Gmail-Zugriffe bleiben Aufgaben des externen Chats beziehungsweise ausdrücklich beauftragter Entrypoints.
+
+Diese Abschnitte ergänzen den aktuellen 1.2.1-Bestandsvertrag. Ausschließlich die ausdrücklich beschriebenen CLI-/API-Ergänzungen, Result-Format-Erweiterungen und Chat-Arbeitsabläufe ändern sich. Das Patch-Paketformat und sein geschlossenes `patch.json` bleiben unverändert.
+
+**Änderungen gegenüber Revision 1:** Der Standardinstallationsweg setzt kein erhalten gebliebenes originales Wheel mehr voraus. Stattdessen wird ein kanonisches, aus vorbereiteten Paketressourcen reproduzierbares Runtime-Artefakt spezifiziert. Format-2-Leser werden vor den Format-2-Schreibern ausgeliefert. Read-only-Grenzen, Selbstupdate einschließlich Chat-Vorlage, Runtime-Ausfall und Legacy-Referenzen werden präzisiert. Der Plan enthält deshalb sechs statt vier fachliche WRC-Gruppen: voraussichtlich 18 statt 12 Commits, ohne zusätzliche Produktfeatures. Die Exchange-Revision 2 ersetzte die vorherige Erweiterungsfassung vollständig; die vorliegende Integration ergänzt die nachfolgenden Nutzerentscheidungen.
+
+`spec/SPECIFICATION.md` ist die einzige normative Gesamtspezifikation. Der
+separate Exchange-Auszug war bytegleich mit Abschnitten 33–39 der ursprünglichen
+Revision 2. Im aktuellen Repository bleiben Kapitel 33/34 erhalten; RIV erhält
+35–41. Es wird keine zweite unabhängig gepflegte Produktspezifikation angelegt.
+Bestandsaussagen beziehen sich auf die oben gebundene Result-Basis.
+
+**Verbindliche Nutzerergänzungen:** Ein fehlendes oder nicht funktionsfähiges
+Wheel löst den bisherigen Entwicklungs-/Übergabeweg gemäß 40.3 aus. Bundles mit
+null, einem oder mehreren Commits sind unterstützt; reine Diagnosebundles sammeln
+Ergebnisse ohne Commit und Push (26.5, 41.3). Diese Regeln gelten auch während
+des Übergangs. Kapitel 4.3 bleibt repositorylokal; generische Chat-Regeln 1.2.1,
+POSIX-Modi und aktuelle Test-/CI-Policy werden nicht auf den alten Snapshot
+zurückgesetzt.
+
+## 36. Öffentliche API und CLI für Inspect und Validate
+
+### 36.1 Gemeinsamer fachlicher Pfad
+
+Die öffentliche Schnittstelle wird um folgende Aufrufe ergänzt:
+
+```python
+from patchharbor import api
+
+info = api.inspect_patch("patch.zip")
+
+report = api.validate_patch("patch.zip")
+report = api.validate_patch("patch.zip", repository="/workspace/repository")
+report = api.validate_patch("patch.zip", reference_bundle="result.zip")
+```
+
+`repository` und `reference_bundle` schließen sich gegenseitig aus. Ohne beide Parameter erfolgt ausschließlich eine Paketprüfung. Es gibt keine implizite Zielwahl über CWD, Registry oder Exchange. Die Eingabe muss eine ausdrücklich benannte Datei sein.
+
+Beide Funktionen akzeptieren wie die bestehende API Textpfade beziehungsweise `PathLike[str]` und einen optionalen request-lokalen `observer`. Leere Pfade, Bytespfade und widersprüchliche Optionen werden abgelehnt; relative Pfade sind zulässig und werden einmal gegen das Aufrufverzeichnis aufgelöst. Das ist keine automatische Zielauswahl. Für ausdrücklich benannte Dateipfade gelten dieselben sicheren Auflösungsregeln wie beim bestehenden expliziten Paketleser; daraus folgt keine Ausweitung der flachen Exchange-Suche. Sie sind synchron, ohne Beobachter still und verwenden die bestehende Application/Core-Schicht. Die CLI ruft diese öffentliche API auf. Es entstehen keine parallelen ZIP-, Manifest- oder Bindungsprüfer.
+
+Fachlich gleiche Prüfungen in `inspect`, `validate` und `apply` müssen dieselben Core-Funktionen und Ressourcenregeln verwenden. `apply` behält darüber hinaus seine eigenen zeitnahen Zustands-, Sperr- und Mutationsprüfungen.
+
+### 36.2 `inspect_patch`
+
+`inspect_patch` liest das Paket kontrolliert, bestimmt die vollständige SHA-256 der tatsächlich gelesenen Bytes und liefert ein unveränderliches, typisiertes `PatchInspection`-Ergebnis.
+
+Der öffentliche Ergebnisvertrag umfasst `package_sha256`, `package_size`, das typisierte `manifest`, den Entrypoint-Pfad, `entries`, `messages` und `warnings`. Das Manifest enthält die vollständigen Bindungswerte. Jeder Eintrag in `entries` besitzt normalisierten Pfad, Rolle, unkomprimierte Größe und Inhalts-SHA-256. Rollen sind Manifest, Entrypoint, Nutzdatei und passive Handoff-Metadaten. `messages` enthält die statisch auslesbaren Namen und Texte der MESSAGE-Blöcke des Entrypoints.
+
+Die Funktion prüft bereits die sichere Lesbarkeit und die statische Gültigkeit des Pakets einschließlich Entrypoint-Vertrag. Eine erfolgreiche Inspektion ist keine Aussage über ein konkretes Repository, die Vertrauenswürdigkeit des Skripts oder dessen späteren Erfolg. Bei unsicherer oder ungültiger Eingabe wird kein scheinbar erfolgreiches Teilresultat geliefert. Manifest und passive Metadaten werden nicht erneut durch einen unabhängigen, schwächeren Parser interpretiert. Verzeichniseinträge werden sicher geprüft, aber nicht als Nutzdateien im Ergebnis gezählt. Das Ergebnis enthält Größen und Prüfsummen, nicht eine zweite vollständige Kopie aller Nutzdaten.
+
+Anzahl und Namen geplanter Git-Commits, tatsächliche Dateimutationen und spätere Testergebnisse werden nicht aus beliebigem Skriptcode erraten. Berechnete Inhaltsprüfsummen sind Beobachtungsdaten; sie sind kein zusätzlicher, im bestehenden `patch.json` behaupteter Prüfsummenvertrag.
+
+### 36.3 `validate_patch`
+
+Ein erfolgreiches `PatchValidationResult` enthält die geprüfte Paketinspektion, `scope`, `binding_matches`, den gegebenenfalls beobachteten beziehungsweise referenzierten Kontext, die SHA-256 einer verwendeten Referenzdatei, den Prüfzeitpunkt und ausdrücklich nicht geprüfte Aspekte.
+
+Die drei möglichen Prüfbereiche lauten:
+
+| `scope` | Aussage bei Erfolg | Bewusst keine Aussage über |
+|---|---|---|
+| `package` | Paket ist nach dem statischen Patch-Vertrag gültig; `binding_matches` ist `null`. | Vorhandensein oder Zustand des Zielrepositorys. |
+| `reference` | Zusätzlich stimmen alle Bindungswerte mit einem geprüften Result-Bundle überein; `binding_matches` ist `true`. | Aktuellen Zustand des ursprünglichen Rechners oder dessen lokale Registry. |
+| `repository` | Zusätzlich stimmt die Bindung mit der konkret geprüften registrierten Repository-Instanz überein; `binding_matches` ist `true`. | Fortbestehen dieses Zustands, Skripterfolg oder CI-Freigabe. |
+
+In allen Bereichen bleiben Skriptausführung, Tests und CI ungeprüft. Der Ergebnisvertrag muss zusätzlich zwischen **Integrität**, **Bindungsabgleich** und **Authentizität** unterscheiden. Ein positiver Bindungsabgleich ist kein Nachweis der Vertrauenswürdigkeit des Pakets. Eine gültige Referenz ohne Runtime oder mit `runtime.status=unavailable` darf für den Bindungsabgleich verwendet werden; das Fehlen des optionalen Werkzeugs macht ihre Repositorydaten nicht ungültig. Eine vorhandene, aber deklarationswidrige Runtime macht dagegen das behauptete vollständige Format-2-Inventar ungültig; ein solcher vollständiger nativer Validierungsauftrag scheitert. Der getrennte Fallback gemäß 40.3 darf bei einem ausschließlich auf die Runtime begrenzten Defekt gesondert geprüfte Repository-Referenzdaten verwenden, ohne vollständige Format-2-Integrität zu behaupten. Die lesende Validierung ist außerdem kein Replay-/Retry-Freigabeschein. Nicht vorgenommene Prüfungen werden als solche ausgewiesen, niemals als erfolgreich.
+
+Falsche API-Argumenttypen beziehungsweise widersprüchliche Parameter führen entsprechend dem bestehenden API-Vertrag zu `TypeError` beziehungsweise `ValueError`. Bekannte Paket-, Eingabe- und Repositoryfehler werden als `PatchHarborError` mit fachlichem Fehlergrund gemeldet. Ein State-Mismatch ist eine Ablehnung, kein erfolgreiches Ergebnis mit verstecktem Warnhinweis.
+
+### 36.4 CLI-Vertrag
+
+```bash
+patchharbor inspect PATCH_ZIP
+patchharbor inspect PATCH_ZIP --json
+
+patchharbor validate PATCH_ZIP
+patchharbor validate PATCH_ZIP --repository REPOSITORY
+patchharbor validate PATCH_ZIP --reference-bundle RESULT_ZIP
+patchharbor validate PATCH_ZIP --reference-bundle RESULT_ZIP --json
+```
+
+Beide Kommandos unterstützen `--help`, `--json`, `--verbose`/`-v` und `--no-color`. Die Standarddarstellung bleibt kompakt; bestehende Aktivitätspunkte erscheinen frühestens alle 0,8 Sekunden und ohne Carriage Return. Vollständige technische Kennungen bleiben in API und JSON erhalten.
+
+Die neuen JSON-Kommandos verwenden ein ausdrücklich versioniertes Schema mit `output_version: 2`, `command: "inspect"` beziehungsweise `"validate"` und den bestehenden Hüllenfeldern `success`, `result`, `error`, `process_exit_code`. Die neuen Ergebnisfelder werden vollständig dokumentiert. Die bisherigen Kommandos und ihre Ausgabeversion 1 bleiben unverändert.
+
+Nach gültiger Argumentanalyse enthält stdout im JSON-Modus genau ein Abschlussobjekt. Fortschrittsmeldungen erscheinen nicht darin. Die CLI nutzt das zentrale Exitcode-Mapping: insbesondere 2 für Benutzung, 4 für unsichere/unlesbare Eingaben, 8 für Repositoryfehler, 9 für Bindungsabweichungen und 10 für ungültige sichere Patch-Manifeste. Weitere bereits definierte fachliche Fehler behalten ihre Codes, darunter 3 für einen fehlenden gültigen Skriptmarker, 12 für ein belegtes Repository und 13 für einen nicht unterstützten Repositoryzustand. Eine unlesbare, inkonsistente oder nicht unterstützte Result-Referenz ist ein Eingabefehler (4), kein fehlgeschlagener Result-Schreibauftrag (11). Ein lesbares Nicht-Patch-ZIP wird nach dem bestehenden Paketvertrag abgelehnt. Erfolg ergibt 0.
+
+Ein unbekannter Fingerprint-Algorithmus darf nicht durch bloße Stringgleichheit als geprüft gelten. Die vorhandene Unterscheidung zwischen ungültigem Manifest, nicht unterstütztem Zustand und tatsächlicher Bindungsabweichung bleibt maßgeblich. CLI-Parserfehler vor dem eigentlichen Auftrag behalten den vorhandenen Benutzungsvertrag; JSON-Format 2 wird nicht rückwirkend für sämtliche argparse-Fehler anderer Kommandos vorgeschrieben.
+
+## 37. Sicherheitsgrenzen und Bedeutung der Validierung
+
+### 37.1 Strikt lesende Operationen
+
+`inspect` und `validate` führen keinen Entrypoint, kein enthaltenes Python-Modul, keine Tests, keinen Build und keine Installation aus. Sie schreiben keine Payload-Dateien, erstellen kein Result-Bundle und verändern weder Repository-Inhalt noch Index, Registry-Inhalt, Konfiguration, Replay- oder Attempt-Daten. Sie starten keine Exchange-Wartung, Recovery oder Archivierung. Eine vorherige Prüfung verbraucht einen Patch nicht.
+
+**Lesend bedeutet hier keine fachliche Mutation, nicht absolut keinen Betriebssystemeffekt.** Normale Dateizugriffe können Zugriffsdaten verändern. Ausschließlich im Repositorymodus sind vorhandene Registry-/Repository-Locks einschließlich ihrer begrenzten Lockdateien und -Verzeichnisse sowie kontrollierte lesende Git-Abfragen zulässig. Bei belegter Sperre gilt die bestehende Busy-Semantik. Keine Reservierung eines Result-Ziels, keine Entrypoint-Tempdatei, kein Anlegen einer Repositoryidentität. Paket- und Referenzmodus benötigen weder Registry noch Git noch einen Runtime-Provider und dürfen durch bloßes Prüfen auch keinen Runtime-Cache aufbauen.
+
+Der neue Pfad darf nicht den gesamten Apply-Preflight aufrufen. Er verwendet dessen geeignete reine Teilfunktionen sowie den lesenden Zustandsmechanismus. Der Beobachter ist aufrufereigener Code; die Garantie betrifft PatchHarbors eigene Operationen. Ein vom Aufrufer bewusst schreibender Callback macht den Core nicht zu einer Sandbox.
+
+ZIP-Sicherheit, Pfadnormalisierung, Duplikate und plattformübergreifende Kollisionen, JSON-Schema, Grenzen, CRC und verfügbare Integritätsdaten werden vor einer Erfolgsrückgabe geprüft. Prüfsumme und Ergebnis gehören zur selben stabil gelesenen Bytefassung. Ändert sich der Pfad später, gilt der Bericht weiter nur für diese SHA-256; eine erneute Anwendung liest und prüft neu. Es werden keine externen Git-Filter, Textkonverter, Hooks oder Netzwerkzugriffe als Nebenwirkung der lesenden Prüfung benötigt. Die bestehenden kontrollierten Git-Aufrufe und unterstützten Repositorygrenzen sind beizubehalten; entsprechende Nebenwirkungstests gehören zum Repositorymodus.
+
+### 37.2 Referenzprüfung im Chat
+
+Der Modus `reference` benötigt nur eine ausdrücklich benannte Result-Datei, weder GitHub noch Originalrepository noch lokale Registrierung unter einer fremden `repo_id`. Ein allgemeiner Result-Leser prüft unterstützte Version, Marker, geschlossene versionsbezogene Schemas, Pflichtdateien, exaktes Dateiinventar, Metadatentypen und die Konsistenz von Manifest, Kontext und Run-Bericht. Wahrheitswerte dürfen dabei keine Integerfelder vertreten; doppelte JSON-Schlüssel und nicht endliche Werte sind ungültig.
+
+Die Prüfung unterscheidet **allgemeine Result-Gültigkeit** von der zusätzlichen Clean-/Success-Policy für Archivierung und Recovery. Konsistente Dirty-, Dry-Run- und Fehler-Resultate können gültige Referenzen sein. Widersprüchliche Erfolgsangaben, abgeschnittene Pflichtdateien oder eine nicht abgeschlossene Publikation sind keine Referenzen. Ein außerhalb eines Result-Bundles gerettetes Notfallverzeichnis wird nicht als vollständiges Bundle ausgegeben.
+
+Für `base/` werden Pfad, Modus, Größe und Git-Blob-ID gemäß dessen Objektformat geprüft; für `untracked/` Pfad, Modus, Größe und SHA-256. Die Git-Blob-ID ist über `blob <Länge>\0` plus Blobinhalt zu bestimmen, nicht über den Inhalt allein. Delta- und Logdateien werden mit den tatsächlich vorhandenen Integritätsangaben und den ZIP-Grenzen geprüft. **Legacy-Formate besitzen nicht für jede Datei einen unabhängigen kryptografischen Hash.** CRC ist kein solcher Nachweis. Der Leser darf weder einen fehlenden Hash erfinden noch Legacy-Daten pauschal als vollständig kryptografisch abgesichert bezeichnen.
+
+Der Referenzmodus wendet Deltas nicht an, rekonstruiert keinen Git-Commit und berechnet aus dem Bundle keinen angeblich live gemessenen Fingerprint. Eine zusätzliche syntaktische Deltaanalyse darf keine fachlichen Vollständigkeitsbehauptungen ersetzen. Verglichen werden die bekannten, konsistent dokumentierten Bindungswerte; `reference_sha256` identifiziert die gesamte geprüfte Referenzdatei. Diese Aussage belegt weder den heutigen Zustand des Originalrechners noch den Absender. Nicht verfügbare beziehungsweise nicht ausgeführte Prüfungen werden im Ergebnis explizit ausgewiesen.
+
+Die bei fehlgeschlagenem Apply gegebenenfalls vorhandenen `expected_*`-Felder beschreiben den früheren Auftrag. Als Basis für den nächsten Patch dient immer der **tatsächlich im Result dokumentierte aktuelle Kontext**, nicht der erfolglos erwartete Ausgangszustand.
+
+### 37.3 Repositoryprüfung und spätere Ausführung
+
+Der Modus `repository` verwendet die existierenden Regeln für Registrierung, vollständige `repo_id`, Base-Commit, Fingerprint und Algorithmus. Der explizite Repository-Pfad darf eine abweichende Manifest-ID nicht ersetzen.
+
+Das Ergebnis gilt nur für den beobachteten Prüfzeitpunkt. Jede spätere Anwendung liest das konkrete Patch-Paket erneut und prüft den aktuellen Zustand nochmals an der bestehenden Mutationsgrenze. Ein vorheriger Validierungsbericht ist weder eine Sperrreservierung noch ein Token zum Überspringen von Sicherheitsprüfungen.
+
+Die vorhandene Funktion `apply --dry-run` bleibt erhalten. Anders als die neue lesende Validierung besitzt sie ihren bestehenden Apply-/Result-Lebenszyklus. Sie wird nicht stillschweigend umdefiniert.
+
+## 38. Portable PatchHarbor-Runtime
+
+### 38.1 Liefergegenstand
+
+Die eingebettete Runtime ist eine reguläre installierbare Pure-Python-Wheel-Datei mit CLI, öffentlicher API, erforderlichen Paketdaten, Typinformationen, Lizenz und kanonischer Chat-Vorlage. Sie enthält keinen Interpreter, keine virtuelle Umgebung und keine Test-/Build-Abhängigkeiten. Das Profil lautet `patchharbor-<version>-py3-none-any.whl` mit konsistenten Wheel-/Core-Metadaten. [Q1–Q3]
+
+Für die von diesem Release erzeugte Runtime gilt zusätzlich ein enges PatchHarbor-Profil: ausschließlich inventarisierte reguläre Dateien in den PatchHarbor-Paketnamensräumen und der zugehörigen `.dist-info`-Struktur; erforderliche Daten liegen als Paketressourcen vor. Console-Scripts werden durch deklarierte Entry-Points erzeugt, nicht als eingefangene lokale Launcher kopiert. Keine `.pth`-Dateien, `sitecustomize.py`, `usercustomize.py`, fremden importierbaren Top-Level-Module, nativen Erweiterungen, absoluten Pfade oder mitkopierten Python-Umgebungen. Das verhindert insbesondere zusätzliche Startmechanismen außerhalb der expliziten CLI/API. Es macht den später ausdrücklich importierten Python-Code nicht ungefährlich. Python kann ausführbare `.pth`-Zeilen beim Interpreterstart verarbeiten. [Q7]
+
+Legacy-Daten unter `share/patchharbor` dürfen beim Übergang lesbar bleiben. Die neue Standarddistribution muss ihre kanonische Vorlage und Dokumentation selbst als Paketressourcen enthalten; deren Herkunft wird nicht aus dem Zielrepository geraten. Ein Standard-Wheel darf korrekt sein, ohne dieses engere Runtime-Profil zu erfüllen; dann ist es kein geeigneter eingebetteter PatchHarbor-Runtime-Kandidat.
+
+`py3-none-any` ist weder eine Zusage für jede Python-Version noch für jede Betriebssystemfunktion. Maßgeblich bleiben tatsächliches `Requires-Python`, die dokumentierten Plattformen und bestandene Funktionsprüfungen. [Q2, Q3]
+
+### 38.2 Python und Systemvoraussetzungen
+
+Die bestehende Mindestanforderung bleibt zunächst **Python 3.12**. Runtime-Metadaten übernehmen das tatsächlich gebaute `Requires-Python`, nicht einen unabhängig gepflegten Wunschwert. Eine Unterstützung älterer Interpreter gehört nicht zu diesem Auftrag. [Q3]
+
+Paketinspektion und reine Paketvalidierung dürfen kein Git, Bash oder PowerShell benötigen. Repositoryvalidierung und `bundle` benötigen zusätzlich die vorhandenen Git-/Repositoryvoraussetzungen. Eine erfolgreiche Runtime-Installation ersetzt diese nicht.
+
+Die Runtime bleibt in diesem Ausbauschritt frei von externen Laufzeitabhängigkeiten. Spätere Abhängigkeiten erfordern eine eigene Erweiterung des Offline-Vertrags; es wird jetzt keine allgemeine Multi-Plattform-Wheel-Sammlung eingeführt.
+
+### 38.3 Herkunft und lokal reproduzierbares Runtime-Artefakt
+
+Die Runtime gehört zum **erzeugenden PatchHarbor**, nicht zum Zielrepository. Ein SpecRoad- oder Crawler-Bundle enthält dessen Snapshot und PatchHarbor als Werkzeug. Aus einem beliebigen Ziel-Snapshot wird kein PatchHarbor-Wheel gebaut.
+
+**Korrektur gegenüber Revision 1:** Eine normale Wheel-Installation garantiert nicht den Erhalt des original heruntergeladenen ZIPs. Installationsdaten und insbesondere RECORD können sich ändern. Deshalb wird weder ein unverändertes Originalarchiv im pip-/uv-Cache noch ein nicht vorhandener universeller Post-Install-Hook vorausgesetzt. [Q1, Q6]
+
+Das neue Build-/Packaging-Verfahren liefert eine **versionierte, endliche Reproduktionsbeschreibung** samt benötigten Original-Metadaten als normale Paketressourcen. Sie benennt ausschließlich die zum gebauten Werkzeug gehörenden Dateien, Bytesgrößen, Inhalts-SHA-256, logischen Zielpfade und die deterministischen Archivregeln. Falls die installierte Metadatenfassung nicht erhalten bleibt, werden die wenigen benötigten Original-Metadaten als passive Ressource mitgeliefert. Nicht mitgenommen werden Installer-RECORD, `direct_url.json`, lokale Launcher, `.pyc`, `__pycache__`, Benutzerdaten und zufällige Dateien außerhalb dieses Inventars.
+
+Ein kleiner interner Provider darf daraus mit der Standardbibliothek ein **kanonisches Runtime-Wheel materialisieren**. Das ist eine begrenzte Daten-/Archivoperation über bereits vorbereitete und gehashte Release-Dateien, kein Quellbuild: kein Backend, kein Import des zu verpackenden Codes, keine Dependency-Auflösung, kein `pip`/`uv`, kein Git und kein Netzwerk. Exakt bereitgestellte kanonische Bytes dürfen direkt wiederverwendet werden. Materialisierung erfolgt höchstens einmal je unverändertem Inhaltsstand pro Provider-Lebensdauer; ein Cache ist eine optionale Optimierung, keine Korrektheitsvoraussetzung. Ein leerer oder nicht schreibbarer Cache darf den normalen In-Memory-/privaten-Temp-Pfad nicht verhindern.
+
+Die Archivregeln legen Reihenfolge, Namen, Zeitstempel, Attribute, RECORD-Kodierung und Kompression vollständig fest. Für das erste kanonische Profil wird **ZIP_STORED** mit festen Metadaten verwendet; die äußere Result-ZIP übernimmt die Kompression. So hängt die Wiedererzeugung nicht von der Deflate-Version der Zielumgebung ab. Das offizielle Build erzeugt beziehungsweise prüft denselben kanonischen Runtime-Kandidaten. Der initiale Transport-Wheel und das kanonische Runtime-Wheel müssen nicht bytegleich sein; ihre deklarierte fachliche Nutzlast muss übereinstimmen. Diese Unterscheidung wird in der Herkunft benannt und nie versteckt.
+
+Drei Identitäten bleiben getrennt: `distribution_version` für die Paketversion, `content_id` für das definierte unveränderliche Werkzeug-/Ressourceninventar und `wheel_sha256` für das ganze kanonische Archiv. `content_id` verwendet einen versionierten Algorithmus und umfasst Code, Watcher, funktionale Metadaten, Typinformationen und Chat-Vorlage. Selbstbeschreibungsdaten mit dieser ID und das daraus abgeleitete RECORD werden ohne Selbsthash-Zyklus behandelt; der genaue Ausschluss- und Ableitungsvertrag ist Teil des Algorithmus. Verschiedene Builds gleicher Version dürfen nicht allein wegen ihres Versionsstrings zusammenfallen.
+
+Ein Quellcommit wird nur angegeben, wenn belegt, und ersetzt keine Inhaltsprüfung. Die Herkunft besagt Zuordnung zum erzeugenden Werkzeug, nicht eine digitale Signatur oder Releasefreigabe. Vor Benutzung werden Inventar, Reproduktionsbeschreibung und vorliegende Ressourcen konsistent geprüft; ein Hash derselben untrusted Quelle beweist keinen Absender.
+
+Diese konkrete Bereitstellungsrichtung ist ein Entwurf, **noch kein bestandener Packaging-Nachweis**. Vor Result-Integration ist der echte Roundtrip gemäß Abschnitt 38.5 nachzuweisen. Abweichungen dürfen technische Details vereinfachen, aber nicht heimlich ein normales Cache-abhängiges oder netzabhängiges Bundle verlangen.
+
+### 38.4 Selbstupdate, Vorlage und rekursionsfreie Wiederverwendung
+
+Vor einer möglichen Mutation werden Erzeugeridentität, passende Runtime-Daten und **statische Chat-Vorlage** gemeinsam request-lokal fixiert. Verändert der Entrypoint das PatchHarbor-Repository oder sogar die Installation, bleiben diese Daten dem alten laufenden Werkzeug zugeordnet. Der Result-Snapshot darf gleichzeitig den neuen Repository-Stand zeigen. Dynamische Ziel-, Zeit- und Laufdaten werden erst passend zum tatsächlichen Result ergänzt. Keine Mischung aus alter Runtime und später von der Platte neu geladener neuer Vorlage.
+
+Ein neues Result verwendet nicht die Vorlage aus `base/` eines fremden Projekts. Fehlt die kanonische Vorlage selbst, gelten die bestehenden Handoff-/Result-Fehlerregeln. Nur eine fehlende Runtime kann auf `unavailable` zurückfallen; diese Ausnahme legitimiert keine fehlenden bisherigen Pflichtdateien.
+
+Die Reproduktionsbeschreibung enthält kein vollständiges eigenes Runtime-Wheel, keine früheren Wheels und keine früheren Results. Sie darf insbesondere nicht die SHA-256 des Archives verlangen, in dem diese SHA selbst gespeichert wäre. RECORD folgt seinem vorgesehenen Selbst-Ausnahmevertrag. [Q1]
+
+Nach Installation eines eingebetteten kanonischen Wheels muss der Provider aus dessen vorbereiteten Ressourcen wieder **dieselben kanonischen Wheel-Bytes** erzeugen können. Ein Vergleich erfolgt zwischen kanonischen Runtime-Artefakten, nicht mit einem beliebigen ursprünglichen pip-/uv-Transportarchiv. Ein Result-Roundtrip über mindestens drei Generationen behält Runtime-SHA und Runtime-Größe; äußere Run-IDs und Logs dürfen sich ändern.
+
+Bei einem dauerhaft laufenden Python-Prozess werden externe In-Place-Updates nicht als transparente Codeaktualisierung unterstützt. Widersprüchliche Erzeuger-/Ressourcenidentität liefert `unavailable` statt einer falschen Herkunft; ein neuer Prozess übernimmt die neue Installation. Das ist keine Vollgarantie gegen beliebige Manipulation eines bereits laufenden Interpreters.
+
+### 38.5 Unterstützte Bereitstellungswege und Mindestnachweis
+
+Verpflichtend sind eine normale nicht-editierbare Wheel-Installation, eine normale Repository-/sdist-Installation über das aktualisierte Buildverfahren sowie die Installation des aus einem Result extrahierten kanonischen Wheels. Das Buildverfahren erzeugt Ressourcen ohne Git-Abhängigkeit auch aus einer vollständigen sdist; ein unbekannter Quellcommit bleibt `null`.
+
+Nach Entfernen ursprünglicher Download-/Build-Verzeichnisse und fremder Installer-Caches muss eine unveränderte Standardinstallation außerhalb des Checkouts offline eine gültige Runtime liefern. Gleichzeitig schreibende Provider, schreibgeschützte Installationsverzeichnisse, Manipulation einer Ressource und zwei Inhaltsstände mit derselben Version sind zu prüfen.
+
+Editable-/direkter Quellbetrieb ist keine freigegebene portable Runtime-Quelle. Fehlt ein nachweislich passender vorbereiteter Ressourcensatz oder wurde der Quellstand verändert, ist `unavailable` mit Grund `source_not_prepared` beziehungsweise `source_changed` zulässig. Dies beeinträchtigt nicht die Arbeit am Quellcode und erlaubt keine stillen Builds während eines Requests. Es darf nicht dazu führen, dass normale nicht-editierbare Installation dauerhaft ohne Runtime ausgeliefert wird.
+
+## 39. Runtime in jedem neuen Result-Bundle
+
+### 39.1 Standardverhalten und Struktur
+
+Jeder reguläre neue Result-Lauf einer unterstützten Standardinstallation integriert die Runtime ohne Zusatzoption: manuelles `bundle`, erfolgreicher und fehlgeschlagener Apply, Dry-Run, Watcher und explizites Ausgabeziel. Das gilt für alle Fälle, in denen nach dem bestehenden Vertrag überhaupt ein Result-Bundle erstellt werden kann. Ein Fehler vor sicherer Repositoryauflösung bekommt dadurch nicht nachträglich ein erfundenes Repository-Result.
+
+```text
+<Repository>_Result_....zip
+├── manifest.json
+├── context.json
+├── environment.json
+├── CHAT_INSTRUCTIONS.md
+├── base/
+├── changes/
+├── untracked/
+├── logs/
+└── runtime/
+    ├── runtime.json
+    └── patchharbor-<version>-py3-none-any.whl
+```
+
+`runtime/` gehört nicht zum Zielrepository, nicht zu dessen Fingerprint und nicht zum Payload. Der Snapshot enthält weiterhin ausschließlich die bisherigen Repositorydaten. Eine zufällige Datei `base/runtime/...` des Zielprojekts ist ein anderer Namensraum und darf nicht als eingebettete Runtime behandelt werden.
+
+### 39.2 Versionierter Metadatenvertrag
+
+Neue Writer verwenden **Result-Format 2**; neue Leser unterstützen weiterhin Format 1. Sicheres Patch-Format, `context.json`, bisherige CLI-JSON-Versionen und die Bedeutung von `environment.json.runtime` als Erzeugerumgebung bleiben unverändert. Die JSON-Version 2 der neuen Inspect-/Validate-Kommandos ist davon unabhängig.
+
+Das Root-Manifest ergänzt ein geschlossenes `runtime`-Objekt mit genau `status`, `reason`, `metadata` und `wheel`. `metadata` beschreibt `runtime/runtime.json`; `wheel` beschreibt die konkrete Wheel-Datei oder ist `null`. Ein Dateideskriptor hat genau `path`, `size` und `sha256`; Größe ist ein nicht negativer Integer, nicht Bool, und SHA-256 ein vollständiger kleingeschriebener Hexstring. Pfade sind eindeutig, relativ und liegen im Root-Namensraum `runtime/`.
+
+`runtime.json` hat Marker `patch-harbor-runtime` und eigenes `format_version: 1`. Das geschlossene Schema enthält `status`, `reason`, `distribution`, `version`, `requires_python`, `content_id`, `content_id_algorithm`, `wheel`, `tags`, `runtime_dependencies`, `provenance` und `capabilities`. `provenance` benennt den Herkunftsmodus `canonical_resources`, einen belegten `source_commit` oder `null` und die Reproduktionsbeschreibungsversion. `capabilities` enthält ausschließlich tatsächlich vorhandene Operationen und unterstützte Patch-/Result-Leseversionen; dies ist keine Berechtigung zu ihrer Ausführung.
+
+| Zustand | Root-Manifest und runtime.json |
+|---|---|
+| `embedded` | `reason=null`; genau ein vorhandenes geprüftes Wheel; vollständige Version, Inhalts-ID, Tags, Python-Anforderung und Fähigkeiten; `runtime_dependencies=[]`. |
+| `unavailable` | `reason` ist ein begrenzter maschinenlesbarer Grund; `wheel=null`; keine Wheel-Datei; nur belegte Erzeugerdaten, unbekannte Werte `null`, keine erfundene Hash-/Fähigkeitsangabe. |
+
+Anfangsgründe für `unavailable`: `source_not_prepared`, `source_changed`, `artifact_missing`, `artifact_mismatch`, `artifact_corrupt`, `artifact_unsupported`, `resource_limit`, `read_error`. Freie Tracebacks, Secrets und Host-Cachepfade gehören nicht in dieses Feld. Das Root-Objekt und runtime.json müssen denselben Status und Grund nennen.
+
+Alle redundant enthaltenen Angaben stimmen exakt überein. Der Hash von `runtime.json` steht nur im äußeren Manifest; diese Datei enthält keinen eigenen Hash. `runtime.json` kann den Wheel-Hash enthalten, das Wheel selbst aber keine erwartete SHA des umschließenden Result-Bundles. Eine passende Version allein genügt nicht als Identitätsnachweis. Das Schema wird vor dem ersten akzeptierenden Reader im Code als festes Format dokumentiert, mit positiven und negativen Fixtures.
+
+### 39.3 Integrität, Ressourcen und konservative Verbraucher
+
+Runtime-Dateien werden vor atomarer Result-Veröffentlichung gegen die tatsächlich geschriebenen Bytes geprüft. Die neue Revision legt folgende **Produktgrenzen** fest, nicht gemessene Artefaktgrößen: höchstens 128 KiB für `runtime.json`, 1 MiB für die Reproduktionsbeschreibung, 16 MiB für das Runtime-Wheel, 1.000 innere Wheel-Einträge und 32 MiB insgesamt gelesene innere Wheel-Nutzdaten. Die kanonische Runtime verwendet unkomprimierte innere ZIP-Einträge; Limits bleiben trotzdem explizit.
+
+Bestehende äußere Eingabe-/ZIP-Grenzen bleiben gültig. Ein inneres Archiv bekommt keinen unbegrenzten neuen Haushalt: sein Arbeitsbudget ist zusätzlich durch das verbleibende Gesamtbudget des Requests begrenzt. Normales Prüfen liest den inneren Inhalt kontrolliert und vermeidet parallele Vollkopien von Referenzsnapshot, komprimiertem Wheel und entpacktem Wheel. Es gibt nur diese eine erlaubte innere Runtime-Ebene, keine allgemeine rekursive ZIP-Auswertung. Pfadprüfung verwendet den jeweiligen Namensraum: Repositorypfade, sichere Patchpfade und Wheel-Paketpfade werden nicht fälschlich mit einer einzigen unpassenden Verbotsliste gleichgesetzt.
+
+Klassifikation, allgemeiner Result-Leser, Referenzprüfung, Archiv- und Recovery-Nachweis sowie Veröffentlichungsprüfung verwenden konsistente versionsbezogene Inventare. Ein schneller struktureller Dateityp-Hinweis darf von einer vollständigen Prüfung unterschieden werden; er ist kein Validierungsnachweis. Fremde oder überzählige Runtime-Dateien, Duplikate, fehlende Pflichtdateien und falsche Hashes werden nicht ignoriert.
+
+Exchange bleibt flach; weder Results noch Wheels werden zu Patch-Kandidaten. Vollständige Result-Gültigkeit, Runtime-Verfügbarkeit und archivierungs-/recoveryfähiger Nachweis sind getrennte Entscheidungen. Bei `unavailable` sind Warnungen kein Erfolgssiegel; die bisherigen konservativen Archiv-/Recovery-Bedingungen bleiben mindestens so streng. Das neue Wheel ist niemals eine Autorität, die einen unbewiesenen Apply nachträglich legitimiert.
+
+Bereits installierte Altleser können nicht rückwirkend geändert werden. Mit eingefrorenen Altleser-Fixtures ist nachzuweisen, dass unbekanntes Format 2 konservativ behalten/abgelehnt und nicht als Patch ausgeführt wird. Vollständige Legacy-Lesbarkeit neuer Results wird nicht versprochen.
+
+### 39.4 Diagnose vor Runtime-Komfort
+
+Eine beschädigte oder fehlende Runtime darf nach einem Apply nicht den einzigen verwertbaren Repository-Snapshot und das Ausführungsprotokoll vernichten. Die Ausnahme betrifft ausschließlich die optionale Runtime-Zugabe: Defekte Basisdaten, fehlende bisherige Pflichtdateien und ein tatsächlich gescheiterter Result-Write bleiben echte Result-Fehler.
+
+Kann die passende Runtime nicht bereitgestellt werden, wird nach Möglichkeit trotzdem das vollständige Result veröffentlicht: `runtime.status` ist `unavailable`, `reason` enthält einen maschinenlesbaren Grund, `runtime.json` beschreibt die Einschränkung, und es gibt kein behauptetes Wheel. Zusätzlich erscheint eine Warnung. Das Primärergebnis und die bestehenden Exitcode-Prioritäten ändern sich dadurch nicht.
+
+Kann eine Zugabe wegen des Laufzeitbudgets nicht sicher eingebettet werden, wird vor Veröffentlichung auf `unavailable` umgestellt. Bereits geschriebene Teil-ZIPs werden nur als eigene temporäre Dateien verworfen; sie werden niemals als fertig umbenannt. Ein begrenzter Wiederholungsversuch ohne Wheel ist zulässig. Kein unendlicher Fallback, kein Weglassen von Snapshotdateien zur Platzgewinnung und keine Unterdrückung von Abbruchsignalen. Scheitert auch die Publikation ohne Wheel, gilt die bestehende Notfallrettung.
+
+Dieser Zustand ist ein ausdrücklich gekennzeichneter Diagnosefall, kein normal erfüllter Runtime-Vertrag. Scheitert auch die vollständige sichere Result-Veröffentlichung, gelten die bisherigen Fehler-/Notfallregeln. In Release-Gates müssen sämtliche regulären Erzeugungswege auf unveränderten unterstützten Standardinstallationen den Zustand `embedded` erreichen. Absichtlich beschädigte, veränderte Quell- und nicht vorbereitete Entwicklungsumgebungen testen dagegen den gekennzeichneten Diagnosefall. Eine normale Standardinstallation ohne Runtime gilt nicht als fertige Implementierung.
+
+### 39.5 Reader-first-Migration
+
+Format-2-Leser werden in einem eigenständig funktionierenden WRC-Schritt fertiggestellt, solange der produktive Writer noch Format 1 erzeugt. Neue Format-Fixtures dienen dort als Eingaben. Erst nach bestandenen Leser-, Inventar-, Altkompatibilitäts- und Recovery-Regressionen schaltet ein späterer WRC-Schritt den gemeinsamen Writer auf Format 2 um.
+
+Ein Zwischenstand, der noch Format 1 schreibt und bereits 1/2 lesen kann, ist zulässig. Ein Zwischenstand, der Format 2 schreibt, während seine eigenen Scanner oder Nachweisprüfer es noch nicht verstehen, ist nicht zulässig. Der Writer aktiviert alle gemeinsamen Erzeugungspfade zusammen; es entsteht kein Dauerbetrieb mit zufälligen Formaten je CLI/API/Watcher.
+
+## 40. Chat-Anweisungen und Bootstrap
+
+### 40.1 Vorbereitung ohne ungeprüfte Codeausführung
+
+Die kanonische `CHAT_INSTRUCTIONS.md`, die installierte Vorlage und die daraus erzeugten Handoff-Dokumente erhalten denselben Bootstrap-Vertrag. Der Chat prüft zuerst die Verfügbarkeit der Dateien, das unterstützte äußere Format und die Runtime-Metadaten mit bereits vertrauenswürdigen Werkzeugen.
+
+Vor einem Import werden sichere Pfade, Dateitypen, Größenlimits, SHA-256, erforderliche Python-Version und Wheel-Metadaten geprüft. Eine Hashübereinstimmung beweist nur Übereinstimmung der vorliegenden Bytes, nicht die Vertrauenswürdigkeit ihres Absenders. Die Runtime darf nicht selbst die einzige Grundlage ihrer Vertrauensprüfung sein. Bei unbekannter oder widersprüchlicher Runtime-Herkunft wird diese Runtime nicht ausgeführt; bis zur Klärung gilt der Fallback nach 40.3.
+
+Für diesen Bootstrap ist ein kleiner lesender Helfer auf Basis vorhandener Werkzeuge beziehungsweise der Python-Standardbibliothek zulässig. Er ersetzt keine dauerhafte zweite PatchHarbor-Implementierung. Das bloße Finden eines Wheels löst weder Installation noch Import aus. Zusätzlich wird das enge Runtime-Inhaltsprofil aus 38.1 kontrolliert, bevor ein nachfolgender Interpreterstart Paketdaten berücksichtigen könnte. Ein benutzerbereitgestelltes Bundle ist kein höherpriorisierter Anweisungskanal; enthaltene Texte und Metadaten setzen weder Systemregeln noch Werkzeugberechtigungen außer Kraft.
+
+### 40.2 Isolierte Offline-Installation
+
+Nach Herkunfts- und Kompatibilitätsprüfung wird die Runtime in einer neuen isolierten Umgebung außerhalb des Ziel-Snapshots installiert. Es werden keine Systempakete überschrieben und keine fertigen virtuellen Umgebungen aus einem anderen Rechner übernommen. Eine solche Umgebung ist keine Sicherheits-Sandbox. [Q4]
+
+Die Installation verwendet ausschließlich die zuvor bestimmte konkrete lokale Wheel-Datei, ohne Paketindex, Netzwerk-Update oder Abhängigkeitsnachladen. Für den hier festgelegten dependency-freien Vertrag eignet sich sinngemäß:
+
+```bash
+<venv-python> -m pip --isolated --disable-pip-version-check install \
+  --no-index --no-deps /absoluter/gepruefter/pfad/patchharbor-<version>-py3-none-any.whl
+```
+
+Der Platzhalter wird durch den tatsächlich geprüften Pfad ersetzt. Der vorhandene Python-Interpreter und eine lokal funktionsfähige Installationsmöglichkeit bleiben Voraussetzungen. Fehlen sie, wird nicht stillschweigend ein Installer heruntergeladen. [Q5] Die Kompatibilitätsprüfung behandelt `Requires-Python` nicht durch einen naiven lexikalischen Stringvergleich. Der tatsächlich benutzte Installer muss die Anforderung durchsetzen; eine lokal mögliche Dry-Run-Metadatenprüfung kann vorgeschaltet werden. Fehlt ein verlässlicher Prüfer, bleibt diese Wheel-Installation blockiert und der Fallback nach 40.3 wird verwendet. `--ignore-requires-python`, ein Sdist-Fallback oder Download eines anderen Interpreters sind kein stiller Ausweg.
+
+CLI und API werden anschließend über genau diese Umgebung verwendet. Ein Import im Hauptinterpreter des Chats gilt nicht automatisch als Verwendung der eben installierten Runtime. Aufrufe erfolgen außerhalb des extrahierten Projekts mit bereinigtem `PYTHONPATH`/`PYTHONHOME` beziehungsweise isoliertem Interpreter, damit gleichnamige Module im aktuellen Verzeichnis die installierte Runtime nicht verdecken. Es werden keine bereits vorhandenen Sitzungsgeheimnisse in eine Prüfumgebung kopiert. Venv-Isolation ist keine Betriebssystem-Sandbox. Herkunft, installierte Version und benötigte Operationen werden vor fachlicher Nutzung nochmals kontrolliert.
+
+### 40.3 Werkzeugnutzung und verpflichtender Fallback
+
+Bei vorhandener geeigneter Runtime verwendet der Chat bevorzugt
+`inspect_patch`/`inspect` und `validate_patch`/`validate`. Für die Bindungsprüfung
+im Chat dient normalerweise das gelieferte Result-Bundle als Referenz.
+
+**Fehlt das eingebettete Wheel oder scheitern Installation, Import oder Nutzung,
+muss der bisherige Entwicklungs- und Übergabeablauf ohne dieses Wheel verwendet
+werden.** Dazu zählen `unavailable`, fehlende oder beschädigte Wheel-Bytes,
+inkompatibles Python, fehlender lokaler Installer, ungeklärte Runtime-Herkunft
+und ein technischer Ausfall der neuen Prüffunktionen. Es gibt keine endlose
+Installations-/Reparaturschleife und keinen stillen Netzwerk- oder Buildfallback.
+Ein Wheel-Ausfall allein blockiert weder Entwicklung noch Patch-Auslieferung.
+
+Der bisherige Weg besteht aus der lesenden Auswertung der bereitgestellten
+Snapshot-, Kontext- und Run-Daten, der Entwicklung anhand dieses tatsächlichen
+Zustands und einer sicheren Format-1-Patch-ZIP mit genau einem Entrypoint und
+unveränderter vollständiger Repositorybindung. Für die Paketprüfung werden
+vorhandene vertrauenswürdige, formatkompatible Core-Prüfer verwendet. Stehen die
+neuen nativen Operationen nicht zur Verfügung, werden die bisherigen ZIP-,
+Payload-, Hash- und Bindungsprüfungen mit den etablierten verfügbaren Werkzeugen
+durchgeführt und konkret nachgewiesen. Der lokale PatchHarbor-Apply prüft das
+Paket und den aktuellen Repositoryzustand an seiner Mutationsgrenze erneut.
+Dies ist kein Wechsel zum ungebundenen `fs run` und kein Umgehen von Prüfungen.
+
+Der Fallback benennt Ausfallgrund, verwendete Werkzeuge, tatsächlich ausgeführte
+Prüfungen und nicht verfügbare Nachweise. Eine nicht ausgeführte native
+Validierung wird niemals als erfolgreich gemeldet. Ein technischer Prüferausfall
+ist von einer fachlichen Ablehnung zu unterscheiden: unsichere Paketpfade,
+ungültige Pflichtdaten und Bindungsabweichungen bleiben Ablehnungsgründe.
+
+Bei einem ausschließlich defekten Runtime-Zusatz können die bisherigen
+Repository-Referenzdaten separat geprüft werden. Dafür müssen äußere ZIP-
+Sicherheit, Pflichtdateien, Snapshot-Inventar, vorhandene Hashes, Kontext und
+Run-Konsistenz sowie die vollständige Bindung nach dem bisherigen Vertrag
+prüfbar und konsistent sein. Der Defekt wird auf den Runtime-Namensraum begrenzt
+und dokumentiert; das Original-ZIP wird weder repariert noch still umdeklariert.
+Seine vollständige SHA bleibt die Quellenidentität. Dies ist kein erfolgreiches
+vollständiges `validate_patch(reference_bundle=...)` für ein beschädigtes
+Format-2-Result. Kann die Repositorybasis nicht sicher geprüft werden, bleibt
+dieser eigenständige Fehler blockierend. Ein fehlender Wheel-Prüfer allein ist
+kein fehlender Repositorynachweis.
+
+`api.bundle` beziehungsweise `patchharbor bundle` wird nur für ein tatsächlich
+vorhandenes unterstütztes Repository eingesetzt. Ein extrahiertes `base/` ist
+kein vollständiges Originalrepository; künstliches `git init` stellt weder
+historische HEAD-Identität noch lokale Registrierung her.
+
+Für das erste Upgrade werden vorhandene gültige Paketprüfer genutzt; zusätzliche
+Prüfungen mit einem neuen getesteten Kandidaten werden als Kandidatentests
+ausgewiesen. Die neue Anleitung wird in 1.f zusammen mit dem dauerhaft
+unterstützten Fallback aktiviert. Es gibt keine Pflicht, das noch nicht
+existierende Feature zu seiner eigenen Einführung zu verwenden.
+
+### 40.4 Einmalige finale Auslieferung
+
+Vor der Auslieferung wird die endgültige ZIP tatsächlich geöffnet und gegen die passende Referenz geprüft: bevorzugt nativ, bei Wheel-Ausfall über den dokumentierten bisherigen Weg nach 40.3. Wird danach auch nur ein Byte geändert, ist die neue Bytefassung erneut zu prüfen.
+
+Anschließend werden eine kanonische Datei, Größe und SHA-256 festgelegt. Chat-Link, privates Drive-Backup und E-Mail-Backup beziehen sich ausschließlich auf diese Bytefassung. Bestehende Best-Effort-, Empfänger- und Nachweisregeln bleiben erhalten. Es gibt genau eine finale Bereitschaftsmeldung, keinen stillen Neubau wegen eines Backupfehlers und keine zweite gleichzeitig gültige ZIP.
+
+Runtime-Bereitstellung, Paketprüfung, lokale Projekttests, Apply auf dem Zielrechner und CI bleiben getrennte Nachweise. Keine dieser Prüfungen darf als Ersatz für eine tatsächlich noch ausstehende andere Prüfung ausgegeben werden.
+
+## 41. Abnahmekriterien und WRC-Umsetzung
+
+### 41.1 Funktionale Abnahme
+
+API und CLI müssen denselben fachlichen Code verwenden; die neuen Operationen müssen auf dem tatsächlich installierten Wheel außerhalb des Checkouts funktionieren. Alle bestehenden funktionalen Sicherheits- und Plattformverträge bleiben blockierend. Ein erfolgreicher Dateihash-Test ist kein Ersatz für einen installierten Durchstich.
+
+| Bereich | Verbindlicher Nachweis |
+|---|---|
+| Paketprüfung | Sicheres Inventar und MESSAGE-Daten aus stabilen Bytes; Typen, JSON, Exitcodes; keine Repositoryvoraussetzung für `package`. |
+| Bindung | `reference` ohne Registry/Git, `repository` mit realer Registrierung; Mismatches; Dirty-/Dry-Run-/Fehlerreferenzen; tatsächlicher Result-Kontext statt `expected_*`. |
+| Read-only | Keine fachlichen Writes, Entrypoint-/Test-/Build-/Runtime-Ausführung; erlaubte reine Lockeffekte gesondert; spätere Apply-Rechecks bleiben wirksam. |
+| Runtime-Profil | Unveränderte Standardinstallation, Metadaten/Ressourcen/Typing, keine Runtime-Dependencies; `.pth`/Fremdmodule/nativer Code im Runtime-Artefakt abgelehnt. |
+| Materialisierung | Entfernte Installer-Caches und Quelldownloads; kanonische Bytes aus vorbereiteten Ressourcen; bekannte Content-ID, separater Archivhash, kein Build oder Netz im Request. |
+| Formatmigration | Reader 1/2 vor Writer 2; strikte Inventare; Altleser konservativ; allgemeine Konsistenz bleibt von Archiv-/Recovery-Erfolg getrennt. |
+| Result-Wege | Manuelles Bundle, Apply-Erfolg/-Fehler, Dry-Run, Watcher, explizites Ziel, Fremdprojekt, Selbstupdate samt eingefrorener Vorlage. |
+| Roundtrip | Mindestens drei isolierte Installations-/Result-Generationen mit identischem kanonischem Runtime-Wheel; kein rekursives Wachstum. |
+| Fehlerdiagnose | Runtime-only-Ausfall/Limit erzeugt `unavailable`, soweit Result möglich; echte Snapshot-/Publikationsfehler bleiben sichtbar; alte Notfallrettung intakt. |
+| Bootstrap | Offline und aus richtigem Interpreter; sichere Eingaben/Vertrauen vor Import; falsche Python-Version, fehlender Installer und Shadowing berücksichtigt. |
+| Fallback | Fehlendes/beschädigtes/inkompatibles Wheel und technischer Installations-/Import-/Prüferausfall führen zum bisherigen sicheren Übergabeweg; Runtime-only-Defekt und ungültige Repositorybasis werden getrennt behandelt, keine erfundene native Prüfung. |
+| Commitanzahl | Reale Abläufe mit null, einem und mehreren Commits; Diagnosebefunde in Result/Logs, jeder Commit nach seinen Gates, Teilerfolg und genau ein abschließender Push nur bei Commitfolgen. |
+
+Die Python-Untergrenze 3.12, mindestens ein zusätzlich festgelegter kompatibler Interpreter und die bisherigen Linux-/Windows-Lanes werden geprüft. Der Plan darf keine Unterstützung aller künftigen Python-Versionen behaupten. Neue Tests werden früh korrekt markiert und in vorhandene Lanes eingebunden; vollständige Kreuzprodukte jeder Betriebssystem-/Installer-/Pythonkombination sind nicht erforderlich.
+
+Runtime-Größe, zusätzliches komprimiertes Bundlevolumen und Spitzen-Speicherbedarf werden gemessen. Keine neue pauschale Geschwindigkeitszusage und keine künstlich engen Zeitlimits für langsam startende Windows-Prozesse. Synchronisationspunkte ersetzen zufälliges Sleep-Timing, soweit sachlich möglich.
+
+**Keine neuen Tests auf Farben, Symbole, Punkte, Wortlaut, Zeilenlayout oder wortgetreue Dokumentprosa.** Fachliches Review der Anweisungen genügt für deren Formulierungen. Installierte Ressourcen, ausführbare Beispiele, JSON-Verträge, Datenintegrität, Prozess-/Dateiverhalten und Sicherheitsgrenzen bleiben funktional testpflichtig. Der Bootstrap wird mit kontrollierten Testszenarien geprüft, nicht durch echte Test-E-Mails oder Drive-Uploads in der Produktsuite.
+
+### 41.2 WRC und Paketgrenzen
+
+Der revidierte Plan trennt sechs fachliche Schritte: **(a)** Paketinspektion/-validierung, **(b)** Referenz- und reale Repositorybindung, **(c)** reproduzierbare Runtime, **(d)** Result-Format-2-Leser, **(e)** Runtime-Einbettung/Writer und **(f)** Chat-Bootstrap/Abschluss. Je Schritt gilt **W → R → C**: kleinste durchgängige sichere Funktion, Robustheit und Grenzfälle, anschließend echte Bereinigung ohne neue Fachfunktion.
+
+Ausgangspunkt sind damit **18 Umsetzungscommits in ungefähr vier Patch-Paketen**. Die sechs zusätzlichen Positionen entstehen durch zwei vorher überladene fachliche Grenzen, nicht durch neue Features: Bindung mit allgemeinem Referenzleser war zuvor in einem R-Commit versteckt; die gesamte Lesermigration war im Writer-W-Commit versteckt. Beides erhält jetzt eigene testbare WRC-Schritte.
+
+W muss die Sicherheitsgrenzen aller bereits angebotenen Eingaben erfüllen. R vervollständigt Fehler-/Grenzfälle statt eine neue große Funktion unter dem Etikett Robustheit zu verstecken. C enthält keine Versionserhöhung, neue öffentliche Operation oder künstliches Formatierungsrauschen. Gibt es keine sinnvolle Bereinigung, wird die Zählung vor Umsetzung angepasst statt ein leerer Commit erzeugt.
+
+Ein Bundle darf null, einen oder mehrere Commit-Schritte enthalten, einschließlich
+mehrerer echter W/R/C-Folgen. Die Anzahl allein erfordert keine Sondergenehmigung.
+Paketgrenzen dürfen innerhalb des Auftrags zusammengelegt oder geteilt werden,
+sofern Tests und Fehleranalyse beherrschbar bleiben. Jeder Commit entsteht im
+Apply-Repository erst nach vollständiger paralleler und anschließender
+vollständiger serieller Suite für genau diesen Zustand (Abschnitt 33).
+Development erzeugt keine Git-Commits. Erst nach allen erfolgreichen Phasen,
+Commits und Abschlussprüfungen führt der Apply-Entrypoint genau einen normalen
+Push auf den bestätigten Zielbranch aus. Diagnosebundles mit null Commits
+pushen nicht. Kein Zwischenpush, Reset/Rollback oder automatischer Tag.
+Die aktuelle Acceptance-CI startet ausschließlich manuell per
+`workflow_dispatch`; ein Push ist keine CI-Ausführung oder CI-Freigabe.
+
+Die Dokumentübernahme verändert ausschließlich Spezifikation, Plan und Changelog
+und erledigt keinen der 18 Umsetzungspunkte. Paketversion und Releasezustand
+bleiben unverändert. Jeder spätere Patch übernimmt seine vollständige Bindung
+aus dem dann aktuellen maßgeblichen Result, insbesondere nach Anwendung dieses
+Dokumentationsbundles.
+
+### 41.3 Diagnosebundles ohne Commit
+
+Ein Diagnosebundle ist ein normales sicheres Patch-Paket mit null vorgesehenen
+Commits. Sein Entrypoint führt die beauftragten Diagnosekommandos aus und sammelt
+deren Ergebnisse in den vorhandenen Ausgabekanälen. PatchHarbor erzeugt danach
+nach dem bestehenden Vertrag das reguläre Result mit Run-Bericht, Execution-Log
+und tatsächlichem Snapshot. Der Entrypoint erzeugt kein zweites Result.
+
+Prüfumfang, zulässige Diagnose-Dateien und deren Rückgabe werden im Auftrag
+benannt. Es gibt keinen Commit, Push oder Tag und keinen Implementierungs-
+Planfortschritt. Die Diagnose ist eine echte Ausführung; ein Dry-Run ersetzt sie
+nicht. Ein beobachteter Fehlerbefund, ein fehlgeschlagenes Diagnosekommando und
+ein gescheiterter Result-Write bleiben unterscheidbar. Erfolg setzt die
+beauftragten Diagnose- und Abschlussprüfungen voraus, keinen künstlichen Commit.
+Die Paket-, Bindungs-, Sicherheits-, Replay- und Recovery-Verträge gelten
+unverändert; Commitanzahl und Planstatus werden nicht aus beliebigem Skriptcode
+erraten. Es werden weder neue `patch.json`-Felder noch ein Core-Commitplaner oder
+ein automatischer Sammler beliebiger Artefakte eingeführt.
+
+## Technische Referenzen zur Erweiterung
+
+Primärquellen laut geliefertem Revision-2-Review am 2. Oktober 2026 geprüft; die Repository-Integration behauptet keine erneute externe Quellenprüfung. Die Standards erklären die Rahmenbedingungen; das kanonische Runtime-Profil, seine Ressourcenbudgets und der Materialisierungsweg sind **eigene Produktentscheidungen dieser Revision**, keine von pip oder PyPA automatisch bereitgestellten Funktionen.
+
+- **[Q1]** PyPA: Binary distribution format. https://packaging.python.org/en/latest/specifications/binary-distribution-format/ — Wheel-Struktur, Installation, RECORD und dessen Selbst-Ausnahme.
+- **[Q2]** PyPA: Platform compatibility tags. https://packaging.python.org/en/latest/specifications/platform-compatibility-tags/
+- **[Q3]** PyPA: Core metadata. https://packaging.python.org/en/latest/specifications/core-metadata/ — Requires-Python und Requires-Dist.
+- **[Q4]** Python: venv. https://docs.python.org/3/library/venv.html — neu angelegte isolierte Interpreterumgebung, keine portable Kopie einer fremden venv.
+- **[Q5]** pip: pip install. https://pip.pypa.io/en/stable/cli/pip_install/ — lokale Wheel-Datei, --no-index, --no-deps und Metadatenprüfung.
+- **[Q6]** PyPA: Recording installed projects. https://packaging.python.org/en/latest/specifications/recording-installed-packages/ — installierte Metadaten sind nicht das ursprüngliche ZIP-Artefakt.
+- **[Q7]** Python: site. https://docs.python.org/3/library/site.html — ausführbare .pth-Einträge beim Interpreterstart.
+- **[Q8]** Python: zipfile. https://docs.python.org/3/library/zipfile.html — ZIP_STORED und kontrollierte ZIP-Einträge.
+- **[Q9]** Git: git. https://git-scm.com/docs/git — GIT_OPTIONAL_LOCKS und kontrollierte Git-Umgebung.
+
+Historische Quelle der Exchange-Revision 2: `patch-harbor_Result_145659_0913_35292b.zip`,
+Commit `9e3a6f9036dc681f463d2fdd6b603aee9b409598`. Die Integration verwendet die
+oben genannte aktuelle Result-Basis; ursprüngliche Dokumentgrößen und SHA-256
+sind im Plan als Herkunft erhalten. Geprüfte Ansatzpunkte sind insbesondere
+`patch_package.py`, `apply_repository.py`, `repository_state.py`,
+`archive_evidence.py`, Result-Lebenszyklus, `chat_instructions.py`, `pyproject.toml`
+und die Test-/CI-Verträge. Die Erweiterung ist weiterhin unimplementiert.
