@@ -126,6 +126,13 @@ and dry-run Results. It uses actual context, never the previous expected binding
 Repository snapshot paths retain the existing portable UTF-8 repository rules;
 patch package paths still use the stricter ASCII contract.
 
+The shared Result reader supplies integrity-checked facts to reference validation
+and to archival/recovery policy. A valid reference does not itself prove a
+successful Apply: those consumers still require a clean, completed success,
+no warnings or dry run, the appropriate expected binding and, for recovery,
+the existing receipt, local digest and Git evidence. Their conservative ZIP
+path policy is unchanged. Result writers still emit format 1.
+
 `validate_patch(patch, repository="/workspace/repository")` returns scope
 `repository`, `binding_matches=True`, the existing `RepositoryContext` and no
 reference SHA. The explicit repository must already be registered. Both keywords

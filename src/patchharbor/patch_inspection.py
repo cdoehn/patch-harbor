@@ -11,6 +11,7 @@ from patchharbor.bundle_handoff import PATCH_HANDOFF_DIRECTORY
 from patchharbor.interpreters import select_interpreter
 from patchharbor.models import RepositoryContext
 from patchharbor.errors import state_mismatch_error
+from patchharbor.exchange_state import ExchangePatchSelection
 from patchharbor.result_reader import ReferenceContext, read_result_reference
 from patchharbor.repository_state import capture_repository_context
 from patchharbor.parser import Message as PatchMessage
@@ -122,10 +123,7 @@ def validate_patch(
     else:
         not_checked += ("repository_binding", "repository_state")
     if context is not None:
-        manifest = inspection.manifest
-        if not (manifest.repo_id == context.repo_id and manifest.base_commit == context.base_commit
-                and manifest.state_fingerprint == context.state_fingerprint
-                and manifest.fingerprint_algorithm == context.fingerprint_algorithm):
+        if not ExchangePatchSelection.from_manifest(inspection.manifest).matches_context(context):
             raise state_mismatch_error("patch binding does not match the explicitly selected context")
     return PatchValidationResult(
         inspection, scope, None if context is None else True, context, reference_sha256,

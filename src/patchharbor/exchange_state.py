@@ -9,6 +9,7 @@ from enum import Enum
 import json
 import os
 from pathlib import Path
+from typing import Protocol
 from uuid import UUID
 
 from patchharbor.errors import PatchHarborError, patch_package_error
@@ -16,7 +17,6 @@ from patchharbor.json_document import serialize_json_document
 from patchharbor.models import (
     GitObjectFormat,
     GitObjectId,
-    RepositoryContext,
     RepositoryId,
 )
 from patchharbor.patch_manifest import PatchManifest
@@ -83,6 +83,22 @@ class ExchangeFileIdentity:
             raise ValueError("exchange file identity requires a full SHA-256")
 
 
+class _BindingContext(Protocol):
+    """Read-only binding fields shared by recorded and live contexts."""
+
+    @property
+    def repo_id(self) -> RepositoryId: ...
+
+    @property
+    def base_commit(self) -> GitObjectId: ...
+
+    @property
+    def state_fingerprint(self) -> str: ...
+
+    @property
+    def fingerprint_algorithm(self) -> str: ...
+
+
 @dataclass(frozen=True, slots=True)
 class ExchangePatchSelection:
     """Manifest fields needed to match one package to a repository state."""
@@ -114,7 +130,7 @@ class ExchangePatchSelection:
             fingerprint_algorithm=manifest.fingerprint_algorithm,
         )
 
-    def matches_context(self, context: RepositoryContext) -> bool:
+    def matches_context(self, context: _BindingContext) -> bool:
         return (
             self.repo_id == context.repo_id
             and self.base_commit == context.base_commit

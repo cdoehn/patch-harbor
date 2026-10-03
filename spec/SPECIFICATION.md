@@ -11,7 +11,7 @@
 **Patch-Paketmarker:** `patch-harbor`
 
 Der aktive Entwicklungsplan für Runtime / Inspect / Validate (RIV) liegt unter
-`planning/runtime-inspect-validate/commit-plan.md`: 5 von 18 Schritten vorbereitet; 1.a angewendet, 1.b-Apply-Nachweis folgt.
+`planning/runtime-inspect-validate/commit-plan.md`: 6 von 18 Schritten vorbereitet; 1.a angewendet, 1.b-Apply-Nachweis folgt.
 Die Zielversion dieser Erweiterung wird gesondert festgelegt; die vorhandene
 Paketversion bleibt 1.2.1. Die abgeschlossenen Pläne unter `planning/1.2.1/`,
 `planning/1.2.0/`, `planning/1.1.1/`, `planning/1.1.0/` und `planning/1.0.0/`

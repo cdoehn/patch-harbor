@@ -2,22 +2,20 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 import hashlib
+import json
 import math
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from uuid import UUID
 
-from patchharbor.archive_evidence import (
-    CLEAN_FINGERPRINT, _APPLY_FIELDS, _BINDING_FIELDS, _MANIFEST_FIELDS,
-    _RECEIPT_FIELDS, _RUN_FIELDS, _document, _selection, _timestamp,
-)
 from patchharbor.bundle_handoff import CHAT_INSTRUCTIONS_NAME, ENVIRONMENT_MARKER, MAX_HANDOFF_ENTRY_BYTES
 from patchharbor.bundle_names import validate_bundle_suffix
 from patchharbor.bundle_paths import BundlePathError, normalize_bundle_path
 from patchharbor.errors import FailureReason, PatchHarborError
 from patchharbor.exchange_state import ExchangePatchSelection
 from patchharbor.exit_status import reason_for_exit_code
-from patchharbor.models import BundlePayload, GitObjectId, RepositoryId
+from patchharbor.models import BundlePayload, GitObjectFormat, GitObjectId, RepositoryId
 from patchharbor.platform.filesystem import (
     FileChangedDuringRead, FileSystemOperationError, UnsupportedFileTypeError,
     read_stable_regular_file_with_sha256,
@@ -26,7 +24,73 @@ from patchharbor.progress import activity
 from patchharbor.repository_paths import RepositoryRelativePath, validate_repository_paths
 from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY, ResourcePolicy
 from patchharbor.run_report import PrimaryResult, PrimaryResultKind
+from patchharbor.state_fingerprint import state_fingerprint_digest
 from patchharbor.zip_payloads import NotZipArchiveError, ZipPayloadError, read_zip_payload_bytes
+
+
+CLEAN_FINGERPRINT = state_fingerprint_digest(
+    staged_records=(), unstaged_records=(), untracked_records=(),
+)[:16]
+_BINDING_FIELDS = {"repo_id", "base_commit", "state_fingerprint", "fingerprint_algorithm"}
+_MANIFEST_FIELDS = _BINDING_FIELDS | {
+    "marker", "format_version", "created_at", "run_id", "dirty", "dry_run",
+    "entrypoint_started", "execution_present", "primary_result",
+    "result_bundle_status", "base_entries", "untracked_entries",
+}
+_APPLY_FIELDS = {
+    prefix + name for prefix in ("expected_", "actual_")
+    for name in ("base_commit", "state_fingerprint", "fingerprint_algorithm")
+}
+_RECEIPT_FIELDS = {"patch_sha256", "completed_commit"}
+_RUN_FIELDS = _BINDING_FIELDS | {
+    "run_id", "operation", "dry_run", "started_at", "ended_at", "duration_seconds",
+    "repository_resolved", "repository_path", "warnings", "execution_present",
+    "primary_result", "result_bundle", "process_exit_code",
+}
+
+
+def _unique_object(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    result: dict[str, object] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("duplicate bundle JSON key")
+        result[key] = value
+    return result
+
+
+def _invalid_constant(_value: str) -> object:
+    raise ValueError("non-finite bundle JSON value")
+
+
+def _document(content: bytes) -> dict[str, object]:
+    if content.startswith(b"\xef\xbb\xbf"):
+        raise ValueError("bundle JSON has a BOM")
+    result = json.loads(content.decode("utf-8"), object_pairs_hook=_unique_object,
+                        parse_constant=_invalid_constant)
+    if type(result) is not dict:
+        raise ValueError("bundle JSON is not an object")
+    return result
+
+
+def _selection(document: dict[str, object]) -> ExchangePatchSelection:
+    if any(type(document.get(key)) is not str for key in _BINDING_FIELDS):
+        raise ValueError("incomplete bundle binding")
+    base = document["base_commit"]
+    return ExchangePatchSelection(
+        repo_id=RepositoryId(document["repo_id"]),
+        base_commit=GitObjectId(base, GitObjectFormat.for_hex_length(len(base))),
+        state_fingerprint=document["state_fingerprint"],
+        fingerprint_algorithm=document["fingerprint_algorithm"],
+    )
+
+
+def _timestamp(value: object) -> datetime:
+    if type(value) is not str:
+        raise ValueError("invalid bundle timestamp")
+    stamp = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    if stamp.tzinfo is None:
+        raise ValueError("bundle timestamp has no timezone")
+    return stamp
 
 
 @dataclass(frozen=True, slots=True)
@@ -237,7 +301,9 @@ def parse_result_payloads(payloads: tuple[BundlePayload, ...]) -> ResultFacts:
             _require(zip_mode is None or bool(zip_mode & 0o111) == (mode == "100755"), "result mode mismatch")
             if kind == "base":
                 oid = GitObjectId(entry["object_id"], binding.base_commit.object_format)
-                hashed = hashlib.new(oid.object_format.value, b"blob " + str(len(raw)).encode("ascii") + b"\0" + raw)
+                hashed = hashlib.new(oid.object_format.value)
+                hashed.update(b"blob " + str(len(raw)).encode("ascii") + b"\0")
+                hashed.update(raw)
                 _require(hashed.hexdigest() == str(oid), "base blob hash mismatch")
                 inventory.append((name, mode, str(oid)))
             else:
