@@ -2,7 +2,7 @@
 ## Inspect / Validate über API und CLI · Offline-Runtime · Result-Format 2 · Chat-Handoff
 
 **Stand:** 3. Oktober 2026. **Status:** aktive Entwicklung;
-**2 von 18 Umsetzungsschritten im Dateistand vorbereitet**. Nächster Schritt: `1.a.C`.
+**3 von 18 Umsetzungsschritten im Dateistand vorbereitet**. Nächster Schritt: `1.b.W`.
 Apply-Commits und Push dieses neuen Stands sind erst durch das zurückgegebene Result bestätigt.
 **Bereich:** RIV (Runtime / Inspect / Validate). **Paketbasis:** 1.2.1.
 **Zielversion:** gesondert festzulegen; keine Versionsanhebung oder Releasefreigabe durch Dokumentation.
@@ -44,11 +44,11 @@ bleiben unverändert. Die 219 Base-Dateien stimmen mit Development überein.
 allgemeinen Result-/Repositorybindung (1.b / P1b) ausgeliefert. Deren neuer
 Referenzleser und Zustandsaufnahme verdienen eine eigene prüfbare Grenze.
 Reihenfolge, 18 Planpositionen und Funktionsumfang bleiben gleich.
-Dieser Dateistand umfasst 1.a.W, 1.a.R; keine künstlich
+Dieser Dateistand umfasst 1.a.W, 1.a.R, 1.a.C; keine künstlich
 aufgeteilten Endzustände. Vor jedem Apply-Commit vollständige parallele,
 danach vollständige serielle Suite; genau ein Push nach der ganzen Folge.
-Lokale Belege: `exchange/reports/patchharbor-riv-003-1.a.R-parallel.json`
-und `exchange/reports/patchharbor-riv-003-1.a.R-serial.json`
+Lokale Belege: `exchange/reports/patchharbor-riv-003-1.a.C-parallel.json`
+und `exchange/reports/patchharbor-riv-003-1.a.C-serial.json`
 (projektspezifischer Exchange, erst nach tatsächlichem Lauf vorhanden).
 Prüfbefehle: `.venv/bin/python tools/run_tests.py --suite all`, danach
 `--suite all --serial`; keine Versionsanhebung, kein Tag, keine CI-Behauptung.
@@ -91,7 +91,7 @@ bei abweichender Development-Wurzel `CWD_MISMATCH`, keine Änderung.
 
 Jeder Zwischenstand wird wirklich hergestellt, getestet und erst dann committed. Ein finaler Working Tree mit künstlich aufgeteiltem Staging ist kein WRC-Nachweis. Commit-IDs werden nach dem Commit aus Git übernommen, nicht im eigenen Commit vorweg erfunden.
 
-### 2.1 Commitübersicht – 2/18 im Dateistand vorbereitet
+### 2.1 Commitübersicht – 3/18 im Dateistand vorbereitet
 
 | Nr. | Kennung | Commit-Subject | Voraussetzung | Paket |
 |---:|---|---|---|---|
@@ -245,7 +245,7 @@ Argumenttypen und gegenseitige Fehlerprioritäten im öffentlichen Vertrag festz
 
 #### 1.a.C – 3/18: `refactor(inspect): consolidate static package facts`
 
-**Status:** offen. **Abhängigkeit:** 1.a.R. **Spec:** 36.1, 37.1, 41.2.
+**Status:** im Dateistand umgesetzt; Apply-Nachweis im späteren Result. **Abhängigkeit:** 1.a.R. **Spec:** 36.1, 37.1, 41.2.
 
 **Ergebnis:** Ein kleiner wiederverwendbarer statischer Faktenpfad statt mehrfacher Parser-/Serialisierungslogik.
 
@@ -648,7 +648,7 @@ Jeder später abgeschlossene Eintrag enthält Plan-ID, tatsächlichen Commit, ur
 
 Fertig ist die Erweiterung erst mit nutzbarer API und CLI, konstant reproduzierbarer Runtime aus Standardinstallationen, sicherer Formatintegration, erhaltenen Sicherheitsgrenzen, ausgeführten Offline-/Roundtrip-Gates, aktueller installierter Anleitung und grüner CI für den tatsächlichen finalen HEAD. „0 Commits offen“ allein ist kein Freigabenachweis.
 
-**Status dieses Dateistands:** 2/18 vorbereitet, 16 weitere Schritte offen.
+**Status dieses Dateistands:** 3/18 vorbereitet, 15 weitere Schritte offen.
 P0 ist nachgewiesen; für Bundle 003 sind konkrete Commit-IDs und Apply-Erfolg
 noch durch das spätere Result zu ergänzen. Paketprüfung ist implementiert,
 Referenz-/Repositorybindung, Runtime, Format 2 und deren Plattformabnahme

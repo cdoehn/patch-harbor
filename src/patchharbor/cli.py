@@ -19,6 +19,7 @@ from patchharbor.context_output import context_json_result, write_context_block
 from patchharbor.errors import format_tool_message
 from patchharbor.exit_status import ExitCode, exit_code_for_error
 from patchharbor.identifier_presentation import shorten_identifier
+from patchharbor.inspection_output import inspection_json_result, validation_json_result
 from patchharbor.json_document import serialize_json_document
 from patchharbor.platform.errors import describe_os_error
 from patchharbor.presentation import (
@@ -663,33 +664,11 @@ def _json_envelope(
     }
 
 
-def _inspection_json_result(info: api.PatchInspection) -> dict[str, object]:
-    manifest = info.manifest
-    return {
-        "package_sha256": info.package_sha256,
-        "package_size": info.package_size,
-        "manifest": {
-            "marker": manifest.marker, "format_version": manifest.format_version,
-            "repo_id": str(manifest.repo_id), "base_commit": str(manifest.base_commit),
-            "state_fingerprint": manifest.state_fingerprint,
-            "fingerprint_algorithm": manifest.fingerprint_algorithm,
-            "entrypoint": manifest.entrypoint,
-        },
-        "entrypoint": info.entrypoint,
-        "entries": [
-            {"path": entry.path, "role": entry.role.value, "size": entry.size,
-             "sha256": entry.sha256, "unix_mode": entry.unix_mode}
-            for entry in info.entries
-        ],
-        "messages": [{"name": message.name, "text": message.text} for message in info.messages],
-        "warnings": list(info.warnings),
-    }
-
-
 def _package_command(
     command: str, path: Path, *, json_output: bool, stdout: TextIO, stderr: TextIO,
     verbose: bool = False, force_plain: bool = False, no_color: bool = False,
 ) -> int:
+    report: api.PatchValidationResult | None = None
     try:
         with _console_scope(
             stdout, stderr=stderr, enabled=not json_output,
@@ -697,17 +676,9 @@ def _package_command(
         ) as console:
             if command == "inspect":
                 info = api.inspect_patch(path, observer=_progress_observer(console))
-                result = _inspection_json_result(info)
             else:
                 report = api.validate_patch(path, observer=_progress_observer(console))
                 info = report.inspection
-                result = {
-                    "inspection": _inspection_json_result(info), "scope": report.scope.value,
-                    "binding_matches": report.binding_matches, "context": None,
-                    "reference_sha256": report.reference_sha256,
-                    "checked_at": report.checked_at.isoformat().replace("+00:00", "Z"),
-                    "not_checked": list(report.not_checked),
-                }
     except PatchHarborError as exc:
         code = int(exit_code_for_error(exc))
         if json_output:
@@ -717,6 +688,7 @@ def _package_command(
             print(format_tool_message(str(exc)), file=stderr)
         return code
     if json_output:
+        result = inspection_json_result(info) if report is None else validation_json_result(report)
         _write_json_document(_json_envelope(command, result=result, error=None,
                                             process_exit_code=0, output_version=2), stdout)
     else:

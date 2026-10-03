@@ -2,7 +2,7 @@
 
 ## 2026-10-03 – RIV 1.a: eigenständige lesende Paketprüfung
 
-**Dateistand:** 1.a.W, 1.a.R; 2/18 vorbereitet. Basis des nächsten Apply:
+**Dateistand:** 1.a.W, 1.a.R, 1.a.C; 3/18 vorbereitet. Basis des nächsten Apply:
 `289fa32b8a295c91e456abe0f61c2ae232966719` aus `patchharbor-apply_Result_122057_1003_77a6b0.zip`.
 P0 ist über dessen tatsächliche Tests, Commit und Push bestätigt. Neue Apply-Commits
 stehen erst im späteren Result; keine erfundene eigene SHA oder CI-Freigabe.
@@ -15,6 +15,7 @@ stehen erst im späteren Result; keine erfundene eigene SHA oder CI-Freigabe.
 - Funktionale Tests für API/CLI, Fehlercodes, Nebenwirkungen und Datenverträge.
 - P1 in Paketprüfung (P1a) und spätere Bindungsprüfung (P1b) getrennt.
 - Fehlerprioritäten, Dateiaustausch, Observerisolation und fehlerhafte Archiv-/JSON-Eingaben abgesichert.
+- Gemeinsame statische Entrypointprüfung von Apply und Inspect konsolidiert; Ausgabeprojektion getrennt.
 - Runtime, Wheel-Fallback-Ausführung und Format 2 bleiben spätere Schritte;
   kein Versionswechsel, Tag oder automatischer CI-Start.
 

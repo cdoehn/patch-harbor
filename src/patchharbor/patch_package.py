@@ -11,6 +11,7 @@ from patchharbor.bundle_paths import BundlePathError, normalize_bundle_path
 from patchharbor.bundle_handoff import BundleHandoff, split_patch_handoff
 from patchharbor.errors import FailureReason, PatchHarborError, patch_package_error
 from patchharbor.models import BundlePayload
+from patchharbor.parser import ParsedScript, ScriptFormatError, parse_script
 from patchharbor.patch_manifest import (
     PATCH_MANIFEST_NAME,
     PatchManifest,
@@ -55,6 +56,18 @@ def _unsafe_patch_zip(path: Path, detail: object) -> PatchHarborError:
         f"unsafe or unreadable patch ZIP {path}: {detail}",
         FailureReason.SOURCE_ERROR,
     )
+
+
+def parse_package_entrypoint(entrypoint: BundlePayload) -> ParsedScript:
+    """Shared static contract; no interpreter lookup or temporary resources."""
+    activity("SCRIPT", f"Parse marker, metadata and MESSAGE blocks: {entrypoint.relative_path}")
+    try:
+        return parse_script(entrypoint.content.decode("utf-8"))
+    except (UnicodeError, ScriptFormatError) as exc:
+        raise PatchHarborError(
+            "patch package entrypoint is not a valid PatchHarbor script",
+            FailureReason.NO_VALID_SCRIPT,
+        ) from exc
 
 
 def resolve_patch_payloads(

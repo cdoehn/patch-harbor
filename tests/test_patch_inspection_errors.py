@@ -117,7 +117,7 @@ def test_archive_failures_are_input_errors_without_partial_results(tmp_path, cas
 
 @pytest.mark.parametrize('content', [
     b'\xef\xbb\xbf' + json.dumps(MANIFEST).encode(),
-    b'{"marker":"patch-harbor","marker":"patch-harbor"}',
+    json.dumps(MANIFEST).encode()[:-1] + b',"marker":"patch-harbor"}',
     json.dumps({**MANIFEST, 'format_version': True}).encode(),
     json.dumps({**MANIFEST, 'format_version': 1.0}).encode(),
     json.dumps({**MANIFEST, 'base_commit': '123456'}).encode(),

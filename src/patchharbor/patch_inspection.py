@@ -8,13 +8,11 @@ from hashlib import sha256
 from pathlib import Path
 
 from patchharbor.bundle_handoff import PATCH_HANDOFF_DIRECTORY
-from patchharbor.errors import FailureReason, PatchHarborError
 from patchharbor.interpreters import select_interpreter
 from patchharbor.models import RepositoryContext
-from patchharbor.parser import Message as PatchMessage, ScriptFormatError, parse_script
+from patchharbor.parser import Message as PatchMessage
 from patchharbor.patch_manifest import PATCH_MANIFEST_NAME, PatchManifest
-from patchharbor.patch_package import resolve_patch_package
-from patchharbor.progress import activity
+from patchharbor.patch_package import parse_package_entrypoint, resolve_patch_package
 from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY, ResourcePolicy
 
 
@@ -70,14 +68,7 @@ def inspect_patch(
     path: Path, *, resource_policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY,
 ) -> PatchInspection:
     package = resolve_patch_package(path, resource_policy=resource_policy)
-    activity("SCRIPT", "Inspect static entrypoint contract without preparing execution")
-    try:
-        script = parse_script(package.entrypoint.content.decode("utf-8"))
-    except (UnicodeError, ScriptFormatError) as exc:
-        raise PatchHarborError(
-            "patch package entrypoint is not a valid PatchHarbor script",
-            FailureReason.NO_VALID_SCRIPT,
-        ) from exc
+    script = parse_package_entrypoint(package.entrypoint)
     # Whitelist the syntax, but do not look for an installed shell.
     select_interpreter(script.text)
     if package.package_sha256 is None or package.package_size is None:

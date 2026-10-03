@@ -17,8 +17,8 @@ from patchharbor.interpreters import (
     resolve_script_interpreter,
 )
 from patchharbor.models import BundlePayload
-from patchharbor.parser import ParsedScript, ScriptFormatError, parse_script
-from patchharbor.patch_package import ValidatedPatchPackage
+from patchharbor.parser import ParsedScript
+from patchharbor.patch_package import ValidatedPatchPackage, parse_package_entrypoint
 from patchharbor.platform.paths import is_physically_within
 from patchharbor.platform.errors import describe_os_error
 from patchharbor.temporary_resources import (
@@ -89,14 +89,7 @@ def _verified_private_resource(
 def _validated_entrypoint(
     package: ValidatedPatchPackage,
 ) -> tuple[ParsedScript, ResolvedInterpreter]:
-    activity("SCRIPT", f"Parse marker, metadata and MESSAGE blocks: {package.entrypoint.relative_path}")
-    try:
-        script = parse_script(package.entrypoint.content.decode("utf-8"))
-    except (UnicodeError, ScriptFormatError) as exc:
-        raise _preflight_error(
-            "patch package entrypoint is not a valid PatchHarbor script",
-            FailureReason.NO_VALID_SCRIPT,
-        ) from exc
+    script = parse_package_entrypoint(package.entrypoint)
     activity("SCRIPT", "Resolve the required Bash/PowerShell interpreter")
     return script, resolve_script_interpreter(script.text)
 
