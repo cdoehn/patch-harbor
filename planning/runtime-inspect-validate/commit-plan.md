@@ -1,8 +1,9 @@
 # PatchHarbor – RIV-Implementierungsplan, Repository-Revision 3
 ## Inspect / Validate über API und CLI · Offline-Runtime · Result-Format 2 · Chat-Handoff
 
-**Stand:** 3. Oktober 2026. **Status:** aktive Planung, noch keine Feature-Implementierung;
-**0 von 18 Umsetzungscommits erledigt**. Alle Positionen sind offen; nächster Schritt: `1.a.W`.
+**Stand:** 3. Oktober 2026. **Status:** aktive Entwicklung;
+**1 von 18 Umsetzungsschritten im Dateistand vorbereitet**. Nächster Schritt: `1.a.R`.
+Apply-Commits und Push dieses neuen Stands sind erst durch das zurückgegebene Result bestätigt.
 **Bereich:** RIV (Runtime / Inspect / Validate). **Paketbasis:** 1.2.1.
 **Zielversion:** gesondert festzulegen; keine Versionsanhebung oder Releasefreigabe durch Dokumentation.
 
@@ -30,10 +31,27 @@ ist 1.2.0, der Repository-Quellstand 1.2.1. Die historische R2-Planungsbasis war
 **Vorbereitung P0:** `OFF-PLAN RIV-DOCS-1`, ein Dokumentationscommit
 `docs: integrate runtime inspection and validation specification`.
 Umfang: `spec/SPECIFICATION.md`, dieser Plan und `spec/SPECIFICATION_CHANGELOG.md`.
-Diese Übernahme zählt nicht zu den 18 Feature-Schritten. Der Plan behauptet
-keinen bereits entstandenen P0-Commit oder Apply-Erfolg; maßgeblich ist das
-anschließend zurückgegebene Result. Danach ist dessen neue Bindung für P1 zu
-verwenden. Keine vorweg erfundene eigene Commit-SHA.
+Diese Übernahme zählt nicht zu den 18 Feature-Schritten. P0 ist durch
+`patchharbor-apply_Result_122057_1003_77a6b0.zip` bestätigt: echter Apply,
+Vollsuite parallel und seriell je 1.581 bestanden / 5 übersprungen, Commit
+`289fa32b8a295c91e456abe0f61c2ae232966719` und normaler Push auf `dev`.
+Result-SHA-256: `755664f001e0bfaf7e4052f7d0185c01e553d667c120f23434321492125560f4`.
+Diese neue Basis ist für Bundle 003 maßgeblich; die Integrationsbasis oben
+bleibt historisch. repo_id, state_fingerprint und fingerprint_algorithm
+bleiben unverändert. Die 219 Base-Dateien stimmen mit Development überein.
+
+**Paketgrenze P1a / Bundle 003:** Gruppe 1.a wird vor der eigenständigen
+allgemeinen Result-/Repositorybindung (1.b / P1b) ausgeliefert. Deren neuer
+Referenzleser und Zustandsaufnahme verdienen eine eigene prüfbare Grenze.
+Reihenfolge, 18 Planpositionen und Funktionsumfang bleiben gleich.
+Dieser Dateistand umfasst 1.a.W; keine künstlich
+aufgeteilten Endzustände. Vor jedem Apply-Commit vollständige parallele,
+danach vollständige serielle Suite; genau ein Push nach der ganzen Folge.
+Lokale Belege: `exchange/reports/patchharbor-riv-003-1.a.W-parallel.json`
+und `exchange/reports/patchharbor-riv-003-1.a.W-serial.json`
+(projektspezifischer Exchange, erst nach tatsächlichem Lauf vorhanden).
+Prüfbefehle: `.venv/bin/python tools/run_tests.py --suite all`, danach
+`--suite all --serial`; keine Versionsanhebung, kein Tag, keine CI-Behauptung.
 
 **Repositoryrollen:** Development unter
 `/home/christian/Codex/patchharbor/patchharbor-codex` erzeugt und prüft Dateistände
@@ -73,7 +91,7 @@ bei abweichender Development-Wurzel `CWD_MISMATCH`, keine Änderung.
 
 Jeder Zwischenstand wird wirklich hergestellt, getestet und erst dann committed. Ein finaler Working Tree mit künstlich aufgeteiltem Staging ist kein WRC-Nachweis. Commit-IDs werden nach dem Commit aus Git übernommen, nicht im eigenen Commit vorweg erfunden.
 
-### 2.1 Commitübersicht – alle Positionen offen
+### 2.1 Commitübersicht – 1/18 im Dateistand vorbereitet
 
 | Nr. | Kennung | Commit-Subject | Voraussetzung | Paket |
 |---:|---|---|---|---|
@@ -99,7 +117,7 @@ Jeder Zwischenstand wird wirklich hergestellt, getestet und erst dann committed.
 
 ### 2.2 Vier Pakete als Ausgangsplanung
 
-**P1:** 1.a + 1.b, sechs Commits. Paketprüfung und Bindungsprüfung sind danach vollständig benutzbar; Results bleiben Format 1. **P2:** 1.c, drei Commits. Runtime-Bereitstellung wird separat praktisch abgesichert. **P3:** 1.d + 1.e, sechs Commits. Erst alle Leser, dann gemeinsamer Writer. **P4:** 1.f, drei Commits. Aktuelle Anleitung und installierte Ende-zu-Ende-Abnahme.
+**P1:** 1.a + 1.b, sechs Commits, aufgeteilt in P1a (Bundle 003, 1.a) und P1b (1.b). Paketprüfung und Bindungsprüfung sind danach vollständig benutzbar; Results bleiben Format 1. **P2:** 1.c, drei Commits. Runtime-Bereitstellung wird separat praktisch abgesichert. **P3:** 1.d + 1.e, sechs Commits. Erst alle Leser, dann gemeinsamer Writer. **P4:** 1.f, drei Commits. Aktuelle Anleitung und installierte Ende-zu-Ende-Abnahme.
 
 Die Grenzen bleiben ausdrücklich flexibel. Bei großer Referenzleser-Arbeit kann P1 geteilt werden; bei großem Reader-Audit P3. P2 und P3 dürfen erst nach bestandenem Runtime-Gate zusammenrücken. P4 kann mit P3 zusammengelegt werden, wenn nur ein kleiner, gut geprüfter Abschluss verbleibt. Keine Zusammenlegung, die ungeklärtes Packaging, lange Tests oder Fehlerzuordnung verdeckt. Keine neue Nutzerfrage allein wegen einer risikoangemessenen Paketgrenze erforderlich.
 
@@ -195,7 +213,7 @@ Aktionen nach tatsächlicher CI-Freigabe.
 
 #### 1.a.W – 1/18: `feat(inspect): add read-only package API and CLI`
 
-**Status:** offen. **Abhängigkeit:** aktuelle geprüfte Basis. **Spec:** 36.1–36.4, 37.1.
+**Status:** im Dateistand umgesetzt; Apply-Nachweis im späteren Result. **Abhängigkeit:** aktuelle geprüfte Basis. **Spec:** 36.1–36.4, 37.1.
 
 **Ergebnis:** Inspect und Validate im Prüfbereich package sind über API und CLI benutzbar, ohne Git, Registry oder Shell.
 
@@ -630,13 +648,12 @@ Jeder später abgeschlossene Eintrag enthält Plan-ID, tatsächlichen Commit, ur
 
 Fertig ist die Erweiterung erst mit nutzbarer API und CLI, konstant reproduzierbarer Runtime aus Standardinstallationen, sicherer Formatintegration, erhaltenen Sicherheitsgrenzen, ausgeführten Offline-/Roundtrip-Gates, aktueller installierter Anleitung und grüner CI für den tatsächlichen finalen HEAD. „0 Commits offen“ allein ist kein Freigabenachweis.
 
-**Status dieser Repository-Revision:** 18 offen. P0 integriert ausschließlich
-Spezifikation, Plan und Changelog. Die lokale Bestands-Vollsuite für diese
-Dateiänderung ist ein eigener Prüfbeleg außerhalb dieses Plans; sie beweist weder
-neue Runtime-Funktionalität noch einen bereits erfolgten Apply oder CI-Lauf.
-Runtime-Machbarkeit, neue funktionale Prüfungen und Plattformabnahme stehen aus.
-Die ursprünglichen Standardquellen wurden für diese Übernahme nicht erneut
-extern geprüft; ihr Quellenstand bleibt derjenige der Exchange-Revision 2.
+**Status dieses Dateistands:** 1/18 vorbereitet, 17 weitere Schritte offen.
+P0 ist nachgewiesen; für Bundle 003 sind konkrete Commit-IDs und Apply-Erfolg
+noch durch das spätere Result zu ergänzen. Paketprüfung ist implementiert,
+Referenz-/Repositorybindung, Runtime, Format 2 und deren Plattformabnahme
+stehen aus. Die ursprünglichen Standardquellen wurden nicht erneut extern
+geprüft; ihr Quellenstand bleibt derjenige der Exchange-Revision 2.
 
 ## 9. Dokumentidentität und Quellen
 

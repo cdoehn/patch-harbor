@@ -1,5 +1,22 @@
 # PatchHarbor – Spezifikations-Changelog
 
+## 2026-10-03 – RIV 1.a: eigenständige lesende Paketprüfung
+
+**Dateistand:** 1.a.W; 1/18 vorbereitet. Basis des nächsten Apply:
+`289fa32b8a295c91e456abe0f61c2ae232966719` aus `patchharbor-apply_Result_122057_1003_77a6b0.zip`.
+P0 ist über dessen tatsächliche Tests, Commit und Push bestätigt. Neue Apply-Commits
+stehen erst im späteren Result; keine erfundene eigene SHA oder CI-Freigabe.
+
+- Öffentliche `inspect_patch`-/`validate_patch`-API und CLI-Kommandos für package-Scope.
+- Unveränderliche Paketfakten, vollständige SHA/Größe, Rollen, Modi und MESSAGE-Daten
+  aus derselben stabil gelesenen ZIP; gemeinsame bestehende Sicherheitsprüfer.
+- JSON-Ausgabe 2 nur für die neuen Kommandos; bestehende Ausgabeversion 1 bleibt.
+- Kein Git/Registry-/Apply-/Result-/Runtime-Lebenszyklus im Paketmodus.
+- Funktionale Tests für API/CLI, Fehlercodes, Nebenwirkungen und Datenverträge.
+- P1 in Paketprüfung (P1a) und spätere Bindungsprüfung (P1b) getrennt.
+- Runtime, Wheel-Fallback-Ausführung und Format 2 bleiben spätere Schritte;
+  kein Versionswechsel, Tag oder automatischer CI-Start.
+
 ## 2026-10-03 – RIV-DOCS-1: Spezifikation und aktiven Entwicklungsplan integrieren
 
 **Status:** Dokumentationsvorbereitung; RIV-Featurefortschritt 0/18.

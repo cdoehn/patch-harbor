@@ -40,6 +40,8 @@ print(report.success, report.result_bundle.status)
 | `unregister(selector, cwd=".")` | `unregister` | `UnregisterResult` |
 | `repositories()` | `registry list` | `RegistryListResult` |
 | `context(repository=".")` | `context` | `RepositoryContext` |
+| `inspect_patch(patch)` | `inspect PATCH_ZIP` | `PatchInspection` |
+| `validate_patch(patch)` | `validate PATCH_ZIP` | `PatchValidationResult` (package scope) |
 | `bundle(repository=".", output_directory=None)` | `bundle` | `BundleResult` |
 | `apply(patch=None, repository=None, dry_run=False, ...)` | manual `apply` | `RunReport` |
 | `dry_run(patch=None, repository=None, ...)` | `apply --dry-run` | `RunReport` |
@@ -64,6 +66,74 @@ An empty suffix clears it; an empty archive name disables archival for the
 selected repository. Registry operations use the user-global registry, not an
 independent API store. API calls do not install a watcher or implicitly register
 repositories.
+
+## Static package inspection (RIV development addition)
+
+This source line implements the package-only part of RIV 1.a. It does not
+release a new version or implement the planned repository/reference modes,
+portable runtime or Result Format 2. `repository` and `reference_bundle` are
+not accepted by these operations yet. The existing `dry_run` keeps its Apply
+semantics and still creates a Result Bundle.
+
+```python
+from patchharbor import api
+
+info = api.inspect_patch("patch.zip")
+print(info.package_sha256, info.package_size, info.entrypoint)
+for entry in info.entries:
+    print(entry.path, entry.role.value, entry.size, entry.sha256, entry.unix_mode)
+report = api.validate_patch("patch.zip")
+assert report.scope is api.PatchValidationScope.PACKAGE
+assert report.binding_matches is None
+```
+
+Both calls require one explicit `str` or `PathLike[str]` file path. A relative
+path is anchored once to the caller's directory; this does not select a
+repository. The existing stable file/ZIP, manifest, reserved handoff and script
+parsers apply. Unsafe input never returns partial successful facts. Interpreter
+syntax is checked without requiring the shell to be installed. No Git, registry,
+Exchange scan, locks, payload writes, script execution, temporary script, runtime
+provider or Result publication occurs. The request-local `observer=None` has
+the usual silent-library and best-effort observation semantics.
+
+`PatchInspection` is frozen and contains `package_sha256` (full lowercase SHA-256),
+`package_size` (archive bytes), typed `manifest`, normalized `entrypoint`, and
+tuples `entries`, `messages`, `warnings`. Every frozen `PatchEntry` has `path`,
+`role` (`PatchEntryRole`: `manifest`, `entrypoint`, `payload`, `handoff`), `size`
+(uncompressed bytes), full content `sha256`, and `unix_mode` (integer permission
+bits, or `None` if absent). Entries are sorted by normalized path; explicit ZIP
+directories are checked but omitted. The frozen `PatchManifest` retains all
+seven manifest fields, with typed repository and Git IDs. `PatchMessage` has
+`name` and `text`. No payload bytes are retained in these public facts.
+
+`PatchValidationResult` is frozen and contains `inspection`, `scope`,
+`binding_matches`, `context`, `reference_sha256`, `checked_at`, and `not_checked`.
+For the implemented `package` scope, binding/context/reference are `None`.
+`checked_at` is an aware UTC `datetime`; `not_checked` is a tuple of identifiers:
+`repository_binding`, `repository_state`, `authenticity`, `execution`,
+`interpreter_availability`, `tests`, `ci`, `replay`. Successful static validity
+does not establish sender trust or approve a later Apply. Content hashes are
+computed observations, not new declared hashes in format-1 `patch.json`.
+
+CLI examples: `patchharbor inspect patch.zip --json` and
+`patchharbor validate patch.zip --json`. Both also accept `--help`, `--verbose`
+(`-v`), `--no-color` and `--plain`. Their JSON envelope has `output_version: 2`,
+`command: "inspect"` or `"validate"`, and the existing `success`, `result`,
+`error`, `process_exit_code` fields. After successful argument parsing stdout
+contains exactly one JSON object, including known error outcomes; JSON never
+contains progress output. Older commands keep output version 1.
+
+The inspect `result` has exactly the inspection fields above. `manifest` uses
+the seven patch.json field names and complete string identifiers; `entries` use
+the five PatchEntry field names; `messages` use `name` and `text`. Tuples become
+arrays and enums become their string values. The validate `result` has exactly
+the validation fields above, with nested `inspection`, null optional values,
+and a UTC ISO-8601 `checked_at` ending in `Z`. A failure has `result: null` and
+the unchanged structured tool `error`. Argument types/values fail as
+`TypeError`/`ValueError`; known package failures raise `PatchHarborError` in the
+API. CLI codes remain 2 (usage), 3 (invalid script/marker), 4 (unsafe/unreadable
+input), 5 (unsupported interpreter syntax), 10 (invalid package/manifest), and
+0 (successful static check). Existing resource limits remain in force.
 
 ## Repository-local configuration
 

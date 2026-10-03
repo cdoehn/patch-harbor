@@ -27,6 +27,8 @@ from patchharbor.api_types import (
     RepositoryId, RepositoryPath, RepositoryResolved, RequestStarted,
     ResultBundleResult, ResultBundleStatus, RunOperation, RunReport, RunTiming,
     RunToolError, ScriptPrepared, ScriptResult, UnregisterResult,
+    PatchEntry, PatchEntryRole, PatchInspection, PatchManifest, PatchMessage,
+    PatchValidationResult, PatchValidationScope,
 )
 from patchharbor.errors import ErrorKind, FailureReason, PatchHarborError
 from patchharbor.output import OutputTargets as _OutputTargets
@@ -48,6 +50,8 @@ __all__ = [
     "UnregisterResult", "apply", "apply_next", "bundle", "configure_archive_directory",
     "configure_bundle_suffix", "configure_exchange_directory", "configuration",
     "context", "dry_run", "register", "repositories", "run", "unregister",
+    "PatchEntry", "PatchEntryRole", "PatchInspection", "PatchManifest", "PatchMessage",
+    "PatchValidationResult", "PatchValidationScope", "inspect_patch", "validate_patch",
 ]
 
 
@@ -209,6 +213,24 @@ def bundle(
     with _observe_activity(_observer(observer)):
         result = _application.bundle_repository(path, output_directory=destination)
         return BundleResult(result.report)
+
+
+def inspect_patch(
+    patch: PathInput, *, observer: ProgressObserver | None = None,
+) -> PatchInspection:
+    """Inspect one explicit package without Git, registration, shell lookup or writes."""
+    path = _path(patch, "patch").absolute()
+    with _observe_activity(_observer(observer)):
+        return _application.inspect_patch(path)
+
+
+def validate_patch(
+    patch: PathInput, *, observer: ProgressObserver | None = None,
+) -> PatchValidationResult:
+    """Check static package validity only; binding modes follow in RIV 1.b."""
+    path = _path(patch, "patch").absolute()
+    with _observe_activity(_observer(observer)):
+        return _application.validate_patch(path)
 
 
 def apply(

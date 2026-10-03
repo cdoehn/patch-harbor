@@ -219,6 +219,7 @@ def _classify_content(
             resource_policy=resource_policy,
             package_path=path,
             package_sha256=sha256(content).hexdigest(),
+            package_size=len(content),
         )
     except PatchHarborError as exc:
         activity("SKIP", f"{path.name}: not a valid PatchHarbor patch ({exc})", "detail")

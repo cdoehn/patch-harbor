@@ -274,6 +274,20 @@ def _build_parser() -> argparse.ArgumentParser:
         ),
     )
 
+    for name in ("inspect", "validate"):
+        package_parser = commands.add_parser(
+            name,
+            help=f"{name} one explicit patch package without executing it",
+            description=(
+                "Check static package validity only, without Git, registration, "
+                "script execution or Result publication. Repository and reference "
+                "binding modes are not yet available."
+            ),
+        )
+        package_parser.add_argument("patch_zip", type=Path, metavar="PATCH_ZIP")
+        package_parser.add_argument("--json", action="store_true", dest="json_output",
+                                    help="write the version-2 machine-readable result")
+
     bundle_parser = commands.add_parser(
         "bundle",
         help="create a Result Bundle for one registered repository",
@@ -615,6 +629,7 @@ def _json_envelope(
     result: dict[str, object] | None,
     error: PatchHarborError | None,
     process_exit_code: int,
+    output_version: int = 1,
 ) -> dict[str, object]:
     structured_error: dict[str, object] | None = None
     if error is not None:
@@ -633,13 +648,80 @@ def _json_envelope(
             ),
         }
     return {
-        "output_version": 1,
+        "output_version": output_version,
         "command": command,
         "success": process_exit_code == 0,
         "result": result,
         "error": structured_error,
         "process_exit_code": process_exit_code,
     }
+
+
+def _inspection_json_result(info: api.PatchInspection) -> dict[str, object]:
+    manifest = info.manifest
+    return {
+        "package_sha256": info.package_sha256,
+        "package_size": info.package_size,
+        "manifest": {
+            "marker": manifest.marker, "format_version": manifest.format_version,
+            "repo_id": str(manifest.repo_id), "base_commit": str(manifest.base_commit),
+            "state_fingerprint": manifest.state_fingerprint,
+            "fingerprint_algorithm": manifest.fingerprint_algorithm,
+            "entrypoint": manifest.entrypoint,
+        },
+        "entrypoint": info.entrypoint,
+        "entries": [
+            {"path": entry.path, "role": entry.role.value, "size": entry.size,
+             "sha256": entry.sha256, "unix_mode": entry.unix_mode}
+            for entry in info.entries
+        ],
+        "messages": [{"name": message.name, "text": message.text} for message in info.messages],
+        "warnings": list(info.warnings),
+    }
+
+
+def _package_command(
+    command: str, path: Path, *, json_output: bool, stdout: TextIO, stderr: TextIO,
+    verbose: bool = False, force_plain: bool = False, no_color: bool = False,
+) -> int:
+    try:
+        with _console_scope(
+            stdout, stderr=stderr, enabled=not json_output,
+            color_enabled=not no_color, plain=force_plain, verbose=verbose,
+        ) as console:
+            if command == "inspect":
+                info = api.inspect_patch(path, observer=_progress_observer(console))
+                result = _inspection_json_result(info)
+            else:
+                report = api.validate_patch(path, observer=_progress_observer(console))
+                info = report.inspection
+                result = {
+                    "inspection": _inspection_json_result(info), "scope": report.scope.value,
+                    "binding_matches": report.binding_matches, "context": None,
+                    "reference_sha256": report.reference_sha256,
+                    "checked_at": report.checked_at.isoformat().replace("+00:00", "Z"),
+                    "not_checked": list(report.not_checked),
+                }
+    except PatchHarborError as exc:
+        code = int(exit_code_for_error(exc))
+        if json_output:
+            _write_json_document(_json_envelope(command, result=None, error=exc,
+                                                process_exit_code=code, output_version=2), stdout)
+        else:
+            print(format_tool_message(str(exc)), file=stderr)
+        return code
+    if json_output:
+        _write_json_document(_json_envelope(command, result=result, error=None,
+                                            process_exit_code=0, output_version=2), stdout)
+    else:
+        print(f"package_sha256: {info.package_sha256}", file=stdout)
+        print(f"package_size: {info.package_size}", file=stdout)
+        print(f"entrypoint: {info.entrypoint}", file=stdout)
+        print(f"entries: {len(info.entries)}", file=stdout)
+        print("scope: package; repository binding and execution not checked", file=stdout)
+        for warning in info.warnings:
+            print(format_tool_message(warning), file=stderr)
+    return 0
 
 
 def _registry_list_json_result(
@@ -1296,6 +1378,13 @@ def main(
             json_output=args.json_output,
             stdout=actual_stdout,
             stderr=actual_stderr,
+            verbose=args.verbose, force_plain=args.plain, no_color=args.no_color,
+        )
+
+    if args.command in ("inspect", "validate"):
+        return _package_command(
+            args.command, args.patch_zip, json_output=args.json_output,
+            stdout=actual_stdout, stderr=actual_stderr,
             verbose=args.verbose, force_plain=args.plain, no_color=args.no_color,
         )
 

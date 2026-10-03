@@ -16,6 +16,10 @@ from patchharbor.models import (
     RegistryRepository, RegistryStatus, RepositoryContext, RepositoryId,
     RepositoryPath,
 )
+from patchharbor.patch_inspection import (
+    PatchEntry, PatchEntryRole, PatchInspection, PatchManifest, PatchMessage,
+    PatchValidationResult, PatchValidationScope,
+)
 from patchharbor.progress import (
     ActivityEvent, PackageFile, ProgressEvent, RepositoryResolved,
     RequestStarted, ScriptPrepared,

@@ -11,6 +11,15 @@ PowerShell scripts and legacy ZIP PatchBundles.
 
 ## Installation
 
+The RIV development line adds static package inspection through
+`patchharbor inspect patch.zip` and `patchharbor validate patch.zip`, with
+`--json` for complete machine-readable facts. These commands do not execute a
+script, need a registered repository, or create a Result Bundle. Only package
+scope is currently implemented; repository/reference binding and the offline
+runtime follow in the [active plan](planning/runtime-inspect-validate/commit-plan.md).
+See the [Python API contract](docs/python-api.md#static-package-inspection-riv-development-addition)
+for result fields and examples. These additions have not been released yet.
+
 PatchHarbor requires Python 3.12 or newer and [pipx](https://pipx.pypa.io/).
 Install the published release with:
 

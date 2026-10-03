@@ -89,6 +89,10 @@ from patchharbor.models import (
 from patchharbor.output import OutputTargets
 from patchharbor.parser import parse_script
 from patchharbor.patch_manifest import PatchManifest
+from patchharbor.patch_inspection import (
+    PatchInspection, PatchValidationResult,
+    inspect_patch as _inspect_patch, validate_patch as _validate_patch,
+)
 from patchharbor.patch_package import (
     ValidatedPatchPackage,
     resolve_patch_package as _resolve_patch_package,
@@ -248,6 +252,16 @@ def validate_patch_package(
 ) -> PatchManifest:
     """Validate one complete patch package through the package boundary."""
     return _validate_patch_package(path, resource_policy=resource_policy)
+
+
+def inspect_patch(path: Path) -> PatchInspection:
+    """Read package facts without entering the Apply lifecycle."""
+    return _inspect_patch(path)
+
+
+def validate_patch(path: Path) -> PatchValidationResult:
+    """Validate an explicitly supplied package; no implicit repository selection."""
+    return _validate_patch(path)
 
 
 def _manifest_matches_context(

@@ -53,6 +53,7 @@ EXPECTED_CORE_RUNTIME_FILES = {
     "parser.py",
     "patch_manifest.py",
     "patch_package.py",
+    "patch_inspection.py",
     "payload_files.py",
     "payload_modes.py",
     "presentation.py",

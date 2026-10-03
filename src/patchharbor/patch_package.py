@@ -39,6 +39,8 @@ class ValidatedPatchPackage:
     warnings: tuple[str, ...] = ()
     handoff: BundleHandoff | None = None
     package_sha256: str | None = None
+    package_size: int | None = None
+    entries: tuple[BundlePayload, ...] = ()
 
     def __post_init__(self) -> None:
         if self.package_sha256 is not None and (
@@ -61,6 +63,7 @@ def resolve_patch_payloads(
     resource_policy: ResourcePolicy,
     package_path: Path,
     package_sha256: str | None = None,
+    package_size: int | None = None,
 ) -> ValidatedPatchPackage:
     activity("MANIFEST", "Locate regular root patch.json")
     manifest_payload = next(
@@ -114,6 +117,8 @@ def resolve_patch_payloads(
         warnings=warnings,
         handoff=handoff,
         package_sha256=package_sha256,
+        package_size=package_size,
+        entries=all_payloads,
     )
 
 
@@ -146,6 +151,7 @@ def resolve_patch_package(
         resource_policy=resource_policy,
         package_path=path,
         package_sha256=captured.sha256,
+        package_size=len(captured.content),
     )
 
 
