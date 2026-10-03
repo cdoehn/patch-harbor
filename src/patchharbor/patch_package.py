@@ -143,7 +143,7 @@ def resolve_patch_package(
     except NotZipArchiveError as exc:
         raise patch_package_error("patch package is not a ZIP archive") from exc
     except (ZipPayloadError, FileChangedDuringRead, FileSystemOperationError,
-            UnsupportedFileTypeError, OSError, RuntimeError) as exc:
+            UnsupportedFileTypeError, OSError, RuntimeError, UnicodeError) as exc:
         raise _unsafe_patch_zip(path, exc) from exc
 
     return resolve_patch_payloads(

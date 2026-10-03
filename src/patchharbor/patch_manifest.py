@@ -68,7 +68,7 @@ def _parse_json_object(payload: bytes) -> dict[str, object]:
             object_pairs_hook=_unique_json_object,
             parse_constant=_reject_non_finite_number,
         )
-    except (json.JSONDecodeError, ValueError) as exc:
+    except (json.JSONDecodeError, ValueError, RecursionError) as exc:
         raise patch_package_error(
             "patch.json is not one valid JSON object"
         ) from exc

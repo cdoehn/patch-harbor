@@ -215,12 +215,24 @@ def bundle(
         return BundleResult(result.report)
 
 
+def _inspection_arguments(
+    patch: PathInput, observer: ProgressObserver | None,
+) -> tuple[Path, ProgressObserver | None]:
+    path = _path(patch, "patch")
+    actual_observer = _observer(observer)
+    try:
+        return path.absolute(), actual_observer
+    except (OSError, UnicodeError) as exc:
+        raise PatchHarborError("cannot anchor patch input path: " + str(exc),
+                               FailureReason.SOURCE_ERROR) from exc
+
+
 def inspect_patch(
     patch: PathInput, *, observer: ProgressObserver | None = None,
 ) -> PatchInspection:
     """Inspect one explicit package without Git, registration, shell lookup or writes."""
-    path = _path(patch, "patch").absolute()
-    with _observe_activity(_observer(observer)):
+    path, actual_observer = _inspection_arguments(patch, observer)
+    with _observe_activity(actual_observer):
         return _application.inspect_patch(path)
 
 
@@ -228,8 +240,8 @@ def validate_patch(
     patch: PathInput, *, observer: ProgressObserver | None = None,
 ) -> PatchValidationResult:
     """Check static package validity only; binding modes follow in RIV 1.b."""
-    path = _path(patch, "patch").absolute()
-    with _observe_activity(_observer(observer)):
+    path, actual_observer = _inspection_arguments(patch, observer)
+    with _observe_activity(actual_observer):
         return _application.validate_patch(path)
 
 

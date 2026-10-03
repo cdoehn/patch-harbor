@@ -77,6 +77,12 @@ def _positive_seconds(value: str) -> float:
     return seconds
 
 
+def _explicit_package_path(value: str) -> Path:
+    if not value or "\x00" in value:
+        raise argparse.ArgumentTypeError("must be a nonempty file path without NUL")
+    return Path(value)
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = _ExactArgumentParser(
         prog="patchharbor",
@@ -284,7 +290,7 @@ def _build_parser() -> argparse.ArgumentParser:
                 "binding modes are not yet available."
             ),
         )
-        package_parser.add_argument("patch_zip", type=Path, metavar="PATCH_ZIP")
+        package_parser.add_argument("patch_zip", type=_explicit_package_path, metavar="PATCH_ZIP")
         package_parser.add_argument("--json", action="store_true", dest="json_output",
                                     help="write the version-2 machine-readable result")
 

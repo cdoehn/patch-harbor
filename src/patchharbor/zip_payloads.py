@@ -8,6 +8,21 @@ from pathlib import Path
 import stat
 import zipfile
 
+# Match optional standard-library compression support without requiring a backend
+# which this interpreter's zipfile cannot use. Corrupt streams remain input errors.
+try:
+    import zlib
+except ImportError:
+    _ZLIB_ERRORS = ()
+else:
+    _ZLIB_ERRORS = (zlib.error,)
+try:
+    import lzma
+except ImportError:
+    _LZMA_ERRORS = ()
+else:
+    _LZMA_ERRORS = (lzma.LZMAError,)
+
 from patchharbor.progress import activity
 
 from patchharbor.bundle_paths import (
@@ -107,6 +122,8 @@ class _ZipReadBudget:
             OSError,
             RuntimeError,
             zipfile.BadZipFile,
+            *_ZLIB_ERRORS,
+            *_LZMA_ERRORS,
         ) as exc:
             raise ZipArchiveReadError(
                 f"cannot read entry {member.relative_path!r}: {exc}"

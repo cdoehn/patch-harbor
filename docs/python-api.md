@@ -135,6 +135,16 @@ API. CLI codes remain 2 (usage), 3 (invalid script/marker), 4 (unsafe/unreadable
 input), 5 (unsupported interpreter syntax), 10 (invalid package/manifest), and
 0 (successful static check). Existing resource limits remain in force.
 
+For these calls, path type/value validation precedes observer validation; both
+precede anchoring the path and Core file I/O. Invalid observers do not cause a
+filesystem lookup. Recognized ZIP decompressor failures and filesystem encoding
+errors are input errors (4); a JSON decoder recursion limit is a manifest error
+(10). Unexpected programming exceptions and interruption signals propagate.
+Each request binds its own observer and restores the enclosing scope even on
+failure; a nested call with `observer=None` does not inherit its caller's
+observer. A replaced filename after capture cannot change the returned digest
+or facts; a later Apply must independently read and validate its own bytes.
+
 ## Repository-local configuration
 
 `configuration(repository=".", *, revalidate=False, observer=None)` accepts the
