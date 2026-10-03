@@ -105,6 +105,7 @@ def require_clean_repository(path: Path) -> RepositoryPath:
 def capture_repository_state(
     repository: RepositoryPath,
     base_commit: GitObjectId,
+    *, read_only: bool = False,
 ) -> RepositoryState:
     """Validate and capture all supported non-HEAD repository state."""
     require_supported_repository_state(repository)
@@ -125,6 +126,7 @@ def capture_repository_state(
         unstaged=read_unstaged_records(
             repository,
             base_commit.object_format,
+            read_only=read_only,
         ),
         untracked=read_untracked_records(repository, untracked_paths),
     )
@@ -132,21 +134,24 @@ def capture_repository_state(
 
 def capture_repository_snapshot(
     repository: RepositoryPath,
+    *, read_only: bool = False,
 ) -> RepositorySnapshot:
     """Capture one complete base commit and supported non-HEAD state."""
     base_commit = read_head_object_id(repository)
     return RepositorySnapshot(
         base_commit=base_commit,
-        state=capture_repository_state(repository, base_commit),
+        state=capture_repository_state(repository, base_commit, read_only=read_only),
     )
 
 
 def capture_consistent_repository_snapshot(
     repository: RepositoryPath,
+    *, read_only: bool = False,
 ) -> RepositorySnapshot:
     """Return one stable snapshot or reject concurrent repository changes."""
-    first = capture_repository_snapshot(repository)
-    second = capture_repository_snapshot(repository)
+    options = {"read_only": True} if read_only else {}
+    first = capture_repository_snapshot(repository, **options)
+    second = capture_repository_snapshot(repository, **options)
     if first != second:
         raise _error("repository changed while being read")
     return second
@@ -295,9 +300,10 @@ def capture_repository_context_for_id(
         return context
 
 
-def capture_repository_context(path: Path) -> RepositoryContext:
+def capture_repository_context(path: Path, *, read_only: bool = False) -> RepositoryContext:
     """Capture one registered repository and release its lock after capture."""
-    paths = registration_user_paths()
+    paths = (registration_user_paths(create_configuration_directory=False)
+             if read_only else registration_user_paths())
     with ExitStack() as repository_scope:
         with registry_lock(paths):
             repository = inspect_repository_root(path)
@@ -311,7 +317,18 @@ def capture_repository_context(path: Path) -> RepositoryContext:
             if locked_id != repo_id:
                 raise _error("repository identity changed while acquiring its lock")
 
-        snapshot = capture_consistent_repository_snapshot(locked_repository)
+        snapshot = (capture_consistent_repository_snapshot(locked_repository, read_only=True)
+                    if read_only else capture_consistent_repository_snapshot(locked_repository))
+
+        if read_only:
+            # Repository lock remains held; all lock acquisition is nonblocking.
+            # Detect out-of-band registration/path changes during the capture.
+            with registry_lock(paths):
+                current_repository = inspect_repository_root(path)
+                if current_repository != locked_repository:
+                    raise _error("repository path changed during capture")
+                if _registered_identity(paths, current_repository) != locked_id:
+                    raise _error("repository identity changed during capture")
 
     return repository_context_from_snapshot(
         locked_repository,

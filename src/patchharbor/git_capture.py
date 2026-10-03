@@ -426,6 +426,14 @@ def _require_supported_index_flags(repository: RepositoryPath) -> None:
         if ord("a") <= tag <= ord("z"):
             raise _unsupported(_UnsupportedState.INDEX)
 
+    # Intent-to-add entries have a normal empty-blob ID in ls-files. Compare
+    # the two index-only views; neither command reads/filters worktree bytes.
+    arguments = ("diff", "--cached", "--raw", "--no-abbrev", "-z", *CANONICAL_DIFF_ARGUMENTS)
+    visible = run_git_bytes(repository, *arguments, "--ita-visible-in-index", "--")
+    invisible = run_git_bytes(repository, *arguments, "--ita-invisible-in-index", "--")
+    if visible != invisible:
+        raise _unsupported(_UnsupportedState.INDEX)
+
 
 def _ignored_directory_prefixes(
     repository: RepositoryPath,
@@ -636,7 +644,7 @@ def _read_worktree_record(
         core_file_mode=core_file_mode,
     )
     if (
-        snapshot.mode == entry.index_mode
+        (not core_file_mode or snapshot.mode == entry.index_mode)
         and _git_blob_object_name(snapshot.content, object_format)
         == entry.index_object
     ):
@@ -652,11 +660,97 @@ def _read_worktree_record(
     )
 
 
-def read_unstaged_records(
+def _require_no_content_conversion(
+    repository: RepositoryPath,
+    records: tuple[UnstagedRecord, ...],
+    object_format: GitObjectFormat,
+) -> None:
+    """Reject ambiguous raw differences without invoking a Git conversion helper.
+
+    Normal context/Apply/bundle retain the state-v1 Git candidate selection.
+    Read-only validation can prove raw differences only when no selected Git
+    conversion could make those bytes equal to the index. It never emulates a
+    configured clean filter or silently returns a different fingerprint contract.
+    """
+    changed = {
+        record.path: record.worktree_content
+        for record in records
+        if record.worktree_kind == b"regular"
+        and _git_blob_object_name(record.worktree_content, object_format) != record.index_object
+    }
+    if not changed:
+        return
+    attributes = {path: {} for path in changed}
+    raw = run_git_bytes(
+        repository, "check-attr", "--all", "-z", "--stdin",
+        input_bytes=b"".join(path + b"\0" for path in changed),
+    )
+    parts = _nul_records(raw, "worktree conversion attributes")
+    if len(parts) % 3:
+        raise _error("git returned malformed worktree conversion attributes")
+    for offset in range(0, len(parts), 3):
+        path, name, value = parts[offset:offset + 3]
+        if path not in attributes or not name or name in attributes[path]:
+            raise _error("git returned ambiguous worktree conversion attributes")
+        attributes[path][name] = value
+    autocrlf = run_git_bytes(
+        repository, "config", "--null", "--get", "core.autocrlf",
+        accepted_returncodes=(0, 1),
+    )
+    eol_conversion = autocrlf.lower() not in (b"", b"false\0", b"no\0", b"off\0", b"0\0")
+    for path, content in changed.items():
+        names = attributes[path]
+        if (b"filter" in names or b"working-tree-encoding" in names
+            or (b"ident" in names and b"$Id:" in content)
+            or (b"\r\n" in content and (eol_conversion or b"text" in names or b"eol" in names))):
+            raise unsupported_repository_state_error(
+                "read-only validation cannot establish state-v1 binding across Git content conversions"
+            )
+
+
+def _read_unstaged_records_without_filters(
     repository: RepositoryPath,
     object_format: GitObjectFormat,
 ) -> tuple[UnstagedRecord, ...]:
+    """Compare raw file bytes, without Git worktree filters or racy-index refresh."""
+    index = _parse_index(
+        run_git_bytes(repository, "ls-files", "--stage", "-z"),
+        object_format,
+    )
+    entries = []
+    for entry in index:
+        target = repository.value / os.fsdecode(entry.path)
+        try:
+            kind = path_kind(target)
+        except FileSystemOperationError as exc:
+            raise _error("cannot inspect a working-tree path") from exc
+        if kind not in (PathKind.MISSING, PathKind.REGULAR_FILE):
+            raise _unsupported(_UnsupportedState.ENTRY_TYPE)
+        entries.append(_UnstagedEntry(entry.path, b"D" if kind is PathKind.MISSING else b"M",
+                                      entry.mode, entry.object_name))
+    core_file_mode = _core_file_mode(repository)
+    records = tuple(
+        _read_worktree_record(
+            repository,
+            entry,
+            core_file_mode=core_file_mode,
+            object_format=object_format,
+        )
+        for entry in entries
+    )
+    captured = tuple(record for record in records if record is not None)
+    _require_no_content_conversion(repository, captured, object_format)
+    return captured
+
+
+def read_unstaged_records(
+    repository: RepositoryPath,
+    object_format: GitObjectFormat,
+    *, read_only: bool = False,
+) -> tuple[UnstagedRecord, ...]:
     """Return canonical index versus working-tree differences."""
+    if read_only:
+        return _read_unstaged_records_without_filters(repository, object_format)
     entries = _parse_unstaged_diff(
         run_git_bytes(
             repository,

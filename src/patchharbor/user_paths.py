@@ -59,6 +59,7 @@ def _user_paths(
     *,
     error_factory: _ErrorFactory,
     purpose: str,
+    create_configuration_directory: bool = True,
 ) -> RegistrationUserPaths:
     if is_windows():
         app_data = os.environ.get("APPDATA")
@@ -86,11 +87,12 @@ def _user_paths(
         locks = state / "locks"
 
     try:
-        configuration.mkdir(parents=True, exist_ok=True)
+        if create_configuration_directory:
+            configuration.mkdir(parents=True, exist_ok=True)
         locks.mkdir(parents=True, exist_ok=True)
         canonical_configuration = physically_canonicalize(
             configuration,
-            must_exist=True,
+            must_exist=create_configuration_directory,
         )
         canonical_locks = physically_canonicalize(locks, must_exist=True)
     except (OSError, RuntimeError) as exc:
@@ -104,11 +106,12 @@ def _user_paths(
     )
 
 
-def registration_user_paths() -> RegistrationUserPaths:
-    """Create user paths whose failures belong to the registry boundary."""
+def registration_user_paths(*, create_configuration_directory: bool = True) -> RegistrationUserPaths:
+    """Resolve registry paths; read-only clients may create only lock directories."""
     return _user_paths(
         error_factory=registry_error,
         purpose="registration",
+        create_configuration_directory=create_configuration_directory,
     )
 
 

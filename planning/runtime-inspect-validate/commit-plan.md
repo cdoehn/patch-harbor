@@ -2,7 +2,7 @@
 ## Inspect / Validate über API und CLI · Offline-Runtime · Result-Format 2 · Chat-Handoff
 
 **Stand:** 3. Oktober 2026. **Status:** aktive Entwicklung;
-**4 von 18 Umsetzungsschritten im Dateistand vorbereitet**. Nächster Schritt: `1.b.R`.
+**5 von 18 Umsetzungsschritten im Dateistand vorbereitet**. Nächster Schritt: `1.b.C`.
 P0 und 1.a sind durch echte Apply-Results bestätigt; neue 1.b-Commits erst im nächsten Result.
 **Bereich:** RIV (Runtime / Inspect / Validate). **Paketbasis:** 1.2.1.
 **Zielversion:** gesondert festzulegen; keine Versionsanhebung oder Releasefreigabe durch Dokumentation.
@@ -68,7 +68,7 @@ base_commit `67215b1a425d7bff8c685934e60104d7b86f1323`,
 state_fingerprint `7c9d2a24e397e0e5`,
 fingerprint_algorithm `patchharbor-state-v1`.
 
-**P1b / Bundle 004:** 1.b.W, echte aufeinanderfolgende Zustände.
+**P1b / Bundle 004:** 1.b.W, 1.b.R, echte aufeinanderfolgende Zustände.
 Allgemeine Referenzintegrität und explizite registrierte Repositorybindung.
 Vor jedem Apply-Commit volle Suite parallel, danach seriell; ein finaler Push.
 Lokale Belege je Zustand: `exchange/reports/patchharbor-riv-004-<PLAN-ID>-parallel.json`
@@ -112,7 +112,7 @@ bei abweichender Development-Wurzel `CWD_MISMATCH`, keine Änderung.
 
 Jeder Zwischenstand wird wirklich hergestellt, getestet und erst dann committed. Ein finaler Working Tree mit künstlich aufgeteiltem Staging ist kein WRC-Nachweis. Commit-IDs werden nach dem Commit aus Git übernommen, nicht im eigenen Commit vorweg erfunden.
 
-### 2.1 Commitübersicht – 4/18 vorbereitet, davon 3 durch Apply bestätigt
+### 2.1 Commitübersicht – 5/18 vorbereitet, davon 3 durch Apply bestätigt
 
 | Nr. | Kennung | Commit-Subject | Voraussetzung | Paket |
 |---:|---|---|---|---|
@@ -300,7 +300,7 @@ In der API repository und reference_bundle ergänzen, gegenseitig ausschließen 
 
 #### 1.b.R – 5/18: `fix(validate): preserve readonly state across binding failures`
 
-**Status:** offen. **Abhängigkeit:** 1.b.W. **Spec:** 37 vollständig, 36.3/36.4.
+**Status:** im Dateistand umgesetzt; Apply-Nachweis im nächsten Result. **Abhängigkeit:** 1.b.W. **Spec:** 37 vollständig, 36.3/36.4.
 
 **Ergebnis:** Alle zulässigen Referenz-/Fehlervarianten und die enge Read-only-Grenze sind abgesichert.
 
@@ -669,7 +669,7 @@ Jeder später abgeschlossene Eintrag enthält Plan-ID, tatsächlichen Commit, ur
 
 Fertig ist die Erweiterung erst mit nutzbarer API und CLI, konstant reproduzierbarer Runtime aus Standardinstallationen, sicherer Formatintegration, erhaltenen Sicherheitsgrenzen, ausgeführten Offline-/Roundtrip-Gates, aktueller installierter Anleitung und grüner CI für den tatsächlichen finalen HEAD. „0 Commits offen“ allein ist kein Freigabenachweis.
 
-**Status dieses Dateistands:** 4/18 vorbereitet, 14 weitere Schritte offen.
+**Status dieses Dateistands:** 5/18 vorbereitet, 13 weitere Schritte offen.
 P0 und 1.a sind angewendet/gepusht; 1.b wartet auf den echten Apply-Nachweis.
 Paketprüfung und beide Bindungsmodi sind vorhanden; Runtime, Format 2 und
 deren Plattformabnahme stehen aus. Quellenstand bleibt Exchange-Revision 2.

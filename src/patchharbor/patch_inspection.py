@@ -116,7 +116,7 @@ def validate_patch(
         not_checked += ("live_repository_state", "local_registration", "reconstructed_state_fingerprint",
                         "legacy_delta_log_hashes")
     elif repository is not None:
-        context = capture_repository_context(repository)
+        context = capture_repository_context(repository, read_only=True)
         scope = PatchValidationScope.REPOSITORY
         not_checked += ("future_repository_state",)
     else:

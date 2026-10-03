@@ -39,6 +39,8 @@ _CANONICAL_GIT_PREFIX = (
     "diff.renames=false",
     "-c",
     "status.renames=false",
+    "-c",
+    "core.fsmonitor=false",
 )
 
 
@@ -102,7 +104,7 @@ def run_git_bytes(
         )
     except FileNotFoundError as exc:
         raise _error("git executable is not available") from exc
-    except OSError as exc:
+    except (OSError, UnicodeError) as exc:
         raise _error(f"cannot start git: {exc}") from exc
 
     if completed.returncode not in accepted_returncodes:

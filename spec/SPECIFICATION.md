@@ -11,7 +11,7 @@
 **Patch-Paketmarker:** `patch-harbor`
 
 Der aktive Entwicklungsplan für Runtime / Inspect / Validate (RIV) liegt unter
-`planning/runtime-inspect-validate/commit-plan.md`: 4 von 18 Schritten vorbereitet; 1.a angewendet, 1.b-Apply-Nachweis folgt.
+`planning/runtime-inspect-validate/commit-plan.md`: 5 von 18 Schritten vorbereitet; 1.a angewendet, 1.b-Apply-Nachweis folgt.
 Die Zielversion dieser Erweiterung wird gesondert festgelegt; die vorhandene
 Paketversion bleibt 1.2.1. Die abgeschlossenen Pläne unter `planning/1.2.1/`,
 `planning/1.2.0/`, `planning/1.1.1/`, `planning/1.1.0/` und `planning/1.0.0/`
@@ -3631,6 +3631,15 @@ Der Referenzmodus wendet Deltas nicht an, rekonstruiert keinen Git-Commit und be
 Die bei fehlgeschlagenem Apply gegebenenfalls vorhandenen `expected_*`-Felder beschreiben den früheren Auftrag. Als Basis für den nächsten Patch dient immer der **tatsächlich im Result dokumentierte aktuelle Kontext**, nicht der erfolglos erwartete Ausgangszustand.
 
 ### 37.3 Repositoryprüfung und spätere Ausführung
+
+Die Read-only-Validierung ruft keine Git-Inhaltsfilter auf. Weichen rohe
+Working-Tree-Bytes vom Index ab und könnten konfigurierte Filter,
+Working-Tree-Encoding, Ident-Expansion oder eine relevante Zeilenendenumwandlung
+den kanonischen Vergleich verändern, wird der Zustand mit Fehler 13 abgelehnt.
+Git-Konvertierungen werden nicht nachgebaut oder still als andere
+Fingerprint-Semantik ausgegeben. Normale Kontext-, Apply- und Bundle-Erfassung
+behalten den bestehenden state-v1-Vertrag; gewöhnliche LF-Textänderungen bleiben
+auch bei text/eol-Attributen validierbar.
 
 Der Modus `repository` verwendet die existierenden Regeln für Registrierung, vollständige `repo_id`, Base-Commit, Fingerprint und Algorithmus. Der explizite Repository-Pfad darf eine abweichende Manifest-ID nicht ersetzen.
 

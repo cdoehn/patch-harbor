@@ -50,6 +50,29 @@ def _assert_unsupported_repository_state(
     assert captured.value.error_kind is ErrorKind.UNSUPPORTED_REPOSITORY_STATE
 
 
+@pytest.mark.parametrize("content", [b"", b"planned\n", None])
+@pytest.mark.parametrize("object_format", [None, "sha256"])
+@pytest.mark.parametrize("name", ["planned.txt", "tracked.txt"])
+def test_intent_to_add_rejected_without_worktree_diff(
+    tmp_path: Path, content: bytes | None, object_format: str | None, name: str,
+) -> None:
+    repository = create_repository(tmp_path / "repository", object_format=object_format)
+    if name == "tracked.txt":
+        git(repository, "rm", "--cached", name)
+    planned = repository / name
+    planned.write_bytes(content or b"")
+    git(repository, "add", "--intent-to-add", name)
+    if content is None:
+        planned.unlink()
+    index_before = (repository / ".git/index").read_bytes()
+
+    with pytest.raises(PatchHarborError) as captured:
+        _repository_state(repository)
+
+    _assert_unsupported_repository_state(captured)
+    assert (repository / ".git/index").read_bytes() == index_before
+
+
 @pytest.mark.parametrize("object_format", [None, "sha256"])
 def test_staged_additions_preserve_binary_blob_ids_and_byte_order(
     tmp_path: Path,
@@ -301,6 +324,19 @@ def test_deleted_tracked_path_must_really_be_missing(tmp_path: Path) -> None:
         _repository_state(repository)
 
     _assert_unsupported_repository_state(captured)
+
+
+def test_raw_worktree_comparison_preserves_filemode_false_contract(tmp_path: Path) -> None:
+    repository = create_repository(tmp_path / "repository")
+    git(repository, "update-index", "--chmod=+x", "tracked.txt")
+    git(repository, "commit", "--quiet", "-m", "executable index entry")
+    git(repository, "config", "core.fileMode", "false")
+    assert _unstaged_records(repository) == ()
+    (repository / "tracked.txt").write_bytes(b"changed raw content\n")
+    record, = _unstaged_records(repository)
+    assert record.index_mode == b"100755"
+    assert record.worktree_mode == b"100644"
+    assert record.worktree_content == b"changed raw content\n"
 
 
 def test_unstaged_read_failure_is_categorized(

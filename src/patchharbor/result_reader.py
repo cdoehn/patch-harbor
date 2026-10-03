@@ -260,7 +260,10 @@ def read_result_reference(path: Path, *, resource_policy: ResourcePolicy = DEFAU
     """Own one stable byte capture; all reference failures are input errors."""
     activity("REFERENCE", f"Read and validate explicit Result reference: {path}")
     try:
-        target = path.resolve(strict=True)
+        try:
+            target = path.resolve(strict=True)
+        except RuntimeError as exc:  # pathlib symlink loops on Python 3.12/3.13
+            raise ValueError("cannot resolve Result reference path") from exc
         _require(target.stat().st_size <= resource_policy.max_input_artifact_bytes, "reference exceeds resource limit")
         captured = read_stable_regular_file_with_sha256(
             target, retained_content_limit=resource_policy.max_input_artifact_bytes, allow_path_identity_fallback=True)

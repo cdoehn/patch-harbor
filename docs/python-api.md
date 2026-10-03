@@ -133,6 +133,18 @@ together raise `ValueError`; there is no implicit CWD, registry or Exchange targ
 All relative input paths are anchored to one calling directory before observation.
 The operations do not reserve a Result target or change registry, index, replay,
 attempts or repository contents. Later Apply always checks its inputs/state again.
+Repository validation rechecks the existing identity and registry mapping after
+the consistent state capture, while retaining its repository lock. Read queries
+disable Git fsmonitor helpers; optional Git locks remain disabled. A missing
+registration does not create configuration directories or identity files. Only
+the existing bounded lock directories/files may be created by this mode.
+Read-only validation compares parsed index entries and stable raw file bytes,
+without Git's racy-index filter execution. Ambiguous content conversions fail
+with unsupported-state error 13: selected filters/working-tree encoding, expanded
+ident values, or CRLF bytes subject to Git text/EOL conversion. Ordinary LF text
+changes remain validatable even with text/eol attributes. Normal context, Apply
+and bundle retain the existing state-v1 Git comparison and fingerprint contract,
+including `core.fileMode=false`; validation does not emulate conversion helpers.
 
 Both binding scopes retain `authenticity`, `execution`, `interpreter_availability`,
 `tests`, `ci`, `replay` in `not_checked`. Reference additionally reports
