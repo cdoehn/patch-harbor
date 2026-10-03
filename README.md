@@ -13,10 +13,12 @@ PowerShell scripts and legacy ZIP PatchBundles.
 
 The RIV development line adds static package inspection through
 `patchharbor inspect patch.zip` and `patchharbor validate patch.zip`, with
-`--json` for complete machine-readable facts. These commands do not execute a
-script, need a registered repository, or create a Result Bundle. Only package
-scope is currently implemented; repository/reference binding and the offline
-runtime follow in the [active plan](planning/runtime-inspect-validate/commit-plan.md).
+`--json` for complete machine-readable facts. `validate` additionally accepts
+either `--reference-bundle result.zip` or `--repository /workspace/repository`
+to compare the complete binding. Package/reference checks require no Git or
+registration; repository checks require the existing registered instance.
+These commands execute no scripts and create no Result Bundle. Offline runtime
+and Result Format 2 follow in the [active plan](planning/runtime-inspect-validate/commit-plan.md).
 See the [Python API contract](docs/python-api.md#static-package-inspection-riv-development-addition)
 for result fields and examples. These additions have not been released yet.
 

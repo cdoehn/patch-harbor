@@ -20,6 +20,7 @@ from patchharbor.patch_inspection import (
     PatchEntry, PatchEntryRole, PatchInspection, PatchManifest, PatchMessage,
     PatchValidationResult, PatchValidationScope,
 )
+from patchharbor.result_reader import ReferenceContext
 from patchharbor.progress import (
     ActivityEvent, PackageFile, ProgressEvent, RepositoryResolved,
     RequestStarted, ScriptPrepared,

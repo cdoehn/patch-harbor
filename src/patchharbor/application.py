@@ -259,9 +259,10 @@ def inspect_patch(path: Path) -> PatchInspection:
     return _inspect_patch(path)
 
 
-def validate_patch(path: Path) -> PatchValidationResult:
+def validate_patch(path: Path, *, repository: Path | None = None,
+                   reference_bundle: Path | None = None) -> PatchValidationResult:
     """Validate an explicitly supplied package; no implicit repository selection."""
-    return _validate_patch(path)
+    return _validate_patch(path, repository=repository, reference_bundle=reference_bundle)
 
 
 def _manifest_matches_context(

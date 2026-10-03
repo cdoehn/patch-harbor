@@ -258,11 +258,12 @@ def test_bad_cli_paths_fail_at_argument_boundary(command, value):
 
 
 def test_unavailable_calling_directory_is_an_input_error(monkeypatch):
-    def unavailable(path):
+    def unavailable(*args):
         raise FileNotFoundError('calling directory removed')
-    monkeypatch.setattr(Path, 'absolute', unavailable)
-    for command in ('inspect', 'validate'):
-        json_cli_failure('patch.zip', command, 4)
+    with monkeypatch.context() as scope:
+        scope.setattr(Path, 'cwd', unavailable)
+        for command in ('inspect', 'validate'):
+            json_cli_failure('patch.zip', command, 4)
 
 
 def test_pathlike_is_evaluated_once(tmp_path):

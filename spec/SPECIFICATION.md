@@ -2,16 +2,16 @@
 
 **Dateiname:** `SPECIFICATION.md`<br>
 **Produktversion:** `1.2.1`<br>
-**Spezifikationsstand:** 2026-10-03 · RIV-Integration Revision 3<br>
+**Spezifikationsstand:** 2026-10-03 · RIV-Integration Revision 4<br>
 **Status:** Verbindliche, freigegebene Produktspezifikation für den Bestandsvertrag 1.2.1; keine Release-Freigabe des konkreten Commits ohne grüne Gates.<br>
-**RIV-Status:** Paketprüfung (1.a) im aktuellen Entwicklungsstand; Bindungsmodi, Runtime und Result-Format 2 weiterhin geplant. Keine Release-Freigabe.<br>
+**RIV-Status:** Paketprüfung (1.a) durch Apply bestätigt; Bindungsmodi (1.b) im Entwicklungsstand, Runtime und Result-Format 2 weiterhin geplant. Keine Release-Freigabe.<br>
 **Projektname:** `PatchHarbor`<br>
 **Kommando:** `patchharbor`<br>
 **Skriptmarker:** `# PATCHHARBOR`<br>
 **Patch-Paketmarker:** `patch-harbor`
 
 Der aktive Entwicklungsplan für Runtime / Inspect / Validate (RIV) liegt unter
-`planning/runtime-inspect-validate/commit-plan.md`: 3 von 18 Schritten im Dateistand vorbereitet; Apply-Nachweis folgt über das Result.
+`planning/runtime-inspect-validate/commit-plan.md`: 4 von 18 Schritten vorbereitet; 1.a angewendet, 1.b-Apply-Nachweis folgt.
 Die Zielversion dieser Erweiterung wird gesondert festgelegt; die vorhandene
 Paketversion bleibt 1.2.1. Die abgeschlossenen Pläne unter `planning/1.2.1/`,
 `planning/1.2.0/`, `planning/1.1.1/`, `planning/1.1.0/` und `planning/1.0.0/`
@@ -3511,7 +3511,7 @@ seriell; GitHub-CI wird ausschließlich manuell gestartet.
 Exchange-Revision 2**. **Basis:** PatchHarbor-Quellstand 1.2.1 aus dem Result
 `patchharbor-apply_Result_073436_1003_116272.zip`, Commit
 `68dba9216b72dc0b6441df83f49c9047b8b038b9`. **Status:** schrittweise in Umsetzung; Paketprüfung gemäß
-1.a vorhanden, übrige Erweiterung noch nicht implementiert oder freigegeben. Die nächste Release-Versionsnummer
+1.a/1.b vorhanden, Runtime und Format 2 noch nicht implementiert oder freigegeben. Die nächste Release-Versionsnummer
 wird gesondert festgelegt; 1.2.1 bezeichnet bereits den vorhandenen Quellstand.
 Das Result nennt separat die ausführende Engine 1.2.0; dies ist keine abweichende
 Quellversion. Herkunft und vollständige Bindung stehen im RIV-Plan.

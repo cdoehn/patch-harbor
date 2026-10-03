@@ -286,14 +286,17 @@ def _build_parser() -> argparse.ArgumentParser:
             name,
             help=f"{name} one explicit patch package without executing it",
             description=(
-                "Check static package validity only, without Git, registration, "
-                "script execution or Result publication. Repository and reference "
-                "binding modes are not yet available."
+                "Check an explicit package without execution or publication. "
+                "Validate can additionally compare one explicit repository or Result reference."
             ),
         )
         package_parser.add_argument("patch_zip", type=_explicit_package_path, metavar="PATCH_ZIP")
         package_parser.add_argument("--json", action="store_true", dest="json_output",
                                     help="write the version-2 machine-readable result")
+        if name == "validate":
+            binding = package_parser.add_mutually_exclusive_group()
+            binding.add_argument("--repository", type=_explicit_package_path, metavar="REPOSITORY")
+            binding.add_argument("--reference-bundle", type=_explicit_package_path, metavar="RESULT_ZIP")
 
     bundle_parser = commands.add_parser(
         "bundle",
@@ -667,6 +670,7 @@ def _json_envelope(
 def _package_command(
     command: str, path: Path, *, json_output: bool, stdout: TextIO, stderr: TextIO,
     verbose: bool = False, force_plain: bool = False, no_color: bool = False,
+    repository: Path | None = None, reference_bundle: Path | None = None,
 ) -> int:
     report: api.PatchValidationResult | None = None
     try:
@@ -677,7 +681,12 @@ def _package_command(
             if command == "inspect":
                 info = api.inspect_patch(path, observer=_progress_observer(console))
             else:
-                report = api.validate_patch(path, observer=_progress_observer(console))
+                options = {}
+                if repository is not None:
+                    options["repository"] = repository
+                if reference_bundle is not None:
+                    options["reference_bundle"] = reference_bundle
+                report = api.validate_patch(path, **options, observer=_progress_observer(console))
                 info = report.inspection
     except PatchHarborError as exc:
         code = int(exit_code_for_error(exc))
@@ -696,7 +705,10 @@ def _package_command(
         print(f"package_size: {info.package_size}", file=stdout)
         print(f"entrypoint: {info.entrypoint}", file=stdout)
         print(f"entries: {len(info.entries)}", file=stdout)
-        print("scope: package; repository binding and execution not checked", file=stdout)
+        print(f"scope: {'package' if report is None else report.scope.value}", file=stdout)
+        if report is not None:
+            print(f"binding_matches: {report.binding_matches}", file=stdout)
+            print("not_checked: " + ", ".join(report.not_checked), file=stdout)
         for warning in info.warnings:
             print(format_tool_message(warning), file=stderr)
     return 0
@@ -1364,6 +1376,8 @@ def main(
             args.command, args.patch_zip, json_output=args.json_output,
             stdout=actual_stdout, stderr=actual_stderr,
             verbose=args.verbose, force_plain=args.plain, no_color=args.no_color,
+            repository=getattr(args, "repository", None),
+            reference_bundle=getattr(args, "reference_bundle", None),
         )
 
     if args.command == "bundle":

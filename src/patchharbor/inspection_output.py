@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from patchharbor.patch_inspection import PatchInspection, PatchValidationResult
+from patchharbor.context_output import context_json_result
 
 
 def inspection_json_result(info: PatchInspection) -> dict[str, object]:
@@ -30,7 +31,8 @@ def inspection_json_result(info: PatchInspection) -> dict[str, object]:
 def validation_json_result(report: PatchValidationResult) -> dict[str, object]:
     return {
         "inspection": inspection_json_result(report.inspection), "scope": report.scope.value,
-        "binding_matches": report.binding_matches, "context": None,
+        "binding_matches": report.binding_matches,
+        "context": None if report.context is None else context_json_result(report.context),
         "reference_sha256": report.reference_sha256,
         "checked_at": report.checked_at.isoformat().replace("+00:00", "Z"),
         "not_checked": list(report.not_checked),

@@ -68,6 +68,7 @@ EXPECTED_CORE_RUNTIME_FILES = {
     "result_bundle_capture.py",
     "result_bundle_publication.py",
     "result_bundle_snapshot.py",
+    "result_reader.py",
     "result_bundle_target.py",
     "result_bundle_writer.py",
     "locks.py",

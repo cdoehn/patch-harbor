@@ -28,7 +28,7 @@ from patchharbor.api_types import (
     ResultBundleResult, ResultBundleStatus, RunOperation, RunReport, RunTiming,
     RunToolError, ScriptPrepared, ScriptResult, UnregisterResult,
     PatchEntry, PatchEntryRole, PatchInspection, PatchManifest, PatchMessage,
-    PatchValidationResult, PatchValidationScope,
+    PatchValidationResult, PatchValidationScope, ReferenceContext,
 )
 from patchharbor.errors import ErrorKind, FailureReason, PatchHarborError
 from patchharbor.output import OutputTargets as _OutputTargets
@@ -51,7 +51,7 @@ __all__ = [
     "configure_bundle_suffix", "configure_exchange_directory", "configuration",
     "context", "dry_run", "register", "repositories", "run", "unregister",
     "PatchEntry", "PatchEntryRole", "PatchInspection", "PatchManifest", "PatchMessage",
-    "PatchValidationResult", "PatchValidationScope", "inspect_patch", "validate_patch",
+    "PatchValidationResult", "PatchValidationScope", "ReferenceContext", "inspect_patch", "validate_patch",
 ]
 
 
@@ -237,12 +237,24 @@ def inspect_patch(
 
 
 def validate_patch(
-    patch: PathInput, *, observer: ProgressObserver | None = None,
+    patch: PathInput, *, repository: PathInput | None = None,
+    reference_bundle: PathInput | None = None, observer: ProgressObserver | None = None,
 ) -> PatchValidationResult:
-    """Check static package validity only; binding modes follow in RIV 1.b."""
-    path, actual_observer = _inspection_arguments(patch, observer)
+    """Validate a package, optionally bound to one explicit repository or Result."""
+    if repository is not None and reference_bundle is not None:
+        raise ValueError("repository and reference_bundle are mutually exclusive")
+    path = _path(patch, "patch")
+    target = _optional_path(repository, "repository")
+    reference = _optional_path(reference_bundle, "reference_bundle")
+    actual_observer = _observer(observer)
+    try:
+        anchor = Path.cwd() if any(p is not None and not p.is_absolute() for p in (path, target, reference)) else None
+        path, target, reference = tuple(None if p is None else p if p.is_absolute() else anchor / p
+                                        for p in (path, target, reference))
+    except (OSError, UnicodeError) as exc:
+        raise PatchHarborError("cannot anchor validation input paths: " + str(exc), FailureReason.SOURCE_ERROR) from exc
     with _observe_activity(actual_observer):
-        return _application.validate_patch(path)
+        return _application.validate_patch(path, repository=target, reference_bundle=reference)
 
 
 def apply(

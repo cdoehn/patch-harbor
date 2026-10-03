@@ -10,6 +10,9 @@ from pathlib import Path
 from patchharbor.bundle_handoff import PATCH_HANDOFF_DIRECTORY
 from patchharbor.interpreters import select_interpreter
 from patchharbor.models import RepositoryContext
+from patchharbor.errors import state_mismatch_error
+from patchharbor.result_reader import ReferenceContext, read_result_reference
+from patchharbor.repository_state import capture_repository_context
 from patchharbor.parser import Message as PatchMessage
 from patchharbor.patch_manifest import PATCH_MANIFEST_NAME, PatchManifest
 from patchharbor.patch_package import parse_package_entrypoint, resolve_patch_package
@@ -25,6 +28,8 @@ class PatchEntryRole(str, Enum):
 
 class PatchValidationScope(str, Enum):
     PACKAGE = "package"
+    REFERENCE = "reference"
+    REPOSITORY = "repository"
 
 
 @dataclass(frozen=True, slots=True)
@@ -58,7 +63,7 @@ class PatchValidationResult:
     inspection: PatchInspection
     scope: PatchValidationScope
     binding_matches: bool | None
-    context: RepositoryContext | None
+    context: RepositoryContext | ReferenceContext | None
     reference_sha256: str | None
     checked_at: datetime
     not_checked: tuple[str, ...]
@@ -94,12 +99,35 @@ def inspect_patch(
 
 
 def validate_patch(
-    path: Path, *, resource_policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY,
+    path: Path, *, repository: Path | None = None, reference_bundle: Path | None = None,
+    resource_policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY,
 ) -> PatchValidationResult:
+    if repository is not None and reference_bundle is not None:
+        raise ValueError("repository and reference_bundle are mutually exclusive")
     inspection = inspect_patch(path, resource_policy=resource_policy)
+    context = None
+    reference_sha256 = None
+    scope = PatchValidationScope.PACKAGE
+    not_checked = ("authenticity", "execution", "interpreter_availability", "tests", "ci", "replay")
+    if reference_bundle is not None:
+        reference, reference_sha256 = read_result_reference(reference_bundle, resource_policy=resource_policy)
+        context = reference.context
+        scope = PatchValidationScope.REFERENCE
+        not_checked += ("live_repository_state", "local_registration", "reconstructed_state_fingerprint",
+                        "legacy_delta_log_hashes")
+    elif repository is not None:
+        context = capture_repository_context(repository)
+        scope = PatchValidationScope.REPOSITORY
+        not_checked += ("future_repository_state",)
+    else:
+        not_checked += ("repository_binding", "repository_state")
+    if context is not None:
+        manifest = inspection.manifest
+        if not (manifest.repo_id == context.repo_id and manifest.base_commit == context.base_commit
+                and manifest.state_fingerprint == context.state_fingerprint
+                and manifest.fingerprint_algorithm == context.fingerprint_algorithm):
+            raise state_mismatch_error("patch binding does not match the explicitly selected context")
     return PatchValidationResult(
-        inspection, PatchValidationScope.PACKAGE, None, None, None,
-        datetime.now(timezone.utc),
-        ("repository_binding", "repository_state", "authenticity", "execution",
-         "interpreter_availability", "tests", "ci", "replay"),
+        inspection, scope, None if context is None else True, context, reference_sha256,
+        datetime.now(timezone.utc), not_checked,
     )

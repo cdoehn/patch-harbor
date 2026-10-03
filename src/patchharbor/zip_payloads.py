@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from io import BytesIO, DEFAULT_BUFFER_SIZE
 from pathlib import Path
+from typing import Callable
 import stat
 import zipfile
 
@@ -27,6 +28,7 @@ from patchharbor.progress import activity
 
 from patchharbor.bundle_paths import (
     BundlePathError,
+    normalize_bundle_path,
     validate_bundle_member_paths,
 )
 from patchharbor.models import BundlePayload
@@ -199,6 +201,7 @@ def _member_unix_mode(entry: zipfile.ZipInfo, is_directory: bool) -> int | None:
 
 def _validate_members(
     entries: list[zipfile.ZipInfo],
+    *, path_normalizer: Callable[..., str] = normalize_bundle_path,
 ) -> tuple[_ValidatedZipMember, ...]:
     member_kinds: list[tuple[zipfile.ZipInfo, bool]] = []
     for entry in entries:
@@ -207,8 +210,8 @@ def _validate_members(
     activity("ZIP", "Validate all member paths and reject duplicate or unsafe targets")
     try:
         normalized_paths = validate_bundle_member_paths(
-            (entry.orig_filename, is_directory)
-            for entry, is_directory in member_kinds
+            ((entry.orig_filename, is_directory) for entry, is_directory in member_kinds),
+            normalizer=path_normalizer,
         )
     except BundlePathError as exc:
         raise InvalidZipArchiveError(str(exc)) from exc
@@ -232,6 +235,7 @@ def _read_open_archive(
     archive: zipfile.ZipFile,
     *,
     policy: ResourcePolicy,
+    path_normalizer: Callable[..., str] = normalize_bundle_path,
 ) -> tuple[BundlePayload, ...]:
     try:
         with archive:
@@ -239,7 +243,7 @@ def _read_open_archive(
             activity("ZIP", f"ZIP structure opened; validate limits for {len(entries)} entries")
             budget = _ZipReadBudget(policy)
             budget.validate_declared_entries(entries)
-            members = _validate_members(entries)
+            members = _validate_members(entries, path_normalizer=path_normalizer)
             return tuple(
                 BundlePayload(
                     relative_path=member.relative_path,
@@ -292,10 +296,12 @@ def read_zip_payload_bytes(
     content: bytes,
     *,
     policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY,
+    path_normalizer: Callable[..., str] = normalize_bundle_path,
 ) -> tuple[BundlePayload, ...]:
     """Validate ZIP bytes already captured through a stable file boundary."""
     _validate_input_bytes(content, policy)
-    return _read_open_archive(_open_archive(BytesIO(content)), policy=policy)
+    return _read_open_archive(_open_archive(BytesIO(content)), policy=policy,
+                              path_normalizer=path_normalizer)
 
 
 def zip_payload_warnings(

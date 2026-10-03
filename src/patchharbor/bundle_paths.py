@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import re
-from typing import Iterable
+from typing import Callable, Iterable
 
 
 MAX_BUNDLE_PATH_CHARS = 512
@@ -85,6 +85,7 @@ def normalize_bundle_path(raw_path: str, *, is_directory: bool = False) -> str:
 
 def validate_bundle_member_paths(
     members: Iterable[tuple[str, bool]],
+    *, normalizer: Callable[..., str] = normalize_bundle_path,
 ) -> tuple[str, ...]:
     """Validate all archive paths and reject portable tree ambiguities."""
     nodes: dict[str, _PathNode] = {}
@@ -112,7 +113,7 @@ def validate_bundle_member_paths(
             existing.explicit = True
 
     for raw_path, is_directory in members:
-        normalized = normalize_bundle_path(
+        normalized = normalizer(
             raw_path,
             is_directory=is_directory,
         )

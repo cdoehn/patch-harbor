@@ -213,14 +213,19 @@ def test_json_cli_uses_public_api_and_complete_typed_facts(tmp_path, monkeypatch
 
 
 @pytest.mark.parametrize("command", ["inspect", "validate"])
-def test_explicit_file_required_and_future_binding_modes_not_offered(command, tmp_path):
-    for arguments in ([command], [command, "patch.zip", "--repository", str(tmp_path)],
-                      [command, "patch.zip", "--reference-bundle", "result.zip"]):
+def test_explicit_file_required_and_binding_options_are_scoped(command, tmp_path):
+    invalid = [[command]]
+    if command == "inspect":
+        invalid += [[command, "patch.zip", "--repository", str(tmp_path)],
+                    [command, "patch.zip", "--reference-bundle", "result.zip"]]
+    else:
+        invalid += [[command, "patch.zip", "--repository", str(tmp_path), "--reference-bundle", "result.zip"]]
+    for arguments in invalid:
         with pytest.raises(SystemExit) as caught:
             main(arguments, stdout=StringIO(), stderr=StringIO())
         assert caught.value.code == 2
-    with pytest.raises(TypeError):
-        api.validate_patch("patch.zip", repository=tmp_path)
+    with pytest.raises(ValueError):
+        api.validate_patch("patch.zip", repository=tmp_path, reference_bundle="result.zip")
 
 
 def test_package_resource_limit_is_the_existing_core_limit(tmp_path):

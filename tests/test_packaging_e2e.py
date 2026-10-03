@@ -84,6 +84,7 @@ EXPECTED_RUNTIME_FILES = {
     "patchharbor/result_bundle_capture.py",
     "patchharbor/result_bundle_publication.py",
     "patchharbor/result_bundle_snapshot.py",
+    "patchharbor/result_reader.py",
     "patchharbor/result_bundle_target.py",
     "patchharbor/result_bundle_writer.py",
     "patchharbor/locks.py",

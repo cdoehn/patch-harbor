@@ -41,7 +41,7 @@ print(report.success, report.result_bundle.status)
 | `repositories()` | `registry list` | `RegistryListResult` |
 | `context(repository=".")` | `context` | `RepositoryContext` |
 | `inspect_patch(patch)` | `inspect PATCH_ZIP` | `PatchInspection` |
-| `validate_patch(patch)` | `validate PATCH_ZIP` | `PatchValidationResult` (package scope) |
+| `validate_patch(patch, repository=None, reference_bundle=None)` | `validate PATCH_ZIP` | `PatchValidationResult` |
 | `bundle(repository=".", output_directory=None)` | `bundle` | `BundleResult` |
 | `apply(patch=None, repository=None, dry_run=False, ...)` | manual `apply` | `RunReport` |
 | `dry_run(patch=None, repository=None, ...)` | `apply --dry-run` | `RunReport` |
@@ -69,11 +69,9 @@ repositories.
 
 ## Static package inspection (RIV development addition)
 
-This source line implements the package-only part of RIV 1.a. It does not
-release a new version or implement the planned repository/reference modes,
-portable runtime or Result Format 2. `repository` and `reference_bundle` are
-not accepted by these operations yet. The existing `dry_run` keeps its Apply
-semantics and still creates a Result Bundle.
+This source line implements RIV 1.a/1.b package and binding validation. Portable
+runtime and Result Format 2 remain planned; no release is implied. The existing
+`dry_run` keeps its Apply semantics and still creates a Result Bundle.
 
 ```python
 from patchharbor import api
@@ -93,7 +91,9 @@ repository. The existing stable file/ZIP, manifest, reserved handoff and script
 parsers apply. Unsafe input never returns partial successful facts. Interpreter
 syntax is checked without requiring the shell to be installed. No Git, registry,
 Exchange scan, locks, payload writes, script execution, temporary script, runtime
-provider or Result publication occurs. The request-local `observer=None` has
+provider or Result publication occurs in package/reference mode. Repository mode
+uses the existing registration, bounded lock effects and controlled Git queries.
+The request-local `observer=None` has
 the usual silent-library and best-effort observation semantics.
 
 `PatchInspection` is frozen and contains `package_sha256` (full lowercase SHA-256),
@@ -108,12 +108,47 @@ seven manifest fields, with typed repository and Git IDs. `PatchMessage` has
 
 `PatchValidationResult` is frozen and contains `inspection`, `scope`,
 `binding_matches`, `context`, `reference_sha256`, `checked_at`, and `not_checked`.
-For the implemented `package` scope, binding/context/reference are `None`.
+For `package` scope, binding/context/reference are `None`.
 `checked_at` is an aware UTC `datetime`; `not_checked` is a tuple of identifiers:
 `repository_binding`, `repository_state`, `authenticity`, `execution`,
 `interpreter_availability`, `tests`, `ci`, `replay`. Successful static validity
 does not establish sender trust or approve a later Apply. Content hashes are
 computed observations, not new declared hashes in format-1 `patch.json`.
+
+`validate_patch(patch, reference_bundle="result.zip")` returns scope `reference`,
+`binding_matches=True`, the full SHA-256 of the captured reference bytes and a
+frozen `ReferenceContext`. Its fields are `repo_id`, `base_commit` (the existing
+typed IDs), `state_fingerprint`, `fingerprint_algorithm`, `dirty` and
+`repository_path` (recorded text, including foreign Windows paths; never resolved
+on this machine). This reader checks the complete format-1 inventory, blob IDs,
+untracked SHA-256 and metadata consistency, accepting consistent dirty, failure
+and dry-run Results. It uses actual context, never the previous expected binding.
+Repository snapshot paths retain the existing portable UTF-8 repository rules;
+patch package paths still use the stricter ASCII contract.
+
+`validate_patch(patch, repository="/workspace/repository")` returns scope
+`repository`, `binding_matches=True`, the existing `RepositoryContext` and no
+reference SHA. The explicit repository must already be registered. Both keywords
+together raise `ValueError`; there is no implicit CWD, registry or Exchange target.
+All relative input paths are anchored to one calling directory before observation.
+The operations do not reserve a Result target or change registry, index, replay,
+attempts or repository contents. Later Apply always checks its inputs/state again.
+
+Both binding scopes retain `authenticity`, `execution`, `interpreter_availability`,
+`tests`, `ci`, `replay` in `not_checked`. Reference additionally reports
+`live_repository_state`, `local_registration`, `reconstructed_state_fingerprint`,
+`legacy_delta_log_hashes`: format 1 has no independent cryptographic hashes for
+every delta/log, and no deltas are applied here. Repository additionally reports
+`future_repository_state`. This is a point-in-time comparison, not an execution,
+replay or sender-trust authorization. Any binding mismatch raises error 9;
+invalid/unreadable/unsupported references raise input error 4. Repository errors
+retain existing codes (8, busy 12, unsupported state 13).
+
+CLI binding options are mutually exclusive:
+`patchharbor validate patch.zip --reference-bundle result.zip --json` or
+`patchharbor validate patch.zip --repository /workspace/repository --json`.
+The JSON `context` object uses the same six fields as `context --json`, with
+complete string IDs and a boolean `dirty`. Reference paths remain foreign text.
 
 CLI examples: `patchharbor inspect patch.zip --json` and
 `patchharbor validate patch.zip --json`. Both also accept `--help`, `--verbose`

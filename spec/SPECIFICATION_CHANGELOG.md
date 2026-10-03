@@ -1,5 +1,20 @@
 # PatchHarbor – Spezifikations-Changelog
 
+## 2026-10-03 – RIV 1.b: explizite Referenz- und Repositorybindung
+
+**Dateistand:** 1.b.W; 4/18 vorbereitet.
+**Apply-Basis:** `67215b1a425d7bff8c685934e60104d7b86f1323` aus `patchharbor-apply_Result_145837_1003_112aa3.zip`.
+Bundle 003 mit drei Commits, sechs Vollsuiten und finalem Push bestätigt.
+Neue Commit-SHAs und Apply-Erfolg stehen erst im nächsten Result.
+
+- `validate_patch` und CLI prüfen wahlweise eine Result-Referenz oder ein registriertes Repository.
+- Format-1-Leser prüft Inventar, Blob-/Dateihashes, Metadaten und tatsächlichen Kontext;
+  konsistente Dirty-, Fehler- und Dry-Run-Results bleiben gültige Referenzen.
+- Paket-/Referenzmodus ohne Git und Registry; Repositorymodus mit bestehenden Locks/lesenden Git-Abfragen.
+- Referenzpfade sind fremde Metadaten, keine lokale Zielwahl. UTF-8-Snapshotpfade bleiben unterstützt.
+- Fehlende Legacy-Delta-/Loghashes, Live-Zustand und Authentizität werden nicht als geprüft behauptet.
+- Results bleiben Format 1; Runtime/Wheel-Fallback und Format 2 folgen separat.
+
 ## 2026-10-03 – RIV 1.a: eigenständige lesende Paketprüfung
 
 **Dateistand:** 1.a.W, 1.a.R, 1.a.C; 3/18 vorbereitet. Basis des nächsten Apply:

@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
-from typing import TextIO
+from typing import TYPE_CHECKING, TextIO
 
 from patchharbor.identifier_presentation import shorten_identifier
 from patchharbor.models import RepositoryContext
+if TYPE_CHECKING:
+    from patchharbor.result_reader import ReferenceContext
 
 
 def write_context_block(context: RepositoryContext, stream: TextIO) -> None:
@@ -42,7 +44,7 @@ def write_context_block(context: RepositoryContext, stream: TextIO) -> None:
     )
 
 
-def context_json_result(context: RepositoryContext) -> dict[str, object]:
+def context_json_result(context: RepositoryContext | ReferenceContext) -> dict[str, object]:
     """Return the closed machine-readable result representation."""
     return {
         "repo_id": str(context.repo_id),
