@@ -113,9 +113,29 @@ pytest-Läufe nacheinander und baut keinen zusätzlichen Test-Scheduler.
 
 Native OS-/Python-/PowerShell-Lanes und Docker verwenden dieselben benannten
 Suites über den Launcher und damit xdist. Die bisherige Abdeckung bleibt erhalten.
-Eine zusätzliche blockierende Ubuntu-24.04/Python-3.12-Lane führt die vollständige
-Suite seriell aus und lädt ihren JSON-Bericht auch im Fehlerfall als Artefakt
-hoch. Keine optionalen Tests, kein continue-on-error und keine stillen Retries.
+Der GitHub-Acceptance-Workflow startet ausschließlich manuell per
+`workflow_dispatch`: keine Push-/Pull-Request-Auslöser, kein Schedule/Nightly und
+kein zusätzlicher serieller Volltestlauf. Die vorhandenen Linux-, Windows-,
+PowerShell- und Docker-Gates bleiben blockierend und verwenden die parallele
+Runner-Policy. Keine optionalen Tests, kein continue-on-error und keine stillen
+Retries.
+
+Im lokalen Apply-Entrypoint muss jeder zu committende Zielzustand zuerst die
+vollständige parallele Suite und anschließend die vollständige serielle Suite
+erfolgreich durchlaufen:
+
+```sh
+.venv/bin/python tools/run_tests.py --suite all
+.venv/bin/python tools/run_tests.py --suite all --serial
+```
+
+Der parallele Lauf verwendet die Default-Worker-Policy `auto`. Erst nach beiden
+grünen Läufen entsteht der Commit. Dieses OFF-PLAN-Migrationsbundle pusht danach
+genau einmal normal auf `dev`, ohne Tag oder Force-Push. Ein Pushfehler erhält
+den erfolgreichen lokalen Commit. Diese Policy ersetzt die frühere Zuordnung
+der seriellen Vollreferenz zu GitHub in den historischen TEST-PARALLEL- und
+POSIX-MODE-Vorgaben; der Modusverifier bleibt als explizites Diagnosewerkzeug
+verfügbar und wird vom Acceptance-Workflow nicht gestartet.
 
 Funktionale Tests prüfen auch ausführbare CI-/Docker-Verträge, nicht den Wortlaut
 der Dokumentation oder die Konsolendarstellung. Ein erzeugtes Patchpaket, ein

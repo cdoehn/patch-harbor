@@ -86,13 +86,15 @@ def test_acceptance_workflow_requires_both_windows_powershell_variants() -> None
     assert "continue-on-error" not in text
 
 
-def test_acceptance_workflow_is_automatic_manual_and_has_no_retries() -> None:
+def test_acceptance_workflow_is_manual_only_and_has_no_retries() -> None:
     text = _workflow_text()
     lowered = text.lower()
 
-    assert "  push:" in text
-    assert "  pull_request:" in text
     assert "  workflow_dispatch:" in text
+    triggers = text.split("\non:\n", 1)[1].split("\npermissions:", 1)[0]
+    assert {line.strip().split(":", 1)[0] for line in triggers.splitlines() if line.strip()} == {
+        "workflow_dispatch",
+    }
     assert "permissions:\n  contents: read" in text
     assert "retry" not in lowered
     assert "rerun" not in lowered
@@ -141,16 +143,12 @@ def test_native_acceptance_matrix_allows_120_minutes() -> None:
     assert "    timeout-minutes: 120\n" in matrix_job
 
 
-def test_ci_keeps_an_unconditional_blocking_full_serial_reference():
+def test_ci_uses_parallel_policy_without_a_serial_reference():
+    from tools.test_policy import DEFAULT_WORKERS
+
     text = _workflow_text()
-    serial = text.split("  serial-reference:\n", 1)[1].split("  windows-powershell7-acceptance:\n", 1)[0]
-    assert "runs-on: ubuntu-24.04" in serial
-    assert "timeout-minutes: 120" in serial
-    assert "python tools/run_tests.py --serial" in serial
-    assert "--report" in serial
-    assert "--suite" not in serial
-    assert "continue-on-error" not in serial
-    assert "if-no-files-found: error" in serial
-    # Only artifact preservation is conditional, not the test/reference job.
-    assert serial.count("if:") == 1
-    assert "if: always()" in serial
+    assert DEFAULT_WORKERS == "auto"
+    assert "serial-reference:" not in text
+    assert "--serial" not in text
+    assert "--workers" not in text
+    assert "verify_test_modes.py" not in text
