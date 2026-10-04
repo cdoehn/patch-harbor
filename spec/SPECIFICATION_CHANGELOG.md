@@ -1,5 +1,25 @@
 # PatchHarbor – Spezifikations-Changelog
 
+## 2026-10-03 – RIV 1.c.R: Herkunft, Ressourcenbudgets und parallele Provider
+
+**Dateistand:** 1.c.R; 8/18 vorbereitet, sieben Feature-Schritte durch echte
+Apply-Results bestätigt. Neue Basis: `616d232c7ac1dc37c602e3e33a750ae09599a9b5`
+aus `patchharbor-apply_Result_194435_1003_3dbbba.zip`.
+
+- Geladene Produzentenidentität erkennt kohärente Neuinstallation gleicher Version;
+  bestehende Antwort bindet weiterhin unveränderlich Artefakt und statische Vorlage.
+- Endliche zusätzliche ID ohne Selbsthash, endgültiger Inhaltsalgorithmus unverändert.
+- Vollständige Archiv-/RECORD-Budgets vor Reads, portables Pfadprofil und
+  Ressourcenverzeichnisse geprüft; Fehler/Abbruch bleiben eindeutig.
+- Frisch gestagter Wheel-Build verhindert Übernahme veralteter Build-Ausgaben.
+- Verhaltenstests für Parallelität, Rechte, Cache-Unabhängigkeit, drei Generationen,
+  echte gleichversionierte Reinstallation, Source/sdist und verändertes Editable.
+- Bundle 006 plant einen Apply-Commit; Development prüft nur parallel, Apply
+  abschließend seriell und parallel vor Commit und einzigem Push.
+- REDUCED_TEST_SCOPE / PLAN_SPEC_MINOR_DEVIATION: Windows- und nativer Rechtebeleg
+  aus dem R-Vorcommit-Gate verschoben; weiterhin vor 1.c.C/GATE-RUNTIME erforderlich.
+  Keine Releasefreigabe, kein Tag/CI-Start, Result-Format 1 und Version 1.2.1 bleiben.
+
 ## 2026-10-03 – RIV 1.c.W: vorbereitete kanonische Wheel-Runtime
 
 **Dateistand:** 1.c.W; 7/18 vorbereitet, 1.a/1.b durch tatsächliche Apply-Results

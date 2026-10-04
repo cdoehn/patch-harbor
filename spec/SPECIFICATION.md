@@ -2,16 +2,16 @@
 
 **Dateiname:** `SPECIFICATION.md`<br>
 **Produktversion:** `1.2.1`<br>
-**Spezifikationsstand:** 2026-10-03 · RIV-Integration Revision 5<br>
+**Spezifikationsstand:** 2026-10-03 · RIV-Integration Revision 6<br>
 **Status:** Verbindliche, freigegebene Produktspezifikation für den Bestandsvertrag 1.2.1; keine Release-Freigabe des konkreten Commits ohne grüne Gates.<br>
-**RIV-Status:** Paketprüfung und Bindungsmodi (1.a/1.b) durch Apply bestätigt; Runtime-Bereitstellung (1.c.W) im Entwicklungsstand. Runtime-Robustheit und Result-Format 2 folgen. Keine Release-Freigabe.<br>
+**RIV-Status:** Paketprüfung, Bindungsmodi und Runtime-Bereitstellung (1.a/1.b/1.c.W) durch Apply bestätigt; Runtime-Robustheit (1.c.R) im Entwicklungsstand. Windows-/GATE-RUNTIME-Abnahme und Result-Format 2 folgen. Keine Release-Freigabe.<br>
 **Projektname:** `PatchHarbor`<br>
 **Kommando:** `patchharbor`<br>
 **Skriptmarker:** `# PATCHHARBOR`<br>
 **Patch-Paketmarker:** `patch-harbor`
 
 Der aktive Entwicklungsplan für Runtime / Inspect / Validate (RIV) liegt unter
-`planning/runtime-inspect-validate/commit-plan.md`: 7 von 18 Schritten vorbereitet; 1.a/1.b angewendet, 1.c.W-Apply-Nachweis folgt.
+`planning/runtime-inspect-validate/commit-plan.md`: 8 von 18 Schritten vorbereitet; 1.a/1.b/1.c.W angewendet, 1.c.R-Apply-Nachweis folgt.
 Die Zielversion dieser Erweiterung wird gesondert festgelegt; die vorhandene
 Paketversion bleibt 1.2.1. Die abgeschlossenen Pläne unter `planning/1.2.1/`,
 `planning/1.2.0/`, `planning/1.1.1/`, `planning/1.1.0/` und `planning/1.0.0/`
@@ -3511,11 +3511,11 @@ GitHub-CI wird ausschließlich manuell gestartet.
 
 ## 35. Erweiterungsziel und Geltungsbereich
 
-**Stand:** 3. Oktober 2026, **Repository-Integration Revision 3 auf Grundlage der
+**Stand:** 3. Oktober 2026, **Repository-Integration Revision 6 auf Grundlage der
 Exchange-Revision 2**. **Basis:** PatchHarbor-Quellstand 1.2.1 aus dem Result
 `patchharbor-apply_Result_073436_1003_116272.zip`, Commit
 `68dba9216b72dc0b6441df83f49c9047b8b038b9`. **Status:** schrittweise in Umsetzung; Paketprüfung gemäß
-1.a/1.b vorhanden, Runtime-Bereitstellung 1.c.W im Dateistand vorbereitet;
+1.a/1.b und Runtime-Bereitstellung 1.c.W angewendet, Runtime-Robustheit 1.c.R im Dateistand vorbereitet;
 Format 2 und die Runtime-Gesamtfreigabe folgen. Die nächste Release-Versionsnummer
 wird gesondert festgelegt; 1.2.1 bezeichnet bereits den vorhandenen Quellstand.
 Das Result nennt separat die ausführende Engine 1.2.0; dies ist keine abweichende
@@ -3688,7 +3688,7 @@ Drei Identitäten bleiben getrennt: `distribution_version` für die Paketversion
 
 Ein Quellcommit wird nur angegeben, wenn belegt, und ersetzt keine Inhaltsprüfung. Die Herkunft besagt Zuordnung zum erzeugenden Werkzeug, nicht eine digitale Signatur oder Releasefreigabe. Vor Benutzung werden Inventar, Reproduktionsbeschreibung und vorliegende Ressourcen konsistent geprüft; ein Hash derselben untrusted Quelle beweist keinen Absender.
 
-Der Dateistand 1.c.W konkretisiert dies durch `build_backend.py`,
+Der Dateistand 1.c.W/R konkretisiert dies durch `build_backend.py`,
 `runtime_wheel.py` und den request-lokalen `RuntimeProvider`. Der Build ergänzt
 das Transport-Wheel um `_runtime`-Paketressourcen; Source-/sdist-Builds verwenden
 denselben Backend-Vertrag. Der Provider ist noch nicht mit Result-Writern verbunden.
@@ -3707,6 +3707,16 @@ Die Reproduktionsbeschreibung enthält kein vollständiges eigenes Runtime-Wheel
 Nach Installation eines eingebetteten kanonischen Wheels muss der Provider aus dessen vorbereiteten Ressourcen wieder **dieselben kanonischen Wheel-Bytes** erzeugen können. Ein Vergleich erfolgt zwischen kanonischen Runtime-Artefakten, nicht mit einem beliebigen ursprünglichen pip-/uv-Transportarchiv. Ein Result-Roundtrip über mindestens drei Generationen behält Runtime-SHA und Runtime-Größe; äußere Run-IDs und Logs dürfen sich ändern.
 
 Bei einem dauerhaft laufenden Python-Prozess werden externe In-Place-Updates nicht als transparente Codeaktualisierung unterstützt. Widersprüchliche Erzeuger-/Ressourcenidentität liefert `unavailable` statt einer falschen Herkunft; ein neuer Prozess übernimmt die neue Installation. Das ist keine Vollgarantie gegen beliebige Manipulation eines bereits laufenden Interpreters.
+
+1.c.R konkretisiert die Prozessbindung durch ein beim Build erzeugtes eigenes
+Identitätsliteral, das beim normalen Paketimport geladen wird. Seine Ableitung
+schließt nur die erzeugte Identitätsdatei aus; der endgültige `content_id` umfasst
+auch deren Bytes. Der Provider prüft Literal, Rezept und Ressourcen gemeinsam.
+Bei kohärenter Neuinstallation gleicher Version liefert der alte Prozess
+`unavailable/source_changed`, ohne eine bereits fixierte Antwort zu verändern.
+Allgemeiner API-Import und Inspect/Validate führen weiterhin keine Materialisierung
+oder Rezeptprüfung aus. Der zyklusfreie Ableitungsvertrag steht in
+`docs/runtime-artifact.md`; die Windows-Abnahme bleibt gemäß Plan ausdrücklich offen.
 
 ### 38.5 Unterstützte Bereitstellungswege und Mindestnachweis
 

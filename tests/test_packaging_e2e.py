@@ -347,7 +347,7 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
             if name.startswith(("patchharbor/", "patchharbor_watcher/"))
             and not name.startswith("patchharbor/_runtime/")
         }
-        assert runtime_files == EXPECTED_RUNTIME_FILES
+        assert runtime_files == EXPECTED_RUNTIME_FILES | {"patchharbor/_runtime_identity.py"}
         assert {name for name in names if name.startswith("patchharbor/_runtime/")} == {
             "patchharbor/_runtime/recipe.json", "patchharbor/_runtime/CHAT_INSTRUCTIONS.md",
             "patchharbor/_runtime/python-api.md", "patchharbor/_runtime/metadata/METADATA",

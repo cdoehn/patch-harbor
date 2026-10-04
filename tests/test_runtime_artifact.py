@@ -144,6 +144,7 @@ def _provider_tree(prepared, root):
     (root / runtime.RECIPE_PATH).write_bytes(prepared[runtime.RECIPE_PATH])
     provider = RuntimeProvider()
     provider._root = root
+    provider._producer_id = runtime.producer_id(_recipe(prepared))
     return provider
 
 
@@ -162,6 +163,7 @@ def test_request_pins_once_and_fresh_request_rejects_changed_installation(prepar
     assert provider.capture() is result and len(calls) == count
     other = RuntimeProvider()
     other._root = tmp_path
+    other._producer_id = provider._producer_id
     assert other.capture().reason == "resources_invalid"
     assert result.artifact.chat_template == prepared[runtime.CHAT_PATH]
 

@@ -1,9 +1,10 @@
-# PatchHarbor – RIV-Implementierungsplan, Repository-Revision 5
+# PatchHarbor – RIV-Implementierungsplan, Repository-Revision 6
 ## Inspect / Validate über API und CLI · Offline-Runtime · Result-Format 2 · Chat-Handoff
 
 **Stand:** 3. Oktober 2026. **Status:** aktive Entwicklung;
-**7 von 18 Umsetzungsschritten im Dateistand vorbereitet**. Nächster Schritt: `1.c.R`.
-P0, 1.a und 1.b sind durch echte Apply-Results bestätigt; 1.c.W erst im nächsten Result.
+**8 von 18 Umsetzungsschritten im Dateistand vorbereitet**. Nächster Schritt: `1.c.C`,
+erst nach vollständigem GATE-RUNTIME einschließlich Windows-Nachweis.
+P0, 1.a, 1.b und 1.c.W sind durch echte Apply-Results bestätigt; 1.c.R erst im nächsten Result.
 **Bereich:** RIV (Runtime / Inspect / Validate). **Paketbasis:** 1.2.1.
 **Zielversion:** gesondert festzulegen; keine Versionsanhebung oder Releasefreigabe durch Dokumentation.
 
@@ -94,6 +95,34 @@ Die Beschreibungen zu Bundle 003/004 oben dokumentieren deren historische Gates.
 Lokaler Nachweis: `exchange/reports/patchharbor-riv-005-1.c.W-parallel.json`.
 Kein Development-Commit, keine Versionsanhebung, kein Tag und kein CI-Start.
 
+**P2a nachgewiesen / Basis für Bundle 006:**
+`patchharbor-apply_Result_194435_1003_3dbbba.zip`, 738659 Bytes, SHA-256
+`59d3f9c825371f8c0a50c97f91429637702daf967c0c391f4ae6ba37c4d58c53`.
+Echter Apply von Bundle 005: abschließend seriell und danach parallel jeweils
+1.916 bestanden / 5 übersprungen; Commit
+`616d232c7ac1dc37c602e3e33a750ae09599a9b5`, genau ein erfolgreicher Push auf `dev`.
+Das Result und die lesende Apply-Prüfung zeigen einen sauberen Baum.
+Alle 234 Base-Dateien stimmten zu Arbeitsbeginn bytegenau mit Development überein.
+Vollständige neue Bindung: repo_id `e7a93d72-62dc-4759-97e8-6bf6cdf10e90`,
+base_commit `616d232c7ac1dc37c602e3e33a750ae09599a9b5`,
+state_fingerprint `7c9d2a24e397e0e5`, fingerprint_algorithm `patchharbor-state-v1`.
+
+**P2b / Bundle 006:** ein Commit `1.c.R`; Herkunft, Grenzen, Konkurrenz und
+echte Offline-/Reinstallationsprüfungen. Lokaler Nachweis ausschließlich parallel:
+`exchange/reports/patchharbor-riv-006-1.c.R-parallel.json`.
+Apply führt am einzigen Endstand die vollständige serielle und anschließend
+parallele Suite vor Commit/Push aus. Result-Writer und Versionsnummer bleiben unverändert.
+
+**Offene Abnahme / REDUCED_TEST_SCOPE, PLAN_SPEC_MINOR_DEVIATION:**
+Die Windows-Stichprobe aus dem ursprünglichen R-Vorcommit-Gate kann in dieser
+Linux-Entwicklungskopie nicht ausgeführt werden. Die R-Implementierung wird als
+eigenständiger Zwischenstand ausgeliefert; der fehlende Plattformnachweis wird
+ausdrücklich hinter diesen Commit verschoben. GATE-RUNTIME bleibt offen und
+blockiert 1.c.C sowie Reader-/Writer-Fortschritt. Ein späterer echter Windows-Lauf
+und ein nativer Nachweis der schreibgeschützten Installation sind erforderlich;
+Windows-chmod allein ist kein ACL-Beleg. Keine Cross-Platform-/Releasefreigabe,
+kein automatischer CI-Start und kein Ersatz des Windows-Nachweises durch Linux.
+
 **Repositoryrollen:** Development unter
 `/home/christian/Codex/patchharbor/patchharbor-codex` erzeugt und prüft Dateistände
 und die finale ZIP, ohne Git-Commits oder Push. Das unabhängige Apply-Repository
@@ -132,7 +161,7 @@ bei abweichender Development-Wurzel `CWD_MISMATCH`, keine Änderung.
 
 Jeder Zwischenstand wird wirklich hergestellt, getestet und erst dann committed. Ein finaler Working Tree mit künstlich aufgeteiltem Staging ist kein WRC-Nachweis. Commit-IDs werden nach dem Commit aus Git übernommen, nicht im eigenen Commit vorweg erfunden.
 
-### 2.1 Commitübersicht – 7/18 vorbereitet, davon 6 durch Apply bestätigt
+### 2.1 Commitübersicht – 8/18 vorbereitet, davon 7 durch Apply bestätigt
 
 | Nr. | Kennung | Commit-Subject | Voraussetzung | Paket |
 |---:|---|---|---|---|
@@ -354,7 +383,7 @@ API- und JSON-Vertragsdokumentation konsolidieren. Gezielte Kontrolltests sicher
 
 #### 1.c.W – 7/18: `feat(runtime): materialize canonical wheel from packaged resources`
 
-**Status:** im Dateistand umgesetzt; Apply-Nachweis im nächsten Result. **Abhängigkeit:** 1.b.C; D-01-Entwurf konkretisiert. **Spec:** 38.1–38.5.
+**Status:** angewendet und gepusht; Commit `616d232c7ac1dc37c602e3e33a750ae09599a9b5`, Result-Nachweis oben. **Abhängigkeit:** 1.b.C; D-01-Entwurf konkretisiert. **Spec:** 38.1–38.5.
 
 **Ergebnis:** Eine Standardinstallation kann ohne Quelldownload oder Installer-Cache offline ein passendes Runtime-Wheel bereitstellen.
 
@@ -370,7 +399,7 @@ Kleinen standardbibliotheksbasierten Materializer für definierte Reihenfolge, f
 
 #### 1.c.R – 8/18: `fix(runtime): verify provenance bounds and cold-cache roundtrips`
 
-**Status:** offen. **Abhängigkeit:** 1.c.W. **Spec:** 38 vollständig; 39.3 Vorbedingungen.
+**Status:** im Dateistand umgesetzt; Apply-Nachweis im nächsten Result, Windows-Abnahme offen (dokumentierte Abweichung P2b). **Abhängigkeit:** 1.c.W. **Spec:** 38 vollständig; 39.3 Vorbedingungen.
 
 **Ergebnis:** Der Provider erkennt geänderte Daten und bleibt bei Fehlern, Reinstallation und parallelen Requests eindeutig.
 
@@ -380,7 +409,21 @@ Das enge Profil verbietet .pth, Fremdmodule, nativen Code und zusätzliche Launc
 
 **Dateifokus:** Runtime-Provider, Materializer, Ressourcen-/Provenienzmodell, Packaging-Tests.
 
-**Prüfungen vor Commit:** T-C1–T-C5 vollständig, Linux/Windows installierte Stichproben; GATE-RUNTIME dokumentieren. Keine Behauptung einer vollständigen Cross-Platform-Freigabe nur aus Linux.
+**Prüfungen vor Commit:** T-C1–T-C5 funktional unter Linux, einschließlich echter
+Wheel-/Source-/sdist-/Editable-Installationen, drei kanonischer Generationen,
+schreibgeschützter Installation, Neuinstallation gleicher Version und paralleler
+Provider. Vollständige Suite gemäß 7.2. Abweichend vom ursprünglichen R-Gate wird
+der noch fehlende echte Windows-/Rechtenachweis hinter diesen Commit, aber vor
+1.c.C/GATE-RUNTIME verschoben (P2b). Keine Cross-Platform-Freigabe nur aus Linux.
+
+**Konkrete R-Härtung:** Ein generiertes, beim Paketimport geladenes Identitätsliteral
+bindet die Runtime an ihren Produzenten; der zusätzliche endliche Digest schließt
+nur seine eigene erzeugte Datei aus. Der Rezept-Inhaltshash umfasst weiterhin alle
+Nutzdateien. Reinstallation gleicher Version wird im alten Prozess erkannt.
+Archiv-/RECORD-Budgets werden vor Ressourcenzugriffen berechnet; mehrdeutige
+Pfadschreibung und ausgetauschte Elternverzeichnisse abgelehnt. Das Buildbackend
+verwendet frische Eingaben statt alter build/lib-Ausgaben. Kein Cache-/Temp-Write
+im Provider und keine Runtime-Arbeit bei allgemeinem API-Import.
 
 **Fertig, wenn:** Kanonischer Artefakt-Roundtrip und sämtliche unterstützten Standardinstallationen nachgewiesen; Fehler sind strukturierte Providerfakten, keine unkontrollierte Result-Auslöschung.
 
@@ -694,10 +737,11 @@ Jeder später abgeschlossene Eintrag enthält Plan-ID, tatsächlichen Commit, ur
 
 Fertig ist die Erweiterung erst mit nutzbarer API und CLI, konstant reproduzierbarer Runtime aus Standardinstallationen, sicherer Formatintegration, erhaltenen Sicherheitsgrenzen, ausgeführten Offline-/Roundtrip-Gates, aktueller installierter Anleitung und grüner CI für den tatsächlichen finalen HEAD. „0 Commits offen“ allein ist kein Freigabenachweis.
 
-**Status dieses Dateistands:** 6/18 vorbereitet, 12 weitere Schritte offen.
-P0 und 1.a sind angewendet/gepusht; 1.b wartet auf den echten Apply-Nachweis.
-Paketprüfung und beide Bindungsmodi sind vorhanden; Runtime, Format 2 und
-deren Plattformabnahme stehen aus. Quellenstand bleibt Exchange-Revision 2.
+**Status dieses Dateistands:** 8/18 vorbereitet, 10 weitere Schritte offen.
+P0, 1.a, 1.b und 1.c.W sind angewendet/gepusht; 1.c.R wartet auf den echten
+Apply-Nachweis. Paketprüfung, beide Bindungsmodi und interne Runtime sind vorhanden;
+Windows-/GATE-RUNTIME-Abnahme, C-Schritt und Result-Format 2 stehen aus.
+Quellenstand bleibt Exchange-Revision 2.
 
 ## 9. Dokumentidentität und Quellen
 

@@ -1,6 +1,8 @@
 """Installed offline roundtrips, without relying on a retained build wheel."""
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
 from importlib import metadata
 import json
 import os
@@ -8,6 +10,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
+from zipfile import ZipFile
 
 import pytest
 
@@ -28,6 +31,35 @@ def _venv(root, cwd, environment):
     return root / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
 
 
+def _install_builder(python, outside, environment):
+    site = Path(_run([str(python), "-I", "-c", "import sysconfig; print(sysconfig.get_path('purelib'))"],
+                     outside, environment).strip())
+    distribution = metadata.distribution("setuptools")
+    shutil.copytree(distribution.locate_file("setuptools"), site / "setuptools")
+    shutil.copytree(distribution.locate_file("_distutils_hack"), site / "_distutils_hack")
+    info = next(path for path in distribution.files if str(path).endswith(".dist-info/METADATA"))
+    shutil.copytree(distribution.locate_file(info).parent, site / info.parent.name)
+
+
+@contextmanager
+def _readonly_installation(python, outside, environment):
+    site = Path(_run([str(python), "-I", "-c", "import sysconfig; print(sysconfig.get_path('purelib'))"],
+                     outside, environment).strip())
+    paths = [site, *site.rglob("*")]
+    modes = [(path, path.stat().st_mode & 0o777) for path in paths]
+    try:
+        for path, mode in modes:
+            path.chmod(mode & ~0o222)
+        # Windows chmod does not implement directory ACLs. Only POSIX proves
+        # denied directory writes here; native Windows remains a separate gate.
+        if os.name != "nt" and os.geteuid() != 0:
+            assert not os.access(site, os.W_OK)
+        yield
+    finally:
+        for path, mode in modes:
+            path.chmod(mode)
+
+
 @pytest.mark.parametrize("route", ["wheel", "source", "sdist"])
 def test_standard_installation_and_three_offline_canonical_generations(tmp_path, route):
     source, output, outside = tmp_path / "source", tmp_path / "dist", tmp_path / "outside"
@@ -43,13 +75,7 @@ def test_standard_installation_and_three_offline_canonical_generations(tmp_path,
     python = _venv(tmp_path / "installed-0", outside, environment)
     if route != "wheel":
         # Offline build dependency, prepared locally for the real pip install.
-        site = Path(_run([str(python), "-I", "-c", "import sysconfig; print(sysconfig.get_path('purelib'))"],
-                         outside, environment).strip())
-        distribution = metadata.distribution("setuptools")
-        shutil.copytree(distribution.locate_file("setuptools"), site / "setuptools")
-        shutil.copytree(distribution.locate_file("_distutils_hack"), site / "_distutils_hack")
-        info = next(path for path in distribution.files if str(path).endswith(".dist-info/METADATA"))
-        shutil.copytree(distribution.locate_file(info).parent, site / info.parent.name)
+        _install_builder(python, outside, environment)
     _run([sys.executable, "-m", "pip", "--python", str(python), "install", "--no-index", "--no-deps",
           "--no-cache-dir", "--no-build-isolation", "--no-compile", str(install_input)], outside, environment)
     shutil.rmtree(source); shutil.rmtree(output)
@@ -91,10 +117,11 @@ target.write_bytes(artifact.wheel_bytes)
 print(json.dumps({'sha256': artifact.wheel_sha256, 'size': len(artifact.wheel_bytes),
                   'content_id': artifact.recipe.content_id, 'requires_python': artifact.recipe.requires_python}))
 '''
-        proof = json.loads(_run([str(python), "-I", "-B", "-c", script, str(destination), str(patch)], outside, environment))
-        cli = json.loads(_run([str(python), "-I", "-B", "-c",
-                              "from patchharbor.cli import main; raise SystemExit(main())",
-                              "validate", "--json", str(patch)], outside, environment))
+        with _readonly_installation(python, outside, environment):
+            proof = json.loads(_run([str(python), "-I", "-B", "-c", script, str(destination), str(patch)], outside, environment))
+            cli = json.loads(_run([str(python), "-I", "-B", "-c",
+                                  "from patchharbor.cli import main; raise SystemExit(main())",
+                                  "validate", "--json", str(patch)], outside, environment))
         assert cli["result"]["scope"] == "package"
         assert not (outside / "SHOULD_NOT_EXIST").exists()
         assert proof["requires_python"] == ">=3.12"
@@ -109,3 +136,132 @@ print(json.dumps({'sha256': artifact.wheel_sha256, 'size': len(artifact.wheel_by
                   "--no-cache-dir", "--no-compile", str(current)], outside, environment)
         current.unlink()
     assert fingerprints[0] == fingerprints[1] == fingerprints[2]
+
+
+@pytest.mark.parametrize("pin_before_update", [False, True])
+def test_same_version_reinstallation_is_bound_to_loaded_producer(tmp_path, pin_before_update):
+    source, outside = tmp_path / "source", tmp_path / "outside"
+    source.mkdir(); outside.mkdir()
+    _copy_release_inputs(source)
+    environment = {key: value for key, value in os.environ.items() if key not in ("PYTHONHOME", "PYTHONPATH")}
+    environment.update(PIP_NO_INDEX="1", PIP_DISABLE_PIP_VERSION_CHECK="1")
+    wheels = []
+    content_ids = []
+    for generation in range(2):
+        output = tmp_path / f"dist-{generation}"
+        if generation:
+            template = source / "CHAT_INSTRUCTIONS.md"
+            template.write_bytes(template.read_bytes() + b"\nUpdated producer.\n")
+        _run([sys.executable, "-m", "build", "--wheel", "--no-isolation", "--outdir", str(output)], source, environment)
+        wheel = next(output.glob("*.whl"))
+        wheels.append(wheel)
+        with ZipFile(wheel) as archive:
+            content_ids.append(json.loads(archive.read("patchharbor/_runtime/recipe.json"))["content_id"])
+    assert wheels[0].name == wheels[1].name and content_ids[0] != content_ids[1]
+    python = _venv(tmp_path / "installed", outside, environment)
+    install = [sys.executable, "-m", "pip", "--python", str(python), "install", "--no-index", "--no-deps",
+               "--no-cache-dir", "--no-compile", "--force-reinstall"]
+    _run([*install, str(wheels[0])], outside, environment)
+    script = '''
+import json, sys
+import patchharbor
+if sys.argv[1] == 'True':
+    from patchharbor.runtime_artifact import RuntimeProvider
+    provider = RuntimeProvider()
+    pinned = provider.capture()
+    assert pinned.status == 'embedded'
+else:
+    assert 'patchharbor.runtime_artifact' not in sys.modules
+print('READY', flush=True)
+assert sys.stdin.readline() == 'capture\\n'
+from patchharbor.runtime_artifact import RuntimeProvider
+current = RuntimeProvider().capture()
+assert current.status == 'unavailable' and current.reason == 'source_changed', current
+if sys.argv[1] == 'True':
+    assert provider.capture() is pinned
+    assert pinned.artifact.recipe.content_id == sys.argv[2]
+print(json.dumps({'reason': current.reason, 'producer_id': patchharbor._runtime_resource_id}))
+'''
+    process = subprocess.Popen([str(python), "-I", "-B", "-u", "-c", script, str(pin_before_update), content_ids[0]],
+                               cwd=outside, env=environment, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                               stderr=subprocess.PIPE, text=True)
+    try:
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            ready = pool.submit(process.stdout.readline)
+            try:
+                assert ready.result(timeout=120).strip() == "READY"
+            except BaseException:
+                process.kill()
+                raise
+        _run([*install, str(wheels[1])], outside, environment)
+        stdout, stderr = process.communicate("capture\n", timeout=300)
+        assert process.returncode == 0, stdout + stderr
+        assert json.loads(stdout)["reason"] == "source_changed"
+    finally:
+        if process.poll() is None:
+            process.kill()
+        process.communicate()
+    fresh = _run([str(python), "-I", "-B", "-c",
+                  "from patchharbor.runtime_artifact import RuntimeProvider; "
+                  "p = RuntimeProvider().capture(); assert p.status == 'embedded', p; "
+                  "print(p.artifact.recipe.content_id)"], outside, environment).strip()
+    assert fresh == content_ids[1]
+
+
+def test_editable_installation_never_claims_prepared_runtime(tmp_path):
+    source, outside = tmp_path / "source", tmp_path / "outside"
+    source.mkdir(); outside.mkdir()
+    _copy_release_inputs(source)
+    environment = {key: value for key, value in os.environ.items() if key not in ("PYTHONHOME", "PYTHONPATH")}
+    environment.update(PIP_NO_INDEX="1", PIP_DISABLE_PIP_VERSION_CHECK="1")
+    python = _venv(tmp_path / "editable", outside, environment)
+    _install_builder(python, outside, environment)
+    _run([sys.executable, "-m", "pip", "--python", str(python), "install", "--no-index", "--no-deps",
+          "--no-cache-dir", "--no-build-isolation", "--editable", str(source)], outside, environment)
+    script = ("from patchharbor.runtime_artifact import RuntimeProvider; "
+              "p = RuntimeProvider().capture(); assert p.status == 'unavailable' and "
+              "p.reason == 'source_not_prepared' and p.artifact is None, p")
+    _run([str(python), "-I", "-B", "-c", script], outside, environment)
+    code = source / "src/patchharbor/runtime_wheel.py"
+    code.write_bytes(code.read_bytes() + b"\n# editable change\n")
+    _run([str(python), "-I", "-B", "-c", script], outside, environment)
+
+
+def test_source_build_ignores_stale_build_outputs_and_preserves_prepared_metadata(tmp_path):
+    source, output = tmp_path / "source", tmp_path / "dist"
+    source.mkdir(); output.mkdir()
+    _copy_release_inputs(source)
+    stale = source / "build/lib/patchharbor/api.py"
+    stale.parent.mkdir(parents=True)
+    stale.write_bytes(b"raise AssertionError('stale code must never ship')\n")
+    os.utime(stale, (2_000_000_000, 2_000_000_000))
+    (stale.parent / "extra.py").write_bytes(b"raise AssertionError('stale module')\n")
+    generated = source / "src/patchharbor/_runtime_identity.py"
+    generated.write_bytes(b"raise AssertionError('stale generated identity')\n")
+    resource = source / "src/patchharbor/_runtime/recipe.json"
+    resource.parent.mkdir()
+    resource.write_bytes(b"stale generated recipe")
+    assert not (source / ".git").exists()
+    script = '''
+from pathlib import Path
+import build_backend
+metadata = Path('prepared-metadata')
+metadata.mkdir()
+info = build_backend.prepare_metadata_for_build_wheel(str(metadata))
+original = (metadata / info / 'METADATA').read_bytes()
+name = build_backend.build_wheel('../dist', metadata_directory=str(metadata / info))
+from zipfile import ZipFile
+with ZipFile(Path('../dist') / name) as wheel:
+    assert wheel.read(info + '/METADATA') == original
+'''
+    _run([sys.executable, "-B", "-c", script], source, os.environ.copy())
+    wheel = next(output.glob("*.whl"))
+    first = wheel.read_bytes()
+    with ZipFile(wheel) as archive:
+        assert archive.read("patchharbor/api.py") == (source / "src/patchharbor/api.py").read_bytes()
+        assert "patchharbor/extra.py" not in archive.namelist()
+        assert archive.read("patchharbor/_runtime_identity.py") != generated.read_bytes()
+    assert resource.read_bytes() == b"stale generated recipe"
+    assert stale.read_bytes() == b"raise AssertionError('stale code must never ship')\n"
+    _run([sys.executable, "-B", "-c", "import build_backend; build_backend.build_wheel('../dist')"], source, os.environ.copy())
+    assert wheel.read_bytes() == first

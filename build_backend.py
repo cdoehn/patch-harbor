@@ -12,7 +12,9 @@ from email.policy import default as email_policy
 import hashlib
 import importlib.util
 import io
+import os
 from pathlib import Path
+import shutil
 import sys
 import tempfile
 from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
@@ -56,8 +58,25 @@ def _record(payloads: dict[str, bytes], path: str) -> bytes:
 def build_wheel(wheel_directory, config_settings=None, metadata_directory=None):
     output = Path(wheel_directory).resolve()
     output.mkdir(parents=True, exist_ok=True)
+    metadata_directory = str(Path(metadata_directory).resolve()) if metadata_directory else None
     with tempfile.TemporaryDirectory(prefix="patchharbor-build-") as temporary:
-        filename = _backend.build_wheel(temporary, config_settings, metadata_directory)
+        # Setuptools may reuse build/lib based on timestamps. A wheel must derive
+        # from current sources even after a same-version rebuild or stale cache.
+        source = Path(temporary) / "source"
+        source.mkdir()
+        for name in ("pyproject.toml", "README.md", "LICENSE", "CHAT_INSTRUCTIONS.md",
+                     "MANIFEST.in", "build_backend.py", "setup.cfg"):
+            if (_ROOT / name).is_file():
+                shutil.copy2(_ROOT / name, source / name)
+        for name in ("src", "docs"):
+            shutil.copytree(_ROOT / name, source / name, ignore=shutil.ignore_patterns(
+                "__pycache__", "*.pyc", "*.pyo", "*.egg-info", "_runtime", "_runtime_identity.py"))
+        previous_cwd = Path.cwd()
+        try:
+            os.chdir(source)
+            filename = _backend.build_wheel(temporary, config_settings, metadata_directory)
+        finally:
+            os.chdir(previous_cwd)
         with ZipFile(Path(temporary) / filename) as wheel:
             if len(wheel.namelist()) != len(set(wheel.namelist())):
                 raise RuntimeError("duplicate transport wheel paths")
@@ -76,8 +95,8 @@ def build_wheel(wheel_directory, config_settings=None, metadata_directory=None):
         canonical = {name: raw for name, raw in transport.items()
                      if name.startswith(("patchharbor/", "patchharbor_watcher/"))
                      and not name.startswith(recipe_module.RESOURCE_ROOT)}
-        canonical[recipe_module.CHAT_PATH] = (_ROOT / "CHAT_INSTRUCTIONS.md").read_bytes()
-        canonical[recipe_module.DOC_PATH] = (_ROOT / "docs/python-api.md").read_bytes()
+        canonical[recipe_module.CHAT_PATH] = (source / "CHAT_INSTRUCTIONS.md").read_bytes()
+        canonical[recipe_module.DOC_PATH] = (source / "docs/python-api.md").read_bytes()
         for name, raw in transport.items():
             if name.startswith(dist_info + "/") and not name.endswith("/RECORD"):
                 suffix = name[len(dist_info) + 1:]
@@ -85,6 +104,8 @@ def build_wheel(wheel_directory, config_settings=None, metadata_directory=None):
                     raw = recipe_module.WHEEL_METADATA
                 canonical[name] = raw
                 canonical[recipe_module.RESOURCE_ROOT + "metadata/" + suffix] = raw
+        initial = recipe_module.prepare_recipe(canonical, version=version, requires_python=requires)
+        canonical[recipe_module.IDENTITY_PATH] = recipe_module.identity_module(recipe_module.producer_id(initial))
         recipe = recipe_module.prepare_recipe(canonical, version=version, requires_python=requires)
         # A successful build must already materialize the identical candidate
         # later reconstructed from an ordinary installed transport wheel.
@@ -94,6 +115,7 @@ def build_wheel(wheel_directory, config_settings=None, metadata_directory=None):
                 del transport[name]
         transport.update({name: raw for name, raw in canonical.items()
                           if name.startswith(recipe_module.RESOURCE_ROOT)})
+        transport[recipe_module.IDENTITY_PATH] = canonical[recipe_module.IDENTITY_PATH]
         transport[recipe_module.RECIPE_PATH] = recipe.data
         record_path = dist_info + "/RECORD"
         del transport[record_path]

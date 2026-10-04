@@ -22,6 +22,8 @@ from zipfile import ZIP_STORED, ZipFile, ZipInfo
 RECIPE_PATH = "patchharbor/_runtime/recipe.json"
 RESOURCE_ROOT = "patchharbor/_runtime/"
 CONTENT_ALGORITHM = "patchharbor-runtime-content-v1"
+PRODUCER_ALGORITHM = "patchharbor-runtime-producer-v1"
+IDENTITY_PATH = "patchharbor/_runtime_identity.py"
 MAX_RECIPE_BYTES = 1024 * 1024
 MAX_WHEEL_BYTES = 16 * 1024 * 1024
 MAX_ENTRIES = 1000
@@ -103,6 +105,22 @@ def _constant(value: str) -> object:
     raise RuntimeDataError("non-finite recipe value: " + value)
 
 
+def _python_requirement(value: object) -> bool:
+    if type(value) is not str or not 0 < len(value) <= 128:
+        return False
+    for constraint in value.split(","):
+        match = re.fullmatch(r"\s*(~=|==|!=|<=|>=|<|>)\s*([0-9A-Za-z.*]+)\s*", constraint)
+        if match is None:
+            return False
+        operator, version = match.groups()
+        if version.endswith(".*"):
+            if operator not in {"==", "!="} or not re.fullmatch(r"[0-9]+(?:\.[0-9]+)*", version[:-2]):
+                return False
+        elif not _VERSION.fullmatch(version) or (operator == "~=" and not re.match(r"[0-9]+\.[0-9]+", version)):
+            return False
+    return True
+
+
 def _path(name: object, dist_info: str) -> str:
     _require(type(name) is str and 0 < len(name) <= 512, "invalid wheel path")
     parts = name.split("/")
@@ -178,8 +196,7 @@ def parse_recipe(raw: bytes) -> RuntimeRecipe:
     version = doc["version"]
     _require(type(version) is str and _VERSION.fullmatch(version) is not None, "invalid runtime version")
     requires = doc["requires_python"]
-    _require(type(requires) is str and 0 < len(requires) <= 128
-             and re.fullmatch(r"[0-9A-Za-z.*<>=!~, +]+", requires) is not None, "invalid Python requirement")
+    _require(_python_requirement(requires), "invalid Python requirement")
     commit = doc["source_commit"]
     _require(commit is None or (type(commit) is str and re.fullmatch(r"(?:[0-9a-f]{40}|[0-9a-f]{64})", commit)),
              "invalid source provenance")
@@ -190,6 +207,7 @@ def parse_recipe(raw: bytes) -> RuntimeRecipe:
         raise RuntimeLimitError("runtime inventory too large")
     entries = []
     names: set[str] = set()
+    directories: dict[str, str] = {}
     total = len(raw)
     dist_info = f"patchharbor-{version}.dist-info"
     for item in doc["entries"]:
@@ -201,6 +219,11 @@ def parse_recipe(raw: bytes) -> RuntimeRecipe:
         _require(source == expected_source, "invalid resource mapping")
         _require(name.casefold() not in names, "duplicate wheel target")
         names.add(name.casefold())
+        parts = name.split("/")
+        for index in range(1, len(parts)):
+            parent = "/".join(parts[:index])
+            _require(directories.setdefault(parent.casefold(), parent) == parent,
+                     "case-ambiguous wheel directory")
         size, digest = item["size"], item["sha256"]
         _require(type(size) is int and size >= 0 and type(digest) is str
                  and _HEX.fullmatch(digest) is not None, "invalid entry size or hash")
@@ -242,8 +265,51 @@ def prepare_recipe(payloads: dict[str, bytes], *, version: str, requires_python:
     return parse_recipe(_json(doc))
 
 
+def producer_id(recipe: RuntimeRecipe) -> str:
+    """Finite identity anchored in loaded code, before adding its own module.
+
+    This deliberately differs from content_id: the final recipe also inventories
+    the generated identity module. Neither digest contains itself.
+    """
+    return sha256(_json({
+        "algorithm": PRODUCER_ALGORITHM, "version": recipe.version,
+        "requires_python": recipe.requires_python, "source_commit": recipe.source_commit,
+        "entries": [{"path": e.path, "source": e.source, "size": e.size, "sha256": e.sha256}
+                    for e in recipe.entries if e.path != IDENTITY_PATH],
+    }))
+
+
+def identity_module(resource_id: str) -> bytes:
+    _require(type(resource_id) is str and _HEX.fullmatch(resource_id) is not None,
+             "invalid producer ID")
+    return (f'# Generated at wheel build; no runtime work.\nRESOURCE_ID = "{resource_id}"\n').encode("ascii")
+
+
+def _record(recipe: RuntimeRecipe) -> bytes:
+    inventory = [(entry.path, entry.sha256, entry.size) for entry in recipe.entries]
+    inventory.append((RECIPE_PATH, sha256(recipe.data), len(recipe.data)))
+    record = io.StringIO(newline="")
+    writer = csv.writer(record, lineterminator="\n")
+    for name, digest, size in sorted(inventory):
+        encoded = base64.urlsafe_b64encode(bytes.fromhex(digest)).rstrip(b"=").decode("ascii")
+        writer.writerow((name, "sha256=" + encoded, size))
+    writer.writerow((recipe.dist_info + "/RECORD", "", ""))
+    return record.getvalue().encode("utf-8")
+
+
 def materialize(recipe: RuntimeRecipe, read: Callable[[str, int], bytes]) -> bytes:
     """Validate prepared input and emit fixed ZIP_STORED bytes; no build/import/IO."""
+    # RuntimeRecipe is an internal value, but callers must not bypass the parser
+    # by constructing one with different paths, limits or provenance.
+    _require(parse_recipe(recipe.data) == recipe, "recipe value differs from its bytes")
+    record_path = recipe.dist_info + "/RECORD"
+    record = _record(recipe)
+    sizes = [(entry.path, entry.size) for entry in recipe.entries]
+    sizes.extend(((RECIPE_PATH, len(recipe.data)), (record_path, len(record))))
+    # Budget the complete archive, including derived data, before resource reads.
+    total = 22 + sum(size + 76 + 2 * len(name.encode("ascii")) for name, size in sizes)
+    if total > MAX_WHEEL_BYTES or sum(size for _, size in sizes) > MAX_CONTENT_BYTES:
+        raise RuntimeLimitError("runtime archive budget exceeded")
     payloads: dict[str, bytes] = {}
     sources: dict[str, bytes] = {}
     for entry in recipe.entries:
@@ -254,19 +320,11 @@ def materialize(recipe: RuntimeRecipe, read: Callable[[str, int], bytes]) -> byt
         _require(len(raw) == entry.size and sha256(raw) == entry.sha256, "runtime resource changed: " + entry.source)
         payloads[entry.path] = raw
     _metadata(payloads, recipe)
+    if IDENTITY_PATH in payloads:
+        _require(payloads[IDENTITY_PATH] == identity_module(producer_id(recipe)),
+                 "inconsistent producer identity module")
     payloads[RECIPE_PATH] = recipe.data
-    record_path = recipe.dist_info + "/RECORD"
-    record = io.StringIO(newline="")
-    writer = csv.writer(record, lineterminator="\n")
-    for name, raw in sorted(payloads.items()):
-        digest = base64.urlsafe_b64encode(hashlib.sha256(raw).digest()).rstrip(b"=").decode("ascii")
-        writer.writerow((name, "sha256=" + digest, len(raw)))
-    writer.writerow((record_path, "", ""))
-    payloads[record_path] = record.getvalue().encode("utf-8")
-    # Exact stored-ZIP size, no ZIP64/extra/comment/data descriptors permitted.
-    total = 22 + sum(len(raw) + 76 + 2 * len(name.encode("ascii")) for name, raw in payloads.items())
-    if total > MAX_WHEEL_BYTES:
-        raise RuntimeLimitError("runtime wheel too large")
+    payloads[record_path] = record
     stream = io.BytesIO()
     with ZipFile(stream, "w", compression=ZIP_STORED, allowZip64=False) as wheel:
         for name in sorted(payloads, key=lambda n: (n.startswith(recipe.dist_info + "/"), n)):
