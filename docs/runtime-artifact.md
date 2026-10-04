@@ -1,6 +1,6 @@
 # Kanonische Runtime, Rezeptformat 1
 
-Stand 1.c.R: interner Provider, Herkunftsprüfung und Buildverfahren. Neue Results bleiben Format 1;
+Stand 1.c.R mit Abnahmekorrektur 1.c.R-FIX1: interner Provider, Herkunftsprüfung und Buildverfahren. Neue Results bleiben Format 1;
 Reader-/Writer-Integration folgt in 1.d/1.e. `RuntimeProvider().capture()` ist
 ein expliziter interner Aufruf, kein neuer CLI-Befehl oder öffentlicher API-Export.
 Source-/Editable-Betrieb liefert `unavailable/source_not_prepared`; normale
@@ -105,16 +105,61 @@ isoliertem Interpreter. Drei Generationen müssen identische Wheel-Bytes liefern
 1.c.R prüft zusätzlich zwei echte Neuinstallationen gleicher Version im laufenden
 Prozess, editierbare Installation, veraltete Build-Ausgaben, API/CLI-Aufrufe und
 Roundtrips bei schreibgeschützter Installation. Unter Linux ohne Root-Rechte
-wird die fehlende Schreibberechtigung tatsächlich geprüft; Windows-chmod ist
-kein ACL-Nachweis. Ein Threadtest prüft geteilte und unabhängige Provider,
+wird die fehlende Schreibberechtigung tatsächlich geprüft. Die Korrektur
+1.c.R-FIX1 verwendet unter Windows DACLs für die aktuelle Prozessidentität;
+Windows-chmod ist kein ACL-Nachweis. Ein Threadtest prüft geteilte und unabhängige Provider,
 Bytegleichheit und unveränderte Dateien bei fehlendem oder korruptem Cache.
 Der Provider besitzt keine temporären Dateien; entsprechend entfällt deren Cleanup.
 
-Die lokale Abnahme erfolgt ausschließlich parallel unter Linux/Python 3.14.
-Ein echter Windows-Lauf und die native Rechteprüfung stehen noch aus.
-GATE-RUNTIME ist deshalb nicht vollständig erfüllt; vor 1.c.C/1.d/1.e ist
-dieser Nachweis über die vorhandenen manuell gestarteten Plattform-Lanes nötig.
-Die Verschiebung dieses Abnahmenachweises ist im Plan ausdrücklich dokumentiert.
+Die Rechtefixture liegt ausschließlich in `tests/runtime_permissions.py` und
+`tests/fixtures/runtime_readonly.ps1`. Vor der Änderung werden die DACLs aller
+Fixturedateien/-verzeichnisse in einem privaten Journal außerhalb der geschützten
+Installation gesichert. Explizite Deny-Einträge sperren Schreiben und Löschen;
+Lesen, Ausführen und das Wiederherstellen der Rechte bleiben möglich. Echte
+Schreib-, Verzeichniserzeugungs-, Umbenennungs- und Löschversuche müssen scheitern.
+Der Prüfablauf ersetzt weder Rechtevergabe noch Benutzerverwaltung im Produkt.
+
+Nach Erfolg und Ausnahmen werden die ursprünglichen DACLs zurückgeschrieben
+und gegen ihre gespeicherte Darstellung geprüft. Bei einem Fehler während der
+Wiederherstellung bleibt ausschließlich das private Journal zur Diagnose erhalten.
+Unverwandte Dateien, ACLs außerhalb der privaten Fixture, Owner und Audit-Regeln
+werden nicht verändert. POSIX root kann Modebits umgehen: ein solcher Lauf
+belegt keinen verweigerten Schreibzugriff, und der separate native Rechtetest
+wird ausdrücklich übersprungen. Die Root-Roundtrip-Prüfung bleibt ausführbar.
+
+Die lokale Abnahme von 1.c.R-FIX1 erfolgt ausschließlich parallel unter
+Linux/Python 3.14. Native DACL-Ausführung steht aus. GATE-RUNTIME bleibt vor
+1.c.C/1.d/1.e offen; die Verschiebung dieses Nachweises ist im Plan dokumentiert.
+
+Für den fehlenden Nachweis nach tatsächlichem Apply/Push den vorhandenen
+Acceptance-Workflow manuell auf dem betreffenden vollständigen Commit starten.
+Er bleibt `workflow_dispatch` ohne automatische Auslöser. Die nativen Lanes
+laden `patchharbor-packaging-<runner>` mit `patchharbor-packaging-tests.json`
+als Artefakt hoch; Aufbewahrung 14 Tage, fehlender Bericht ist ein Fehler.
+Vor Freigabe sind Run-HEAD, Run-Versuch und erfolgreiche Windows-/Linux-Jobs
+zuzuordnen. `tools.test_results.validate` muss den vollständigen Bericht
+akzeptieren; der Windows-Bericht muss `binding.platform == "Windows"`, einen
+passenden Interpreter und `expected_workers > 0` enthalten. Insbesondere müssen
+diese Fälle bestanden sein, nicht übersprungen oder nur gesammelt:
+
+- `test_standard_installation_and_three_offline_canonical_generations`: wheel/source/sdist.
+- `test_native_permissions_deny_writes_and_restore`: beide Verbraucherfälle.
+- `test_windows_dacl_restore_after_completed_setup_error`: powershell.exe und pwsh.
+- Die vorhandenen gleichversionierten Neuinstallations- und Editable-Fälle.
+
+Die Testnamen beziehen sich auf `test_runtime_packaging.py` und
+`test_runtime_permissions.py`. Der Quellhash bindet die tatsächlichen Checkout-
+Bytes einschließlich Test-/Workflowdateien; eine lokale Development-Bindung mit
+ignorierten Rollenregeln ist kein Ersatz für die CI-Bindung. Aus einem grünen
+Linux-Result, einem bloßen Upload oder einem früheren Run darf kein Windows-
+Gate abgeleitet werden. Es gibt weiterhin keine behauptete Releasefreigabe.
+
+Die Fixture verwendet die dokumentierten
+[Windows-Dateirechte](https://learn.microsoft.com/en-us/dotnet/api/system.security.accesscontrol.filesystemrights),
+[DACL-Wiederherstellung](https://learn.microsoft.com/en-us/dotnet/api/system.security.accesscontrol.objectsecurity.setsecuritydescriptorsddlform)
+und [Set-Acl](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.security/set-acl).
+Die Berichtübergabe verwendet vorhandene
+[Workflow-Artefakte](https://docs.github.com/en/actions/tutorials/store-and-share-data).
 
 Normative Grundlagen: [Wheel-Format](https://packaging.python.org/en/latest/specifications/binary-distribution-format/)
 und [setuptools-Erweiterungen](https://setuptools.pypa.io/en/latest/userguide/extension.html).

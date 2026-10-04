@@ -1,5 +1,22 @@
 # PatchHarbor – Spezifikations-Changelog
 
+## 2026-10-04 – RIV 1.c.R-FIX1: native Rechteabnahme und CI-Nachweise
+
+**FIX:** Planposition bleibt 8/18; 1.c.R ist über Result
+`patchharbor-apply_Result_064126_1004_5de6a7.zip` angewendet/gepusht,
+Commit `5e27c78d190a642d60eac55f767bc69dc086ac48`.
+
+- Windows-Rechtefixture verwendet native DACLs statt chmod als Ersatznachweis.
+- Tatsächliche Datei-/Verzeichnis-Schreib-, Umbenennungs- und Löschversuche müssen
+  verweigert werden; Lesen und installierte Offline-Materialisierung funktionieren.
+- Gespeicherte DACLs nach Erfolg, Teilsetup-/Verbraucherfehlern wiederherstellen;
+  bei fehlgeschlagener Wiederherstellung das private Journal erhalten.
+- Neue Verhaltenstests für Rechte, Isolation, Pfadgrenzen und Cleanup;
+  native Windows-Pfade unter Linux ausdrücklich nicht als ausgeführt zählen.
+- Manueller CI-Workflow veröffentlicht Packaging-JSON je nativer Lane.
+- Kein neuer Planpunkt, keine Laufzeit-/Resultformatänderung und kein CI-Start.
+  GATE-RUNTIME bleibt bis zur echten Windows-Abnahme offen; danach erst 1.c.C.
+
 ## 2026-10-03 – RIV 1.c.R: Herkunft, Ressourcenbudgets und parallele Provider
 
 **Dateistand:** 1.c.R; 8/18 vorbereitet, sieben Feature-Schritte durch echte

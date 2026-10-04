@@ -124,6 +124,16 @@ PowerShell- und Docker-Gates bleiben blockierend und verwenden die parallele
 Runner-Policy. Keine optionalen Tests, kein continue-on-error und keine stillen
 Retries.
 
+Die native Packaging-Lane speichert seit `1.c.R-FIX1` ihren Controller-Bericht
+unter `${{ runner.temp }}/patchharbor-packaging-tests.json` und lädt ihn auch bei
+Fehlern als `patchharbor-packaging-<runner>` hoch (14 Tage Aufbewahrung).
+Fehlende Dateien sind Fehler. Der JSON-Bericht enthält Sammlung, Phasen,
+Workerabschlüsse, Plattform/Interpreter und Quellbindung; ein Upload allein
+ist kein bestandenes Gate. Die erforderlichen Runtime-/Windows-Rechtefälle
+und Zuordnung zum tatsächlichen Run-HEAD stehen in `docs/runtime-artifact.md`.
+Die DACL-Tests ändern ausschließlich Rechte ihrer privaten temporären Fixtures;
+Linux-Ausführung und Windows-Skips ersetzen keinen nativen Windows-Beleg.
+
 Im Development läuft jeder Zwischenstand ausschließlich parallel. Im lokalen
 Apply-Entrypoint läuft vor jedem Zwischencommit die vollständige parallele Suite.
 Nur der letzte Zustand am Bundle-Ende durchläuft diese beiden vollständigen

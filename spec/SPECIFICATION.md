@@ -2,16 +2,16 @@
 
 **Dateiname:** `SPECIFICATION.md`<br>
 **Produktversion:** `1.2.1`<br>
-**Spezifikationsstand:** 2026-10-03 · RIV-Integration Revision 6<br>
+**Spezifikationsstand:** 2026-10-04 · RIV-Integration Revision 7<br>
 **Status:** Verbindliche, freigegebene Produktspezifikation für den Bestandsvertrag 1.2.1; keine Release-Freigabe des konkreten Commits ohne grüne Gates.<br>
-**RIV-Status:** Paketprüfung, Bindungsmodi und Runtime-Bereitstellung (1.a/1.b/1.c.W) durch Apply bestätigt; Runtime-Robustheit (1.c.R) im Entwicklungsstand. Windows-/GATE-RUNTIME-Abnahme und Result-Format 2 folgen. Keine Release-Freigabe.<br>
+**RIV-Status:** Paketprüfung, Bindungsmodi und Runtime-Bereitstellung/-Robustheit (1.a/1.b/1.c.W/R) durch Apply bestätigt; Korrektur der nativen Rechteabnahme (1.c.R-FIX1) im Entwicklungsstand. Windows-/GATE-RUNTIME-Abnahme und Result-Format 2 folgen. Keine Release-Freigabe.<br>
 **Projektname:** `PatchHarbor`<br>
 **Kommando:** `patchharbor`<br>
 **Skriptmarker:** `# PATCHHARBOR`<br>
 **Patch-Paketmarker:** `patch-harbor`
 
 Der aktive Entwicklungsplan für Runtime / Inspect / Validate (RIV) liegt unter
-`planning/runtime-inspect-validate/commit-plan.md`: 8 von 18 Schritten vorbereitet; 1.a/1.b/1.c.W angewendet, 1.c.R-Apply-Nachweis folgt.
+`planning/runtime-inspect-validate/commit-plan.md`: 8 von 18 Schritten angewendet; 1.c.R-FIX1 vorbereitet, unveränderter Planzähler.
 Die Zielversion dieser Erweiterung wird gesondert festgelegt; die vorhandene
 Paketversion bleibt 1.2.1. Die abgeschlossenen Pläne unter `planning/1.2.1/`,
 `planning/1.2.0/`, `planning/1.1.1/`, `planning/1.1.0/` und `planning/1.0.0/`
@@ -3511,11 +3511,11 @@ GitHub-CI wird ausschließlich manuell gestartet.
 
 ## 35. Erweiterungsziel und Geltungsbereich
 
-**Stand:** 3. Oktober 2026, **Repository-Integration Revision 6 auf Grundlage der
+**Stand:** 4. Oktober 2026, **Repository-Integration Revision 7 auf Grundlage der
 Exchange-Revision 2**. **Basis:** PatchHarbor-Quellstand 1.2.1 aus dem Result
 `patchharbor-apply_Result_073436_1003_116272.zip`, Commit
 `68dba9216b72dc0b6441df83f49c9047b8b038b9`. **Status:** schrittweise in Umsetzung; Paketprüfung gemäß
-1.a/1.b und Runtime-Bereitstellung 1.c.W angewendet, Runtime-Robustheit 1.c.R im Dateistand vorbereitet;
+1.a/1.b und Runtime-Bereitstellung/-Robustheit 1.c.W/R angewendet, native Rechteabnahme 1.c.R-FIX1 im Dateistand vorbereitet;
 Format 2 und die Runtime-Gesamtfreigabe folgen. Die nächste Release-Versionsnummer
 wird gesondert festgelegt; 1.2.1 bezeichnet bereits den vorhandenen Quellstand.
 Das Result nennt separat die ausführende Engine 1.2.0; dies ist keine abweichende
@@ -3723,6 +3723,15 @@ oder Rezeptprüfung aus. Der zyklusfreie Ableitungsvertrag steht in
 Verpflichtend sind eine normale nicht-editierbare Wheel-Installation, eine normale Repository-/sdist-Installation über das aktualisierte Buildverfahren sowie die Installation des aus einem Result extrahierten kanonischen Wheels. Das Buildverfahren erzeugt Ressourcen ohne Git-Abhängigkeit auch aus einer vollständigen sdist; ein unbekannter Quellcommit bleibt `null`.
 
 Nach Entfernen ursprünglicher Download-/Build-Verzeichnisse und fremder Installer-Caches muss eine unveränderte Standardinstallation außerhalb des Checkouts offline eine gültige Runtime liefern. Gleichzeitig schreibende Provider, schreibgeschützte Installationsverzeichnisse, Manipulation einer Ressource und zwei Inhaltsstände mit derselben Version sind zu prüfen.
+
+Der Rechtebeleg muss auf der jeweiligen nativen Plattform tatsächlich verweigerte
+Schreibzugriffe zeigen; gesetzte Mode-/Read-only-Bits allein reichen nicht.
+1.c.R-FIX1 ergänzt dafür Windows-DACLs ausschließlich auf privaten Testfixtures,
+prüft verweigerte Dateierzeugung, Änderung, Umbenennung und Löschung und stellt
+die gespeicherten Rechte wieder her. Die spätere CI-Ausführung dieser Tests
+bleibt ein eigener Nachweis; eine lokale Linux-Ausführung schließt das
+Windows-Gate nicht. Packaging-Berichte werden im manuell gestarteten Workflow
+mit Plattform-/Quellbindung gespeichert, ohne Änderung der bestehenden Produkt-ACL-Regeln.
 
 Editable-/direkter Quellbetrieb ist keine freigegebene portable Runtime-Quelle. Fehlt ein nachweislich passender vorbereiteter Ressourcensatz oder wurde der Quellstand verändert, ist `unavailable` mit Grund `source_not_prepared` beziehungsweise `source_changed` zulässig. Dies beeinträchtigt nicht die Arbeit am Quellcode und erlaubt keine stillen Builds während eines Requests. Es darf nicht dazu führen, dass normale nicht-editierbare Installation dauerhaft ohne Runtime ausgeliefert wird.
 

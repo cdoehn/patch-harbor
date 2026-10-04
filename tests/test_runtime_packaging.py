@@ -15,6 +15,7 @@ from zipfile import ZipFile
 import pytest
 
 from scripts.build_release import _copy_release_inputs
+from tests.runtime_permissions import readonly_tree
 from tests.test_patch_inspection import write_package
 
 pytestmark = pytest.mark.packaging
@@ -45,19 +46,10 @@ def _install_builder(python, outside, environment):
 def _readonly_installation(python, outside, environment):
     site = Path(_run([str(python), "-I", "-c", "import sysconfig; print(sysconfig.get_path('purelib'))"],
                      outside, environment).strip())
-    paths = [site, *site.rglob("*")]
-    modes = [(path, path.stat().st_mode & 0o777) for path in paths]
-    try:
-        for path, mode in modes:
-            path.chmod(mode & ~0o222)
-        # Windows chmod does not implement directory ACLs. Only POSIX proves
-        # denied directory writes here; native Windows remains a separate gate.
-        if os.name != "nt" and os.geteuid() != 0:
-            assert not os.access(site, os.W_OK)
+    with readonly_tree(site, owner=outside.parent, environment=environment) as permissions:
+        if os.name == "nt":
+            assert permissions == {"enforced": True, "method": "windows_dacl"}
         yield
-    finally:
-        for path, mode in modes:
-            path.chmod(mode)
 
 
 @pytest.mark.parametrize("route", ["wheel", "source", "sdist"])

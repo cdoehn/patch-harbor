@@ -64,6 +64,16 @@ jobs:
       - name: Run packaging tests
         run: >-
           python tools/run_tests.py --suite packaging --durations=10
+          --report "${{ runner.temp }}/patchharbor-packaging-tests.json"
+
+      - name: Upload native packaging evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: patchharbor-packaging-${{ matrix.runner }}
+          path: ${{ runner.temp }}/patchharbor-packaging-tests.json
+          if-no-files-found: error
+          retention-days: 14
 
   windows-powershell7-acceptance:
     name: Release gate - Windows 2025 - PowerShell 7
