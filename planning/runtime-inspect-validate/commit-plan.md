@@ -1,11 +1,12 @@
-# PatchHarbor – RIV-Implementierungsplan, Repository-Revision 7
+# PatchHarbor – RIV-Implementierungsplan, Repository-Revision 8
 ## Inspect / Validate über API und CLI · Offline-Runtime · Result-Format 2 · Chat-Handoff
 
 **Stand:** 4. Oktober 2026. **Status:** aktive Entwicklung;
 **8 von 18 Umsetzungsschritten im Dateistand vorbereitet**. Nächster Schritt: `1.c.C`,
 erst nach vollständigem GATE-RUNTIME einschließlich Windows-Nachweis.
 P0 sowie 1.a, 1.b und 1.c.W/R sind durch echte Apply-Results bestätigt.
-Der Dateistand bereitet `1.c.R-FIX1` zur nativen Rechteabnahme vor; kein neuer Planpunkt.
+`1.c.R-FIX1` ist angewendet; der Dateistand bereitet `1.c.R-FIX2` für die
+CI-Testvoraussetzungen und unverdeckte Wiederherstellungsfehler vor; kein neuer Planpunkt.
 **Bereich:** RIV (Runtime / Inspect / Validate). **Paketbasis:** 1.2.1.
 **Zielversion:** gesondert festzulegen; keine Versionsanhebung oder Releasefreigabe durch Dokumentation.
 
@@ -156,6 +157,50 @@ Roundtrips prüfen, bevor 1.c.C vorbereitet wird. Kriterien stehen in
 `docs/runtime-artifact.md`. Lokaler Nachweis dieser Korrektur:
 `exchange/reports/patchharbor-riv-007-1.c.R-FIX1-parallel.json`.
 
+**FIX1 angewendet / Basis für Bundle 008:**
+`patchharbor-apply_Result_073542_1004_a995cf.zip`, 757439 Bytes, SHA-256
+`d46f250884bbba6f6ec808334905896e758e72e20228545efd8c218a5b6c7b71`.
+Echter Apply von Bundle 007: abschließend seriell 1.967 bestanden / 7 übersprungen
+in 559,23 Sekunden, danach parallel dieselben Ergebnisse in 146,63 Sekunden.
+Commit `5535d77fba44acd2232ebf51ca5be0205b0abc3a`, ein erfolgreicher Push auf `dev`,
+sauberer Baum. Alle 238 Base-Dateien stimmten mit dem Development-Ausgang überein.
+Neue vollständige Bindung: repo_id `e7a93d72-62dc-4759-97e8-6bf6cdf10e90`,
+base_commit `5535d77fba44acd2232ebf51ca5be0205b0abc3a`,
+state_fingerprint `7c9d2a24e397e0e5`, fingerprint_algorithm `patchharbor-state-v1`.
+
+**CI-Befund und Bundle 008 / FIX `1.c.R-FIX2`, unverändert 8/18:**
+`Fix: repair runtime acceptance setup and expose ACL restoration failures [RIV 1.c.R-FIX2]`.
+Der manuell gestartete [Acceptance-Lauf 37188040469, Versuch 1](https://github.com/cdoehn/patch-harbor/actions/runs/37188040469)
+auf genau diesem HEAD ist fehlgeschlagen. Beide nativen Ubuntu-Jobs und der
+separate PowerShell-7-Plattformjob meldeten Erfolg; Windows-Packaging meldete
+8 Fehler / 16 bestandene Tests / 1 Skip. Beide Docker-Jobs scheiterten am
+Quellbetriebstest mit je 1 Fehler / 1.450 bestandenen Tests / 1 Skip.
+
+Der Quellbetriebstest prüfte bisher ungeachtet seiner Installationsart den
+laufenden Testprozess. Er importiert jetzt eine echte saubere Quellkopie in
+einem isolierten Kindprozess und verbietet während capture Datei-/Cachezugriffe,
+Build-/Prozessstarts und Netzwerkzugriffe. Das gilt auch bei installiertem
+Wheel im aufrufenden Testprozess. Runtime-Produktcode wird nicht angepasst.
+
+Die ACL-Fixture entfernt geerbtes PSModulePath ausschließlich aus der
+Kindprozessumgebung. Beide Engines konstruieren ihre eigenen Modulpfade;
+Caller, Registry und Rechnerkonfiguration bleiben unverändert. Der native
+Teilsetup-Test fängt ausschließlich seine eigene injizierte Ausnahme, damit
+ein echter Wiederherstellungsfehler nicht als erwarteter Fehler verschwindet.
+Die PowerShell-Fixture meldet gescheiterte Wiederherstellungsoperationen mit
+Pfad und Fehlergrund sowie abweichende gespeicherte/tatsächliche Deskriptoren.
+Ihre strikte DACL-Prüfung und Journalaufbewahrung bleiben erhalten.
+
+**Weiterhin offen / REDUCED_TEST_SCOPE:** Die genaue Ursache der zusätzlichen
+pwsh-Wiederherstellungsabweichung war im ersten CI-Log verdeckt. Sie wird durch
+diese Diagnoseverbesserung nicht als behoben behauptet. Windows muss den neuen
+Stand real ausführen; ebenso die Docker-Lanes. Lokal stehen weder Windows noch
+Docker-Socket-Zugriff zur Verfügung. Ein Linux-Lauf mit tatsächlich installiertem
+Wheel prüft die gemeldete Installationsannahme separat, ersetzt jedoch Docker/Windows
+nicht. GATE-RUNTIME bleibt vor 1.c.C/1.d/1.e gesperrt. Kein automatischer CI-Start.
+Lokaler Vollnachweis ausschließlich parallel:
+`exchange/reports/patchharbor-riv-008-1.c.R-FIX2-parallel.json`.
+
 **Repositoryrollen:** Development unter
 `/home/christian/Codex/patchharbor/patchharbor-codex` erzeugt und prüft Dateistände
 und die finale ZIP, ohne Git-Commits oder Push. Das unabhängige Apply-Repository
@@ -194,7 +239,7 @@ bei abweichender Development-Wurzel `CWD_MISMATCH`, keine Änderung.
 
 Jeder Zwischenstand wird wirklich hergestellt, getestet und erst dann committed. Ein finaler Working Tree mit künstlich aufgeteiltem Staging ist kein WRC-Nachweis. Commit-IDs werden nach dem Commit aus Git übernommen, nicht im eigenen Commit vorweg erfunden.
 
-### 2.1 Commitübersicht – 8/18 durch Apply bestätigt, zusätzliche Korrektur 1.c.R-FIX1 vorbereitet
+### 2.1 Commitübersicht – 8/18 durch Apply bestätigt, FIX1 angewendet, zusätzliche Korrektur 1.c.R-FIX2 vorbereitet
 
 | Nr. | Kennung | Commit-Subject | Voraussetzung | Paket |
 |---:|---|---|---|---|
@@ -432,7 +477,7 @@ Kleinen standardbibliotheksbasierten Materializer für definierte Reihenfolge, f
 
 #### 1.c.R – 8/18: `fix(runtime): verify provenance bounds and cold-cache roundtrips`
 
-**Status:** angewendet/gepusht als `5e27c78d190a642d60eac55f767bc69dc086ac48`; Windows-Abnahme offen (P2b), `1.c.R-FIX1` im Dateistand vorbereitet. **Abhängigkeit:** 1.c.W. **Spec:** 38 vollständig; 39.3 Vorbedingungen.
+**Status:** angewendet/gepusht als `5e27c78d190a642d60eac55f767bc69dc086ac48`; Windows-Abnahme fehlgeschlagen; `1.c.R-FIX1` angewendet, `1.c.R-FIX2` im Dateistand vorbereitet. **Abhängigkeit:** 1.c.W. **Spec:** 38 vollständig; 39.3 Vorbedingungen.
 
 **Ergebnis:** Der Provider erkennt geänderte Daten und bleibt bei Fehlern, Reinstallation und parallelen Requests eindeutig.
 
@@ -771,8 +816,8 @@ Jeder später abgeschlossene Eintrag enthält Plan-ID, tatsächlichen Commit, ur
 Fertig ist die Erweiterung erst mit nutzbarer API und CLI, konstant reproduzierbarer Runtime aus Standardinstallationen, sicherer Formatintegration, erhaltenen Sicherheitsgrenzen, ausgeführten Offline-/Roundtrip-Gates, aktueller installierter Anleitung und grüner CI für den tatsächlichen finalen HEAD. „0 Commits offen“ allein ist kein Freigabenachweis.
 
 **Status dieses Dateistands:** 8/18 vorbereitet, 10 weitere Schritte offen.
-P0, 1.a, 1.b und 1.c.W/R sind angewendet/gepusht; 1.c.R-FIX1 wartet auf den echten
-Apply-Nachweis. Der Fix erhöht den Planzähler nicht. Paketprüfung, beide Bindungsmodi und interne Runtime sind vorhanden;
+P0, 1.a, 1.b, 1.c.W/R und 1.c.R-FIX1 sind angewendet/gepusht; 1.c.R-FIX2 wartet
+auf den echten Apply-Nachweis. Der Fix erhöht den Planzähler nicht. Paketprüfung, beide Bindungsmodi und interne Runtime sind vorhanden;
 Windows-/GATE-RUNTIME-Abnahme, C-Schritt und Result-Format 2 stehen aus.
 Quellenstand bleibt Exchange-Revision 2.
 

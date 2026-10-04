@@ -127,9 +127,27 @@ werden nicht verändert. POSIX root kann Modebits umgehen: ein solcher Lauf
 belegt keinen verweigerten Schreibzugriff, und der separate native Rechtetest
 wird ausdrücklich übersprungen. Die Root-Roundtrip-Prüfung bleibt ausführbar.
 
-Die lokale Abnahme von 1.c.R-FIX1 erfolgt ausschließlich parallel unter
-Linux/Python 3.14. Native DACL-Ausführung steht aus. GATE-RUNTIME bleibt vor
-1.c.C/1.d/1.e offen; die Verschiebung dieses Nachweises ist im Plan dokumentiert.
+Der erste native [CI-Lauf von 1.c.R-FIX1](https://github.com/cdoehn/patch-harbor/actions/runs/37188040469)
+(Versuch 1, HEAD `5535d77fba44acd2232ebf51ca5be0205b0abc3a`) scheiterte unter
+Windows und in beiden Docker-Lanes. 1.c.R-FIX2 korrigiert die Testvoraussetzungen:
+Der Quellbetriebstest importiert eine saubere Quellkopie in einem neuen Prozess,
+auch wenn sein Controller eine installierte Wheel-Runtime verwendet. Während
+capture sind Datei-/Cachezugriffe, Prozessstarts und Netzwerk gesperrt.
+
+Die ACL-Kindprozesse erhalten eine Kopie ihrer Umgebung ohne PSModulePath
+(Groß-/Kleinschreibung unabhängig). So baut jede Engine ihre eigenen Modulpfade
+auf. Die aufrufende Umgebung wird nicht verändert. Das beseitigt den bekannten
+[Konflikt beim Start von Windows PowerShell über Python aus PowerShell 7](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_psmodulepath#starting-windows-powershell-from-powershell-7).
+Der native Regressionstest gibt bewusst einen ungeeigneten geerbten Modulpfad vor.
+
+Der Teilsetup-Test unterscheidet seine eigene injizierte Ausnahme von nativen
+Fehlern. Die strikte DACL-Wiederherstellung meldet Pfade, einzelne Fehler und
+abweichende Deskriptoren, bevor sie mit erhaltenem Journal scheitert. Im ersten
+pwsh-Lauf wurde dieser Fehler verdeckt; seine genaue Ursache bleibt offen und
+wird durch die neue Diagnose nicht als behoben erklärt. Die Linux-Prüfung von
+1.c.R-FIX2 erfolgt ausschließlich parallel, zusätzlich aus einer installierten
+Wheel-Umgebung. Native Windows-/Docker-Nachweise für den neuen Stand stehen aus;
+GATE-RUNTIME bleibt vor 1.c.C/1.d/1.e offen.
 
 Für den fehlenden Nachweis nach tatsächlichem Apply/Push den vorhandenen
 Acceptance-Workflow manuell auf dem betreffenden vollständigen Commit starten.

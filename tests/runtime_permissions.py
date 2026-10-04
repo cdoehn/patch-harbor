@@ -29,10 +29,15 @@ def _run_acl(action: str, root: Path, journal: Path, environment: dict[str, str]
     if executable is None:
         raise RuntimeError("native Windows permission engine is unavailable")
     script = Path(__file__).parent / "fixtures/runtime_readonly.ps1"
+    # Python can inherit PowerShell 7's module paths even when launching 5.1.
+    # Let each engine construct its own defaults; this fixture needs only its
+    # built-in modules. Keep the caller's environment unchanged.
+    child_environment = {key: value for key, value in environment.items()
+                         if key.upper() != "PSMODULEPATH"}
     result = subprocess.run(
         [executable, "-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
          "-File", str(script), "-Action", action, "-Root", str(root), "-Journal", str(journal)],
-        env=environment, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=300,
+        env=child_environment, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=300,
     )
     if result.returncode:
         raise RuntimeError(f"native ACL {action} failed: {result.stdout}{result.stderr}")

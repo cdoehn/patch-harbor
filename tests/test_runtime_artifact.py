@@ -177,9 +177,35 @@ def test_missing_resource_produces_structured_unavailable(prepared, tmp_path, mi
     assert result.reason == "resources_missing"
 
 
-def test_source_mode_does_not_build_or_search_caches():
-    provider = RuntimeProvider()
-    assert provider.capture().reason == "source_not_prepared"
+def test_source_mode_does_not_build_or_search_caches(tmp_path):
+    # The controller may itself use an installed wheel (the Docker gate does).
+    # Import a real clean source copy in a fresh process, without installer or
+    # module state from that controller masquerading as a source installation.
+    source = tmp_path / "source"
+    source.mkdir()
+    _copy_release_inputs(source)
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    script = '''
+import os, socket, subprocess, sys
+from pathlib import Path
+source = Path(sys.argv[1]).resolve()
+sys.path.insert(0, str(source))
+import patchharbor
+from patchharbor.runtime_artifact import RuntimeProvider
+assert Path(patchharbor.__file__).resolve().is_relative_to(source)
+assert patchharbor._runtime_resource_id is None
+provider = RuntimeProvider()
+def forbidden(*args, **kwargs):
+    raise AssertionError('source provider attempted resource, cache, build or network work')
+Path.open = os.open = os.scandir = subprocess.run = subprocess.Popen = socket.socket = forbidden
+provision = provider.capture()
+assert provision.status == 'unavailable' and provision.reason == 'source_not_prepared'
+assert provision.artifact is None and provider.capture() is provision
+'''
+    result = subprocess.run([sys.executable, "-I", "-B", "-c", script, str(source / "src")],
+                            cwd=outside, capture_output=True, text=True)
+    assert result.returncode == 0, result.stdout + result.stderr
 
 
 def test_recipe_size_limit_precedes_parsing():

@@ -1,5 +1,24 @@
 # PatchHarbor – Spezifikations-Changelog
 
+## 2026-10-04 – RIV 1.c.R-FIX2: CI-Testvoraussetzungen und Fehlerdiagnose
+
+**FIX:** unverändert 8/18. FIX1 angewendet als
+`5535d77fba44acd2232ebf51ca5be0205b0abc3a`; der erste manuelle Acceptance-Lauf
+37188040469 (Versuch 1) scheiterte in Windows-Packaging und beiden Docker-Jobs.
+
+- Quellbetrieb aus einer echten isolierten Quellkopie prüfen, auch bei installiertem
+  Wheel im Testcontroller; keine Änderung am produktiven Runtime-Provider.
+- Geerbten PSModulePath nur für ACL-Kindprozesse entfernen, sodass deren Engine
+  passende Module lädt; keine globale Umgebungs-/Registryänderung.
+- Erwarteten injizierten Fehler von echten Setup-/Wiederherstellungsfehlern trennen;
+  Originalfehler und genaue DACL-Abweichungen im nächsten CI-Lauf sichtbar machen.
+- Strikte Rechteprüfung und privates Wiederherstellungsjournal erhalten.
+- Die zusätzliche pwsh-Wiederherstellungsursache bleibt offen. Linux-Abnahme und
+  installierte Wheel-Regression ersetzen den neuen Windows-/Docker-Lauf nicht.
+- Ein geplanter Apply-Commit, lokale Tests nur parallel; finales Apply seriell
+  und danach parallel vor Commit/Push. Keine Versionsanhebung, kein CI-Start.
+
+
 ## 2026-10-04 – RIV 1.c.R-FIX1: native Rechteabnahme und CI-Nachweise
 
 **FIX:** Planposition bleibt 8/18; 1.c.R ist über Result

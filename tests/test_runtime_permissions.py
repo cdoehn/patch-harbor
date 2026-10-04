@@ -3,6 +3,7 @@ from concurrent.futures import ThreadPoolExecutor
 import json
 import os
 from pathlib import Path
+import subprocess
 from threading import Barrier
 
 import pytest
@@ -10,6 +11,30 @@ import pytest
 from tests import runtime_permissions as permissions
 
 pytestmark = pytest.mark.packaging
+
+
+@pytest.mark.parametrize("engine", ["powershell.exe", "pwsh"])
+@pytest.mark.parametrize("key", ["PSModulePath", "PSMODULEPATH", "psmodulepath"])
+def test_acl_child_rebuilds_module_paths_without_changing_parent(tmp_path, monkeypatch, engine, key):
+    environment = {"PATH": "native engine path", key: "foreign module path",
+                   "PATCHHARBOR_WINDOWS_ACCEPTANCE_ENGINE": engine, "FIXTURE_VALUE": "preserve"}
+    before = environment.copy()
+    executable = str(tmp_path / engine)
+    monkeypatch.setattr(permissions.shutil, "which", lambda name, path: executable if name == engine else None)
+    calls = []
+    def run(command, **options):
+        calls.append((command, options["env"]))
+        return subprocess.CompletedProcess(command, 0, "", "")
+    monkeypatch.setattr(permissions.subprocess, "run", run)
+    root, journal = tmp_path / "owned tree", tmp_path / "journal.json"
+    for action in ("deny", "restore"):
+        permissions._run_acl(action, root, journal, environment)
+    assert len(calls) == 2 and environment == before
+    for command, child in calls:
+        assert command[0] == executable
+        assert not any(name.upper() == "PSMODULEPATH" for name in child)
+        assert child == {name: value for name, value in before.items() if name != key}
+        assert command[-4:] == ["-Root", str(root), "-Journal", str(journal)]
 
 
 def _tree(owner, name="installed [fixture] Gr\u00fc\u00dfe ' quote"):
@@ -154,6 +179,23 @@ def test_failed_windows_restoration_retains_only_its_private_journal(tmp_path, m
     assert sibling.read_bytes() == b"unrelated" and root.is_dir()
 
 
+def test_restoration_error_preserves_the_setup_failure_and_journal(tmp_path, monkeypatch):
+    root = _tree(tmp_path)
+    setup_failure, restore_failure = LookupError("injected setup failure"), RuntimeError("native restore failed")
+    def runner(action, target, journal, environment):
+        if action == "deny":
+            journal.write_bytes(b"original DACLs")
+            raise setup_failure
+        raise restore_failure
+    monkeypatch.setattr(permissions, "_run_acl", runner)
+    with pytest.raises(RuntimeError) as raised:
+        with permissions._windows_readonly(root, os.environ.copy()):
+            pytest.fail("failed setup reached consumer")
+    assert raised.value is restore_failure and raised.value.__context__ is setup_failure
+    journals = list(tmp_path.glob("runtime-acl-*/original-dacls.json"))
+    assert len(journals) == 1 and journals[0].read_bytes() == b"original DACLs"
+
+
 def test_ineffective_denial_is_a_failure(tmp_path):
     with pytest.raises(AssertionError):
         permissions._require_denied(lambda: (tmp_path / "writable").write_bytes(b"unexpected"))
@@ -164,8 +206,10 @@ def test_ineffective_denial_is_a_failure(tmp_path):
 def test_windows_dacl_restore_after_completed_setup_error(tmp_path, monkeypatch, engine):
     root = _tree(tmp_path)
     before = _snapshot(root)
-    environment = {**os.environ, "PATCHHARBOR_WINDOWS_ACCEPTANCE_ENGINE": engine}
+    environment = {**os.environ, "PATCHHARBOR_WINDOWS_ACCEPTANCE_ENGINE": engine,
+                   "PSModulePath": str(tmp_path / "unusable-inherited-module-path")}
     original = permissions._run_acl
+    failure = LookupError("failure before consumer")
     injected = False
     def runner(action, *args):
         nonlocal injected
@@ -174,11 +218,13 @@ def test_windows_dacl_restore_after_completed_setup_error(tmp_path, monkeypatch,
             with pytest.raises(PermissionError):
                 (root / "module.py").write_bytes(b"blocked")
             injected = True
-            raise RuntimeError("failure before consumer")
+            raise failure
     monkeypatch.setattr(permissions, "_run_acl", runner)
-    with pytest.raises(RuntimeError):
+    # A native setup/restore RuntimeError must escape with its original details,
+    # rather than being swallowed as the intentional consumer failure.
+    with pytest.raises(LookupError) as raised:
         with permissions.readonly_tree(root, owner=tmp_path, environment=environment):
             pytest.fail("failed setup reached consumer")
-    assert injected and _snapshot(root) == before
+    assert raised.value is failure and injected and _snapshot(root) == before
     (root / "nested/data").write_bytes(b"restored")
     assert not list(tmp_path.glob("runtime-acl-*"))

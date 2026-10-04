@@ -80,20 +80,21 @@ if ($Action -eq 'deny') {
             $acl.SetSecurityDescriptorSddlForm($record.sddl, $section)
             Set-Acl -LiteralPath $record.path -AclObject $acl
         } catch {
-            $failures += $_
+            $failures += "restore '$($record.path)': $($_.Exception.Message)"
         }
     }
     foreach ($record in $saved.entries) {
         try {
             $actual = (Get-Acl -LiteralPath $record.path).GetSecurityDescriptorSddlForm($section)
             if ($actual -ne $record.sddl) {
-                throw 'Restored DACL differs from its saved descriptor'
+                throw "Restored DACL differs: expected '$($record.sddl)'; actual '$actual'"
             }
         } catch {
-            $failures += $_
+            $failures += "verify '$($record.path)': $($_.Exception.Message)"
         }
     }
     if ($failures.Count -ne 0) {
-        throw "ACL restoration failed for $($failures.Count) operations; keep private journal"
+        throw ("ACL restoration failed for $($failures.Count) operations; keep private journal`n" +
+               ($failures -join "`n"))
     }
 }
