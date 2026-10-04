@@ -2,16 +2,16 @@
 
 **Dateiname:** `SPECIFICATION.md`<br>
 **Produktversion:** `1.2.1`<br>
-**Spezifikationsstand:** 2026-10-04 · RIV-Integration Revision 9<br>
+**Spezifikationsstand:** 2026-10-04 · RIV-Integration Revision 11<br>
 **Status:** Verbindliche, freigegebene Produktspezifikation für den Bestandsvertrag 1.2.1; keine Release-Freigabe des konkreten Commits ohne grüne Gates.<br>
-**RIV-Status:** Paketprüfung, Bindungsmodi und Runtime-Bereitstellung/-Robustheit (1.a/1.b/1.c.W/R) durch Apply bestätigt; 1.c.R-FIX1/FIX2 angewendet, Windows-Packaging weiterhin fehlgeschlagen; DACL-Readback-Korrektur 1.c.R-FIX3 im Entwicklungsstand. Windows-/GATE-RUNTIME-Abnahme und Result-Format 2 folgen. Keine Release-Freigabe.<br>
+**RIV-Status:** Paketprüfung, Bindungsmodi und Runtime (1.a/1.b/1.c samt FIX1–FIX3) durch Apply bestätigt; native Windows-/GATE-RUNTIME-Abnahme auf Bundle 009 erfüllt. Format-2-Leser 1.d.W im Entwicklungsstand; Writer bleiben Format 1. Keine Release-Freigabe.<br>
 **Projektname:** `PatchHarbor`<br>
 **Kommando:** `patchharbor`<br>
 **Skriptmarker:** `# PATCHHARBOR`<br>
 **Patch-Paketmarker:** `patch-harbor`
 
 Der aktive Entwicklungsplan für Runtime / Inspect / Validate (RIV) liegt unter
-`planning/runtime-inspect-validate/commit-plan.md`: 8 von 18 Schritten angewendet; 1.c.R-FIX1/FIX2 angewendet, 1.c.R-FIX3 vorbereitet, unveränderter Planzähler.
+`planning/runtime-inspect-validate/commit-plan.md`: 9 von 18 Schritten angewendet; 1.d.W als 10/18 vorbereitet. FIX1–FIX3 sind angewendet und erhöhen den Planzähler nicht.
 Die Zielversion dieser Erweiterung wird gesondert festgelegt; die vorhandene
 Paketversion bleibt 1.2.1. Die abgeschlossenen Pläne unter `planning/1.2.1/`,
 `planning/1.2.0/`, `planning/1.1.1/`, `planning/1.1.0/` und `planning/1.0.0/`
@@ -3439,7 +3439,7 @@ Quellen-/Interpreterbindung aus. Kein Ergebnisvergleich von Reihenfolge, Farbe,
 Layout, Dauer, Zeitstempel oder Worker-Zuteilung. Prozess- und Dateisolation ist
 Teil der Verhaltenstests. Keine neuen Darstellungs- oder Dokumentationstests.
 Die frühere serielle CI-Lane wurde durch CI-MANUAL-1 abgelöst. Verbindlich ist
-`docs/test-parallelism.md`: GitHub-Acceptance ausschließlich manuell per
+`docs/test-parallelism.md`: GitHub-Acceptance ausschließlich per
 `workflow_dispatch`, ohne zusätzlichen seriellen Volltestlauf. Die vorhandenen
 Linux-/Windows-/PowerShell-/Docker-Gates bleiben erhalten. Der Modusverifier
 ist ein explizites Diagnosewerkzeug und kein automatisch gestarteter CI-Schritt.
@@ -3451,7 +3451,15 @@ verlangen keinen eigenen Lauf; fehlende CI auf ihrem einzelnen Commit allein
 blockiert keinen Folgepatch. Ältere CI-Takt-/Vorcommit-Vorgaben sind damit ersetzt.
 Bekannte CI-Fehler werden weiter ausgewertet, native Nachweise bleiben an den
 wirklich geprüften Stand gebunden. Zusätzliche CI nur auf ausdrücklichen Auftrag;
-keine automatischen Auslöser oder Wiederholungen. Lokale Gates bleiben erhalten.
+keine Push-/PR-/Zeitplan-Auslöser oder automatischen Wiederholungen.
+Für fällige Bundles ist der Apply-Entrypoint ausdrücklich beauftragt, nach dem
+erfolgreichen Push den vorhandenen Workflow per `workflow_dispatch` zu starten,
+auf alle vorgeschriebenen Jobs einschließlich Windows zu warten und Run-ID,
+URL, vollständigen geprüften Commit, Job-Ergebnisse und relevante Testnachweise
+oder Fehlerdiagnosen über Ausführungslog/Result zurückzugeben. Fehlender Zugang,
+fehlende Rechte oder unvollständige CI bleiben erkennbare offene Nachweise;
+kein vorzeitiger Gesamterfolg und kein blinder Retry. Die allgemeine S-Schleife
+enthält keine eigene CI-Regel. Lokale Gates bleiben erhalten.
 
 Die Nutzeranweisung vom 3. Oktober 2026 ersetzt die frühere doppelte Prüfung
 vor jedem Zwischencommit: Development führt ausschließlich parallele Tests aus.
@@ -3515,18 +3523,18 @@ Die frühere Testzuordnung des POSIX-W/R/C-Auftrags ist historisch. Für aktuell
 PatchHarbor-Entwicklung gelten Abschnitt 33 und `docs/test-parallelism.md`:
 Development ausschließlich parallel; Apply-Zwischenstände parallel, nur am
 Bundle-Ende vollständig seriell und parallel vor letztem Commit/Push.
-GitHub-CI wird ausschließlich manuell gestartet.
+GitHub-CI verwendet ausschließlich `workflow_dispatch` gemäß Abschnitt 33.
 
 
 ## 35. Erweiterungsziel und Geltungsbereich
 
-**Stand:** 4. Oktober 2026, **Repository-Integration Revision 10 auf Grundlage der
+**Stand:** 4. Oktober 2026, **Repository-Integration Revision 11 auf Grundlage der
 Exchange-Revision 2**. **Basis:** PatchHarbor-Quellstand 1.2.1 aus dem Result
 `patchharbor-apply_Result_073436_1003_116272.zip`, Commit
 `68dba9216b72dc0b6441df83f49c9047b8b038b9`. **Status:** schrittweise in Umsetzung; Paketprüfung gemäß
-1.a/1.b und Runtime-Bereitstellung/-Robustheit 1.c.W/R samt FIX1–FIX3 angewendet;
-GATE-RUNTIME auf Bundle 009 nativ bestätigt, Cleanup 1.c.C im Dateistand vorbereitet;
-Format 2 und die Runtime-Gesamtfreigabe folgen. Die nächste Release-Versionsnummer
+1.a/1.b und Runtime 1.c samt FIX1–FIX3 angewendet;
+GATE-RUNTIME auf Bundle 009 nativ bestätigt, Format-2-Leser 1.d.W vorbereitet;
+Writer 2 und die Runtime-Gesamtfreigabe folgen. Die nächste Release-Versionsnummer
 wird gesondert festgelegt; 1.2.1 bezeichnet bereits den vorhandenen Quellstand.
 Das Result nennt separat die ausführende Engine 1.2.0; dies ist keine abweichende
 Quellversion. Herkunft und vollständige Bindung stehen im RIV-Plan.
@@ -3811,7 +3819,17 @@ Das Root-Manifest ergänzt ein geschlossenes `runtime`-Objekt mit genau `status`
 
 Anfangsgründe für `unavailable`: `source_not_prepared`, `source_changed`, `artifact_missing`, `artifact_mismatch`, `artifact_corrupt`, `artifact_unsupported`, `resource_limit`, `read_error`. Freie Tracebacks, Secrets und Host-Cachepfade gehören nicht in dieses Feld. Das Root-Objekt und runtime.json müssen denselben Status und Grund nennen.
 
-Alle redundant enthaltenen Angaben stimmen exakt überein. Der Hash von `runtime.json` steht nur im äußeren Manifest; diese Datei enthält keinen eigenen Hash. `runtime.json` kann den Wheel-Hash enthalten, das Wheel selbst aber keine erwartete SHA des umschließenden Result-Bundles. Eine passende Version allein genügt nicht als Identitätsnachweis. Das Schema wird vor dem ersten akzeptierenden Reader im Code als festes Format dokumentiert, mit positiven und negativen Fixtures.
+Alle redundant enthaltenen Angaben stimmen exakt überein. Der Hash von `runtime.json` steht nur im äußeren Manifest; diese Datei enthält keinen eigenen Hash. `runtime.json` kann den Wheel-Hash enthalten, das Wheel selbst aber keine erwartete SHA des umschließenden Result-Bundles. Eine passende Version allein genügt nicht als Identitätsnachweis. Das feste Schema des ersten akzeptierenden Readers ist in `docs/result-format-2.md` einschließlich positiver und negativer Fixtures dokumentiert und konkretisiert diesen Abschnitt verbindlich.
+
+`distribution` ist `patchharbor`. `provenance` hat genau `mode`, `source_commit`
+und `recipe_format_version` (Integer 1). `capabilities` hat genau `operations`
+mit `["inspect_patch","validate_patch"]`, `patch_formats` mit `[1]` und
+`result_formats` mit `[1]` oder `[1,2]`; Formatlisten enthalten nur Integer.
+Bei `unavailable` sind content_id, content_id_algorithm, wheel, tags,
+runtime_dependencies, provenance und capabilities jeweils `null`. Nur belegte
+Version/Python-Anforderung dürfen bekannt sein. Mindestens eine Warnung im Run
+ist Pflicht. Root-CHAT und environment.json sind in Format 2 obligatorisch;
+die optionale Legacy-Paarung von Format 1 bleibt lesbar.
 
 ### 39.3 Integrität, Ressourcen und konservative Verbraucher
 
@@ -3974,9 +3992,11 @@ Development erzeugt keine Git-Commits. Erst nach allen erfolgreichen Phasen,
 Commits und Abschlussprüfungen führt der Apply-Entrypoint genau einen normalen
 Push auf den bestätigten Zielbranch aus. Diagnosebundles mit null Commits
 pushen nicht. Kein Zwischenpush, Reset/Rollback oder automatischer Tag.
-Die aktuelle Acceptance-CI startet ausschließlich manuell per
+Die aktuelle Acceptance-CI startet ausschließlich per
 `workflow_dispatch` im Fünf-Bundle-Takt nach Abschnitt 33 (014, 019 usw.
 nach Basis 009); ein Push ist keine CI-Ausführung oder CI-Freigabe.
+Der fällige Apply-Entrypoint dispatcht nach erfolgreichem Push, wartet auf alle
+Jobs einschließlich Windows und liefert die CI-Nachweise im Result zurück.
 Zwischenbundles dürfen ohne eigenen CI-Lauf weitergeführt werden.
 
 Die Dokumentübernahme verändert ausschließlich Spezifikation, Plan und Changelog

@@ -1,10 +1,10 @@
-# PatchHarbor – RIV-Implementierungsplan, Repository-Revision 10
+# PatchHarbor – RIV-Implementierungsplan, Repository-Revision 11
 ## Inspect / Validate über API und CLI · Offline-Runtime · Result-Format 2 · Chat-Handoff
 
 **Stand:** 4. Oktober 2026. **Status:** aktive Entwicklung;
-**9 von 18 Umsetzungsschritten im Dateistand vorbereitet**, davon 8 durch Apply
-bestätigt. Bundle 010 enthält `1.c.C`; danach folgt `1.d.W`.
-P0, 1.a, 1.b, 1.c.W/R und alle drei R-Korrekturen sind angewendet.
+**10 von 18 Umsetzungsschritten im Dateistand vorbereitet**, davon 9 durch Apply
+bestätigt. Bundle 011 enthält `1.d.W`; danach folgt `1.d.R`.
+P0, 1.a, 1.b, 1.c und alle drei R-Korrekturen sind angewendet.
 GATE-RUNTIME ist durch die erfolgreiche native CI auf dem Apply-Commit von
 Bundle 009 bestätigt. Der CI-Takt unten gilt für weitere Bundles.
 **Bereich:** RIV (Runtime / Inspect / Validate). **Paketbasis:** 1.2.1.
@@ -280,6 +280,31 @@ Apply am einzigen Endstand seriell, parallel, ein Commit, ein normaler Push.
 Die CI von Bundle 009 belegt dessen Stand; Bundle 010 erhält keine erfundene
 Windows-Freigabe. Nach erfolgreichem Apply folgt `1.d.W` gemäß folgendem CI-Takt.
 
+**1.c.C angewendet / Basis für Bundle 011:**
+`patchharbor-apply_Result_155806_1004_5e62e7.zip`, 772692 Bytes, SHA-256
+`00e6f34878e1d2a9d3cdf16f1915abe662494d2e24bb8552b6e9024fc2665b01`.
+Echter Apply von Bundle 010: abschließend seriell 2.013 bestanden / 7 Skips
+in 496,31 Sekunden, danach parallel dieselben Ergebnisse in 132,56 Sekunden.
+Commit `d31047b2feca049c2db5443bb61df2ce7ce5e7f6`, genau ein normaler Push auf `dev`,
+sauberer Baum; alle 240 Basisdateien byte- und modusgleich mit Development.
+Vollständige Bindung: repo_id `e7a93d72-62dc-4759-97e8-6bf6cdf10e90`,
+base_commit `d31047b2feca049c2db5443bb61df2ce7ce5e7f6`,
+state_fingerprint `7c9d2a24e397e0e5`, fingerprint_algorithm `patchharbor-state-v1`.
+
+**Bundle 011 / PLAN `1.d.W`, 10/18 vorbereitet:**
+`feat(result): accept format-2 inputs before enabling writers [RIV 1.d.W]`.
+Ein gemeinsamer Result-Leser akzeptiert Format 1 und 2 mit vollständiger
+Inventar-, Hash-, Metadaten- und Budgetprüfung. Der festgelegte Vertrag steht in
+`docs/result-format-2.md`; produktive Writer erzeugen weiter Format 1.
+Referenzvalidierung, Veröffentlichung und konservative Archiv-/Recovery-Fakten
+verwenden denselben Reader. Exchange-Klassifikation bleibt ein Typ-Hinweis;
+Wheels und Results werden keine ausführbaren Patch-Kandidaten. Das innere Wheel
+wird kontrolliert gelesen, niemals installiert oder importiert.
+Ein eigenständiger W-Stand vor Robustheit/Cleanup hält die Formatumstellung
+prüfbar. Vollnachweis: `exchange/reports/patchharbor-riv-011-1.d.W-parallel.json`.
+Apply am einzigen Endstand seriell, parallel, ein Commit und ein normaler Push.
+Keine CI für Bundle 011; nächster Planschritt nach echtem Result ist `1.d.R`.
+
 **Verbindlicher CI-Takt ab 4. Oktober 2026:** GitHub-Runnerzeit sparen;
 ausschließlich `workflow_dispatch`, keine Push-/PR-/Schedule-Auslöser und keine
 automatischen Wiederholungen. Nach dem Lauf zu Bundle 009 erst nach fünf weiteren
@@ -290,7 +315,16 @@ Commit. Diese Nutzerregel ersetzt ältere CI-Takt-/Vorcommit-Vorgaben, auch in
 den historischen Einträgen dieses Plans. Bekannte CI-Fehler weiter auswerten;
 zusätzliche Läufe nur auf ausdrücklichen Nutzerauftrag. Native Nachweise und
 Gesamt-/Releasefreigabe bleiben ehrlich an tatsächlich geprüfte Stände gebunden.
-Die lokalen Gates aus 7.2 bleiben unverändert.
+Bei fälligen Bundles enthält der Entrypoint den ausdrücklich beauftragten
+CI-Schritt: nach erfolgreichem Push den bestehenden Acceptance-Workflow über
+`workflow_dispatch` starten und bis zum Abschluss aller vorgeschriebenen Jobs
+einschließlich Windows warten. Run-ID, URL, vollständiger geprüfter Commit,
+Job-Ergebnisse und relevante Testnachweise oder Fehlerdiagnosen gehören in das
+Ausführungslog und damit in das Apply-Result. Eingerichteter GitHub-Zugang und
+passende Rechte sind Voraussetzung; fehlende Nachweise bleiben offen.
+Kein vorzeitiger Gesamterfolg bei roter oder unvollständiger fälliger CI, kein
+automatischer Retry. Diese Orchestrierung ist PatchHarbor-spezifisch und kein
+Bestandteil der allgemeinen S-Schleife. Die lokalen Gates aus 7.2 bleiben unverändert.
 
 **Repositoryrollen:** Development unter
 `/home/christian/Codex/patchharbor/patchharbor-codex` erzeugt und prüft Dateistände
@@ -330,7 +364,7 @@ bei abweichender Development-Wurzel `CWD_MISMATCH`, keine Änderung.
 
 Jeder Zwischenstand wird wirklich hergestellt, getestet und erst dann committed. Ein finaler Working Tree mit künstlich aufgeteiltem Staging ist kein WRC-Nachweis. Commit-IDs werden nach dem Commit aus Git übernommen, nicht im eigenen Commit vorweg erfunden.
 
-### 2.1 Commitübersicht – 8/18 durch Apply bestätigt, FIX1–FIX3 angewendet, 1.c.C als 9/18 vorbereitet
+### 2.1 Commitübersicht – 9/18 durch Apply bestätigt, FIX1–FIX3 angewendet, 1.d.W als 10/18 vorbereitet
 
 | Nr. | Kennung | Commit-Subject | Voraussetzung | Paket |
 |---:|---|---|---|---|
@@ -372,9 +406,10 @@ Bei einer Commitfolge führt ausschließlich der Apply-Entrypoint nach allen
 grünen Stufen und Abschlussprüfungen genau einen normalen Push auf den
 bestätigten Zielbranch aus; für P0 ist dies `origin`, `refs/heads/dev`.
 Kein Zwischenpush, Force-Push, automatischer Tag oder Push-Retry. GitHub-CI
-startet ausschließlich manuell per `workflow_dispatch` im Fünf-Bundle-Takt
-(014, 019 usw. nach Basis 009); der Push startet sie nicht. Für das nächste
-Paket gilt das tatsächlich zurückgegebene neue Result.
+startet ausschließlich per `workflow_dispatch` im Fünf-Bundle-Takt
+(014, 019 usw. nach Basis 009). Der fällige Apply-Entrypoint dispatcht nach dem
+Push, wartet und gibt die CI-Nachweise im Result zurück; kein Push-Trigger.
+Für das nächste Paket gilt das tatsächlich zurückgegebene neue Result.
 
 ## 3. Geprüfte Ansatzpunkte und Verantwortungen
 
@@ -569,7 +604,7 @@ Kleinen standardbibliotheksbasierten Materializer für definierte Reihenfolge, f
 
 #### 1.c.R – 8/18: `fix(runtime): verify provenance bounds and cold-cache roundtrips`
 
-**Status:** angewendet/gepusht als `5e27c78d190a642d60eac55f767bc69dc086ac48`; Windows-Abnahme fehlgeschlagen; `1.c.R-FIX1/FIX2` angewendet, `1.c.R-FIX3` im Dateistand vorbereitet. **Abhängigkeit:** 1.c.W. **Spec:** 38 vollständig; 39.3 Vorbedingungen.
+**Status:** angewendet/gepusht als `5e27c78d190a642d60eac55f767bc69dc086ac48`; FIX1–FIX3 angewendet, native Windows-Abnahme/GATE-RUNTIME auf Bundle 009 bestätigt. **Abhängigkeit:** 1.c.W. **Spec:** 38 vollständig; 39.3 Vorbedingungen.
 
 **Ergebnis:** Der Provider erkennt geänderte Daten und bleibt bei Fehlern, Reinstallation und parallelen Requests eindeutig.
 
@@ -599,7 +634,7 @@ im Provider und keine Runtime-Arbeit bei allgemeinem API-Import.
 
 #### 1.c.C – 9/18: `refactor(runtime): isolate artifact lifecycle and packaging data`
 
-**Status:** im Dateistand vorbereitet (Bundle 010); tatsächlicher Apply folgt. **Abhängigkeit:** 1.c.R; GATE-RUNTIME auf Bundle 009 erfüllt. **Spec:** 38, 41.2.
+**Status:** angewendet/gepusht als `d31047b2feca049c2db5443bb61df2ce7ce5e7f6` (Bundle 010). **Abhängigkeit:** 1.c.R; GATE-RUNTIME auf Bundle 009 erfüllt. **Spec:** 38, 41.2.
 
 **Ergebnis:** Die spätere Resultschicht benötigt nur eine kleine unveränderliche Providerantwort.
 
@@ -617,7 +652,7 @@ Reproduktionsregeln und Content-ID-Algorithmus dokumentieren, die während W/R e
 
 #### 1.d.W – 10/18: `feat(result): accept format-2 inputs before enabling writers`
 
-**Status:** offen. **Abhängigkeit:** 1.b.C und 1.c.C. **Spec:** 39.2–39.3/39.5, 37.2.
+**Status:** im Dateistand vorbereitet (Bundle 011); tatsächlicher Apply folgt. **Abhängigkeit:** 1.b.C und 1.c.C. **Spec:** 39.2–39.3/39.5, 37.2.
 
 **Ergebnis:** Alle neuen Verbraucher verstehen Format 1 und 2; produktive Erzeugung bleibt ausdrücklich Format 1.
 
@@ -889,7 +924,7 @@ Sämtliche gewählten Stufen und ihre Gates erfolgreich, voller lokal möglicher
 
 Keine zusätzlichen knappen Gesamtsuite-Timeouts für Pixel-Läufe erfinden. Ein bestehender Wrapper wie `scripts/test.sh` ist auf seine tatsächlichen Limits zu prüfen, nicht blind zu übernehmen. Der Entrypoint braucht ein für Umfang/Hardware geeignetes Laufzeitbudget; bei zu langem Paket lieber Grenze teilen als Tests streichen. Einzelne bewusst getestete Prozess-Timeouts bleiben funktional erforderlich.
 
-Nur der Apply-Entrypoint pusht nach erfolgreicher Commitfolge genau einmal normal auf den bestätigten Zielbranch. Diagnosebundles pushen nicht. Kein Zwischenpush oder automatisches Release. Acceptance-CI ausschließlich manuell per `workflow_dispatch` im Fünf-Bundle-Takt ab Bundle 009 (nächste 014, 019); zwischen diesen Ständen ist kein zusätzlicher Lauf erforderlich. Fehlende CI auf einem Zwischencommit allein blockiert kein Folgepaket. Ein fälliger ausstehender Lauf bleibt als ausstehend ausgewiesen. Ein bekannter CI-Fehler wird vor dem nächsten produktiven Paket bewertet.
+Nur der Apply-Entrypoint pusht nach erfolgreicher Commitfolge genau einmal normal auf den bestätigten Zielbranch. Diagnosebundles pushen nicht. Kein Zwischenpush oder automatisches Release. Acceptance-CI ausschließlich per `workflow_dispatch` im Fünf-Bundle-Takt ab Bundle 009 (nächste 014, 019); der fällige Entrypoint startet nach dem Push, wartet einschließlich Windows und gibt zugeordnete Nachweise im Result zurück. Zwischen diesen Ständen ist kein zusätzlicher Lauf erforderlich. Fehlende CI auf einem Zwischencommit allein blockiert kein Folgepaket. Ein fälliger ausstehender Lauf bleibt als ausstehend ausgewiesen. Ein bekannter CI-Fehler wird vor dem nächsten produktiven Paket bewertet.
 
 ### 7.4 Fehler und Wiederaufnahme
 
@@ -907,11 +942,12 @@ Jeder später abgeschlossene Eintrag enthält Plan-ID, tatsächlichen Commit, ur
 
 Fertig ist die Erweiterung erst mit nutzbarer API und CLI, konstant reproduzierbarer Runtime aus Standardinstallationen, sicherer Formatintegration, erhaltenen Sicherheitsgrenzen, ausgeführten Offline-/Roundtrip-Gates, aktueller installierter Anleitung und grüner CI für den tatsächlichen finalen HEAD. „0 Commits offen“ allein ist kein Freigabenachweis.
 
-**Status dieses Dateistands:** 9/18 vorbereitet, 9 weitere Schritte offen.
-P0, 1.a, 1.b, 1.c.W/R und FIX1–FIX3 sind angewendet/gepusht (8 Feature-Schritte).
-Windows-/GATE-RUNTIME-Abnahme auf Bundle 009 bestätigt; C wartet auf Apply.
+**Status dieses Dateistands:** 10/18 vorbereitet, 8 weitere Schritte offen.
+P0, 1.a, 1.b, 1.c und FIX1–FIX3 sind angewendet/gepusht (9 Feature-Schritte).
+Windows-/GATE-RUNTIME-Abnahme auf Bundle 009 bestätigt; 1.d.W wartet auf Apply.
 Paketprüfung, beide Bindungsmodi und interne Runtime sind vorhanden;
-Result-Format 2 und Bootstrap folgen. Nächste reguläre CI nach Bundle 014.
+Format-2-Leser vorbereitet, Writer/Bootstrap folgen. Nächste reguläre CI nach
+Apply/Push von Bundle 014, durch dessen Entrypoint angefordert und zurückgemeldet.
 Quellenstand bleibt Exchange-Revision 2.
 
 ## 9. Dokumentidentität und Quellen

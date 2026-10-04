@@ -1,10 +1,9 @@
-"""Read complete format-1 Result facts without imposing archival success policy."""
+"""Read complete format-1/2 Result facts without imposing archival success policy."""
 from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
 import hashlib
-import json
 import math
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from uuid import UUID
@@ -12,9 +11,11 @@ from uuid import UUID
 from patchharbor.bundle_handoff import CHAT_INSTRUCTIONS_NAME, ENVIRONMENT_MARKER, MAX_HANDOFF_ENTRY_BYTES
 from patchharbor.bundle_names import validate_bundle_suffix
 from patchharbor.bundle_paths import BundlePathError, normalize_bundle_path
-from patchharbor.errors import FailureReason, PatchHarborError
+from patchharbor.errors import ErrorKind, FailureReason, PatchHarborError
 from patchharbor.exchange_state import ExchangePatchSelection
 from patchharbor.exit_status import reason_for_exit_code
+from patchharbor.json_document import parse_json_document as _document
+from patchharbor.result_runtime import ResultRuntime, read_result_runtime
 from patchharbor.models import BundlePayload, GitObjectFormat, GitObjectId, RepositoryId
 from patchharbor.platform.filesystem import (
     FileChangedDuringRead, FileSystemOperationError, UnsupportedFileTypeError,
@@ -25,7 +26,7 @@ from patchharbor.repository_paths import RepositoryRelativePath, validate_reposi
 from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY, ResourcePolicy
 from patchharbor.run_report import PrimaryResult, PrimaryResultKind
 from patchharbor.state_fingerprint import state_fingerprint_digest
-from patchharbor.zip_payloads import NotZipArchiveError, ZipPayloadError, read_zip_payload_bytes
+from patchharbor.zip_payloads import InvalidZipArchiveError, NotZipArchiveError, ZipPayloadError, read_zip_payload_bytes
 
 
 CLEAN_FINGERPRINT = state_fingerprint_digest(
@@ -47,29 +48,6 @@ _RUN_FIELDS = _BINDING_FIELDS | {
     "repository_resolved", "repository_path", "warnings", "execution_present",
     "primary_result", "result_bundle", "process_exit_code",
 }
-
-
-def _unique_object(pairs: list[tuple[str, object]]) -> dict[str, object]:
-    result: dict[str, object] = {}
-    for key, value in pairs:
-        if key in result:
-            raise ValueError("duplicate bundle JSON key")
-        result[key] = value
-    return result
-
-
-def _invalid_constant(_value: str) -> object:
-    raise ValueError("non-finite bundle JSON value")
-
-
-def _document(content: bytes) -> dict[str, object]:
-    if content.startswith(b"\xef\xbb\xbf"):
-        raise ValueError("bundle JSON has a BOM")
-    result = json.loads(content.decode("utf-8"), object_pairs_hook=_unique_object,
-                        parse_constant=_invalid_constant)
-    if type(result) is not dict:
-        raise ValueError("bundle JSON is not an object")
-    return result
 
 
 def _selection(document: dict[str, object]) -> ExchangePatchSelection:
@@ -117,6 +95,8 @@ class ResultFacts:
     expected: ExchangePatchSelection | None
     patch_sha256: str | None
     completed_commit: GitObjectId | None
+    format_version: int = 1
+    runtime: ResultRuntime | None = None
 
 
 def _require(condition: bool, message: str) -> None:
@@ -137,7 +117,17 @@ def _primary(document: object) -> PrimaryResult:
     _require(primary.success == (kind in (PrimaryResultKind.SUCCESS, PrimaryResultKind.DRY_RUN_SUCCESS)),
              "inconsistent primary success kind")
     if reason is not None:
-        _require(PrimaryResultKind.for_tool_error(PatchHarborError("reference", reason)) is kind,
+        # Run documents retain the numeric reason and primary kind, not the
+        # original ErrorKind. Accept its categorized and legacy generic forms.
+        category = {
+            FailureReason.STATE_MISMATCH: ErrorKind.STATE_MISMATCH,
+            FailureReason.REPOSITORY_BUSY: ErrorKind.REPOSITORY_BUSY,
+            FailureReason.REPOSITORY_ERROR: ErrorKind.REPOSITORY_RESOLUTION_ERROR,
+            FailureReason.UNSUPPORTED_REPOSITORY_STATE: ErrorKind.UNSUPPORTED_REPOSITORY_STATE,
+        }.get(reason, ErrorKind.TOOL_ERROR)
+        possible = {PrimaryResultKind.for_tool_error(PatchHarborError("reference", reason, error_kind=c))
+                    for c in (ErrorKind.TOOL_ERROR, category)}
+        _require(kind in possible,
                  "inconsistent primary error kind")
     return primary
 
@@ -195,18 +185,47 @@ def _handoff(files: dict[str, bytes], context: dict, run: dict) -> set[str]:
     return names
 
 
-def parse_result_payloads(payloads: tuple[BundlePayload, ...]) -> ResultFacts:
+def read_result_or_patch_payloads(content: bytes, *,
+                                  policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY) -> tuple[BundlePayload, ...]:
+    """Keep the patch profile strict; allow snapshot paths only for Result hints.
+
+    Member type/path validation fails before any content read. Only that failure
+    permits retrying with the repository namespace, never a CRC or budget error.
+    A marked Result still requires complete validation before it is evidence.
+    """
+    try:
+        return read_zip_payload_bytes(content, policy=policy)
+    except InvalidZipArchiveError as original:
+        payloads = read_zip_payload_bytes(content, policy=policy, path_normalizer=result_member_path)
+        manifest = next((p.content for p in payloads if p.relative_path == "manifest.json"), None)
+        try:
+            marked = manifest is not None and _document(manifest).get("marker") == "patch-harbor-result-bundle"
+        except (ValueError, RecursionError):
+            marked = False
+        if not marked:
+            raise original
+        return payloads
+
+
+def parse_result_payloads(payloads: tuple[BundlePayload, ...], *,
+                          resource_policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY) -> ResultFacts:
     """Validate ZIP-reader output; neither apply deltas nor infer a live fingerprint."""
     files = {entry.relative_path: entry.content for entry in payloads}
     modes = {entry.relative_path: entry.unix_mode for entry in payloads}
     _require(len(files) == len(payloads), "duplicate result members")
+    _require(len(payloads) <= resource_policy.max_zip_entries
+             and all(len(raw) <= resource_policy.max_content_bytes for raw in files.values())
+             and sum(len(raw) for raw in files.values()) <= resource_policy.max_zip_total_bytes,
+             "Result payload budget exceeded")
     manifest = _document(files["manifest.json"])
     context = _document(files["context.json"])
     run = _document(files["logs/run.json"])
+    version = manifest.get("format_version")
+    manifest_fields = _MANIFEST_FIELDS | ({"runtime"} if version == 2 else set())
     _require(manifest.get("marker") == "patch-harbor-result-bundle"
-             and type(manifest.get("format_version")) is int and manifest["format_version"] == 1
-             and set(manifest) in (_MANIFEST_FIELDS, _MANIFEST_FIELDS | _APPLY_FIELDS,
-                                   _MANIFEST_FIELDS | _APPLY_FIELDS | _RECEIPT_FIELDS)
+             and type(version) is int and version in (1, 2)
+             and set(manifest) in (manifest_fields, manifest_fields | _APPLY_FIELDS,
+                                   manifest_fields | _APPLY_FIELDS | _RECEIPT_FIELDS)
              and set(context) in (_BINDING_FIELDS | {"dirty", "created_at"},
                                   _BINDING_FIELDS | {"dirty", "created_at", "bundle_suffix"})
              and set(run) == _RUN_FIELDS, "unsupported or incomplete result schema")
@@ -260,7 +279,7 @@ def parse_result_payloads(payloads: tuple[BundlePayload, ...]) -> ResultFacts:
     if _APPLY_FIELDS <= set(manifest):
         expected = _selection({"repo_id": manifest["repo_id"],
                                **{key: manifest["expected_" + key] for key in _BINDING_FIELDS - {"repo_id"}}})
-        _require(expected.base_commit.object_format == binding.base_commit.object_format,
+        _require(not primary.success or expected.base_commit.object_format == binding.base_commit.object_format,
                  "inconsistent expected object format")
         _require(all(manifest["actual_" + key] == manifest[key] for key in _BINDING_FIELDS - {"repo_id"}),
                  "inconsistent actual result context")
@@ -278,7 +297,18 @@ def parse_result_payloads(payloads: tuple[BundlePayload, ...]) -> ResultFacts:
     expected_files = {"manifest.json", "context.json", "logs/run.json", "changes/staged.patch", "changes/unstaged.patch"}
     if primary.entrypoint_started:
         expected_files.add("logs/execution.log")
-    expected_files.update(_handoff(files, context, run))
+    handoff = _handoff(files, context, run)
+    _require(version == 1 or handoff == {"environment.json", CHAT_INSTRUCTIONS_NAME},
+             "Result 2 requires passive handoff data")
+    expected_files.update(handoff)
+    runtime = None
+    if version == 2:
+        runtime = read_result_runtime(manifest["runtime"], files, resource_policy=resource_policy)
+        _require(runtime.status != "unavailable" or bool(run["warnings"]),
+                 "unavailable runtime requires a run warning")
+        expected_files.add(runtime.metadata.path)
+        if runtime.wheel is not None:
+            expected_files.add(runtime.wheel.path)
     inventory = []
     repository_paths = []
     for kind in ("base", "untracked"):
@@ -319,7 +349,7 @@ def parse_result_payloads(payloads: tuple[BundlePayload, ...]) -> ResultFacts:
     return ResultFacts(ReferenceContext(binding.repo_id, path, binding.base_commit, context["dirty"],
                                         binding.state_fingerprint, binding.fingerprint_algorithm),
                        run["run_id"], operation, run["dry_run"], primary, tuple(run["warnings"]),
-                       tuple(sorted(inventory)), expected, digest, completed)
+                       tuple(sorted(inventory)), expected, digest, completed, version, runtime)
 
 
 def read_result_reference(path: Path, *, resource_policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY) -> tuple[ResultFacts, str]:
@@ -335,7 +365,7 @@ def read_result_reference(path: Path, *, resource_policy: ResourcePolicy = DEFAU
             target, retained_content_limit=resource_policy.max_input_artifact_bytes, allow_path_identity_fallback=True)
         _require(captured.content is not None, "reference exceeds resource limit")
         payloads = read_zip_payload_bytes(captured.content, policy=resource_policy, path_normalizer=result_member_path)
-        return parse_result_payloads(payloads), captured.sha256
+        return parse_result_payloads(payloads, resource_policy=resource_policy), captured.sha256
     except (FileChangedDuringRead, FileSystemOperationError, UnsupportedFileTypeError,
             NotZipArchiveError, ZipPayloadError, OSError, ValueError, TypeError, KeyError,
             UnicodeError, RecursionError, OverflowError, PatchHarborError) as exc:

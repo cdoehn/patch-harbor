@@ -203,7 +203,10 @@ erfolgreich, einschließlich beider Ubuntu-/Docker-Lanes und Windows.
 Windows-Packaging besteht unter Python 3.12 mit 65 bestandenen Tests und genau
 einem POSIX-Skip. Die nativen DACL-Fälle beider Engines und der Standardinstallations-
 Roundtrip sind damit bestätigt; GATE-RUNTIME ist für diese Basis erfüllt.
-Die lokale Abnahme von 1.c.C bleibt ausschließlich parallel.
+1.c.C ist durch Bundle 010 angewendet: Commit
+`d31047b2feca049c2db5443bb61df2ce7ce5e7f6`, im Apply abschließend seriell und
+parallel je 2.013 bestanden / 7 Skips. Development prüft ausschließlich parallel.
+Der folgende Reader-Vertrag steht in [result-format-2.md](result-format-2.md).
 
 Der Launcher aktiviert den Evidenz-Controller auch ohne Berichtdatei. Vor
 Exit 0 prüft er `tools.test_results.validate`, alle Worker-/Phasenbelege und die
@@ -227,13 +230,17 @@ bestanden sein, nicht übersprungen oder nur gesammelt:
 - `test_windows_dacl_restore_after_completed_setup_error`: powershell.exe und pwsh.
 - Die vorhandenen gleichversionierten Neuinstallations- und Editable-Fälle.
 
-GitHub-CI bleibt ausschließlich manuell. Nach dem Lauf zu Bundle 009 erst nach
+GitHub-CI bleibt ausschließlich `workflow_dispatch`. Nach dem Lauf zu Bundle 009 erst nach
 fünf weiteren Bundles wieder regulär CI: 014, 019 usw., nach deren Apply/Push.
 Zwischenbundles benötigen keinen eigenen Lauf und bleiben nicht allein wegen
 fehlender CI auf ihrem Einzelcommit stehen. Zusätzliche Läufe nur auf ausdrücklichen
 Nutzerauftrag; bekannte Fehler weiter auswerten. Der grüne Lauf von Bundle 009
 wird nicht als Windows-Ausführung von Bundle 010 ausgegeben. Lokale Gates und
 GATE-RUNTIME-Verhaltensanforderungen bleiben verbindlich.
+Das fällige Bundle beauftragt seinen Apply-Entrypoint mit Dispatch nach dem
+erfolgreichen Push, Warten auf alle Jobs einschließlich Windows und Rückgabe
+von Run-ID/URL, vollständigem Commit, Job-Ergebnissen und Testnachweisen bzw.
+Fehlerdiagnosen im Result-Ausführungslog. Kein zusätzlicher Trigger oder Retry.
 
 Die Testnamen beziehen sich auf `test_runtime_packaging.py` und
 `test_runtime_permissions.py`. Der Quellhash bindet die tatsächlichen Checkout-

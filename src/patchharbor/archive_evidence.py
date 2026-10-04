@@ -8,9 +8,8 @@ from patchharbor.exchange_state import ExchangePatchSelection
 from patchharbor.models import BundlePayload, GitObjectId
 from patchharbor.patch_package import resolve_patch_payloads
 from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY
-from patchharbor.result_reader import CLEAN_FINGERPRINT, parse_result_payloads
+from patchharbor.result_reader import CLEAN_FINGERPRINT, parse_result_payloads, read_result_or_patch_payloads
 from patchharbor.run_report import PrimaryResultKind
-from patchharbor.zip_payloads import read_zip_payload_bytes
 
 
 @dataclass(frozen=True)
@@ -59,7 +58,7 @@ def _result_evidence(payloads: tuple[BundlePayload, ...]) -> ArchiveEvidence:
 
 def parse_archive_evidence(content: bytes, path: Path) -> ArchiveEvidence:
     """Validate complete bytes; errors mean 'keep', never an archival decision."""
-    payloads = read_zip_payload_bytes(content)
+    payloads = read_result_or_patch_payloads(content)
     files = {item.relative_path: item.content for item in payloads}
     if "manifest.json" in files and "patch.json" in files:
         raise ValueError("ambiguous bundle kind")

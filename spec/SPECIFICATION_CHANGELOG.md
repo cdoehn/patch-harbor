@@ -1,5 +1,30 @@
 # PatchHarbor – Spezifikations-Changelog
 
+## 2026-10-04 – RIV 1.d.W: Format-2-Leser vor Writer-Aktivierung
+
+- Bundle 010 tatsächlich angewendet als
+  `d31047b2feca049c2db5443bb61df2ce7ce5e7f6`: abschließend seriell und parallel
+  je 2.013 bestanden / 7 Skips, ein normaler Push, sauberer Baum.
+- `1.d.W` als 10/18 vorbereitet, 9 Feature-Schritte durch Apply bestätigt.
+  Gemeinsamer Reader für Result 1/2; produktive Writer bleiben bei Format 1.
+- Geschlossenes Runtime-Schema in `docs/result-format-2.md`, vollständige
+  Deskriptor-/Hash-/Inventarprüfung, kanonisches inneres Wheel und gemeinsames
+  Bytebudget. Keine Installation, Extraktion oder Ausführung von Wheel-Code.
+- Referenzprüfung, Veröffentlichungsprüfung und Archiv-/Recovery-Fakten nutzen
+  denselben Reader. Diagnosegültigkeit bleibt von Erfolgsevidence getrennt.
+  Results mit Unicode-Repositorypfaden bleiben lesbar; Patchpfade bleiben streng.
+- Regressionen für embedded/unavailable, Dirty/Fehler/Dry-Run, korrupte Metadaten
+  und Archive, Limits, öffentliche API/CLI sowie tatsächliche Recovery.
+- Bestehende Reader-Lücke für kategorisierte Werkzeugfehler geschlossen:
+  Zustandskonflikte bleiben gültige Diagnosen, auch wenn das abgelehnte Paket
+  ein anderes Git-Objektformat erwartete. Maßgeblich bleibt der tatsächliche Kontext.
+- Ergänzte Nutzerregel: fälliges Bundle dispatcht nach Apply/Push die vorhandene
+  CI einschließlich Windows und wartet; Run-/Commit-/Job-/Testnachweise kommen
+  im Result zurück. Unverändert Basis 009, nächste 014/019; keine Extra-CI für 011.
+- Development nur parallel; Apply-Endstand seriell und danach parallel vor
+  einem Commit und einem normalen Push. Null-/Mehrcommit-Bundles und sicherer
+  bisheriger Übergabeweg bei Wheel-Ausfall bleiben erhalten. Keine Releasefreigabe.
+
 
 ## 2026-10-04 – RIV 1.c.C: Build-/Runtime-Trennung und CI-Takt
 

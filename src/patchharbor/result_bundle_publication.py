@@ -28,6 +28,7 @@ from patchharbor.platform.filesystem import (
     sync_regular_file_best_effort,
 )
 from patchharbor.result_bundle_snapshot import ResultBundleSnapshot
+from patchharbor.result_reader import read_result_reference
 from patchharbor.run_report import RunReport, RunSession
 from patchharbor.result_bundle_writer import write_result_bundle
 
@@ -212,6 +213,14 @@ def release_result_bundle_publication(
 
 def _verify_result_bundle(path: Path, *, execution_present: bool) -> None:
     try:
+        # Bound and validate all content before the additional publication CRC
+        # pass. Writer activation remains separate; the shared reader accepts 1/2.
+        try:
+            facts, _digest = read_result_reference(path)
+            if facts.primary_result.entrypoint_started != execution_present:
+                raise result_bundle_error("Result Bundle execution state changed")
+        except PatchHarborError as exc:
+            raise result_bundle_error("Result Bundle integrity verification failed") from exc
         with zipfile.ZipFile(path, mode="r") as archive:
             names = archive.namelist()
             if any(

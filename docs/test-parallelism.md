@@ -117,7 +117,7 @@ pytest-Läufe nacheinander und baut keinen zusätzlichen Test-Scheduler.
 
 Native OS-/Python-/PowerShell-Lanes und Docker verwenden dieselben benannten
 Suites über den Launcher und damit xdist. Die bisherige Abdeckung bleibt erhalten.
-Der GitHub-Acceptance-Workflow startet ausschließlich manuell per
+Der GitHub-Acceptance-Workflow startet ausschließlich per
 `workflow_dispatch`: keine Push-/Pull-Request-Auslöser, kein Schedule/Nightly und
 kein zusätzlicher serieller Volltestlauf. Die vorhandenen Linux-, Windows-,
 PowerShell- und Docker-Gates bleiben blockierend und verwenden die parallele
@@ -132,6 +132,15 @@ keinen Folgepatch. Bekannte CI-Fehler weiter auswerten; zusätzliche Läufe nur
 auf ausdrücklichen Auftrag. Native Freigaben gelten für die tatsächlich
 geprüften Stände. Die lokalen parallelen bzw. finalen seriellen/parallelen
 Gates bleiben unverändert.
+
+Bei fälligen Bundles startet der ausdrücklich beauftragte Apply-Entrypoint nach
+erfolgreichem Push den vorhandenen Workflow per `workflow_dispatch` und wartet
+auf alle vorgeschriebenen Jobs einschließlich Windows. Er gibt Run-ID, URL,
+vollständigen geprüften Commit, Job-Ergebnisse sowie relevante Testnachweise
+oder Fehlerdiagnosen über das Ausführungslog im Result zurück. GitHub-Zugang
+mit passenden Rechten muss vorhanden sein. Fehlende/rote CI bleibt sichtbar;
+kein vorzeitiger Gesamterfolg, kein automatischer Retry. Diese Regel gehört
+zu PatchHarbor, nicht zur allgemeinen S-Schleife.
 
 Die native Packaging-Lane speichert seit `1.c.R-FIX1` ihren Controller-Bericht
 unter `${{ runner.temp }}/patchharbor-packaging-tests.json` und lädt ihn auch bei
@@ -159,8 +168,8 @@ erforderlich. Erst nach beiden grünen Endgates entstehen letzter Commit und
 genau ein normaler Push auf den bestätigten Zielbranch, ohne Tag oder Force-Push.
 Ein Pushfehler erhält die erfolgreichen lokalen Commits. Diagnosebundles mit
 null Commits haben auftragsbezogene Prüfungen und keinen Push. Diese Nutzerregel
-ersetzt serielle Tests vor jedem Zwischencommit. CI und Modusverifier starten
-weiterhin nicht automatisch.
+ersetzt serielle Tests vor jedem Zwischencommit. Der Modusverifier bleibt ein
+explizites Diagnosewerkzeug; CI startet nur durch den beauftragten Dispatch.
 
 Funktionale Tests prüfen auch ausführbare CI-/Docker-Verträge, nicht den Wortlaut
 der Dokumentation oder die Konsolendarstellung. Ein erzeugtes Patchpaket, ein

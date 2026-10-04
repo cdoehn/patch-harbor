@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 import errno
+import json
 from pathlib import Path
 from uuid import UUID
 
@@ -39,22 +40,23 @@ def test_result_bundle_filename_starts_with_repository_and_uses_short_run_id() -
 
 
 def _publish(publication: ResultBundlePublication, **options) -> None:
+    from patchharbor.result_bundle import _context_document, _manifest_document
     final_path = publication.final_path
+    report = successful_bundle_run_report(final_path.parent / "repository", final_path)
+    snapshot = build_result_bundle_snapshot(base_entries=(), staged_patch=b"", unstaged_patch=b"", untracked_entries=())
+    context = _context_document(report)
+    environment = {
+        "marker": "patch-harbor-environment", "format_version": 1, "bundle_type": "Result",
+        "repository_context": {k: context[k] for k in ("repo_id", "base_commit", "state_fingerprint", "fingerprint_algorithm")},
+        "run_id": report.run_id_text, "bundle_suffix": "",
+    }
     publish_result_bundle(
         publication,
-        manifest={},
-        context_document={},
-        handoff=BundleHandoff(b"contract\n", b"{}\n"),
-        run_report=successful_bundle_run_report(
-            final_path.parent / "repository",
-            final_path,
-        ),
-        snapshot=build_result_bundle_snapshot(
-            base_entries=(),
-            staged_patch=b"",
-            unstaged_patch=b"",
-            untracked_entries=(),
-        ),
+        manifest=_manifest_document(report=report, snapshot=snapshot),
+        context_document=context,
+        handoff=BundleHandoff(b"contract\n", json.dumps(environment).encode()),
+        run_report=report,
+        snapshot=snapshot,
         **options,
     )
 
