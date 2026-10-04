@@ -255,5 +255,20 @@ with ZipFile(Path('../dist') / name) as wheel:
         assert archive.read("patchharbor/_runtime_identity.py") != generated.read_bytes()
     assert resource.read_bytes() == b"stale generated recipe"
     assert stale.read_bytes() == b"raise AssertionError('stale code must never ship')\n"
-    _run([sys.executable, "-B", "-c", "import build_backend; build_backend.build_wheel('../dist')"], source, os.environ.copy())
+    outside = tmp_path / "outside"
+    foreign = outside / "patchharbor"
+    foreign.mkdir(parents=True)
+    (foreign / "__init__.py").write_bytes(b"raise AssertionError('foreign CWD package imported')\n")
+    (foreign / "runtime_wheel.py").write_bytes(b"raise AssertionError('foreign generator imported')\n")
+    script = '''
+import os, sys
+sys.path.insert(0, sys.argv[1])
+import build_backend
+os.chdir(sys.argv[2])
+sys.path.insert(0, sys.argv[2])
+build_backend.build_wheel(sys.argv[3])
+assert 'patchharbor' not in sys.modules
+'''
+    _run([sys.executable, "-I", "-B", "-c", script, str(source), str(outside), str(output)],
+         outside, os.environ.copy())
     assert wheel.read_bytes() == first

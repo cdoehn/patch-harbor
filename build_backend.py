@@ -5,13 +5,9 @@ builds retain setuptools semantics and intentionally have no portable runtime.
 """
 from __future__ import annotations
 
-import base64
-import csv
 from email.parser import BytesParser
 from email.policy import default as email_policy
-import hashlib
 import importlib.util
-import io
 import os
 from pathlib import Path
 import shutil
@@ -45,14 +41,52 @@ def _recipe_module():
     return module
 
 
-def _record(payloads: dict[str, bytes], path: str) -> bytes:
-    stream = io.StringIO(newline="")
-    writer = csv.writer(stream, lineterminator="\n")
-    for name, raw in sorted(payloads.items()):
-        digest = base64.urlsafe_b64encode(hashlib.sha256(raw).digest()).rstrip(b"=").decode()
-        writer.writerow((name, "sha256=" + digest, len(raw)))
-    writer.writerow((path, "", ""))
-    return stream.getvalue().encode("utf-8")
+def _prepare_recipe(runtime, payloads: dict[str, bytes], *, version: str, requires_python: str):
+    """Build-only recipe construction; validate with the anchored runtime reader."""
+    dist_info = f"patchharbor-{version}.dist-info/"
+    doc = {
+        "marker": "patch-harbor-runtime-recipe", "format_version": 1,
+        "distribution": "patchharbor", "version": version, "requires_python": requires_python,
+        "content_id_algorithm": runtime.CONTENT_ALGORITHM, "source_commit": None,
+        "entries": [{"path": name,
+                     "source": runtime.RESOURCE_ROOT + "metadata/" + name[len(dist_info):] if name.startswith(dist_info) else name,
+                     "size": len(raw), "sha256": runtime.sha256(raw)} for name, raw in sorted(payloads.items())],
+    }
+    doc["content_id"] = runtime.sha256(runtime.recipe_json(doc))
+    return runtime.parse_recipe(runtime.recipe_json(doc))
+
+
+def _prepare_transport(runtime, transport: dict[str, bytes], *, version: str,
+                       requires_python: str, chat: bytes, documentation: bytes) -> dict[str, bytes]:
+    """Prepare one transport inventory without filesystem or request ownership."""
+    dist_info = f"patchharbor-{version}.dist-info"
+    canonical = {name: raw for name, raw in transport.items()
+                 if name.startswith(("patchharbor/", "patchharbor_watcher/"))
+                 and not name.startswith(runtime.RESOURCE_ROOT) and name != runtime.IDENTITY_PATH}
+    canonical[runtime.CHAT_PATH] = chat
+    canonical[runtime.DOC_PATH] = documentation
+    for name, raw in transport.items():
+        if name.startswith(dist_info + "/") and not name.endswith("/RECORD"):
+            suffix = name[len(dist_info) + 1:]
+            if suffix == "WHEEL":
+                raw = runtime.WHEEL_METADATA
+            canonical[name] = raw
+            canonical[runtime.RESOURCE_ROOT + "metadata/" + suffix] = raw
+    initial = _prepare_recipe(runtime, canonical, version=version, requires_python=requires_python)
+    canonical[runtime.IDENTITY_PATH] = runtime.identity_module(runtime.producer_id(initial))
+    recipe = _prepare_recipe(runtime, canonical, version=version, requires_python=requires_python)
+    # A successful build must already materialize the candidate later read from
+    # an ordinary installation, without preserving its downloaded transport.
+    runtime.materialize(recipe, lambda name, size: canonical[name])
+    record_path = dist_info + "/RECORD"
+    prepared = {name: raw for name, raw in transport.items()
+                if not name.startswith(runtime.RESOURCE_ROOT) and name != record_path}
+    prepared.update({name: raw for name, raw in canonical.items()
+                     if name.startswith(runtime.RESOURCE_ROOT) or name == runtime.IDENTITY_PATH})
+    prepared[runtime.RECIPE_PATH] = recipe.data
+    prepared[record_path] = runtime.wheel_record(
+        ((name, runtime.sha256(raw), len(raw)) for name, raw in prepared.items()), record_path)
+    return prepared
 
 
 def build_wheel(wheel_directory, config_settings=None, metadata_directory=None):
@@ -91,35 +125,11 @@ def build_wheel(wheel_directory, config_settings=None, metadata_directory=None):
         if metadata_name != dist_info + "/METADATA" or filename != f"patchharbor-{version}-py3-none-any.whl":
             raise RuntimeError("unexpected transport identity")
         recipe_module = _recipe_module()
-        # Rebuild from the current transport every time, never stale source data.
-        canonical = {name: raw for name, raw in transport.items()
-                     if name.startswith(("patchharbor/", "patchharbor_watcher/"))
-                     and not name.startswith(recipe_module.RESOURCE_ROOT)}
-        canonical[recipe_module.CHAT_PATH] = (source / "CHAT_INSTRUCTIONS.md").read_bytes()
-        canonical[recipe_module.DOC_PATH] = (source / "docs/python-api.md").read_bytes()
-        for name, raw in transport.items():
-            if name.startswith(dist_info + "/") and not name.endswith("/RECORD"):
-                suffix = name[len(dist_info) + 1:]
-                if suffix == "WHEEL":
-                    raw = recipe_module.WHEEL_METADATA
-                canonical[name] = raw
-                canonical[recipe_module.RESOURCE_ROOT + "metadata/" + suffix] = raw
-        initial = recipe_module.prepare_recipe(canonical, version=version, requires_python=requires)
-        canonical[recipe_module.IDENTITY_PATH] = recipe_module.identity_module(recipe_module.producer_id(initial))
-        recipe = recipe_module.prepare_recipe(canonical, version=version, requires_python=requires)
-        # A successful build must already materialize the identical candidate
-        # later reconstructed from an ordinary installed transport wheel.
-        recipe_module.materialize(recipe, lambda name, size: canonical[name])
-        for name in tuple(transport):
-            if name.startswith(recipe_module.RESOURCE_ROOT):
-                del transport[name]
-        transport.update({name: raw for name, raw in canonical.items()
-                          if name.startswith(recipe_module.RESOURCE_ROOT)})
-        transport[recipe_module.IDENTITY_PATH] = canonical[recipe_module.IDENTITY_PATH]
-        transport[recipe_module.RECIPE_PATH] = recipe.data
-        record_path = dist_info + "/RECORD"
-        del transport[record_path]
-        transport[record_path] = _record(transport, record_path)
+        transport = _prepare_transport(
+            recipe_module, transport, version=version, requires_python=requires,
+            chat=(source / "CHAT_INSTRUCTIONS.md").read_bytes(),
+            documentation=(source / "docs/python-api.md").read_bytes(),
+        )
         staged = Path(temporary) / (filename + ".prepared")
         with ZipFile(staged, "w", compression=ZIP_DEFLATED) as wheel:
             for name, raw in sorted(transport.items()):

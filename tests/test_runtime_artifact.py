@@ -15,6 +15,7 @@ from zipfile import ZipFile, ZIP_STORED
 
 import pytest
 
+from build_backend import _prepare_recipe, _prepare_transport
 from patchharbor.runtime_artifact import RuntimeProvider
 from patchharbor import runtime_wheel as runtime
 from patchharbor.platform.filesystem import FileReadLimitExceeded, read_stable_regular_file_bounded
@@ -131,7 +132,7 @@ def test_content_id_covers_changed_code_of_same_version(prepared):
     recipe = _recipe(prepared)
     payloads = {entry.path: prepared[entry.source] for entry in recipe.entries}
     payloads["patchharbor/api.py"] += b"\n# different build\n"
-    other = runtime.prepare_recipe(payloads, version=recipe.version, requires_python=recipe.requires_python)
+    other = _prepare_recipe(runtime, payloads, version=recipe.version, requires_python=recipe.requires_python)
     assert other.version == recipe.version
     assert other.content_id != recipe.content_id
 
@@ -229,7 +230,7 @@ def test_consistently_rehashed_but_incompatible_metadata_is_rejected(prepared, c
         name = recipe.dist_info + "/WHEEL"
         payloads[name] = payloads[name].replace(b"py3-none-any", b"py3-none-win_amd64")
     payloads[runtime.RESOURCE_ROOT + "metadata/" + name.split("/", 1)[1]] = payloads[name]
-    modified = runtime.prepare_recipe(payloads, version=recipe.version, requires_python=recipe.requires_python)
+    modified = _prepare_recipe(runtime, payloads, version=recipe.version, requires_python=recipe.requires_python)
     with pytest.raises(runtime.RuntimeDataError):
         runtime.materialize(modified, lambda name, size: payloads[name])
 
@@ -248,6 +249,22 @@ def test_provider_does_not_write_or_start_processes(prepared, tmp_path, monkeypa
     monkeypatch.setattr(subprocess, "Popen", forbidden)
     assert provider.capture().status == "embedded"
     assert {p.relative_to(tmp_path): p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()} == before
+
+
+def test_repreparing_transport_replaces_stale_resources_without_mutating_input(prepared):
+    recipe = _recipe(prepared)
+    stale = dict(prepared)
+    for name in tuple(stale):
+        if name.startswith(runtime.RESOURCE_ROOT) or name == runtime.IDENTITY_PATH:
+            stale[name] = b"stale generated data"
+    stale[runtime.RESOURCE_ROOT + "obsolete.json"] = b"discard this old resource"
+    before = dict(stale)
+    rebuilt = _prepare_transport(runtime, stale, version=recipe.version,
+                                 requires_python=recipe.requires_python,
+                                 chat=prepared[runtime.CHAT_PATH], documentation=prepared[runtime.DOC_PATH])
+    assert stale == before
+    assert rebuilt == prepared
+    assert _capture(rebuilt) == _capture(prepared)
 
 
 @pytest.mark.parametrize("data,limit", [(b"", 0), (b"abc", 3), (b"abc", 2)])

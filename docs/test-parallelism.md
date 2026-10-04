@@ -124,6 +124,15 @@ PowerShell- und Docker-Gates bleiben blockierend und verwenden die parallele
 Runner-Policy. Keine optionalen Tests, kein continue-on-error und keine stillen
 Retries.
 
+Seit der Nutzeranweisung vom 4. Oktober 2026 läuft reguläre GitHub-CI nur nach
+jeweils fünf weiteren Bundles: Basis ist der manuelle Lauf zu Bundle 009,
+nächste Stände 014, 019 usw., nach tatsächlichem Apply/Push. Zwischenbundles
+brauchen keinen eigenen Lauf; fehlende CI auf ihrem Commit allein blockiert
+keinen Folgepatch. Bekannte CI-Fehler weiter auswerten; zusätzliche Läufe nur
+auf ausdrücklichen Auftrag. Native Freigaben gelten für die tatsächlich
+geprüften Stände. Die lokalen parallelen bzw. finalen seriellen/parallelen
+Gates bleiben unverändert.
+
 Die native Packaging-Lane speichert seit `1.c.R-FIX1` ihren Controller-Bericht
 unter `${{ runner.temp }}/patchharbor-packaging-tests.json` und lädt ihn auch bei
 Fehlern als `patchharbor-packaging-<runner>` hoch (14 Tage Aufbewahrung).

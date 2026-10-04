@@ -95,6 +95,29 @@ def test_installed_template_is_resolved_from_distribution_file_record(tmp_path: 
         load_chat_template()
 
 
+@pytest.mark.parametrize("directory", ["src", "site-packages"])
+@pytest.mark.parametrize("available", [True, False])
+def test_prepared_template_owns_lookup_even_in_directory_named_src(tmp_path, monkeypatch, directory, available):
+    module = tmp_path / directory / "patchharbor/chat_instructions.py"
+    resources = module.parent / "_runtime"
+    resources.mkdir(parents=True)
+    module.touch()
+    (tmp_path / CHAT_INSTRUCTIONS_NAME).write_bytes(b"adjacent source lookalike\n")
+    template = resources / CHAT_INSTRUCTIONS_NAME
+    if available:
+        template.write_bytes(b"own prepared producer\n")
+    monkeypatch.setattr(instructions_module, "__file__", str(module))
+    monkeypatch.chdir(tmp_path)
+    def forbidden(*args):
+        pytest.fail("prepared installation searched legacy distribution metadata")
+    monkeypatch.setattr(instructions_module.metadata, "distribution", forbidden)
+    if available:
+        assert load_chat_template() == "own prepared producer\n"
+    else:
+        with pytest.raises(PatchHarborError):
+            load_chat_template()
+
+
 # Write exact bytes rather than relying on the host's text-mode newline
 # translation: these Windows regressions must fail on Linux before the fix too.
 LINE_ENDING_CASES = [

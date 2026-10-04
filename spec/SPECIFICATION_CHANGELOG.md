@@ -1,5 +1,31 @@
 # PatchHarbor – Spezifikations-Changelog
 
+
+## 2026-10-04 – RIV 1.c.C: Build-/Runtime-Trennung und CI-Takt
+
+- Bundle 009 tatsächlich angewendet als
+  `f4b0920cadac710cd48568fb16d517e9c92fe692`, abschließend seriell und parallel
+  je 2.008 bestanden / 7 Skips, ein normaler Push, sauberer Baum.
+- Manueller Acceptance-Lauf 37206108132, Versuch 1 auf genau diesem HEAD:
+  alle sechs Jobs erfolgreich, Windows-Packaging 65 bestanden / 1 POSIX-Skip.
+  GATE-RUNTIME bestätigt; vollständiges Joblog und Metadaten gesichert.
+  Maschinenbericht im CI-Controller geprüft; separater lokaler Artefakt-Download
+  netzbedingt nicht möglich, keine behauptete lokale JSON-Nachprüfung.
+- `1.c.C` als 9/18 vorbereitet; 8 Feature-Schritte durch Apply bestätigt.
+  Build-Rezept und Transportvorbereitung ins Backend begrenzt, Materializer
+  und unveränderlicher request-lokaler Provider bleiben installiert nutzbar.
+- Gemeinsame Rezeptkodierung und RECORD-Serialisierung bei getrennten Inventaren;
+  vorbereitete eigene Vorlage vor Source-/share-Fallback, auch unter `src`.
+- Funktionale Regressionen für unveränderte Eingabeinventare, veraltete Ressourcen,
+  Generatorherkunft und Vorlagenbesitz. Keine neuen Darstellungs-/Prosatests.
+- Nutzerregel vom 4. Oktober: CI ausschließlich manuell alle fünf weiteren
+  Bundles, nach Basis 009 nächste 014 und 019. Zwischencommits benötigen keinen
+  eigenen CI-Lauf. Bekannte Fehler auswerten; Zusatzläufe nur auf Nutzerauftrag.
+- Development nur parallel; Apply-Endstand seriell, danach parallel, ein Commit
+  und ein normaler Push. Null-/Mehrcommit-Bundles bleiben erlaubt. Wheel-Ausfall
+  verwendet weiterhin den bisherigen sicheren Übergabeweg. Kein Format-2-Writer,
+  keine Versionserhöhung und keine neue Releasefreigabe.
+
 ## 2026-10-04 – RIV 1.c.R-FIX3: Windows-DACL-Readback
 
 - Bundle 008 durch echten Apply auf `31d8d2274facaac2b6590ab39ca9ac83b3ab6357`

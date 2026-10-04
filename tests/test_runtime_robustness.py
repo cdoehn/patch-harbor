@@ -10,6 +10,7 @@ from zipfile import ZipFile
 
 import pytest
 
+from build_backend import _prepare_recipe
 from patchharbor import runtime_artifact as provider_module
 from patchharbor import runtime_wheel as runtime
 from patchharbor.runtime_artifact import RuntimeProvider
@@ -24,9 +25,9 @@ def test_loaded_producer_rejects_coherent_same_version_replacement(prepared, tmp
     recipe = _recipe(prepared)
     payloads = {entry.path: prepared[entry.source] for entry in recipe.entries}
     payloads[runtime.CHAT_PATH] += b"\nUpdated producer template.\n"
-    initial = runtime.prepare_recipe(payloads, version=recipe.version, requires_python=recipe.requires_python)
+    initial = _prepare_recipe(runtime, payloads, version=recipe.version, requires_python=recipe.requires_python)
     payloads[runtime.IDENTITY_PATH] = runtime.identity_module(runtime.producer_id(initial))
-    changed = runtime.prepare_recipe(payloads, version=recipe.version, requires_python=recipe.requires_python)
+    changed = _prepare_recipe(runtime, payloads, version=recipe.version, requires_python=recipe.requires_python)
     payloads[runtime.RECIPE_PATH] = changed.data
     next_process = _provider_tree(payloads, tmp_path)
     assert pending.capture().reason == "source_changed"
@@ -120,7 +121,7 @@ def test_rehashed_identity_module_is_data_not_executed_code(prepared, tmp_path):
     recipe = _recipe(prepared)
     payloads = {entry.path: prepared[entry.source] for entry in recipe.entries}
     payloads[runtime.IDENTITY_PATH] = b"raise AssertionError('must never execute described code')\n"
-    changed = runtime.prepare_recipe(payloads, version=recipe.version, requires_python=recipe.requires_python)
+    changed = _prepare_recipe(runtime, payloads, version=recipe.version, requires_python=recipe.requires_python)
     payloads[runtime.RECIPE_PATH] = changed.data
     result = _provider_tree(payloads, tmp_path).capture()
     assert result.status == "unavailable" and result.reason == "resources_invalid"

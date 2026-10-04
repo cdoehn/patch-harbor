@@ -1,7 +1,7 @@
 """Finite, versioned data recipe for the canonical dependency-free runtime wheel.
 
-Only standard-library data operations live here. The build backend uses this
-same implementation; consuming a recipe never imports its described modules.
+Only standard-library data operations live here. The build backend creates the
+recipe; this module validates and materializes it without importing its modules.
 """
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ import hashlib
 import io
 import json
 import re
-from typing import Callable
+from typing import Callable, Iterable
 from zipfile import ZIP_STORED, ZipFile, ZipInfo
 
 
@@ -88,7 +88,8 @@ def _require(condition: bool, message: str) -> None:
         raise RuntimeDataError(message)
 
 
-def _json(document: object) -> bytes:
+def recipe_json(document: object) -> bytes:
+    """The versioned recipe/producer encoding, shared with the build backend."""
     return (json.dumps(document, sort_keys=True, ensure_ascii=True,
                        separators=(",", ":"), allow_nan=False) + "\n").encode("ascii")
 
@@ -246,23 +247,8 @@ def parse_recipe(raw: bytes) -> RuntimeRecipe:
         for i in range(1, len(entry.path.split("/"))):
             _require("/".join(entry.path.split("/")[:i]).casefold() not in names, "file/directory collision")
     unsigned = {k: v for k, v in doc.items() if k != "content_id"}
-    _require(sha256(_json(unsigned)) == content_id and _json(doc) == raw, "recipe content ID or encoding mismatch")
+    _require(sha256(recipe_json(unsigned)) == content_id and recipe_json(doc) == raw, "recipe content ID or encoding mismatch")
     return RuntimeRecipe(version, requires, content_id, commit, tuple(entries), raw)
-
-
-def prepare_recipe(payloads: dict[str, bytes], *, version: str, requires_python: str) -> RuntimeRecipe:
-    """Build-time only: derive the self-description, without an archive self-hash."""
-    dist_info = f"patchharbor-{version}.dist-info/"
-    doc = {
-        "marker": "patch-harbor-runtime-recipe", "format_version": 1,
-        "distribution": "patchharbor", "version": version, "requires_python": requires_python,
-        "content_id_algorithm": CONTENT_ALGORITHM, "source_commit": None,
-        "entries": [{"path": name,
-                     "source": RESOURCE_ROOT + "metadata/" + name[len(dist_info):] if name.startswith(dist_info) else name,
-                     "size": len(raw), "sha256": sha256(raw)} for name, raw in sorted(payloads.items())],
-    }
-    doc["content_id"] = sha256(_json(doc))
-    return parse_recipe(_json(doc))
 
 
 def producer_id(recipe: RuntimeRecipe) -> str:
@@ -271,7 +257,7 @@ def producer_id(recipe: RuntimeRecipe) -> str:
     This deliberately differs from content_id: the final recipe also inventories
     the generated identity module. Neither digest contains itself.
     """
-    return sha256(_json({
+    return sha256(recipe_json({
         "algorithm": PRODUCER_ALGORITHM, "version": recipe.version,
         "requires_python": recipe.requires_python, "source_commit": recipe.source_commit,
         "entries": [{"path": e.path, "source": e.source, "size": e.size, "sha256": e.sha256}
@@ -285,15 +271,18 @@ def identity_module(resource_id: str) -> bytes:
     return (f'# Generated at wheel build; no runtime work.\nRESOURCE_ID = "{resource_id}"\n').encode("ascii")
 
 
-def _record(recipe: RuntimeRecipe) -> bytes:
-    inventory = [(entry.path, entry.sha256, entry.size) for entry in recipe.entries]
-    inventory.append((RECIPE_PATH, sha256(recipe.data), len(recipe.data)))
+def wheel_record(inventory: Iterable[tuple[str, str, int]], record_path: str) -> bytes:
+    """Serialize validated (path, hex SHA-256, size) facts, excluding RECORD.
+
+    Transport and canonical wheels share this encoding, not their inventories.
+    Callers retain their own path/profile validation and resource budgets.
+    """
     record = io.StringIO(newline="")
     writer = csv.writer(record, lineterminator="\n")
     for name, digest, size in sorted(inventory):
         encoded = base64.urlsafe_b64encode(bytes.fromhex(digest)).rstrip(b"=").decode("ascii")
         writer.writerow((name, "sha256=" + encoded, size))
-    writer.writerow((recipe.dist_info + "/RECORD", "", ""))
+    writer.writerow((record_path, "", ""))
     return record.getvalue().encode("utf-8")
 
 
@@ -303,7 +292,9 @@ def materialize(recipe: RuntimeRecipe, read: Callable[[str, int], bytes]) -> byt
     # by constructing one with different paths, limits or provenance.
     _require(parse_recipe(recipe.data) == recipe, "recipe value differs from its bytes")
     record_path = recipe.dist_info + "/RECORD"
-    record = _record(recipe)
+    inventory = [(entry.path, entry.sha256, entry.size) for entry in recipe.entries]
+    inventory.append((RECIPE_PATH, sha256(recipe.data), len(recipe.data)))
+    record = wheel_record(inventory, record_path)
     sizes = [(entry.path, entry.size) for entry in recipe.entries]
     sizes.extend(((RECIPE_PATH, len(recipe.data)), (record_path, len(record))))
     # Budget the complete archive, including derived data, before resource reads.

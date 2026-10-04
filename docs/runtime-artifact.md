@@ -1,6 +1,7 @@
 # Kanonische Runtime, Rezeptformat 1
 
-Stand 1.c.R mit Abnahmekorrektur 1.c.R-FIX1: interner Provider, Herkunftsprüfung und Buildverfahren. Neue Results bleiben Format 1;
+Stand 1.c.C mit nativ bestätigten Abnahmekorrekturen FIX1–FIX3:
+interner Provider, Herkunftsprüfung und getrenntes Buildverfahren. Neue Results bleiben Format 1;
 Reader-/Writer-Integration folgt in 1.d/1.e. `RuntimeProvider().capture()` ist
 ein expliziter interner Aufruf, kein neuer CLI-Befehl oder öffentlicher API-Export.
 Source-/Editable-Betrieb liefert `unavailable/source_not_prepared`; normale
@@ -14,6 +15,22 @@ Quellbaum zu verändern. Der Wheel-Build verwendet eine frische private Kopie
 der definierten Build-Eingaben; `build/lib`, egg-info, Bytecode und zuvor
 generierte Runtime-Ressourcen werden nicht übernommen. Frontend-Metadaten werden
 über ihren absoluten Pfad an setuptools weitergegeben. `MANIFEST.in` nimmt den Backend-Code in die sdist auf.
+Die Rezept-Erzeugung und Vorbereitung des Transportinventars liegen nur in
+`build_backend.py`; diese Buildfunktionen werden nicht im Runtime-Wheel installiert.
+`runtime_wheel.py` besitzt den stdlib-basierten Rezeptvalidator und den reinen
+Materializer. `runtime_artifact.py` übernimmt begrenzte Ressourcenreads und den
+unveränderlichen Besitz pro Request. CLI, API und Watcher erhalten keine eigenen
+Generatoren oder voneinander abweichenden Provider.
+
+Das Backend lädt den gemeinsamen Validator über seinen eigenen absoluten
+Quellpfad. Ein fremdes Arbeitsverzeichnis oder gleichnamiges Paket darf ihn
+nicht ersetzen. Transportvorbereitung verändert ihr Eingabeinventar nicht;
+veraltete erzeugte Ressourcen und Identitätsdaten werden vollständig neu
+abgeleitet. Rezept-/Produzenten-JSON und RECORD haben jeweils genau einen
+Serializer. Nur die Bytekodierung ist geteilt: Transport- und kanonisches
+Inventar sowie deren Pfad-/Profilregeln bleiben verschieden. Andere vorhandene
+Hash-/Pfadhelfer mit abweichenden Verträgen werden nicht zusammengezogen.
+
 Git, Installer-Caches und ein ursprüngliches Download-Wheel sind keine
 Build-Eingaben. `source_commit` ist deshalb ehrlich `null`.
 
@@ -21,7 +38,10 @@ Der Transport behält die bisherigen `share/patchharbor`-Dokumente. Das kanonisc
 Wheel enthält ausschließlich Code in `patchharbor`/`patchharbor_watcher`, Typing,
 Paketressourcen und die eigene `.dist-info`-Struktur. Der Vorlagenloader bevorzugt
 die Ressourcen beim verankerten Produzentencode; alte Installationen behalten
-ihren share-Fallback. Ein defekter vorbereiteter Satz wird nicht durch die
+ihren share-Fallback. Reihenfolge: eigene vorbereitete Paketressource,
+verankerte Quellvorlage, Legacy-share-Vorlage. Das gilt auch bei einer installierten
+Paketwurzel namens `src` mit zufällig daneben liegender Quellvorlage.
+Ein defekter vorbereiteter Satz wird nicht durch die
 Vorlage einer anderen Installation ersetzt.
 
 Das geschlossene Rezept enthält `marker=patch-harbor-runtime-recipe`,
@@ -176,26 +196,44 @@ Die [automatische Vererbung](https://learn.microsoft.com/en-us/windows/win32/sec
 und [Bedeutung der ACE-Reihenfolge](https://learn.microsoft.com/en-us/windows/win32/secauthz/order-of-aces-in-a-dacl)
 begründen die begrenzte Ausnahme vom früheren Darstellungsvergleich.
 
-Die lokale Abnahme von FIX3 ist ausschließlich parallel. Sie prüft die exakten
-CI-SDDL-Paare und Fehler-/Journalpfade, ersetzt aber keine native Windows-Ausführung.
-GATE-RUNTIME bleibt bis zum erfolgreichen manuellen Lauf auf dem tatsächlichen
-neuen Apply-Commit vor 1.c.C/1.d/1.e offen. Produktcode und Result-Writer bleiben unverändert.
+Der manuelle [Acceptance-Lauf 37206108132, Versuch 1](https://github.com/cdoehn/patch-harbor/actions/runs/37206108132)
+bestätigt FIX3 auf dem tatsächlichen Apply-Commit
+`f4b0920cadac710cd48568fb16d517e9c92fe692` aus Bundle 009. Alle sechs Jobs sind
+erfolgreich, einschließlich beider Ubuntu-/Docker-Lanes und Windows.
+Windows-Packaging besteht unter Python 3.12 mit 65 bestandenen Tests und genau
+einem POSIX-Skip. Die nativen DACL-Fälle beider Engines und der Standardinstallations-
+Roundtrip sind damit bestätigt; GATE-RUNTIME ist für diese Basis erfüllt.
+Die lokale Abnahme von 1.c.C bleibt ausschließlich parallel.
 
-Für den fehlenden Nachweis nach tatsächlichem Apply/Push den vorhandenen
-Acceptance-Workflow manuell auf dem betreffenden vollständigen Commit starten.
-Er bleibt `workflow_dispatch` ohne automatische Auslöser. Die nativen Lanes
-laden `patchharbor-packaging-<runner>` mit `patchharbor-packaging-tests.json`
-als Artefakt hoch; Aufbewahrung 14 Tage, fehlender Bericht ist ein Fehler.
-Vor Freigabe sind Run-HEAD, Run-Versuch und erfolgreiche Windows-/Linux-Jobs
-zuzuordnen. `tools.test_results.validate` muss den vollständigen Bericht
-akzeptieren; der Windows-Bericht muss `binding.platform == "Windows"`, einen
-passenden Interpreter und `expected_workers > 0` enthalten. Insbesondere müssen
-diese Fälle bestanden sein, nicht übersprungen oder nur gesammelt:
+Der Launcher aktiviert den Evidenz-Controller auch ohne Berichtdatei. Vor
+Exit 0 prüft er `tools.test_results.validate`, alle Worker-/Phasenbelege und die
+unveränderte Quellen-/Interpreterbindung. Der erfolgreiche CI-Schritt belegt
+diese Prüfung im Windows-Controller. Run- und Jobdaten sowie das vollständige
+Windows-Log sind im Exchange gesichert. Artefaktmetadaten einschließlich SHA-256
+wurden abgeholt; der separate lokale Download der Artefaktbytes scheiterte an
+der Netzsperre. Eine erneute lokale JSON-Prüfung wird deshalb nicht behauptet.
+
+Die nativen Lanes laden `patchharbor-packaging-<runner>` mit
+`patchharbor-packaging-tests.json` hoch (14 Tage); fehlende Dateien sind Fehler.
+Für CI-Nachweise werden Run-HEAD, Versuch und tatsächliche Windows-/Linux-Jobs
+zugeordnet. Ein vollständig abgeholter Bericht wird zusätzlich mit
+`tools.test_results.validate` geprüft; seine Bindung muss die native Plattform,
+den passenden Interpreter und `expected_workers > 0` bestätigen. Die CI-Prüfung
+im Controller bleibt in jedem Lauf Pflicht. Insbesondere müssen folgende Fälle
+bestanden sein, nicht übersprungen oder nur gesammelt:
 
 - `test_standard_installation_and_three_offline_canonical_generations`: wheel/source/sdist.
 - `test_native_permissions_deny_writes_and_restore`: beide Verbraucherfälle.
 - `test_windows_dacl_restore_after_completed_setup_error`: powershell.exe und pwsh.
 - Die vorhandenen gleichversionierten Neuinstallations- und Editable-Fälle.
+
+GitHub-CI bleibt ausschließlich manuell. Nach dem Lauf zu Bundle 009 erst nach
+fünf weiteren Bundles wieder regulär CI: 014, 019 usw., nach deren Apply/Push.
+Zwischenbundles benötigen keinen eigenen Lauf und bleiben nicht allein wegen
+fehlender CI auf ihrem Einzelcommit stehen. Zusätzliche Läufe nur auf ausdrücklichen
+Nutzerauftrag; bekannte Fehler weiter auswerten. Der grüne Lauf von Bundle 009
+wird nicht als Windows-Ausführung von Bundle 010 ausgegeben. Lokale Gates und
+GATE-RUNTIME-Verhaltensanforderungen bleiben verbindlich.
 
 Die Testnamen beziehen sich auf `test_runtime_packaging.py` und
 `test_runtime_permissions.py`. Der Quellhash bindet die tatsächlichen Checkout-

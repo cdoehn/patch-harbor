@@ -3444,6 +3444,15 @@ Die frühere serielle CI-Lane wurde durch CI-MANUAL-1 abgelöst. Verbindlich ist
 Linux-/Windows-/PowerShell-/Docker-Gates bleiben erhalten. Der Modusverifier
 ist ein explizites Diagnosewerkzeug und kein automatisch gestarteter CI-Schritt.
 
+Nutzeranweisung vom 4. Oktober 2026: reguläre GitHub-CI erst nach jeweils fünf
+weiteren Bundles. Zählbasis ist der tatsächliche manuelle Lauf zu Bundle 009;
+nächste reguläre CI nach Apply/Push von Bundle 014, dann 019 usw. Zwischenbundles
+verlangen keinen eigenen Lauf; fehlende CI auf ihrem einzelnen Commit allein
+blockiert keinen Folgepatch. Ältere CI-Takt-/Vorcommit-Vorgaben sind damit ersetzt.
+Bekannte CI-Fehler werden weiter ausgewertet, native Nachweise bleiben an den
+wirklich geprüften Stand gebunden. Zusätzliche CI nur auf ausdrücklichen Auftrag;
+keine automatischen Auslöser oder Wiederholungen. Lokale Gates bleiben erhalten.
+
 Die Nutzeranweisung vom 3. Oktober 2026 ersetzt die frühere doppelte Prüfung
 vor jedem Zwischencommit: Development führt ausschließlich parallele Tests aus.
 Im Apply prüft `.venv/bin/python tools/run_tests.py --suite all` jeden
@@ -3511,11 +3520,12 @@ GitHub-CI wird ausschließlich manuell gestartet.
 
 ## 35. Erweiterungsziel und Geltungsbereich
 
-**Stand:** 4. Oktober 2026, **Repository-Integration Revision 9 auf Grundlage der
+**Stand:** 4. Oktober 2026, **Repository-Integration Revision 10 auf Grundlage der
 Exchange-Revision 2**. **Basis:** PatchHarbor-Quellstand 1.2.1 aus dem Result
 `patchharbor-apply_Result_073436_1003_116272.zip`, Commit
 `68dba9216b72dc0b6441df83f49c9047b8b038b9`. **Status:** schrittweise in Umsetzung; Paketprüfung gemäß
-1.a/1.b und Runtime-Bereitstellung/-Robustheit 1.c.W/R angewendet, 1.c.R-FIX1/FIX2 angewendet, DACL-Readback-Korrektur 1.c.R-FIX3 im Dateistand vorbereitet;
+1.a/1.b und Runtime-Bereitstellung/-Robustheit 1.c.W/R samt FIX1–FIX3 angewendet;
+GATE-RUNTIME auf Bundle 009 nativ bestätigt, Cleanup 1.c.C im Dateistand vorbereitet;
 Format 2 und die Runtime-Gesamtfreigabe folgen. Die nächste Release-Versionsnummer
 wird gesondert festgelegt; 1.2.1 bezeichnet bereits den vorhandenen Quellstand.
 Das Result nennt separat die ausführende Engine 1.2.0; dies ist keine abweichende
@@ -3688,10 +3698,19 @@ Drei Identitäten bleiben getrennt: `distribution_version` für die Paketversion
 
 Ein Quellcommit wird nur angegeben, wenn belegt, und ersetzt keine Inhaltsprüfung. Die Herkunft besagt Zuordnung zum erzeugenden Werkzeug, nicht eine digitale Signatur oder Releasefreigabe. Vor Benutzung werden Inventar, Reproduktionsbeschreibung und vorliegende Ressourcen konsistent geprüft; ein Hash derselben untrusted Quelle beweist keinen Absender.
 
-Der Dateistand 1.c.W/R konkretisiert dies durch `build_backend.py`,
+Der Dateistand 1.c.W/R/C konkretisiert dies durch `build_backend.py`,
 `runtime_wheel.py` und den request-lokalen `RuntimeProvider`. Der Build ergänzt
 das Transport-Wheel um `_runtime`-Paketressourcen; Source-/sdist-Builds verwenden
 denselben Backend-Vertrag. Der Provider ist noch nicht mit Result-Writern verbunden.
+Die Erzeugung von Rezept und Transportressourcen erfolgt ausschließlich im
+Buildbackend. Die installierte Runtime enthält den lesenden Validator und
+Materializer; `RuntimeProvider` besitzt die unveränderliche Requestantwort.
+Beide Wege verwenden dieselbe Rezeptkodierung und RECORD-Serialisierung,
+mit ihren jeweiligen Inventaren und Pfadregeln. Der Backend-Generator wird
+relativ zum eigenen Backend geladen, niemals aus einem fremden Arbeitsordner.
+Bei Vorlagen haben eigene vorbereitete Paketressourcen Vorrang vor einem
+verankerten Source-Template und dem bisherigen share-Fallback. Ein defekter
+vorbereiteter Satz darf keine Vorlage einer anderen Installation auswählen.
 Der genaue zyklusfreie Algorithmus steht in `docs/runtime-artifact.md`.
 Vor Result-Integration bleiben GATE-RUNTIME und der Roundtrip gemäß 38.5 erforderlich;
 eine Linux-Abnahme behauptet keine Windows- oder Releasefreigabe.
@@ -3748,7 +3767,9 @@ Flags dürfen ihre Reihenfolge ändern. Schutz-/Requestflags, Verlust von `AI` u
 eine Umordnung über Deny-/Objekt-/Callback-ACEs oder Flaggruppen hinweg bleiben
 Fehler. Vollständiger nativer UTF-8-JSON-Readback ist Pflicht; Exit-Code 0 allein
 genügt nicht. Echte DACL-Abweichungen und unvollständige Belege erhalten das private
-Journal. Die erfolgreiche Windows-Ausführung bleibt vor GATE-RUNTIME erforderlich.
+Journal. Die erfolgreiche Windows-Ausführung bleibt vor GATE-RUNTIME erforderlich;
+sie ist für FIX3 durch Lauf 37206108132 auf dem tatsächlichen Apply-Commit
+`f4b0920cadac710cd48568fb16d517e9c92fe692` bestätigt (65 Packaging-Tests / 1 POSIX-Skip).
 
 Editable-/direkter Quellbetrieb ist keine freigegebene portable Runtime-Quelle. Fehlt ein nachweislich passender vorbereiteter Ressourcensatz oder wurde der Quellstand verändert, ist `unavailable` mit Grund `source_not_prepared` beziehungsweise `source_changed` zulässig. Dies beeinträchtigt nicht die Arbeit am Quellcode und erlaubt keine stillen Builds während eines Requests. Es darf nicht dazu führen, dass normale nicht-editierbare Installation dauerhaft ohne Runtime ausgeliefert wird.
 
@@ -3954,7 +3975,9 @@ Commits und Abschlussprüfungen führt der Apply-Entrypoint genau einen normalen
 Push auf den bestätigten Zielbranch aus. Diagnosebundles mit null Commits
 pushen nicht. Kein Zwischenpush, Reset/Rollback oder automatischer Tag.
 Die aktuelle Acceptance-CI startet ausschließlich manuell per
-`workflow_dispatch`; ein Push ist keine CI-Ausführung oder CI-Freigabe.
+`workflow_dispatch` im Fünf-Bundle-Takt nach Abschnitt 33 (014, 019 usw.
+nach Basis 009); ein Push ist keine CI-Ausführung oder CI-Freigabe.
+Zwischenbundles dürfen ohne eigenen CI-Lauf weitergeführt werden.
 
 Die Dokumentübernahme verändert ausschließlich Spezifikation, Plan und Changelog
 und erledigt keinen der 18 Umsetzungspunkte. Paketversion und Releasezustand
