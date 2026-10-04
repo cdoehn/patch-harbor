@@ -1,5 +1,25 @@
 # PatchHarbor – Spezifikations-Changelog
 
+## 2026-10-04 – RIV 1.c.R-FIX3: Windows-DACL-Readback
+
+- Bundle 008 durch echten Apply auf `31d8d2274facaac2b6590ab39ca9ac83b3ab6357`
+  bestätigt; abschließend seriell und parallel je 1.974 bestanden / 7 Skips,
+  genau ein Push, sauberer Baum. Feature-Zähler bleibt 8/18.
+- Manueller CI-Lauf 37191971893, Versuch 1: fünf Jobs erfolgreich; Windows-
+  Packaging 8 Fehler / 23 bestanden / 1 Skip. Fehlerdiagnosen zeigen ergänztes
+  `AI` und umgeordnete benachbarte gleichartige Allow-ACEs nach Set-Acl.
+- Original-DACLs weiter zurückschreiben; vollständigen UTF-8-JSON-Readback gegen
+  das Journal prüfen. Ausschließlich Hinzufügen von `AI` und Umordnung unmittelbar
+  benachbarter einfacher Allow-ACEs mit identischen Flags akzeptieren.
+- Rechte, SIDs, übrige Kontroll-/ACE-Flags, Anzahl und Duplikate bleiben exakt;
+  Deny-/Objekt-/Callback-ACEs und Flaggruppen bilden feste Reihenfolgegrenzen.
+  Ungültige Berichte und echte Unterschiede scheitern mit erhaltenem Journal.
+- Regressionen mit den vier echten CI-SDDL-Paaren, unabhängigen Zugriffsentscheidungen
+  und fehlerhaften Readbacks. Keine Text-/Layouttests und keine Produkt-ACL-Änderung.
+- Development nur parallel; Apply am einzigen Endstand vollständig seriell und
+  danach parallel vor einem Commit und einem Push. Native Windows-Abnahme bleibt
+  offen (REDUCED_TEST_SCOPE); kein automatischer CI-Start und kein vorgezogener C-Schritt.
+
 ## 2026-10-04 – RIV 1.c.R-FIX2: CI-Testvoraussetzungen und Fehlerdiagnose
 
 **FIX:** unverändert 8/18. FIX1 angewendet als

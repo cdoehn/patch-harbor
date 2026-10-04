@@ -11,6 +11,7 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $section = [System.Security.AccessControl.AccessControlSections]::Access
 $encoding = [System.Text.UTF8Encoding]::new($false)
+[Console]::OutputEncoding = $encoding
 $rootPath = [System.IO.Path]::GetFullPath($Root).TrimEnd('\')
 $journalPath = [System.IO.Path]::GetFullPath($Journal)
 $comparison = [System.StringComparison]::OrdinalIgnoreCase
@@ -83,18 +84,19 @@ if ($Action -eq 'deny') {
             $failures += "restore '$($record.path)': $($_.Exception.Message)"
         }
     }
-    foreach ($record in $saved.entries) {
+    $readback = @(foreach ($record in $saved.entries) {
         try {
             $actual = (Get-Acl -LiteralPath $record.path).GetSecurityDescriptorSddlForm($section)
-            if ($actual -ne $record.sddl) {
-                throw "Restored DACL differs: expected '$($record.sddl)'; actual '$actual'"
-            }
+            @{ path = $record.path; sddl = $actual }
         } catch {
             $failures += "verify '$($record.path)': $($_.Exception.Message)"
         }
-    }
+    })
     if ($failures.Count -ne 0) {
         throw ("ACL restoration failed for $($failures.Count) operations; keep private journal`n" +
                ($failures -join "`n"))
     }
+    # The caller verifies every saved DACL against this complete native readback.
+    # JSON avoids host formatting/line wrapping and preserves non-ASCII paths.
+    @{ root = $rootPath; entries = $readback } | ConvertTo-Json -Depth 5 -Compress
 }

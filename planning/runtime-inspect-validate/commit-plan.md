@@ -1,12 +1,12 @@
-# PatchHarbor – RIV-Implementierungsplan, Repository-Revision 8
+# PatchHarbor – RIV-Implementierungsplan, Repository-Revision 9
 ## Inspect / Validate über API und CLI · Offline-Runtime · Result-Format 2 · Chat-Handoff
 
 **Stand:** 4. Oktober 2026. **Status:** aktive Entwicklung;
 **8 von 18 Umsetzungsschritten im Dateistand vorbereitet**. Nächster Schritt: `1.c.C`,
 erst nach vollständigem GATE-RUNTIME einschließlich Windows-Nachweis.
 P0 sowie 1.a, 1.b und 1.c.W/R sind durch echte Apply-Results bestätigt.
-`1.c.R-FIX1` ist angewendet; der Dateistand bereitet `1.c.R-FIX2` für die
-CI-Testvoraussetzungen und unverdeckte Wiederherstellungsfehler vor; kein neuer Planpunkt.
+`1.c.R-FIX1` und `1.c.R-FIX2` sind angewendet; der Dateistand bereitet
+`1.c.R-FIX3` für den Windows-DACL-Readback vor; kein neuer Planpunkt.
 **Bereich:** RIV (Runtime / Inspect / Validate). **Paketbasis:** 1.2.1.
 **Zielversion:** gesondert festzulegen; keine Versionsanhebung oder Releasefreigabe durch Dokumentation.
 
@@ -191,7 +191,7 @@ Die PowerShell-Fixture meldet gescheiterte Wiederherstellungsoperationen mit
 Pfad und Fehlergrund sowie abweichende gespeicherte/tatsächliche Deskriptoren.
 Ihre strikte DACL-Prüfung und Journalaufbewahrung bleiben erhalten.
 
-**Weiterhin offen / REDUCED_TEST_SCOPE:** Die genaue Ursache der zusätzlichen
+**Bei Auslieferung von Bundle 008 offen / REDUCED_TEST_SCOPE:** Die genaue Ursache der zusätzlichen
 pwsh-Wiederherstellungsabweichung war im ersten CI-Log verdeckt. Sie wird durch
 diese Diagnoseverbesserung nicht als behoben behauptet. Windows muss den neuen
 Stand real ausführen; ebenso die Docker-Lanes. Lokal stehen weder Windows noch
@@ -200,6 +200,48 @@ Wheel prüft die gemeldete Installationsannahme separat, ersetzt jedoch Docker/W
 nicht. GATE-RUNTIME bleibt vor 1.c.C/1.d/1.e gesperrt. Kein automatischer CI-Start.
 Lokaler Vollnachweis ausschließlich parallel:
 `exchange/reports/patchharbor-riv-008-1.c.R-FIX2-parallel.json`.
+
+**FIX2 angewendet / Basis für Bundle 009:**
+`patchharbor-apply_Result_090228_1004_2718ed.zip`, 760967 Bytes, SHA-256
+`669633a245c94e6f087d489d6bd482c38cfd9bd313cfa39defcba705b55d822f`.
+Echter Apply von Bundle 008: abschließend seriell 1.974 bestanden / 7 übersprungen
+in 497,28 Sekunden, danach parallel dieselben Ergebnisse in 201,95 Sekunden.
+Commit `31d8d2274facaac2b6590ab39ca9ac83b3ab6357`, genau ein normaler Push auf `dev`,
+sauberer Baum. Alle 238 Base-Dateien stimmten mit dem Development-Ausgang überein.
+Neue vollständige Bindung: repo_id `e7a93d72-62dc-4759-97e8-6bf6cdf10e90`,
+base_commit `31d8d2274facaac2b6590ab39ca9ac83b3ab6357`,
+state_fingerprint `7c9d2a24e397e0e5`, fingerprint_algorithm `patchharbor-state-v1`.
+
+**CI-Befund und Bundle 009 / FIX `1.c.R-FIX3`, unverändert 8/18:**
+`Fix: verify restored Windows ACLs across native inheritance normalization [RIV 1.c.R-FIX3]`.
+Der manuelle [Acceptance-Lauf 37191971893, Versuch 1](https://github.com/cdoehn/patch-harbor/actions/runs/37191971893)
+auf genau diesem HEAD meldet fünf erfolgreiche Jobs (Linux, Docker, separates
+PowerShell 7); nur Windows-Packaging scheitert mit 8 Fehlern / 23 bestandenen
+Tests / 1 Skip. Das vollständige Joblog 111405903594 zeigt vier wiederkehrende
+SDDL-Paare: ergänztes Auto-Inheritance-Flag `AI` und teilweise umgeordnete
+benachbarte einfache Allow-ACEs mit identischen Flags. Die Rechte selbst sind
+in diesen Paaren vollständig erhalten. Die Set-Acl-Restoreoperation meldet
+keinen Fehler; der bisherige Textgleichheitsvergleich scheitert am Readback.
+
+Die Korrektur schreibt weiterhin die Original-DACLs zurück und verlangt danach
+einen vollständigen UTF-8-JSON-Readback. Verglichen werden sämtliche Objekte,
+Kontrollflags und ACEs. Nur `AI` darf hinzukommen; nur unmittelbar benachbarte
+einfache Allow-ACEs mit identischen Flags dürfen ihre Reihenfolge tauschen.
+Rechte, SIDs, Vererbungsflags, Duplikate und Anzahl bleiben exakt erhalten;
+Deny-/Objekt-/Callback-Einträge und Flagwechsel sind feste Reihenfolgegrenzen.
+Ungültige/unvollständige Berichte oder echte Rechteabweichungen lassen den Lauf
+mit erhaltenem Journal scheitern. Produkt-ACLs und Runtime-Code ändern sich nicht.
+Diese begründete Korrektur der Testannahme ist in Spec 38.5 und
+`docs/runtime-artifact.md` ausdrücklich beschrieben; keine pauschale Ignorierung
+von Reihenfolge oder Rechten und kein neuer Produktvertrag.
+
+Lokaler Vollnachweis ausschließlich parallel:
+`exchange/reports/patchharbor-riv-009-1.c.R-FIX3-parallel.json`.
+**REDUCED_TEST_SCOPE:** Kein natives Windows in dieser Entwicklungskopie. Die
+Regressionen prüfen die echten CI-Deskriptoren, ein unabhängiges Zugriffsmodell
+und die vollständige Subprozess-/Journalprüfung mit kontrollierter OS-Grenze.
+GATE-RUNTIME bleibt offen; nach Apply/Push ist der manuelle native CI-Lauf auf
+dem neuen Commit erforderlich. Keine Vorwegnahme von 1.c.C oder Writer 2.
 
 **Repositoryrollen:** Development unter
 `/home/christian/Codex/patchharbor/patchharbor-codex` erzeugt und prüft Dateistände
@@ -239,7 +281,7 @@ bei abweichender Development-Wurzel `CWD_MISMATCH`, keine Änderung.
 
 Jeder Zwischenstand wird wirklich hergestellt, getestet und erst dann committed. Ein finaler Working Tree mit künstlich aufgeteiltem Staging ist kein WRC-Nachweis. Commit-IDs werden nach dem Commit aus Git übernommen, nicht im eigenen Commit vorweg erfunden.
 
-### 2.1 Commitübersicht – 8/18 durch Apply bestätigt, FIX1 angewendet, zusätzliche Korrektur 1.c.R-FIX2 vorbereitet
+### 2.1 Commitübersicht – 8/18 durch Apply bestätigt, FIX1/FIX2 angewendet, zusätzliche Korrektur 1.c.R-FIX3 vorbereitet
 
 | Nr. | Kennung | Commit-Subject | Voraussetzung | Paket |
 |---:|---|---|---|---|
@@ -477,7 +519,7 @@ Kleinen standardbibliotheksbasierten Materializer für definierte Reihenfolge, f
 
 #### 1.c.R – 8/18: `fix(runtime): verify provenance bounds and cold-cache roundtrips`
 
-**Status:** angewendet/gepusht als `5e27c78d190a642d60eac55f767bc69dc086ac48`; Windows-Abnahme fehlgeschlagen; `1.c.R-FIX1` angewendet, `1.c.R-FIX2` im Dateistand vorbereitet. **Abhängigkeit:** 1.c.W. **Spec:** 38 vollständig; 39.3 Vorbedingungen.
+**Status:** angewendet/gepusht als `5e27c78d190a642d60eac55f767bc69dc086ac48`; Windows-Abnahme fehlgeschlagen; `1.c.R-FIX1/FIX2` angewendet, `1.c.R-FIX3` im Dateistand vorbereitet. **Abhängigkeit:** 1.c.W. **Spec:** 38 vollständig; 39.3 Vorbedingungen.
 
 **Ergebnis:** Der Provider erkennt geänderte Daten und bleibt bei Fehlern, Reinstallation und parallelen Requests eindeutig.
 
@@ -816,7 +858,7 @@ Jeder später abgeschlossene Eintrag enthält Plan-ID, tatsächlichen Commit, ur
 Fertig ist die Erweiterung erst mit nutzbarer API und CLI, konstant reproduzierbarer Runtime aus Standardinstallationen, sicherer Formatintegration, erhaltenen Sicherheitsgrenzen, ausgeführten Offline-/Roundtrip-Gates, aktueller installierter Anleitung und grüner CI für den tatsächlichen finalen HEAD. „0 Commits offen“ allein ist kein Freigabenachweis.
 
 **Status dieses Dateistands:** 8/18 vorbereitet, 10 weitere Schritte offen.
-P0, 1.a, 1.b, 1.c.W/R und 1.c.R-FIX1 sind angewendet/gepusht; 1.c.R-FIX2 wartet
+P0, 1.a, 1.b, 1.c.W/R und 1.c.R-FIX1/FIX2 sind angewendet/gepusht; 1.c.R-FIX3 wartet
 auf den echten Apply-Nachweis. Der Fix erhöht den Planzähler nicht. Paketprüfung, beide Bindungsmodi und interne Runtime sind vorhanden;
 Windows-/GATE-RUNTIME-Abnahme, C-Schritt und Result-Format 2 stehen aus.
 Quellenstand bleibt Exchange-Revision 2.

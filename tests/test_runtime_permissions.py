@@ -24,9 +24,11 @@ def test_acl_child_rebuilds_module_paths_without_changing_parent(tmp_path, monke
     calls = []
     def run(command, **options):
         calls.append((command, options["env"]))
-        return subprocess.CompletedProcess(command, 0, "", "")
+        return subprocess.CompletedProcess(command, 0, journal.read_text(), "")
     monkeypatch.setattr(permissions.subprocess, "run", run)
     root, journal = tmp_path / "owned tree", tmp_path / "journal.json"
+    journal.write_text(json.dumps({"root": str(root), "entries": [
+        {"path": str(root), "sddl": "D:(A;;FA;;;SY)"}]}))
     for action in ("deny", "restore"):
         permissions._run_acl(action, root, journal, environment)
     assert len(calls) == 2 and environment == before

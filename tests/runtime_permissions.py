@@ -8,6 +8,8 @@ import shutil
 import subprocess
 import tempfile
 
+from tests.runtime_acl import verify_restored_dacls
+
 
 def _owned_paths(root: Path, owner: Path) -> list[Path]:
     if not root.is_absolute() or root.is_symlink() or root.is_junction():
@@ -41,6 +43,8 @@ def _run_acl(action: str, root: Path, journal: Path, environment: dict[str, str]
     )
     if result.returncode:
         raise RuntimeError(f"native ACL {action} failed: {result.stdout}{result.stderr}")
+    if action == "restore":
+        verify_restored_dacls(journal, result.stdout)
 
 
 @contextmanager

@@ -2,16 +2,16 @@
 
 **Dateiname:** `SPECIFICATION.md`<br>
 **Produktversion:** `1.2.1`<br>
-**Spezifikationsstand:** 2026-10-04 · RIV-Integration Revision 8<br>
+**Spezifikationsstand:** 2026-10-04 · RIV-Integration Revision 9<br>
 **Status:** Verbindliche, freigegebene Produktspezifikation für den Bestandsvertrag 1.2.1; keine Release-Freigabe des konkreten Commits ohne grüne Gates.<br>
-**RIV-Status:** Paketprüfung, Bindungsmodi und Runtime-Bereitstellung/-Robustheit (1.a/1.b/1.c.W/R) durch Apply bestätigt; Native Rechteabnahme 1.c.R-FIX1 angewendet, CI fehlgeschlagen; Testsetup-/Diagnosekorrektur 1.c.R-FIX2 im Entwicklungsstand. Windows-/GATE-RUNTIME-Abnahme und Result-Format 2 folgen. Keine Release-Freigabe.<br>
+**RIV-Status:** Paketprüfung, Bindungsmodi und Runtime-Bereitstellung/-Robustheit (1.a/1.b/1.c.W/R) durch Apply bestätigt; 1.c.R-FIX1/FIX2 angewendet, Windows-Packaging weiterhin fehlgeschlagen; DACL-Readback-Korrektur 1.c.R-FIX3 im Entwicklungsstand. Windows-/GATE-RUNTIME-Abnahme und Result-Format 2 folgen. Keine Release-Freigabe.<br>
 **Projektname:** `PatchHarbor`<br>
 **Kommando:** `patchharbor`<br>
 **Skriptmarker:** `# PATCHHARBOR`<br>
 **Patch-Paketmarker:** `patch-harbor`
 
 Der aktive Entwicklungsplan für Runtime / Inspect / Validate (RIV) liegt unter
-`planning/runtime-inspect-validate/commit-plan.md`: 8 von 18 Schritten angewendet; 1.c.R-FIX1 angewendet, 1.c.R-FIX2 vorbereitet, unveränderter Planzähler.
+`planning/runtime-inspect-validate/commit-plan.md`: 8 von 18 Schritten angewendet; 1.c.R-FIX1/FIX2 angewendet, 1.c.R-FIX3 vorbereitet, unveränderter Planzähler.
 Die Zielversion dieser Erweiterung wird gesondert festgelegt; die vorhandene
 Paketversion bleibt 1.2.1. Die abgeschlossenen Pläne unter `planning/1.2.1/`,
 `planning/1.2.0/`, `planning/1.1.1/`, `planning/1.1.0/` und `planning/1.0.0/`
@@ -3511,11 +3511,11 @@ GitHub-CI wird ausschließlich manuell gestartet.
 
 ## 35. Erweiterungsziel und Geltungsbereich
 
-**Stand:** 4. Oktober 2026, **Repository-Integration Revision 7 auf Grundlage der
+**Stand:** 4. Oktober 2026, **Repository-Integration Revision 9 auf Grundlage der
 Exchange-Revision 2**. **Basis:** PatchHarbor-Quellstand 1.2.1 aus dem Result
 `patchharbor-apply_Result_073436_1003_116272.zip`, Commit
 `68dba9216b72dc0b6441df83f49c9047b8b038b9`. **Status:** schrittweise in Umsetzung; Paketprüfung gemäß
-1.a/1.b und Runtime-Bereitstellung/-Robustheit 1.c.W/R angewendet, native Rechteabnahme 1.c.R-FIX1 angewendet, Testsetup-/Diagnosekorrektur 1.c.R-FIX2 im Dateistand vorbereitet;
+1.a/1.b und Runtime-Bereitstellung/-Robustheit 1.c.W/R angewendet, 1.c.R-FIX1/FIX2 angewendet, DACL-Readback-Korrektur 1.c.R-FIX3 im Dateistand vorbereitet;
 Format 2 und die Runtime-Gesamtfreigabe folgen. Die nächste Release-Versionsnummer
 wird gesondert festgelegt; 1.2.1 bezeichnet bereits den vorhandenen Quellstand.
 Das Result nennt separat die ausführende Engine 1.2.0; dies ist keine abweichende
@@ -3737,8 +3737,18 @@ Der erste echte Acceptance-Lauf von 1.c.R-FIX1 scheiterte unter Windows und in
 Docker; er ist keine Freigabe. 1.c.R-FIX2 isoliert die Modulpfade der nativen
 Testprozesse und die Quellinstallation für den Quellbetriebsnachweis. Erwartete
 injizierte Testfehler dürfen echte Setup-/Wiederherstellungsfehler nicht verdecken.
-DACL-Abweichungen bleiben Fehler mit erhaltenem privaten Journal; ihre konkrete
-Ursache und erfolgreiche Behebung brauchen weiterhin einen nativen Nachweis.
+Der Folge-Lauf von FIX2 belegt unter Windows eine unzulässige Testannahme:
+Set-Acl kann `AI` ergänzen und gleichartige benachbarte Allow-ACEs umordnen.
+FIX3 ersetzt den reinen SDDL-Textvergleich durch einen konservativen Readback-
+Vergleich ausschließlich für die private Testfixture. Die gespeicherten Original-
+DACLs werden weiterhin zurückgeschrieben. Vollständiges Objektinventar, sämtliche
+Rechte/SIDs/ACE-Flags und Eintragsanzahl einschließlich Duplikaten müssen erhalten
+bleiben. Nur `AI` darf hinzukommen; nur benachbarte einfache Allow-ACEs mit gleichen
+Flags dürfen ihre Reihenfolge ändern. Schutz-/Requestflags, Verlust von `AI` und
+eine Umordnung über Deny-/Objekt-/Callback-ACEs oder Flaggruppen hinweg bleiben
+Fehler. Vollständiger nativer UTF-8-JSON-Readback ist Pflicht; Exit-Code 0 allein
+genügt nicht. Echte DACL-Abweichungen und unvollständige Belege erhalten das private
+Journal. Die erfolgreiche Windows-Ausführung bleibt vor GATE-RUNTIME erforderlich.
 
 Editable-/direkter Quellbetrieb ist keine freigegebene portable Runtime-Quelle. Fehlt ein nachweislich passender vorbereiteter Ressourcensatz oder wurde der Quellstand verändert, ist `unavailable` mit Grund `source_not_prepared` beziehungsweise `source_changed` zulässig. Dies beeinträchtigt nicht die Arbeit am Quellcode und erlaubt keine stillen Builds während eines Requests. Es darf nicht dazu führen, dass normale nicht-editierbare Installation dauerhaft ohne Runtime ausgeliefert wird.
 

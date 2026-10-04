@@ -120,7 +120,7 @@ Schreib-, Verzeichniserzeugungs-, Umbenennungs- und Löschversuche müssen schei
 Der Prüfablauf ersetzt weder Rechtevergabe noch Benutzerverwaltung im Produkt.
 
 Nach Erfolg und Ausnahmen werden die ursprünglichen DACLs zurückgeschrieben
-und gegen ihre gespeicherte Darstellung geprüft. Bei einem Fehler während der
+und gegen einen vollständigen nativen Readback geprüft. Bei einem Fehler während der
 Wiederherstellung bleibt ausschließlich das private Journal zur Diagnose erhalten.
 Unverwandte Dateien, ACLs außerhalb der privaten Fixture, Owner und Audit-Regeln
 werden nicht verändert. POSIX root kann Modebits umgehen: ein solcher Lauf
@@ -141,13 +141,45 @@ auf. Die aufrufende Umgebung wird nicht verändert. Das beseitigt den bekannten
 Der native Regressionstest gibt bewusst einen ungeeigneten geerbten Modulpfad vor.
 
 Der Teilsetup-Test unterscheidet seine eigene injizierte Ausnahme von nativen
-Fehlern. Die strikte DACL-Wiederherstellung meldet Pfade, einzelne Fehler und
-abweichende Deskriptoren, bevor sie mit erhaltenem Journal scheitert. Im ersten
-pwsh-Lauf wurde dieser Fehler verdeckt; seine genaue Ursache bleibt offen und
-wird durch die neue Diagnose nicht als behoben erklärt. Die Linux-Prüfung von
-1.c.R-FIX2 erfolgt ausschließlich parallel, zusätzlich aus einer installierten
-Wheel-Umgebung. Native Windows-/Docker-Nachweise für den neuen Stand stehen aus;
-GATE-RUNTIME bleibt vor 1.c.C/1.d/1.e offen.
+Fehlern. 1.c.R-FIX2 legte die zuvor verdeckten Wiederherstellungsdiagnosen offen.
+Der zweite [CI-Lauf 37191971893, Versuch 1](https://github.com/cdoehn/patch-harbor/actions/runs/37191971893)
+auf HEAD `31d8d2274facaac2b6590ab39ca9ac83b3ab6357` bestätigt erfolgreiche Linux-,
+Docker- und PowerShell-7-Plattformjobs. Windows-Packaging meldet 8 Fehler,
+23 bestandene Tests und 1 Skip. Sämtliche 6.302 im vollständigen Joblog enthaltenen
+SDDL-Vergleichspaare (einschließlich Wiederholungen) gehören zu vier Formen:
+Windows ergänzt `AI`, bei der Probe-Datei ändert sich zusätzlich die Reihenfolge
+benachbarter einfacher Allow-Einträge mit gleichen Flags. Es gibt dort keine
+gemeldeten Fehler der Set-Acl-Restoreoperation selbst.
+
+1.c.R-FIX3 korrigiert deshalb den bisherigen Textgleichheitsvergleich, nicht die
+gespeicherten Rechte. Set-Acl schreibt weiterhin den unveränderten Original-SDDL
+jedes Objekts zurück. PowerShell liefert danach alle Pfade und ausgelesenen DACLs
+als UTF-8-JSON. `tests/runtime_acl.py` prüft das vollständige Inventar gegen das
+private Journal; Exit-Code 0 allein genügt nicht. Doppelte Felder/Pfade, fehlende
+oder zusätzliche Objekte und ungültige Berichte scheitern mit erhaltenem Journal.
+
+Der Vergleich lässt ausschließlich Folgendes zu:
+
+- Gleichbleibende Kontrollflags oder ein von Windows ergänztes `AI`; Verlust von
+  `AI` sowie jede Änderung von `P` oder `AR` bleiben Fehler.
+- Umordnung benachbarter einfacher Allow-ACEs mit exakt gleichen ACE-Flags.
+  Masken, SIDs, Flags, Eintragsanzahl und Duplikate müssen vollständig gleich sein.
+  Deny-, Objekt-/Callback-ACEs und andere Flaggruppen bilden feste Reihenfolgegrenzen.
+
+Das ist eine konservative Vergleichsregel für private Testfixtures, kein
+allgemeiner ACL-Normalisierer. Unbekannte komplexe Darstellungen werden nur bei
+exakter Gleichheit akzeptiert. Ein unabhängiges Zugriffsentscheidungsmodell prüft
+die erlaubten Umordnungen; Gegenproben ändern Rechte, SIDs, Flags, Einträge und
+Allow-/Deny-Reihenfolge. Echte Schreib-/Löschverweigerung, Setup-/Verbraucherfehler,
+gleichzeitige Fixtures und beide Windows-Engines bleiben im nativen Testumfang.
+Die [automatische Vererbung](https://learn.microsoft.com/en-us/windows/win32/secauthz/automatic-propagation-of-inheritable-aces)
+und [Bedeutung der ACE-Reihenfolge](https://learn.microsoft.com/en-us/windows/win32/secauthz/order-of-aces-in-a-dacl)
+begründen die begrenzte Ausnahme vom früheren Darstellungsvergleich.
+
+Die lokale Abnahme von FIX3 ist ausschließlich parallel. Sie prüft die exakten
+CI-SDDL-Paare und Fehler-/Journalpfade, ersetzt aber keine native Windows-Ausführung.
+GATE-RUNTIME bleibt bis zum erfolgreichen manuellen Lauf auf dem tatsächlichen
+neuen Apply-Commit vor 1.c.C/1.d/1.e offen. Produktcode und Result-Writer bleiben unverändert.
 
 Für den fehlenden Nachweis nach tatsächlichem Apply/Push den vorhandenen
 Acceptance-Workflow manuell auf dem betreffenden vollständigen Commit starten.
