@@ -1,10 +1,11 @@
-# PatchHarbor – RIV-Implementierungsplan, Repository-Revision 15
+# PatchHarbor – RIV-Implementierungsplan, Repository-Revision 16
 ## Inspect / Validate über API und CLI · Offline-Runtime · Result-Format 2 · Chat-Handoff
 
 **Stand:** 5. Oktober 2026. **Status:** aktive Entwicklung;
-**14 von 18 Umsetzungsschritten im Dateistand vorbereitet**, davon 12 durch Apply
+**15 von 18 Umsetzungsschritten im Dateistand vorbereitet**, davon 12 durch Apply
 bestätigt. `1.e.W` ist mit 2.145 bestandenen Tests / 7 Skips parallel geprüft
-und als echter Zwischenstand eingefroren; Bundle 013 setzt mit `1.e.R` fort. Bundle 012 ist tatsächlich angewendet,
+und als echter Zwischenstand eingefroren. `1.e.R` ist mit 2.165 bestanden / 7 Skips
+ebenfalls parallel bestätigt und eingefroren; Bundle 013 schließt mit `1.e.C`. Bundle 012 ist tatsächlich angewendet,
 GATE-READERS und GATE-RUNTIME sind bestätigt. Nächste reguläre CI: Bundle 014.
 **Bereich:** RIV (Runtime / Inspect / Validate). **Paketbasis:** 1.2.1.
 **Zielversion:** gesondert festzulegen; keine Versionsanhebung oder Releasefreigabe durch Dokumentation.
@@ -405,7 +406,7 @@ bei abweichender Development-Wurzel `CWD_MISMATCH`, keine Änderung.
 
 Jeder Zwischenstand wird wirklich hergestellt, getestet und erst dann committed. Ein finaler Working Tree mit künstlich aufgeteiltem Staging ist kein WRC-Nachweis. Commit-IDs werden nach dem Commit aus Git übernommen, nicht im eigenen Commit vorweg erfunden.
 
-### 2.1 Commitübersicht – 12/18 durch Apply bestätigt, 1.e.W/R als 14/18 vorbereitet
+### 2.1 Commitübersicht – 12/18 durch Apply bestätigt, 1.e.W/R/C als 15/18 vorbereitet
 
 | Nr. | Kennung | Commit-Subject | Voraussetzung | Paket |
 |---:|---|---|---|---|
@@ -759,7 +760,7 @@ Format 2 standardmäßig aktivieren und genau zwei neue Runtime-Einträge bei em
 
 #### 1.e.R – 14/18: `fix(result): preserve snapshots across runtime and self-update failures`
 
-**Status:** umgesetzt; Freigabe nur mit vollständigem parallelem R-Nachweis, noch kein Apply-Commit. **Abhängigkeit:** 1.e.W. **Spec:** 38.4–38.5, 39 vollständig.
+**Status:** lokal parallel bestätigt (2.165 bestanden / 7 Skips), Dateistand eingefroren; noch kein Apply-Commit. **Abhängigkeit:** 1.e.W. **Spec:** 38.4–38.5, 39 vollständig.
 
 **Ergebnis:** Selbstupdates, Watcher und Fehlerpublikation bleiben reproduzierbar und diagnostisch eindeutig.
 
@@ -777,7 +778,7 @@ Result A → frische installierte Runtime → Result B → weitere frische Runti
 
 #### 1.e.C – 15/18: `refactor(result): simplify pinned publication lifecycle`
 
-**Status:** offen. **Abhängigkeit:** 1.e.R. **Spec:** 38.4, 39, 41.2.
+**Status:** umgesetzt; Freigabe nur mit vollständigem parallelem C-Nachweis und unveränderter Testsammlung, noch kein Apply-Commit. **Abhängigkeit:** 1.e.R. **Spec:** 38.4, 39, 41.2.
 
 **Ergebnis:** Ein kleiner gemeinsamer Lifecycle für gepinnte Ressourcen und atomare Results.
 
@@ -983,7 +984,7 @@ Jeder später abgeschlossene Eintrag enthält Plan-ID, tatsächlichen Commit, ur
 
 Fertig ist die Erweiterung erst mit nutzbarer API und CLI, konstant reproduzierbarer Runtime aus Standardinstallationen, sicherer Formatintegration, erhaltenen Sicherheitsgrenzen, ausgeführten Offline-/Roundtrip-Gates, aktueller installierter Anleitung und grüner CI für den tatsächlichen finalen HEAD. „0 Commits offen“ allein ist kein Freigabenachweis.
 
-**Status dieses Dateistands:** 14/18 vorbereitet, 12/18 durch tatsächlichen Apply bestätigt.
+**Status dieses Dateistands:** 15/18 vorbereitet, 12/18 durch tatsächlichen Apply bestätigt.
 Bundle 012: `1.d.R` = `7dbb3a82a3db9b8ea4340cc433cf53f8452e7420`,
 `1.d.C` = `d48567ff7b2f61ea82f8cfba9c23415fab10706a`.
 Vollständige parallele Gates je Zustand; C abschließend seriell und parallel,
@@ -1007,9 +1008,10 @@ Standardpfad-Nachweise sind Bestandteil des verbindlichen parallelen W-Gates.
 1.e.R ergänzt reale Self-updates, drei Result-Generationen, Allokations-/ZIP-Messung
 und Fehlergrenzen bei der Publikation. Notfallberichte bewahren den zuletzt
 erfolgreich erfassten Kontext. W ist vollständig parallel bestätigt und eingefroren;
-R benötigt vor Freigabe seinen eigenen vollständigen Parallel-Nachweis.
-Development ausschließlich parallel. Als nächster echter Zustand bleibt 1.e.C,
-danach 1.f.W/R/C; nächste reguläre CI nach Apply/Push von Bundle 014 inklusive Windows.
+R ist ebenfalls vollständig bestätigt und eingefroren. C bündelt die Publikationsdaten,
+entfernt doppelte Übergaben und typisiert die Budgetgrenze. Freigabe erfordert
+einen eigenen vollständigen Parallel-Lauf mit identischer Sammlung und Ergebnissen.
+Development ausschließlich parallel. Nach tatsächlichem Apply folgen 1.f.W/R/C; nächste reguläre CI nach Apply/Push von Bundle 014 inklusive Windows.
 
 ## 9. Dokumentidentität und Quellen
 

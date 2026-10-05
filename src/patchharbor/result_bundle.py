@@ -10,6 +10,7 @@ from pathlib import Path
 from uuid import UUID
 
 from patchharbor.archive_git import completed_commit_for_context
+from patchharbor.bundle_handoff import BundleHandoff
 from patchharbor.configuration_context import configuration_paths_for_id
 from patchharbor.errors import (
     FailureReason,
@@ -36,6 +37,7 @@ from patchharbor.result_resources import (
 )
 from patchharbor.result_bundle_publication import (
     PublicationDurability,
+    PublishedResultBundle,
     ResultBundlePublication,
     prepare_result_bundle_publication,
     publish_result_bundle,
@@ -221,25 +223,53 @@ def _manifest_document(
     return document
 
 
-def _publication_documents(report, target, snapshot, resources, *,
-                           expected_manifest=None, receipt=None, execution_log=None):
+@dataclass(frozen=True, slots=True)
+class _ResultDocuments:
+    report: RunReport
+    handoff: BundleHandoff
+    manifest: dict[str, object]
+    context: dict[str, object]
+    runtime: ResultRuntimePayload
+
+
+def _publication_documents(
+    report: RunReport, target: ResultBundleTarget, snapshot: ResultBundleSnapshot,
+    resources: PinnedResultResources, *, expected_manifest: PatchManifest | None = None,
+    receipt: dict[str, object] | None = None, execution_log: bytes | None = None,
+) -> _ResultDocuments:
     """Choose a complete runtime payload before opening the publication ZIP."""
-    runtime = resources.runtime
     handoff = create_result_handoff(report, target, template=resources.require_template())
     context = _context_document(report, bundle_suffix=target.bundle_suffix)
-    for attempt in range(2):
-        report = replace(report, warnings=tuple(dict.fromkeys((*report.warnings, *runtime.warnings))))
-        manifest = _manifest_document(report=report, snapshot=snapshot, runtime=runtime,
+
+    def assemble(runtime: ResultRuntimePayload) -> _ResultDocuments:
+        completed = replace(report, warnings=tuple(dict.fromkeys((*report.warnings, *runtime.warnings))))
+        manifest = _manifest_document(report=completed, snapshot=snapshot, runtime=runtime,
                                       expected_manifest=expected_manifest)
         if receipt is not None:
             manifest.update(receipt)
-        if runtime.status != "embedded" or runtime_fits(
-            runtime, manifest=manifest, context_document=context, handoff=handoff,
-            run_report=report, snapshot=snapshot, execution_log=execution_log,
-        ):
-            return report, handoff, manifest, context, runtime
-        runtime = runtime_payload(None, reason="resource_limit")
-    raise result_bundle_error("cannot prepare bounded Result runtime")
+        return _ResultDocuments(completed, handoff, manifest, context, runtime)
+
+    documents = assemble(resources.runtime)
+    if resources.runtime.status == "embedded" and not runtime_fits(
+        documents.runtime, manifest=documents.manifest, context_document=context,
+        handoff=handoff, run_report=documents.report, snapshot=snapshot, execution_log=execution_log,
+    ):
+        documents = assemble(runtime_payload(None, reason="resource_limit"))
+    return documents
+
+
+def _publish_documents(
+    publication: ResultBundlePublication, documents: _ResultDocuments,
+    snapshot: ResultBundleSnapshot, run_directory: Path, *, execution_log: bytes | None = None,
+    before_publish: Callable[[str], None] | None = None,
+) -> PublishedResultBundle:
+    """Publish the same prepared document set for manual and Apply requests."""
+    _write_run_document(run_directory, documents.report)
+    return publish_result_bundle(
+        publication, manifest=documents.manifest, context_document=documents.context,
+        run_report=documents.report, handoff=documents.handoff, snapshot=snapshot,
+        runtime=documents.runtime, execution_log=execution_log, before_publish=before_publish,
+    )
 
 
 def _context_document(
@@ -402,22 +432,16 @@ def create_apply_result_bundle(
         receipt = (None if package_sha256 is None else
                    {"patch_sha256": package_sha256,
                     "completed_commit": str(completed_commit) if completed_commit else None})
-        report, handoff, manifest, context, runtime = _publication_documents(
+        documents = _publication_documents(
             report, target, captured.bundle_snapshot, resources,
             expected_manifest=expected_manifest, receipt=receipt, execution_log=execution_log)
+        report = documents.report
         warnings = report.warnings
         revalidate_result_bundle_target(target, registry_snapshot)
-        _write_run_document(run_directory, report)
-        publish_result_bundle(
-            publication,
-            manifest=manifest,
+        _publish_documents(
+            publication, documents, captured.bundle_snapshot, run_directory,
             before_publish=(before_publish if completed_commit is not None else None),
-            context_document=context,
-            run_report=report,
-            handoff=handoff,
-            snapshot=captured.bundle_snapshot,
             execution_log=execution_log,
-            runtime=runtime,
         )
     except PatchHarborError as exc:
         report = _apply_report(
@@ -534,22 +558,16 @@ def create_manual_result_bundle(
                 primary_result=PrimaryResult.success_result(),
                 result_bundle=ResultBundleResult.created(target.final_path),
             )
-            report, handoff, manifest, context_document, runtime = _publication_documents(
+            documents = _publication_documents(
                 report, target, bundle_snapshot, resources)
+            report = documents.report
             revalidate_result_bundle_target(target, locked_registry)
-            _write_run_document(run_directory, report)
             publication = prepare_result_bundle_publication(
                 target.final_path,
                 run_id=session.run_id,
             )
-            published = publish_result_bundle(
-                publication,
-                manifest=manifest,
-                context_document=context_document,
-                run_report=report,
-                handoff=handoff,
-                snapshot=bundle_snapshot,
-                runtime=runtime,
+            published = _publish_documents(
+                publication, documents, bundle_snapshot, run_directory,
             )
     except PatchHarborError as exc:
         raise _manual_bundle_failure(

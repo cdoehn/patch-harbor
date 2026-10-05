@@ -3,6 +3,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from hashlib import sha256
+from io import BytesIO
+from typing import TYPE_CHECKING
+from zipfile import ZipFile
 
 from patchharbor import __version__
 from patchharbor.chat_instructions import load_chat_template
@@ -12,6 +15,11 @@ from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY, ResourcePolicy
 from patchharbor.result_runtime import METADATA_PATH, UNAVAILABLE_REASONS
 from patchharbor.runtime_artifact import RuntimeArtifact, RuntimeProvider
 from patchharbor.runtime_wheel import CONTENT_ALGORITHM
+
+if TYPE_CHECKING:
+    from patchharbor.bundle_handoff import BundleHandoff
+    from patchharbor.result_bundle_snapshot import ResultBundleSnapshot
+    from patchharbor.run_report import RunReport
 
 
 def _descriptor(path: str, raw: bytes) -> dict[str, object]:
@@ -74,8 +82,6 @@ def runtime_payload(artifact: RuntimeArtifact | None, *, reason: str | None = No
                          "patch_formats": [1], "result_formats": [1, 2]},
     }
     # Reading central metadata does not extract or duplicate wheel payloads.
-    from io import BytesIO
-    from zipfile import ZipFile
     with ZipFile(BytesIO(artifact.wheel_bytes)) as archive:
         inner_bytes = sum(info.file_size for info in archive.infolist())
     return ResultRuntimePayload("embedded", None, serialize_json_document(doc).encode("utf-8"),
@@ -108,9 +114,11 @@ def capture_result_resources() -> PinnedResultResources:
     return PinnedResultResources(runtime, template)
 
 
-def runtime_fits(runtime: ResultRuntimePayload, *, manifest: dict[str, object],
-                 context_document: dict[str, object], handoff, run_report, snapshot,
-                 execution_log: bytes | None, policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY) -> bool:
+def runtime_fits(
+    runtime: ResultRuntimePayload, *, manifest: dict[str, object], context_document: dict[str, object],
+    handoff: BundleHandoff, run_report: RunReport, snapshot: ResultBundleSnapshot,
+    execution_log: bytes | None, policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY,
+) -> bool:
     """Check the exact outer payload and the shared inner-byte budget before publication."""
     contents = [serialize_json_document(doc).encode("utf-8") for doc in
                 (manifest, context_document, run_report.as_run_document())]

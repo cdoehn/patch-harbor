@@ -1,5 +1,17 @@
 # PatchHarbor – Spezifikations-Changelog
 
+## 2026-10-05 – RIV 1.e.C: gemeinsame Publikationsdaten
+
+- R vollständig parallel geprüft: 2.165 bestanden / 7 Skips; vor C eingefroren.
+- Ein typisierter interner Dokumentensatz verbindet Report, Handoff, Manifest,
+  Kontext und Runtime. Manueller und Apply-Pfad publizieren ihn über denselben Helfer.
+- Die Budgetentscheidung besitzt genau einen vorbereitenden Fallback ohne
+  Publikationswiederholung; doppelte Argumentübergaben entfallen.
+- Die Result-Roundtrip-Fixture führt jede Generation ohne redundante Fallunterscheidung aus.
+- 15/18 vorbereitet, 12/18 durch Apply bestätigt. C muss dieselbe vollständige
+  Testsammlung mit gleichen Ergebnissen bestehen. Apply: W/R parallel, C seriell
+  und danach parallel, drei Commits, ein abschließender Push; CI erst wieder 014.
+
 ## 2026-10-05 – RIV 1.e.R: Self-update, Result-Roundtrip und Fehlerdiagnose
 
 - W vollständig parallel geprüft: 2.145 bestanden / 7 Skips; Dateistand vor R eingefroren.

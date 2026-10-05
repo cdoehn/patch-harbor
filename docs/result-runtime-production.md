@@ -21,6 +21,10 @@ erkennt geänderte Ressourcen anhand ihrer Inhaltsidentität.
 | Snapshot war bereits erfolgreich erfasst | Notfallbericht behält dessen geprüften Kontext, auch nach einem neuen Commit |
 | Abbruchsignal | Keine Umdeutung in einen Runtime-Fallback oder erfolgreichen Lauf |
 
+Der gemeinsame interne Dokumentensatz hält Report, Handoff, Manifest, Kontext
+und Runtime zusammen. Beide Erzeugungswege nutzen denselben Publikationshelfer;
+der Runtime-Fallback wird vor Öffnen der temporären ZIP entschieden.
+
 Nur eigene temporäre Dateien werden entfernt. Vorhandene fremde Dateien und
 geänderte Reservierungen bleiben geschützt. Runtime-Fallback entfernt keine
 Snapshot-, Änderungs- oder Untracked-Dateien. Results mit Warnungen sind weiterhin

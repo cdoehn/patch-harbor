@@ -115,9 +115,8 @@ print(json.dumps({'sha256': artifact.wheel_sha256, 'size': len(artifact.wheel_by
             cli = json.loads(_run([str(python), "-I", "-B", "-c",
                                   "from patchharbor.cli import main; raise SystemExit(main())",
                                   "validate", "--json", str(patch)], outside, environment))
-            if generation in range(3):
-                repository = create_repository(outside / f'foreign-repository-{generation}')
-                produced = json.loads(_run([str(python), '-I', '-B', '-c', r'''
+            repository = create_repository(outside / f'foreign-repository-{generation}')
+            produced = json.loads(_run([str(python), '-I', '-B', '-c', r'''
 import hashlib, io, json, socket, sys, tracemalloc
 from pathlib import Path
 from zipfile import ZipFile
@@ -163,11 +162,11 @@ measurement = {'wheel_sha256': facts.runtime.wheel.sha256, 'size': len(raw),
 (repo.parent / (repo.name + '-metrics.json')).write_text(json.dumps(measurement))
 print(json.dumps(measurement))
 ''', str(repository), str(destination / next(destination.glob('*.whl')).name)], outside, environment))
-                assert produced['wheel_sha256'] == proof['sha256'] and produced['size'] == proof['size']
-                assert 0 < produced['compressed_addition'] < 2 * 1024 * 1024
-                # A bounded small-repository allocation regression check. This
-                # measures Python allocations, not total process RSS.
-                assert 0 < produced['peak_python_bytes'] < 128 * 1024 * 1024
+            assert produced['wheel_sha256'] == proof['sha256'] and produced['size'] == proof['size']
+            assert 0 < produced['compressed_addition'] < 2 * 1024 * 1024
+            # A bounded small-repository allocation regression check. This
+            # measures Python allocations, not total process RSS.
+            assert 0 < produced['peak_python_bytes'] < 128 * 1024 * 1024
         assert cli["result"]["scope"] == "package"
         assert not (outside / "SHOULD_NOT_EXIST").exists()
         assert proof["requires_python"] == ">=3.12"
