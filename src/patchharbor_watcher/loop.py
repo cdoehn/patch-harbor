@@ -1,4 +1,4 @@
-"""Thin polling lifecycle around PatchHarbor Core automatic apply."""
+"""Native event lifecycle around scoped Core automatic Apply."""
 
 from __future__ import annotations
 
@@ -8,13 +8,17 @@ from enum import Enum
 import json
 import time
 from typing import TextIO
+from queue import Empty, Queue
+from threading import Thread
+
+import patchharbor.api as api
+from patchharbor_watcher.events import EventKind
+from patchharbor_watcher.platform import open_event_source
+from patchharbor_watcher.observation import Observation
+from patchharbor_watcher.protocol import LockReference
+from patchharbor_watcher.scheduling import QUIET_SECONDS, Schedule
 
 from patchharbor_watcher.apply_boundary import ApplyCompletion
-
-
-_NO_MATCHING_PATCH_MESSAGE = (
-    "no state-bound patch package matches a registered repository"
-)
 
 
 class WatcherPollOutcome(str, Enum):
@@ -65,6 +69,8 @@ def _apply_error_document(
 def _shared_poll_outcome(completion: ApplyCompletion) -> WatcherPollOutcome:
     response = completion.apply_result
     if (
+        completion.progress.status == 'attempted'
+        and
         completion.process_exit_code == 0
         and isinstance(response, dict)
         and response.get("command") == "apply"
@@ -73,15 +79,7 @@ def _shared_poll_outcome(completion: ApplyCompletion) -> WatcherPollOutcome:
     ):
         return WatcherPollOutcome.APPLIED
 
-    error = _apply_error_document(completion)
-    if (
-        isinstance(response, dict)
-        and response.get("command") == "apply"
-        and response.get("success") is False
-        and error is not None
-        and error.get("kind") == "patch_package_error"
-        and error.get("message") == _NO_MATCHING_PATCH_MESSAGE
-    ):
+    if completion.progress.status == 'no_candidate':
         return WatcherPollOutcome.WAITING
     return WatcherPollOutcome.ERROR
 
@@ -139,7 +137,7 @@ def _write_operational_record(
 
 def _write_lifecycle_record(
     event: str,
-    poll_interval_seconds: float,
+    quiet_seconds: float,
     stream: TextIO,
 ) -> None:
     stream.write(
@@ -147,7 +145,7 @@ def _write_lifecycle_record(
             {
                 "event": event,
                 "scope": "registered_repositories",
-                "poll_interval_seconds": poll_interval_seconds,
+                "quiet_seconds": quiet_seconds,
             }
         )
     )
@@ -167,6 +165,10 @@ def poll_repositories_once(
     if stop_requested():
         return None
     completion = delegate()
+    return publish_completion(event_state, completion, log_stream, error_stream)
+
+
+def publish_completion(event_state, completion, log_stream, error_stream):
     outcome = _shared_poll_outcome(completion)
     signature = _completion_signature(outcome, completion)
     if event_state.should_publish(signature):
@@ -193,39 +195,130 @@ def poll_repositories_once(
     return outcome
 
 
+def _readiness(lock: LockReference):
+    core_lock = api.ApplyLock(api.ApplyLockKind(lock.kind),
+                             None if lock.repo_id is None else api.RepositoryId(lock.repo_id))
+    blocked = api.apply_readiness(core_lock).blocked_on
+    return None if blocked is None else LockReference(
+        blocked.kind.value, None if blocked.repo_id is None else str(blocked.repo_id))
+
+
 def run_repository_watcher(
-    *,
-    delegate: Callable[[], ApplyCompletion],
-    poll_interval_seconds: float = 1.0,
-    log_stream: TextIO,
-    error_stream: TextIO,
-    stop_requested: Callable[[], bool] = _never_stop,
-    wait_between_polls: Callable[[float], object] = time.sleep,
+    *, delegate, log_stream: TextIO, error_stream: TextIO,
+    stop_requested=_never_stop, bind_wake=lambda callback: None,
+    target_provider=api.watch_targets, control_provider=api.watch_control_paths,
+    readiness=_readiness, source_factory=open_event_source, clock=time.monotonic,
+    worker_factory=Thread,
 ) -> None:
-    """Poll the public automatic-Apply boundary until a stop is requested."""
-    if poll_interval_seconds <= 0:
-        raise ValueError("poll interval must be greater than zero")
+    """Block on events/deadlines; keep receiving while one isolated Apply runs.
+
+    The main thread alone owns subscriptions and generations. A single helper
+    thread waits for the existing worker process and wakes this event loop on
+    completion. Stop retains the existing policy: wait for an active Apply;
+    process-group signals continue to reach the worker through the OS.
+    """
+    schedule, observation = Schedule(), Observation()
     event_state = SharedWatcherEventState()
-    _write_lifecycle_record(
-        "watcher_started",
-        poll_interval_seconds,
-        log_stream,
-    )
+    completed = Queue(maxsize=1)
+    source, worker, snapshot = None, None, None
+    control_lock, control_probe, control_backoff = None, None, 5.0
+
+    def wake():
+        if source is not None:
+            source.wake()
+
+    def refresh():
+        nonlocal source, control_lock, control_probe, control_backoff
+        directories, failure = observation.refresh(target_provider, control_provider)
+        fresh = source_factory(directories)
+        previous, source = source, fresh
+        if previous is not None:
+            previous.close()
+        schedule.replace(observation.targets, clock())
+        blocked = getattr(failure, 'lock', None)
+        control_lock = None if blocked is None else LockReference(
+            blocked.kind.value, None if blocked.repo_id is None else str(blocked.repo_id))
+        control_backoff = 5.0
+        control_probe = None if control_lock is None else clock() + control_backoff
+        if failure is not None:
+            error_stream.write(f'patchharbor-watcher: {failure}\n')
+            error_stream.flush()
+
+    def accept(events):
+        if any(observation.needs_refresh(event) for event in events):
+            refresh()
+            return
+        now = clock()
+        for event in events:
+            if event.kind is EventKind.CHANGED:
+                schedule.changed(event.directory, now)
+
+    def invoke(targets):
+        try:
+            result = delegate(exchanges=targets)
+        except BaseException as exc:
+            result = exc
+        completed.put(result)
+        wake()
+
+    _write_lifecycle_record('watcher_started', QUIET_SECONDS, log_stream)
     try:
+        refresh()
+        bind_wake(wake)
         while not stop_requested():
-            poll_repositories_once(
-                event_state,
-                delegate=delegate,
-                log_stream=log_stream,
-                error_stream=error_stream,
-                stop_requested=stop_requested,
-            )
+            # Drain observations that preceded an expiring deadline before
+            # granting any scope. Changes after launch still reach Core gates.
+            while True:
+                events = source.read(0)
+                if not events or stop_requested():
+                    break
+                accept(events)
             if stop_requested():
                 break
-            wait_between_polls(poll_interval_seconds)
+            if worker is not None:
+                try:
+                    result = completed.get_nowait()
+                except Empty:
+                    pass
+                else:
+                    worker.join()
+                    worker = None
+                    if isinstance(result, BaseException):
+                        raise result
+                    publish_completion(event_state, result, log_stream, error_stream)
+                    schedule.finish(snapshot, result.progress, clock())
+            if worker is None:
+                if control_lock is not None and control_probe <= clock():
+                    blocked = readiness(control_lock)
+                    if blocked is None:
+                        refresh()
+                    else:
+                        control_lock = blocked
+                        control_backoff = min(300.0, control_backoff * 2)
+                        control_probe = clock() + control_backoff
+                for lock in schedule.probes(clock()):
+                    try:
+                        schedule.probed(lock, readiness(lock), clock())
+                    except api.PatchHarborError as exc:
+                        schedule.probe_failed(lock)
+                        error_stream.write(f'patchharbor-watcher: {exc}\n')
+                        error_stream.flush()
+                targets = schedule.ready(clock())
+                if targets and not stop_requested():
+                    snapshot = schedule.begin(targets)
+                    worker = worker_factory(target=invoke, args=(targets,), name='patchharbor-apply')
+                    worker.start()
+            if not stop_requested():
+                timeout = None if worker is not None else schedule.timeout(clock())
+                if worker is None and control_probe is not None:
+                    control_timeout = max(0.0, control_probe - clock())
+                    timeout = control_timeout if timeout is None else min(timeout, control_timeout)
+                accept(source.read(timeout))
     finally:
-        _write_lifecycle_record(
-            "watcher_stopped",
-            poll_interval_seconds,
-            log_stream,
-        )
+        bind_wake(None)
+        # Keep the wake target alive until the completion thread has returned.
+        if worker is not None:
+            worker.join()
+        if source is not None:
+            source.close()
+        _write_lifecycle_record('watcher_stopped', QUIET_SECONDS, log_stream)

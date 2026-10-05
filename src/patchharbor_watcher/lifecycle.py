@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
+from collections.abc import Callable
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 import signal
@@ -16,6 +17,7 @@ class WatcherStopController:
 
     _event: Event = field(default_factory=Event)
     _signal_number: int | None = field(default=None, init=False)
+    _wake: Callable[[], None] | None = field(default=None, init=False)
 
     def request_stop(
         self,
@@ -25,6 +27,13 @@ class WatcherStopController:
         if self._signal_number is None and _signal_number is not None:
             self._signal_number = _signal_number
         self._event.set()
+        if self._wake is not None:
+            self._wake()
+
+    def bind_wake(self, wake: Callable[[], None] | None) -> None:
+        self._wake = wake
+        if wake is not None and self.stop_requested():
+            wake()
 
     def stop_requested(self) -> bool:
         return self._event.is_set()

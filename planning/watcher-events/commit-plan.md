@@ -1,9 +1,9 @@
 # PatchHarbor – Implementierungsplan für Exchange-Ereignisse
 
-Stand: 5. Oktober 2026. Plan-ID: `watcher-events`, Revision 3.
+Stand: 5. Oktober 2026. Plan-ID: `watcher-events`, Revision 4.
 Aktiv auf ausdrücklichen Nutzerauftrag; fünf geplante Commitschritte einschließlich
-Dokumentationsbootstrap. `WE-0` und `WE-1` sind durch tatsächliches Apply bestätigt
-(2/5); `WE-2` ist für Bundle 018 vorbereitet, sein Apply steht aus.
+Dokumentationsbootstrap. `WE-0` bis `WE-2` sind durch tatsächliches Apply bestätigt
+(3/5); `WE-3` ist für Bundle 019 vorbereitet, sein Apply steht aus.
 Zielversion noch nicht festgelegt.
 
 Normative Grundlage: [Watcher-Spezifikation](specification.md) und
@@ -43,12 +43,12 @@ Result; diese Tabelle ist keine dauerhafte Patch-Basis.
 | --- | --- | --- | --- |
 | WE-0 | Spezifikation, Plan, zentrale Einordnung, Changelog und Abschlussvermerk des bisherigen Plans. Kein Watcher-Code. | bestätigtes Bundle 015 | durch Bundle 016 tatsächlich angewendet |
 | WE-1 | Öffentliche Core-Abfrage der geprüften Beobachtungsziele, optional eingeschränkter automatischer Exchange-Scope, strukturierte Fortschritts-/Sperrbereitschaft. Bisheriger Aufruf ohne Einschränkung unverändert. | WE-0 angewendet | durch Bundle 017 tatsächlich angewendet |
-| WE-2 | Native Linux-/Windows-Ereignisadapter, Filter und Ressourcenlebenszyklus; deterministische Ereignisabstraktion. Noch keine Aktivierung des neuen CLI-Betriebs. | WE-1 angewendet bzw. echter vorangehender Bundle-Zustand | Bundle 018 vorbereitet; Apply und native Windows-Prüfung offen |
-| WE-3 | Fünfsekunden-Zustandsautomat, Startprüfung, Parallelität der Ereigniserfassung, sequenzieller Worker, Nachlauf, Konfigurationsaktualisierung und CLI-Umstellung. | WE-2 | geplant |
+| WE-2 | Native Linux-/Windows-Ereignisadapter, Filter und Ressourcenlebenszyklus; deterministische Ereignisabstraktion. Noch keine Aktivierung des neuen CLI-Betriebs. | WE-1 angewendet bzw. echter vorangehender Bundle-Zustand | durch Bundle 018 tatsächlich angewendet; native Windows-Prüfung offen |
+| WE-3 | Fünfsekunden-Zustandsautomat, Startprüfung, Parallelität der Ereigniserfassung, sequenzieller Worker, Nachlauf, Konfigurationsaktualisierung und CLI-Umstellung. | WE-2 | für Bundle 019 vorbereitet; Apply offen |
 | WE-4 | Vollständige Robustheits-/Plattformintegration, reale Ereignis-/Apply- und installierte Wheel-Nachweise, Dokumentationsabgleich und Abnahme. | WE-3 | geplant |
 
 Nächster vorbereiteter Commit:
-`feat(watcher): add native filesystem event adapters [WE-2]`.
+`feat(watcher): trigger scoped apply after five quiet seconds [WE-3]`.
 
 Fortschrittsnachweis für WE-0: Result
 `patchharbor-apply_Result_163737_1005_90175f.zip`, SHA-256
@@ -71,6 +71,17 @@ Alle 267 Base-Dateien und Git-Modi entsprechen Apply und Development-Ausgangssta
 Dieses Result bindet Bundle 018; unveränderte Repository-ID und Fingerprint,
 weiterhin Format-1-Fallback ohne eingebettetes Wheel. Der vorangehende Dry-Run
 `patchharbor-apply_Result_173637_1005_ce705e.zip` ist kein Apply-Nachweis.
+
+Fortschrittsnachweis für WE-2: Result
+`patchharbor-apply_Result_191643_1005_9db1f1.zip`, SHA-256
+`3ffd6c1338c65ed508fb01ff5e2d395429e61d14b9b33135be3362b5c194a8bc`.
+Tatsächlicher Apply erfolgreich; Commit `93edc103feb20be996e1a754d8530fb90748d270`,
+ein normaler Push nach `dev`, saubere Arbeitskopie. Vollständige serielle und
+anschließend parallele Suite jeweils 2.333 bestanden / 7 übersprungen.
+Alle 274 Base-Dateien und Git-Modi entsprechen Apply und Development-Ausgangsstand.
+Dieses Result bindet Bundle 019. Format-1-Fallback ohne eingebettetes Wheel;
+der vorausgehende Dry-Run ist kein Apply-Nachweis. Native Windows-Prüfung bleibt
+für die fällige CI nach dem Endstand von Bundle 019 offen.
 
 Tests für das jeweilige Verhalten entstehen im zuständigen Implementierungsschritt.
 WE-4 ersetzt keine vorherigen Commit-Gates. Ein Schritt erhält erst nach Auswertung
@@ -117,6 +128,14 @@ die ausstehende native Windows-CI nicht. Die CLI-Aktivierung bleibt WE-3.
 - Ein Worker, mehrere offene Wurzeln, Fortschrittsnachlauf und Sperrwiederaufnahme.
 - Konfigurationsänderungen aktualisieren Ziele; `--poll-interval` wird nicht umgedeutet.
 - Keine verlorenen Generationen, Fehlerwiederholungen oder Result-Endlosschleifen.
+
+WE-3 bereitet die aktive CLI-Anbindung vor: monotone Fristen je Wurzel,
+Generationserhalt während des sequenziellen Workers, private Scope-/Fortschritts-
+Übertragung, gefilterte Kontrollpfade und Sperrbereitschaft mit begrenztem Backoff.
+Core liefert zusätzlich unverbindliche `WatchControlPaths.exchange_paths` für
+fehlende Wurzeln. Diese Pfade erlauben nur Beobachtung ihrer Wiederkehr; sie
+sind keine freigegebenen `ExchangeWatchTarget`-Objekte. Der bisherige
+`--poll-interval`-Aufruf wird abgewiesen. WE-4 ergänzt die Abnahme des Gesamtbetriebs.
 
 ### WE-4 – Abnahmekriterien
 
@@ -173,7 +192,7 @@ Kein zusätzlicher CI-Lauf wird aus diesem Plan allein automatisch abgeleitet.
 Der dauerhafte Fortschritt steht zusätzlich unter
 `exchange/reports/patchharbor-dev-loop-state.json` im projektspezifischen Exchange.
 Verbrauchte Results werden erst bei bestätigter Folgebundle-Auslieferung markiert.
-Der alte Plan bleibt als abgeschlossen dokumentiert; dieser steht bei 2/5
+Der alte Plan bleibt als abgeschlossen dokumentiert; dieser steht bei 3/5
 bestätigten Commitschritten. S/N und die Grenze von fünf aufeinanderfolgenden
 fehlgeschlagenen tatsächlichen Bundles bleiben gemäß lokalen Rollenregeln gültig.
 

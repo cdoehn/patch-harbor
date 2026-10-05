@@ -1,8 +1,8 @@
 # Native Watcher-Ereignisadapter – WE-2
 
-Die Adapter sind vorbereitet; der bestehende CLI-Watcher verwendet weiterhin
-seine bisherige Polling-Schleife. Die Anbindung, fünf Sekunden Ruhefrist,
-Worker-Steuerung und Konfigurationsaktualisierung folgen in WE-3. Die Module
+Die Adapter sind durch WE-2 angewendet. WE-3 bindet sie im Development an
+die CLI mit fünf Sekunden Ruhefrist, Worker-Steuerung und
+Konfigurationsaktualisierung an. Die Module
 sind interne Watcher-Bausteine und keine zusätzliche öffentliche Apply-API.
 `events.py` enthält den plattformneutralen Vertrag. Die Factory und nativen
 Systemaufrufe liegen getrennt unter `patchharbor_watcher.platform`; Core

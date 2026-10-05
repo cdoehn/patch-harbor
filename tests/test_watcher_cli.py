@@ -37,14 +37,13 @@ def test_cli_runs_the_global_repository_watcher(
     stderr = StringIO()
 
     assert watcher_cli.main(
-        ["--poll-interval", "0.25"],
+        [],
         stdout=stdout,
         stderr=stderr,
     ) == 0
-    assert observed["poll_interval_seconds"] == 0.25
     assert observed["delegate"] is watcher_cli.delegate_to_automatic_apply
     assert callable(observed["stop_requested"])
-    assert callable(observed["wait_between_polls"])
+    assert callable(observed["bind_wake"])
     assert observed["log_stream"] is stdout
     assert observed["error_stream"] is stderr
 
@@ -81,6 +80,7 @@ def test_watcher_rejects_invalid_registry_without_starting_loop(tmp_path, monkey
     (
         ("/tmp/incoming",),
         ("--configure", "/tmp/incoming"),
+        ("--poll-interval", "0.25"),
     ),
 )
 def test_cli_rejects_removed_legacy_input_contract(
@@ -105,6 +105,5 @@ def test_cli_help_exposes_only_shared_watcher_actions(
     assert captured.value.code == 0
     help_text = capsys.readouterr().out
     assert "--install-systemd-user-unit" in help_text
-    assert "--poll-interval" in help_text
     assert "--configure" not in help_text
     assert "INPUT_DIRECTORY" not in help_text

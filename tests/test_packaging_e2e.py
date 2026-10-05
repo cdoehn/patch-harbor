@@ -108,6 +108,9 @@ EXPECTED_RUNTIME_FILES = {
     "patchharbor_watcher/systemd_linux.py",
     "patchharbor_watcher/worker.py",
     "patchharbor_watcher/events.py",
+    "patchharbor_watcher/protocol.py",
+    "patchharbor_watcher/scheduling.py",
+    "patchharbor_watcher/observation.py",
     "patchharbor_watcher/platform/__init__.py",
     "patchharbor_watcher/platform/linux.py",
     "patchharbor_watcher/platform/windows.py",
@@ -809,7 +812,6 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
     )
     assert watcher_help.returncode == 0
     assert "--install-systemd-user-unit" in watcher_help.stdout
-    assert "--poll-interval" in watcher_help.stdout
     assert "--configure" not in watcher_help.stdout
     assert "INPUT_DIRECTORY" not in watcher_help.stdout
 

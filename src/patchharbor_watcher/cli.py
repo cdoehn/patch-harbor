@@ -28,23 +28,13 @@ def _install_systemd_user_unit() -> Path:
     return install_systemd_user_unit()
 
 
-def _positive_seconds(value: str) -> float:
-    try:
-        seconds = float(value)
-    except ValueError as exc:
-        raise argparse.ArgumentTypeError("must be a number") from exc
-    if seconds <= 0:
-        raise argparse.ArgumentTypeError("must be greater than zero")
-    return seconds
-
-
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="patchharbor-watcher",
         allow_abbrev=False,
         description=(
-            "Continuously invoke PatchHarbor's parameterless automatic Apply "
-            "mode across the Exchange directories of all registered repositories."
+            "Watch filesystem events and request scoped automatic Apply "
+            "after five seconds of quiet across the Exchange directories of all registered repositories."
         ),
         epilog=(
             "Register each repository and configure its Exchange with 'patchharbor configure "
@@ -61,13 +51,6 @@ def _build_parser() -> argparse.ArgumentParser:
             "install the Linux systemd user unit; "
             "do not enable or start it"
         ),
-    )
-    parser.add_argument(
-        "--poll-interval",
-        type=_positive_seconds,
-        default=1.0,
-        metavar="SECONDS",
-        help="seconds between Core apply requests (default: 1.0)",
     )
     return parser
 
@@ -86,7 +69,7 @@ def main(
     stop_controller = WatcherStopController()
 
     try:
-        api.repositories()  # Validate the registry; Core refreshes settings on every poll.
+        api.repositories()  # Validate the registry; Event subscriptions refresh settings through Core.
         if arguments.install_systemd_user_unit:
             unit_path = _install_systemd_user_unit()
             print(unit_path, file=actual_stdout)
@@ -95,11 +78,10 @@ def main(
         with installed_stop_signals(stop_controller):
             run_repository_watcher(
                 delegate=delegate_to_automatic_apply,
-                poll_interval_seconds=arguments.poll_interval,
                 log_stream=actual_stdout,
                 error_stream=actual_stderr,
                 stop_requested=stop_controller.stop_requested,
-                wait_between_polls=stop_controller.wait,
+                bind_wake=stop_controller.bind_wake,
             )
     except KeyboardInterrupt:
         return 130

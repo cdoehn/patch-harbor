@@ -39,6 +39,7 @@ def _automatic_apply_envelope(
     run_id: str = "run-id",
 ) -> dict[str, object]:
     return {
+        "watcher_progress": {"version": 1, "status": "no_candidate" if run_id.startswith("idle-") else "attempted" if success else "error", "blocked_on": None},
         "output_version": 1,
         "command": "apply",
         "success": success,
@@ -191,73 +192,3 @@ def test_repeated_identical_core_error_is_logged_once(
 
     assert len(log.getvalue().splitlines()) == 1
     assert errors.getvalue() == "configuration changed\n"
-
-
-def test_shared_watcher_publishes_lifecycle_and_stops_between_polls(
-    tmp_path: Path,
-) -> None:
-    calls = 0
-    waits = 0
-    stopping = False
-    log = StringIO()
-
-    def delegate() -> ApplyCompletion:
-        nonlocal calls
-        calls += 1
-        return _completion(
-            exit_code=10,
-            result=_automatic_apply_envelope(
-                success=False,
-                process_exit_code=10,
-                error_kind="patch_package_error",
-                error_message=(
-                    "no state-bound patch package matches a registered repository"
-                ),
-                run_id=f"idle-{calls}",
-            ),
-        )
-
-    def wait(_seconds: float) -> None:
-        nonlocal waits, stopping
-        waits += 1
-        stopping = waits == 2
-
-    run_repository_watcher(
-        delegate=delegate,
-        poll_interval_seconds=0.25,
-        log_stream=log,
-        error_stream=StringIO(),
-        stop_requested=lambda: stopping,
-        wait_between_polls=wait,
-    )
-
-    assert calls == 2
-    records = [json.loads(line) for line in log.getvalue().splitlines()]
-    assert [record["event"] for record in records] == [
-        "watcher_started",
-        "waiting_for_exchange_patch",
-        "watcher_stopped",
-    ]
-    assert records[0]["poll_interval_seconds"] == 0.25
-
-
-def test_delegate_exception_propagates_after_watcher_stopped_record(
-    tmp_path: Path,
-) -> None:
-    log = StringIO()
-
-    def fail() -> ApplyCompletion:
-        raise OSError("core process unavailable")
-
-    with pytest.raises(OSError, match="core process unavailable"):
-        run_repository_watcher(
-            delegate=fail,
-            log_stream=log,
-            error_stream=StringIO(),
-        )
-
-    records = [json.loads(line) for line in log.getvalue().splitlines()]
-    assert [record["event"] for record in records] == [
-        "watcher_started",
-        "watcher_stopped",
-    ]

@@ -514,10 +514,23 @@ def _exchange_settings(
 
 
 def _watch_control_paths(paths: RegistrationUserPaths, registry: RegistrySnapshot) -> WatchControlPaths:
+    # Advisory restoration paths only. A missing Exchange cannot be an approved
+    # WatchTarget, but its nearest existing parent can reveal its return. Broken
+    # settings still fail watch_targets()/Apply; they are never repaired here.
+    exchanges = set()
+    for mapping in registry.repositories:
+        try:
+            local = configuration_paths_for_id(mapping.repo_id, registry)
+            settings = load_configuration(local, validate_directory=False)
+        except PatchHarborError:
+            continue
+        if settings.exchange_directory is not None:
+            exchanges.add(settings.exchange_directory)
     return WatchControlPaths(
         paths.registry_path,
         tuple(sorted({mapping.repository_path.value / ".patchharbor" / "config.json"
                       for mapping in registry.repositories}, key=str)),
+        tuple(sorted(exchanges, key=str)),
     )
 
 

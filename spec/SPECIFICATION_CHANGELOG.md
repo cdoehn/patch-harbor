@@ -1,5 +1,17 @@
 # PatchHarbor – Spezifikations-Changelog
 
+## 2026-10-05 – WE-3: Ereignissteuerung und begrenzte Worker-Scope
+
+- WE-2 durch tatsächliches Bundle-018-Result bestätigt (3/5 Planschritte).
+- Fünf Sekunden monotone Ruhe je Exchange, einmalige Startprüfung, keine
+  periodische Discovery im Leerlauf; Ereigniserfassung während eines Workers.
+- Versionierter privater Scope-/Fortschrittsvertrag, Generationserhalt und
+  technische Sperrbereitschaft mit Backoff bis 300 Sekunden.
+- Gefilterte Konfigurationsereignisse und Beobachtung der Wiederkehr fehlender
+  Wurzeln über unverbindliche Core-Pfade; sämtliche Apply-Prüfungen bleiben aktiv.
+- CLI-Pollintervall entfernt. Bundle 019 führt nach dem einzigen Push die fällige
+  CI einschließlich Windows aus; tatsächliches Apply und native Abnahme offen.
+
 ## 2026-10-05 – WE-2: Native Ereignisadapter vorbereitet
 
 - WE-1 durch tatsächliches Bundle-017-Result bestätigt (2/5 Planschritte).

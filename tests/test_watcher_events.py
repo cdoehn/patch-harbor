@@ -312,3 +312,13 @@ def test_windows_arm_retains_buffer_ownership_until_native_failure_is_certain(tm
     with pytest.raises(KeyboardInterrupt if interrupted else EventBackendError):
         kernel.arm(watch)
     assert watch.pending is interrupted
+
+
+def test_nonblocking_windows_barrier_drains_unrelated_completions_before_return(tmp_path):
+    root = tmp_path / 'exchange'
+    root.mkdir()
+    kernel = FakeKernel()
+    with windows.WindowsEventSource((root,), _kernel=kernel) as source:
+        kernel.send(source, root.parent, windows_records((1, 'unrelated')))
+        kernel.send(source, root, windows_records((1, 'bundle.zip')))
+        assert source.read(0) == (DirectoryEvent(EventKind.CHANGED, root, 'bundle.zip'),)

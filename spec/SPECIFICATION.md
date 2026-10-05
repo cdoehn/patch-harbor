@@ -171,29 +171,28 @@ Er kann unter Linux als systemd-Service betrieben werden und:
 
 Der Watcher besitzt keine eigene Eingangsordner-Konfiguration. Startup prüft nur
 die Registry über `api.repositories()`, nicht eine Konfiguration relativ zum
-Service-Arbeitsverzeichnis. Jeder Poll ruft über einen privaten Worker
-`api.apply_next()` auf; Core lädt die lokalen Konfigurationen frisch und scannt
-jeden physisch eindeutigen Exchange-Ordner einmal. Paketklassifikation und
-persistenter Dateidentitätsvertrag sind dieselben wie beim manuellen Apply.
-Gültig registrierte Instanzen mit `exchange_directory: null` sowie fehlende
-Repository-Pfade werden übersprungen. Eine fehlende oder ungültige Konfiguration
-eines vorhandenen Repositorys, ein Identitätskonflikt oder ein nicht verfügbarer
-konfigurierter Exchange führt zum Poll-Fehler vor Ausführung; keine Reparatur
-und kein stilles Überspringen beschädigter Konfigurationen.
+Service-Arbeitsverzeichnis. Native Ereignisse markieren geprüfte Exchange-Wurzeln
+als bearbeitungsbedürftig. Erst nach fünf Sekunden Ruhe ruft ein privater Worker
+`api.apply_next(exchanges=...)` auf. Core revalidiert die lokalen Konfigurationen,
+physischen Wurzeln, Inhalte und sämtliche Ausführungsgrenzen. Im unveränderten
+Leerlauf findet kein periodischer Scan oder Workerstart statt. Gültiges `null`
+und fehlende Repository-Pfade werden übersprungen; beschädigte Konfigurationen
+sperren die Ausführung bis zu einer beobachteten Korrektur. Es gibt keine Reparatur
+oder stilles Überspringen von Fehlern.
 
 Der Watcher implementiert keine eigene Repository-, Git-, Manifest-, Fingerprint-, Lock-, Ausführungs- oder Result-Bundle-Logik. Er darf Prüfungen des Core weder nachbauen noch umgehen.
 
 Der Watcher lässt die Exchange-Verzeichnisse ausschließlich flach scannen und implementiert keine eigene Archivierungslogik. Sein globaler Core-Scan darf nach Abschnitt 16.2.1 nachweislich überholte Bundles in den konfigurierten Archiv-Unterordner verschieben. Sonstige Dateien und unklare Zustände bleiben liegen; unveränderte Nichtkandidaten und bereits verarbeitete Dateien werden nicht fortlaufend neu delegiert.
 
-### 3.2.1 Ereignisüberwachung – WE-2 vorbereitet, Aktivierung ausstehend
+### 3.2.1 Ereignisüberwachung – WE-3 im Development implementiert
 
 Das normative Entwicklungsziel steht in
 [`planning/watcher-events/specification.md`](../planning/watcher-events/specification.md),
 die Commitfolge in
 [`planning/watcher-events/commit-plan.md`](../planning/watcher-events/commit-plan.md).
-Die vorstehenden Poll-Beschreibungen und `--poll-interval` dokumentieren bis zur
-Aktivierung durch WE-3 den bestehenden Betrieb. WE-0 hat die Dokumentation übernommen;
-WE-1 ergänzt die Core-Schnittstellen ohne Umstellung der Watcher-Schleife.
+WE-0 bis WE-2 sind durch tatsächliches Apply bestätigt. WE-3 ersetzt die
+Polling-Schleife im Development; die installierte Engine wird nicht automatisch
+umgestellt. Der entfernte Aufruf `--poll-interval` wird als ungültig abgewiesen.
 
 Ziel: native, nicht rekursive Ereignisüberwachung pro physischem Exchange-Root;
 mindestens fünf zusammenhängende Sekunden Ruhe vor einem Scan, zurückgesetzt
@@ -218,11 +217,15 @@ Nachlaufentscheidungen zusätzlich zu den unveränderten Apply-Ergebnissen;
 ein verbrauchter Versuch ist kein Erfolgsnachweis. Details der Schnittstellen
 stehen in [`docs/python-api.md`](../docs/python-api.md).
 
-WE-2 bereitet flache native Ereignisadapter, strukturierte Verlust-/Fehlermeldungen,
-begrenzte Ereignismengen und unterbrechbare Ressourcenlebenszyklen vor. Sie führen
+WE-2 liefert flache native Ereignisadapter, strukturierte Verlust-/Fehlermeldungen,
+begrenzte Ereignismengen und unterbrechbare Ressourcenlebenszyklen. Sie führen
 keine Core-Discovery aus; native Windows-Nachweise bleiben ausstehend. Der
 [Adaptervertrag](../docs/watcher-event-adapters.md) beschreibt die Grenze zur
-späteren WE-3-Zeitsteuerung. Die bestehende CLI-Schleife bleibt bis dahin aktiv.
+WE-3-Zeitsteuerung. Diese erfasst Ereignisse während Apply weiter und schützt
+neue Generationen vor dem Abschluss älterer Arbeit. Bekannte Sperren werden
+ohne Bundle-Scan mit Backoff geprüft. Kontrollereignisse erneuern die Core-Ziele;
+fehlende Roots erhalten nur unverbindliche Beobachtungshinweise über
+`WatchControlPaths.exchange_paths`, keine Ausführungsfreigabe.
 
 ### 3.3 Repo Assist
 
@@ -540,7 +543,6 @@ Der separate Watcher besitzt ab 1.1.1 keinen eigenen Eingangsordnerparameter und
 ```bash
 patchharbor-watcher
 patchharbor-watcher --install-systemd-user-unit
-patchharbor-watcher --poll-interval SEKUNDEN
 ```
 
 Er bezieht die Exchange-Verzeichnisse über Core ausschließlich aus den lokalen

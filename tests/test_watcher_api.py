@@ -25,6 +25,7 @@ def test_worker_calls_public_automatic_api_once_and_transports_report(monkeypatc
     report = SimpleNamespace(
         apply_json_envelope=lambda: envelope,
         process_exit_code=code,
+        automatic=api.AutomaticApplyResult(api.AutomaticApplyStatus.ATTEMPTED),
         result_bundle=SimpleNamespace(
             emergency_diagnostics_path=None, status=api.ResultBundleStatus.NOT_ATTEMPTED,
         ),
@@ -38,7 +39,9 @@ def test_worker_calls_public_automatic_api_once_and_transports_report(monkeypatc
     output = StringIO()
     assert worker.main(stdout=output, stderr=StringIO()) == code
     assert calls == [((), {})]  # no path, no manual retry, no visible script sinks
-    assert json.loads(output.getvalue()) == envelope
+    document = json.loads(output.getvalue())
+    assert document.pop("watcher_progress") == {"version": 1, "status": "attempted", "blocked_on": None}
+    assert document == envelope
     # JSON is the machine transport, not a test of rendered console output.
     output.getvalue().encode("ascii")
 

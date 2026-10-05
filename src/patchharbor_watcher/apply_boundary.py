@@ -9,6 +9,7 @@ import subprocess
 import sys
 from typing import NoReturn
 
+from patchharbor_watcher.protocol import Progress, encode_scope, read_progress
 
 DEFAULT_APPLY_COMMAND = (sys.executable, "-m", "patchharbor_watcher.worker")
 
@@ -21,6 +22,15 @@ class ApplyCompletion:
     apply_result: dict[str, object] | None
     invalid_response_text: str | None
     stderr_text: str
+
+    @property
+    def progress(self) -> Progress:
+        try:
+            if self.apply_result is None:
+                raise ValueError('worker returned no document')
+            return read_progress(self.apply_result.get('watcher_progress'))
+        except (ValueError, TypeError, AttributeError):
+            return Progress('error')
 
 
 def _reject_nonfinite_json(value: str) -> NoReturn:
@@ -45,19 +55,21 @@ def _parse_apply_response(
 
 def delegate_to_automatic_apply(
     *,
+    exchanges=None,
     apply_command: Sequence[str] = DEFAULT_APPLY_COMMAND,
     environment: Mapping[str, str] | None = None,
 ) -> ApplyCompletion:
     """Run one API worker with the existing process and signal boundary.
 
     No new session, process group, timeout, retry, or shell is introduced. The
-    worker (not this transport) calls api.apply_next; it receives no CLI flags.
+    worker calls api.apply_next with an advisory scope over its private stdin
+    protocol. No explicit candidate path, manual retry or CLI flags are sent.
     """
     arguments = list(apply_command)
     completed = subprocess.run(
         arguments,
         check=False,
-        stdin=subprocess.DEVNULL,
+        input=encode_scope(exchanges),
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         env=environment,

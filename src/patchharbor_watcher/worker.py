@@ -8,13 +8,15 @@ additional public command or API surface.
 from __future__ import annotations
 
 import json
+from pathlib import Path
 import sys
 from typing import TextIO
 
 import patchharbor.api as api
+from patchharbor_watcher.protocol import MAX_REQUEST_BYTES, decode_scope, progress_document
 
 
-def main(*, stdout: TextIO | None = None, stderr: TextIO | None = None) -> int:
+def main(*, request: bytes = b'', stdout: TextIO | None = None, stderr: TextIO | None = None) -> int:
     """Perform exactly one global automatic poll and return its completion code.
 
     Known failures already arrive as RunReport objects. Unexpected exceptions
@@ -24,9 +26,15 @@ def main(*, stdout: TextIO | None = None, stderr: TextIO | None = None) -> int:
     """
     result_stream = sys.stdout if stdout is None else stdout
     diagnostic_stream = sys.stderr if stderr is None else stderr
-    report = api.apply_next()
+    entries = decode_scope(request)
+    targets = None if entries is None else tuple(api.ExchangeWatchTarget(
+        Path(entry['directory']), entry['device'], entry['inode'],
+        tuple(api.RepositoryId(value) for value in entry['repository_ids'])) for entry in entries)
+    report = api.apply_next() if targets is None else api.apply_next(exchanges=targets)
+    document = dict(report.apply_json_envelope())
+    document['watcher_progress'] = progress_document(report.automatic)
     result_stream.write(json.dumps(
-        report.apply_json_envelope(), ensure_ascii=True, allow_nan=False,
+        document, ensure_ascii=True, allow_nan=False,
         separators=(",", ":"),
     ) + "\n")
     result_stream.flush()
@@ -47,4 +55,4 @@ def main(*, stdout: TextIO | None = None, stderr: TextIO | None = None) -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(main(request=sys.stdin.buffer.read(MAX_REQUEST_BYTES + 1)))

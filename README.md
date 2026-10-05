@@ -618,13 +618,13 @@ matrix has a 120-minute job limit; separate PowerShell/Docker bounds are unchang
 
 ## Linux watcher
 
-The optional watcher is a thin permanent trigger for Core's parameterless
-automatic Apply mode. It has no input-directory argument and no separate
+The optional watcher observes native filesystem events and triggers Core's
+automatic Apply mode after five seconds of quiet in each Exchange root. It has no input-directory argument and no separate
 configuration or file-classification logic. Its selection scope remains global:
 it can inspect eligible packages for every registered repository and does not
 use the watcher's current working directory as a repository restriction. Unlike
 a deliberate manual Apply, this mode does not retry an unchanged failed package
-on later polls.
+on later automatic requests.
 
 Register and configure each repository first. The following example configures
 one already registered repository, then installs the disabled systemd user unit:
@@ -638,8 +638,8 @@ systemctl --user enable --now patchharbor-watcher.service
 ```
 
 The installer never enables or starts the service. Run the watcher directly in
-the foreground with `patchharbor-watcher`, optionally using
-`--poll-interval SECONDS`.
+the foreground with `patchharbor-watcher`. The quiet period is fixed at five
+seconds; the former `--poll-interval` option is rejected.
 
 Inspect or stop the service with:
 
@@ -648,14 +648,26 @@ journalctl --user -u patchharbor-watcher.service
 systemctl --user disable --now patchharbor-watcher.service
 ```
 
-Startup validates the central registry, not a configuration relative to the
-service's working directory. Every poll reloads the registered repositories'
-local settings through Core and scans distinct physical Exchange directories
-once. Valid repositories with `exchange_directory: null` and missing repository
-paths have no watched directory and are skipped. A missing/invalid config in an
-existing repository, conflicting identity or unavailable configured Exchange
-fails the poll without repair; it is not silently treated as an unconfigured repo.
-After manual correction the next poll reloads the settings.
+Startup validates the central registry, then subscribes to Core's Exchange and
+control paths before starting a five-second quiet period for existing bundles.
+Every direct create/write/delete/rename resets its Exchange deadline. Reads and
+changes inside existing subdirectories do not trigger a scan. Idle watchers
+block on native events without periodic scans or worker starts. Events continue
+to arrive during Apply; at most one worker runs, restricted to quiet Exchanges.
+
+Registry and local configuration changes refresh subscriptions through Core.
+Unset Exchanges and missing repository paths are skipped. Damaged configuration
+suspends Apply until a relevant repair event; missing known roots are observed
+through their existing parents. Watcher hints never replace Core validation.
+Known lock conflicts use readiness-only backoff (5, 10, 20, 40, 80, 160, then
+300 seconds), without bundle scans. Backend failures are reported; there is no
+silent polling fallback. Git changes outside Exchange do not trigger a scan:
+use a new Exchange change, restart, or a deliberate manual Apply in that case.
+
+Linux and Windows use native adapters without new dependencies. The new Windows
+end-to-end acceptance remains pending the scheduled CI. A running installed
+watcher must be restarted after upgrading, once any active Apply has finished.
+The existing manual Apply and wheel/runtime fallback remain available.
 
 The watcher uses the same repository-local configuration, package validation,
 persistent replay state, repository locks and Result Bundle behavior as Core. A

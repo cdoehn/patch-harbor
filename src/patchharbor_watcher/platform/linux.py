@@ -132,7 +132,7 @@ class LinuxEventSource(SourceLifecycle):
                                 child_directory_metadata=bool(name and mask & IN_ISDIR and not mask & (MEMBERSHIP | IN_ATTRIB))))
                     if batch.result():
                         return batch.result()
-                    if deadline is not None and remaining(deadline) == 0:
+                    if timeout != 0 and deadline is not None and remaining(deadline) == 0:
                         return ()
             except OSError as exc:
                 if not self._closing:

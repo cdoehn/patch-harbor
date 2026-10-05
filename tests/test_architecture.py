@@ -457,7 +457,7 @@ def test_watcher_uses_public_api_with_an_isolated_worker_boundary() -> None:
     ):
         assert forbidden_core_detail not in watcher_loop_source
         assert forbidden_core_detail not in watcher_cli_source
-    assert graph["patchharbor_watcher.worker"] == frozenset({"patchharbor.api"})
+    assert graph["patchharbor_watcher.worker"] == frozenset({"patchharbor.api", "patchharbor_watcher.protocol"})
     assert "patchharbor.api" in graph["patchharbor_watcher.cli"]
     assert "patchharbor_watcher.worker" in watcher_boundary_source
     for module in watcher_modules:

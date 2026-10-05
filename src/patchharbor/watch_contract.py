@@ -39,6 +39,7 @@ class WatchControlPaths:
 
     registry_path: Path
     configuration_paths: tuple[Path, ...]
+    exchange_paths: tuple[Path, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

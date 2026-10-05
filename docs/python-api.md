@@ -281,7 +281,7 @@ then do state/replay validation and newest-`mtime_ns` selection apply across all
 eligible candidates. It never retries a failed identity; Core owns selection,
 replay, lock, revalidation, recovery and publication together. No separate select-then-apply token or stale
 validated package is exposed. The watcher uses this operation in a separate
-worker process for each poll; the library itself never starts a polling loop.
+worker process for each event-triggered scan; the library never starts a loop.
 
 The optional `exchanges` argument accepts a tuple of `ExchangeWatchTarget`
 snapshots from `watch_targets()`. `None` retains global discovery; `()` scans
@@ -300,7 +300,11 @@ a missing configured Exchange fails closed. `registry_path` and
 `configuration_paths` identify control files, including unset/missing repositories.
 Clients must observe their parents/ancestors for atomic replacement/restoration.
 `watch_control_paths()` supplies those registry-derived paths independently of
-local configuration validity, so a suspended client can observe a repair.
+local configuration validity, so a suspended client can observe a repair. Its
+`exchange_paths` also carries advisory paths from valid documents without
+requiring those directories to exist. Clients may watch their existing parents
+for restoration. These are never validated scan scopes; `watch_targets()` and
+Apply still reject missing or invalid destinations.
 
 Automatic calls set `report.automatic` to immutable `AutomaticApplyResult`:
 
@@ -323,8 +327,9 @@ readiness periodically when idle.
 
 Scheduling status is in-process API data, not persisted Apply-success evidence;
 existing CLI/Result JSON schemas are unchanged. Manual Apply has `automatic=None`.
-The current CLI watcher still uses global polling. Event adapters and activation
-follow in plan steps WE-2/WE-3; these Core APIs alone do not change its timing.
+The CLI watcher uses native events and five quiet seconds per Exchange. WE-3
+passes the selected scope and structured progress through a versioned private
+worker protocol; the public CLI/Result envelope is unchanged.
 
 Dry-run still produces a Result Bundle when a repository can be safely resolved;
 it neither writes payload files nor executes, consumes replay or archives. API
@@ -455,26 +460,26 @@ resolves configuration against the service's current working directory.
 
 ## Watcher process boundary
 
-Startup checks the registry only. Every `apply_next()` reloads local settings
-inside Core. Existing repositories with valid config and unset Exchange are
-skipped, as are missing registered repository paths. Invalid/missing local config
-in a live repository, conflicting identity, or an unavailable configured Exchange
-makes the poll fail before execution, without repair. A later poll sees deliberate
-manual corrections. An empty registry has no candidates, not a setup error.
-Revalidation is no reservation: automatic Apply rechecks configuration, state,
-locks and filesystem objects at its existing mutation boundary.
+Startup checks the registry and subscribes to Core's targets and control paths.
+Existing bundles receive the same initial five-second quiet period as later
+changes. Each worker starts the current installation's Python interpreter with
+`-m patchharbor_watcher.worker`. Its bounded, versioned stdin request contains
+full physical Exchange observations, never an explicit candidate path. The
+worker calls `api.apply_next(exchanges=...)` and preserves automatic no-retry
+semantics. Empty scope remains empty. Malformed requests fail before Core.
 
-Each watcher poll starts the current installation's Python interpreter with
-`-m patchharbor_watcher.worker`. That private worker calls `api.apply_next()`
-without visible output sinks or observers and serializes the returned report
-using the existing Apply JSON envelope. The operational log schema, deduplication
-of idle/error records, global repository scope and automatic no-retry policy
-are unchanged. Raw script output remains in the Result Bundle, not in the JSON
-pipe. There are no new services, runtime dependencies, CLI flags, process groups,
-or signal handlers. The parent still stops between polls and waits for an active
-poll; existing OS/group/service signal delivery and Core process-tree cleanup
-remain responsible for interruption of that poll. This is not an in-process
-asynchronous or cancellable API.
+The private response adds `watcher_progress` to a copy of the Apply envelope.
+The parent uses its structured status and lock, never a guessed error message,
+to drain consumed work or await readiness. Raw script output remains in the
+Result Bundle. Public CLI and persisted Result schemas remain unchanged.
+
+The main thread receives events while one helper thread waits for the existing
+worker process. The stop controller wakes an idle native wait. Once stopped,
+no further worker starts; an active worker is awaited. Existing OS/group/service
+signal delivery and Core process-tree cleanup retain their interruption role.
+No extra process groups, services or dependencies are introduced. This remains
+a synchronous Core API. Native backend failure is explicit, without polling
+fallback; configuration repair and root restoration are driven by filtered events.
 
 
 ## Installation and scope of support
