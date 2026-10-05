@@ -1,10 +1,11 @@
-# PatchHarbor – RIV-Implementierungsplan, Repository-Revision 11
+# PatchHarbor – RIV-Implementierungsplan, Repository-Revision 12
 ## Inspect / Validate über API und CLI · Offline-Runtime · Result-Format 2 · Chat-Handoff
 
 **Stand:** 4. Oktober 2026. **Status:** aktive Entwicklung;
-**10 von 18 Umsetzungsschritten im Dateistand vorbereitet**, davon 9 durch Apply
-bestätigt. Bundle 011 enthält `1.d.W`; danach folgt `1.d.R`.
-P0, 1.a, 1.b, 1.c und alle drei R-Korrekturen sind angewendet.
+**11 von 18 Umsetzungsschritten im Dateistand vorbereitet**, davon 10 durch Apply
+bestätigt. Bundle 012 plant `1.d.R` und danach `1.d.C` als getrennte Zustände.
+Der aktuelle R-Stand wird vor der C-Bereinigung vollständig parallel geprüft.
+P0, 1.a, 1.b, 1.c, 1.d.W und alle drei R-Korrekturen sind angewendet.
 GATE-RUNTIME ist durch die erfolgreiche native CI auf dem Apply-Commit von
 Bundle 009 bestätigt. Der CI-Takt unten gilt für weitere Bundles.
 **Bereich:** RIV (Runtime / Inspect / Validate). **Paketbasis:** 1.2.1.
@@ -305,6 +306,32 @@ prüfbar. Vollnachweis: `exchange/reports/patchharbor-riv-011-1.d.W-parallel.jso
 Apply am einzigen Endstand seriell, parallel, ein Commit und ein normaler Push.
 Keine CI für Bundle 011; nächster Planschritt nach echtem Result ist `1.d.R`.
 
+**1.d.W angewendet / Basis für Bundle 012:**
+`patchharbor-apply_Result_172314_1004_8bc4fe.zip`, 790207 Bytes, SHA-256
+`a9078deb3962b06aec4d3640b079b1ada3c466c02852fd677f470944ec6981a3`.
+Echter Apply von Bundle 011: abschließend seriell 2.103 bestanden / 7 Skips
+in 622,41 Sekunden, danach parallel dieselben Ergebnisse in 154,11 Sekunden.
+Commit `164987080b64d364feac477afa6a7b541ec8d852`, genau ein normaler Push auf `dev`,
+sauberer Baum; alle 245 Basisdateien byte- und modusgleich mit Development.
+Vollständige Bindung: repo_id `e7a93d72-62dc-4759-97e8-6bf6cdf10e90`,
+base_commit `164987080b64d364feac477afa6a7b541ec8d852`,
+state_fingerprint `7c9d2a24e397e0e5`, fingerprint_algorithm `patchharbor-state-v1`.
+
+**Bundle 012 / R-C-Folge geplant, aktuell `1.d.R`, 11/18 vorbereitet:**
+`fix(result): harden mixed-version inventories and evidence checks [RIV 1.d.R]`.
+Vor der vollständigen inneren ZIP-Metadatenallokation werden Anzahl, Namen,
+Verzeichnisgrenzen und EOCD geprüft; gefälschte kleine Zähler umgehen kein Limit.
+Tiefe JSON-Strukturen bleiben kontrollierte Klassifikations-/Eingabefehler.
+Gemischte Exchanges prüfen aktuelle und eingefrorene Format-1-Lesermodule aus
+Bundle 010 mit echten Archiventscheidungen; neue Results/Wheels sind keine
+Patch-Kandidaten. Korrupte Runtime wird nicht in unavailable umgedeutet.
+Der produktive Writer bleibt Format 1. Lokales R-Gate ausschließlich parallel:
+`exchange/reports/patchharbor-riv-012-1.d.R-parallel.json`.
+Danach folgt eine eigene getestete C-Dateifassung im selben Bundle. Apply prüft
+R vollständig parallel vor Commit 1, den endgültigen C-Stand vollständig seriell
+und danach parallel vor Commit 2; genau ein abschließender normaler Push.
+Keine zusätzliche CI für Bundle 012; nächste reguläre CI unverändert Bundle 014.
+
 **Verbindlicher CI-Takt ab 4. Oktober 2026:** GitHub-Runnerzeit sparen;
 ausschließlich `workflow_dispatch`, keine Push-/PR-/Schedule-Auslöser und keine
 automatischen Wiederholungen. Nach dem Lauf zu Bundle 009 erst nach fünf weiteren
@@ -364,7 +391,7 @@ bei abweichender Development-Wurzel `CWD_MISMATCH`, keine Änderung.
 
 Jeder Zwischenstand wird wirklich hergestellt, getestet und erst dann committed. Ein finaler Working Tree mit künstlich aufgeteiltem Staging ist kein WRC-Nachweis. Commit-IDs werden nach dem Commit aus Git übernommen, nicht im eigenen Commit vorweg erfunden.
 
-### 2.1 Commitübersicht – 9/18 durch Apply bestätigt, FIX1–FIX3 angewendet, 1.d.W als 10/18 vorbereitet
+### 2.1 Commitübersicht – 10/18 durch Apply bestätigt, FIX1–FIX3 angewendet, 1.d.R als 11/18 vorbereitet
 
 | Nr. | Kennung | Commit-Subject | Voraussetzung | Paket |
 |---:|---|---|---|---|
@@ -652,7 +679,7 @@ Reproduktionsregeln und Content-ID-Algorithmus dokumentieren, die während W/R e
 
 #### 1.d.W – 10/18: `feat(result): accept format-2 inputs before enabling writers`
 
-**Status:** im Dateistand vorbereitet (Bundle 011); tatsächlicher Apply folgt. **Abhängigkeit:** 1.b.C und 1.c.C. **Spec:** 39.2–39.3/39.5, 37.2.
+**Status:** angewendet/gepusht als `164987080b64d364feac477afa6a7b541ec8d852` (Bundle 011). **Abhängigkeit:** 1.b.C und 1.c.C. **Spec:** 39.2–39.3/39.5, 37.2.
 
 **Ergebnis:** Alle neuen Verbraucher verstehen Format 1 und 2; produktive Erzeugung bleibt ausdrücklich Format 1.
 
@@ -668,7 +695,7 @@ Allgemeinen Result-Leser, Referenzvalidierung, schnelle Klassifikation und die n
 
 #### 1.d.R – 11/18: `fix(result): harden mixed-version inventories and evidence checks`
 
-**Status:** offen. **Abhängigkeit:** 1.d.W. **Spec:** 39.2–39.5, 37.2.
+**Status:** R-Dateistand vorbereitet (erster Schritt in Bundle 012); tatsächlicher Apply folgt. **Abhängigkeit:** 1.d.W. **Spec:** 39.2–39.5, 37.2.
 
 **Ergebnis:** Gemischte Ordner und manipulierte Archive führen nicht zu falschen Apply-/Recovery-/Archiventscheidungen.
 
@@ -942,11 +969,11 @@ Jeder später abgeschlossene Eintrag enthält Plan-ID, tatsächlichen Commit, ur
 
 Fertig ist die Erweiterung erst mit nutzbarer API und CLI, konstant reproduzierbarer Runtime aus Standardinstallationen, sicherer Formatintegration, erhaltenen Sicherheitsgrenzen, ausgeführten Offline-/Roundtrip-Gates, aktueller installierter Anleitung und grüner CI für den tatsächlichen finalen HEAD. „0 Commits offen“ allein ist kein Freigabenachweis.
 
-**Status dieses Dateistands:** 10/18 vorbereitet, 8 weitere Schritte offen.
-P0, 1.a, 1.b, 1.c und FIX1–FIX3 sind angewendet/gepusht (9 Feature-Schritte).
-Windows-/GATE-RUNTIME-Abnahme auf Bundle 009 bestätigt; 1.d.W wartet auf Apply.
-Paketprüfung, beide Bindungsmodi und interne Runtime sind vorhanden;
-Format-2-Leser vorbereitet, Writer/Bootstrap folgen. Nächste reguläre CI nach
+**Status dieses Dateistands:** 11/18 vorbereitet, 7 weitere Schritte offen.
+P0, 1.a, 1.b, 1.c, 1.d.W und FIX1–FIX3 sind angewendet/gepusht (10 Feature-Schritte).
+Windows-/GATE-RUNTIME-Abnahme auf Bundle 009 bestätigt; 1.d.R wartet auf Apply.
+Paketprüfung, beide Bindungsmodi, interne Runtime und Format-2-Leser vorhanden;
+Reader-Robustheit vorbereitet, C-Bereinigung/Writer/Bootstrap folgen. Nächste reguläre CI nach
 Apply/Push von Bundle 014, durch dessen Entrypoint angefordert und zurückgemeldet.
 Quellenstand bleibt Exchange-Revision 2.
 

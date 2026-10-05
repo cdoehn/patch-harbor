@@ -1,0 +1,19 @@
+{
+  "purpose": "Frozen pre-Format-2 reader modules; supporting infrastructure comes from the tested checkout.",
+  "source_commit": "d31047b2feca049c2db5443bb61df2ce7ce5e7f6",
+  "source_result_sha256": "00e6f34878e1d2a9d3cdf16f1915abe662494d2e24bb8552b6e9024fc2665b01",
+  "files": {
+    "result_reader.py": {
+      "source_path": "src/patchharbor/result_reader.py",
+      "sha256": "ea9a52b6ecf287b002db96f3616b7430633a3092df00cfff2a14f5c92e1a665a"
+    },
+    "exchange.py": {
+      "source_path": "src/patchharbor/exchange.py",
+      "sha256": "d839f2f518353c7d4e79b96b47cf0097db7110d84b4bb7b13486c51b23f054d7"
+    },
+    "archive_evidence.py": {
+      "source_path": "src/patchharbor/archive_evidence.py",
+      "sha256": "23ed7114d578907bc4f4d3570eb40cb1585f880af4f85aae42c23a32c0468a5f"
+    }
+  }
+}

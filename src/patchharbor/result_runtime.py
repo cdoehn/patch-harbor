@@ -74,6 +74,33 @@ def _capabilities(value: object) -> tuple[tuple[str, ...], tuple[int, ...], tupl
     return tuple(value["operations"]), tuple(value["patch_formats"]), tuple(value["result_formats"])
 
 
+def _bounded_directory(raw: bytes, policy: ResourcePolicy) -> int:
+    """Bound metadata allocation before ZipFile builds its complete member list.
+
+    This only preflights the fixed canonical envelope; ZipFile and the profile
+    checks below still validate every header and all content. A forged small
+    EOCD count cannot hide extra central-directory entries.
+    """
+    end = len(raw) - 22
+    _require(end >= 0, "truncated runtime ZIP boundary")
+    signature, disk, directory_disk, disk_count, count, size, offset, comment = struct.unpack_from(
+        "<4s4H2IH", raw, end)
+    _require(signature == b"PK\x05\x06" and disk == directory_disk == comment == 0
+             and disk_count == count and 0 < count <= min(wheel.MAX_ENTRIES, policy.max_zip_entries),
+             "unsupported runtime ZIP directory or entry budget")
+    _require(offset + size == end and count * 47 <= size <= count * (46 + 512),
+             "runtime ZIP directory budget or bounds exceeded")
+    cursor = offset
+    for _ in range(count):
+        _require(cursor + 46 <= end and raw[cursor:cursor + 4] == b"PK\x01\x02",
+                 "invalid runtime ZIP directory member")
+        name, extra, comment = struct.unpack_from("<3H", raw, cursor + 28)
+        _require(0 < name <= 512 and extra == comment == 0, "noncanonical runtime ZIP directory data")
+        cursor += 46 + name
+    _require(cursor == end, "runtime ZIP directory count mismatch")
+    return count
+
+
 def _read_wheel(raw: bytes, *, policy: ResourcePolicy, remaining_bytes: int) -> wheel.RuntimeRecipe:
     """Validate one canonical archive, retaining only recipe and small metadata.
 
@@ -81,10 +108,11 @@ def _read_wheel(raw: bytes, *, policy: ResourcePolicy, remaining_bytes: int) -> 
     outer wheel bytes are neither extracted nor materialized into another wheel.
     """
     _require(len(raw) <= wheel.MAX_WHEEL_BYTES, "runtime wheel budget exceeded")
+    count = _bounded_directory(raw, policy)
     try:
         with ZipFile(BytesIO(raw)) as archive:
             infos = archive.infolist()
-            _require(len(infos) <= min(wheel.MAX_ENTRIES, policy.max_zip_entries),
+            _require(len(infos) == count,
                      "inner runtime entry budget exceeded")
             _require(sum(i.file_size for i in infos) <= min(wheel.MAX_CONTENT_BYTES, remaining_bytes),
                      "shared runtime byte budget exceeded")

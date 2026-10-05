@@ -1,5 +1,22 @@
 # PatchHarbor – Spezifikations-Changelog
 
+## 2026-10-04 – RIV 1.d.R: begrenzte Verzeichnisse und Altleser-Nachweis
+
+- Bundle 011 tatsächlich angewendet als
+  `164987080b64d364feac477afa6a7b541ec8d852`: abschließend seriell und parallel
+  je 2.103 bestanden / 7 Skips, ein normaler Push, sauberer Baum.
+- R als 11/18 vorbereitet; zehn Schritte durch Apply bestätigt. Bundle 012 plant
+  R und C als getrennte echte Dateistände, eigene Tests und zwei Apply-Commits.
+- Inneres zentrales ZIP-Verzeichnis vor ZipInfo-Allokation begrenzt und geprüft;
+  gefälschte Zähler, Pfadlängen, Zusatzdaten und Grenzen scheitern früh.
+- Rekursionstiefe im Result-Marker beendet die Exchange-Erkennung kontrolliert.
+- Unveränderte historische Lesermodule mit Herkunft/Hashes eingefroren.
+  Echte gemischte Exchanges belegen konservatives Behalten neuer Results und
+  fortgesetzte Format-1-Archivierung; Wheels werden nicht als Patch ausgewählt.
+- Writer bleibt Format 1. Lokale Tests ausschließlich parallel; Apply vor R
+  parallel, am endgültigen C-Stand seriell und parallel vor letztem Commit/Push.
+  Keine zusätzliche CI oder Releasefreigabe; nächste reguläre CI Bundle 014.
+
 ## 2026-10-04 – RIV 1.d.W: Format-2-Leser vor Writer-Aktivierung
 
 - Bundle 010 tatsächlich angewendet als
