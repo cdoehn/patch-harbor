@@ -171,11 +171,13 @@ def test_chat_manifest_and_resource_contract_match_runtime_constants() -> None:
     assert expected_limits in _normalise_space(document)
 
     result_marker = "patch-harbor-result-bundle"
-    for relative_path in (
-        "src/patchharbor/exchange.py",
-        "src/patchharbor/result_bundle.py",
-    ):
-        assert f'"{result_marker}"' in _text(PROJECT_ROOT / relative_path)
+    from patchharbor.models import BundlePayload
+    from patchharbor.result_bundle import _RESULT_MARKER
+    from patchharbor.result_reader import has_result_marker
+    assert _RESULT_MARKER == result_marker
+    assert has_result_marker((BundlePayload(
+        relative_path="manifest.json", content=json.dumps({"marker": result_marker}).encode(),
+    ),))
 
 
 def test_chat_public_commands_are_real_and_use_correct_optionality() -> None:

@@ -5,7 +5,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 from hashlib import sha256
-import json
 import os
 from pathlib import Path
 import stat
@@ -36,12 +35,10 @@ from patchharbor.platform.filesystem import (
 from patchharbor.platform.paths import physically_canonicalize
 from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY, ResourcePolicy
 from patchharbor.user_paths import RegistrationUserPaths
-from patchharbor.result_reader import read_result_or_patch_payloads
+from patchharbor.result_reader import has_result_marker, read_result_or_patch_payloads
 from patchharbor.zip_payloads import ZipPayloadError
 
 
-_RESULT_BUNDLE_MANIFEST = "manifest.json"
-_RESULT_BUNDLE_MARKER = "patch-harbor-result-bundle"
 
 
 class ExchangeScanError(RuntimeError):
@@ -105,41 +102,6 @@ class _ContentClassification:
     kind: ExchangeArtifactKind
     selection: ExchangePatchSelection | None = None
     package: ValidatedPatchPackage | None = None
-
-
-def _unique_json_object(
-    pairs: list[tuple[str, object]],
-) -> dict[str, object]:
-    document: dict[str, object] = {}
-    for key, value in pairs:
-        if key in document:
-            raise ValueError(f"duplicate JSON key: {key}")
-        document[key] = value
-    return document
-
-
-def _is_result_bundle(payloads: tuple[BundlePayload, ...]) -> bool:
-    manifest = next(
-        (
-            payload
-            for payload in payloads
-            if payload.relative_path == _RESULT_BUNDLE_MANIFEST
-        ),
-        None,
-    )
-    if manifest is None or manifest.content.startswith(b"\xef\xbb\xbf"):
-        return False
-    try:
-        document = json.loads(
-            manifest.content.decode("utf-8", errors="strict"),
-            object_pairs_hook=_unique_json_object,
-        )
-    except (UnicodeDecodeError, json.JSONDecodeError, ValueError, RecursionError):
-        return False
-    return (
-        type(document) is dict
-        and document.get("marker") == _RESULT_BUNDLE_MARKER
-    )
 
 
 def _read_exchange_file(
@@ -210,7 +172,7 @@ def _classify_content(
         return _ContentClassification(kind=ExchangeArtifactKind.OTHER)
 
     activity("IDENTIFY", f"Check PatchHarbor Result marker: {path.name}")
-    if _is_result_bundle(payloads):
+    if has_result_marker(payloads):
         activity("RESULT", f"{path.name}: Result Bundle, not an executable patch", "detail")
         return _ContentClassification(kind=ExchangeArtifactKind.RESULT_BUNDLE)
 

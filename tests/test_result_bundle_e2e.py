@@ -3,12 +3,13 @@ from __future__ import annotations
 from collections.abc import Callable
 from datetime import datetime
 from hashlib import sha256
-from io import StringIO
+from io import BytesIO, StringIO
 import json
 import os
 from pathlib import Path
 import re
 import stat
+import struct
 import subprocess
 from typing import BinaryIO
 from uuid import UUID
@@ -1002,10 +1003,21 @@ def test_manual_bundle_leaves_no_published_or_temporary_file_after_failure(
             write_incomplete,
         )
     else:
+        original_write = result_bundle_publication_module.write_result_bundle
+        def write_bad_crc(destination: BinaryIO, **options: object) -> None:
+            buffer = BytesIO()
+            original_write(buffer, **options)
+            raw = bytearray(buffer.getvalue())
+            # Corrupt the actual central-directory CRC of the first member.
+            # This exercises the shared reader, independent of testzip usage.
+            directory = struct.unpack_from("<I", raw, len(raw) - 6)[0]
+            assert raw[directory:directory + 4] == b"PK\x01\x02"
+            raw[directory + 16] ^= 1
+            destination.write(raw)
         monkeypatch.setattr(
-            zipfile.ZipFile,
-            "testzip",
-            lambda self: self.namelist()[0],
+            result_bundle_publication_module,
+            "write_result_bundle",
+            write_bad_crc,
         )
 
     with pytest.raises(PatchHarborError) as captured:

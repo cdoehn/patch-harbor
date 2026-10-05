@@ -2,16 +2,16 @@
 
 **Dateiname:** `SPECIFICATION.md`<br>
 **Produktversion:** `1.2.1`<br>
-**Spezifikationsstand:** 2026-10-04 · RIV-Integration Revision 12<br>
+**Spezifikationsstand:** 2026-10-04 · RIV-Integration Revision 13<br>
 **Status:** Verbindliche, freigegebene Produktspezifikation für den Bestandsvertrag 1.2.1; keine Release-Freigabe des konkreten Commits ohne grüne Gates.<br>
-**RIV-Status:** Paketprüfung, Bindungsmodi und Runtime (1.a/1.b/1.c samt FIX1–FIX3) durch Apply bestätigt; native Windows-/GATE-RUNTIME-Abnahme auf Bundle 009 erfüllt. Format-2-Leser 1.d.W durch Apply bestätigt; Robustheit 1.d.R im Entwicklungsstand, Writer bleiben Format 1. Keine Release-Freigabe.<br>
+**RIV-Status:** Paketprüfung, Bindungsmodi und Runtime (1.a/1.b/1.c samt FIX1–FIX3) durch Apply bestätigt; native Windows-/GATE-RUNTIME-Abnahme auf Bundle 009 erfüllt. Format-2-Leser 1.d.W durch Apply bestätigt; Robustheit/Bereinigung 1.d.R/C als getrennte Zustände vorbereitet, Writer bleiben Format 1. Keine Release-Freigabe.<br>
 **Projektname:** `PatchHarbor`<br>
 **Kommando:** `patchharbor`<br>
 **Skriptmarker:** `# PATCHHARBOR`<br>
 **Patch-Paketmarker:** `patch-harbor`
 
 Der aktive Entwicklungsplan für Runtime / Inspect / Validate (RIV) liegt unter
-`planning/runtime-inspect-validate/commit-plan.md`: 10 von 18 Schritten angewendet; 1.d.R als 11/18 vorbereitet. FIX1–FIX3 sind angewendet und erhöhen den Planzähler nicht.
+`planning/runtime-inspect-validate/commit-plan.md`: 10 von 18 Schritten angewendet; 1.d.R/C bis 12/18 vorbereitet. FIX1–FIX3 sind angewendet und erhöhen den Planzähler nicht.
 Die Zielversion dieser Erweiterung wird gesondert festgelegt; die vorhandene
 Paketversion bleibt 1.2.1. Die abgeschlossenen Pläne unter `planning/1.2.1/`,
 `planning/1.2.0/`, `planning/1.1.1/`, `planning/1.1.0/` und `planning/1.0.0/`
@@ -3528,12 +3528,12 @@ GitHub-CI verwendet ausschließlich `workflow_dispatch` gemäß Abschnitt 33.
 
 ## 35. Erweiterungsziel und Geltungsbereich
 
-**Stand:** 4. Oktober 2026, **Repository-Integration Revision 12 auf Grundlage der
+**Stand:** 4. Oktober 2026, **Repository-Integration Revision 13 auf Grundlage der
 Exchange-Revision 2**. **Basis:** PatchHarbor-Quellstand 1.2.1 aus dem Result
 `patchharbor-apply_Result_073436_1003_116272.zip`, Commit
 `68dba9216b72dc0b6441df83f49c9047b8b038b9`. **Status:** schrittweise in Umsetzung; Paketprüfung gemäß
 1.a/1.b und Runtime 1.c samt FIX1–FIX3 angewendet;
-GATE-RUNTIME auf Bundle 009 nativ bestätigt, Format-2-Leser 1.d.W angewendet und 1.d.R vorbereitet;
+GATE-RUNTIME auf Bundle 009 nativ bestätigt, Format-2-Leser 1.d.W angewendet und 1.d.R/C vorbereitet;
 Writer 2 und die Runtime-Gesamtfreigabe folgen. Die nächste Release-Versionsnummer
 wird gesondert festgelegt; 1.2.1 bezeichnet bereits den vorhandenen Quellstand.
 Das Result nennt separat die ausführende Engine 1.2.0; dies ist keine abweichende

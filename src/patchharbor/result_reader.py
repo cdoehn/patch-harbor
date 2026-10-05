@@ -32,6 +32,7 @@ from patchharbor.zip_payloads import InvalidZipArchiveError, NotZipArchiveError,
 CLEAN_FINGERPRINT = state_fingerprint_digest(
     staged_records=(), unstaged_records=(), untracked_records=(),
 )[:16]
+_RESULT_MARKER = "patch-harbor-result-bundle"
 _BINDING_FIELDS = {"repo_id", "base_commit", "state_fingerprint", "fingerprint_algorithm"}
 _MANIFEST_FIELDS = _BINDING_FIELDS | {
     "marker", "format_version", "created_at", "run_id", "dirty", "dry_run",
@@ -97,6 +98,7 @@ class ResultFacts:
     completed_commit: GitObjectId | None
     format_version: int = 1
     runtime: ResultRuntime | None = None
+    handoff_present: bool = False
 
 
 def _require(condition: bool, message: str) -> None:
@@ -185,6 +187,15 @@ def _handoff(files: dict[str, bytes], context: dict, run: dict) -> set[str]:
     return names
 
 
+def has_result_marker(payloads: tuple[BundlePayload, ...]) -> bool:
+    """One strict marker hint for classification, never a validity claim."""
+    manifest = next((p.content for p in payloads if p.relative_path == "manifest.json"), None)
+    try:
+        return manifest is not None and _document(manifest).get("marker") == _RESULT_MARKER
+    except (ValueError, RecursionError):
+        return False
+
+
 def read_result_or_patch_payloads(content: bytes, *,
                                   policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY) -> tuple[BundlePayload, ...]:
     """Keep the patch profile strict; allow snapshot paths only for Result hints.
@@ -197,12 +208,7 @@ def read_result_or_patch_payloads(content: bytes, *,
         return read_zip_payload_bytes(content, policy=policy)
     except InvalidZipArchiveError as original:
         payloads = read_zip_payload_bytes(content, policy=policy, path_normalizer=result_member_path)
-        manifest = next((p.content for p in payloads if p.relative_path == "manifest.json"), None)
-        try:
-            marked = manifest is not None and _document(manifest).get("marker") == "patch-harbor-result-bundle"
-        except (ValueError, RecursionError):
-            marked = False
-        if not marked:
+        if not has_result_marker(payloads):
             raise original
         return payloads
 
@@ -222,7 +228,7 @@ def parse_result_payloads(payloads: tuple[BundlePayload, ...], *,
     run = _document(files["logs/run.json"])
     version = manifest.get("format_version")
     manifest_fields = _MANIFEST_FIELDS | ({"runtime"} if version == 2 else set())
-    _require(manifest.get("marker") == "patch-harbor-result-bundle"
+    _require(manifest.get("marker") == _RESULT_MARKER
              and type(version) is int and version in (1, 2)
              and set(manifest) in (manifest_fields, manifest_fields | _APPLY_FIELDS,
                                    manifest_fields | _APPLY_FIELDS | _RECEIPT_FIELDS)
@@ -349,7 +355,7 @@ def parse_result_payloads(payloads: tuple[BundlePayload, ...], *,
     return ResultFacts(ReferenceContext(binding.repo_id, path, binding.base_commit, context["dirty"],
                                         binding.state_fingerprint, binding.fingerprint_algorithm),
                        run["run_id"], operation, run["dry_run"], primary, tuple(run["warnings"]),
-                       tuple(sorted(inventory)), expected, digest, completed, version, runtime)
+                       tuple(sorted(inventory)), expected, digest, completed, version, runtime, bool(handoff))
 
 
 def read_result_reference(path: Path, *, resource_policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY) -> tuple[ResultFacts, str]:

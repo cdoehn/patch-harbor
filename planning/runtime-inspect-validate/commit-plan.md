@@ -1,10 +1,10 @@
-# PatchHarbor – RIV-Implementierungsplan, Repository-Revision 12
+# PatchHarbor – RIV-Implementierungsplan, Repository-Revision 13
 ## Inspect / Validate über API und CLI · Offline-Runtime · Result-Format 2 · Chat-Handoff
 
 **Stand:** 4. Oktober 2026. **Status:** aktive Entwicklung;
-**11 von 18 Umsetzungsschritten im Dateistand vorbereitet**, davon 10 durch Apply
-bestätigt. Bundle 012 plant `1.d.R` und danach `1.d.C` als getrennte Zustände.
-Der aktuelle R-Stand wird vor der C-Bereinigung vollständig parallel geprüft.
+**12 von 18 Umsetzungsschritten im Dateistand vorbereitet**, davon 10 durch Apply
+bestätigt. Bundle 012 enthält `1.d.R` und `1.d.C` als getrennte echte Zustände.
+R wurde vor Beginn der C-Bereinigung vollständig parallel geprüft und eingefroren.
 P0, 1.a, 1.b, 1.c, 1.d.W und alle drei R-Korrekturen sind angewendet.
 GATE-RUNTIME ist durch die erfolgreiche native CI auf dem Apply-Commit von
 Bundle 009 bestätigt. Der CI-Takt unten gilt für weitere Bundles.
@@ -332,6 +332,22 @@ R vollständig parallel vor Commit 1, den endgültigen C-Stand vollständig seri
 und danach parallel vor Commit 2; genau ein abschließender normaler Push.
 Keine zusätzliche CI für Bundle 012; nächste reguläre CI unverändert Bundle 014.
 
+**Bundle 012 / zweiter echter Zustand `1.d.C`, 12/18 vorbereitet:**
+`refactor(result): centralize versioned read contracts [RIV 1.d.C]`.
+Der eingefrorene R-Stand bestand 2.132 Tests / 7 Skips in 139,12 Sekunden.
+Erst anschließend wurden Marker-/JSON-Prüfungen der Result-Verbraucher
+vereinheitlicht. Der allgemeine Reader liefert den geprüften Handoff-Fakt;
+Publikation ergänzt nur ihre eigenen Pflichtbedingungen und verwendet die
+bereits ausgeführte vollständige CRC-/Inventarprüfung statt erneut alles zu lesen.
+Der CRC-Fehlertest beschädigt echte Archivbytes und hängt nicht von einem
+bestimmten internen testzip-Aufruf ab. Der eigenständig vom Buildbackend geladene
+Runtime-Rezeptleser behält seine getrennte Bootstrap-Grenze.
+C-Nachweis: `exchange/reports/patchharbor-riv-012-1.d.C-parallel.json`;
+Test-IDs, Ergebnisse und Skips müssen dem R-Gate entsprechen. Der Writer bleibt
+Format 1. Nach erfolgreichem R/C-Apply ist GATE-READERS abgeschlossen; erst danach
+folgt `1.e.W` mit produktiver Writer-Aktivierung. Keine neue öffentliche API,
+Versionsanhebung oder zusätzliche CI in diesem Cleanup.
+
 **Verbindlicher CI-Takt ab 4. Oktober 2026:** GitHub-Runnerzeit sparen;
 ausschließlich `workflow_dispatch`, keine Push-/PR-/Schedule-Auslöser und keine
 automatischen Wiederholungen. Nach dem Lauf zu Bundle 009 erst nach fünf weiteren
@@ -391,7 +407,7 @@ bei abweichender Development-Wurzel `CWD_MISMATCH`, keine Änderung.
 
 Jeder Zwischenstand wird wirklich hergestellt, getestet und erst dann committed. Ein finaler Working Tree mit künstlich aufgeteiltem Staging ist kein WRC-Nachweis. Commit-IDs werden nach dem Commit aus Git übernommen, nicht im eigenen Commit vorweg erfunden.
 
-### 2.1 Commitübersicht – 10/18 durch Apply bestätigt, FIX1–FIX3 angewendet, 1.d.R als 11/18 vorbereitet
+### 2.1 Commitübersicht – 10/18 durch Apply bestätigt, FIX1–FIX3 angewendet, 1.d.R/C bis 12/18 vorbereitet
 
 | Nr. | Kennung | Commit-Subject | Voraussetzung | Paket |
 |---:|---|---|---|---|
@@ -711,7 +727,7 @@ Dirty-/Fehlerreferenz mit neuer Runtime bleibt Referenz und nicht automatisch Er
 
 #### 1.d.C – 12/18: `refactor(result): centralize versioned read contracts`
 
-**Status:** offen. **Abhängigkeit:** 1.d.R. **Spec:** 39.3/39.5, 41.2.
+**Status:** eigener C-Dateistand nach geprüftem R vorbereitet (zweiter Schritt in Bundle 012); tatsächlicher Apply folgt. **Abhängigkeit:** 1.d.R. **Spec:** 39.3/39.5, 41.2.
 
 **Ergebnis:** Ein nachvollziehbarer Versionsdispatch und keine auseinanderlaufenden Runtime-Inventarprüfer.
 
@@ -969,11 +985,11 @@ Jeder später abgeschlossene Eintrag enthält Plan-ID, tatsächlichen Commit, ur
 
 Fertig ist die Erweiterung erst mit nutzbarer API und CLI, konstant reproduzierbarer Runtime aus Standardinstallationen, sicherer Formatintegration, erhaltenen Sicherheitsgrenzen, ausgeführten Offline-/Roundtrip-Gates, aktueller installierter Anleitung und grüner CI für den tatsächlichen finalen HEAD. „0 Commits offen“ allein ist kein Freigabenachweis.
 
-**Status dieses Dateistands:** 11/18 vorbereitet, 7 weitere Schritte offen.
+**Status dieses Dateistands:** 12/18 vorbereitet, 6 weitere Schritte offen.
 P0, 1.a, 1.b, 1.c, 1.d.W und FIX1–FIX3 sind angewendet/gepusht (10 Feature-Schritte).
-Windows-/GATE-RUNTIME-Abnahme auf Bundle 009 bestätigt; 1.d.R wartet auf Apply.
+Windows-/GATE-RUNTIME-Abnahme auf Bundle 009 bestätigt; 1.d.R/C warten auf Apply.
 Paketprüfung, beide Bindungsmodi, interne Runtime und Format-2-Leser vorhanden;
-Reader-Robustheit vorbereitet, C-Bereinigung/Writer/Bootstrap folgen. Nächste reguläre CI nach
+Reader-Robustheit und C-Bereinigung vorbereitet; Writer/Bootstrap folgen. Nächste reguläre CI nach
 Apply/Push von Bundle 014, durch dessen Entrypoint angefordert und zurückgemeldet.
 Quellenstand bleibt Exchange-Revision 2.
 

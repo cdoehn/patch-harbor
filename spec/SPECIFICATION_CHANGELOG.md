@@ -1,5 +1,21 @@
 # PatchHarbor – Spezifikations-Changelog
 
+## 2026-10-04 – RIV 1.d.C: gemeinsamer Leservertrag ohne doppelten Vollread
+
+- R vollständig parallel bestanden: 2.132 Tests / 7 Skips. Erst nach dessen
+  eingefrorenem Dateistand folgt C als zweiter echter Schritt in Bundle 012.
+- Gemeinsame Marker-/JSON-Prüfung für Result-Klassifikation und Pfadprofilwahl;
+  keine parallelen ad-hoc Parser derselben Result-Daten.
+- Der gemeinsame Reader liefert geprüfte Handoff-Fakten. Veröffentlichung nutzt
+  seine vollständige CRC-/Inventarprüfung und prüft nur eigene Pflichten zusätzlich.
+- CRC-Regression beschädigt tatsächliche Archivbytes; Sicherheitsnachweis bleibt
+  unabhängig von der Wahl eines internen Lesehelfers.
+- Vorhandenen Marker-Test von Quelltextfundstelle auf tatsächliche Erkennung
+  umgestellt; keine neue Darstellungs- oder Prosaprüfung.
+- 12/18 vorbereitet, 10/18 durch Apply bestätigt. R parallel vor Commit 1,
+  C seriell und parallel vor Commit 2, genau ein abschließender Push.
+  Development nur parallel; Writer 1, Paketversion und CI-Takt unverändert.
+
 ## 2026-10-04 – RIV 1.d.R: begrenzte Verzeichnisse und Altleser-Nachweis
 
 - Bundle 011 tatsächlich angewendet als

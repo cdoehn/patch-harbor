@@ -118,7 +118,9 @@ def legacy_source(tmp_path_factory):
     fixtures = Path(__file__).parent / "fixtures/result_format1"
     provenance = json.loads((fixtures / "provenance.json").read_bytes())
     for name, record in provenance["files"].items():
-        raw = (fixtures / name).read_bytes()
+        # Git may use CRLF in a Windows worktree. Restore the historical LF
+        # bytes before their digest check and before loading the frozen module.
+        raw = (fixtures / name).read_bytes().replace(b"\r\n", b"\n")
         assert hashlib.sha256(raw).hexdigest() == record["sha256"]
         (root / record["source_path"]).write_bytes(raw)
     return root / "src", provenance

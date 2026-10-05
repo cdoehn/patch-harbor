@@ -11,11 +11,10 @@ import secrets
 import stat
 from typing import BinaryIO, Iterator
 from uuid import UUID
-import zipfile
 
 from patchharbor.progress import activity
 
-from patchharbor.bundle_handoff import BundleHandoff, CHAT_INSTRUCTIONS_NAME, ENVIRONMENT_NAME
+from patchharbor.bundle_handoff import BundleHandoff
 from patchharbor.errors import PatchHarborError, result_bundle_error
 from patchharbor.identifier_presentation import shorten_identifier
 from patchharbor.platform.filesystem import (
@@ -31,19 +30,6 @@ from patchharbor.result_bundle_snapshot import ResultBundleSnapshot
 from patchharbor.result_reader import read_result_reference
 from patchharbor.run_report import RunReport, RunSession
 from patchharbor.result_bundle_writer import write_result_bundle
-
-
-_REQUIRED_RESULT_BUNDLE_ENTRIES = frozenset(
-    (
-        "manifest.json",
-        "context.json",
-        CHAT_INSTRUCTIONS_NAME,
-        ENVIRONMENT_NAME,
-        "changes/staged.patch",
-        "changes/unstaged.patch",
-        "logs/run.json",
-    )
-)
 
 
 @dataclass(frozen=True)
@@ -212,34 +198,16 @@ def release_result_bundle_publication(
 
 
 def _verify_result_bundle(path: Path, *, execution_present: bool) -> None:
+    # The shared bounded read already verifies CRC, names and all versioned
+    # inventories. Publication only adds its producer-specific obligations.
     try:
-        # Bound and validate all content before the additional publication CRC
-        # pass. Writer activation remains separate; the shared reader accepts 1/2.
-        try:
-            facts, _digest = read_result_reference(path)
-            if facts.primary_result.entrypoint_started != execution_present:
-                raise result_bundle_error("Result Bundle execution state changed")
-        except PatchHarborError as exc:
-            raise result_bundle_error("Result Bundle integrity verification failed") from exc
-        with zipfile.ZipFile(path, mode="r") as archive:
-            names = archive.namelist()
-            if any(
-                names.count(name) != 1
-                for name in _REQUIRED_RESULT_BUNDLE_ENTRIES
-            ):
-                raise result_bundle_error(
-                    "Result Bundle is missing a required entry"
-                )
-            if (names.count("logs/execution.log") == 1) != execution_present:
-                raise result_bundle_error(
-                    "Result Bundle execution log does not match the run report"
-                )
-            if archive.testzip() is not None:
-                raise result_bundle_error("Result Bundle failed its CRC check")
-    except PatchHarborError:
-        raise
-    except (OSError, RuntimeError, ValueError, zipfile.BadZipFile) as exc:
-        raise result_bundle_error("cannot verify the Result Bundle") from exc
+        facts, _digest = read_result_reference(path)
+    except (PatchHarborError, OSError, RuntimeError, ValueError) as exc:
+        raise result_bundle_error("Result Bundle integrity verification failed") from exc
+    if not facts.handoff_present:
+        raise result_bundle_error("Result publication requires passive handoff data")
+    if facts.primary_result.entrypoint_started != execution_present:
+        raise result_bundle_error("Result Bundle execution state changed")
 
 
 @contextmanager
