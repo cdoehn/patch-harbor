@@ -226,8 +226,7 @@ def test_apply_timeout_bundles_output_and_exit_code(
         package,
         context,
         native_script(
-            "printf 'entrypoint-output\\n'\nsleep 60",
-            "[Console]::Out.WriteLine('entrypoint-output')\n"
+            "sleep 60",
             "Start-Sleep -Seconds 60",
         ),
     )
@@ -265,13 +264,59 @@ def test_apply_timeout_bundles_output_and_exit_code(
         execution_log = archive.read("logs/execution.log")
         run_report = json.loads(archive.read("logs/run.json"))
 
-    assert execution_log == native_value(
-        b"entrypoint-output\n",
-        b"entrypoint-output\r\n",
-    )
+    # The deadline includes interpreter startup. Empty output is valid even
+    # when a slow PowerShell process has not yet executed its first statement.
+    assert execution_log == b""
     assert run_report["primary_result"]["kind"] == "timeout"
     assert run_report["primary_result"]["timed_out"] is True
     assert run_report["process_exit_code"] == int(ExitCode.TIMEOUT)
+
+
+def test_apply_timeout_preserves_output_after_entrypoint_ready(tmp_path, monkeypatch):
+    import io
+    import threading
+
+    from patchharbor.application import apply_patch_package, resolve_patch_package
+    from patchharbor.errors import FailureReason, PatchHarborError
+    from patchharbor.output import OutputTargets
+    from patchharbor.platform.lifecycle import ProcessTree
+
+    repository = create_repository(tmp_path / "repository")
+    environment, context = _register_context(repository, tmp_path / "user")
+    for key, value in environment.items():
+        monkeypatch.setenv(key, value)
+    package = tmp_path / "ready-timeout.zip"
+    _write_execution_package(package, context, native_script(
+        "printf 'entrypoint-output\\n'\nsleep 60",
+        "[Console]::Out.WriteLine('entrypoint-output')\nStart-Sleep -Seconds 60",
+    ))
+    ready = threading.Event()
+    def observe(lines, _discarded):
+        if any(line.rstrip("\r\n") == "entrypoint-output" for line in lines):
+            ready.set()
+
+    real_run = ProcessTree.run
+    def run_after_output(tree, *, timeout_seconds):
+        # Synchronize only this fixture's deadline. The real native process,
+        # timeout, tree cleanup, output drain and Result writer still run.
+        assert ready.wait(30), "entrypoint did not produce its readiness record"
+        return real_run(tree, timeout_seconds=timeout_seconds)
+    monkeypatch.setattr(ProcessTree, "run", run_after_output)
+    with pytest.raises(PatchHarborError) as failure:
+        apply_patch_package(resolve_patch_package(package), output_directory=tmp_path / "results",
+                            timeout_seconds=1.0,
+                            output=OutputTargets(visible_text_stream=io.StringIO(), line_observer=observe))
+    assert failure.value.reason is FailureReason.TIMEOUT
+    report = failure.value.run_report
+    assert report.process_exit_code == int(ExitCode.TIMEOUT)
+    result = report.apply_result()
+    assert result["primary_result"]["timed_out"] is True
+    assert result["primary_result"]["entrypoint_started"] is True
+    with zipfile.ZipFile(result["result_bundle"]["path"]) as archive:
+        assert archive.read("logs/execution.log") == native_value(b"entrypoint-output\n", b"entrypoint-output\r\n")
+        run = json.loads(archive.read("logs/run.json"))
+    assert run["primary_result"]["kind"] == "timeout"
+    assert run["process_exit_code"] == int(ExitCode.TIMEOUT)
 
 
 def test_apply_interrupt_bundles_output_and_exit_code(

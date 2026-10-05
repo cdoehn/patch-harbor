@@ -815,7 +815,7 @@ seine Prüfung benutzt die bestehende vertrauenswürdige Übergabemethode.
 
 #### 1.f.W – 16/18: `feat(handoff): document and exercise verified offline bootstrap`
 
-**Status:** lokal vollständig parallel geprüft und eingefroren; tatsächlicher Apply offen. **Abhängigkeit:** 1.e.C; D-04 Übergang geklärt. **Spec:** 40.1–40.4.
+**Status:** angewendet/gepusht als `b322cd8a41a10463a798206403305445d01ed777`; finale CI fehlgeschlagen, Korrektur siehe 1.f.R-FIX1. **Abhängigkeit:** 1.e.C; D-04 Übergang geklärt. **Spec:** 40.1–40.4.
 
 **Ergebnis:** Die neue kanonische Anleitung führt tatsächlich vom Result zur isolierten nativen Prüfung.
 
@@ -845,7 +845,7 @@ Lokaler Vollnachweis: `exchange/reports/patchharbor-riv-014-1.f.W-parallel.json`
 
 #### 1.f.R – 17/18: `test(handoff): verify offline bootstrap and release integration`
 
-**Status:** lokal vollständig parallel geprüft (2.224 bestanden / 7 Skips) und eingefroren; tatsächlicher Apply offen. **Abhängigkeit:** 1.f.W. **Spec:** 40, 41.1.
+**Status:** angewendet/gepusht als `559a1ca7e871613b63f513cf70da9e2c869ad6ec`; finale CI fehlgeschlagen, Korrektur siehe 1.f.R-FIX1. **Abhängigkeit:** 1.f.W. **Spec:** 40, 41.1.
 
 **Ergebnis:** Die vollständige Übergabekette ist in blockierende funktionale Gates eingebunden.
 
@@ -892,7 +892,7 @@ Lokaler Vollnachweis: `exchange/reports/patchharbor-riv-014-1.f.R-parallel-reche
 
 #### 1.f.C – 18/18: `refactor(handoff): consolidate final runtime guidance and audit`
 
-**Status:** im Dateistand vorbereitet; vollständige parallele Äquivalenzprüfung, tatsächlicher Apply und finale CI noch offen. **Abhängigkeit:** 1.f.R. **Spec:** 35–41.
+**Status:** angewendet/gepusht als `ca582a851b72222acfc66f50d82ee5c32aecbe28`; finale CI fehlgeschlagen, Korrektur siehe 1.f.R-FIX1. **Abhängigkeit:** 1.f.R. **Spec:** 35–41.
 
 **Ergebnis:** Eine konsistente dokumentierte Übergabe und ehrliche Abschlussbilanz ohne neue Features.
 
@@ -1058,34 +1058,75 @@ Jeder später abgeschlossene Eintrag enthält Plan-ID, tatsächlichen Commit, ur
 
 Fertig ist die Erweiterung erst mit nutzbarer API und CLI, konstant reproduzierbarer Runtime aus Standardinstallationen, sicherer Formatintegration, erhaltenen Sicherheitsgrenzen, ausgeführten Offline-/Roundtrip-Gates, aktueller installierter Anleitung und grüner CI für den tatsächlichen finalen HEAD. „0 Commits offen“ allein ist kein Freigabenachweis.
 
-**Status dieses Dateistands:** 15/18 vorbereitet, 12/18 durch tatsächlichen Apply bestätigt.
-Bundle 012: `1.d.R` = `7dbb3a82a3db9b8ea4340cc433cf53f8452e7420`,
-`1.d.C` = `d48567ff7b2f61ea82f8cfba9c23415fab10706a`.
-Vollständige parallele Gates je Zustand; C abschließend seriell und parallel,
-je 2.132 bestanden / 7 Skips; normaler finaler Push und sauberer Baum bestätigt.
-Apply-Result-SHA-256: `091282e5e34e8eef42d0a58dddaac37662622ab9a0566812391b145e73d30ea9`.
+**Status dieses Dateistands:** 18/18 ursprüngliche Implementierungspositionen sind
+angewendet und gepusht. Die Endabnahme ist wegen der fehlgeschlagenen CI offen.
 
-Technische Basis für Bundle 013 ist der anschließende erfolgreiche Watcher-Diagnoselauf:
-`patchharbor-apply_Result_064502_1005_81dbbd.zip`, SHA-256
-`61a81f216eb585e92f426d08b373d0a7703ac8438c0ac4da5808548c198f21c3`.
-Null Commits, unveränderter sauberer HEAD und 250 byte-/modusgleiche Base-Dateien.
-Vollständige Bindung: repo_id `e7a93d72-62dc-4759-97e8-6bf6cdf10e90`,
-base_commit `d48567ff7b2f61ea82f8cfba9c23415fab10706a`,
+### 8.1 Tatsächlicher Teilfortschritt von Bundle 014
+
+Maßgebliches tatsächliches Apply-Result:
+`patchharbor-apply_Result_101834_1005_f6c869.zip`, SHA-256
+`9bf5f023867b45d7bea8f1fc56b35ce210c05851c6735484f4bd3cd0976d99a9`.
+Es meldet Exit 1 nach allen drei Commits und dem einzigen erfolgreichen Push.
+`completed_commit = null` hebt die unabhängig geprüften Commits nicht auf:
+
+- 1.f.W: `b322cd8a41a10463a798206403305445d01ed777`, parallel 2.174 bestanden / 7 Skips.
+- 1.f.R: `559a1ca7e871613b63f513cf70da9e2c869ad6ec`, parallel 2.223 bestanden / 8 Skips.
+- 1.f.C: `ca582a851b72222acfc66f50d82ee5c32aecbe28`, seriell und anschließend parallel jeweils 2.223 bestanden / 8 Skips.
+
+Die 263 Result-Base-Dateien stimmen byte- und modusgenau mit dem Endcommit,
+Apply-Arbeitsbaum und Development-Ausgang überein. Apply ist sauber; `origin/dev`
+zeigt auf denselben Endcommit. Der zusätzliche Apply-Skip betrifft das dort
+fehlende optionale uv; die CI-Lane Ubuntu 26.04 hat den uv-Nachweis bestanden.
+
+CI [37297611484](https://github.com/cdoehn/patch-harbor/actions/runs/37297611484),
+Attempt 1 auf diesem vollständigen Endcommit: native Ubuntu 24.04/26.04 und
+Windows PowerShell 7 erfolgreich; Windows PowerShell 5.1 sowie beide Docker-Jobs
+fehlgeschlagen. Windows erreichte vor dem Ein-Sekunden-Timeout teilweise noch
+keine Entrypoint-Ausgabe. Drei Docker-E2E-Tests ersetzten die Fallback-Vorlage,
+obwohl die installierte Runtime ihre eigene fixierte Vorlage bevorzugt.
+Die späteren Windows-/Docker-Gates sind damit nicht als bestanden belegt.
+
+Zusätzlich brach die lokale CI-Orchestrierung unmittelbar nach dem Dispatch mit
+`CI run binding mismatch` ab. Die abgeschlossene GitHub-Antwort stimmt inzwischen
+in Commit, Branch, Workflow, Handoff-ID und Attempt überein. Der konkrete beim
+ersten Abruf abweichende Wert wurde damals nicht gespeichert und ist nicht
+rekonstruierbar. Das ist kein Nachweis einer grünen CI.
+
+### 8.2 1.f.R-FIX1 – Bundle 015: CI-Abnahme korrigieren
+
+Ein gezielter Korrekturcommit auf der tatsächlichen Result-Basis:
+repo_id `e7a93d72-62dc-4759-97e8-6bf6cdf10e90`,
+base_commit `ca582a851b72222acfc66f50d82ee5c32aecbe28`,
 state_fingerprint `7c9d2a24e397e0e5`, fingerprint_algorithm `patchharbor-state-v1`.
+Die drei erfolgreichen Commits werden nicht wiederholt.
 
-1.e.W aktiviert den gemeinsamen Format-2-Writer. Runtime und statische Vorlage
-werden vor Payload/Entrypoint fixiert, Snapshot und dynamische Zielinformationen
-entstehen weiter aus dem tatsächlichen späteren Repositoryzustand.
-Runtime-Ausfall und fehlendes Zusatzbudget bewahren Primärergebnis und Pflichtdaten;
-fehlende Pflichtvorlage bleibt Result-Fehler. Native Writer- und installierte
-Standardpfad-Nachweise sind Bestandteil des verbindlichen parallelen W-Gates.
-1.e.R ergänzt reale Self-updates, drei Result-Generationen, Allokations-/ZIP-Messung
-und Fehlergrenzen bei der Publikation. Notfallberichte bewahren den zuletzt
-erfolgreich erfassten Kontext. W ist vollständig parallel bestätigt und eingefroren;
-R ist ebenfalls vollständig bestätigt und eingefroren. C bündelt die Publikationsdaten,
-entfernt doppelte Übergaben und typisiert die Budgetgrenze. Freigabe erfordert
-einen eigenen vollständigen Parallel-Lauf mit identischer Sammlung und Ergebnissen.
-Development ausschließlich parallel. Nach tatsächlichem Apply folgen 1.f.W/R/C; nächste reguläre CI nach Apply/Push von Bundle 014 inklusive Windows.
+- Fallback-Vorlagentests wählen ausdrücklich einen unvorbereiteten Producer,
+  unabhängig von Source- oder Wheelinstallation. Die produktive Priorität der
+  fixierten kanonischen Vorlage bleibt erhalten.
+- Der CLI-Timeout-Test prüft einen bewusst stillen Entrypoint. Ein zusätzlicher
+  realer API-/Prozess-/Result-Test synchronisiert nur die Testfrist mit einer
+  gelesenen Bereitschaftsausgabe und prüft danach echten Timeout und bytegenau
+  erhaltene Ausgabe. Kein erhöhtes produktives Timeout oder Runnerbudget.
+- Die CI-Orchestrierung protokolliert Dispatchantwort, Run-ID/URL und tatsächliche
+  Bindungsfelder vor deren Freigabe. Noch anlaufende Metadaten dürfen höchstens
+  120 Sekunden nach dem Dispatch vervollständigt werden. Jede endgültige
+  Abweichung bleibt blockierend; auch bei Abschluss wird vollständig geprüft.
+  Es gibt weiterhin genau einen Dispatch und keine automatische Wiederholung.
+
+Development: ausschließlich parallel, gezielte funktionale Regressionen auch
+mit real gebautem installiertem Wheel und danach vollständige Suite.
+Nachweise unter `exchange/reports/patchharbor-riv-015-*.json` sind nur zusammen
+mit erfolgreichem Exit und passender Quellbindung gültig.
+Apply: vollständige serielle und anschließend parallele Suite auf demselben
+Korrekturstand, ein Commit, ein normaler finaler Push. Das angeforderte Fixbundle
+holt die fehlgeschlagene fällige Endabnahme von 014 auf seinem neuen Endcommit
+mit einem CI-Lauf einschließlich Windows nach und liefert Run-/Job-Nachweise
+im Result zurück. Der reguläre Fünfer-Takt bleibt 019, 024 usw.; keine neuen
+Push-/PR-Trigger und kein zusätzlicher Runner-Job.
+
+Der Fixcommit und seine native Windows-/Docker-Abnahme sind bei Vorbereitung
+noch offen. Erst das passende tatsächliche Result samt grüner gebundener CI
+schließt den bestehenden Plan. Danach kein weiteres Bundle und kein neuer Plan.
 
 ## 9. Dokumentidentität und Quellen
 

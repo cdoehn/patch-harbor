@@ -37,6 +37,18 @@ def built_result_source(tmp_path_factory):
 
 
 @pytest.fixture
+def unavailable_result_producer(monkeypatch):
+    """Select the source fallback explicitly, including inside installed tests."""
+    def provider():
+        captured = RuntimeProvider()
+        captured._producer_id = None
+        return captured
+
+    assert provider().capture().reason == "source_not_prepared"
+    monkeypatch.setattr(result_resources, "RuntimeProvider", provider)
+
+
+@pytest.fixture
 def prepared_result_producer(built_result_source, monkeypatch):
     identity = producer_id(parse_recipe((built_result_source / RECIPE_PATH).read_bytes()))
 

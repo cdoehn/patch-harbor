@@ -127,6 +127,11 @@ native Windows use Python 3.12. pipx and wheel/source/sdist acceptance remain in
 packaging. No new runner lane is added. Optional uv absence in other lanes is
 an explicit skip; the designated lane must provide a passed uv proof.
 
+Newly dispatched run metadata may settle for at most 120 seconds; observed
+binding fields and mismatches are retained with the Run ID and URL even on
+failure. No run or artifact is accepted until the full binding matches, and
+completion is checked again. This never retries the dispatch.
+
 `scripts/run_handoff_ci.py` records a durable intent in an owned ignored
 `build/handoff-ci/<id>` before dispatch. Reusing the same workspace refuses a
 second attempt. An ambiguous network response requires diagnosis, not redispatch.
@@ -167,7 +172,8 @@ runs the intermediate parallel gates and, only at the final state, serial then
 parallel before the final commit and sole push. No local test or simulated
 transport is presented as an executed Windows job or a completed Apply.
 
-All 18 planned implementation positions are prepared by this final bundle;
-15 are confirmed by received Apply Results. Final approval awaits the actual
-remaining three commits and successful bound CI. On confirmation the active
+All 18 planned implementation positions are confirmed by actual Apply Results.
+Bundle 014 completed its commits and push, then failed CI. Correction 015
+addresses the timeout/template fixtures and CI receipt handling. Final approval
+awaits its actual Apply and successful bound Windows/Linux CI. On confirmation the active
 plan ends, without an extra bundle, new plan, version bump or automatic tag.

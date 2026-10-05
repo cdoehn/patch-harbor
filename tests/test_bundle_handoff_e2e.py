@@ -232,7 +232,9 @@ def test_configuration_change_during_handoff_is_revalidated(tmp_path: Path, monk
     assert not list(exchange.glob(".*.tmp"))
 
 
-def test_template_failure_publishes_no_incomplete_bundle(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_template_failure_publishes_no_incomplete_bundle(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, unavailable_result_producer,
+) -> None:
     import patchharbor.chat_instructions as template_module
     environment, exchange = _configure_user(tmp_path)
     repository = create_repository(tmp_path / "repository")
@@ -240,8 +242,9 @@ def test_template_failure_publishes_no_incomplete_bundle(tmp_path: Path, monkeyp
     for key, value in environment.items():
         monkeypatch.setenv(key, value)
     monkeypatch.setattr(template_module, "_template_path", lambda: tmp_path / "missing-template.md")
-    with pytest.raises(PatchHarborError, match="chat-instructions template"):
+    with pytest.raises(PatchHarborError) as failure:
         create_manual_result_bundle(repository)
+    assert failure.value.reason.value == "result_bundle_error"
     assert not list(exchange.glob("*_Result_*"))
     assert not list(exchange.glob(".*.tmp"))
     assert git(repository, "status", "--porcelain").stdout == ""
@@ -250,6 +253,7 @@ def test_template_failure_publishes_no_incomplete_bundle(tmp_path: Path, monkeyp
 @pytest.mark.parametrize("line_ending", [b"\r\n", b"\r"], ids=["crlf", "cr"])
 def test_result_bundle_normalizes_generated_instructions_not_repository_bytes(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, line_ending: bytes,
+    unavailable_result_producer,
 ) -> None:
     import patchharbor.chat_instructions as template_module
     environment, exchange = _configure_user(tmp_path)

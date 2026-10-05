@@ -151,9 +151,13 @@ def run(commit, handoff_id, *, workspace=None, timeout=8100):
         save(receipt, evidence)
         dispatched = request(f"actions/workflows/{WORKFLOW}/dispatches",
                              {"ref": BRANCH, "inputs": {"handoff_id": handoff_id, "expected_commit": commit}})
+        evidence["dispatch_response"] = ({key: dispatched.get(key) for key in
+                                          ("workflow_run_id", "run_url", "html_url")}
+                                         if isinstance(dispatched, dict) else None)
         evidence["status"] = "awaiting_run"
         save(receipt, evidence)
         deadline = time.monotonic() + timeout
+        binding_deadline = time.monotonic() + min(timeout, 120)
         run_id = dispatched.get("workflow_run_id") if isinstance(dispatched, dict) else None
         while True:
             require(time.monotonic() < deadline, "CI wait deadline exceeded; do not redispatch")
@@ -165,12 +169,30 @@ def run(commit, handoff_id, *, workspace=None, timeout=8100):
                     continue
                 run_id = found[0]["id"]
             observed = request(f"actions/runs/{run_id}")
-            require(observed["head_sha"] == commit and observed["head_branch"] == BRANCH
-                    and observed["event"] == "workflow_dispatch" and observed["display_title"] == title
-                    and observed["workflow_id"] == workflow["id"] and observed["run_attempt"] == 1,
-                    "CI run binding mismatch")
-            if evidence.get("run_id") is None:
-                evidence.update(run_id=run_id, url=observed["html_url"], status="running", run_attempt=1)
+            expected = {"id": run_id, "head_sha": commit, "head_branch": BRANCH,
+                        "event": "workflow_dispatch", "display_title": title,
+                        "workflow_id": workflow["id"], "run_attempt": 1}
+            mismatches = {key: {"expected": value, "observed": observed.get(key)}
+                          for key, value in expected.items() if observed.get(key) != value}
+            # A newly dispatched run can be visible before its metadata settles.
+            # Persist the actual response even on failure; no job/artifact is
+            # accepted until every binding field matches, including at completion.
+            evidence.update(run_id=run_id, url=observed.get("html_url"),
+                            run_attempt=observed.get("run_attempt"), binding_verified=not mismatches,
+                            observed_run={key: observed.get(key) for key in
+                                          (*expected, "status", "conclusion", "html_url")},
+                            binding_mismatches=mismatches)
+            if mismatches:
+                evidence["status"] = "awaiting_run_binding"
+                evidence.setdefault("binding_observations", []).append(evidence["observed_run"])
+                save(receipt, evidence)
+                pending = observed.get("status") in {"requested", "waiting", "pending", "queued", "in_progress"}
+                require(pending and time.monotonic() < binding_deadline,
+                        "CI run binding mismatch: " + ", ".join(sorted(mismatches)))
+                time.sleep(60)
+                continue
+            if evidence["status"] != "running":
+                evidence["status"] = "running"
                 save(receipt, evidence)
             if observed["status"] == "completed":
                 break

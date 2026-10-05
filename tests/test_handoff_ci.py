@@ -66,6 +66,11 @@ def github(tmp_path, monkeypatch):
         if "/runs?" in route:
             return {"workflow_runs": [deepcopy(run)] if state.dispatched or state.fault == "duplicate" else []}
         if route == "actions/runs/100":
+            if state.fault in {"pending_metadata", "binding_never_settles"}:
+                if not state.sleeps or state.fault == "binding_never_settles":
+                    return {**run, "status": "queued", "display_title": "", "run_attempt": 0}
+            if state.fault == "binding_changes_at_completion":
+                return {**run, "head_sha": "b" * 40} if state.sleeps else {**run, "status": "in_progress"}
             if state.fault == "waiting":
                 if not state.sleeps: return {**run, "status": "queued"}
             if state.fault == "timeout": return {**run, "status": "queued"}
@@ -83,7 +88,7 @@ def github(tmp_path, monkeypatch):
     return state
 
 
-@pytest.mark.parametrize("mode", [None, "waiting", "legacy_response"])
+@pytest.mark.parametrize("mode", [None, "waiting", "legacy_response", "pending_metadata"])
 def test_one_dispatch_returns_complete_bound_windows_and_second_python_evidence(github, mode):
     github.fault = mode
     result = ci.run(COMMIT, HANDOFF, workspace=github.workspace)
@@ -93,7 +98,10 @@ def test_one_dispatch_returns_complete_bound_windows_and_second_python_evidence(
     assert len(result["artifacts"]) == 4
     assert all(row["reports"] for row in result["artifacts"])
     assert json.loads((github.workspace / "evidence.json").read_text()) == result
-    assert github.sleeps == ([60] if mode == "waiting" else [])
+    assert github.sleeps == ([60] if mode in {"waiting", "pending_metadata"} else [])
+    assert result["binding_verified"] is True and result["binding_mismatches"] == {}
+    if mode == "pending_metadata":
+        assert result["binding_observations"][0]["run_attempt"] == 0
     before = list(github.calls)
     with pytest.raises(FileExistsError): ci.run(COMMIT, HANDOFF, workspace=github.workspace)
     assert github.calls == before  # no second dispatch after restart
@@ -101,11 +109,15 @@ def test_one_dispatch_returns_complete_bound_windows_and_second_python_evidence(
 
 @pytest.mark.parametrize("fault", ["auth", "duplicate", "dispatch_uncertain", "timeout", "wrong_sha",
                                    "wrong_branch", "wrong_workflow", "rerun", "missing_windows",
-                                   "wrong_job_sha", "failed_job", "missing_report", "expired_report", "corrupt_report"])
+                                   "wrong_job_sha", "failed_job", "missing_report", "expired_report", "corrupt_report",
+                                   "wrong_run_id", "wrong_event", "wrong_title", "binding_never_settles",
+                                   "binding_changes_at_completion"])
 def test_ci_failures_preserve_receipt_and_never_rerun(github, fault):
     github.fault = fault
     changes = {"wrong_sha": {"head_sha": "b"*40}, "wrong_branch": {"head_branch": "main"},
-               "wrong_workflow": {"workflow_id": 999}, "rerun": {"run_attempt": 2}}
+               "wrong_workflow": {"workflow_id": 999}, "rerun": {"run_attempt": 2},
+               "wrong_run_id": {"id": 101}, "wrong_event": {"event": "push"},
+               "wrong_title": {"display_title": "another handoff"}}
     github.run.update(changes.get(fault, {}))
     if fault == "missing_windows": github.jobs[:] = [row for row in github.jobs if "Windows" not in row["name"]]
     if fault == "wrong_job_sha": github.jobs[0]["head_sha"] = "b"*40
@@ -120,6 +132,13 @@ def test_ci_failures_preserve_receipt_and_never_rerun(github, fault):
     assert len([body for route, body in github.calls if body is not None]) <= 1
     if fault == "failed_job":
         assert result["failure_log"]["bytes"] > 0 and result["jobs"]
+    if fault in changes or fault == "binding_changes_at_completion":
+        assert result["run_id"] == 100 and result["url"] == github.run["html_url"]
+        assert result["binding_mismatches"] and result["binding_verified"] is False
+        assert not any("/jobs?" in route or "/artifacts?" in route for route, _ in github.calls)
+    if fault == "binding_never_settles":
+        assert github.sleeps == [60, 60]
+        assert result["binding_verified"] is False and len(result["binding_observations"]) == 2
 
 
 @pytest.mark.parametrize("fault", ["wrong_platform", "wrong_python", "missing_test", "changed_sources", "extra_file"])
