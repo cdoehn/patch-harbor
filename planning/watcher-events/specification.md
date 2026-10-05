@@ -3,7 +3,7 @@
 Stand: 5. Oktober 2026. Plan-ID: `watcher-events`. Status: verbindliches
 Entwicklungsziel, noch nicht vollständig implementiert. `WE-0` bis `WE-2` sind
 durch Bundles 016 bis 018 angewendet. `WE-3` implementiert die CLI-Umstellung
-im Development; tatsächliches Apply und native Windows-Abnahme stehen aus.
+im Development; WE-4 ergänzt Integrations-, Wheel- und Abnahmetests; tatsächliches Apply und native Windows-Abnahme stehen aus.
 Die bereits installierte Engine wird durch die Vorbereitung nicht ersetzt.
 Produktversion und Release-Tag werden durch diesen Plan nicht angehoben.
 
@@ -206,7 +206,8 @@ Neustart, Replay und unveränderte Hash-/State-Bindung.
 Zusätzlich: echte native Dateiereignisse unter Linux und Windows, echte Apply-
 Resultate, Stop ohne Hängen, installierter Wheel-/Runtime-Pfad ohne neue
 Abhängigkeiten und der vorhandene Offline-Fallback. Keine neuen Tests auf Farben,
-Wortlaut, README-Prosa oder Markdownlayout. Die Projekt-Test-/CI-Regeln stehen im
+Wortlaut, README-Prosa oder Markdownlayout. Der [Betriebs-/Nachweisüberblick](../../docs/watcher-events.md) ordnet die
+Prüfungen den Verträgen zu. Die Projekt-Test-/CI-Regeln stehen im
 [Commit-Plan](commit-plan.md); allein lokale Linux-Tests bestätigen kein Windows.
 
 ## 9. Technische Referenzen

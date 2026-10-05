@@ -510,3 +510,5 @@ Release verification covers direct Python calls, CLI/API parity, the separate
 Watcher worker, actual script output and Result Bundles, plus installed-wheel
 imports and execution. The full platform release gates still determine whether
 a particular release commit is ready to use; this document is not a CI receipt.
+
+Weitere Betriebs- und Abnahmedetails: [Ereignis-Watcher](watcher-events.md).

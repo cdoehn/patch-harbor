@@ -82,3 +82,5 @@ keine neue Termux-Service-Zusage. Netzwerk-/virtuelle Dateisysteme und Änderung
 ohne unterstützte OS-Ereignisse erhalten keine pauschale Erkennungsgarantie.
 Core muss weiterhin Inhalt, Pfade, Fingerprint und Replay unabhängig prüfen;
 manueller Apply und der dokumentierte Wheel-/Runtime-Fallback bleiben verfügbar.
+
+Weitere Betriebs- und Abnahmedetails: [Ereignis-Watcher](watcher-events.md).

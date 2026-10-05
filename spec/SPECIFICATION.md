@@ -184,7 +184,7 @@ Der Watcher implementiert keine eigene Repository-, Git-, Manifest-, Fingerprint
 
 Der Watcher lässt die Exchange-Verzeichnisse ausschließlich flach scannen und implementiert keine eigene Archivierungslogik. Sein globaler Core-Scan darf nach Abschnitt 16.2.1 nachweislich überholte Bundles in den konfigurierten Archiv-Unterordner verschieben. Sonstige Dateien und unklare Zustände bleiben liegen; unveränderte Nichtkandidaten und bereits verarbeitete Dateien werden nicht fortlaufend neu delegiert.
 
-### 3.2.1 Ereignisüberwachung – WE-3 im Development implementiert
+### 3.2.1 Ereignisüberwachung – WE-3/WE-4 vorbereitet
 
 Das normative Entwicklungsziel steht in
 [`planning/watcher-events/specification.md`](../planning/watcher-events/specification.md),
@@ -225,7 +225,9 @@ WE-3-Zeitsteuerung. Diese erfasst Ereignisse während Apply weiter und schützt
 neue Generationen vor dem Abschluss älterer Arbeit. Bekannte Sperren werden
 ohne Bundle-Scan mit Backoff geprüft. Kontrollereignisse erneuern die Core-Ziele;
 fehlende Roots erhalten nur unverbindliche Beobachtungshinweise über
-`WatchControlPaths.exchange_paths`, keine Ausführungsfreigabe.
+`WatchControlPaths.exchange_paths`, keine Ausführungsfreigabe. WE-4 ergänzt echte
+Ereignis-/Apply- und installierte Wheel-Prüfungen. [Betrieb und Abnahme](../docs/watcher-events.md)
+unterscheiden lokale Nachweise von noch ausstehendem Apply und nativer Windows-CI.
 
 ### 3.3 Repo Assist
 

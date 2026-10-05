@@ -109,7 +109,10 @@ def artifact_evidence(artifact, expected, *, source_digest=None):
             counts["skipped"] += len(signature[1])
             focus = [{"nodeid": nodeid, "outcome": outcome} for nodeid, outcome, _ in signature[2]
                      if any(part in nodeid for part in ("test_runtime_bootstrap", "test_handoff_commit_sequence",
-                                                        "test_runtime_packaging", "test_runtime_acl"))]
+                                                        "test_runtime_packaging", "test_runtime_acl",
+                                                        "test_watcher_events_native", "test_watcher_event_loop_e2e",
+                                                        "test_watcher_scheduling",
+                                                        "test_release_distributions_run_after_pipx_installation"))]
             if "packaging" in name:
                 require(any("test_actual_offline_install" in row["nodeid"] and row["outcome"] == "passed"
                             for row in focus), "missing actual bootstrap proof")

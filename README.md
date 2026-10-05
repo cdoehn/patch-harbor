@@ -793,3 +793,5 @@ not a replacement for registered/state-bound `apply`: it does not acquire the
 repository lock or perform the base/fingerprint gate. Reuse it only within an
 already controlled application/entrypoint context. See the
 [POSIX contract](planning/posix-mode/specification.md) and `CHAT_INSTRUCTIONS.md`.
+
+Weitere Betriebs- und Abnahmedetails: [Ereignis-Watcher](docs/watcher-events.md).

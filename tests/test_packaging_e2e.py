@@ -866,3 +866,15 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
         assert b"installed-apply" in result_archive.read("logs/execution.log")
         installed_handoff = json.loads(result_archive.read("environment.json"))
         assert installed_handoff["runtime"]["patchharbor_version"] == RELEASE_VERSION
+
+    # Actual native wait and scoped worker from the wheel, with independent
+    # user state and no checkout on sys.path. This also runs on native Windows.
+    event_repo = _create_release_repository(tmp_path / "installed-event-repo")
+    event_environment = runtime_environment.copy()
+    event_environment.update(isolated_user_environment(tmp_path / "installed-event-user"))
+    native = _run([str(installed_python), "-I", str(PROJECT_ROOT / "tests/watcher_installed_probe.py"),
+                   str(event_repo), str(tmp_path / "installed-event-exchange")],
+                  cwd=empty_workdir, environment=event_environment, timeout=90)
+    assert native.returncode == 0, native.stdout + native.stderr
+    evidence = json.loads(native.stdout)
+    assert evidence["native_wait"] and evidence["actual_worker_apply"] and evidence["quiet_seconds"] == 5

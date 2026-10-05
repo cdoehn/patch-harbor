@@ -1,5 +1,16 @@
 # PatchHarbor – Spezifikations-Changelog
 
+## 2026-10-05 – WE-4: Integration und Abschlussprüfung vorbereitet
+
+- WE-3 separat nach vollständiger paralleler Prüfung festgehalten; WE-4 ist der
+  tatsächliche zweite Dateizustand von Bundle 019, kein rückwirkliches Phasenlabel.
+- Reale Ereignissteuerung während Apply, mehrere Bundles, fehlgeschlagene
+  Identität ohne Retry, unabhängiger Download und Signalstop im Leerlauf geprüft.
+- Installierter Wheel führt außerhalb des Checkouts eine native Fünfsekunden-
+  Warteoperation mit anschließendem tatsächlichem Worker-Apply aus.
+- CI-Rückgabe umfasst die Watcher-Nachweise einschließlich Windows; Abschluss
+  bleibt bis zur Auswertung des tatsächlichen Apply-/CI-Result offen.
+
 ## 2026-10-05 – WE-3: Ereignissteuerung und begrenzte Worker-Scope
 
 - WE-2 durch tatsächliches Bundle-018-Result bestätigt (3/5 Planschritte).

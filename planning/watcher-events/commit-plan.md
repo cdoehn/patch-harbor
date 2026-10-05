@@ -1,9 +1,10 @@
 # PatchHarbor – Implementierungsplan für Exchange-Ereignisse
 
-Stand: 5. Oktober 2026. Plan-ID: `watcher-events`, Revision 4.
+Stand: 5. Oktober 2026. Plan-ID: `watcher-events`, Revision 5.
 Aktiv auf ausdrücklichen Nutzerauftrag; fünf geplante Commitschritte einschließlich
 Dokumentationsbootstrap. `WE-0` bis `WE-2` sind durch tatsächliches Apply bestätigt
-(3/5); `WE-3` ist für Bundle 019 vorbereitet, sein Apply steht aus.
+(3/5); `WE-3` und `WE-4` sind als zwei echte aufeinanderfolgende Zustände für
+Bundle 019 vorbereitet. Ihr Apply und die finale native CI stehen aus.
 Zielversion noch nicht festgelegt.
 
 Normative Grundlage: [Watcher-Spezifikation](specification.md) und
@@ -45,10 +46,18 @@ Result; diese Tabelle ist keine dauerhafte Patch-Basis.
 | WE-1 | Öffentliche Core-Abfrage der geprüften Beobachtungsziele, optional eingeschränkter automatischer Exchange-Scope, strukturierte Fortschritts-/Sperrbereitschaft. Bisheriger Aufruf ohne Einschränkung unverändert. | WE-0 angewendet | durch Bundle 017 tatsächlich angewendet |
 | WE-2 | Native Linux-/Windows-Ereignisadapter, Filter und Ressourcenlebenszyklus; deterministische Ereignisabstraktion. Noch keine Aktivierung des neuen CLI-Betriebs. | WE-1 angewendet bzw. echter vorangehender Bundle-Zustand | durch Bundle 018 tatsächlich angewendet; native Windows-Prüfung offen |
 | WE-3 | Fünfsekunden-Zustandsautomat, Startprüfung, Parallelität der Ereigniserfassung, sequenzieller Worker, Nachlauf, Konfigurationsaktualisierung und CLI-Umstellung. | WE-2 | für Bundle 019 vorbereitet; Apply offen |
-| WE-4 | Vollständige Robustheits-/Plattformintegration, reale Ereignis-/Apply- und installierte Wheel-Nachweise, Dokumentationsabgleich und Abnahme. | WE-3 | geplant |
+| WE-4 | Vollständige Robustheits-/Plattformintegration, reale Ereignis-/Apply- und installierte Wheel-Nachweise, Dokumentationsabgleich und Abnahme. | WE-3 | für Bundle 019 vorbereitet; Apply/CI offen |
 
-Nächster vorbereiteter Commit:
-`feat(watcher): trigger scoped apply after five quiet seconds [WE-3]`.
+Vorbereitete Commits, in dieser Reihenfolge:
+1. `feat(watcher): trigger scoped apply after five quiet seconds [WE-3]`
+2. `test(watcher): verify native event apply and installed runtime [WE-4]`
+
+WE-3 wurde vor Beginn der WE-4-Arbeiten separat nach vollständiger paralleler
+Suite festgehalten: 2.368 bestanden / 7 übersprungen. Die erste Payload installiert
+nur WE-3; der geprüfte Übergangsdelta erzeugt WE-4 erst nach dessen Vorgängercommit.
+Der Endstand wird vollständig parallel im Development geprüft. Apply prüft WE-3
+parallel vor dem ersten Commit und WE-4 seriell sowie danach parallel vor dem
+zweiten Commit. Erst dann erfolgen ein Push und die fällige CI.
 
 Fortschrittsnachweis für WE-0: Result
 `patchharbor-apply_Result_163737_1005_90175f.zip`, SHA-256
@@ -144,6 +153,13 @@ sind keine freigegebenen `ExchangeWatchTarget`-Objekte. Der bisherige
 - Wheel-/Offline-Runtime, Fallback, Prozessstop und bestehende Core-Sicherheit bestehen.
 - README, API-Dokumentation, zentrale Spezifikation und Changelog beschreiben den
   implementierten Betrieb. Geplante und bestätigte Eigenschaften sind unterscheidbar.
+
+WE-4 ergänzt reale Ereignis-/Worker- und installierte Wheel-Nachweise sowie die
+[Betriebs- und Abnahmedokumentation](../../docs/watcher-events.md). Tests prüfen
+unter anderem weiter eintreffende Ereignisse, mehrere vorhandene Bundles,
+Fehlversuche ohne automatischen Retry und einen unabhängigen aktiven Download.
+Die private Übergabe gibt CI-Nachweise im Result-Ausführungslog zurück. Lokales
+Linux und Windows-Simulationen ersetzen nicht die noch ausstehende native CI.
 
 ## 3. Bundle-Grenzen und CI
 
