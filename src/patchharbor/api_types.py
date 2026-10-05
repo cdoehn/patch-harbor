@@ -21,6 +21,10 @@ from patchharbor.patch_inspection import (
     PatchValidationResult, PatchValidationScope,
 )
 from patchharbor.result_reader import ReferenceContext
+from patchharbor.watch_contract import (
+    ApplyLock, ApplyLockKind, ApplyReadiness, AutomaticApplyResult,
+    AutomaticApplyStatus, ExchangeWatchTarget, WatchControlPaths, WatchTargets,
+)
 from patchharbor.progress import (
     ActivityEvent, PackageFile, ProgressEvent, RepositoryResolved,
     RequestStarted, ScriptPrepared,

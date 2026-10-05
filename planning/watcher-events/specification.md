@@ -1,8 +1,9 @@
 # PatchHarbor – Ereignisgesteuerter Exchange-Watcher
 
 Stand: 5. Oktober 2026. Plan-ID: `watcher-events`. Status: verbindliches
-Entwicklungsziel, noch nicht implementiert. `WE-0` übernimmt ausschließlich
-Dokumentation. Die installierte Polling-Schleife ändert sich dadurch nicht.
+Entwicklungsziel, noch nicht vollständig implementiert. `WE-0` ist durch Bundle
+016 angewendet. `WE-1` bereitet die Core-Schnittstellen vor; sein tatsächliches
+Apply steht aus. Die installierte Polling-Schleife ändert sich dadurch nicht.
 Produktversion und Release-Tag werden durch diesen Plan nicht angehoben.
 
 ## 1. Ziel und Ausgangslage
@@ -83,6 +84,19 @@ Ein Dateiereignis ist niemals die Erlaubnis zu einem expliziten manuellen Apply
 des gemeldeten Pfads. Der automatische Ursprung, seine fehlende automatische
 Wiederholung fehlgeschlagener Identitäten und sämtliche Locks bleiben erhalten.
 Beobachtungsinformationen sind keine Reservierung und keine neue Vertrauensgrenze.
+
+Die in WE-1 vorbereitete Python-API konkretisiert diese Grenze:
+`watch_targets()` liefert physische Exchange-Identitäten mit Repository-IDs und
+Registry-/Konfigurationspfaden; `watch_control_paths()` liefert Kontrollpfade auch
+bei beschädigter lokaler Konfiguration. `apply_next(exchanges=tuple(...))` prüft
+die Beobachtungen erneut; `None` bleibt global und `()` bleibt leer. Physischer
+Root-Ersatz wird auch zwischen Auswahl und Mutationsbeginn abgewiesen.
+`RunReport.automatic` trennt `NO_CANDIDATE`, `ATTEMPTED`, `LOCKED`, `DRY_RUN` und
+`ERROR` ohne Meldungstext-Vergleiche. `ATTEMPTED` bestätigt nur die verbrauchte
+Replay-Identität, keinen erfolgreichen Apply. `apply_readiness(blocked_on)` prüft
+und löst die bekannte technische Sperre ohne Bundle-Scans oder Reservierung.
+Diese Ablaufdaten ergänzen ausschließlich die Python-API; bestehende persistierte
+Result-/CLI-JSON-Verträge bleiben erhalten. Die Worker-Anbindung folgt in WE-3.
 
 ## 5. Ausführung, Nachlauf und Konkurrenz
 

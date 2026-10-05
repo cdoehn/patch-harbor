@@ -8,6 +8,7 @@ from pathlib import Path
 
 from patchharbor.errors import (
     PatchHarborError,
+    LockBusyError,
     registry_error,
     repository_busy_error,
     repository_resolution_error,
@@ -19,6 +20,7 @@ from patchharbor.platform.locking import (
     exclusive_file_lock,
 )
 from patchharbor.user_paths import RegistrationUserPaths
+from patchharbor.watch_contract import ApplyLock, ApplyLockKind
 
 
 @contextmanager
@@ -49,7 +51,9 @@ def registry_lock(paths: RegistrationUserPaths) -> Iterator[None]:
     """Hold the single global registry lock without trusting file absence."""
     with _application_lock(
         paths.registry_lock_path,
-        unavailable_error=registry_error("repository registry is busy"),
+        unavailable_error=LockBusyError(
+            registry_error("repository registry is busy"), ApplyLock(ApplyLockKind.REGISTRY),
+        ),
         operation_error=registry_error,
     ):
         yield
@@ -81,7 +85,9 @@ def repository_lock(
     """Hold one repository lock or fail with the public busy exit code."""
     with _application_lock(
         repository_lock_path(paths, repo_id),
-        unavailable_error=repository_busy_error(),
+        unavailable_error=LockBusyError(
+            repository_busy_error(), ApplyLock(ApplyLockKind.REPOSITORY, repo_id),
+        ),
         operation_error=repository_resolution_error,
     ):
         yield

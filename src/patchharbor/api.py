@@ -29,6 +29,8 @@ from patchharbor.api_types import (
     RunToolError, ScriptPrepared, ScriptResult, UnregisterResult,
     PatchEntry, PatchEntryRole, PatchInspection, PatchManifest, PatchMessage,
     PatchValidationResult, PatchValidationScope, ReferenceContext,
+    ApplyLock, ApplyLockKind, ApplyReadiness, AutomaticApplyResult,
+    AutomaticApplyStatus, ExchangeWatchTarget, WatchControlPaths, WatchTargets,
 )
 from patchharbor.errors import ErrorKind, FailureReason, PatchHarborError
 from patchharbor.output import OutputTargets as _OutputTargets
@@ -52,6 +54,9 @@ __all__ = [
     "context", "dry_run", "register", "repositories", "run", "unregister",
     "PatchEntry", "PatchEntryRole", "PatchInspection", "PatchManifest", "PatchMessage",
     "PatchValidationResult", "PatchValidationScope", "ReferenceContext", "inspect_patch", "validate_patch",
+    "ApplyLock", "ApplyLockKind", "ApplyReadiness", "AutomaticApplyResult",
+    "AutomaticApplyStatus", "ExchangeWatchTarget", "WatchControlPaths", "WatchTargets",
+    "watch_targets", "watch_control_paths", "apply_readiness",
 ]
 
 
@@ -302,22 +307,54 @@ def apply_next(
     *, dry_run: bool = False, output_directory: PathInput | None = None,
     timeout: float = DEFAULT_TIMEOUT_SECONDS, output: OutputStreams | None = None,
     observer: ProgressObserver | None = None,
+    exchanges: tuple[ExchangeWatchTarget, ...] | None = None,
 ) -> RunReport:
-    """One automatic poll of all repository-configured Exchange directories, never retrying a failed identity.
+    """Discover/apply once, optionally limited to freshly observed Exchange roots.
 
 This is not a polling loop. The watcher/larger orchestrator owns that lifecycle.
 The existing automatic Core path performs selection, revalidation, mutation and
 attempt publication together; no candidate token escapes this boundary.
+None keeps global discovery; an empty tuple scans nothing. Stale/foreign roots
+fail closed. The report's automatic field describes progress without messages.
     """
     if not isinstance(dry_run, bool):
         raise TypeError("dry_run must be boolean")
+    if exchanges is not None and (
+        not isinstance(exchanges, tuple)
+        or any(not isinstance(target, ExchangeWatchTarget) for target in exchanges)
+    ):
+        raise TypeError("exchanges must be a tuple of ExchangeWatchTarget or None")
     destination = _optional_path(output_directory, "output_directory")
     seconds, targets = _timeout(timeout), _output(output)
     with _observe_activity(_observer(observer)):
         return _application.run_apply_path(
             None, automatic=True, dry_run=dry_run, output_directory=destination,
-            timeout_seconds=seconds, output=targets,
+            timeout_seconds=seconds, output=targets, exchanges=exchanges,
         )
+
+
+def watch_targets(*, observer: ProgressObserver | None = None) -> WatchTargets:
+    """Read validated Exchange/control targets without scanning bundle contents."""
+    with _observe_activity(_observer(observer)):
+        return _application.watch_targets()
+
+
+def watch_control_paths(*, observer: ProgressObserver | None = None) -> WatchControlPaths:
+    """Read registry/local config paths, including unset, missing or broken repos."""
+    with _observe_activity(_observer(observer)):
+        return _application.watch_control_paths()
+
+
+def apply_readiness(lock: ApplyLock, *, observer: ProgressObserver | None = None) -> ApplyReadiness:
+    """Probe one known pending lock conflict; release it before returning.
+
+This reads no bundle contents and reserves nothing. Operation/configuration
+errors still raise PatchHarborError. Clients must reenter normal Apply gates.
+    """
+    if not isinstance(lock, ApplyLock):
+        raise TypeError("lock must be ApplyLock")
+    with _observe_activity(_observer(observer)):
+        return _application.apply_readiness(lock)
 
 
 def run(

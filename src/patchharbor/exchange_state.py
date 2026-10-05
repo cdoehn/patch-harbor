@@ -12,7 +12,8 @@ from pathlib import Path
 from typing import Protocol
 from uuid import UUID
 
-from patchharbor.errors import PatchHarborError, patch_package_error
+from patchharbor.errors import LockBusyError, PatchHarborError, patch_package_error
+from patchharbor.watch_contract import ApplyLock, ApplyLockKind
 from patchharbor.json_document import serialize_json_document
 from patchharbor.models import (
     GitObjectFormat,
@@ -497,7 +498,9 @@ def _state_lock(paths: RegistrationUserPaths) -> Iterator[None]:
     try:
         lock.__enter__()
     except LockUnavailable as exc:
-        raise _error("exchange processing state is busy") from exc
+        raise LockBusyError(
+            _error("exchange processing state is busy"), ApplyLock(ApplyLockKind.EXCHANGE_STATE),
+        ) from exc
     except LockOperationError as exc:
         raise _error(
             f"{exc.operation}: {describe_os_error(exc.cause)}"

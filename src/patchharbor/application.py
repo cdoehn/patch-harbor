@@ -6,6 +6,7 @@ from collections.abc import Callable, Iterator
 from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass, replace
 from pathlib import Path
+import stat
 import unicodedata
 from typing import TextIO
 
@@ -44,6 +45,8 @@ from patchharbor.errors import (
     ErrorKind,
     FailureReason,
     PatchHarborError,
+    LockBusyError,
+    NoEligiblePatchError,
     configuration_error,
     patch_package_error,
     registry_error,
@@ -59,6 +62,7 @@ from patchharbor.exchange import (
     scan_exchange_directory,
 )
 from patchharbor.exchange_state import (
+    _state_lock,
     ExchangeApplyStatus,
     ExchangePatchSelection,
     mark_exchange_apply_finished,
@@ -138,6 +142,11 @@ from patchharbor.sources import (
 from patchharbor.user_paths import (
     RegistrationUserPaths,
     configuration_user_paths,
+    registration_user_paths,
+)
+from patchharbor.watch_contract import (
+    ApplyLock, ApplyLockKind, ApplyReadiness, AutomaticApplyResult,
+    AutomaticApplyStatus, ExchangeWatchTarget, WatchControlPaths, WatchTargets,
 )
 
 
@@ -289,6 +298,7 @@ class DiscoveredExchangePatch:
     configuration_paths: RepositoryConfigurationPaths
     retry_failed: bool = False
     explicitly_selected: bool = False
+    watch_target: ExchangeWatchTarget | None = None
 
     def __post_init__(self) -> None:
         if self.artifact.selection is None:
@@ -313,6 +323,8 @@ class DiscoveredExchangePatch:
             raise RuntimeError("discovered Exchange patch lost selection data")
 
         def verify_identity() -> None:
+            if self.watch_target is not None:
+                _require_watch_target_unchanged(self.watch_target)
             current_configuration = revalidate_exchange_directory(
                 load_configuration(self.configuration_paths)
             )
@@ -324,6 +336,8 @@ class DiscoveredExchangePatch:
                 self.artifact.identity,
                 directory=self.configuration.exchange_directory,
             )
+            if self.watch_target is not None:
+                _require_watch_target_unchanged(self.watch_target)
 
         activity("REPLAY", f"Record attempted run {str(run_id)} before mutation", identifiers=(str(run_id),))
         mark_exchange_apply_started(
@@ -393,6 +407,7 @@ class ExchangeDiscoveryScope:
 
     repository_context: RepositoryContext | None
     allow_failed_retry: bool
+    exchanges: tuple[ExchangeWatchTarget, ...] | None = None
 
     @property
     def is_repository_scoped(self) -> bool:
@@ -419,12 +434,128 @@ def _manual_exchange_discovery_scope(
     )
 
 
-def _automatic_exchange_discovery_scope() -> ExchangeDiscoveryScope:
-    """Keep watcher-triggered parameterless Apply global and non-retrying."""
+def _automatic_exchange_discovery_scope(
+    exchanges: tuple[ExchangeWatchTarget, ...] | None = None,
+) -> ExchangeDiscoveryScope:
+    """Keep automatic Apply non-retrying, optionally limited to observed roots."""
     return ExchangeDiscoveryScope(
         repository_context=None,
         allow_failed_retry=False,
+        exchanges=exchanges,
     )
+
+
+def _watch_target(directory: Path, repository_ids: tuple[RepositoryId, ...]) -> ExchangeWatchTarget:
+    """Observe directory identity without listing it or reading any bundles."""
+    try:
+        before = directory.stat(follow_symlinks=False)
+        physical = directory.resolve(strict=True)
+        after = directory.stat(follow_symlinks=False)
+        if (physical != directory or not stat.S_ISDIR(before.st_mode)
+                or not stat.S_ISDIR(after.st_mode) or not before.st_ino
+                or (before.st_dev, before.st_ino) != (after.st_dev, after.st_ino)):
+            raise configuration_error("exchange watch directory identity is unstable")
+    except (OSError, RuntimeError) as exc:
+        raise configuration_error(f"cannot observe exchange watch directory: {directory}") from exc
+    return ExchangeWatchTarget(directory, before.st_dev, before.st_ino, repository_ids)
+
+
+def _require_watch_target_unchanged(target: ExchangeWatchTarget) -> None:
+    if _watch_target(target.directory, target.repository_ids) != target:
+        raise configuration_error("exchange watch directory identity changed")
+
+
+def _exchange_settings(
+    registry: RegistrySnapshot, scope: ExchangeDiscoveryScope,
+) -> tuple[
+    dict[RepositoryId, tuple[RepositoryConfigurationPaths, RepositoryConfiguration]],
+    dict[Path, ExchangeWatchTarget],
+]:
+    """Resolve and validate configuration before any Exchange scan/maintenance."""
+    settings: dict[RepositoryId, tuple[RepositoryConfigurationPaths, RepositoryConfiguration]] = {}
+    groups: dict[Path, list[RepositoryId]] = {}
+    for mapping in registry.repositories:
+        scoped = scope.repository_context
+        if scoped is not None and mapping.repo_id != scoped.repo_id:
+            continue
+        if scoped is None and registered_repository_status(
+            mapping.repository_path, mapping.repo_id,
+        ) is RegistryStatus.MISSING:
+            continue
+        local = configuration_paths_for_id(mapping.repo_id, registry)
+        configuration = load_configuration(local)
+        if configuration.exchange_directory is None and scoped is None:
+            continue
+        revalidate_exchange_directory(configuration)
+        _require_exchange_configuration_allowed(
+            configuration.exchange_directory, registry, exchange_must_exist=True,
+        )
+        settings[mapping.repo_id] = local, configuration
+        groups.setdefault(configuration.exchange_directory, []).append(mapping.repo_id)
+    if scope.repository_context is not None and scope.repository_context.repo_id not in settings:
+        raise repository_resolution_error("current repository is no longer registered")
+    targets = {
+        directory: _watch_target(directory, tuple(sorted(ids)))
+        for directory, ids in sorted(groups.items(), key=lambda item: str(item[0]))
+    }
+    if scope.exchanges is not None:
+        if scope.is_repository_scoped or scope.allow_failed_retry:
+            raise configuration_error("watch scope is only valid for automatic Apply")
+        # Explicit empty scope stays empty. Supplied snapshots are restrictions,
+        # never trusted permissions; aliases/fabricated/stale observations fail.
+        for target in scope.exchanges:
+            if targets.get(target.directory) != target:
+                raise configuration_error("exchange watch target is foreign or stale")
+        allowed = {target.directory for target in scope.exchanges}
+        targets = {path: target for path, target in targets.items() if path in allowed}
+        settings = {repo_id: pair for repo_id, pair in settings.items()
+                    if pair[1].exchange_directory in allowed}
+    return settings, targets
+
+
+def _watch_control_paths(paths: RegistrationUserPaths, registry: RegistrySnapshot) -> WatchControlPaths:
+    return WatchControlPaths(
+        paths.registry_path,
+        tuple(sorted({mapping.repository_path.value / ".patchharbor" / "config.json"
+                      for mapping in registry.repositories}, key=str)),
+    )
+
+
+def watch_control_paths() -> WatchControlPaths:
+    """Resolve control paths from registry even if local configuration is broken."""
+    paths = registration_user_paths(create_configuration_directory=False)
+    with registry_lock(paths):
+        return _watch_control_paths(paths, load_registry(paths))
+
+
+def watch_targets() -> WatchTargets:
+    """Return validated physical roots, with no bundle discovery or state capture."""
+    paths = registration_user_paths(create_configuration_directory=False)
+    with registry_lock(paths):
+        registry = load_registry(paths)
+        _, targets = _exchange_settings(registry, _automatic_exchange_discovery_scope())
+        controls = _watch_control_paths(paths, registry)
+        return WatchTargets(tuple(targets.values()), controls.registry_path, controls.configuration_paths)
+
+
+def apply_readiness(lock: ApplyLock) -> ApplyReadiness:
+    """Probe only the named technical lock; no candidate work or reservation."""
+    paths = registration_user_paths(create_configuration_directory=False)
+    try:
+        if lock.kind is ApplyLockKind.EXCHANGE_STATE:
+            with _state_lock(paths):
+                pass
+        else:
+            with registry_lock(paths):
+                if lock.kind is ApplyLockKind.REPOSITORY:
+                    registry = load_registry(paths)
+                    if not any(mapping.repo_id == lock.repo_id for mapping in registry.repositories):
+                        raise repository_resolution_error("lock repository is no longer registered")
+                    with repository_lock(paths, lock.repo_id):
+                        pass
+    except LockBusyError as exc:
+        return ApplyReadiness(blocked_on=exc.lock)
+    return ApplyReadiness()
 
 
 def _candidate_filename_key(artifact: ExchangeArtifact) -> tuple[str, str]:
@@ -474,42 +605,22 @@ def discover_exchange_patch(
     """Return the newest eligible package inside one selection scope."""
     activity("DISCOVER", "Load Exchange configuration and repository registry", "heading")
     paths = configuration_user_paths()
-    settings: dict[RepositoryId, tuple[RepositoryConfigurationPaths, RepositoryConfiguration]] = {}
-    groups: dict[Path, list[RepositoryId]] = {}
     with registry_lock(paths):
         registry = load_registry(paths)
-        for mapping in registry.repositories:
-            scoped = scope.repository_context
-            if scoped is not None and mapping.repo_id != scoped.repo_id:
-                continue
-            if scoped is None and registered_repository_status(
-                mapping.repository_path, mapping.repo_id,
-            ) is RegistryStatus.MISSING:
-                continue
-            local = configuration_paths_for_id(mapping.repo_id, registry)
-            configuration = load_configuration(local)
-            if configuration.exchange_directory is None and scoped is None:
-                # Freshly registered but not configured yet: it has no watched directory.
-                activity("DISCOVER", f"Repository has no Exchange configured: {mapping.repository_path}", "warning")
-                continue
-            revalidate_exchange_directory(configuration)
-            _require_exchange_configuration_allowed(
-                configuration.exchange_directory, registry, exchange_must_exist=True,
-            )
-            settings[mapping.repo_id] = local, configuration
-            groups.setdefault(configuration.exchange_directory, []).append(mapping.repo_id)
-        if scope.repository_context is not None and scope.repository_context.repo_id not in settings:
-            raise repository_resolution_error("current repository is no longer registered")
+        settings, targets = _exchange_settings(registry, scope)
 
     found: list[ExchangeArtifact] = []
     # Shared physical paths are scanned once. Maintenance is still strictly per repo.
-    for directory in sorted(groups, key=str):
+    for directory, target in targets.items():
+        _require_watch_target_unchanged(target)
         try:
             artifacts = scan_exchange_directory(directory, paths=paths)
         except ExchangeScanError as exc:
             raise configuration_error(f"cannot scan exchange directory: {directory}") from exc
+        _require_watch_target_unchanged(target)
         if archive:
-            for repo_id in groups[directory]:
+            for repo_id in target.repository_ids:
+                _require_watch_target_unchanged(target)
                 local, configuration = settings[repo_id]
                 artifacts = recover_exchange_artifacts(
                     artifacts, configuration=configuration, paths=paths, repository_id=repo_id,
@@ -560,6 +671,8 @@ def discover_exchange_patch(
         matches.append(artifact)
 
     _revalidate_exchange_discovery(paths, settings, registry)
+    for target in targets.values():
+        _require_watch_target_unchanged(target)
 
     if not matches:
         activity("SELECT", "No eligible patch remains after content, scope, state and replay checks", "warning")
@@ -569,6 +682,10 @@ def discover_exchange_patch(
             if scope.is_repository_scoped
             else "no state-bound patch package matches a registered repository"
         )
+        if not scope.is_repository_scoped:
+            raise NoEligiblePatchError(
+                message, FailureReason.PATCH_PACKAGE_ERROR, error_kind=ErrorKind.PATCH_PACKAGE_ERROR,
+            )
         raise patch_package_error(message)
 
     artifact = _select_exchange_candidate(matches)
@@ -580,6 +697,8 @@ def discover_exchange_patch(
         artifact, directory=configuration.exchange_directory,
     )
     _revalidate_exchange_discovery(paths, settings, registry)
+    target = targets[configuration.exchange_directory]
+    _require_watch_target_unchanged(target)
     context = contexts.get(package.manifest.repo_id)
     if context is None or not _manifest_matches_context(package.manifest, context):
         raise patch_package_error(
@@ -592,6 +711,7 @@ def discover_exchange_patch(
         configuration=configuration,
         configuration_paths=local,
         retry_failed=(artifact.apply_status is ExchangeApplyStatus.FAILED),
+        watch_target=target,
     )
 
 
@@ -1013,14 +1133,49 @@ def run_apply_path(
     session: RunSession | None = None,
     automatic: bool = False,
     current_directory: Path | None = None,
+    exchanges: tuple[ExchangeWatchTarget, ...] | None = None,
 ) -> RunReport:
     """Run one Apply request through a single public application boundary."""
     actual_session = session or RunSession.start()
+    if exchanges is not None and (not automatic or path is not None):
+        raise ValueError("Exchange watch scope requires automatic parameterless Apply")
+    attempted = False
+
+    def finish(report: RunReport, error: PatchHarborError | None = None) -> RunReport:
+        if not automatic:
+            return report
+        status = AutomaticApplyStatus.ERROR
+        blocked_on = None
+        if attempted:
+            status = AutomaticApplyStatus.ATTEMPTED
+        elif isinstance(error, NoEligiblePatchError):
+            status = AutomaticApplyStatus.NO_CANDIDATE
+        elif dry_run and report.success:
+            status = AutomaticApplyStatus.DRY_RUN
+        else:
+            # Completion may wrap a pre-mutation lock failure to attach its
+            # Result Bundle. Follow explicit causes, never diagnostic text.
+            cause: BaseException | None = error
+            seen: set[int] = set()
+            while cause is not None and id(cause) not in seen:
+                seen.add(id(cause))
+                if isinstance(cause, LockBusyError):
+                    status, blocked_on = AutomaticApplyStatus.LOCKED, cause.lock
+                    break
+                cause = cause.__cause__
+        return replace(report, automatic=AutomaticApplyResult(status, blocked_on))
+
+    def publish_attempt() -> None:
+        nonlocal attempted
+        assert discovered is not None
+        discovered.publish_attempt(str(actual_session.run_id))
+        attempted = True
+
     try:
         discovered: DiscoveredExchangePatch | None = None
         if path is None:
             scope = (
-                _automatic_exchange_discovery_scope()
+                _automatic_exchange_discovery_scope(exchanges)
                 if automatic
                 else _manual_exchange_discovery_scope(
                     Path.cwd() if current_directory is None else current_directory
@@ -1035,11 +1190,11 @@ def run_apply_path(
             if not dry_run:
                 discovered = _maintain_explicit_exchange(package, selected_path, output=output)
     except PatchHarborError as error:
-        return unresolved_apply_report(
+        return finish(unresolved_apply_report(
             session=actual_session,
             dry_run=dry_run,
             error=error,
-        )
+        ), error)
 
     emit(RequestStarted(
         source_name=str(selected_path),
@@ -1058,20 +1213,20 @@ def run_apply_path(
 
     try:
         if dry_run:
-            return dry_run_patch_package(
+            return finish(dry_run_patch_package(
                 package,
                 output_directory=output_directory,
                 output=output,
                 session=actual_session,
-            )
-        return apply_patch_package(
+            ))
+        return finish(apply_patch_package(
             package,
             output_directory=output_directory,
             timeout_seconds=timeout_seconds,
             output=output,
             session=actual_session,
             before_mutation=(
-                (lambda: discovered.publish_attempt(str(actual_session.run_id)))
+                publish_attempt
                 if discovered is not None
                 else None
             ),
@@ -1086,17 +1241,17 @@ def run_apply_path(
                 if discovered is not None
                 else None
             ),
-        )
+        ))
     except PatchHarborError as error:
         report = error.run_report
         if isinstance(report, RunReport):
-            return report
-        return unresolved_apply_report(
+            return finish(report, error)
+        return finish(unresolved_apply_report(
             session=actual_session,
             dry_run=dry_run,
             warnings=package.warnings,
             error=error,
-        )
+        ), error)
 
 
 def register_repository(

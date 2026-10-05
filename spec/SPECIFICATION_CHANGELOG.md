@@ -1,5 +1,17 @@
 # PatchHarbor – Spezifikations-Changelog
 
+## 2026-10-05 – WE-1: Core-Grenzen für den Ereignis-Watcher vorbereitet
+
+- WE-0 durch tatsächliches Bundle-016-Result bestätigt (1/5 Planschritte).
+- Öffentliche Abfragen für geprüfte physische Exchange-Wurzeln und Kontrollpfade;
+  keine Bundle-Scans bei Beobachtungsabfrage oder technischer Sperrprüfung.
+- Optional eingeschränkte automatische Discovery: leere/fremde/veraltete Scopes
+  erweitern die Auswahl nicht; andere Exchanges bleiben von Scans und Wartung frei.
+- Strukturierte Zustände für leere Auswahl, verbrauchten Versuch, Sperrkonflikt,
+  Dry-Run und Fehler. Root-Identität wird auch vor Mutationsbeginn erneut geprüft.
+- WE-1 für Bundle 017 vorbereitet; Apply offen. Watcher-Aktivierung folgt in WE-3,
+  native Abschlussnachweise bleiben offen. Keine zusätzliche CI vor Bundle 019.
+
 ## 2026-10-05 – WE-0: Planungsbootstrap für Exchange-Ereignisse
 
 - Neuer aktiver Plan `planning/watcher-events/commit-plan.md` mit eigenständiger

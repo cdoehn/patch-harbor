@@ -5,6 +5,8 @@ from __future__ import annotations
 from enum import Enum
 from pathlib import Path
 
+from patchharbor.watch_contract import ApplyLock
+
 
 TOOL_PREFIX = "patchharbor:"
 WARNING_PREFIX = f"{TOOL_PREFIX} warning:"
@@ -64,6 +66,18 @@ class PatchHarborError(Exception):
         self.emergency_diagnostics_path = emergency_diagnostics_path
         self.emergency_diagnostics_failed = emergency_diagnostics_failed
         self.run_report = run_report
+
+
+class LockBusyError(PatchHarborError):
+    """Nonblocking lock contention, preserving the existing public error kind."""
+
+    def __init__(self, error: PatchHarborError, lock: ApplyLock) -> None:
+        super().__init__(str(error), error.reason, error_kind=error.error_kind)
+        self.lock = lock
+
+
+class NoEligiblePatchError(PatchHarborError):
+    """Completed automatic discovery found no eligible candidate."""
 
 
 def configuration_error(message: str) -> PatchHarborError:

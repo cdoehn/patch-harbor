@@ -99,6 +99,7 @@ EXPECTED_RUNTIME_FILES = {
     "patchharbor/state_fingerprint.py",
     "patchharbor/temporary_resources.py",
     "patchharbor/user_paths.py",
+    "patchharbor/watch_contract.py",
     "patchharbor_watcher/__init__.py",
     "patchharbor_watcher/loop.py",
     "patchharbor_watcher/cli.py",

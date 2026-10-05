@@ -2,10 +2,10 @@
 
 **Dateiname:** `SPECIFICATION.md`<br>
 **Produktversion:** `1.2.1`<br>
-**Spezifikationsstand:** 2026-10-05 · Watcher-Ereignisplanung WE-0<br>
+**Spezifikationsstand:** 2026-10-05 · Watcher-Core WE-1 vorbereitet<br>
 **Status:** Verbindliche, freigegebene Produktspezifikation für den Bestandsvertrag 1.2.1; keine Release-Freigabe des konkreten Commits ohne grüne Gates.<br>
 **RIV-Status:** 18/18 Umsetzungsschritte samt Abschlusskorrektur durch Bundle 015 und CI-Run 37306630290 auf `a02391dc045d42e317b3e766f0b1e9fa8dfadec1` bestätigt; Plan abgeschlossen.<br>
-**Watcher-Ereignisse:** neuer aktiver Plan; WE-0 dokumentiert das Ziel, noch keine Änderung des Polling-Betriebs.<br>
+**Watcher-Ereignisse:** WE-0 durch Bundle 016 bestätigt; Core-Schnittstellen WE-1 vorbereitet, noch keine Änderung des Polling-Betriebs.<br>
 **Projektname:** `PatchHarbor`<br>
 **Kommando:** `patchharbor`<br>
 **Skriptmarker:** `# PATCHHARBOR`<br>
@@ -13,8 +13,9 @@
 
 Der aktive Entwicklungsplan liegt unter `planning/watcher-events/commit-plan.md`;
 das normative Entwicklungsziel unter `planning/watcher-events/specification.md`.
-WE-0 übernimmt ausschließlich Dokumentation; Implementierung und Apply-Nachweis
-des neuen Watcher-Verhaltens stehen noch aus. Die Zielversion wird gesondert
+WE-0 ist angewendet. WE-1 bereitet Core-Beobachtungsziele, eingeschränkte
+automatische Discovery und strukturierte Ablauf-/Sperrdaten vor. Sein Apply-Nachweis
+und die Aktivierung des neuen Watcher-Verhaltens stehen aus. Die Zielversion wird gesondert
 festgelegt; die vorhandene Paketversion bleibt 1.2.1.
 Der RIV-Plan unter `planning/runtime-inspect-validate/commit-plan.md` ist abgeschlossen.
 Die abgeschlossenen Pläne unter `planning/1.2.1/`,
@@ -29,7 +30,7 @@ der 18 RIV-Umsetzungsschritte. Änderungen am Produktziel stehen in
 
 Dieses Dokument beschreibt den Bestandsvertrag von PatchHarbor 1.2.1 und das
 Produktziel der RIV-Erweiterung in Abschnitten 35–41 sowie das noch nicht
-implementierte Watcher-Ziel nach Abschnitt 3.2.1. Dokumentationsübernahmen
+vollständig implementierte Watcher-Ziel nach Abschnitt 3.2.1. Dokumentationsübernahmen
 aktivieren für sich allein keine neue Laufzeitfunktion.
 Ihre Querverweise ergänzen die jeweils betroffenen Basisabschnitte; unbetroffene
 Bestandsverträge einschließlich repositorylokaler Konfiguration bleiben erhalten.
@@ -184,14 +185,15 @@ Der Watcher implementiert keine eigene Repository-, Git-, Manifest-, Fingerprint
 
 Der Watcher lässt die Exchange-Verzeichnisse ausschließlich flach scannen und implementiert keine eigene Archivierungslogik. Sein globaler Core-Scan darf nach Abschnitt 16.2.1 nachweislich überholte Bundles in den konfigurierten Archiv-Unterordner verschieben. Sonstige Dateien und unklare Zustände bleiben liegen; unveränderte Nichtkandidaten und bereits verarbeitete Dateien werden nicht fortlaufend neu delegiert.
 
-### 3.2.1 Geplante Ereignisüberwachung – WE-0
+### 3.2.1 Ereignisüberwachung – WE-1 vorbereitet, Aktivierung ausstehend
 
 Das normative Entwicklungsziel steht in
 [`planning/watcher-events/specification.md`](../planning/watcher-events/specification.md),
 die Commitfolge in
 [`planning/watcher-events/commit-plan.md`](../planning/watcher-events/commit-plan.md).
 Die vorstehenden Poll-Beschreibungen und `--poll-interval` dokumentieren bis zur
-Aktivierung durch WE-3 den bestehenden Betrieb. WE-0 ändert ausschließlich Dokumentation.
+Aktivierung durch WE-3 den bestehenden Betrieb. WE-0 hat die Dokumentation übernommen;
+WE-1 ergänzt die Core-Schnittstellen ohne Umstellung der Watcher-Schleife.
 
 Ziel: native, nicht rekursive Ereignisüberwachung pro physischem Exchange-Root;
 mindestens fünf zusammenhängende Sekunden Ruhe vor einem Scan, zurückgesetzt
@@ -207,6 +209,14 @@ Konfigurationswechsel, Sperrkonflikte, Root-Ersatz und Ereignisverlust werden
 gemäß der neuen Spezifikation behandelt. Zusätzliche Laufzeitabhängigkeiten und
 ein stiller Polling-Fallback sind nicht vorgesehen. Bisherige manuelle Apply-
 und Runtime-Fallback-Verträge bleiben erhalten.
+
+WE-1 konkretisiert dies durch `api.watch_targets()` und `watch_control_paths()`
+für Beobachtungs-/Kontrollpfade, `apply_next(exchanges=...)` für erneut geprüfte
+physische Wurzeln und `apply_readiness(lock)` für bekannte Sperrkonflikte ohne
+Bundle-Scan oder Reservierung. `RunReport.automatic` liefert strukturierte
+Nachlaufentscheidungen zusätzlich zu den unveränderten Apply-Ergebnissen;
+ein verbrauchter Versuch ist kein Erfolgsnachweis. Details der Schnittstellen
+stehen in [`docs/python-api.md`](../docs/python-api.md).
 
 ### 3.3 Repo Assist
 

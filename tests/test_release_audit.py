@@ -83,6 +83,7 @@ EXPECTED_CORE_RUNTIME_FILES = {
     "state_fingerprint.py",
     "temporary_resources.py",
     "user_paths.py",
+    "watch_contract.py",
     "zip_payloads.py",
     "platform/__init__.py",
     "platform/errors.py",

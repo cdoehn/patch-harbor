@@ -46,6 +46,9 @@ print(report.success, report.result_bundle.status)
 | `apply(patch=None, repository=None, dry_run=False, ...)` | manual `apply` | `RunReport` |
 | `dry_run(patch=None, repository=None, ...)` | `apply --dry-run` | `RunReport` |
 | `apply_next(dry_run=False, ...)` | automatic global Apply | `RunReport` |
+| `watch_targets()` | validated Exchange roots and control paths, without bundle scanning | `WatchTargets` |
+| `watch_control_paths()` | registry/local config paths even with invalid local config | `WatchControlPaths` |
+| `apply_readiness(lock)` | probe and release a known technical lock conflict | `ApplyReadiness` |
 | `run(source, cwd=".", ...)` | `fs run` | `ScriptResult` |
 
 All operations accept `observer=None`. Execution operations accept
@@ -279,6 +282,49 @@ eligible candidates. It never retries a failed identity; Core owns selection,
 replay, lock, revalidation, recovery and publication together. No separate select-then-apply token or stale
 validated package is exposed. The watcher uses this operation in a separate
 worker process for each poll; the library itself never starts a polling loop.
+
+The optional `exchanges` argument accepts a tuple of `ExchangeWatchTarget`
+snapshots from `watch_targets()`. `None` retains global discovery; `()` scans
+nothing. Each target contains the canonical directory, device/inode identity and
+registered owner IDs. Duplicate roots are scanned once. Core reloads configuration
+and rejects foreign, reconfigured or physically replaced targets before scanning.
+It rechecks physical identity during discovery and immediately before consuming
+the replay identity. Only selected roots undergo bundle reads, recovery and
+archive maintenance; an active download in another Exchange is not scanned.
+These snapshots grant no authority and reserve no candidate or repository lock.
+
+`watch_targets()` reads registry and local configuration without enumerating
+Exchanges, hashing bundles or capturing Git state. Unset Exchanges and missing
+repositories contribute no Exchange root; invalid live configuration/identity or
+a missing configured Exchange fails closed. `registry_path` and
+`configuration_paths` identify control files, including unset/missing repositories.
+Clients must observe their parents/ancestors for atomic replacement/restoration.
+`watch_control_paths()` supplies those registry-derived paths independently of
+local configuration validity, so a suspended client can observe a repair.
+
+Automatic calls set `report.automatic` to immutable `AutomaticApplyResult`:
+
+| `AutomaticApplyStatus` | Scheduling meaning |
+| --- | --- |
+| `NO_CANDIDATE` | Valid discovery finished without an eligible candidate; stop draining. |
+| `ATTEMPTED` | The replay boundary consumed a candidate; execution may still have failed. Further candidates may be checked subject to the caller's quiet-period rules. |
+| `LOCKED` | No attempt was consumed; `blocked_on` identifies the technical lock. |
+| `DRY_RUN` | Successful validation only; no consumption or progress-driven drain. |
+| `ERROR` | No confirmed progress; await an external change/repair, without blind retry. |
+
+For a known pending lock conflict, `apply_readiness(report.automatic.blocked_on)`
+probes the registry, repository or Exchange-state lock and releases it before
+returning. `ready` is momentary; `blocked_on` identifies a remaining conflict
+(possibly the registry needed to resolve a repository lock). No Exchange scan,
+bundle hashing, replay-state read or reservation occurs. Unregistered repository
+IDs and lock-operation errors raise `PatchHarborError`; they are not readiness.
+Apply must still reenter all normal gates after a successful probe. Do not call
+readiness periodically when idle.
+
+Scheduling status is in-process API data, not persisted Apply-success evidence;
+existing CLI/Result JSON schemas are unchanged. Manual Apply has `automatic=None`.
+The current CLI watcher still uses global polling. Event adapters and activation
+follow in plan steps WE-2/WE-3; these Core APIs alone do not change its timing.
 
 Dry-run still produces a Result Bundle when a repository can be safely resolved;
 it neither writes payload files nor executes, consumes replay or archives. API

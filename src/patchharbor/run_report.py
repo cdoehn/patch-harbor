@@ -17,6 +17,7 @@ from patchharbor.exit_status import (
     completed_process_exit_code, exit_code_for_reason, primary_process_exit_code,
 )
 from patchharbor.models import RepositoryContext, RepositoryId, RepositoryPath
+from patchharbor.watch_contract import AutomaticApplyResult
 
 
 _SECRET_ENV_MARKERS = (
@@ -732,6 +733,9 @@ class RunReport:
     primary_result: PrimaryResult
     result_bundle: ResultBundleResult
     primary_tool_error: RunToolError | None = None
+    # In-process automatic scheduling information; persisted Result/CLI schemas
+    # remain unchanged. This is not evidence of a successful Apply.
+    automatic: AutomaticApplyResult | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(

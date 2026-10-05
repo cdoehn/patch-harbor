@@ -1,9 +1,10 @@
 # PatchHarbor – Implementierungsplan für Exchange-Ereignisse
 
-Stand: 5. Oktober 2026. Plan-ID: `watcher-events`, Revision 1.
+Stand: 5. Oktober 2026. Plan-ID: `watcher-events`, Revision 2.
 Aktiv auf ausdrücklichen Nutzerauftrag; fünf geplante Commitschritte einschließlich
-Dokumentationsbootstrap. Aktuell ist nur `WE-0` vorbereitet, kein Schritt dieses
-Plans durch ein tatsächliches Apply bestätigt. Zielversion noch nicht festgelegt.
+Dokumentationsbootstrap. `WE-0` ist durch tatsächliches Apply bestätigt (1/5);
+`WE-1` ist für Bundle 017 vorbereitet, sein Apply steht aus.
+Zielversion noch nicht festgelegt.
 
 Normative Grundlage: [Watcher-Spezifikation](specification.md) und
 [zentrale Spezifikation](../../spec/SPECIFICATION.md), Abschnitt 3.2.1.
@@ -40,14 +41,25 @@ Result; diese Tabelle ist keine dauerhafte Patch-Basis.
 
 | ID | Inhalt und Ergebnis | Abhängigkeit | Status |
 | --- | --- | --- | --- |
-| WE-0 | Spezifikation, Plan, zentrale Einordnung, Changelog und Abschlussvermerk des bisherigen Plans. Kein Watcher-Code. | bestätigtes Bundle 015 | vorbereitet; Apply offen |
-| WE-1 | Öffentliche Core-Abfrage der geprüften Beobachtungsziele, optional eingeschränkter automatischer Exchange-Scope, strukturierte Fortschritts-/Sperrbereitschaft. Bisheriger Aufruf ohne Einschränkung unverändert. | WE-0 angewendet | geplant |
+| WE-0 | Spezifikation, Plan, zentrale Einordnung, Changelog und Abschlussvermerk des bisherigen Plans. Kein Watcher-Code. | bestätigtes Bundle 015 | durch Bundle 016 tatsächlich angewendet |
+| WE-1 | Öffentliche Core-Abfrage der geprüften Beobachtungsziele, optional eingeschränkter automatischer Exchange-Scope, strukturierte Fortschritts-/Sperrbereitschaft. Bisheriger Aufruf ohne Einschränkung unverändert. | WE-0 angewendet | Bundle 017 vorbereitet; Apply offen |
 | WE-2 | Native Linux-/Windows-Ereignisadapter, Filter und Ressourcenlebenszyklus; deterministische Ereignisabstraktion. Noch keine Aktivierung des neuen CLI-Betriebs. | WE-1 angewendet bzw. echter vorangehender Bundle-Zustand | geplant |
 | WE-3 | Fünfsekunden-Zustandsautomat, Startprüfung, Parallelität der Ereigniserfassung, sequenzieller Worker, Nachlauf, Konfigurationsaktualisierung und CLI-Umstellung. | WE-2 | geplant |
 | WE-4 | Vollständige Robustheits-/Plattformintegration, reale Ereignis-/Apply- und installierte Wheel-Nachweise, Dokumentationsabgleich und Abnahme. | WE-3 | geplant |
 
-Vorgesehener erster Commit:
-`docs(watcher): bootstrap event-driven exchange specification and plan [WE-0]`.
+Nächster vorbereiteter Commit:
+`feat(core): expose watcher targets and scoped automatic apply [WE-1]`.
+
+Fortschrittsnachweis für WE-0: Result
+`patchharbor-apply_Result_163737_1005_90175f.zip`, SHA-256
+`23b1f010aac400e0b7cc41135c37eee872dcf8401f19e780e09f141b112c88fc`.
+Tatsächlicher Apply erfolgreich, kein Dry-Run; Commit
+`1948cee7bb131ea4edfb18586296f47e2135051c`, ein normaler Push nach `dev`,
+Arbeitskopie sauber. Vollständige serielle und danach parallele Suite jeweils
+2.231 bestanden / 7 übersprungen. Alle 265 Base-Dateien und Git-Modi stimmen
+mit Apply-Commit und Development-Ausgangsstand überein. Diese neue Referenz bindet
+Bundle 017; Repository-ID und Fingerprint entsprechen der Tabelle oben.
+Result weiterhin Format 1 ohne Wheel: dokumentierter lokaler Core-Fallback.
 
 Tests für das jeweilige Verhalten entstehen im zuständigen Implementierungsschritt.
 WE-4 ersetzt keine vorherigen Commit-Gates. Ein Schritt erhält erst nach Auswertung
@@ -63,6 +75,13 @@ Schritt zugeordnet und werden samt Teilfortschritten transparent dokumentiert.
   den Scope nicht. Ein aktiver Download in B verhindert keinen erlaubten Scan in A.
 - Keine manuelle Retry-Semantik und keine vorab freigegebenen Kandidatentokens.
 - Sperrbereitschaft prüft keine Bundle-Inhalte und reserviert keine Apply-Sperre.
+
+Vorbereitete Schnittstellen: `api.watch_targets()`, `api.watch_control_paths()`,
+`api.apply_next(exchanges=...)`, `api.apply_readiness(lock)` und
+`RunReport.automatic`. Verhaltensprüfungen in `tests/test_watch_targets_e2e.py`
+decken auch Root-Ersatz vor Mutation, explizit leere Scopes, Fehlertext-Verwechslung,
+echte Sperrkonkurrenz, unverbrauchte Dry-Runs und ausbleibende automatische Retries
+fehlgeschlagener Identitäten ab. Ereignisadapter und CLI-Zeitsteuerung folgen.
 
 ### WE-2 – Abnahmekriterien
 
@@ -102,7 +121,7 @@ Commits haben. Keine künstlichen W/R/C-Phasen aus einem bereits fertigen Endzus
 
 GitHub bleibt ausschließlich `workflow_dispatch`. Die nächste reguläre CI ist
 Bundle 019, danach 024 usw.; zusätzliche Läufe nur auf ausdrücklichen Nutzerauftrag.
-016 fordert keine CI an. Bei fälligen Bundles dispatcht der Apply-Entrypoint erst
+016 und 017 fordern keine CI an. Bei fälligen Bundles dispatcht der Apply-Entrypoint erst
 nach dem einzigen erfolgreichen Push genau einmal und wartet auf alle Jobs
 einschließlich Windows. Volle Commitbindung, Run-ID/URL, Job-/Testnachweise und
 Fehlerdiagnosen stehen im Result-/Ausführungslog. Kein automatischer Retry.
@@ -134,7 +153,7 @@ Kein zusätzlicher CI-Lauf wird aus diesem Plan allein automatisch abgeleitet.
 Der dauerhafte Fortschritt steht zusätzlich unter
 `exchange/reports/patchharbor-dev-loop-state.json` im projektspezifischen Exchange.
 Verbrauchte Results werden erst bei bestätigter Folgebundle-Auslieferung markiert.
-Der alte Plan bleibt als abgeschlossen dokumentiert; dieser beginnt bei 0/5
+Der alte Plan bleibt als abgeschlossen dokumentiert; dieser steht bei 1/5
 bestätigten Commitschritten. S/N und die Grenze von fünf aufeinanderfolgenden
 fehlgeschlagenen tatsächlichen Bundles bleiben gemäß lokalen Rollenregeln gültig.
 
