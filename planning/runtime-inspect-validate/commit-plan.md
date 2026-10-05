@@ -1,7 +1,19 @@
 # PatchHarbor – RIV-Implementierungsplan, Repository-Revision 19
 ## Inspect / Validate über API und CLI · Offline-Runtime · Result-Format 2 · Chat-Handoff
 
-**Stand:** 5. Oktober 2026. **Status:** aktive Entwicklung;
+**Abschlussnachtrag vom 5. Oktober 2026:** Dieser Plan ist abgeschlossen.
+Bundle 015 bestätigt nach den 18 ursprünglichen Schritten auch `1.f.R-FIX1`,
+Commit `a02391dc045d42e317b3e766f0b1e9fa8dfadec1`, genau einen normalen Push,
+sauberen Baum und je 2.230 bestandene Tests / 8 Skips seriell und parallel.
+CI-Run `37306630290` bestätigt alle sechs Jobs einschließlich Windows auf diesem
+Commit. Maßgebliches Result: `patchharbor-apply_Result_114833_1005_ce0723.zip`,
+SHA-256 `dcecc3071979ecc113d3ab1a2b315affa7d45c52bfd5985eed31d7ba37daddd3`.
+Neuer aktiver Plan auf ausdrücklichen Nutzerauftrag:
+[`planning/watcher-events/commit-plan.md`](../watcher-events/commit-plan.md).
+Die nachfolgenden Zwischenstandsberichte bleiben historische Dokumentation;
+ihre damaligen offenen Gates werden durch diesen Abschlussnachtrag aufgelöst.
+
+**Historischer Stand vor Bundle 014/015:** 5. Oktober 2026;
 **18 von 18 Umsetzungsschritten im Dateistand vorbereitet**, davon 15 durch Apply
 bestätigt. Bundle 013 ist tatsächlich angewendet; GATE-READERS und GATE-RUNTIME
 bleiben bestätigt. `1.f.W` ist mit 2.174 bestandenen Tests / 7 Skips parallel geprüft und eingefroren.
@@ -16,7 +28,7 @@ nach tatsächlichem Apply und erfolgreicher CI auf dem finalen HEAD bestätigt.
 
 **Normative Grundlage:** `spec/SPECIFICATION.md`, insbesondere 35–41 sowie die
 fortgeltenden Bestandsverträge. Dieser Plan liegt unter
-`planning/runtime-inspect-validate/commit-plan.md` und ist ausdrücklich aktiv;
+`planning/runtime-inspect-validate/commit-plan.md` und war während RIV aktiv;
 der abgeschlossene `planning/1.2.1/commit-plan.md` bleibt historisch.
 
 **Technische Integrationsbasis:** `patchharbor-apply_Result_073436_1003_116272.zip`.

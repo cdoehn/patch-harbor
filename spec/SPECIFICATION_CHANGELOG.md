@@ -1,5 +1,19 @@
 # PatchHarbor – Spezifikations-Changelog
 
+## 2026-10-05 – WE-0: Planungsbootstrap für Exchange-Ereignisse
+
+- Neuer aktiver Plan `planning/watcher-events/commit-plan.md` mit eigenständiger
+  Spezifikation; fünf Commitschritte einschließlich des Dokumentationsbootstraps.
+- Ziel: flache native Ereignisüberwachung, pro Exchange fünf Sekunden Ruhe nach
+  letzter relevanter Änderung, kein periodischer Scan/Worker im Leerlauf.
+- Startbestand, laufende Applies, mehrere Exchanges/Bundles, Konfigurationswechsel,
+  Sperrwiederaufnahme, Ereignisverlust und Plattformgrenzen sind ausdrücklich geregelt.
+- RIV-Abschluss anhand Bundle 015 samt sechs erfolgreichen CI-Jobs bestätigt.
+  Diese historischen Nachweise bestätigen noch keine neue Watcher-Funktion.
+- Bundle 016 übernimmt ausschließlich Planung. Bestehender Watcher, Produktversion
+  und installierte Engine bleiben im bisherigen Zustand. Keine CI-Anforderung;
+  nächste reguläre CI bleibt 019, vorgesehen auf dem vollständigen neuen Endstand.
+
 ## 2026-10-05 – RIV 1.f.C: gemeinsamer Handoff und Abschlussabgleich
 
 - R mit 2.224 bestandenen Tests / 7 Skips parallel eingefroren; C behält Sammlung

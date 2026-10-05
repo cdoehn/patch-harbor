@@ -2,18 +2,22 @@
 
 **Dateiname:** `SPECIFICATION.md`<br>
 **Produktversion:** `1.2.1`<br>
-**Spezifikationsstand:** 2026-10-04 · RIV-Integration Revision 13<br>
+**Spezifikationsstand:** 2026-10-05 · Watcher-Ereignisplanung WE-0<br>
 **Status:** Verbindliche, freigegebene Produktspezifikation für den Bestandsvertrag 1.2.1; keine Release-Freigabe des konkreten Commits ohne grüne Gates.<br>
-**RIV-Status:** Paketprüfung, Bindungsmodi und Runtime (1.a/1.b/1.c samt FIX1–FIX3) durch Apply bestätigt; native Windows-/GATE-RUNTIME-Abnahme auf Bundle 009 erfüllt. Format-2-Leser 1.d.W durch Apply bestätigt; Robustheit/Bereinigung 1.d.R/C als getrennte Zustände vorbereitet, Writer bleiben Format 1. Keine Release-Freigabe.<br>
+**RIV-Status:** 18/18 Umsetzungsschritte samt Abschlusskorrektur durch Bundle 015 und CI-Run 37306630290 auf `a02391dc045d42e317b3e766f0b1e9fa8dfadec1` bestätigt; Plan abgeschlossen.<br>
+**Watcher-Ereignisse:** neuer aktiver Plan; WE-0 dokumentiert das Ziel, noch keine Änderung des Polling-Betriebs.<br>
 **Projektname:** `PatchHarbor`<br>
 **Kommando:** `patchharbor`<br>
 **Skriptmarker:** `# PATCHHARBOR`<br>
 **Patch-Paketmarker:** `patch-harbor`
 
-Der aktive Entwicklungsplan für Runtime / Inspect / Validate (RIV) liegt unter
-`planning/runtime-inspect-validate/commit-plan.md`: 10 von 18 Schritten angewendet; 1.d.R/C bis 12/18 vorbereitet. FIX1–FIX3 sind angewendet und erhöhen den Planzähler nicht.
-Die Zielversion dieser Erweiterung wird gesondert festgelegt; die vorhandene
-Paketversion bleibt 1.2.1. Die abgeschlossenen Pläne unter `planning/1.2.1/`,
+Der aktive Entwicklungsplan liegt unter `planning/watcher-events/commit-plan.md`;
+das normative Entwicklungsziel unter `planning/watcher-events/specification.md`.
+WE-0 übernimmt ausschließlich Dokumentation; Implementierung und Apply-Nachweis
+des neuen Watcher-Verhaltens stehen noch aus. Die Zielversion wird gesondert
+festgelegt; die vorhandene Paketversion bleibt 1.2.1.
+Der RIV-Plan unter `planning/runtime-inspect-validate/commit-plan.md` ist abgeschlossen.
+Die abgeschlossenen Pläne unter `planning/1.2.1/`,
 `planning/1.2.0/`, `planning/1.1.1/`, `planning/1.1.0/` und `planning/1.0.0/`
 bleiben historische Grundlagen. Die Dokumentübernahme `RIV-DOCS-1` liegt außerhalb
 der 18 RIV-Umsetzungsschritte. Änderungen am Produktziel stehen in
@@ -24,8 +28,9 @@ der 18 RIV-Umsetzungsschritte. Änderungen am Produktziel stehen in
 ## 1. Zweck, Gültigkeit und Verhältnis zu 1.1.1
 
 Dieses Dokument beschreibt den Bestandsvertrag von PatchHarbor 1.2.1 und das
-geplante Produktziel der RIV-Erweiterung in Abschnitten 35–41. Die Erweiterung
-aktiviert durch ihre Dokumentation weder neue Kommandos noch Result-Format 2.
+Produktziel der RIV-Erweiterung in Abschnitten 35–41 sowie das noch nicht
+implementierte Watcher-Ziel nach Abschnitt 3.2.1. Dokumentationsübernahmen
+aktivieren für sich allein keine neue Laufzeitfunktion.
 Ihre Querverweise ergänzen die jeweils betroffenen Basisabschnitte; unbetroffene
 Bestandsverträge einschließlich repositorylokaler Konfiguration bleiben erhalten.
 
@@ -178,6 +183,30 @@ und kein stilles Überspringen beschädigter Konfigurationen.
 Der Watcher implementiert keine eigene Repository-, Git-, Manifest-, Fingerprint-, Lock-, Ausführungs- oder Result-Bundle-Logik. Er darf Prüfungen des Core weder nachbauen noch umgehen.
 
 Der Watcher lässt die Exchange-Verzeichnisse ausschließlich flach scannen und implementiert keine eigene Archivierungslogik. Sein globaler Core-Scan darf nach Abschnitt 16.2.1 nachweislich überholte Bundles in den konfigurierten Archiv-Unterordner verschieben. Sonstige Dateien und unklare Zustände bleiben liegen; unveränderte Nichtkandidaten und bereits verarbeitete Dateien werden nicht fortlaufend neu delegiert.
+
+### 3.2.1 Geplante Ereignisüberwachung – WE-0
+
+Das normative Entwicklungsziel steht in
+[`planning/watcher-events/specification.md`](../planning/watcher-events/specification.md),
+die Commitfolge in
+[`planning/watcher-events/commit-plan.md`](../planning/watcher-events/commit-plan.md).
+Die vorstehenden Poll-Beschreibungen und `--poll-interval` dokumentieren bis zur
+Aktivierung durch WE-3 den bestehenden Betrieb. WE-0 ändert ausschließlich Dokumentation.
+
+Ziel: native, nicht rekursive Ereignisüberwachung pro physischem Exchange-Root;
+mindestens fünf zusammenhängende Sekunden Ruhe vor einem Scan, zurückgesetzt
+durch jede relevante Änderung. Im unveränderten Leerlauf kein periodischer Scan
+oder Apply-Worker. Vorhandene Dateien erhalten nach Einrichtung der Beobachtung
+eine einmalige Startprüfung nach derselben Ruhefrist. Lesen und Änderungen
+innerhalb von Unterordnern lösen keinen Scan aus.
+
+Core behält Konfiguration, Klassifikation, Bindung, Locks, Replay und Ausführung.
+Eine geprüfte Scope-Erweiterung der öffentlichen automatischen API begrenzt die
+Auswahl auf aktuell ruhige Exchanges. Ereignisse während Apply, mehrere Bundles,
+Konfigurationswechsel, Sperrkonflikte, Root-Ersatz und Ereignisverlust werden
+gemäß der neuen Spezifikation behandelt. Zusätzliche Laufzeitabhängigkeiten und
+ein stiller Polling-Fallback sind nicht vorgesehen. Bisherige manuelle Apply-
+und Runtime-Fallback-Verträge bleiben erhalten.
 
 ### 3.3 Repo Assist
 
