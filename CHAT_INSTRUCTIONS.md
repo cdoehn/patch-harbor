@@ -234,6 +234,65 @@ Ein fehlgeschlagener Patch kann Dateien geändert oder neu erzeugt haben. Arbeit
 immer auf dem tatsächlich zurückgegebenen Snapshot weiter und unterstelle keine
 globale Rückabwicklung.
 
+### Geprüfte Runtime und verbindlicher bisheriger Übergabeweg
+
+Result-Format 2 ergänzt `runtime/runtime.json` und gegebenenfalls ein kanonisches
+Wheel. Format 1 sowie `unavailable` bleiben gültige Referenzen. `runtime/` ist
+Werkzeugmaterial außerhalb des Repository-Snapshots; `base/runtime/` ist etwas
+anderes. Das Finden eines Wheels erlaubt weder Installation noch Import.
+
+Prüfe zuerst Herkunft und Berechtigung mit bereits vertrauenswürdigen Werkzeugen.
+Ein Hash aus derselben unbekannten Quelle authentifiziert keinen Absender.
+Prüfe äußere ZIP-Sicherheit, vollständiges Inventar, Größen, Hashes und das enge
+Wheel-Profil einschließlich RECORD, Python-Anforderung, dependency-freier
+Metadaten und Ausschluss von `.pth`, Fremdmodulen und Launchern **vor** Codeausführung.
+Unbekannte Herkunft oder fehlender verlässlicher Prüfer führt zum bisherigen Weg.
+Ein Skript aus dem ungeprüften Wheel darf nicht seine eigene Vertrauensbasis sein.
+
+Erst danach explizit eine frische Umgebung außerhalb des Ziel-Snapshots anlegen.
+Nur das geprüfte lokale Wheel offline installieren: kein Index, Nachladen,
+Buildfallback, Interpreterdownload oder `--ignore-requires-python`. Ein vorhandener
+Installer muss die vollständige `Requires-Python`-Bedingung vor Installation am
+Zielinterpreter prüfen, etwa durch einen lokalen pip-Dry-Run. Eine venv ist keine
+Sicherheits-Sandbox. Keine Session-Secrets weitergeben; `PYTHONPATH`/`PYTHONHOME`
+bereinigen und einen fremden Arbeitsordner sowie den isolierten Interpreter nutzen.
+
+Das separat reviewed Repository-Beispiel `scripts/runtime_bootstrap.py` und
+`docs/runtime-bootstrap.md` konkretisieren den Ablauf. Der Helfer setzt eine
+bereits vertrauenswürdige passende Core-Installation voraus; er ist keine neue
+öffentliche API und wird nicht aus einer fremden Result-Runtime gestartet.
+Fehlt er, bleibt die folgende bisherige Prüfung verbindlich.
+
+Mit dem konkret geprüften venv-Interpreter (Windows: `Scripts/python.exe`,
+POSIX: `bin/python`) prüfen:
+
+```text
+<venv-python> -I -m patchharbor.cli inspect /absolut/patch.zip --json
+<venv-python> -I -m patchharbor.cli validate /absolut/patch.zip --reference-bundle /absolut/result.zip --json
+```
+
+**Fehlt oder versagt das Wheel, muss der bisherige Übergabeweg verwendet werden.**
+Das gilt für fehlende/defekte Bytes, ungeklärte Herkunft, inkompatibles Python,
+fehlenden Installer und technische Import-/Nutzungsfehler. Ein Versuch genügt;
+keine Reparatur- oder Netzwerkschleife. Entwickle am geprüften tatsächlichen
+Snapshot; verwende vorhandene vertrauenswürdige Paketprüfer oder die etablierten
+ZIP-, Payload-, Hash- und Bindungsprüfungen. Alle vier vollständigen Werte aus
+`context.json` bleiben verbindlich. Kein künstliches `git init` aus `base/`,
+kein ungebundenes `fs run`; Apply prüft den realen Zustand erneut.
+
+Bei ausschließlich defektem Runtime-Zusatz separat äußere ZIP-Sicherheit,
+Pflichtdateien, Snapshot-Inventar/Blob-IDs/Hashes, Kontext und Run-Konsistenz
+prüfen. Originalbytes und vollständige Result-SHA behalten; weder reparieren
+noch als Format 1 umdeklarieren. Dieser Nachweis ist keine erfolgreiche native
+Vollvalidierung des defekten Format-2-Results. Ungültige Repositorydaten,
+unsichere Paketpfade und Bindungsabweichungen bleiben blockierend.
+
+Ausfallgrund, Werkzeuge, tatsächliche Prüfungen und fehlende Nachweise benennen.
+Statische Validierung belegt weder Tests noch CI, Authentizität oder Apply-Erfolg.
+Die finale ZIP vollständig öffnen und prüfen; bei jeder Byteänderung erneut
+prüfen. Genau eine kanonische Datei ausliefern; externe Backups nur bei
+Autorisierung und bytegleich, ohne eine zweite ZIP wegen eines Backupfehlers.
+
 ## 4. Zielversion, Commit-Plan und Spezifikation finden
 
 Bestimme die aktive Zielversion aus dem Repository. Eine laut Plan erst zum
@@ -287,6 +346,11 @@ ihrer Anzahl keine Genehmigung. Nutzerangaben zu Anzahl oder Umfang bleiben
 maßgeblich. Jeder Commit muss ein fachlich geschlossener, testbarer Zwischenstand
 sein; die Gesamtfolge bleibt im beauftragten Scope. Mehrere Commits erweitern
 weder Scope noch Testpolicy.
+
+Auch ein Diagnosebundle mit **null Commits** ist zulässig. Es sammelt die
+beauftragten Diagnosen im Result/Log, staged und pusht nichts und erhöht keinen
+Planzähler. Sein auftragsbezogener Prüfumfang bleibt erhalten; es benötigt keine
+erfundenen Commit-Gates. Tatsächliche Änderungen und Teilerfolge immer auswerten.
 
 Kleine notwendige Lücken im selben Commit-Scope als
 `PLAN_SPEC_MINOR_DEVIATION` melden. Scope-Erweiterungen, vorgezogene Planpunkte,

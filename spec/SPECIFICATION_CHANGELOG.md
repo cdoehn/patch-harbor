@@ -1,5 +1,20 @@
 # PatchHarbor – Spezifikations-Changelog
 
+## 2026-10-05 – RIV 1.f.W: geprüfter Bootstrap und bisherige Übergabe
+
+- Bundle 013 mit drei echten Commits, lokalen Gates und finalem Push bestätigt;
+  15/18 angewendet, 16/18 im Dateistand vorbereitet. Keine vorweggenommene CI-Freigabe.
+- Kanonische Chat-Vorlage enthält Herkunfts-/Profilprüfung vor Wheel-Code,
+  explizite Offlineinstallation und verpflichtenden bisherigen Übergabeweg bei Ausfall.
+- Reviewed Repository-Helfer nutzt vorhandene vertrauenswürdige Parser;
+  Runtime-only-Defekte bleiben getrennt von ungültigen Repositorydaten und
+  werden nie als erfolgreiche native Vollvalidierung ausgegeben.
+- Reale isolierte Bootstrap- und Null-/Ein-/Mehrcommit-Applies ergänzen die
+  blockierenden Packaging-/E2E-Gates. Die Vorlagengröße richtet sich am bestehenden
+  Handoff-Bytebudget aus, nicht an einer zusätzlichen Prosa-Längenvorgabe.
+- Bundle 014 schließt nach den echten R/C-Zuständen mit fälliger CI einschließlich
+  Windows. Deren tatsächliche Ergebnisse bleiben bis zum Apply offen.
+
 ## 2026-10-05 – RIV 1.e.C: gemeinsame Publikationsdaten
 
 - R vollständig parallel geprüft: 2.165 bestanden / 7 Skips; vor C eingefroren.

@@ -216,6 +216,22 @@ def read_result_or_patch_payloads(content: bytes, *,
 def parse_result_payloads(payloads: tuple[BundlePayload, ...], *,
                           resource_policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY) -> ResultFacts:
     """Validate ZIP-reader output; neither apply deltas nor infer a live fingerprint."""
+    return _parse_result_payloads(payloads, resource_policy=resource_policy, verify_runtime=True)
+
+
+def _parse_repository_payloads(payloads: tuple[BundlePayload, ...], *,
+                               resource_policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY) -> ResultFacts:
+    """Private handoff fallback: repository evidence only, never full Result validity.
+
+    Outer ZIP/path/CRC limits still apply before this boundary. The original
+    artifact is neither rewritten nor downgraded. Native readers and archive/
+    recovery callers always use parse_result_payloads with runtime verification.
+    """
+    return _parse_result_payloads(payloads, resource_policy=resource_policy, verify_runtime=False)
+
+
+def _parse_result_payloads(payloads: tuple[BundlePayload, ...], *,
+                           resource_policy: ResourcePolicy, verify_runtime: bool) -> ResultFacts:
     files = {entry.relative_path: entry.content for entry in payloads}
     modes = {entry.relative_path: entry.unix_mode for entry in payloads}
     _require(len(files) == len(payloads), "duplicate result members")
@@ -308,13 +324,17 @@ def parse_result_payloads(payloads: tuple[BundlePayload, ...], *,
              "Result 2 requires passive handoff data")
     expected_files.update(handoff)
     runtime = None
-    if version == 2:
+    if version == 2 and verify_runtime:
         runtime = read_result_runtime(manifest["runtime"], files, resource_policy=resource_policy)
         _require(runtime.status != "unavailable" or bool(run["warnings"]),
                  "unavailable runtime requires a run warning")
         expected_files.add(runtime.metadata.path)
         if runtime.wheel is not None:
             expected_files.add(runtime.wheel.path)
+    elif version == 2:
+        # Only this reserved namespace may be excluded from the private
+        # repository-only assessment. Unknown root/snapshot members still fail.
+        expected_files.update(name for name in files if name.startswith("runtime/"))
     inventory = []
     repository_paths = []
     for kind in ("base", "untracked"):

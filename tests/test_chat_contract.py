@@ -7,6 +7,7 @@ import re
 import pytest
 
 from patchharbor.cli import _build_parser as build_core_parser
+from patchharbor.bundle_handoff import MAX_HANDOFF_ENTRY_BYTES
 from patchharbor.parser import REQUIRED_MARKER
 from patchharbor.patch_manifest import (
     PATCH_FORMAT_VERSION,
@@ -113,7 +114,7 @@ def test_chat_contract_is_canonical_versioned_and_compact() -> None:
     assert not raw.startswith(b"\xef\xbb\xbf")
     assert b"\r" not in raw
     assert raw.endswith(b"\n")
-    assert len(raw) <= 32 * 1024
+    assert len(raw) <= MAX_HANDOFF_ENTRY_BYTES
     assert all(line.rstrip() == line for line in document.splitlines())
     assert (PROJECT_ROOT / ".gitattributes").read_text(encoding="utf-8") == (
         "/CHAT_INSTRUCTIONS.md text eol=lf\n"

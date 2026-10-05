@@ -3744,7 +3744,8 @@ Bei kohärenter Neuinstallation gleicher Version liefert der alte Prozess
 `unavailable/source_changed`, ohne eine bereits fixierte Antwort zu verändern.
 Allgemeiner API-Import und Inspect/Validate führen weiterhin keine Materialisierung
 oder Rezeptprüfung aus. Der zyklusfreie Ableitungsvertrag steht in
-`docs/runtime-artifact.md`; die Windows-Abnahme bleibt gemäß Plan ausdrücklich offen.
+`docs/runtime-artifact.md`; die frühere Windows-Abnahme wurde gemäß Plan
+mit Bundle 009 bestätigt. Die abschließende CI auf dem finalen HEAD bleibt separat.
 
 ### 38.5 Unterstützte Bereitstellungswege und Mindestnachweis
 
@@ -3935,8 +3936,12 @@ historische HEAD-Identität noch lokale Registrierung her.
 
 Für das erste Upgrade werden vorhandene gültige Paketprüfer genutzt; zusätzliche
 Prüfungen mit einem neuen getesteten Kandidaten werden als Kandidatentests
-ausgewiesen. Die neue Anleitung wird in 1.f zusammen mit dem dauerhaft
-unterstützten Fallback aktiviert. Es gibt keine Pflicht, das noch nicht
+ausgewiesen. Der Dateistand 1.f aktiviert die neue Anleitung zusammen mit dem dauerhaft
+unterstützten Fallback. `docs/runtime-bootstrap.md` und der separat reviewed
+Repository-Helfer `scripts/runtime_bootstrap.py` konkretisieren den Ablauf auf
+Basis eines bereits vertrauenswürdigen kompatiblen Cores, ohne neue öffentliche
+Core-Operation. Der interne Repository-only-Leseweg lässt sämtliche bisherigen
+Pflichtprüfungen bestehen und ist keine native Vollreferenzvalidierung. Es gibt keine Pflicht, das noch nicht
 existierende Feature zu seiner eigenen Einführung zu verwenden.
 
 ### 40.4 Einmalige finale Auslieferung

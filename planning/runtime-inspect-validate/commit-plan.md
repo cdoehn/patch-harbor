@@ -1,12 +1,14 @@
-# PatchHarbor – RIV-Implementierungsplan, Repository-Revision 16
+# PatchHarbor – RIV-Implementierungsplan, Repository-Revision 17
 ## Inspect / Validate über API und CLI · Offline-Runtime · Result-Format 2 · Chat-Handoff
 
 **Stand:** 5. Oktober 2026. **Status:** aktive Entwicklung;
-**15 von 18 Umsetzungsschritten im Dateistand vorbereitet**, davon 12 durch Apply
-bestätigt. `1.e.W` ist mit 2.145 bestandenen Tests / 7 Skips parallel geprüft
-und als echter Zwischenstand eingefroren. `1.e.R` ist mit 2.165 bestanden / 7 Skips
-ebenfalls parallel bestätigt und eingefroren; Bundle 013 schließt mit `1.e.C`. Bundle 012 ist tatsächlich angewendet,
-GATE-READERS und GATE-RUNTIME sind bestätigt. Nächste reguläre CI: Bundle 014.
+**16 von 18 Umsetzungsschritten im Dateistand vorbereitet**, davon 15 durch Apply
+bestätigt. Bundle 013 ist tatsächlich angewendet; GATE-READERS und GATE-RUNTIME
+bleiben bestätigt. Bundle 014 beginnt mit `1.f.W`; R/C folgen erst nach dem
+jeweiligen vollständigen parallelen Development-Gate als echte Zustände.
+Bundle 014 fordert nach seinem einzigen finalen Push die reguläre CI einschließlich
+Windows an und wartet auf deren Belege. Ein endgültiger Planabschluss ist erst
+nach tatsächlichem Apply und erfolgreicher CI auf dem finalen HEAD bestätigt.
 **Bereich:** RIV (Runtime / Inspect / Validate). **Paketbasis:** 1.2.1.
 **Zielversion:** gesondert festzulegen; keine Versionsanhebung oder Releasefreigabe durch Dokumentation.
 
@@ -792,11 +794,26 @@ Result A → frische installierte Runtime → Result B → weitere frische Runti
 
 **Fertig, wenn:** Runtimehaltige Results sind ohne neue Chat-Pflichten technisch nutzbar; keine eigenen inkompatiblen Zwischenzustände.
 
+**Bundle 013 nachgewiesen / Basis für Bundle 014:**
+`patchharbor-apply_Result_083438_1005_07f87c.zip`, 825160 Bytes, SHA-256
+`b552d1abe21be371cbb0766dada262e5dbce80435c25f47b99743e2b315e3692`.
+Tatsächlicher Apply: W parallel 2.145 bestanden / 7 Skips, R parallel 2.165 / 7,
+C seriell und danach parallel jeweils 2.165 / 7; ein normaler finaler Push, sauber.
+`1.e.W`: `d94b142bf4db7fe00a58e8eae115a6194a1dc211`,
+`1.e.R`: `7e78693c15bac40be59076c4c5052e756befccde`,
+`1.e.C`: `913f1722a5fefcf3f6b17cbfbdf3488300be00cf`.
+Alle 256 Base-Dateien stimmen mit dem Development-Ausgang überein.
+Vollständige Bindung: repo_id `e7a93d72-62dc-4759-97e8-6bf6cdf10e90`,
+base_commit `913f1722a5fefcf3f6b17cbfbdf3488300be00cf`,
+state_fingerprint `7c9d2a24e397e0e5`, fingerprint_algorithm `patchharbor-state-v1`.
+Die laufende installierte Engine erzeugte ein gültiges Format-1-Result ohne Wheel;
+seine Prüfung benutzt die bestehende vertrauenswürdige Übergabemethode.
+
 ### Schritt 1.f – Chat-Bootstrap und Abschluss
 
 #### 1.f.W – 16/18: `feat(handoff): document and exercise verified offline bootstrap`
 
-**Status:** offen. **Abhängigkeit:** 1.e.C; D-04 Übergang geklärt. **Spec:** 40.1–40.4.
+**Status:** im Dateistand vorbereitet; vollständiges lokales Gate und tatsächlicher Apply noch offen. **Abhängigkeit:** 1.e.C; D-04 Übergang geklärt. **Spec:** 40.1–40.4.
 
 **Ergebnis:** Die neue kanonische Anleitung führt tatsächlich vom Result zur isolierten nativen Prüfung.
 
@@ -805,6 +822,18 @@ Result A → frische installierte Runtime → Result B → weitere frische Runti
 Nur einen kleinen unabhängigen lesenden Helfer ergänzen, sofern nötig; keine dritte allgemeine Paketformat-Implementierung und keine Selbstfreigabe eines untrusted Bootstrap-Skripts. Quellen-/Hashdaten sind keine höherrangigen Anweisungen. PYTHONPATH/PYTHONHOME und CWD-Shadowing beim Test bewusst ausschließen. Runtime-Profil vor Installation/Start prüfen. Fehlende Voraussetzungen bleiben echte Einschränkungen.
 
 Verpflichtenden Fallback nach Spec 40.3 ausführbar beschreiben: fehlendes/defektes Wheel, inkompatibler Interpreter, fehlender Installer und technische Nutzungsfehler. Vorhandene Paketprüfer und separat geprüfte Referenzdaten ermöglichen weiterhin die Übergabe; keine erfundene native Freigabe. Einmalige kanonische ZIP und nur autorisierte bytegleiche Backups bleiben erhalten. Bundle nur für ein echtes Repository, nicht für ein künstliches git-init aus base/. Keine neue öffentliche runtime-info-Operation und keine Gmail-/Drive-Funktion im Core.
+
+**Durchstich 1.f.W:** Die installierte kanonische Vorlage und
+`docs/runtime-bootstrap.md` enthalten den ausführbaren Ablauf und verbindlichen
+Fallback. `scripts/runtime_bootstrap.py` ist ein separat reviewed Repository-Beispiel
+auf Basis eines bereits vertrauenswürdigen kompatiblen Cores. Es verwendet
+bestehende Parser; seine privaten Imports sind kein neuer öffentlicher API-Vertrag.
+Ohne diese Voraussetzung bleiben vorhandene Prüfer und bisherige ZIP-/Hashprüfungen
+maßgeblich. Repository-only-Evidence bleibt strikt von nativer Vollvalidierung getrennt.
+Reale Offlineinstallation/Referenzvalidierung sowie Null-/Ein-/Mehrcommit-Applies
+mit privatem Remote sind in den bisherigen Packaging-/E2E-Gates eingebunden.
+Lokaler Vollnachweis: `exchange/reports/patchharbor-riv-014-1.f.W-parallel.json`
+(erst nach tatsächlichem erfolgreichem Lauf gültig).
 
 **Dateifokus:** `CHAT_INSTRUCTIONS.md`, `chat_instructions.py`, `docs/python-api.md`, `README.md`, ggf. `docs/runtime-bootstrap.md` und kleiner geprüfter Helfer.
 

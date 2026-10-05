@@ -69,8 +69,8 @@ repositories.
 
 ## Static package inspection (RIV development addition)
 
-This source line implements RIV 1.a/1.b package and binding validation. Portable
-runtime and Result Format 2 remain planned; no release is implied. The existing
+This development line implements package/binding validation, portable offline
+runtime and Result Format 2; no release is implied. The existing
 `dry_run` keeps its Apply semantics and still creates a Result Bundle.
 
 ```python
@@ -131,7 +131,12 @@ and to archival/recovery policy. A valid reference does not itself prove a
 successful Apply: those consumers still require a clean, completed success,
 no warnings or dry run, the appropriate expected binding and, for recovery,
 the existing receipt, local digest and Git evidence. Their conservative ZIP
-path policy is unchanged. Result writers still emit format 1.
+path policy is unchanged. Current writers emit format 2 with a verified embedded
+runtime or a declared runtime-only restriction; readers also accept format 1.
+Full reference validation rejects a corrupt declared runtime. The separately
+reviewed [bootstrap and previous handoff procedure](runtime-bootstrap.md) can
+check repository evidence independently when only that optional addition fails.
+Such a receipt is explicitly distinct from native full reference validation.
 
 `validate_patch(patch, repository="/workspace/repository")` returns scope
 `repository`, `binding_matches=True`, the existing `RepositoryContext` and no

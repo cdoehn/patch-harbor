@@ -742,6 +742,14 @@ Python-Umgebungen bereit. Zum Importieren muss PatchHarbor in der Umgebung des
 aufrufenden Python-Programms installiert sein. Das Wheel enthält `py.typed` und
 die API-Dokumentation; neue Runtime-Abhängigkeiten gibt es nicht.
 
+Die RIV-Entwicklung ergänzt lesende `inspect`-/`validate`-Operationen und
+Result-Format 2 mit einer offline installierbaren Runtime. Der
+[Bootstrap-Ablauf](docs/runtime-bootstrap.md) prüft Herkunft und Integrität vor
+Codeausführung und verwendet bei Wheel-Ausfall verbindlich den bisherigen
+Übergabeweg. Diagnosebundles dürfen null Commits enthalten, Entwicklungsbundles
+einen oder mehrere echte geprüfte Zustände. Die Planabnahme verlangt noch den
+tatsächlichen finalen Apply und dessen CI; Veröffentlichung bleibt separat.
+
 
 ### Watcher als API-Verbraucher (API-3)
 
