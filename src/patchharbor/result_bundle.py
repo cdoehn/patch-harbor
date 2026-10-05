@@ -374,10 +374,12 @@ def create_apply_result_bundle(
             ),
         )
 
+    diagnostic_context = actual_context
     try:
         if execution_log is not None:
             _write_execution_log(run_directory, execution_log)
         captured = capture_result_bundle(repository, repo_id)
+        diagnostic_context = captured.context
         revalidate_result_bundle_target(target, registry_snapshot)
         report = _apply_report(
             session=session,
@@ -423,7 +425,7 @@ def create_apply_result_bundle(
             dry_run=dry_run,
             repository=repository,
             repo_id=repo_id,
-            context=actual_context,
+            context=diagnostic_context,
             warnings=warnings,
             primary_outcome=primary_outcome,
             result_bundle=ResultBundleResult.failed(str(exc)),
@@ -443,7 +445,7 @@ def create_apply_result_bundle(
             dry_run=dry_run,
             repository=repository,
             repo_id=repo_id,
-            context=actual_context,
+            context=diagnostic_context,
             warnings=warnings,
             primary_outcome=primary_outcome,
             result_bundle=ResultBundleResult.failed(

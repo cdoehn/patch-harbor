@@ -115,10 +115,10 @@ print(json.dumps({'sha256': artifact.wheel_sha256, 'size': len(artifact.wheel_by
             cli = json.loads(_run([str(python), "-I", "-B", "-c",
                                   "from patchharbor.cli import main; raise SystemExit(main())",
                                   "validate", "--json", str(patch)], outside, environment))
-            if generation == 0:
-                repository = create_repository(outside / 'foreign-repository')
-                produced = json.loads(_run([str(python), '-I', '-B', '-c', '''
-import json, socket, sys
+            if generation in range(3):
+                repository = create_repository(outside / f'foreign-repository-{generation}')
+                produced = json.loads(_run([str(python), '-I', '-B', '-c', r'''
+import hashlib, io, json, socket, sys, tracemalloc
 from pathlib import Path
 from zipfile import ZipFile
 from patchharbor import api
@@ -128,17 +128,46 @@ def forbidden(*args, **kwargs):
 socket.socket = forbidden
 repo = Path(sys.argv[1])
 api.register(repo)
-api.configure_exchange_directory(repo.parent / 'result-exchange', repository=repo)
+api.configure_exchange_directory(repo.parent / (repo.name + '-results'), repository=repo)
+tracemalloc.start()
 bundle = api.bundle(repo)
+peak_python_bytes = tracemalloc.get_traced_memory()[1]
+tracemalloc.stop()
 facts, digest = read_result_reference(bundle.path)
 assert facts.format_version == 2 and facts.runtime.status == 'embedded'
 assert not facts.warnings and facts.context.repository_path == str(repo)
 with ZipFile(bundle.path) as archive:
     raw = archive.read(facts.runtime.wheel.path)
     assert len(raw) == facts.runtime.wheel.size
-print(json.dumps({'wheel_sha256': facts.runtime.wheel.sha256, 'size': len(raw)}))
-''', str(repository)], outside, environment))
-                assert produced == {'wheel_sha256': proof['sha256'], 'size': proof['size']}
+    assert hashlib.sha256(raw).hexdigest() == facts.runtime.wheel.sha256
+    # Reconstruct the comparable mandatory ZIP without runtime data to measure
+    # additional compressed bytes. Preserve member attributes/compression.
+    baseline = io.BytesIO()
+    with ZipFile(baseline, 'w') as prior:
+        for info in archive.infolist():
+            if info.filename.startswith('runtime/'):
+                continue
+            content = archive.read(info.filename)
+            if info.filename == 'manifest.json':
+                manifest = json.loads(content)
+                manifest.pop('runtime'); manifest['format_version'] = 1
+                content = (json.dumps(manifest, ensure_ascii=True, indent=2) + '\n').encode()
+            prior.writestr(info, content)
+    compressed_addition = bundle.path.stat().st_size - len(baseline.getvalue())
+target = Path(sys.argv[2])
+# The next generation is installed from the actual Result, not the independent
+# provider probe above. The trusted fixture source supplied this wheel.
+target.write_bytes(raw)
+measurement = {'wheel_sha256': facts.runtime.wheel.sha256, 'size': len(raw),
+               'peak_python_bytes': peak_python_bytes, 'compressed_addition': compressed_addition}
+(repo.parent / (repo.name + '-metrics.json')).write_text(json.dumps(measurement))
+print(json.dumps(measurement))
+''', str(repository), str(destination / next(destination.glob('*.whl')).name)], outside, environment))
+                assert produced['wheel_sha256'] == proof['sha256'] and produced['size'] == proof['size']
+                assert 0 < produced['compressed_addition'] < 2 * 1024 * 1024
+                # A bounded small-repository allocation regression check. This
+                # measures Python allocations, not total process RSS.
+                assert 0 < produced['peak_python_bytes'] < 128 * 1024 * 1024
         assert cli["result"]["scope"] == "package"
         assert not (outside / "SHOULD_NOT_EXIST").exists()
         assert proof["requires_python"] == ">=3.12"

@@ -1,5 +1,18 @@
 # PatchHarbor – Spezifikations-Changelog
 
+## 2026-10-05 – RIV 1.e.R: Self-update, Result-Roundtrip und Fehlerdiagnose
+
+- W vollständig parallel geprüft: 2.145 bestanden / 7 Skips; Dateistand vor R eingefroren.
+- Notfallberichte behalten nach erfolgreicher Snapshotaufnahme den neuen geprüften
+  Kontext, wenn die spätere Publikation scheitert.
+- Reale isolierte Self-updates prüfen alte Runtime/Vorlage zusammen mit neuem
+  Repository-Commit, auch bei fehlgeschlagenem Entrypoint nach dem Commit.
+- Alle drei Installationswege erzeugen drei echte Result-Generationen und verwenden
+  jeweils das daraus entnommene Wheel; Python-Allokation und ZIP-Mehrbedarf werden gemessen.
+- Dirty/Untracked und explizite Ziele bleiben vollständig; Schreib-, Verifikations-
+  und Publikationsfehler werden nicht in Runtime-Erfolge umgedeutet.
+- 14/18 vorbereitet, 12/18 durch Apply bestätigt; eigener vollständiger R-Gate erforderlich.
+
 ## 2026-10-05 – RIV 1.e.W: gemeinsame Runtime-Einbettung
 
 - Bundle 012 tatsächlich angewendet: zwölf Planschritte und GATE-READERS bestätigt.
