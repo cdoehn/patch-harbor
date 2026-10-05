@@ -103,6 +103,10 @@ EXPECTED_WATCHER_RUNTIME_FILES = {
     "loop.py",
     "systemd_linux.py",
     "worker.py",
+    "events.py",
+    "platform/__init__.py",
+    "platform/linux.py",
+    "platform/windows.py",
 }
 
 

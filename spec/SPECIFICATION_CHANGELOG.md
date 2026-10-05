@@ -1,5 +1,17 @@
 # PatchHarbor – Spezifikations-Changelog
 
+## 2026-10-05 – WE-2: Native Ereignisadapter vorbereitet
+
+- WE-1 durch tatsächliches Bundle-017-Result bestätigt (2/5 Planschritte).
+- Getrennte inotify-/ReadDirectoryChangesW-Adapter, flache und gefilterte
+  Vorfahrenbeobachtung, kontrolliertes Aufwecken/Schließen ohne neue Abhängigkeiten.
+- Strukturierte Hinweise für Änderungen, Root-Verlust und Queue-Überlauf;
+  begrenzte Ereignismengen und explizite Backend-Fehler ohne Polling-Fallback.
+- Deterministische Decoder-/Ressourcenprüfungen sowie echte native Ereignistests.
+  Lokale Linux-Nachweise ersetzen keine Windows-CI; diese bleibt bis 019 offen.
+- Bundle 018 bereitet WE-2 vor. Die CLI-Aktivierung und Ruhefrist folgen in WE-3;
+  keine Versionsänderung oder zusätzliche CI durch diesen Zwischenstand.
+
 ## 2026-10-05 – WE-1: Core-Grenzen für den Ereignis-Watcher vorbereitet
 
 - WE-0 durch tatsächliches Bundle-016-Result bestätigt (1/5 Planschritte).

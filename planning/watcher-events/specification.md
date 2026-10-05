@@ -1,9 +1,10 @@
 # PatchHarbor – Ereignisgesteuerter Exchange-Watcher
 
 Stand: 5. Oktober 2026. Plan-ID: `watcher-events`. Status: verbindliches
-Entwicklungsziel, noch nicht vollständig implementiert. `WE-0` ist durch Bundle
-016 angewendet. `WE-1` bereitet die Core-Schnittstellen vor; sein tatsächliches
-Apply steht aus. Die installierte Polling-Schleife ändert sich dadurch nicht.
+Entwicklungsziel, noch nicht vollständig implementiert. `WE-0` und `WE-1` sind
+durch Bundles 016/017 angewendet. `WE-2` bereitet die nativen Adapter vor; sein
+tatsächliches Apply und der native Windows-Nachweis stehen aus. Die installierte
+Polling-Schleife ändert sich dadurch nicht.
 Produktversion und Release-Tag werden durch diesen Plan nicht angehoben.
 
 ## 1. Ziel und Ausgangslage
@@ -85,7 +86,7 @@ des gemeldeten Pfads. Der automatische Ursprung, seine fehlende automatische
 Wiederholung fehlgeschlagener Identitäten und sämtliche Locks bleiben erhalten.
 Beobachtungsinformationen sind keine Reservierung und keine neue Vertrauensgrenze.
 
-Die in WE-1 vorbereitete Python-API konkretisiert diese Grenze:
+Die durch WE-1 angewendete Python-API konkretisiert diese Grenze:
 `watch_targets()` liefert physische Exchange-Identitäten mit Repository-IDs und
 Registry-/Konfigurationspfaden; `watch_control_paths()` liefert Kontrollpfade auch
 bei beschädigter lokaler Konfiguration. `apply_next(exchanges=tuple(...))` prüft
@@ -163,6 +164,15 @@ die Standardbibliothek ein. PatchHarbor bleibt ohne zusätzliche Laufzeit-
 abhängigkeiten; Wheel, Offline-Runtime und bisheriger Fallback bleiben verwendbar.
 Tests müssen die unterstützten nativen Plattformen tatsächlich nachweisen.
 Termux erhält hierdurch keine neue zugesagte Watcher-Service-Unterstützung.
+
+Die in WE-2 vorbereiteten Adapter verwenden eine feste Beobachtungsgeneration,
+unterbrechbare native Warteoperationen und eng gefilterte Vorfahrenbeobachtungen.
+Sie liefern strukturierte Änderungs-, Root-Verlust- und Überlaufhinweise und
+führen keine Bundle-/Konfigurationslesezugriffe oder Scans aus. Die Ereignismenge
+pro Rückgabe bleibt begrenzt; Verlust verlangt später Core-Revalidierung und eine
+erneute vollständige Ruhefrist. Details und Nachweisgrenzen stehen im
+[Adaptervertrag](../../docs/watcher-event-adapters.md). Fünfsekunden-Steuerung
+und Worker-Anbindung werden erst mit WE-3 aktiviert.
 
 Nicht unterstützte Plattformen oder Dateisysteme werden mit eindeutigem
 strukturiertem Fehler gemeldet. Insbesondere sind entfernte Änderungen auf

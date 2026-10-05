@@ -2,10 +2,10 @@
 
 **Dateiname:** `SPECIFICATION.md`<br>
 **Produktversion:** `1.2.1`<br>
-**Spezifikationsstand:** 2026-10-05 · Watcher-Core WE-1 vorbereitet<br>
+**Spezifikationsstand:** 2026-10-05 · Native Watcher-Adapter WE-2 vorbereitet<br>
 **Status:** Verbindliche, freigegebene Produktspezifikation für den Bestandsvertrag 1.2.1; keine Release-Freigabe des konkreten Commits ohne grüne Gates.<br>
 **RIV-Status:** 18/18 Umsetzungsschritte samt Abschlusskorrektur durch Bundle 015 und CI-Run 37306630290 auf `a02391dc045d42e317b3e766f0b1e9fa8dfadec1` bestätigt; Plan abgeschlossen.<br>
-**Watcher-Ereignisse:** WE-0 durch Bundle 016 bestätigt; Core-Schnittstellen WE-1 vorbereitet, noch keine Änderung des Polling-Betriebs.<br>
+**Watcher-Ereignisse:** WE-0/WE-1 durch Bundles 016/017 bestätigt; native Adapter WE-2 vorbereitet, noch keine Änderung des Polling-Betriebs.<br>
 **Projektname:** `PatchHarbor`<br>
 **Kommando:** `patchharbor`<br>
 **Skriptmarker:** `# PATCHHARBOR`<br>
@@ -13,9 +13,9 @@
 
 Der aktive Entwicklungsplan liegt unter `planning/watcher-events/commit-plan.md`;
 das normative Entwicklungsziel unter `planning/watcher-events/specification.md`.
-WE-0 ist angewendet. WE-1 bereitet Core-Beobachtungsziele, eingeschränkte
-automatische Discovery und strukturierte Ablauf-/Sperrdaten vor. Sein Apply-Nachweis
-und die Aktivierung des neuen Watcher-Verhaltens stehen aus. Die Zielversion wird gesondert
+WE-0/WE-1 sind angewendet. WE-2 bereitet native Linux-/Windows-Ereignisadapter vor.
+Sein Apply-Nachweis, native Windows-Prüfung und die Aktivierung des neuen
+Watcher-Verhaltens stehen aus. Die Zielversion wird gesondert
 festgelegt; die vorhandene Paketversion bleibt 1.2.1.
 Der RIV-Plan unter `planning/runtime-inspect-validate/commit-plan.md` ist abgeschlossen.
 Die abgeschlossenen Pläne unter `planning/1.2.1/`,
@@ -185,7 +185,7 @@ Der Watcher implementiert keine eigene Repository-, Git-, Manifest-, Fingerprint
 
 Der Watcher lässt die Exchange-Verzeichnisse ausschließlich flach scannen und implementiert keine eigene Archivierungslogik. Sein globaler Core-Scan darf nach Abschnitt 16.2.1 nachweislich überholte Bundles in den konfigurierten Archiv-Unterordner verschieben. Sonstige Dateien und unklare Zustände bleiben liegen; unveränderte Nichtkandidaten und bereits verarbeitete Dateien werden nicht fortlaufend neu delegiert.
 
-### 3.2.1 Ereignisüberwachung – WE-1 vorbereitet, Aktivierung ausstehend
+### 3.2.1 Ereignisüberwachung – WE-2 vorbereitet, Aktivierung ausstehend
 
 Das normative Entwicklungsziel steht in
 [`planning/watcher-events/specification.md`](../planning/watcher-events/specification.md),
@@ -217,6 +217,12 @@ Bundle-Scan oder Reservierung. `RunReport.automatic` liefert strukturierte
 Nachlaufentscheidungen zusätzlich zu den unveränderten Apply-Ergebnissen;
 ein verbrauchter Versuch ist kein Erfolgsnachweis. Details der Schnittstellen
 stehen in [`docs/python-api.md`](../docs/python-api.md).
+
+WE-2 bereitet flache native Ereignisadapter, strukturierte Verlust-/Fehlermeldungen,
+begrenzte Ereignismengen und unterbrechbare Ressourcenlebenszyklen vor. Sie führen
+keine Core-Discovery aus; native Windows-Nachweise bleiben ausstehend. Der
+[Adaptervertrag](../docs/watcher-event-adapters.md) beschreibt die Grenze zur
+späteren WE-3-Zeitsteuerung. Die bestehende CLI-Schleife bleibt bis dahin aktiv.
 
 ### 3.3 Repo Assist
 

@@ -366,7 +366,9 @@ def test_platform_specific_mechanics_stay_inside_platform_package() -> None:
     modules = _runtime_modules()
     platform_only_roots = {"ctypes", "fcntl", "msvcrt"}
     for module, path in modules.items():
-        if module.startswith("patchharbor.platform"):
+        if module.startswith(("patchharbor.platform.", "patchharbor_watcher.platform.")):
+            continue
+        if module in {"patchharbor.platform", "patchharbor_watcher.platform"}:
             continue
         assert _import_roots(path).isdisjoint(platform_only_roots), module
 
@@ -381,6 +383,14 @@ def test_platform_specific_mechanics_stay_inside_platform_package() -> None:
     assert "patchharbor.platform.locking" in graph["patchharbor.locks"]
     assert "patchharbor.platform.runtime" in graph["patchharbor.user_paths"]
     assert "patchharbor.physical_paths" not in graph
+
+    assert graph["patchharbor_watcher.events"] == frozenset()
+    assert graph["patchharbor_watcher.platform"] == frozenset({
+        "patchharbor_watcher.events", "patchharbor_watcher.platform.linux",
+        "patchharbor_watcher.platform.windows",
+    })
+    for module in ("patchharbor_watcher.platform.linux", "patchharbor_watcher.platform.windows"):
+        assert graph[module] == frozenset({"patchharbor_watcher.events"})
 
     git_capture_source = modules["patchharbor.git_capture"].read_text(
         encoding="utf-8"
