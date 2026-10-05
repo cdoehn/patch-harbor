@@ -1,11 +1,11 @@
-# PatchHarbor – RIV-Implementierungsplan, Repository-Revision 17
+# PatchHarbor – RIV-Implementierungsplan, Repository-Revision 18
 ## Inspect / Validate über API und CLI · Offline-Runtime · Result-Format 2 · Chat-Handoff
 
 **Stand:** 5. Oktober 2026. **Status:** aktive Entwicklung;
-**16 von 18 Umsetzungsschritten im Dateistand vorbereitet**, davon 15 durch Apply
+**17 von 18 Umsetzungsschritten im Dateistand vorbereitet**, davon 15 durch Apply
 bestätigt. Bundle 013 ist tatsächlich angewendet; GATE-READERS und GATE-RUNTIME
-bleiben bestätigt. Bundle 014 beginnt mit `1.f.W`; R/C folgen erst nach dem
-jeweiligen vollständigen parallelen Development-Gate als echte Zustände.
+bleiben bestätigt. `1.f.W` ist mit 2.174 bestandenen Tests / 7 Skips parallel geprüft und eingefroren.
+Bundle 014 bereitet jetzt `1.f.R` vor; C folgt erst nach dem vollständigen R-Gate.
 Bundle 014 fordert nach seinem einzigen finalen Push die reguläre CI einschließlich
 Windows an und wartet auf deren Belege. Ein endgültiger Planabschluss ist erst
 nach tatsächlichem Apply und erfolgreicher CI auf dem finalen HEAD bestätigt.
@@ -813,7 +813,7 @@ seine Prüfung benutzt die bestehende vertrauenswürdige Übergabemethode.
 
 #### 1.f.W – 16/18: `feat(handoff): document and exercise verified offline bootstrap`
 
-**Status:** im Dateistand vorbereitet; vollständiges lokales Gate und tatsächlicher Apply noch offen. **Abhängigkeit:** 1.e.C; D-04 Übergang geklärt. **Spec:** 40.1–40.4.
+**Status:** lokal vollständig parallel geprüft und eingefroren; tatsächlicher Apply offen. **Abhängigkeit:** 1.e.C; D-04 Übergang geklärt. **Spec:** 40.1–40.4.
 
 **Ergebnis:** Die neue kanonische Anleitung führt tatsächlich vom Result zur isolierten nativen Prüfung.
 
@@ -858,6 +858,29 @@ Snapshot-/Bindungsdaten. Null-Commit-Diagnose, Einzelcommit und mehrere echte
 Commitzustände in isolierten Testrepositorys prüfen: Logs/Result, Gate-Reihenfolge,
 Teilerfolg, kein Push bei Diagnose oder Fehler, genau ein finaler Push bei
 erfolgreicher Commitfolge. Produktionsregistry und echter Remote bleiben tabu. Externe Backup-Fehler nicht durch neue ZIPs beheben. Keine echten Drive-/Mail-Transaktionen in der Projektsuite.
+
+**Durchstich 1.f.R:** Technische Installations-/Import-/Nutzungsfehler und
+unveränderte Ablehnung ungültiger Pflichtdaten sind funktional geprüft.
+Requires-Python wird als echte Konjunktion vom Offlineinstaller durchgesetzt;
+Hash-Pins erkennen zwischenzeitlich geänderte Wheelbytes. Die Runtimeprozesse
+laufen im Test unter Netzwerkverbot, auch bei bewusst vergiftetem CWD/PYTHONPATH.
+Reale fehlgeschlagene Zwischen-/Endgates belegen erhaltene Teilcommits ohne Push.
+
+Die bestehende native Ubuntu-26.04-Lane nutzt Python 3.14 (die beiden anderen
+nativen Basislanes weiter 3.12) und stellt uv als Testwerkzeug bereit. Normale
+Wheel-/Source-/sdist-Roundtrips und pipx-Smoke bleiben blockierend; kein zusätzlicher
+Runner-Job und keine Runtime-Abhängigkeit. Lokale Installationsvorbereitung und
+netzsperrende eigentliche Runtimeprüfungen sind getrennt.
+`scripts/run_handoff_ci.py` ist ausschließlich projektbezogene Orchestrierung.
+Der fällige Apply-Entrypoint prüft vorher lesenden GitHub-Zugang, dispatcht nach
+seinem einzigen finalen Push einmal, bindet Run an volle SHA und eindeutige
+Handoff-ID, wartet einschließlich Windows und prüft die hochgeladenen Testbelege.
+Run-ID/URL, Job-/Testresultate und bei Fehler Diagnosen erscheinen als
+`PATCHHARBOR_CI_JSON` im Ausführungslog. Keine Wiederholung oder zusätzliche
+Push-/PR-/Zeitplan-Auslöser. Fehlende Actions-Schreibrechte, falscher HEAD und
+unvollständige Belege bleiben Fehler mit erhaltenem tatsächlichem Commitstand.
+Lokaler Vollnachweis: `exchange/reports/patchharbor-riv-014-1.f.R-parallel-recheck.json`
+(erst nach tatsächlichem erfolgreichem Lauf gültig). CI bleibt bis zum Apply offen.
 
 **Dateifokus:** Installierte Integrations-/Packaging-Tests, bestehende CI-Lanes/Markierungen, Bootstrap-Beispiele.
 

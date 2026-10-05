@@ -110,3 +110,38 @@ Git commits and a private local bare remote for zero/one/multiple commit cases.
 Its gate commands are fixture checks, not nested runs of the project suite.
 Both are selected by existing blocking packaging/E2E gates. Native Windows/CI
 evidence must come from actual runs, never from these Linux development results.
+
+## PatchHarbor project CI at the handoff boundary
+
+The project, not Core, requests acceptance CI every fifth bundle after 009
+(014, 019, ...). Intermediate bundles do not spend an extra CI run. The prepared
+Apply entrypoint checks GitHub read access before its commits and dispatches
+once after its single final push. `gh` must already be authenticated for the
+repository with Actions write access; failure does not trigger a login prompt,
+retry or second push. Local commits and their actual result remain reviewable.
+
+The workflow retains only `workflow_dispatch`. `handoff_id` and the full
+`expected_commit` bind the request and checkout. The existing Ubuntu 26.04 lane
+uses Python 3.14 and installs uv for one representative route; Ubuntu 24.04 and
+native Windows use Python 3.12. pipx and wheel/source/sdist acceptance remain in
+packaging. No new runner lane is added. Optional uv absence in other lanes is
+an explicit skip; the designated lane must provide a passed uv proof.
+
+`scripts/run_handoff_ci.py` records a durable intent in an owned ignored
+`build/handoff-ci/<id>` before dispatch. Reusing the same workspace refuses a
+second attempt. An ambiguous network response requires diagnosis, not redispatch.
+GitHub is polled by that ordinary process, without model calls. The correlated
+run must complete successfully with all six jobs, including both Windows engines.
+Reports must be structurally complete, internally bound to unchanged source
+bytes and the expected platform/interpreter. Cross-platform source digests may
+differ because checkouts have platform EOL conventions; each job still binds to
+the exact requested Git commit.
+
+Machine JSON in the Apply execution log contains run ID/URL, full commit, job
+steps, artifact hashes, test counts and the relevant bootstrap/commit proofs.
+Failures retain job diagnostics and artifact references. A dispatch/start is not
+a passed CI. Final plan approval requires the actual completed Apply and CI.
+The workflow run/job/artifact contracts follow the
+[GitHub REST API](https://docs.github.com/en/rest/actions/workflows#create-a-workflow-dispatch-event),
+[workflow job endpoint](https://docs.github.com/en/rest/actions/workflow-jobs#list-jobs-for-a-workflow-run-attempt)
+and [artifact endpoint](https://docs.github.com/en/rest/actions/artifacts#download-an-artifact).

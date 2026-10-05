@@ -110,3 +110,20 @@ def test_real_diagnostic_and_commit_sequences_keep_gates_and_single_final_push(t
     assert not facts.context.dirty and not git(repo, "status", "--porcelain").stdout
     assert git(repo, "ls-remote", "origin", "refs/heads/main").stdout.split()[0] == str(facts.context.base_commit)
     assert not git(repo, "ls-remote", "--tags", "origin").stdout
+
+
+@pytest.mark.parametrize("fail_phase", [1, 2, 3])
+def test_failed_gate_retains_real_partial_commits_and_never_pushes(tmp_path, fail_phase):
+    repo, remote, before, report, facts, events = sequence(tmp_path, 3, fail_phase=fail_phase)
+    assert report.process_exit_code == 29 and not facts.primary_result.success
+    commits = [event for event in events if event["action"] == "commit"]
+    assert len(commits) == fail_phase - 1
+    assert facts.context.dirty and facts.completed_commit is None
+    assert git(repo, "rev-list", "--reverse", str(before.base_commit)+"..HEAD").stdout.splitlines() == [e["sha"] for e in commits]
+    assert str(facts.context.base_commit) == (commits[-1]["sha"] if commits else str(before.base_commit))
+    assert (repo / "tracked.txt").read_bytes() == f"state {fail_phase}\n".encode()
+    assert not git(repo, "diff", "--cached", "--name-only").stdout
+    assert not any(e["action"] == "push" for e in events)
+    assert events[-1] == {"action": "gate_failed", "phase": fail_phase,
+                          "mode": "serial" if fail_phase == 3 else "parallel"}
+    assert git(repo, "ls-remote", "origin", "refs/heads/main").stdout.split()[0] == str(before.base_commit)

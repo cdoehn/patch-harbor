@@ -149,6 +149,7 @@ def install(assessment: Assessment, workspace: Path, *, python: str = sys.execut
 
 def check_patch(patch: Path, bootstrap: Bootstrap) -> dict[str, object]:
     """Check final patch bytes, retaining honest native vs previous-path evidence."""
+    patch = patch.absolute()
     assessment = bootstrap.assessment
     current = assess(assessment.reference, trusted_source_sha256=assessment.reference_sha256)
     package = resolve_patch_package(patch)
@@ -157,26 +158,34 @@ def check_patch(patch: Path, bootstrap: Bootstrap) -> dict[str, object]:
         raise ValueError("patch/reference binding mismatch")
     method, reason = "previous_handoff", bootstrap.reason
     if bootstrap.status == "ready":
-        result = _run([str(bootstrap.python), "-I", "-B", "-m", "patchharbor.cli", "validate", str(patch.resolve()),
-                       "--reference-bundle", str(assessment.reference), "--json"],
-                      bootstrap.workspace, _environment(bootstrap.workspace))
         try:
+            result = _run([str(bootstrap.python), "-I", "-B", "-m", "patchharbor.cli", "validate", str(patch),
+                           "--reference-bundle", str(assessment.reference), "--json"],
+                          bootstrap.workspace, _environment(bootstrap.workspace))
             native = json.loads(result.stdout)
-        except (ValueError, UnicodeError):
+        except (OSError, ValueError, UnicodeError):
             reason = "native_tool_unavailable"
         else:
-            if not native.get("success") or result.returncode:
+            if not isinstance(native, dict) or type(native.get("success")) is not bool:
+                reason = "native_tool_unavailable"
+            elif native["success"] is False:
                 raise ValueError("native validation rejected the patch/reference")
-            validation = native["result"]
-            if (validation["reference_sha256"] != current.reference_sha256
-                    or validation["inspection"]["package_sha256"] != package.package_sha256
-                    or validation["binding_matches"] is not True or validation["scope"] != "reference"):
-                raise ValueError("native validation returned inconsistent evidence")
-            method, reason = "native_reference", None
+            else:
+                validation = native.get("result")
+                if (result.returncode or not isinstance(validation, dict)
+                        or not isinstance(validation.get("inspection"), dict)):
+                    reason = "native_tool_unavailable"
+                else:
+                    if (validation.get("reference_sha256") != current.reference_sha256
+                            or validation["inspection"].get("package_sha256") != package.package_sha256
+                            or validation.get("binding_matches") is not True or validation.get("scope") != "reference"):
+                        raise ValueError("native validation returned inconsistent evidence")
+                    method, reason = "native_reference", None
     # No old success receipt is valid for changed final bytes.
     final = resolve_patch_package(patch)
     if final.package_sha256 != package.package_sha256:
         raise ValueError("final patch bytes changed; validation must be repeated")
+    assess(assessment.reference, trusted_source_sha256=assessment.reference_sha256)
     return {"method": method, "reason": reason, "package_sha256": final.package_sha256,
             "package_size": patch.stat().st_size, "reference_sha256": current.reference_sha256,
             "binding": binding, "full_reference_valid": current.full_reference_valid,

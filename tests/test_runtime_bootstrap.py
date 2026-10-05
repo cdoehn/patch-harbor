@@ -2,15 +2,22 @@
 from __future__ import annotations
 
 from hashlib import sha256
+from io import BytesIO
 import json
 from pathlib import Path
+import shutil
 import subprocess
+import sys
 from zipfile import ZipFile
 
 import pytest
 
 from patchharbor import api
+from patchharbor import runtime_wheel
+from patchharbor.zip_payloads import ZipPayloadError
+from build_backend import _prepare_recipe
 from scripts import runtime_bootstrap as bootstrap
+from tests.result_runtime_support import attach_runtime, replace_wheel, rewrite_wheel
 from tests.registration_support import create_repository
 from tests.test_result_runtime_writer import package
 
@@ -104,3 +111,172 @@ def test_missing_installer_uses_previous_handoff(handoff, tmp_path, network_guar
     result = bootstrap.install(assessment, tmp_path / "runtime", installer_python=str(tmp_path / "absent-python"))
     assert result.status == "fallback" and result.reason == "installer_or_python_incompatible"
     assert bootstrap.check_patch(patch, result)["method"] == "previous_handoff"
+
+
+def rewrite(path, change):
+    with ZipFile(path) as archive:
+        files = {info.filename: archive.read(info) for info in archive.infolist()}
+    change(files)
+    with ZipFile(path, "w") as archive:
+        for name, data in files.items():
+            archive.writestr(name, data)
+
+
+@pytest.mark.parametrize("fault", ["snapshot", "context", "run", "extra", "unsafe"])
+def test_bad_repository_evidence_still_blocks_runtime_fallback(handoff, fault, monkeypatch):
+    reference, _ = handoff
+    def change(files):
+        files["runtime/runtime.json"] = b"broken optional runtime"
+        if fault == "snapshot":
+            name = next(name for name in files if name.startswith("base/"))
+            files[name] += b"changed"
+        elif fault in {"context", "run"}:
+            name = "context.json" if fault == "context" else "logs/run.json"
+            doc = json.loads(files[name]); doc["base_commit"] = "a" * 40
+            files[name] = json.dumps(doc).encode()
+        else:
+            files["extra.txt" if fault == "extra" else "../escape"] = b"bad"
+    rewrite(reference, change)
+    monkeypatch.setattr(bootstrap, "_run", lambda *a: pytest.fail("invalid reference launched code"))
+    with pytest.raises((ValueError, api.PatchHarborError, ZipPayloadError)):
+        bootstrap.assess(reference)
+
+
+@pytest.mark.parametrize("name", ["foreign.py", "patchharbor/unsafe.pth"])
+def test_forbidden_runtime_profile_never_executes_even_with_rehashed_outer_descriptors(handoff, tmp_path, name, monkeypatch):
+    reference, patch = handoff
+    def change(files):
+        wheel = next(raw for name, raw in files.items() if name.endswith(".whl"))
+        bad = rewrite_wheel(wheel, lambda rows: rows.append((name, b"raise AssertionError('untrusted')")))
+        replace_wheel(files, bad)
+    rewrite(reference, change)
+    monkeypatch.setattr(bootstrap, "_run", lambda *a: pytest.fail("untrusted runtime executed"))
+    assessment = bootstrap.assess(reference, trusted_source_sha256=sha256(reference.read_bytes()).hexdigest())
+    outcome = bootstrap.install(assessment, tmp_path / "never-created")
+    assert outcome.status == "fallback" and outcome.reason == "runtime_invalid"
+    assert bootstrap.check_patch(patch, outcome)["native_validation"] is False
+
+
+def test_complete_python_requirement_is_enforced_before_installation(handoff, tmp_path, network_guard):
+    reference, patch = handoff
+    def change(files):
+        raw = next(raw for name, raw in files.items() if name.endswith(".whl"))
+        with ZipFile(BytesIO(raw)) as wheel:
+            original = runtime_wheel.parse_recipe(wheel.read(runtime_wheel.RECIPE_PATH))
+            payloads = {entry.path: wheel.read(entry.path) for entry in original.entries}
+        requirement = ">=3.12,!=3.*"  # a valid conjunction with no compatible Python 3
+        for name in (original.dist_info + "/METADATA", runtime_wheel.RESOURCE_ROOT + "metadata/METADATA"):
+            payloads[name] = payloads[name].replace(original.requires_python.encode(), requirement.encode())
+        initial = _prepare_recipe(runtime_wheel, payloads, version=original.version, requires_python=requirement)
+        payloads[runtime_wheel.IDENTITY_PATH] = runtime_wheel.identity_module(runtime_wheel.producer_id(initial))
+        recipe = _prepare_recipe(runtime_wheel, payloads, version=original.version, requires_python=requirement)
+        raw = runtime_wheel.materialize(recipe, lambda name, size: payloads[name])
+        updated = attach_runtime(files, raw); files.clear(); files.update(updated)
+    rewrite(reference, change)
+    assessment = bootstrap.assess(reference, trusted_source_sha256=sha256(reference.read_bytes()).hexdigest())
+    assert assessment.reason is None  # profile valid, current interpreter incompatible
+    outcome = bootstrap.install(assessment, tmp_path / "incompatible")
+    assert outcome.reason == "installer_or_python_incompatible"
+    assert not (outcome.workspace / "installation_failed.log").exists()
+    assert not list((outcome.workspace / "venv").rglob("patchharbor/__init__.py"))
+    assert bootstrap.check_patch(patch, outcome)["method"] == "previous_handoff"
+
+
+@pytest.mark.parametrize("fault", ["missing_venv", "install", "import", "wheel_changed"])
+def test_failed_bootstrap_has_one_attempt_and_uses_previous_handoff(handoff, tmp_path, monkeypatch, network_guard, fault):
+    reference, patch = handoff
+    assessment = bootstrap.assess(reference, trusted_source_sha256=sha256(reference.read_bytes()).hexdigest())
+    original = bootstrap._run
+    calls = []
+    def run(command, workspace, environment):
+        calls.append(command)
+        if (fault == "missing_venv" and "venv" in command or
+                fault == "install" and "pip" in command and "--dry-run" not in command or
+                fault == "import" and "-c" in command):
+            return subprocess.CompletedProcess(command, 1, "", "injected technical failure")
+        if fault == "wheel_changed" and "--dry-run" in command:
+            (workspace / assessment.wheel_name).write_bytes(b"changed after verified capture")
+        return original(command, workspace, environment)
+    monkeypatch.setattr(bootstrap, "_run", run)
+    outcome = bootstrap.install(assessment, tmp_path / "failed-runtime")
+    expected = {"missing_venv": "venv_unavailable", "install": "installation_failed",
+                "import": "runtime_import_failed", "wheel_changed": "installer_or_python_incompatible"}
+    assert outcome.status == "fallback" and outcome.reason == expected[fault]
+    assert len(calls) == len({tuple(command) for command in calls})
+    assert bootstrap.check_patch(patch, outcome)["method"] == "previous_handoff"
+
+
+def test_runtime_cannot_import_project_shadow_modules(handoff, tmp_path, monkeypatch, network_guard):
+    reference, patch = handoff
+    shadow = tmp_path / "shadow"; shadow.mkdir()
+    poison = b"raise AssertionError('project module must not be imported')\n"
+    (shadow / "patchharbor.py").write_bytes(poison)
+    monkeypatch.setenv("PYTHONPATH", str(shadow))
+    original = bootstrap._run
+    def run(command, workspace, environment):
+        (workspace / "patchharbor.py").write_bytes(poison)
+        return original(command, workspace, environment)
+    monkeypatch.setattr(bootstrap, "_run", run)
+    assessment = bootstrap.assess(reference, trusted_source_sha256=sha256(reference.read_bytes()).hexdigest())
+    outcome = bootstrap.install(assessment, tmp_path / "isolated")
+    assert outcome.status == "ready"
+    assert bootstrap.check_patch(patch, outcome)["native_validation"] is True
+
+
+@pytest.mark.parametrize("fault", ["missing_python", "encoding", "crash", "json_shape", "json_missing"])
+def test_technical_native_tool_failure_uses_previous_checks(handoff, tmp_path, monkeypatch, fault):
+    reference, patch = handoff
+    assessment = bootstrap.assess(reference)
+    workspace = tmp_path / "existing-runtime"; workspace.mkdir()
+    outcome = bootstrap.Bootstrap(assessment, "ready", None, workspace / "python", workspace)
+    def run(*args):
+        if fault == "missing_python": raise FileNotFoundError("interpreter disappeared")
+        if fault == "encoding": raise UnicodeError("invalid process encoding")
+        return subprocess.CompletedProcess([], 1 if fault == "crash" else 0,
+                {"crash": "traceback", "json_shape": "[]", "json_missing": '{"success":true}'}[fault], "")
+    monkeypatch.setattr(bootstrap, "_run", run)
+    result = bootstrap.check_patch(patch, outcome)
+    assert result["method"] == "previous_handoff" and result["reason"] == "native_tool_unavailable"
+
+
+@pytest.mark.parametrize("fault", ["binding", "patch_changed", "reference_changed", "semantic_rejection", "wrong_evidence"])
+def test_invalid_or_changed_validation_inputs_never_receive_success(handoff, tmp_path, monkeypatch, fault):
+    reference, patch = handoff
+    assessment = bootstrap.assess(reference)
+    workspace = tmp_path / "existing-runtime"; workspace.mkdir()
+    outcome = bootstrap.Bootstrap(assessment, "ready", None, workspace / "python", workspace)
+    if fault == "binding":
+        def change(files):
+            doc = json.loads(files["patch.json"]); doc["base_commit"] = "a" * 40
+            files["patch.json"] = json.dumps(doc).encode()
+        rewrite(patch, change)
+    def run(*args):
+        if fault == "binding": pytest.fail("mismatched binding reached native code")
+        if fault == "patch_changed": rewrite(patch, lambda files: files.update({"later.txt": b"changed"}))
+        if fault == "reference_changed": reference.write_bytes(reference.read_bytes() + b"changed")
+        if fault == "semantic_rejection": return subprocess.CompletedProcess([], 4, '{"success":false}', "")
+        if fault == "wrong_evidence":
+            return subprocess.CompletedProcess([], 0, json.dumps({"success": True, "result": {"inspection": {}, "scope": "package"}}), "")
+        return subprocess.CompletedProcess([], 1, "technical failure", "")
+    monkeypatch.setattr(bootstrap, "_run", run)
+    with pytest.raises(ValueError): bootstrap.check_patch(patch, outcome)
+
+
+def test_uv_installed_runtime_works_outside_checkout(handoff, tmp_path, network_guard):
+    uv = shutil.which("uv")
+    if uv is None:
+        pytest.skip("uv route runs on the designated Ubuntu 26.04 CI lane")
+    reference, patch = handoff
+    assessment = bootstrap.assess(reference, trusted_source_sha256=sha256(reference.read_bytes()).hexdigest())
+    workspace = tmp_path / "uv-runtime"; workspace.mkdir()
+    environment = bootstrap._environment(workspace)
+    wheel = workspace / assessment.wheel_name; wheel.write_bytes(assessment.wheel_bytes)
+    target = workspace / "venv" / ("Scripts/python.exe" if sys.platform == "win32" else "bin/python")
+    # Installer preparation is separate. Actual installed runtime operations run
+    # under the process-family network guard, including their import proof.
+    for command in ([uv, "venv", "--offline", "--no-python-downloads", "--python", sys.executable, str(target.parent.parent)],
+                    [uv, "pip", "install", "--offline", "--no-index", "--no-deps", "--python", str(target), str(wheel)]):
+        result = subprocess.run(command, cwd=workspace, env=environment, capture_output=True)
+        assert result.returncode == 0, result.stderr
+    outcome = bootstrap.Bootstrap(assessment, "ready", None, target, workspace)
+    assert bootstrap.check_patch(patch, outcome)["native_validation"] is True

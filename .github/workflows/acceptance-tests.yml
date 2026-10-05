@@ -1,7 +1,20 @@
 name: PatchHarbor acceptance tests
+run-name: PatchHarbor acceptance - ${{ inputs.handoff_id || 'manual' }}
 
 on:
   workflow_dispatch:
+    inputs:
+      handoff_id:
+        description: Optional unique handoff identity (no automatic retry)
+        type: string
+        default: ""
+      expected_commit:
+        description: Optional full pushed commit required by the handoff
+        type: string
+        default: ""
+
+env:
+  PATCHHARBOR_EXPECTED_COMMIT: ${{ inputs.expected_commit }}
 
 permissions:
   contents: read
@@ -21,24 +34,34 @@ jobs:
           - name: Release gate - Ubuntu 24.04
             runner: ubuntu-24.04
             windows_engine: ""
+            python: "3.12"
           - name: Release gate - Windows 2025
             runner: windows-2025
             windows_engine: powershell.exe
+            python: "3.12"
           - name: Release gate - Ubuntu 26.04
             runner: ubuntu-26.04
             windows_engine: ""
+            python: "3.14"
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
 
-      - name: Set up Python 3.12
+      - name: Set up Python
         uses: actions/setup-python@v7
         with:
-          python-version: "3.12"
+          python-version: ${{ matrix.python }}
+
+      - name: Verify requested commit
+        run: python -c "import os,subprocess; expected=os.environ['PATCHHARBOR_EXPECTED_COMMIT']; actual=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(); assert not expected or actual == expected"
 
       - name: Install development dependencies
         run: python -m pip install --disable-pip-version-check -e ".[dev]"
+
+      - name: Prepare representative uv installation route
+        if: matrix.runner == 'ubuntu-26.04'
+        run: python -m pip install --disable-pip-version-check uv
 
       - name: Verify Windows PowerShell and PowerShell 7
         if: runner.os == 'Windows'
@@ -52,14 +75,17 @@ jobs:
       - name: Run core and architecture tests
         run: >-
           python tools/run_tests.py --suite core --durations=10
+          --report "${{ runner.temp }}/patchharbor-core-tests.json"
 
       - name: Run E2E and acceptance tests
         run: >-
           python tools/run_tests.py --suite e2e --durations=10
+          --report "${{ runner.temp }}/patchharbor-e2e-tests.json"
 
       - name: Run platform tests
         run: >-
           python tools/run_tests.py --suite platform --durations=10
+          --report "${{ runner.temp }}/patchharbor-platform-tests.json"
 
       - name: Run packaging tests
         run: >-
@@ -71,7 +97,11 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: patchharbor-packaging-${{ matrix.runner }}
-          path: ${{ runner.temp }}/patchharbor-packaging-tests.json
+          path: |
+            ${{ runner.temp }}/patchharbor-core-tests.json
+            ${{ runner.temp }}/patchharbor-e2e-tests.json
+            ${{ runner.temp }}/patchharbor-platform-tests.json
+            ${{ runner.temp }}/patchharbor-packaging-tests.json
           if-no-files-found: error
           retention-days: 14
 
@@ -94,6 +124,9 @@ jobs:
       - name: Install development dependencies
         run: python -m pip install --disable-pip-version-check -e ".[dev]"
 
+      - name: Verify requested commit
+        run: python -c "import os,subprocess; expected=os.environ['PATCHHARBOR_EXPECTED_COMMIT']; actual=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(); assert not expected or actual == expected"
+
       - name: Verify PowerShell 7
         shell: pwsh
         run: Get-Command pwsh -ErrorAction Stop
@@ -102,6 +135,16 @@ jobs:
         shell: pwsh
         run: >-
           python tools/run_tests.py --suite windows --durations=10
+          --report "${{ runner.temp }}/patchharbor-windows-tests.json"
+
+      - name: Upload native Windows evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: patchharbor-windows-powershell7
+          path: ${{ runner.temp }}/patchharbor-windows-tests.json
+          if-no-files-found: error
+          retention-days: 14
 
   ubuntu-docker-integration:
     name: Docker release gate - Ubuntu ${{ matrix.ubuntu }}
@@ -122,7 +165,11 @@ jobs:
       - name: Build image and run blocking integration gates
         env:
           PATCHHARBOR_DOCKER_LOG_DIR: ${{ runner.temp }}/patchharbor-docker-integration/ubuntu-${{ matrix.ubuntu }}
-        run: ./scripts/run_docker_integration_tests.sh "${{ matrix.ubuntu }}"
+        run: |
+          if [ -n "$PATCHHARBOR_EXPECTED_COMMIT" ]; then
+            test "$(git rev-parse HEAD)" = "$PATCHHARBOR_EXPECTED_COMMIT"
+          fi
+          ./scripts/run_docker_integration_tests.sh "${{ matrix.ubuntu }}"
 
       - name: Upload Docker integration diagnostics
         if: always()

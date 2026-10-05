@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 from tests.platform_support import PROJECT_ROOT
 
 
@@ -91,13 +93,13 @@ def test_acceptance_workflow_is_manual_only_and_has_no_retries() -> None:
     lowered = text.lower()
 
     assert "  workflow_dispatch:" in text
-    triggers = text.split("\non:\n", 1)[1].split("\npermissions:", 1)[0]
-    assert {line.strip().split(":", 1)[0] for line in triggers.splitlines() if line.strip()} == {
+    triggers = re.search(r"(?ms)^on:\n(.*?)(?=^[^ \n]|\Z)", text).group(1)
+    assert set(re.findall(r"^  ([a-z_]+):", triggers, flags=re.MULTILINE)) == {
         "workflow_dispatch",
     }
     assert "permissions:\n  contents: read" in text
-    assert "retry" not in lowered
-    assert "rerun" not in lowered
+    assert not re.search(r"uses:.*retry", lowered)
+    assert "gh run rerun" not in lowered
     assert "max-attempts" not in lowered
 
 

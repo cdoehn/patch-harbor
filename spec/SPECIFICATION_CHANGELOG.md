@@ -1,5 +1,20 @@
 # PatchHarbor – Spezifikations-Changelog
 
+## 2026-10-05 – RIV 1.f.R: Fehlergrenzen und fällige CI
+
+- W mit 2.174 bestandenen Tests / 7 Skips vollständig parallel eingefroren.
+- Fehlende Werkzeuge, inkompatible Python-Konjunktionen, Hashwechsel,
+  Schattenmodule und technische Nutzungsfehler sind vom fachlichen Ablehnen getrennt.
+  Geänderte finale Patch-/Referenzbytes erhalten keinen alten Erfolgsnachweis.
+- Reale Gatefehler bewahren Teilcommits und den nicht committeden Dateistand;
+  ohne erfolgreiche Gesamtfolge gibt es keinen Push.
+- Bestehende CI-Lanes liefern maschinenlesbare Gatebelege; Ubuntu 26.04 nutzt
+  Python 3.14 und einen repräsentativen uv-Pfad, Grundmatrix bleibt Python 3.12.
+- Projektbezogener Helfer dispatcht die fällige CI einmal, nach finalem Push,
+  bindet volle SHA/Handoff-ID und liefert Windows-/Job-/Testnachweise im Apply-Log.
+  Kein Core-Scheduler, keine automatische CI-Wiederholung und keine neuen Trigger.
+- 17/18 vorbereitet, 15/18 angewendet; finaler Apply und CI weiterhin ausstehend.
+
 ## 2026-10-05 – RIV 1.f.W: geprüfter Bootstrap und bisherige Übergabe
 
 - Bundle 013 mit drei echten Commits, lokalen Gates und finalem Push bestätigt;
