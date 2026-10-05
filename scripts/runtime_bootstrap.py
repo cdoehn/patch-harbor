@@ -23,6 +23,11 @@ from patchharbor.result_reader import _parse_repository_payloads, parse_result_p
 from patchharbor.zip_payloads import read_zip_payload_bytes
 
 
+def _binding(value) -> dict[str, str]:
+    return {key: str(getattr(value, key)) for key in
+            ("repo_id", "base_commit", "state_fingerprint", "fingerprint_algorithm")}
+
+
 @dataclass(frozen=True)
 class Assessment:
     reference: Path
@@ -67,8 +72,7 @@ def assess(reference: Path, *, trusted_source_sha256: str | None = None) -> Asse
     # Shared existing schema, inventory, blob/hash, run and context checks. This
     # result is deliberately labelled separately from native full validation.
     repository = _parse_repository_payloads(payloads)
-    binding = {key: str(getattr(repository.context, key)) for key in
-               ("repo_id", "base_commit", "state_fingerprint", "fingerprint_algorithm")}
+    binding = _binding(repository.context)
     try:
         complete = parse_result_payloads(payloads)
     except (PatchHarborError, ValueError, KeyError, TypeError, UnicodeError, RecursionError, OverflowError):
@@ -153,7 +157,7 @@ def check_patch(patch: Path, bootstrap: Bootstrap) -> dict[str, object]:
     assessment = bootstrap.assessment
     current = assess(assessment.reference, trusted_source_sha256=assessment.reference_sha256)
     package = resolve_patch_package(patch)
-    binding = {key: str(getattr(package.manifest, key)) for key in assessment.binding}
+    binding = _binding(package.manifest)
     if binding != current.binding:
         raise ValueError("patch/reference binding mismatch")
     method, reason = "previous_handoff", bootstrap.reason

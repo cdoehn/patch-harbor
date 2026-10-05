@@ -1,5 +1,20 @@
 # PatchHarbor – Spezifikations-Changelog
 
+## 2026-10-05 – RIV 1.f.C: gemeinsamer Handoff und Abschlussabgleich
+
+- R mit 2.224 bestandenen Tests / 7 Skips parallel eingefroren; C behält Sammlung
+  und Ergebnisse. Reale Apply-Gates und CI-Nachweise entstehen erst später.
+- Ein gemeinsamer Testskript-Helfer transportiert native Python-Fixtures durch
+  Bash/PowerShell; doppelte Quote-Logik in Self-update und Commitfolgen entfällt.
+- Gemeinsame Bindungsprojektion und Quellenidentität ersetzen Bootstrap-Duplikate.
+- Planstatus bereits angewendeter Schritte, API-/Format-/Bootstrap-Dokumentation
+  und Abdeckungsnachweise sind abgeglichen. 18/18 vorbereitet, 15/18 angewendet.
+- Bundle 014 liefert drei echte Zustände. Der Entrypoint prüft W/R parallel,
+  C seriell und danach parallel, erzeugt drei Commits und pusht genau einmal;
+  anschließend fällige CI einschließlich Windows mit zugeordneten Result-Logs.
+- Bei bestätigtem finalem Apply und CI endet der Plan ohne weiteres Bundle.
+  Keine neue Version, kein Tag und kein vorweggenommener Release.
+
 ## 2026-10-05 – RIV 1.f.R: Fehlergrenzen und fällige CI
 
 - W mit 2.174 bestandenen Tests / 7 Skips vollständig parallel eingefroren.

@@ -46,3 +46,9 @@ Prozess-RSS oder beliebig große Repository-Snapshots. Messwerte werden im jewei
 isolierten Testverzeichnis als `foreign-repository-*-metrics.json` gespeichert.
 Native Windows-Nachweise kommen aus dem fälligen CI-Lauf; ein lokaler Linux-Test
 ersetzt sie nicht.
+
+Die Verwendung des eingebetteten Wheels folgt dem separat geprüften
+[Bootstrap- und Fallback-Vertrag](runtime-bootstrap.md). Ein beschädigter
+Runtime-Zusatz darf nicht als native Vollintegrität ausgewiesen werden;
+Repository-only-Evidence gehört ausschließlich zum dort beschriebenen bisherigen
+Übergabeweg und verändert keine Archivierungs-/Recovery-Regeln.

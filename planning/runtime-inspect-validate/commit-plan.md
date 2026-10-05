@@ -1,11 +1,13 @@
-# PatchHarbor – RIV-Implementierungsplan, Repository-Revision 18
+# PatchHarbor – RIV-Implementierungsplan, Repository-Revision 19
 ## Inspect / Validate über API und CLI · Offline-Runtime · Result-Format 2 · Chat-Handoff
 
 **Stand:** 5. Oktober 2026. **Status:** aktive Entwicklung;
-**17 von 18 Umsetzungsschritten im Dateistand vorbereitet**, davon 15 durch Apply
+**18 von 18 Umsetzungsschritten im Dateistand vorbereitet**, davon 15 durch Apply
 bestätigt. Bundle 013 ist tatsächlich angewendet; GATE-READERS und GATE-RUNTIME
 bleiben bestätigt. `1.f.W` ist mit 2.174 bestandenen Tests / 7 Skips parallel geprüft und eingefroren.
-Bundle 014 bereitet jetzt `1.f.R` vor; C folgt erst nach dem vollständigen R-Gate.
+`1.f.R` ist mit 2.224 bestandenen Tests / 7 Skips ebenfalls geprüft und eingefroren.
+Bundle 014 schließt mit `1.f.C`; der volle C-Gate muss dieselbe Sammlung und Ergebnisse
+bestätigen. Diese Vorbereitung ist kein tatsächlicher Apply- oder CI-Nachweis.
 Bundle 014 fordert nach seinem einzigen finalen Push die reguläre CI einschließlich
 Windows an und wartet auf deren Belege. Ein endgültiger Planabschluss ist erst
 nach tatsächlichem Apply und erfolgreicher CI auf dem finalen HEAD bestätigt.
@@ -408,7 +410,7 @@ bei abweichender Development-Wurzel `CWD_MISMATCH`, keine Änderung.
 
 Jeder Zwischenstand wird wirklich hergestellt, getestet und erst dann committed. Ein finaler Working Tree mit künstlich aufgeteiltem Staging ist kein WRC-Nachweis. Commit-IDs werden nach dem Commit aus Git übernommen, nicht im eigenen Commit vorweg erfunden.
 
-### 2.1 Commitübersicht – 12/18 durch Apply bestätigt, 1.e.W/R/C als 15/18 vorbereitet
+### 2.1 Commitübersicht – 15/18 durch Apply bestätigt, 1.f.W/R/C als 18/18 vorbereitet
 
 | Nr. | Kennung | Commit-Subject | Voraussetzung | Paket |
 |---:|---|---|---|---|
@@ -712,7 +714,7 @@ Allgemeinen Result-Leser, Referenzvalidierung, schnelle Klassifikation und die n
 
 #### 1.d.R – 11/18: `fix(result): harden mixed-version inventories and evidence checks`
 
-**Status:** R-Dateistand vorbereitet (erster Schritt in Bundle 012); tatsächlicher Apply folgt. **Abhängigkeit:** 1.d.W. **Spec:** 39.2–39.5, 37.2.
+**Status:** angewendet und gepusht als `7dbb3a82a3db9b8ea4340cc433cf53f8452e7420`; tatsächlicher Result-Nachweis zu Bundle 012. **Abhängigkeit:** 1.d.W. **Spec:** 39.2–39.5, 37.2.
 
 **Ergebnis:** Gemischte Ordner und manipulierte Archive führen nicht zu falschen Apply-/Recovery-/Archiventscheidungen.
 
@@ -728,7 +730,7 @@ Dirty-/Fehlerreferenz mit neuer Runtime bleibt Referenz und nicht automatisch Er
 
 #### 1.d.C – 12/18: `refactor(result): centralize versioned read contracts`
 
-**Status:** eigener C-Dateistand nach geprüftem R vorbereitet (zweiter Schritt in Bundle 012); tatsächlicher Apply folgt. **Abhängigkeit:** 1.d.R. **Spec:** 39.3/39.5, 41.2.
+**Status:** angewendet und gepusht als `d48567ff7b2f61ea82f8cfba9c23415fab10706a`; tatsächlicher Result-Nachweis zu Bundle 012. **Abhängigkeit:** 1.d.R. **Spec:** 39.3/39.5, 41.2.
 
 **Ergebnis:** Ein nachvollziehbarer Versionsdispatch und keine auseinanderlaufenden Runtime-Inventarprüfer.
 
@@ -746,7 +748,7 @@ Doppelte Versionstabellen und ad-hoc JSON-Prüfungen entfernen. Fixtures teilen,
 
 #### 1.e.W – 13/18: `feat(result): embed pinned runtime in all result creation paths`
 
-**Status:** lokal parallel bestätigt (2.145 bestanden / 7 Skips), Dateistand eingefroren; noch kein Apply-Commit. **Abhängigkeit:** 1.d.C; GATE-READERS und GATE-RUNTIME erfüllt. **Spec:** 39.1–39.4, 38.4.
+**Status:** angewendet und gepusht als `d94b142bf4db7fe00a58e8eae115a6194a1dc211`; tatsächlicher Result-Nachweis zu Bundle 013. **Abhängigkeit:** 1.d.C; GATE-READERS und GATE-RUNTIME erfüllt. **Spec:** 39.1–39.4, 38.4.
 
 **Ergebnis:** Gemeinsamer Writer erzeugt Format 2 samt Runtime; minimale Fehlerdiagnose funktioniert ab dem ersten aktivierten Writer.
 
@@ -762,7 +764,7 @@ Format 2 standardmäßig aktivieren und genau zwei neue Runtime-Einträge bei em
 
 #### 1.e.R – 14/18: `fix(result): preserve snapshots across runtime and self-update failures`
 
-**Status:** lokal parallel bestätigt (2.165 bestanden / 7 Skips), Dateistand eingefroren; noch kein Apply-Commit. **Abhängigkeit:** 1.e.W. **Spec:** 38.4–38.5, 39 vollständig.
+**Status:** angewendet und gepusht als `7e78693c15bac40be59076c4c5052e756befccde`; tatsächlicher Result-Nachweis zu Bundle 013. **Abhängigkeit:** 1.e.W. **Spec:** 38.4–38.5, 39 vollständig.
 
 **Ergebnis:** Selbstupdates, Watcher und Fehlerpublikation bleiben reproduzierbar und diagnostisch eindeutig.
 
@@ -780,7 +782,7 @@ Result A → frische installierte Runtime → Result B → weitere frische Runti
 
 #### 1.e.C – 15/18: `refactor(result): simplify pinned publication lifecycle`
 
-**Status:** umgesetzt; Freigabe nur mit vollständigem parallelem C-Nachweis und unveränderter Testsammlung, noch kein Apply-Commit. **Abhängigkeit:** 1.e.R. **Spec:** 38.4, 39, 41.2.
+**Status:** angewendet und gepusht als `913f1722a5fefcf3f6b17cbfbdf3488300be00cf`; tatsächlicher Result-Nachweis zu Bundle 013. **Abhängigkeit:** 1.e.R. **Spec:** 38.4, 39, 41.2.
 
 **Ergebnis:** Ein kleiner gemeinsamer Lifecycle für gepinnte Ressourcen und atomare Results.
 
@@ -843,7 +845,7 @@ Lokaler Vollnachweis: `exchange/reports/patchharbor-riv-014-1.f.W-parallel.json`
 
 #### 1.f.R – 17/18: `test(handoff): verify offline bootstrap and release integration`
 
-**Status:** offen. **Abhängigkeit:** 1.f.W. **Spec:** 40, 41.1.
+**Status:** lokal vollständig parallel geprüft (2.224 bestanden / 7 Skips) und eingefroren; tatsächlicher Apply offen. **Abhängigkeit:** 1.f.W. **Spec:** 40, 41.1.
 
 **Ergebnis:** Die vollständige Übergabekette ist in blockierende funktionale Gates eingebunden.
 
@@ -890,13 +892,33 @@ Lokaler Vollnachweis: `exchange/reports/patchharbor-riv-014-1.f.R-parallel-reche
 
 #### 1.f.C – 18/18: `refactor(handoff): consolidate final runtime guidance and audit`
 
-**Status:** offen. **Abhängigkeit:** 1.f.R. **Spec:** 35–41.
+**Status:** im Dateistand vorbereitet; vollständige parallele Äquivalenzprüfung, tatsächlicher Apply und finale CI noch offen. **Abhängigkeit:** 1.f.R. **Spec:** 35–41.
 
 **Ergebnis:** Eine konsistente dokumentierte Übergabe und ehrliche Abschlussbilanz ohne neue Features.
 
 **Umsetzung:** Doppelte Bootstrap-Erklärungen, veraltete Zwischenoptionen und unnötige Helfer entfernen. Spezifikation, API-Exporte, Beispielpfade, Paketdaten, Changelog und Plan abgleichen. Technische Fixtures und Ownership vereinfachen; keine wörtlichen Dokumentations-Snapshots hinzufügen.
 
 Abdeckungsmatrix und wirkliche Prüfbelege vervollständigen. Alle nicht erledigten Punkte offen lassen; CI erst nach realer Bestätigung als grün vermerken. Keine eigene SHA im zu erzeugenden Commit behaupten. Ein späterer Versions-/Releaseauftrag bleibt außerhalb dieses Cleanup; das Papier allein erzeugt keinen Tag.
+
+**Cleanup 1.f.C:** Gemeinsame Übergabe nativer Python-Testskripte für
+Self-update und Commitfolgen; interne Quotes/Zeilen bleiben unabhängig vom
+Bash-/PowerShell-Argumentparser. Der Bootstrap verwendet eine gemeinsame Projektion
+der vier Bindungsfelder, die Testfixture eine gemeinsame vertrauenswürdige
+Quellenidentität. Keine neue Operation und keine zusätzliche Testsammlung.
+
+Statuszeilen der tatsächlich angewendeten 1.d-/1.e-Schritte sind mit den vorhandenen
+Results abgeglichen. API-, Result-, Runtime- und Bootstrap-Dokumentation stimmen
+über Formate, Herkunft, Fallback, Null-/Mehrcommit-Bundles und verbleibende
+Nachweise überein. Der Abschlussabgleich steht in `docs/runtime-bootstrap.md`.
+Lokaler C-Nachweis: `exchange/reports/patchharbor-riv-014-1.f.C-parallel.json`,
+Äquivalenz gegen den eingefrorenen R-Nachweis. Keine eigene spätere Commit-SHA,
+kein Tag, keine Versionsanhebung und keine Releasefreigabe.
+
+Nach erfolgreichem tatsächlichem Apply/Push und zugehöriger erfolgreicher CI mit
+Windows sind alle 18 Schritte erledigt. Dann nur Abschluss melden und Schleife
+beenden; kein zusätzliches Bundle und keinen neuen Plan beginnen. Scheitern
+Apply/CI, tatsächliche Teilcommits und den konkreten Fehler anhand des Results
+bewerten; keine erneute Anwendung des alten basisgebundenen Patches.
 
 **Dateifokus:** Handoff-/Dokumentationshelfer, Plan-/Changelog-Verweise, Testfixturen.
 

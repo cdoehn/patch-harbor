@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+import base64
 import os
 from pathlib import Path
+import shlex
 import shutil
 import subprocess
 import sys
@@ -44,6 +46,21 @@ def native_script(posix_body: str, windows_body: str) -> str:
     """Build one marker-valid script from the current platform body."""
     body = native_value(posix_body, windows_body).rstrip("\n")
     return f"{REQUIRED_MARKER}\n{body}\n"
+
+
+def native_python_script(code: str, *, python: str = sys.executable) -> str:
+    """Carry a Python fixture program through both native argument parsers.
+
+    Encoding keeps multiline source and its internal quotes out of PowerShell's
+    legacy native argument conversion. This packages test code, never input data.
+    """
+    encoded = base64.b64encode(code.encode("utf-8")).decode("ascii")
+    command = f"import base64; exec(base64.b64decode('{encoded}'))"
+    ps_quote = lambda value: "'" + value.replace("'", "''") + "'"
+    return native_script(
+        f"{shlex.quote(python)} -c {shlex.quote(command)}",
+        f"& {ps_quote(python)} -c {ps_quote(command)}\nexit $LASTEXITCODE",
+    )
 
 
 def normalized_path(path: str | Path) -> str:

@@ -4,7 +4,6 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
-import shlex
 import shutil
 import sys
 from zipfile import ZipFile
@@ -13,7 +12,7 @@ import pytest
 
 from patchharbor import api
 from scripts.build_release import _copy_release_inputs
-from tests.platform_support import native_script, native_value
+from tests.platform_support import native_python_script, native_value
 from tests.registration_support import create_repository, git
 from tests.test_runtime_packaging import _run, _venv
 
@@ -56,11 +55,7 @@ def test_installed_self_update_pins_old_runtime_and_template_but_new_repository(
         "subprocess.run(['git','commit','-m','self update'],check=True); "
         f"sys.exit({exit_code})"
     )
-    ps_quote = lambda value: "'" + value.replace("'", "''") + "'"
-    body = native_script(
-        f"{shlex.quote(sys.executable)} -c {shlex.quote(code)}",
-        f"& {ps_quote(sys.executable)} -c {ps_quote(code)}\nexit $LASTEXITCODE",
-    )
+    body = native_python_script(code)
     patch = outside / "self-update.patch.zip"
     with ZipFile(patch, "w") as archive:
         archive.writestr("patch.json", json.dumps({

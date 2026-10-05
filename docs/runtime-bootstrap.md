@@ -145,3 +145,29 @@ The workflow run/job/artifact contracts follow the
 [GitHub REST API](https://docs.github.com/en/rest/actions/workflows#create-a-workflow-dispatch-event),
 [workflow job endpoint](https://docs.github.com/en/rest/actions/workflow-jobs#list-jobs-for-a-workflow-run-attempt)
 and [artifact endpoint](https://docs.github.com/en/rest/actions/artifacts#download-an-artifact).
+
+## Final RIV audit
+
+| Contract | Executable evidence and boundary |
+| --- | --- |
+| Static inspection, immutable package facts and CLI JSON 2 | `test_patch_inspection*`; no execution or registry access in package scope |
+| Original Result 1/2 and explicit repository validation | `test_reference_validation*`, `test_repository_validation`; exact binding, actual state, no fabricated Git history |
+| Canonical runtime profile, provenance and limits | `test_runtime_artifact`, `test_runtime_robustness`, `test_runtime_permissions`; no runtime dependencies or implicit installer |
+| Mixed versions, archive and recovery | `test_result_format2`, `test_result_robustness`; strict public native integrity remains separate from success policy |
+| All Result writers and request-pinned self-update | `test_result_runtime_writer`, `test_result_runtime_publication`, `test_result_runtime_roundtrip`; original producer with new repository snapshot |
+| Installed three-generation roundtrip | `test_runtime_packaging`; same canonical bytes, bounded measured overhead, wheel/source/sdist and native rights |
+| Bootstrap and previous procedure | `test_runtime_bootstrap`; real offline operation, trust/byte checks, mandatory fallback and invalid-base rejection |
+| Zero/one/multiple commits, failure/partial progress | `test_handoff_commit_sequence`; real local Apply, private remote, gates before commits and one final push |
+| Due CI and its complete evidence | `test_handoff_ci`; transport fixtures prove correlation/error handling. Actual Linux/Windows CI must still run on the final pushed HEAD |
+
+The local development gates for W and R passed in parallel with 2,174 and 2,224
+tests respectively (7 explicit skips each). C must retain R's exact collection
+and outcomes; its separate full gate provides that evidence. The actual Apply
+runs the intermediate parallel gates and, only at the final state, serial then
+parallel before the final commit and sole push. No local test or simulated
+transport is presented as an executed Windows job or a completed Apply.
+
+All 18 planned implementation positions are prepared by this final bundle;
+15 are confirmed by received Apply Results. Final approval awaits the actual
+remaining three commits and successful bound CI. On confirmation the active
+plan ends, without an extra bundle, new plan, version bump or automatic tag.

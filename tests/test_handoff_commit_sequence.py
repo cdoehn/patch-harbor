@@ -3,16 +3,14 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-import shlex
 import subprocess
-import sys
 from zipfile import ZipFile
 
 import pytest
 
 from patchharbor import api
 from patchharbor.result_reader import read_result_reference
-from tests.platform_support import native_script, native_value
+from tests.platform_support import native_python_script, native_value
 from tests.registration_support import create_repository, git
 
 pytestmark = pytest.mark.e2e
@@ -65,9 +63,7 @@ if COUNT:
     run('git','push','--no-follow-tags','--recurse-submodules=no','origin','HEAD:refs/heads/main')
     event(action='push', sha=run('git','rev-parse','HEAD').decode().strip())
 '''
-    ps_quote = lambda value: "'" + value.replace("'", "''") + "'"
-    body = native_script(f"{shlex.quote(sys.executable)} -c {shlex.quote(code)}",
-                         f"& {ps_quote(sys.executable)} -c {ps_quote(code)}\nexit $LASTEXITCODE")
+    body = native_python_script(code)
     entrypoint = native_value("run.sh", "run.ps1")
     patch = tmp_path / "handoff.zip"
     with ZipFile(patch, "w") as archive:

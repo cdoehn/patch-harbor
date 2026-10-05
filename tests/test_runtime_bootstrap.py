@@ -68,7 +68,7 @@ def test_actual_offline_install_and_native_reference_check(handoff, tmp_path, mo
     monkeypatch.setenv("EXAMPLE_SESSION_SECRET", "must-not-be-forwarded")
     monkeypatch.setenv("PYTHONPATH", str(tmp_path / "shadow"))
     monkeypatch.setenv("PYTHONHOME", str(tmp_path / "invalid-python-home"))
-    assessment = bootstrap.assess(reference, trusted_source_sha256=sha256(reference.read_bytes()).hexdigest())
+    assessment = trusted_assessment(reference)
     assert assessment.reason is None
     result = bootstrap.install(assessment, tmp_path / "isolated-runtime")
     assert result.status == "ready", result
@@ -107,10 +107,15 @@ def test_runtime_only_defect_uses_original_reference_without_forging_native_succ
 
 def test_missing_installer_uses_previous_handoff(handoff, tmp_path, network_guard):
     reference, patch = handoff
-    assessment = bootstrap.assess(reference, trusted_source_sha256=sha256(reference.read_bytes()).hexdigest())
+    assessment = trusted_assessment(reference)
     result = bootstrap.install(assessment, tmp_path / "runtime", installer_python=str(tmp_path / "absent-python"))
     assert result.status == "fallback" and result.reason == "installer_or_python_incompatible"
     assert bootstrap.check_patch(patch, result)["method"] == "previous_handoff"
+
+
+def trusted_assessment(reference):
+    # Fixture identity stands in for an independently trusted source channel.
+    return bootstrap.assess(reference, trusted_source_sha256=sha256(reference.read_bytes()).hexdigest())
 
 
 def rewrite(path, change):
@@ -151,7 +156,7 @@ def test_forbidden_runtime_profile_never_executes_even_with_rehashed_outer_descr
         replace_wheel(files, bad)
     rewrite(reference, change)
     monkeypatch.setattr(bootstrap, "_run", lambda *a: pytest.fail("untrusted runtime executed"))
-    assessment = bootstrap.assess(reference, trusted_source_sha256=sha256(reference.read_bytes()).hexdigest())
+    assessment = trusted_assessment(reference)
     outcome = bootstrap.install(assessment, tmp_path / "never-created")
     assert outcome.status == "fallback" and outcome.reason == "runtime_invalid"
     assert bootstrap.check_patch(patch, outcome)["native_validation"] is False
@@ -173,7 +178,7 @@ def test_complete_python_requirement_is_enforced_before_installation(handoff, tm
         raw = runtime_wheel.materialize(recipe, lambda name, size: payloads[name])
         updated = attach_runtime(files, raw); files.clear(); files.update(updated)
     rewrite(reference, change)
-    assessment = bootstrap.assess(reference, trusted_source_sha256=sha256(reference.read_bytes()).hexdigest())
+    assessment = trusted_assessment(reference)
     assert assessment.reason is None  # profile valid, current interpreter incompatible
     outcome = bootstrap.install(assessment, tmp_path / "incompatible")
     assert outcome.reason == "installer_or_python_incompatible"
@@ -185,7 +190,7 @@ def test_complete_python_requirement_is_enforced_before_installation(handoff, tm
 @pytest.mark.parametrize("fault", ["missing_venv", "install", "import", "wheel_changed"])
 def test_failed_bootstrap_has_one_attempt_and_uses_previous_handoff(handoff, tmp_path, monkeypatch, network_guard, fault):
     reference, patch = handoff
-    assessment = bootstrap.assess(reference, trusted_source_sha256=sha256(reference.read_bytes()).hexdigest())
+    assessment = trusted_assessment(reference)
     original = bootstrap._run
     calls = []
     def run(command, workspace, environment):
@@ -217,7 +222,7 @@ def test_runtime_cannot_import_project_shadow_modules(handoff, tmp_path, monkeyp
         (workspace / "patchharbor.py").write_bytes(poison)
         return original(command, workspace, environment)
     monkeypatch.setattr(bootstrap, "_run", run)
-    assessment = bootstrap.assess(reference, trusted_source_sha256=sha256(reference.read_bytes()).hexdigest())
+    assessment = trusted_assessment(reference)
     outcome = bootstrap.install(assessment, tmp_path / "isolated")
     assert outcome.status == "ready"
     assert bootstrap.check_patch(patch, outcome)["native_validation"] is True
@@ -267,7 +272,7 @@ def test_uv_installed_runtime_works_outside_checkout(handoff, tmp_path, network_
     if uv is None:
         pytest.skip("uv route runs on the designated Ubuntu 26.04 CI lane")
     reference, patch = handoff
-    assessment = bootstrap.assess(reference, trusted_source_sha256=sha256(reference.read_bytes()).hexdigest())
+    assessment = trusted_assessment(reference)
     workspace = tmp_path / "uv-runtime"; workspace.mkdir()
     environment = bootstrap._environment(workspace)
     wheel = workspace / assessment.wheel_name; wheel.write_bytes(assessment.wheel_bytes)
