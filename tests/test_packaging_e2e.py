@@ -85,6 +85,7 @@ EXPECTED_RUNTIME_FILES = {
     "patchharbor/result_bundle_publication.py",
     "patchharbor/result_bundle_snapshot.py",
     "patchharbor/result_reader.py",
+    "patchharbor/result_resources.py",
     "patchharbor/runtime_artifact.py",
     "patchharbor/result_runtime.py",
     "patchharbor/runtime_wheel.py",

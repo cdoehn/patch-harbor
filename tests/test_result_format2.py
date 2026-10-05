@@ -337,8 +337,8 @@ def test_real_recovery_consumes_only_complete_successful_format2_evidence(canoni
         if state == "corrupt": files["runtime/runtime.json"] += b"changed"
         elif state == "future": edit_document(files, "manifest.json", lambda doc: doc.update(format_version=3))
     _rewrite(result, upgrade)
-    # Model the fixture producer's locally pinned Result-2 bytes. The normal
-    # product producer remains Format 1; all actual recovery checks still run.
+    # Model the fixture producer's locally pinned replacement bytes; all actual
+    # recovery checks still run, including conservative unavailable evidence.
     _edit_record(env, patch, lambda row: row.update(result_sha256=hashlib.sha256(result.read_bytes()).hexdigest()))
     assert _scan(repo, env, automatic=True).returncode == 10
     saved = _identity_record(env, patch, hashlib.sha256(patch_bytes).hexdigest())

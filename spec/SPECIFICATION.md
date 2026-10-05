@@ -3709,7 +3709,8 @@ Ein Quellcommit wird nur angegeben, wenn belegt, und ersetzt keine Inhaltsprüfu
 Der Dateistand 1.c.W/R/C konkretisiert dies durch `build_backend.py`,
 `runtime_wheel.py` und den request-lokalen `RuntimeProvider`. Der Build ergänzt
 das Transport-Wheel um `_runtime`-Paketressourcen; Source-/sdist-Builds verwenden
-denselben Backend-Vertrag. Der Provider ist noch nicht mit Result-Writern verbunden.
+denselben Backend-Vertrag. Seit 1.e.W verbindet `result_resources.py` den Provider mit allen gemeinsamen
+Result-Wegen; die Requestdaten werden vor möglichen Apply-Mutationen fixiert.
 Die Erzeugung von Rezept und Transportressourcen erfolgt ausschließlich im
 Buildbackend. Die installierte Runtime enthält den lesenden Validator und
 Materializer; `RuntimeProvider` besitzt die unveränderliche Requestantwort.

@@ -15,6 +15,7 @@ import pytest
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+CLI_SOURCE_PATH = PROJECT_ROOT / "src"
 REQUIRED_MARKER = "# PATCHHARBOR"
 IS_WINDOWS = os.name == "nt"
 
@@ -55,7 +56,7 @@ def project_environment(
 ) -> dict[str, str]:
     """Return an environment importing PatchHarbor from this checkout."""
     environment = os.environ.copy()
-    source_path = str(PROJECT_ROOT / "src")
+    source_path = str(CLI_SOURCE_PATH)
     existing_pythonpath = environment.get("PYTHONPATH")
     environment["PYTHONPATH"] = (
         source_path

@@ -9,6 +9,8 @@ from uuid import uuid4
 
 import pytest
 
+pytestmark = pytest.mark.usefixtures("prepared_result_producer")
+
 import patchharbor.exchange_recovery as recovery
 import patchharbor.exchange_state as ledger
 from patchharbor.errors import PatchHarborError, patch_package_error

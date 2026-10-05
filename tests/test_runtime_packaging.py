@@ -17,6 +17,7 @@ import pytest
 from scripts.build_release import _copy_release_inputs
 from tests.runtime_permissions import readonly_tree
 from tests.test_patch_inspection import write_package
+from tests.registration_support import create_repository
 
 pytestmark = pytest.mark.packaging
 
@@ -114,6 +115,30 @@ print(json.dumps({'sha256': artifact.wheel_sha256, 'size': len(artifact.wheel_by
             cli = json.loads(_run([str(python), "-I", "-B", "-c",
                                   "from patchharbor.cli import main; raise SystemExit(main())",
                                   "validate", "--json", str(patch)], outside, environment))
+            if generation == 0:
+                repository = create_repository(outside / 'foreign-repository')
+                produced = json.loads(_run([str(python), '-I', '-B', '-c', '''
+import json, socket, sys
+from pathlib import Path
+from zipfile import ZipFile
+from patchharbor import api
+from patchharbor.result_reader import read_result_reference
+def forbidden(*args, **kwargs):
+    raise AssertionError('Result attempted Python networking')
+socket.socket = forbidden
+repo = Path(sys.argv[1])
+api.register(repo)
+api.configure_exchange_directory(repo.parent / 'result-exchange', repository=repo)
+bundle = api.bundle(repo)
+facts, digest = read_result_reference(bundle.path)
+assert facts.format_version == 2 and facts.runtime.status == 'embedded'
+assert not facts.warnings and facts.context.repository_path == str(repo)
+with ZipFile(bundle.path) as archive:
+    raw = archive.read(facts.runtime.wheel.path)
+    assert len(raw) == facts.runtime.wheel.size
+print(json.dumps({'wheel_sha256': facts.runtime.wheel.sha256, 'size': len(raw)}))
+''', str(repository)], outside, environment))
+                assert produced == {'wheel_sha256': proof['sha256'], 'size': proof['size']}
         assert cli["result"]["scope"] == "package"
         assert not (outside / "SHOULD_NOT_EXIST").exists()
         assert proof["requires_python"] == ">=3.12"

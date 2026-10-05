@@ -1,4 +1,4 @@
-"""Synthetic Result-2 inputs over actual canonical wheels; no product writer 2."""
+"""Synthetic runtime variants over actual canonical wheels and Result snapshots."""
 from __future__ import annotations
 
 import hashlib
@@ -16,13 +16,15 @@ def descriptor(path: str, content: bytes) -> dict:
 
 
 def attach_runtime(files: dict[str, bytes], raw: bytes | None) -> dict[str, bytes]:
-    files = dict(files)
+    files = {name: content for name, content in files.items() if not name.startswith("runtime/")}
     manifest = json.loads(files["manifest.json"])
     manifest["format_version"] = 2
     if raw is None:
         doc = json.loads((Path(__file__).parent / "fixtures/result_runtime_unavailable.json").read_bytes())
         edit_document(files, "logs/run.json", lambda run: run.update(warnings=["runtime unavailable"]))
     else:
+        # This synthetic fixture supplies its own valid runtime and warning state.
+        edit_document(files, "logs/run.json", lambda run: run.update(warnings=[]))
         with ZipFile(BytesIO(raw)) as archive:
             recipe = wheel.parse_recipe(archive.read(wheel.RECIPE_PATH))
         path = "runtime/" + recipe.wheel_name

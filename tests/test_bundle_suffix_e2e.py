@@ -43,7 +43,7 @@ def _assert_result(path: Path, suffix: str) -> dict[str, object]:
         assert len(context["repo_id"]) == 36
         assert len(context["base_commit"]) == 40
         assert len(context["state_fingerprint"]) == 16
-        assert json.loads(archive.read("manifest.json"))["format_version"] == 1
+        assert json.loads(archive.read("manifest.json"))["format_version"] == 2
     return context
 
 

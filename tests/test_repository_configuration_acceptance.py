@@ -166,7 +166,7 @@ def test_real_worker_reloads_target_config_and_ignores_wrong_exchange(pair, tmp_
 
 
 @pytest.mark.parametrize("disable_b", [False, True])
-def test_shared_exchange_archives_only_the_owning_repositories_bundles(pair, tmp_path, disable_b):
+def test_shared_exchange_archives_only_the_owning_repositories_bundles(pair, tmp_path, disable_b, prepared_result_producer):
     a, b, ca, cb, exchange, _ = _configure(pair, tmp_path, True)
     if disable_b:
         api.configure_archive_directory("", repository=b)

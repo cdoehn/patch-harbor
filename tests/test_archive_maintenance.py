@@ -25,6 +25,8 @@ from tests.registration_support import (
 from tests.test_exchange_archive_e2e import _world, _bundle, _advance, _committing_patch, _scan, ARCHIVE
 from tests.test_exchange_e2e import _register_context
 
+pytestmark = pytest.mark.usefixtures("prepared_result_producer")
+
 
 def _inputs(env, exchange, monkeypatch):
     for name, value in env.items():

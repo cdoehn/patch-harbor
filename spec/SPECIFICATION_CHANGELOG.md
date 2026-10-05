@@ -1,5 +1,19 @@
 # PatchHarbor – Spezifikations-Changelog
 
+## 2026-10-05 – RIV 1.e.W: gemeinsame Runtime-Einbettung
+
+- Bundle 012 tatsächlich angewendet: zwölf Planschritte und GATE-READERS bestätigt.
+  Der nachfolgende Watcher-Diagnoselauf enthält null Commits und denselben sauberen Stand.
+- Manueller Bundle-, Apply-, Dry-Run- und Watcher-Pfad verwenden Format 2.
+  Runtime und statische Chat-Vorlage werden vor Apply-Mutationen zusammen fixiert.
+- Runtime-only-Ausfall und Zusatzbudgetüberschreitung erzeugen eine begründete
+  Warnung und `unavailable`; Snapshot, Logs und ursprüngliches Primärergebnis bleiben.
+- Fehlende bisherige Pflichtdateien bleiben echte Result-Fehler. Prüfung der
+  tatsächlichen ZIP-Inhalte erfolgt vor atomarer Veröffentlichung über den Reader.
+- 13/18 vorbereitet; Freigabe nur nach vollständiger paralleler W-Prüfung.
+  R/C folgen als echte getrennte Zustände.
+  Development nur parallel, CI weiter im Fünf-Bundle-Takt, nächste reguläre 014.
+
 ## 2026-10-04 – RIV 1.d.C: gemeinsamer Leservertrag ohne doppelten Vollread
 
 - R vollständig parallel bestanden: 2.132 Tests / 7 Skips. Erst nach dessen

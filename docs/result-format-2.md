@@ -1,7 +1,8 @@
 # Result-Format 2: festgelegter Leservertrag
 
-Stand `1.d.C`. Der produktive Writer bleibt Format 1; Fixtures prüfen bereits
-Format 2. Allgemeine Referenzgültigkeit und Archiv-/Recovery-Erfolg bleiben
+Stand `1.e.W`. Alle regulären Result-Wege erzeugen Format 2.
+Vorbereitete Standardinstallationen betten ihre Runtime ein; unvorbereiteter
+Quellbetrieb liefert `unavailable/source_not_prepared` mit Warnung. Allgemeine Referenzgültigkeit und Archiv-/Recovery-Erfolg bleiben
 getrennt. Der Leser importiert, installiert oder startet keinen Wheel-Code.
 
 Ein Format-2-Manifest enthält die bisherigen geschlossenen Felder und zusätzlich
@@ -88,7 +89,12 @@ Result-Verbraucher sind gemeinsam; ihre verschiedenen Policies bleiben getrennt.
 Die schnelle
 Exchange-Klassifikation bleibt ein sicherer Typ-Hinweis und akzeptiert auch
 unbekannte Result-Versionen ausdrücklich nicht als ausführbares Patch-Paket.
-Der gemeinsame produktive Writer wird erst in `1.e.W` auf Format 2 umgestellt.
+Der gemeinsame produktive Writer ist seit `1.e.W` auf Format 2 umgestellt.
+Die vor dem Apply festgehaltenen Runtime-/Vorlagenbytes gehören zum Erzeuger;
+der spätere Repositorysnapshot kann bereits dessen Nachfolgestand enthalten.
+Vor Veröffentlichung wird das gesamte zusätzliche Runtime-Budget berücksichtigt.
+Bei Runtime-Ausfall bleibt ein vollständiges Result mit Warnung und ohne Wheel möglich;
+fehlende Pflichtvorlagen und echte Snapshot-/Publikationsfehler bleiben Fehler.
 
 Positive und negative Eingaben werden in `tests/test_result_format2.py` aus
 festgelegten Metadaten-Fixtures und einem tatsächlich gebauten kanonischen Wheel

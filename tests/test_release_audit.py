@@ -69,6 +69,7 @@ EXPECTED_CORE_RUNTIME_FILES = {
     "result_bundle_publication.py",
     "result_bundle_snapshot.py",
     "result_reader.py",
+    "result_resources.py",
     "runtime_artifact.py",
     "result_runtime.py",
     "runtime_wheel.py",

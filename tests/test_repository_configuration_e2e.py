@@ -299,7 +299,7 @@ def test_user_can_manually_initialize_old_repository_without_migration(repos, tm
 
 
 @pytest.mark.parametrize("shared", [False, True])
-def test_archive_maintenance_uses_each_repositorys_own_child_directory(repos, tmp_path, shared):
+def test_archive_maintenance_uses_each_repositorys_own_child_directory(repos, tmp_path, shared, prepared_result_producer):
     a, b, ca, cb, ea, eb = _configured(repos, tmp_path, shared=shared)
     api.configure_archive_directory("Archive-A", repository=a)
     api.configure_archive_directory("Archive-B", repository=b)

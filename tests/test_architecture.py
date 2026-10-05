@@ -15,9 +15,6 @@ PACKAGE_ROOTS = {
 }
 
 ENTRYPOINT_MODULES = {
-    # Internal provider boundary, exercised by installed consumers in 1.c;
-    # Result integration follows reader-first in 1.e, not at API import time.
-    "patchharbor.runtime_artifact",
     "patchharbor.cli",
     "patchharbor_watcher",
     "patchharbor_watcher.cli",

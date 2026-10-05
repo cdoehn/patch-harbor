@@ -1,13 +1,11 @@
-# PatchHarbor – RIV-Implementierungsplan, Repository-Revision 13
+# PatchHarbor – RIV-Implementierungsplan, Repository-Revision 14
 ## Inspect / Validate über API und CLI · Offline-Runtime · Result-Format 2 · Chat-Handoff
 
-**Stand:** 4. Oktober 2026. **Status:** aktive Entwicklung;
-**12 von 18 Umsetzungsschritten im Dateistand vorbereitet**, davon 10 durch Apply
-bestätigt. Bundle 012 enthält `1.d.R` und `1.d.C` als getrennte echte Zustände.
-R wurde vor Beginn der C-Bereinigung vollständig parallel geprüft und eingefroren.
-P0, 1.a, 1.b, 1.c, 1.d.W und alle drei R-Korrekturen sind angewendet.
-GATE-RUNTIME ist durch die erfolgreiche native CI auf dem Apply-Commit von
-Bundle 009 bestätigt. Der CI-Takt unten gilt für weitere Bundles.
+**Stand:** 5. Oktober 2026. **Status:** aktive Entwicklung;
+**13 von 18 Umsetzungsschritten im Dateistand vorbereitet**, davon 12 durch Apply
+bestätigt. Bundle 013 beginnt mit `1.e.W`; R/C folgen erst nach dessen vollständigem
+parallelen Gate und eingefrorenem Zwischenstand. Bundle 012 ist tatsächlich angewendet,
+GATE-READERS und GATE-RUNTIME sind bestätigt. Nächste reguläre CI: Bundle 014.
 **Bereich:** RIV (Runtime / Inspect / Validate). **Paketbasis:** 1.2.1.
 **Zielversion:** gesondert festzulegen; keine Versionsanhebung oder Releasefreigabe durch Dokumentation.
 
@@ -407,7 +405,7 @@ bei abweichender Development-Wurzel `CWD_MISMATCH`, keine Änderung.
 
 Jeder Zwischenstand wird wirklich hergestellt, getestet und erst dann committed. Ein finaler Working Tree mit künstlich aufgeteiltem Staging ist kein WRC-Nachweis. Commit-IDs werden nach dem Commit aus Git übernommen, nicht im eigenen Commit vorweg erfunden.
 
-### 2.1 Commitübersicht – 10/18 durch Apply bestätigt, FIX1–FIX3 angewendet, 1.d.R/C bis 12/18 vorbereitet
+### 2.1 Commitübersicht – 12/18 durch Apply bestätigt, 1.e.W als 13/18 vorbereitet
 
 | Nr. | Kennung | Commit-Subject | Voraussetzung | Paket |
 |---:|---|---|---|---|
@@ -745,7 +743,7 @@ Doppelte Versionstabellen und ad-hoc JSON-Prüfungen entfernen. Fixtures teilen,
 
 #### 1.e.W – 13/18: `feat(result): embed pinned runtime in all result creation paths`
 
-**Status:** offen. **Abhängigkeit:** 1.d.C; GATE-READERS und GATE-RUNTIME erfüllt. **Spec:** 39.1–39.4, 38.4.
+**Status:** umgesetzt; Freigabe nur mit vollständigem parallelem W-Nachweis, noch kein Apply-Commit. **Abhängigkeit:** 1.d.C; GATE-READERS und GATE-RUNTIME erfüllt. **Spec:** 39.1–39.4, 38.4.
 
 **Ergebnis:** Gemeinsamer Writer erzeugt Format 2 samt Runtime; minimale Fehlerdiagnose funktioniert ab dem ersten aktivierten Writer.
 
@@ -985,13 +983,29 @@ Jeder später abgeschlossene Eintrag enthält Plan-ID, tatsächlichen Commit, ur
 
 Fertig ist die Erweiterung erst mit nutzbarer API und CLI, konstant reproduzierbarer Runtime aus Standardinstallationen, sicherer Formatintegration, erhaltenen Sicherheitsgrenzen, ausgeführten Offline-/Roundtrip-Gates, aktueller installierter Anleitung und grüner CI für den tatsächlichen finalen HEAD. „0 Commits offen“ allein ist kein Freigabenachweis.
 
-**Status dieses Dateistands:** 12/18 vorbereitet, 6 weitere Schritte offen.
-P0, 1.a, 1.b, 1.c, 1.d.W und FIX1–FIX3 sind angewendet/gepusht (10 Feature-Schritte).
-Windows-/GATE-RUNTIME-Abnahme auf Bundle 009 bestätigt; 1.d.R/C warten auf Apply.
-Paketprüfung, beide Bindungsmodi, interne Runtime und Format-2-Leser vorhanden;
-Reader-Robustheit und C-Bereinigung vorbereitet; Writer/Bootstrap folgen. Nächste reguläre CI nach
-Apply/Push von Bundle 014, durch dessen Entrypoint angefordert und zurückgemeldet.
-Quellenstand bleibt Exchange-Revision 2.
+**Status dieses Dateistands:** 13/18 vorbereitet, 12/18 durch tatsächlichen Apply bestätigt.
+Bundle 012: `1.d.R` = `7dbb3a82a3db9b8ea4340cc433cf53f8452e7420`,
+`1.d.C` = `d48567ff7b2f61ea82f8cfba9c23415fab10706a`.
+Vollständige parallele Gates je Zustand; C abschließend seriell und parallel,
+je 2.132 bestanden / 7 Skips; normaler finaler Push und sauberer Baum bestätigt.
+Apply-Result-SHA-256: `091282e5e34e8eef42d0a58dddaac37662622ab9a0566812391b145e73d30ea9`.
+
+Technische Basis für Bundle 013 ist der anschließende erfolgreiche Watcher-Diagnoselauf:
+`patchharbor-apply_Result_064502_1005_81dbbd.zip`, SHA-256
+`61a81f216eb585e92f426d08b373d0a7703ac8438c0ac4da5808548c198f21c3`.
+Null Commits, unveränderter sauberer HEAD und 250 byte-/modusgleiche Base-Dateien.
+Vollständige Bindung: repo_id `e7a93d72-62dc-4759-97e8-6bf6cdf10e90`,
+base_commit `d48567ff7b2f61ea82f8cfba9c23415fab10706a`,
+state_fingerprint `7c9d2a24e397e0e5`, fingerprint_algorithm `patchharbor-state-v1`.
+
+1.e.W aktiviert den gemeinsamen Format-2-Writer. Runtime und statische Vorlage
+werden vor Payload/Entrypoint fixiert, Snapshot und dynamische Zielinformationen
+entstehen weiter aus dem tatsächlichen späteren Repositoryzustand.
+Runtime-Ausfall und fehlendes Zusatzbudget bewahren Primärergebnis und Pflichtdaten;
+fehlende Pflichtvorlage bleibt Result-Fehler. Native Writer- und installierte
+Standardpfad-Nachweise sind Bestandteil des verbindlichen parallelen W-Gates.
+Development ausschließlich parallel. Weitere echte Zustände bleiben 1.e.R/C,
+danach 1.f.W/R/C; nächste reguläre CI nach Apply/Push von Bundle 014 inklusive Windows.
 
 ## 9. Dokumentidentität und Quellen
 

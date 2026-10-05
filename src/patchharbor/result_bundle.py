@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from contextlib import ExitStack
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import os
 from pathlib import Path
 from uuid import UUID
@@ -30,6 +30,10 @@ from patchharbor.registry import load_registry
 from patchharbor.repository import inspect_local_registration, inspect_repository_root
 from patchharbor.result_bundle_handoff import create_result_handoff
 from patchharbor.result_bundle_capture import capture_result_bundle
+from patchharbor.result_resources import (
+    PinnedResultResources, ResultRuntimePayload, capture_result_resources,
+    runtime_fits, runtime_payload,
+)
 from patchharbor.result_bundle_publication import (
     PublicationDurability,
     ResultBundlePublication,
@@ -59,7 +63,7 @@ from patchharbor.user_paths import registration_user_paths
 
 
 _RESULT_MARKER = "patch-harbor-result-bundle"
-_RESULT_FORMAT_VERSION = 1
+_RESULT_FORMAT_VERSION = 2
 
 
 @dataclass(frozen=True)
@@ -173,6 +177,7 @@ def _manifest_document(
     *,
     report: RunReport,
     snapshot: ResultBundleSnapshot,
+    runtime: ResultRuntimePayload,
     expected_manifest: PatchManifest | None = None,
 ) -> dict[str, object]:
     context = report.context
@@ -193,6 +198,7 @@ def _manifest_document(
         "execution_present": report.execution_present,
         "primary_result": report.primary_result.kind_text,
         "result_bundle_status": report.result_bundle.status_text,
+        "runtime": runtime.document(),
         **snapshot.manifest_entries(),
     }
     if expected_manifest is not None:
@@ -213,6 +219,27 @@ def _manifest_document(
             }
         )
     return document
+
+
+def _publication_documents(report, target, snapshot, resources, *,
+                           expected_manifest=None, receipt=None, execution_log=None):
+    """Choose a complete runtime payload before opening the publication ZIP."""
+    runtime = resources.runtime
+    handoff = create_result_handoff(report, target, template=resources.require_template())
+    context = _context_document(report, bundle_suffix=target.bundle_suffix)
+    for attempt in range(2):
+        report = replace(report, warnings=tuple(dict.fromkeys((*report.warnings, *runtime.warnings))))
+        manifest = _manifest_document(report=report, snapshot=snapshot, runtime=runtime,
+                                      expected_manifest=expected_manifest)
+        if receipt is not None:
+            manifest.update(receipt)
+        if runtime.status != "embedded" or runtime_fits(
+            runtime, manifest=manifest, context_document=context, handoff=handoff,
+            run_report=report, snapshot=snapshot, execution_log=execution_log,
+        ):
+            return report, handoff, manifest, context, runtime
+        runtime = runtime_payload(None, reason="resource_limit")
+    raise result_bundle_error("cannot prepare bounded Result runtime")
 
 
 def _context_document(
@@ -324,6 +351,7 @@ def create_apply_result_bundle(
     session: RunSession,
     dry_run: bool,
     primary_outcome: ApplyPrimaryOutcome,
+    resources: PinnedResultResources,
     execution_log: bytes | None = None,
     package_sha256: str | None = None,
     before_publish: Callable[[str], None] | None = None,
@@ -361,13 +389,6 @@ def create_apply_result_bundle(
             primary_outcome=primary_outcome,
             result_bundle=ResultBundleResult.created(target.final_path),
         )
-        handoff = create_result_handoff(report, target)
-        revalidate_result_bundle_target(target, registry_snapshot)
-        _write_run_document(run_directory, report)
-        manifest = _manifest_document(
-            report=report, snapshot=captured.bundle_snapshot,
-            expected_manifest=expected_manifest,
-        )
         completed_commit = None
         if (package_sha256 is not None and primary_outcome.result.success
             and report.execution_present and not dry_run
@@ -376,18 +397,25 @@ def create_apply_result_bundle(
                 completed_commit = completed_commit_for_context(actual_context, captured.context)
             except (PatchHarborError, OSError, ValueError):
                 pass  # A success/no-op is not automatically a committed success.
-        if package_sha256 is not None:
-            manifest.update({"patch_sha256": package_sha256,
-                             "completed_commit": str(completed_commit) if completed_commit else None})
+        receipt = (None if package_sha256 is None else
+                   {"patch_sha256": package_sha256,
+                    "completed_commit": str(completed_commit) if completed_commit else None})
+        report, handoff, manifest, context, runtime = _publication_documents(
+            report, target, captured.bundle_snapshot, resources,
+            expected_manifest=expected_manifest, receipt=receipt, execution_log=execution_log)
+        warnings = report.warnings
+        revalidate_result_bundle_target(target, registry_snapshot)
+        _write_run_document(run_directory, report)
         publish_result_bundle(
             publication,
             manifest=manifest,
             before_publish=(before_publish if completed_commit is not None else None),
-            context_document=_context_document(report, bundle_suffix=target.bundle_suffix),
+            context_document=context,
             run_report=report,
             handoff=handoff,
             snapshot=captured.bundle_snapshot,
             execution_log=execution_log,
+            runtime=runtime,
         )
     except PatchHarborError as exc:
         report = _apply_report(
@@ -488,6 +516,7 @@ def create_manual_result_bundle(
                     )
                 revalidate_result_bundle_target(target, locked_registry)
 
+            resources = capture_result_resources()
             captured = capture_result_bundle(locked_repository, locked_id)
             revalidate_result_bundle_target(target, locked_registry)
             context = captured.context
@@ -503,7 +532,8 @@ def create_manual_result_bundle(
                 primary_result=PrimaryResult.success_result(),
                 result_bundle=ResultBundleResult.created(target.final_path),
             )
-            handoff = create_result_handoff(report, target)
+            report, handoff, manifest, context_document, runtime = _publication_documents(
+                report, target, bundle_snapshot, resources)
             revalidate_result_bundle_target(target, locked_registry)
             _write_run_document(run_directory, report)
             publication = prepare_result_bundle_publication(
@@ -512,14 +542,12 @@ def create_manual_result_bundle(
             )
             published = publish_result_bundle(
                 publication,
-                manifest=_manifest_document(
-                    report=report,
-                    snapshot=bundle_snapshot,
-                ),
-                context_document=_context_document(report, bundle_suffix=target.bundle_suffix),
+                manifest=manifest,
+                context_document=context_document,
                 run_report=report,
                 handoff=handoff,
                 snapshot=bundle_snapshot,
+                runtime=runtime,
             )
     except PatchHarborError as exc:
         raise _manual_bundle_failure(

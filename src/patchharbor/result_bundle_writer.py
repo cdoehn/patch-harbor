@@ -13,6 +13,7 @@ from patchharbor.errors import result_bundle_error
 from patchharbor.json_document import serialize_json_document
 from patchharbor.result_bundle_snapshot import ResultBundleSnapshot
 from patchharbor.run_report import RunReport
+from patchharbor.result_resources import ResultRuntimePayload
 
 
 def _zip_info(name: str, *, executable: bool = False) -> zipfile.ZipInfo:
@@ -48,6 +49,7 @@ def write_result_bundle(
     run_report: RunReport,
     snapshot: ResultBundleSnapshot,
     execution_log: bytes | None = None,
+    runtime: ResultRuntimePayload | None = None,
 ) -> None:
     """Write one captured Result Bundle to a caller-owned binary stream."""
     if run_report.execution_present != (execution_log is not None):
@@ -73,6 +75,9 @@ def write_result_bundle(
                 )
             for name, content in handoff.entries():
                 _write_entry(archive, name, content)
+            if runtime is not None:
+                for name, content in runtime.entries():
+                    _write_entry(archive, name, content)
             if execution_log is not None:
                 _write_entry(
                     archive,

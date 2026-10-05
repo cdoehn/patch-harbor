@@ -20,7 +20,7 @@ from tests.test_exchange_archive_e2e import (
 )
 from tests.test_exchange_e2e import _identity_record, _register_context, _write_custom_package
 
-pytestmark = pytest.mark.e2e
+pytestmark = [pytest.mark.e2e, pytest.mark.usefixtures("prepared_result_producer")]
 
 _CRASH = r'''
 import os, sys

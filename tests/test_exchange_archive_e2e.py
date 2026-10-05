@@ -13,7 +13,7 @@ from tests.test_exchange_e2e import (
 )
 
 
-pytestmark = pytest.mark.e2e
+pytestmark = [pytest.mark.e2e, pytest.mark.usefixtures("prepared_result_producer")]
 ARCHIVE = "PatchHarbor-Archive"
 
 

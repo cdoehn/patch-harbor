@@ -122,6 +122,7 @@ from patchharbor.result_bundle import (
     create_apply_result_bundle,
     create_manual_result_bundle,
 )
+from patchharbor.result_resources import PinnedResultResources, capture_result_resources
 from patchharbor.run_report import (
     ApplyPrimaryOutcome,
     RunReport,
@@ -663,6 +664,7 @@ def _complete_apply_result_bundle(
     package: ValidatedPatchPackage,
     *,
     session: RunSession,
+    resources: PinnedResultResources,
     dry_run: bool,
     warnings: tuple[str, ...],
     primary_outcome: ApplyPrimaryOutcome,
@@ -681,6 +683,7 @@ def _complete_apply_result_bundle(
         publication=resolved.result_publication,
         warnings=warnings,
         session=session,
+        resources=resources,
         dry_run=dry_run,
         primary_outcome=primary_outcome,
         execution_log=execution_log,
@@ -702,6 +705,7 @@ def _complete_mutation_result_bundle(
         mutation_gate.resolved,
         mutation_gate.package,
         session=mutation_gate.session,
+        resources=mutation_gate.result_resources,
         dry_run=mutation_gate.dry_run,
         warnings=mutation_gate.warnings,
         primary_outcome=primary_outcome,
@@ -742,6 +746,9 @@ def preflight_patch_package_repository(
             )
             raise report.reported_error() from error
 
+        # Pin the running producer before payload writes, entrypoint execution,
+        # or observer callbacks can change the installation/source checkout.
+        resources = capture_result_resources()
         emit(RepositoryResolved(resolved.context))
 
         activity("BINDING", f"Compare full manifest binding: base {str(manifest.base_commit)}, "
@@ -755,6 +762,7 @@ def preflight_patch_package_repository(
                 resolved,
                 package,
                 session=actual_session,
+                resources=resources,
                 dry_run=dry_run,
                 warnings=package.warnings,
                 primary_outcome=ApplyPrimaryOutcome.from_tool_error(error),
@@ -779,6 +787,7 @@ def preflight_patch_package_repository(
                     resolved,
                     package,
                     session=actual_session,
+                    resources=resources,
                     dry_run=dry_run,
                     warnings=package.warnings,
                     primary_outcome=ApplyPrimaryOutcome.from_tool_error(error),
@@ -804,6 +813,7 @@ def preflight_patch_package_repository(
                 package=package,
                 prepared_package=prepared_package,
                 dry_run=dry_run,
+                result_resources=resources,
                 before_mutation=before_mutation,
             )
 

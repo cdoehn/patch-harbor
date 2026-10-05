@@ -27,6 +27,7 @@ from patchharbor.repository_state import (
     repository_context_from_snapshot,
 )
 from patchharbor.run_report import RunSession
+from patchharbor.result_resources import PinnedResultResources
 
 
 class MutationFailureKind(str, Enum):
@@ -46,6 +47,7 @@ class ApplyMutationGate:
     package: ValidatedPatchPackage
     prepared_package: PreparedPatchPackage
     dry_run: bool
+    result_resources: PinnedResultResources
     before_mutation: Callable[[], None] | None = None
 
     def __post_init__(self) -> None:

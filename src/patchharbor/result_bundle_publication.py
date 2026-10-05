@@ -30,6 +30,7 @@ from patchharbor.result_bundle_snapshot import ResultBundleSnapshot
 from patchharbor.result_reader import read_result_reference
 from patchharbor.run_report import RunReport, RunSession
 from patchharbor.result_bundle_writer import write_result_bundle
+from patchharbor.result_resources import ResultRuntimePayload
 
 
 @dataclass(frozen=True)
@@ -265,6 +266,7 @@ def publish_result_bundle(
     snapshot: ResultBundleSnapshot,
     execution_log: bytes | None = None,
     before_publish: Callable[[str], None] | None = None,
+    runtime: ResultRuntimePayload | None = None,
 ) -> PublishedResultBundle:
     """Write, verify, best-effort sync, and atomically publish one bundle."""
     activity("PUBLISH", f"Prepare atomic Result publication: {publication.final_path}", "heading")
@@ -288,6 +290,7 @@ def publish_result_bundle(
                 run_report=run_report,
                 snapshot=snapshot,
                 execution_log=execution_log,
+                runtime=runtime,
             )
 
         _require_owned_temporary_file(

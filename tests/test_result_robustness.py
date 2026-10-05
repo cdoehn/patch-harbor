@@ -136,6 +136,15 @@ def test_mixed_exchange_uses_actual_current_and_frozen_reader_decisions(canonica
     old = _bundle(repo, env)
     with ZipFile(old) as archive:
         files = {name: archive.read(name) for name in archive.namelist()}
+    # Keep an explicit legacy reference in this mixed exchange after the
+    # production writer has advanced. No runtime warning existed in format 1.
+    legacy_files = {name: raw for name, raw in files.items() if not name.startswith("runtime/")}
+    def format1(manifest):
+        manifest["format_version"] = 1
+        manifest.pop("runtime")
+    edit_document(legacy_files, "manifest.json", format1)
+    edit_document(legacy_files, "logs/run.json", lambda d: d.update(warnings=[]))
+    write_reference(old, legacy_files)
     files = attach_runtime(files, None if state == "unavailable" else canonical)
     if state == "corrupt": files["runtime/runtime.json"] += b"corrupt"
     elif state == "future": edit_document(files, "manifest.json", lambda d: d.update(format_version=3))
@@ -173,7 +182,7 @@ print(json.dumps({Path(m.__file__).name: hashlib.sha256(Path(m.__file__).read_by
 
 
 @pytest.mark.e2e
-def test_mixed_exchange_selects_only_real_patch_and_writer_remains_format1(canonical, tmp_path):
+def test_mixed_exchange_selects_only_real_patch_and_writer_produces_format2(canonical, tmp_path):
     from tests.test_exchange_archive_e2e import _world
     from tests.test_exchange_e2e import _write_custom_package
     env, exchange, repo, context = _world(tmp_path)
@@ -190,6 +199,6 @@ def test_mixed_exchange_selects_only_real_patch_and_writer_remains_format1(canon
     document = json.loads(result.stdout)
     produced = Path(document["result"]["result_bundle"]["path"])
     with ZipFile(produced) as archive:
-        assert json.loads(archive.read("manifest.json"))["format_version"] == 1
-        assert not any(name.startswith("runtime/") for name in archive.namelist())
+        assert json.loads(archive.read("manifest.json"))["format_version"] == 2
+        assert json.loads(archive.read("runtime/runtime.json"))["reason"] == "source_not_prepared"
     assert (exchange / "embedded.zip").is_file() and (exchange / "unavailable.zip").is_file()

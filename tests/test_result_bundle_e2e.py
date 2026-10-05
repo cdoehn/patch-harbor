@@ -226,6 +226,7 @@ def test_manual_bundle_materializes_committed_blobs_without_export_rules(
             "changes/staged.patch",
             "changes/unstaged.patch",
             "logs/run.json",
+            "runtime/runtime.json",
         }
         for relative_path, expected_content in committed.items():
             assert archive.read(f"base/{relative_path}") == expected_content
@@ -240,7 +241,7 @@ def test_manual_bundle_materializes_committed_blobs_without_export_rules(
     assert run_id.version == 4
     assert str(run_id) == manifest["run_id"]
     assert manifest["marker"] == "patch-harbor-result-bundle"
-    assert manifest["format_version"] == 1
+    assert manifest["format_version"] == 2
     assert manifest["dirty"] is False
     assert manifest["execution_present"] is False
     assert manifest["primary_result"] == "success"
@@ -348,7 +349,7 @@ def test_manual_bundle_json_completion_matches_persisted_run_report(
     assert run["repository_path"] == result["repository_path"]
     assert run["base_commit"] == result["base_commit"]
     assert run["state_fingerprint"] == result["state_fingerprint"]
-    assert run["warnings"] == []
+    assert run["warnings"]  # Unprepared source mode explicitly diagnoses unavailable runtime.
     assert run["execution_present"] is False
     assert run["result_bundle"] == {
         "attempted": True,
