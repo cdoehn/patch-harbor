@@ -2313,10 +2313,24 @@ Verbindlicher Ablauf:
 1. Ausgabeordner physisch kanonisieren und gegen alle registrierten Repository-Pfade prüfen.
 2. Temporären Dateinamen im selben Ausgabeordner reservieren.
 3. Bundle vollständig schreiben und schließen.
-4. ZIP-Struktur und Pflichtdateien prüfen.
-5. Temporäre Datei flushen und, soweit plattformgerecht möglich, synchronisieren.
+4. Eigentümerschaft prüfen, temporäre Datei und Elternverzeichnis bestmöglich synchronisieren; Eigentümerschaft erneut prüfen.
+5. ZIP-Struktur, Pflichtdateien, vollständige Inhalte und Bindungen prüfen; den Hash genau dieser verifizierten Bytes festhalten.
 6. Zielpfad unmittelbar vor Veröffentlichung revalidieren.
 7. Über `os.replace()` atomar auf den endgültigen Namen veröffentlichen.
+
+Bei `FileChangedDuringRead` darf ausschließlich die Verifikation der eigenen
+temporären Datei wiederholt werden. Vor jedem Versuch gelten Schritt 4 und
+alle Integritätsprüfungen erneut. Die erste Prüfung beginnt sofort; die
+weiteren Pausen betragen 2, 3, 5, 10, 20, 20, 30, 30, 60, 60 und 60 Sekunden.
+Diese insgesamt 300 Sekunden werden mit nachfolgenden Hashprüfungen derselben
+Veröffentlichung geteilt. Explizit längere Linux-CIFS-Dateiattribut-/Close-Caches
+dürfen das Budget nach dokumentierter endlicher Regel verlängern. Dateioperationen
+haben davon unabhängige Betriebssystemlaufzeiten. Warten ist kein Integritätsnachweis.
+Vor dem Rename muss ein erneuter vollständiger Hashvergleich mit den verifizierten
+Bytes erfolgreich sein; Recovery-Belege verwenden denselben Hash.
+Dateiaustausch, Symlinks, Inhalts-, Bindungs- und Ressourcenfehler sind keine
+Retry-Freigabe. Ein Entrypoint, Commit oder Push wird durch diese Regel niemals
+erneut ausgeführt. Details und CIFS-Abnahme: [Result-Publikation](../docs/result-publication-cifs.md).
 
 Bei fehlgeschlagener Bundle-Erzeugung:
 
@@ -2325,6 +2339,11 @@ Bei fehlgeschlagener Bundle-Erzeugung:
 - werden `execution.log` und `run.json` soweit möglich in einem privaten Notfallverzeichnis unter dem PatchHarbor-Zustandsverzeichnis gesichert,
 - wird der Notfallpfad auf stderr und im äußeren strukturierten Ergebnis ausgegeben,
 - wird dieser Rettungspfad niemals selbst als erfolgreiches Result Bundle bezeichnet.
+
+Bei Verifikationsfehlern enthält die normale Fehlermeldung eine sichere Kategorie
+und Versuchszahl. Die Notfallrettung ergänzt bestmöglich `verification.json` mit
+Prüfstufe, Metadatenabweichung, Wartebudget und Sync-Ergebnissen. Result-/Run-Formate
+bleiben unverändert; Inhalte und Zugangsdaten gehören nicht in diese Diagnose.
 
 ### 18.6 Manueller Bundle-Auftrag
 

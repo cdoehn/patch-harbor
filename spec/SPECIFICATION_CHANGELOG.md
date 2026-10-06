@@ -1,5 +1,25 @@
 # PatchHarbor – Spezifikations-Changelog
 
+## 2026-10-06 – CIFS-1: Eigene temporäre Results vor Verifikation stabilisieren
+
+- Bundle 022 und sein vollständiger grüner CI-Lauf bestätigen den Abschluss
+  des Watcher-Plans. Der ausdrücklich beauftragte CIFS-Fix erhält einen eigenen
+  Plan und einen zusammengehörigen Commit in Bundle 023.
+- Datei und Verzeichnis werden vor der ersten Verifikation und jedem weiteren
+  Versuch synchronisiert. Nur ein typisierter `FileChangedDuringRead` darf
+  die Prüfung derselben eigenen temporären Datei erneut auslösen.
+- Sofortiger Erstversuch; Pausen 2, 3, 5, 10, 20, 20, 30, 30, 60, 60, 60 Sekunden.
+  Gemeinsames Budget für vollständige Verifikation und abschließenden Hashread;
+  ausdrücklich längere Linux-CIFS-Caches verlängern es begrenzt.
+- Geöffnete Handles müssen zur reservierten regulären Datei gehören. Symlinks,
+  fremde Dateien und Integritätsfehler bleiben terminal. Der finale Hash muss
+  zum tatsächlich vollständig geprüften ZIP passen. Apply wird nie wiederholt.
+- Sichere Metadaten, Versuche und Synchronisationsstatus stehen bei erschöpfter
+  Verifikation zusätzlich in `verification.json` der Notfalldiagnose.
+  Result-/Run-Schemaversionen und Wheel-Fallback bleiben erhalten.
+- Tatsächlicher Apply und Prüfung auf echter Windows-CIFS-Freigabe stehen für
+  den Fix aus. Keine zusätzliche CI in 023; nächster regulärer Termin ist 024.
+
 ## 2026-10-06 – WE-4: Native Windows-Umbenennungssperre berücksichtigt
 
 - Bundle 021 ist tatsächlich angewendet; die anschließende manuelle CI bestätigt

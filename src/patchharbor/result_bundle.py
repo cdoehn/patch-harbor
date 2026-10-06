@@ -5,6 +5,7 @@ from __future__ import annotations
 from contextlib import ExitStack
 from collections.abc import Callable
 from dataclasses import dataclass, replace
+import json
 import os
 from pathlib import Path
 from uuid import UUID
@@ -44,6 +45,7 @@ from patchharbor.result_bundle_publication import (
     result_bundle_filename,
 )
 from patchharbor.result_bundle_snapshot import ResultBundleSnapshot
+from patchharbor.result_verification import ResultVerificationError
 from patchharbor.result_bundle_target import (
     ResultBundleTarget,
     prepare_result_bundle_target,
@@ -265,11 +267,22 @@ def _publish_documents(
 ) -> PublishedResultBundle:
     """Publish the same prepared document set for manual and Apply requests."""
     _write_run_document(run_directory, documents.report)
-    return publish_result_bundle(
-        publication, manifest=documents.manifest, context_document=documents.context,
-        run_report=documents.report, handoff=documents.handoff, snapshot=snapshot,
-        runtime=documents.runtime, execution_log=execution_log, before_publish=before_publish,
-    )
+    try:
+        return publish_result_bundle(
+            publication, manifest=documents.manifest, context_document=documents.context,
+            run_report=documents.report, handoff=documents.handoff, snapshot=snapshot,
+            runtime=documents.runtime, execution_log=execution_log, before_publish=before_publish,
+        )
+    except ResultVerificationError as exc:
+        # Keep the versioned Result/run schemas unchanged. The existing error
+        # string carries the classification; emergency evidence adds safe detail.
+        try:
+            with (run_directory / "verification.json").open("x", encoding="utf-8") as stream:
+                json.dump(exc.diagnostics, stream, ensure_ascii=True, indent=2)
+                stream.write("\n")
+        except OSError:
+            pass  # Diagnostic storage must never replace the original failure.
+        raise
 
 
 def _context_document(

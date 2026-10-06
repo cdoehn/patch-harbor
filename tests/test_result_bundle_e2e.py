@@ -1113,12 +1113,20 @@ def test_manual_bundle_reports_best_effort_sync_outcomes(
     assert run_cli(repository, "register").returncode == 0
     assert run_cli(repository, "configure", "exchange-directory", str(tmp_path / "exchange")).returncode == 0
     directory_statuses = iter(
-        (MetadataSyncStatus.UNSUPPORTED, MetadataSyncStatus.FAILED)
+        (MetadataSyncStatus.UNSUPPORTED, MetadataSyncStatus.UNSUPPORTED,
+         MetadataSyncStatus.FAILED)
     )
+    synchronized_files = []
+
+    def file_sync(path, *, expected_identity):
+        assert os.path.samestat(path.stat(), expected_identity)
+        synchronized_files.append(path)
+        return MetadataSyncStatus.FAILED
+
     monkeypatch.setattr(
         result_bundle_publication_module,
         "sync_regular_file_best_effort",
-        lambda _path: MetadataSyncStatus.FAILED,
+        file_sync,
     )
     monkeypatch.setattr(
         result_bundle_publication_module,
@@ -1132,6 +1140,7 @@ def test_manual_bundle_reports_best_effort_sync_outcomes(
     )
 
     assert result.path.is_file()
+    assert len(synchronized_files) == 2 and synchronized_files[0] == synchronized_files[1]
     assert result.publication_durability.temporary_file is MetadataSyncStatus.FAILED
     assert (
         result.publication_durability.directory_before_replace

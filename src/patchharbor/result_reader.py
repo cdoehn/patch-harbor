@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from datetime import datetime
 import hashlib
 import math
+import os
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from uuid import UUID
 
@@ -378,17 +379,20 @@ def _parse_result_payloads(payloads: tuple[BundlePayload, ...], *,
                        tuple(sorted(inventory)), expected, digest, completed, version, runtime, bool(handoff))
 
 
-def read_result_reference(path: Path, *, resource_policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY) -> tuple[ResultFacts, str]:
+def read_result_reference(path: Path, *, resource_policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY,
+                          expected_identity: os.stat_result | None = None) -> tuple[ResultFacts, str]:
     """Own one stable byte capture; all reference failures are input errors."""
     activity("REFERENCE", f"Read and validate explicit Result reference: {path}")
     try:
         try:
-            target = path.resolve(strict=True)
+            # Publication must never resolve a substituted leaf symlink.
+            target = path.resolve(strict=True) if expected_identity is None else path.absolute()
         except RuntimeError as exc:  # pathlib symlink loops on Python 3.12/3.13
             raise ValueError("cannot resolve Result reference path") from exc
-        _require(target.stat().st_size <= resource_policy.max_input_artifact_bytes, "reference exceeds resource limit")
+        _require(target.lstat().st_size <= resource_policy.max_input_artifact_bytes, "reference exceeds resource limit")
         captured = read_stable_regular_file_with_sha256(
-            target, retained_content_limit=resource_policy.max_input_artifact_bytes, allow_path_identity_fallback=True)
+            target, retained_content_limit=resource_policy.max_input_artifact_bytes, allow_path_identity_fallback=True,
+            expected_identity=expected_identity, max_bytes=resource_policy.max_input_artifact_bytes)
         _require(captured.content is not None, "reference exceeds resource limit")
         payloads = read_zip_payload_bytes(captured.content, policy=resource_policy, path_normalizer=result_member_path)
         return parse_result_payloads(payloads, resource_policy=resource_policy), captured.sha256

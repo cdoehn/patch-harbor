@@ -93,7 +93,10 @@ Dateisysteme erhalten keine weitergehende Garantie als ihre nativen Ereignisse.
 | Offline-Runtime und bisheriger Fallback | vorhandene Runtime-/Bootstrap-Suiten |
 
 Linux-Nachweise stammen aus den lokalen parallelen Läufen. Simulationen sind
-kein Windows-Nachweis. Bundle 019 fordert nach seinem einzigen Push genau einen
-CI-Lauf einschließlich nativer Windows-Jobs an. Die Rückgabe enthält die volle
-Commitbindung, Run-ID/URL, Job-Status und relevante Testnachweise oder Fehler.
-Erst deren Auswertung und das tatsächliche Apply bestätigen den Planabschluss.
+kein Windows-Nachweis. Der tatsächliche Apply von Bundle 022 und der manuelle
+[CI-Lauf 37459998721](https://github.com/cdoehn/patch-harbor/actions/runs/37459998721)
+bestätigen Commit `44cc77a42b492fc1f31267db5139253ef7545b9f` einschließlich aller
+sechs Jobs und Windows-Packaging. Der [Plan](../planning/watcher-events/commit-plan.md)
+dokumentiert Result-Bindung, vorherige Fehler und vollständigen Abschluss.
+Diese Abnahme gilt für diesen Endstand; spätere Änderungen brauchen eigene
+Nachweise. Der nächste reguläre CI-Termin bleibt Bundle 024.

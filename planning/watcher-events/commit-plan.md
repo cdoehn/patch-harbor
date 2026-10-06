@@ -1,16 +1,17 @@
 # PatchHarbor – Implementierungsplan für Exchange-Ereignisse
 
-Stand: 6. Oktober 2026. Plan-ID: `watcher-events`, Revision 6.
-Aktiv auf ausdrücklichen Nutzerauftrag; fünf geplante Commitschritte einschließlich
-Dokumentationsbootstrap. Alle fünf geplanten Commits sind tatsächlich angewendet
-und gepusht (5/5). Bundle 019 scheiterte anschließend an der fälligen CI;
-die native Abschlussprüfung ist nicht bestanden. Bundle 020 bereitet eine
-Korrektur des Windows-Testsetups innerhalb von WE-4 vor.
+Stand: 6. Oktober 2026. Plan-ID: `watcher-events`, Revision 7, abgeschlossen.
+Alle fünf geplanten Commitschritte einschließlich Dokumentationsbootstrap sind
+tatsächlich angewendet und gepusht (5/5). Die Korrekturen aus Bundles 020–022
+und alle sechs CI-Jobs einschließlich nativer Plattformprüfungen auf dem
+Endcommit von 022 sind bestätigt.
 Zielversion noch nicht festgelegt.
 
 Normative Grundlage: [Watcher-Spezifikation](specification.md) und
 [zentrale Spezifikation](../../spec/SPECIFICATION.md), Abschnitt 3.2.1.
-Dieser Plan ersetzt den abgeschlossenen RIV-Plan als aktiven Entwicklungsplan.
+Dieser Plan folgte auf den abgeschlossenen RIV-Plan. Der ausdrücklich neu
+beauftragte CIFS-Fix wird im [Result-Plan](../result-publication/commit-plan.md)
+geführt.
 
 ## 1. Vertrauenswürdige Ausgangsbasis
 
@@ -45,9 +46,9 @@ Result; diese Tabelle ist keine dauerhafte Patch-Basis.
 | --- | --- | --- | --- |
 | WE-0 | Spezifikation, Plan, zentrale Einordnung, Changelog und Abschlussvermerk des bisherigen Plans. Kein Watcher-Code. | bestätigtes Bundle 015 | durch Bundle 016 tatsächlich angewendet |
 | WE-1 | Öffentliche Core-Abfrage der geprüften Beobachtungsziele, optional eingeschränkter automatischer Exchange-Scope, strukturierte Fortschritts-/Sperrbereitschaft. Bisheriger Aufruf ohne Einschränkung unverändert. | WE-0 angewendet | durch Bundle 017 tatsächlich angewendet |
-| WE-2 | Native Linux-/Windows-Ereignisadapter, Filter und Ressourcenlebenszyklus; deterministische Ereignisabstraktion. Noch keine Aktivierung des neuen CLI-Betriebs. | WE-1 angewendet bzw. echter vorangehender Bundle-Zustand | durch Bundle 018 tatsächlich angewendet; native Windows-Prüfung offen |
+| WE-2 | Native Linux-/Windows-Ereignisadapter, Filter und Ressourcenlebenszyklus; deterministische Ereignisabstraktion. Noch keine Aktivierung des neuen CLI-Betriebs. | WE-1 angewendet bzw. echter vorangehender Bundle-Zustand | durch Bundle 018 tatsächlich angewendet; native Windows-Prüfung auf Endstand 022 bestätigt |
 | WE-3 | Fünfsekunden-Zustandsautomat, Startprüfung, Parallelität der Ereigniserfassung, sequenzieller Worker, Nachlauf, Konfigurationsaktualisierung und CLI-Umstellung. | WE-2 | durch Bundle 019 tatsächlich angewendet und gepusht |
-| WE-4 | Vollständige Robustheits-/Plattformintegration, reale Ereignis-/Apply- und installierte Wheel-Nachweise, Dokumentationsabgleich und Abnahme. | WE-3 | durch Bundle 019 angewendet und gepusht; 020/021 angewendet; Windows-E2E bestanden; Plattformtest-Korrektur in 022 vorbereitet, native Abnahme offen |
+| WE-4 | Vollständige Robustheits-/Plattformintegration, reale Ereignis-/Apply- und installierte Wheel-Nachweise, Dokumentationsabgleich und Abnahme. | WE-3 | durch Bundle 019 angewendet und gepusht; Korrekturen 020–022 angewendet; vollständige native Abnahme bestätigt |
 
 Durch Bundle 019 angewendete Commits, in dieser Reihenfolge:
 1. `feat(watcher): trigger scoped apply after five quiet seconds [WE-3]`
@@ -187,6 +188,19 @@ reguläre CI bleibt 024. Die Windows-Plattform- und Packaging-Abnahme des
 korrigierten Endstands bleibt bis zum nativen Nachweis offen. Das maßgebliche
 Format-1-Result verwendet weiterhin den dokumentierten lokalen Core-Fallback.
 
+Abschlussnachweis: Bundle 022 ist durch das tatsächliche Result
+`patchharbor-apply_Result_101342_1006_7d3d55.zip` bestätigt, SHA-256
+`ebdfde1ef19fc9a2fbb1c8205b4841919a9660bfc73d38221d300d2884b00604`.
+Commit `44cc77a42b492fc1f31267db5139253ef7545b9f`, ein normaler Push auf `dev`,
+saubere Arbeitskopie; jeweils 2.386 bestanden / 7 übersprungen in vollständiger
+serieller und anschließend paralleler Suite. Alle 282 Base-Dateien samt Modi
+entsprechen dem geprüften Apply- und Development-Stand.
+Der anschließend vom Nutzer gestartete [CI-Lauf 37459998721](https://github.com/cdoehn/patch-harbor/actions/runs/37459998721)
+bestätigt denselben vollständigen Commit: alle sechs Jobs erfolgreich,
+einschließlich Windows-Core, E2E, Plattform, Packaging und PowerShell 7.
+Damit sind die zuvor offenen Abschlussprüfungen bestätigt und dieser Plan ist
+abgeschlossen. Neue Änderungen benötigen ihre eigenen Nachweise.
+
 Fortschrittsnachweis für WE-0: Result
 `patchharbor-apply_Result_163737_1005_90175f.zip`, SHA-256
 `23b1f010aac400e0b7cc41135c37eee872dcf8401f19e780e09f141b112c88fc`.
@@ -287,7 +301,8 @@ WE-4 ergänzt reale Ereignis-/Worker- und installierte Wheel-Nachweise sowie die
 unter anderem weiter eintreffende Ereignisse, mehrere vorhandene Bundles,
 Fehlversuche ohne automatischen Retry und einen unabhängigen aktiven Download.
 Die private Übergabe gibt CI-Nachweise im Result-Ausführungslog zurück. Lokales
-Linux und Windows-Simulationen ersetzen nicht die noch ausstehende native CI.
+Linux und Windows-Simulationen ersetzen keine native CI; diese ist für den
+Endstand von Bundle 022 mit dem oben gebundenen Lauf bestätigt.
 
 ## 3. Bundle-Grenzen und CI
 
@@ -336,8 +351,8 @@ Kein zusätzlicher CI-Lauf wird aus diesem Plan allein automatisch abgeleitet.
 Der dauerhafte Fortschritt steht zusätzlich unter
 `exchange/reports/patchharbor-dev-loop-state.json` im projektspezifischen Exchange.
 Verbrauchte Results werden erst bei bestätigter Folgebundle-Auslieferung markiert.
-Der alte Plan bleibt als abgeschlossen dokumentiert; dieser steht bei 5/5
-bestätigten Commitschritten mit offener Korrektur und nativer Abnahme. S/N und die Grenze von fünf aufeinanderfolgenden
+Dieser Plan steht bei 5/5 bestätigten Commitschritten mit abgeschlossenen
+Korrekturen und nativer Abnahme. S/N und die Grenze von fünf aufeinanderfolgenden
 fehlgeschlagenen tatsächlichen Bundles bleiben gemäß lokalen Rollenregeln gültig.
 
 ## 5. Abschluss

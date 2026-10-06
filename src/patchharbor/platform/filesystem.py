@@ -13,6 +13,7 @@ import stat
 import tempfile
 
 from patchharbor.platform.runtime import is_windows
+from patchharbor.platform.file_handles import open_regular_nofollow
 
 
 class PathKind(Enum):
@@ -36,6 +37,20 @@ class MetadataSyncStatus(Enum):
 
 class FileChangedDuringRead(RuntimeError):
     """A path no longer identifies the same regular file during one read."""
+
+    def __init__(self, message: str = "", *, category: str = "unknown",
+                 before: os.stat_result | None = None,
+                 after: os.stat_result | None = None) -> None:
+        super().__init__(message)
+        if category not in {"unknown", "path-missing", "initial-open-state-mismatch",
+                            "current-path-state-mismatch", "descriptor-state-changed",
+                            "final-path-state-mismatch", "size-mismatch"}:
+            raise ValueError("invalid stable-read mismatch category")
+        self.category = category
+        fields = ("st_dev", "st_ino", "st_mode", "st_size", "st_mtime_ns", "st_ctime_ns")
+        self.metadata = {label: {name: getattr(value, name) for name in fields}
+                         for label, value in (("before", before), ("after", after))
+                         if value is not None}
 
 
 class UnsupportedFileTypeError(RuntimeError):
@@ -260,9 +275,15 @@ def _require_regular_file(metadata: os.stat_result) -> None:
 def _regular_path_metadata(path: Path) -> os.stat_result:
     metadata = _inspect_path_without_following(path)
     if metadata is None:
-        raise FileChangedDuringRead
+        raise FileChangedDuringRead(category="path-missing")
     _require_regular_file(metadata)
     return metadata
+
+
+def require_file_identity(metadata: os.stat_result, expected: os.stat_result) -> None:
+    """Ownership mismatches are terminal, never metadata stabilization retries."""
+    if not stat.S_ISREG(metadata.st_mode) or not os.path.samestat(metadata, expected):
+        raise FileSystemOperationError("owned file identity changed", OSError(errno.EINVAL, "identity mismatch"))
 
 
 def _read_stable_regular_file(
@@ -272,8 +293,11 @@ def _read_stable_regular_file(
     calculate_sha256: bool,
     allow_path_identity_fallback: bool,
     max_bytes: int | None = None,
+    expected_identity: os.stat_result | None = None,
 ) -> tuple[bytes | None, bool, int, int, str | None]:
     initial_metadata = _regular_path_metadata(path)
+    if expected_identity is not None:
+        require_file_identity(initial_metadata, expected_identity)
     if max_bytes is not None and initial_metadata.st_size > max_bytes:
         raise FileReadLimitExceeded("regular file exceeds read budget")
 
@@ -286,23 +310,30 @@ def _read_stable_regular_file(
 
     descriptor: int | None = None
     try:
-        descriptor = os.open(path, flags)
+        descriptor = (os.open(path, flags) if expected_identity is None
+                      else open_regular_nofollow(path))
         opened_metadata = os.fstat(descriptor)
         _require_regular_file(opened_metadata)
+        if expected_identity is not None:
+            require_file_identity(opened_metadata, expected_identity)
         if not _same_path_and_open_file_state(
             initial_metadata,
             opened_metadata,
             allow_path_identity_fallback=allow_path_identity_fallback,
         ):
-            raise FileChangedDuringRead
+            raise FileChangedDuringRead(category="initial-open-state-mismatch",
+                                        before=initial_metadata, after=opened_metadata)
 
         current_metadata = _regular_path_metadata(path)
+        if expected_identity is not None:
+            require_file_identity(current_metadata, expected_identity)
         if not _same_path_and_open_file_state(
             current_metadata,
             opened_metadata,
             allow_path_identity_fallback=allow_path_identity_fallback,
         ):
-            raise FileChangedDuringRead
+            raise FileChangedDuringRead(category="current-path-state-mismatch",
+                                        before=current_metadata, after=opened_metadata)
 
         hasher = sha256() if calculate_sha256 else None
         retained: bytearray | None = bytearray()
@@ -337,16 +368,19 @@ def _read_stable_regular_file(
                 pass
 
     final_metadata = _regular_path_metadata(path)
-    if (
-        not _same_open_file_state(opened_metadata, finished_metadata)
-        or not _same_path_and_open_file_state(
-            final_metadata,
-            finished_metadata,
-            allow_path_identity_fallback=allow_path_identity_fallback,
-        )
-        or size != finished_metadata.st_size
+    if expected_identity is not None:
+        require_file_identity(final_metadata, expected_identity)
+    if not _same_open_file_state(opened_metadata, finished_metadata):
+        raise FileChangedDuringRead(category="descriptor-state-changed",
+                                    before=opened_metadata, after=finished_metadata)
+    if not _same_path_and_open_file_state(
+        final_metadata, finished_metadata,
+        allow_path_identity_fallback=allow_path_identity_fallback,
     ):
-        raise FileChangedDuringRead
+        raise FileChangedDuringRead(category="final-path-state-mismatch",
+                                    before=finished_metadata, after=final_metadata)
+    if size != finished_metadata.st_size:
+        raise FileChangedDuringRead(category="size-mismatch")
 
     return (
         bytes(retained) if retained is not None else None,
@@ -388,6 +422,8 @@ def read_stable_regular_file_with_sha256(
     *,
     retained_content_limit: int,
     allow_path_identity_fallback: bool = False,
+    expected_identity: os.stat_result | None = None,
+    max_bytes: int | None = None,
 ) -> StableRegularFileHash:
     """Hash a stable regular file while bounding retained in-memory content.
 
@@ -396,6 +432,8 @@ def read_stable_regular_file_with_sha256(
     remains unsuitable as a sole trust decision and is reserved for callers
     that subsequently re-open and verify the complete content hash.
     """
+    if max_bytes is not None and (type(max_bytes) is not int or max_bytes < 0):
+        raise ValueError("max_bytes must be a non-negative integer")
     if (
         isinstance(retained_content_limit, bool)
         or not isinstance(retained_content_limit, int)
@@ -407,6 +445,8 @@ def read_stable_regular_file_with_sha256(
         retained_content_limit=retained_content_limit,
         calculate_sha256=True,
         allow_path_identity_fallback=allow_path_identity_fallback,
+        expected_identity=expected_identity,
+        max_bytes=max_bytes,
     )
     if digest is None:
         raise RuntimeError("stable hashed file read did not produce a digest")
@@ -435,20 +475,27 @@ def _sync_descriptor_best_effort(
     path: Path,
     *,
     directory: bool,
+    expected_identity: os.stat_result | None = None,
 ) -> MetadataSyncStatus:
     if directory and is_windows():
         return MetadataSyncStatus.UNSUPPORTED
 
-    flags = os.O_RDONLY | getattr(os, "O_BINARY", 0)
+    flags = os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_NOFOLLOW", 0)
     if directory:
         flags |= getattr(os, "O_DIRECTORY", 0)
     try:
-        descriptor = os.open(path, flags)
+        descriptor = (os.open(path, flags) if expected_identity is None
+                      else open_regular_nofollow(path, writable=is_windows()))
     except OSError:
+        if expected_identity is not None:
+            raise
         return MetadataSyncStatus.FAILED
 
     status = MetadataSyncStatus.SYNCED
     try:
+        if expected_identity is not None:
+            require_file_identity(os.fstat(descriptor), expected_identity)
+            require_file_identity(path.lstat(), expected_identity)
         try:
             os.fsync(descriptor)
         except OSError as exc:
@@ -457,6 +504,8 @@ def _sync_descriptor_best_effort(
                 if exc.errno in _UNSUPPORTED_SYNC_ERRNOS
                 else MetadataSyncStatus.FAILED
             )
+        if expected_identity is not None:
+            require_file_identity(path.lstat(), expected_identity)
     finally:
         try:
             os.close(descriptor)
@@ -466,9 +515,11 @@ def _sync_descriptor_best_effort(
     return status
 
 
-def sync_regular_file_best_effort(path: Path) -> MetadataSyncStatus:
+def sync_regular_file_best_effort(
+    path: Path, *, expected_identity: os.stat_result | None = None,
+) -> MetadataSyncStatus:
     """Try to synchronize one closed regular file without promising durability."""
-    return _sync_descriptor_best_effort(path, directory=False)
+    return _sync_descriptor_best_effort(path, directory=False, expected_identity=expected_identity)
 
 
 def sync_directory_best_effort(path: Path) -> MetadataSyncStatus:

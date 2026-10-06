@@ -26,11 +26,14 @@ from patchharbor.platform.filesystem import (
     sync_directory_best_effort,
     sync_regular_file_best_effort,
 )
+from patchharbor.platform.file_handles import open_regular_nofollow
+from patchharbor.result_verification import ResultVerification
 from patchharbor.result_bundle_snapshot import ResultBundleSnapshot
 from patchharbor.result_reader import read_result_reference
 from patchharbor.run_report import RunReport, RunSession
 from patchharbor.result_bundle_writer import write_result_bundle
 from patchharbor.result_resources import ResultRuntimePayload
+from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY
 
 
 @dataclass(frozen=True)
@@ -148,7 +151,7 @@ def _same_regular_file(
     if expected_token is None:
         return True
     try:
-        with path.open("rb") as stream:
+        with os.fdopen(open_regular_nofollow(path), "rb") as stream:
             opened = os.fstat(stream.fileno())
             return (
                 os.path.samestat(observed, opened)
@@ -198,17 +201,19 @@ def release_result_bundle_publication(
     )
 
 
-def _verify_result_bundle(path: Path, *, execution_present: bool) -> None:
+def _verify_result_bundle(path: Path, *, execution_present: bool,
+                          expected_identity: os.stat_result | None = None) -> str:
     # The shared bounded read already verifies CRC, names and all versioned
     # inventories. Publication only adds its producer-specific obligations.
     try:
-        facts, _digest = read_result_reference(path)
+        facts, digest = read_result_reference(path, expected_identity=expected_identity)
     except (PatchHarborError, OSError, RuntimeError, ValueError) as exc:
         raise result_bundle_error("Result Bundle integrity verification failed") from exc
     if not facts.handoff_present:
         raise result_bundle_error("Result publication requires passive handoff data")
     if facts.primary_result.entrypoint_started != execution_present:
         raise result_bundle_error("Result Bundle execution state changed")
+    return digest
 
 
 @contextmanager
@@ -216,6 +221,7 @@ def _publication_destination(
     publication: ResultBundlePublication,
 ) -> Iterator[tuple[BinaryIO, os.stat_result]]:
     stream: BinaryIO | None = None
+    descriptor: int | None = None
     try:
         if publication.reservation_stat is None:
             if path_kind(publication.temporary_path) is not PathKind.MISSING:
@@ -225,7 +231,9 @@ def _publication_destination(
             stream = publication.temporary_path.open("xb")
             owned_stat = os.fstat(stream.fileno())
         else:
-            stream = publication.temporary_path.open("r+b")
+            descriptor = open_regular_nofollow(publication.temporary_path, writable=True)
+            stream = os.fdopen(descriptor, "r+b")
+            descriptor = None
             owned_stat = os.fstat(stream.fileno())
             observed = os.lstat(publication.temporary_path)
             if (
@@ -252,6 +260,8 @@ def _publication_destination(
     except OSError as exc:
         raise result_bundle_error("cannot create the Result Bundle") from exc
     finally:
+        if descriptor is not None:
+            os.close(descriptor)
         if stream is not None:
             stream.close()
 
@@ -293,43 +303,39 @@ def publish_result_bundle(
                 runtime=runtime,
             )
 
-        _require_owned_temporary_file(
-            publication.temporary_path,
-            owned_stat,
-        )
+        def require_owned() -> None:
+            _require_owned_temporary_file(publication.temporary_path, owned_stat)
+
+        def synchronize() -> tuple[MetadataSyncStatus, MetadataSyncStatus]:
+            file_sync = sync_regular_file_best_effort(
+                publication.temporary_path, expected_identity=owned_stat,
+            )
+            directory_sync = sync_directory_best_effort(publication.temporary_path.parent)
+            return file_sync, directory_sync
+
+        verification = ResultVerification(publication.temporary_path,
+                                          require_owned=require_owned, synchronize=synchronize)
         activity("VERIFY", "Verify temporary Result structure, required files and CRC")
-        _verify_result_bundle(
-            publication.temporary_path,
-            execution_present=run_report.execution_present,
-        )
-        _require_owned_temporary_file(
-            publication.temporary_path,
-            owned_stat,
-        )
-        activity("SYNC", "Synchronize Result file and parent directory where supported")
-        temporary_file_sync = sync_regular_file_best_effort(
-            publication.temporary_path
-        )
-        directory_before_replace = sync_directory_best_effort(
-            publication.temporary_path.parent
-        )
-        _require_owned_temporary_file(
-            publication.temporary_path,
-            owned_stat,
+        digest = verification.run(
+            "temporary-result-stable-read",
+            lambda: _verify_result_bundle(publication.temporary_path,
+                                         execution_present=run_report.execution_present,
+                                         expected_identity=owned_stat),
         )
         if before_publish is not None:
-            activity("RECEIPT", "Hash temporary Result bytes and pin recovery evidence before publication")
-            digest = read_stable_regular_file_with_sha256(
-                publication.temporary_path, retained_content_limit=1,
-                allow_path_identity_fallback=True,
-            ).sha256
+            activity("RECEIPT", "Pin verified Result bytes as recovery evidence before publication")
             before_publish(digest)
-            _require_owned_temporary_file(publication.temporary_path, owned_stat)
-            if read_stable_regular_file_with_sha256(
+            require_owned()
+        final_digest = verification.run(
+            "temporary-result-final-read",
+            lambda: read_stable_regular_file_with_sha256(
                 publication.temporary_path, retained_content_limit=1,
-                allow_path_identity_fallback=True,
-            ).sha256 != digest:
-                raise result_bundle_error("Result Bundle bytes changed before publication")
+                allow_path_identity_fallback=True, expected_identity=owned_stat,
+                max_bytes=DEFAULT_RESOURCE_POLICY.max_input_artifact_bytes,
+            ).sha256,
+        )
+        if final_digest != digest:
+            raise result_bundle_error("Result Bundle bytes changed before publication")
         activity("PUBLISH", f"Publish verified Result atomically: {publication.final_path}")
         replace_path(
             publication.temporary_path,
@@ -342,8 +348,8 @@ def publish_result_bundle(
         return PublishedResultBundle(
             path=publication.final_path,
             durability=PublicationDurability(
-                temporary_file=temporary_file_sync,
-                directory_before_replace=directory_before_replace,
+                temporary_file=verification.file_sync,
+                directory_before_replace=verification.directory_sync,
                 directory_after_replace=directory_after_replace,
             ),
         )
