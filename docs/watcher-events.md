@@ -1,9 +1,10 @@
 # Ereignisgesteuerter Exchange-Watcher
 
 Der Development-Stand von WE-3/WE-4 verwendet native Dateisystemereignisse.
-WE-0 bis WE-4 und die Testsetup-Korrektur aus Bundle 020 sind durch tatsächliche
-Results bestätigt. Bundle 021 korrigiert die Windows-Abschlussbehandlung;
-sein Apply und die abschließende native Windows-Abnahme stehen noch aus.
+WE-0 bis WE-4 und die Korrekturen aus Bundle 020/021 sind durch tatsächliche
+Results bestätigt. Die Windows-E2E-Prüfungen bestehen. Bundle 022 korrigiert
+die Prüfung einer Windows-Umbenennungssperre; sein Apply und die abschließende
+native Windows-Abnahme stehen noch aus.
 Produktversion und Tags ändern sich dadurch nicht.
 
 ## Betrieb
@@ -65,6 +66,13 @@ Root-Austausch und Ereignisverlust erneuern Beobachtung und Ruhefrist. Ein
 Backend-Ausfall wird als Fehler sichtbar; es gibt keinen stillen Polling-Fallback.
 Ein Stoppsignal weckt auch ereignisloses Warten. Weitere Worker werden verhindert;
 ein bereits laufender Apply behält seine bisherige Prozess-/Signalbehandlung.
+
+Unter Windows kann die laufende Beobachtung das Umbenennen eines übergeordneten
+Exchange-Ordners verhindern. Für ein geplantes Verschieben zuerst einen
+laufenden Apply beenden lassen und den Watcher geordnet stoppen. Nach dem
+Verschieben die Exchange-Konfiguration prüfen und den Watcher erneut starten.
+Eine vom Betriebssystem verweigerte Umbenennung verändert die beobachtete
+Wurzel nicht; ihre Ereigniserkennung bleibt aktiv.
 
 Git-Änderungen außerhalb des Exchanges lösen keine Prüfung aus. Für ein dadurch
 passend gewordenes Bundle sind ein neues Exchange-Ereignis, Watcher-Neustart

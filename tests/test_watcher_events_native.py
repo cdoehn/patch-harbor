@@ -125,9 +125,32 @@ def test_real_root_or_ancestor_replacement_invalidates_subscription(tmp_path, an
     parent = tmp_path / "parent"
     root = parent / "exchange"
     root.mkdir(parents=True)
+    original_parent, original_root = parent.stat(), root.stat()
     with open_event_source((root,)) as source:
         moved = parent if ancestor else root
-        moved.rename(moved.with_name("moved"))
+        destination = moved.with_name("moved")
+        try:
+            moved.rename(destination)
+        except PermissionError as error:
+            # Windows may deny an ancestor rename while its child directory
+            # has an open watch handle (MS-FSA 2.1.5.15.12 / 2.1.4.2).
+            if not (sys.platform == "win32" and ancestor and error.winerror == 5):
+                raise
+            assert not destination.exists()
+            assert os.path.samestat(parent.stat(), original_parent)
+            assert os.path.samestat(root.stat(), original_root)
+            probe = root / "after-denied-rename.partial"
+            probe.write_bytes(b"watch remains active")
+            receive(source, lambda event: event.kind is EventKind.CHANGED
+                    and event.directory == root and event.name == probe.name)
+            source.close()
+            # A permission problem or leaked child handle must still fail:
+            # after closing, this same rename has to succeed without retries.
+            moved.rename(destination)
+            assert not moved.exists()
+            assert os.path.samestat(destination.stat(), original_parent)
+            assert os.path.samestat((destination / root.name).stat(), original_root)
+            return
         moved.mkdir()
         seen = receive(source, lambda event: event.kind is EventKind.ROOT_INVALIDATED and event.directory == root)
         assert DirectoryEvent(EventKind.ROOT_INVALIDATED, root) in seen

@@ -67,6 +67,16 @@ auch deren Meldung wird abgeholt. Ein zeitgleich schließender Reader verbucht
 seinen bereits empfangenen Abschluss, ohne die Operation erneut anzumelden.
 Grundlage: [CancelIoEx](https://learn.microsoft.com/en-us/windows/win32/api/ioapiset/nf-ioapiset-cancelioex).
 
+Windows kann das Umbenennen eines Vorfahren der Exchange-Wurzel verweigern,
+solange der Watcher einen Unterordner geöffnet hält. Die Freigabe zum Löschen
+am einzelnen Handle hebt diese Einschränkung nicht auf. Bei einer solchen
+Ablehnung bleibt die Verzeichnisidentität erhalten und die Beobachtung aktiv;
+ein tatsächlich erfolgreicher Austausch muss weiterhin invalidiert werden.
+Die native Prüfung verlangt im Sperrfall außerdem, dass dieselbe Umbenennung
+nach dem Schließen des Watchers gelingt. Grundlage:
+[Windows-Umbenennungsvertrag](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-fsa/87f86c9b-6c2a-4803-84b7-131a74a434fa)
+und [offene Einträge unter einem Verzeichnis](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-fsa/133840e4-778e-44ca-9b41-da2323615075).
+
 Größen- und Schreibzeitmeldungen können durch Windows-Dateicaches verzögert
 werden. Die Ruhefrist beginnt mit den beobachteten Ereignissen; ihr Ablauf
 beweist weder einen geschlossenen Schreibhandle noch einen fertigen Download.

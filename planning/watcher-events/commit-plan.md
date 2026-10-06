@@ -47,7 +47,7 @@ Result; diese Tabelle ist keine dauerhafte Patch-Basis.
 | WE-1 | Öffentliche Core-Abfrage der geprüften Beobachtungsziele, optional eingeschränkter automatischer Exchange-Scope, strukturierte Fortschritts-/Sperrbereitschaft. Bisheriger Aufruf ohne Einschränkung unverändert. | WE-0 angewendet | durch Bundle 017 tatsächlich angewendet |
 | WE-2 | Native Linux-/Windows-Ereignisadapter, Filter und Ressourcenlebenszyklus; deterministische Ereignisabstraktion. Noch keine Aktivierung des neuen CLI-Betriebs. | WE-1 angewendet bzw. echter vorangehender Bundle-Zustand | durch Bundle 018 tatsächlich angewendet; native Windows-Prüfung offen |
 | WE-3 | Fünfsekunden-Zustandsautomat, Startprüfung, Parallelität der Ereigniserfassung, sequenzieller Worker, Nachlauf, Konfigurationsaktualisierung und CLI-Umstellung. | WE-2 | durch Bundle 019 tatsächlich angewendet und gepusht |
-| WE-4 | Vollständige Robustheits-/Plattformintegration, reale Ereignis-/Apply- und installierte Wheel-Nachweise, Dokumentationsabgleich und Abnahme. | WE-3 | durch Bundle 019 angewendet und gepusht; 020 angewendet; weitere Windows-Korrektur in 021 vorbereitet, native Abnahme offen |
+| WE-4 | Vollständige Robustheits-/Plattformintegration, reale Ereignis-/Apply- und installierte Wheel-Nachweise, Dokumentationsabgleich und Abnahme. | WE-3 | durch Bundle 019 angewendet und gepusht; 020/021 angewendet; Windows-E2E bestanden; Plattformtest-Korrektur in 022 vorbereitet, native Abnahme offen |
 
 Durch Bundle 019 angewendete Commits, in dieser Reihenfolge:
 1. `feat(watcher): trigger scoped apply after five quiet seconds [WE-3]`
@@ -146,6 +146,46 @@ Bundle 021 startet keine zusätzliche CI; die nächste reguläre CI bleibt 024.
 Die Korrektur gilt erst nach tatsächlichem Apply und vollständigen nativen
 Windows-Nachweisen als abschließend abgenommen. Das Format-1-Result ohne Wheel
 verwendet weiterhin den dokumentierten vertrauenswürdigen lokalen Core-Fallback.
+
+Bundle 021 ist durch das tatsächliche Result
+`patchharbor-apply_Result_084521_1006_9dfe42.zip` bestätigt, SHA-256
+`8cb2e6c090c48ea1b4c73fe29a1ad59dbad328ed02c048924a04a8978b618846`.
+Commit `2a9a014fec1828adfc1c690fb078cefe8a1170ff`, ein normaler Push auf `dev`,
+saubere Arbeitskopie; vollständige serielle und anschließend parallele Suite
+jeweils 2.386 bestanden / 7 übersprungen. Alle 282 Base-Dateien samt Git-Modi
+entsprechen Result, eingefrorenem Development-Zustand und Apply-Commit.
+Die vollständige Bindung für Bundle 022 lautet:
+
+| Bindungsfeld | Wert |
+| --- | --- |
+| `repo_id` | `e7a93d72-62dc-4759-97e8-6bf6cdf10e90` |
+| `base_commit` | `2a9a014fec1828adfc1c690fb078cefe8a1170ff` |
+| `state_fingerprint` | `7c9d2a24e397e0e5` |
+| `fingerprint_algorithm` | `patchharbor-state-v1` |
+
+Der manuelle [CI-Lauf 37440941932](https://github.com/cdoehn/patch-harbor/actions/runs/37440941932)
+ist an denselben Commit gebunden. Windows-Core besteht mit 1.629 Tests / 83 Skips,
+Windows-E2E mit 516 Tests / 35 Skips. Die drei früheren E2E-Fehler sind behoben.
+In der folgenden Plattformgruppe bestehen 27 Tests / 8 Skips; ein Test scheitert
+beim Umbenennen eines Vorfahren der geöffneten Exchange-Wurzel mit `WinError 5`.
+Windows-Packaging wird nicht erreicht. Beide nativen Ubuntu-Jobs, beide
+Docker-Jobs und der separate PowerShell-7-Job bestehen.
+
+Bundle 022 bereitet einen Korrekturcommit vor:
+`test(watcher): respect Windows ancestor rename restrictions [WE-4-renamefix]`.
+Der bestehende native Test berücksichtigt ausschließlich die dokumentierte
+Windows-Sperre beim Vorfahrenwechsel. Er prüft dann unveränderte Identitäten,
+weiterhin eintreffende Ereignisse und den erfolgreichen gleichen Rename nach
+dem Schließen des Watchers. Andere Fehler bleiben Fehler. Erfolgreiche Wechsel
+müssen weiterhin das tatsächliche Invalidierungsereignis liefern; es gibt
+keinen neuen Skip und keine Änderung des produktiven Watcher-Codes.
+
+Development prüft ausschließlich parallel. Apply prüft vor dem einen Commit
+den vollständigen Endstand seriell und anschließend parallel und führt danach
+einen normalen Push aus. Bundle 022 fordert keine zusätzliche CI an; die nächste
+reguläre CI bleibt 024. Die Windows-Plattform- und Packaging-Abnahme des
+korrigierten Endstands bleibt bis zum nativen Nachweis offen. Das maßgebliche
+Format-1-Result verwendet weiterhin den dokumentierten lokalen Core-Fallback.
 
 Fortschrittsnachweis für WE-0: Result
 `patchharbor-apply_Result_163737_1005_90175f.zip`, SHA-256

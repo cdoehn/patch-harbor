@@ -1,5 +1,18 @@
 # PatchHarbor – Spezifikations-Changelog
 
+## 2026-10-06 – WE-4: Native Windows-Umbenennungssperre berücksichtigt
+
+- Bundle 021 ist tatsächlich angewendet; die anschließende manuelle CI bestätigt
+  alle Windows-E2E-Fälle einschließlich der vorherigen drei Fehler.
+- Ein Plattformtest scheitert vor seiner Ereignisprüfung: Windows verweigert
+  das Umbenennen eines Vorfahren mit geöffnetem Unterordner.
+- Bundle 022 berücksichtigt diesen eng begrenzten Sperrfall und verlangt
+  unveränderte Identitäten, weiter funktionierende Ereigniserkennung und einen
+  erfolgreichen Rename nach der Handle-Freigabe. Kein zusätzlicher Skip.
+- Betriebsdokumentation und Plan sind abgeglichen. Produktiver Watcher-Code,
+  Core-Grenzen und Testgates bleiben erhalten. Tatsächlicher Apply sowie native
+  Windows-Plattform-/Packaging-Abnahme von 022 sind offen; reguläre CI bleibt 024.
+
 ## 2026-10-06 – WE-4: Windows-Abschlussbehandlung korrigiert
 
 - Bundle 020 ist tatsächlich angewendet; die folgende manuelle CI bestätigt die
