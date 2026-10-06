@@ -1,10 +1,11 @@
 # PatchHarbor – Implementierungsplan für Exchange-Ereignisse
 
-Stand: 5. Oktober 2026. Plan-ID: `watcher-events`, Revision 5.
+Stand: 6. Oktober 2026. Plan-ID: `watcher-events`, Revision 6.
 Aktiv auf ausdrücklichen Nutzerauftrag; fünf geplante Commitschritte einschließlich
-Dokumentationsbootstrap. `WE-0` bis `WE-2` sind durch tatsächliches Apply bestätigt
-(3/5); `WE-3` und `WE-4` sind als zwei echte aufeinanderfolgende Zustände für
-Bundle 019 vorbereitet. Ihr Apply und die finale native CI stehen aus.
+Dokumentationsbootstrap. Alle fünf geplanten Commits sind tatsächlich angewendet
+und gepusht (5/5). Bundle 019 scheiterte anschließend an der fälligen CI;
+die native Abschlussprüfung ist nicht bestanden. Bundle 020 bereitet eine
+Korrektur des Windows-Testsetups innerhalb von WE-4 vor.
 Zielversion noch nicht festgelegt.
 
 Normative Grundlage: [Watcher-Spezifikation](specification.md) und
@@ -45,19 +46,63 @@ Result; diese Tabelle ist keine dauerhafte Patch-Basis.
 | WE-0 | Spezifikation, Plan, zentrale Einordnung, Changelog und Abschlussvermerk des bisherigen Plans. Kein Watcher-Code. | bestätigtes Bundle 015 | durch Bundle 016 tatsächlich angewendet |
 | WE-1 | Öffentliche Core-Abfrage der geprüften Beobachtungsziele, optional eingeschränkter automatischer Exchange-Scope, strukturierte Fortschritts-/Sperrbereitschaft. Bisheriger Aufruf ohne Einschränkung unverändert. | WE-0 angewendet | durch Bundle 017 tatsächlich angewendet |
 | WE-2 | Native Linux-/Windows-Ereignisadapter, Filter und Ressourcenlebenszyklus; deterministische Ereignisabstraktion. Noch keine Aktivierung des neuen CLI-Betriebs. | WE-1 angewendet bzw. echter vorangehender Bundle-Zustand | durch Bundle 018 tatsächlich angewendet; native Windows-Prüfung offen |
-| WE-3 | Fünfsekunden-Zustandsautomat, Startprüfung, Parallelität der Ereigniserfassung, sequenzieller Worker, Nachlauf, Konfigurationsaktualisierung und CLI-Umstellung. | WE-2 | für Bundle 019 vorbereitet; Apply offen |
-| WE-4 | Vollständige Robustheits-/Plattformintegration, reale Ereignis-/Apply- und installierte Wheel-Nachweise, Dokumentationsabgleich und Abnahme. | WE-3 | für Bundle 019 vorbereitet; Apply/CI offen |
+| WE-3 | Fünfsekunden-Zustandsautomat, Startprüfung, Parallelität der Ereigniserfassung, sequenzieller Worker, Nachlauf, Konfigurationsaktualisierung und CLI-Umstellung. | WE-2 | durch Bundle 019 tatsächlich angewendet und gepusht |
+| WE-4 | Vollständige Robustheits-/Plattformintegration, reale Ereignis-/Apply- und installierte Wheel-Nachweise, Dokumentationsabgleich und Abnahme. | WE-3 | durch Bundle 019 angewendet und gepusht; CI fehlgeschlagen, Korrektur in 020 vorbereitet |
 
-Vorbereitete Commits, in dieser Reihenfolge:
+Durch Bundle 019 angewendete Commits, in dieser Reihenfolge:
 1. `feat(watcher): trigger scoped apply after five quiet seconds [WE-3]`
 2. `test(watcher): verify native event apply and installed runtime [WE-4]`
 
 WE-3 wurde vor Beginn der WE-4-Arbeiten separat nach vollständiger paralleler
 Suite festgehalten: 2.368 bestanden / 7 übersprungen. Die erste Payload installiert
 nur WE-3; der geprüfte Übergangsdelta erzeugt WE-4 erst nach dessen Vorgängercommit.
-Der Endstand wird vollständig parallel im Development geprüft. Apply prüft WE-3
-parallel vor dem ersten Commit und WE-4 seriell sowie danach parallel vor dem
-zweiten Commit. Erst dann erfolgen ein Push und die fällige CI.
+Der Endstand bestand die vollständige parallele Development-Prüfung. Apply prüfte
+WE-3 parallel vor dem ersten Commit und WE-4 seriell sowie danach parallel vor
+dem zweiten Commit. Danach erfolgten ein Push und die fällige CI.
+
+Fortschritts- und Fehlernachweis für WE-3/WE-4: maßgebliches tatsächliches Result
+`patchharbor-apply_Result_204527_1005_656f6e.zip`, SHA-256
+`66470609a0f89bd81e22fcb9181f76c225d6e81009017e2a3deba460db08000f`.
+Die vollständige Repositorybindung für Bundle 020 lautet:
+
+| Bindungsfeld | Wert |
+| --- | --- |
+| `repo_id` | `e7a93d72-62dc-4759-97e8-6bf6cdf10e90` |
+| `base_commit` | `1b7efeaf0569f4b7f798f564094b7bf478aa7c73` |
+| `state_fingerprint` | `7c9d2a24e397e0e5` |
+| `fingerprint_algorithm` | `patchharbor-state-v1` |
+
+WE-3: Commit `e5b666bd09613fe6fbcec2e73efdab6d316f1982` nach 2.368 bestandenen
+Tests / 7 Skips parallel. WE-4: Commit `1b7efeaf0569f4b7f798f564094b7bf478aa7c73`
+nach jeweils 2.376 bestandenen Tests / 7 Skips seriell und anschließend parallel.
+Ein normaler Push nach `dev`, saubere Arbeitskopie; alle 282 Base-Dateien und
+Git-Modi sind gegen die eingefrorenen Zustände, Apply und Development geprüft.
+Das Gesamtresult hat dennoch Exit-Code 1. Sein fehlendes `completed_commit`
+hebt die durch Git und Ausführungslog bestätigten Teilfortschritte nicht auf.
+Format-1-Fallback ohne eingebettetes Wheel; der vorherige Dry-Run bestätigt
+keinen Apply.
+
+[CI-Run 37373497123](https://github.com/cdoehn/patch-harbor/actions/runs/37373497123)
+ist an den vollständigen Endcommit gebunden und wurde genau einmal gestartet.
+Vier Jobs waren erfolgreich, der Windows-2025-Core-Lauf schlug fehl, der
+Docker-Job für Ubuntu 24.04 wurde abgebrochen. Windows-E2E, Plattform- und
+Packaging-Prüfungen wurden deshalb nicht ausgeführt; PowerShell 7 allein
+bestätigt diese fehlenden Prüfungen nicht.
+
+Im heruntergeladenen Windows-Bericht betreffen beide Fehler Setup und Teardown
+derselben übergroßen Worker-Anfrage. Ihr automatisch erzeugter pytest-Node-ID
+hat 1.048.653 Zeichen; der Testkörper wurde nicht erreicht. pytest übernimmt
+den Node-ID in `PYTEST_CURRENT_TEST`, was die Windows-Grenze für Umgebungswerte
+überschreitet. Die kurze explizite Kennung `oversized-request` behält den
+Prüfwert von `MAX_REQUEST_BYTES + 1` Bytes und die Ablehnung vor Core-Aufruf bei.
+
+Bundle 020: ein Korrekturcommit
+`test(watcher): bound oversized-request test identity on Windows [WE-4-fix]`.
+Keine Änderung an Laufzeitverhalten, Request-Limit oder Produktschnittstellen.
+Vor Commit gelten die vollständigen seriellen und danach parallelen Apply-Gates,
+gefolgt von einem normalen Push. Bundle 020 fordert keine zusätzliche CI an;
+native Nachweise für seinen korrigierten Endstand bleiben offen. Die nächste
+reguläre CI ist 024; ein vorgezogener Lauf benötigt einen ausdrücklichen Auftrag.
 
 Fortschrittsnachweis für WE-0: Result
 `patchharbor-apply_Result_163737_1005_90175f.zip`, SHA-256
@@ -174,8 +219,8 @@ praktischen Schrittgrenzen angepasst werden; CI-Zählung nicht zurücksetzen.
 Mehrere Commits pro Bundle sind erlaubt; auftragsbezogene Diagnosen dürfen null
 Commits haben. Keine künstlichen W/R/C-Phasen aus einem bereits fertigen Endzustand.
 
-GitHub bleibt ausschließlich `workflow_dispatch`. Die nächste reguläre CI ist
-Bundle 019, danach 024 usw.; zusätzliche Läufe nur auf ausdrücklichen Nutzerauftrag.
+GitHub bleibt ausschließlich `workflow_dispatch`. Die reguläre CI zu Bundle 019
+ist ausgewertet; der nächste reguläre Termin ist 024. Zusätzliche Läufe nur auf ausdrücklichen Nutzerauftrag.
 016 bis 018 fordern keine CI an. Bei fälligen Bundles dispatcht der Apply-Entrypoint erst
 nach dem einzigen erfolgreichen Push genau einmal und wartet auf alle Jobs
 einschließlich Windows. Volle Commitbindung, Run-ID/URL, Job-/Testnachweise und
@@ -208,8 +253,8 @@ Kein zusätzlicher CI-Lauf wird aus diesem Plan allein automatisch abgeleitet.
 Der dauerhafte Fortschritt steht zusätzlich unter
 `exchange/reports/patchharbor-dev-loop-state.json` im projektspezifischen Exchange.
 Verbrauchte Results werden erst bei bestätigter Folgebundle-Auslieferung markiert.
-Der alte Plan bleibt als abgeschlossen dokumentiert; dieser steht bei 3/5
-bestätigten Commitschritten. S/N und die Grenze von fünf aufeinanderfolgenden
+Der alte Plan bleibt als abgeschlossen dokumentiert; dieser steht bei 5/5
+bestätigten Commitschritten mit offener Korrektur und nativer Abnahme. S/N und die Grenze von fünf aufeinanderfolgenden
 fehlgeschlagenen tatsächlichen Bundles bleiben gemäß lokalen Rollenregeln gültig.
 
 ## 5. Abschluss

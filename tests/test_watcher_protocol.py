@@ -22,7 +22,10 @@ def test_empty_and_global_scope_remain_distinct():
 
 @pytest.mark.parametrize('raw', [b'[]', b'{}', b'{"version":1,"version":1,"exchanges":[]}',
     b'{"version":true,"exchanges":[]}', b'{"version":1,"exchanges":{}}',
-    b'{"version":1,"exchanges":NaN}', b'x' * (MAX_REQUEST_BYTES + 1)])
+    b'{"version":1,"exchanges":NaN}',
+    # pytest copies the node ID into PYTEST_CURRENT_TEST; keep the large payload
+    # out of that environment variable so Windows can reach the test body.
+    pytest.param(b'x' * (MAX_REQUEST_BYTES + 1), id='oversized-request')])
 def test_invalid_worker_scope_never_calls_core(monkeypatch, raw):
     monkeypatch.setattr(api, 'apply_next', lambda **kw: pytest.fail('invalid request reached Core'))
     with pytest.raises((ValueError, TypeError)):

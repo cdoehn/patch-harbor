@@ -1,5 +1,15 @@
 # PatchHarbor – Spezifikations-Changelog
 
+## 2026-10-06 – WE-4: Windows-Testsetup korrigiert, Abschluss offen
+
+- Alle fünf Plancommits sind angewendet und gepusht; die lokalen Abschlussgates
+  von Bundle 019 bestanden. Die anschließende CI ist fehlgeschlagen.
+- Der pytest-Node-ID der übergroßen Worker-Anfrage überschritt unter Windows die
+  Grenze für `PYTEST_CURRENT_TEST`. Eine kurze explizite Kennung erhält denselben
+  Prüfwert und dieselbe Ablehnung vor dem Core-Aufruf.
+- Bundle 020 bereitet einen Korrekturcommit vor. Die fehlenden Windows- und
+  Docker-Nachweise sind im Plan offen vermerkt; nächste reguläre CI bleibt 024.
+
 ## 2026-10-05 – WE-4: Integration und Abschlussprüfung vorbereitet
 
 - WE-3 separat nach vollständiger paralleler Prüfung festgehalten; WE-4 ist der
