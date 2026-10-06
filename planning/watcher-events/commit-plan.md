@@ -47,7 +47,7 @@ Result; diese Tabelle ist keine dauerhafte Patch-Basis.
 | WE-1 | Öffentliche Core-Abfrage der geprüften Beobachtungsziele, optional eingeschränkter automatischer Exchange-Scope, strukturierte Fortschritts-/Sperrbereitschaft. Bisheriger Aufruf ohne Einschränkung unverändert. | WE-0 angewendet | durch Bundle 017 tatsächlich angewendet |
 | WE-2 | Native Linux-/Windows-Ereignisadapter, Filter und Ressourcenlebenszyklus; deterministische Ereignisabstraktion. Noch keine Aktivierung des neuen CLI-Betriebs. | WE-1 angewendet bzw. echter vorangehender Bundle-Zustand | durch Bundle 018 tatsächlich angewendet; native Windows-Prüfung offen |
 | WE-3 | Fünfsekunden-Zustandsautomat, Startprüfung, Parallelität der Ereigniserfassung, sequenzieller Worker, Nachlauf, Konfigurationsaktualisierung und CLI-Umstellung. | WE-2 | durch Bundle 019 tatsächlich angewendet und gepusht |
-| WE-4 | Vollständige Robustheits-/Plattformintegration, reale Ereignis-/Apply- und installierte Wheel-Nachweise, Dokumentationsabgleich und Abnahme. | WE-3 | durch Bundle 019 angewendet und gepusht; CI fehlgeschlagen, Korrektur in 020 vorbereitet |
+| WE-4 | Vollständige Robustheits-/Plattformintegration, reale Ereignis-/Apply- und installierte Wheel-Nachweise, Dokumentationsabgleich und Abnahme. | WE-3 | durch Bundle 019 angewendet und gepusht; 020 angewendet; weitere Windows-Korrektur in 021 vorbereitet, native Abnahme offen |
 
 Durch Bundle 019 angewendete Commits, in dieser Reihenfolge:
 1. `feat(watcher): trigger scoped apply after five quiet seconds [WE-3]`
@@ -103,6 +103,49 @@ Vor Commit gelten die vollständigen seriellen und danach parallelen Apply-Gates
 gefolgt von einem normalen Push. Bundle 020 fordert keine zusätzliche CI an;
 native Nachweise für seinen korrigierten Endstand bleiben offen. Die nächste
 reguläre CI ist 024; ein vorgezogener Lauf benötigt einen ausdrücklichen Auftrag.
+
+Bundle 020 ist durch das tatsächliche Result
+`patchharbor-apply_Result_044150_1006_496d2c.zip` bestätigt, SHA-256
+`a5aa7bf96607ce002fbd055a146a1f9307c54a9d1d2d85e03c63c98f4871f2a7`.
+Commit `589647546389fdbf6eb7e0282af5d6ddb6241606`, ein normaler Push auf `dev`,
+saubere Arbeitskopie; vollständige serielle und anschließend parallele Suite
+jeweils 2.376 bestanden / 7 übersprungen. Die 282 Dateien samt Git-Modi sind
+gegen Result, eingefrorenen Entwicklungsstand und Apply-Commit geprüft.
+Dieses Result bindet Bundle 021 vollständig:
+
+| Bindungsfeld | Wert |
+| --- | --- |
+| `repo_id` | `e7a93d72-62dc-4759-97e8-6bf6cdf10e90` |
+| `base_commit` | `589647546389fdbf6eb7e0282af5d6ddb6241606` |
+| `state_fingerprint` | `7c9d2a24e397e0e5` |
+| `fingerprint_algorithm` | `patchharbor-state-v1` |
+
+Der anschließend vom Nutzer gestartete [CI-Lauf 37426591455](https://github.com/cdoehn/patch-harbor/actions/runs/37426591455)
+prüft denselben vollständigen Commit. Der vorherige Testsetup-Fehler ist behoben;
+Windows-Core besteht mit 1.623 Tests / 83 Skips. Windows-E2E meldet drei Fehler,
+513 bestandene Tests und 35 Skips. Alle drei Fehler betreffen einen beim Stoppen
+weiter laufenden Watcher; zusätzlich verletzt der Nachbar-Download-Test seinen
+Scope. Windows-Platform und Packaging werden nicht erreicht. Die zwei nativen
+Ubuntu-Jobs, beide Docker-Jobs und die fünf separaten PowerShell-7-Tests bestehen.
+
+Bundle 021 bereitet einen zusammengehörigen Korrekturcommit vor:
+`fix(watcher): drain Windows completions before releasing watches [WE-4-winfix]`.
+Abbruch und Abschluss werden durchgängig über den Completion Port verarbeitet;
+Puffer bleiben bis zur zugehörigen Meldung erhalten, auch beim gleichzeitigen
+Stoppen eines Readers. Deterministische Abbruchrennen und begrenzte native
+Kindprozesse sichern Ressourcenfreigabe, ausstehende Meldungen und Quellenwechsel.
+Der Download-Test erzeugt mittels `fsync` beobachtbare Schreibänderungen und
+prüft zusätzlich fünf Sekunden Ruhe nach dem letzten Schreibvorgang. Hängende
+Watcher liefern einen Thread-Stacktrace, ohne die ursprüngliche Ausnahme zu
+verdecken. Dokumentiert wird die Grenze verzögerter OS-Meldungen und die atomare
+Bereitstellung fertiger Bundles; Core-Prüfungen und ereignisloses Warten bleiben.
+
+Development prüft ausschließlich parallel. Apply prüft den Endstand vollständig
+seriell und danach parallel vor einem Commit und einem abschließenden Push.
+Bundle 021 startet keine zusätzliche CI; die nächste reguläre CI bleibt 024.
+Die Korrektur gilt erst nach tatsächlichem Apply und vollständigen nativen
+Windows-Nachweisen als abschließend abgenommen. Das Format-1-Result ohne Wheel
+verwendet weiterhin den dokumentierten vertrauenswürdigen lokalen Core-Fallback.
 
 Fortschrittsnachweis für WE-0: Result
 `patchharbor-apply_Result_163737_1005_90175f.zip`, SHA-256

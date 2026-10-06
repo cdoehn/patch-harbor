@@ -4,6 +4,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 import sys
+import subprocess
 from threading import Event, Thread
 from time import monotonic
 
@@ -17,6 +18,40 @@ from tests.platform_support import create_symlink_or_skip
 
 pytestmark = [pytest.mark.platform,
     pytest.mark.skipif(not (sys.platform.startswith("linux") or sys.platform == "win32"), reason="native Linux/Windows events required")]
+
+
+@pytest.mark.parametrize("state", ["idle", "queued", "received", "rebind"])
+def test_native_close_completes_with_pending_or_finished_requests(tmp_path, state):
+    # A bounded child process captures a native deadlock without hanging the
+    # whole CI worker. Sources are owned/read/closed by the same thread, as in
+    # the real watcher; rebind also closes an old port after opening a new one.
+    code = r'''
+import faulthandler, os, sys
+from pathlib import Path
+from patchharbor_watcher import open_event_source
+faulthandler.dump_traceback_later(12)
+root, state = Path(sys.argv[1]), sys.argv[2]
+for _ in range(3):
+    source = open_event_source((root,))
+    if state in ('queued', 'received'):
+        with (root / 'bundle.partial').open('ab') as stream:
+            stream.write(b'next chunk')
+            stream.flush()
+            os.fsync(stream.fileno())
+        if state == 'received':
+            assert source.read(5)
+    replacement = open_event_source((root,)) if state == 'rebind' else None
+    source.close()
+    source.close()
+    source.wake()
+    assert source.read(0) == ()
+    if replacement is not None:
+        replacement.close()
+faulthandler.cancel_dump_traceback_later()
+'''
+    completed = subprocess.run([sys.executable, '-c', code, str(tmp_path), state],
+                               capture_output=True, text=True, timeout=20)
+    assert completed.returncode == 0, (completed.stdout, completed.stderr)
 
 
 def receive(source, predicate):

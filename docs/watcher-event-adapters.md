@@ -59,10 +59,22 @@ relevant. Fertige Puffer werden vor erneuter Anmeldung kopiert.
 Grundlage: [ReadDirectoryChangesW](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-readdirectorychangesw)
 und [Completion-Port-Empfang](https://learn.microsoft.com/en-us/windows/win32/api/ioapiset/nf-ioapiset-getqueuedcompletionstatus).
 
-Beim Schließen werden ausstehende Operationen abgebrochen und ihr Abschluss
-abgewartet, bevor Puffer, OVERLAPPED-Strukturen und Handles freigegeben werden.
-Eine bereits abgeschlossene Operation kann dem Abbruch zuvorgekommen sein.
+Beim Schließen werden zunächst alle ausstehenden Operationen zum Abbruch
+angemeldet. Ihre Abschlussmeldungen werden über denselben Completion Port
+abgeholt, bevor Puffer, OVERLAPPED-Strukturen und Handles freigegeben werden.
+Eine bereits abgeschlossene Operation kann dem Abbruch zuvorgekommen sein;
+auch deren Meldung wird abgeholt. Ein zeitgleich schließender Reader verbucht
+seinen bereits empfangenen Abschluss, ohne die Operation erneut anzumelden.
 Grundlage: [CancelIoEx](https://learn.microsoft.com/en-us/windows/win32/api/ioapiset/nf-ioapiset-cancelioex).
+
+Größen- und Schreibzeitmeldungen können durch Windows-Dateicaches verzögert
+werden. Die Ruhefrist beginnt mit den beobachteten Ereignissen; ihr Ablauf
+beweist weder einen geschlossenen Schreibhandle noch einen fertigen Download.
+Für die Übergabe vollständige Bundles außerhalb des beobachteten Exchange-Roots
+fertigstellen und anschließend atomar hineinverschieben. Core prüft den
+Dateizustand und die Paketintegrität weiterhin unabhängig. Native Schreibtests
+verwenden `fsync`, damit der Betriebssystemcache die getesteten Änderungen
+meldet; ein reines Leeren des Python-Puffers reicht dafür nicht aus.
 
 ## Nachweise und Grenzen
 
@@ -72,6 +84,9 @@ Completion-Ereignissen. `tests/test_watcher_events_native.py` führt auf der
 jeweiligen unterstützten Plattform echte Dateioperationen, flache Beobachtung,
 atomaren Austausch, Root-/Vorfahrenwechsel sowie Stop im Leerlauf aus. Zusätzliche
 Linux-Fälle prüfen Descriptorfreigabe, Initialisierungs- und Empfangsfehler.
+Begrenzte Kindprozesse prüfen den nativen Abschluss offener und bereits
+abgeschlossener Anfragen sowie den Wechsel auf eine neue Quelle. Ein Hänger
+liefert einen Stacktrace und lässt nicht den gesamten Testworker warten.
 
 Die lokalen Nachweise stammen von Linux. Native Windows-Nachweise stehen bis zur
 vorgesehenen CI aus; Simulationen gelten nicht als Windows-Abnahme. Alle nativen

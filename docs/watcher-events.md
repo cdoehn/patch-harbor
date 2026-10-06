@@ -1,8 +1,9 @@
 # Ereignisgesteuerter Exchange-Watcher
 
 Der Development-Stand von WE-3/WE-4 verwendet native Dateisystemereignisse.
-WE-0 bis WE-2 sind durch tatsächliche Results bestätigt. Die abschließende
-Apply-/CI-Abnahme dieses Stands einschließlich Windows steht noch aus.
+WE-0 bis WE-4 und die Testsetup-Korrektur aus Bundle 020 sind durch tatsächliche
+Results bestätigt. Bundle 021 korrigiert die Windows-Abschlussbehandlung;
+sein Apply und die abschließende native Windows-Abnahme stehen noch aus.
 Produktversion und Tags ändern sich dadurch nicht.
 
 ## Betrieb
@@ -18,6 +19,12 @@ geöffnet und danach bestehende Dateien zur ersten Prüfung vorgemerkt. Ohne
 Änderung oder offene Arbeit wartet der Prozess blockierend; es gibt weder einen
 sekündlichen Exchange-Scan noch regelmäßige Workerstarts. Lesen und Schreiben
 innerhalb bestehender Unterordner, etwa `reports/`, lösen keine Prüfung aus.
+
+Die Ruhefrist bezieht sich auf eingegangene Dateisystemereignisse. Unter
+Windows können Dateicaches Schreibmeldungen verzögern. Die Frist ersetzt keine
+Fertigmeldung eines Downloads: vollständige Bundles außerhalb des Exchange-Roots
+bereitstellen und atomar hineinverschieben. Paketintegrität und stabilen
+Dateizustand prüft Core bei jeder Verarbeitung erneut.
 
 Die bisherige Option `--poll-interval` wird abgewiesen. Unveränderte systemd-
 Units benötigen keine neuen Parameter. Nach Installation des neuen Stands den

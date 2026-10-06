@@ -79,7 +79,6 @@ class _Kernel32:
                                             ctypes.POINTER(pointer), _DWORD], _BOOL),
             "PostQueuedCompletionStatus": ([_HANDLE, _DWORD, _ULONG_PTR, pointer], _BOOL),
             "CancelIoEx": ([_HANDLE, pointer], _BOOL),
-            "GetOverlappedResult": ([_HANDLE, pointer, ctypes.POINTER(_DWORD), _BOOL], _BOOL),
             "CloseHandle": ([_HANDLE], _BOOL),
         }
         for name, (arguments, result) in declarations.items():
@@ -130,16 +129,12 @@ class _Kernel32:
         if not self.dll.PostQueuedCompletionStatus(port, 0, 0, None):
             raise _native_error("cannot wake completion port", ctypes.get_last_error())
 
-    def cancel_and_wait(self, watch):
+    def cancel(self, watch):
         if watch.pending:
-            # NOT_FOUND means completion won the cancellation race. In either
-            # case wait for completion before freeing the overlapped memory.
+            # Cancellation only requests completion. NOT_FOUND means the
+            # operation already completed; its IOCP packet must still be read.
             cancelled = self.dll.CancelIoEx(watch.handle, ctypes.byref(watch.overlapped))
             error = 0 if cancelled else ctypes.get_last_error()
-            transferred = _DWORD()
-            self.dll.GetOverlappedResult(watch.handle, ctypes.byref(watch.overlapped),
-                                        ctypes.byref(transferred), True)
-            watch.pending = False
             if error not in (0, 1168):
                 raise _native_error("cannot cancel directory events", error)
 
@@ -177,22 +172,31 @@ class WindowsEventSource(SourceLifecycle):
             self._dispose()
             raise
 
+    def _completed_watch(self, completion):
+        key, _, error, address = completion
+        if key == 0 and address is None and not error:
+            with self._state:
+                self._wake_pending = False
+            return None
+        watch = self._watches.get(key)
+        if watch is None or address != ctypes.addressof(watch.overlapped) or not watch.pending:
+            raise EventBackendError(EventErrorKind.INVALID_EVENT, "unknown directory completion")
+        # Receipt, including ERROR_OPERATION_ABORTED, ends native ownership.
+        # Do this even if a concurrent close has already set _closing.
+        watch.pending = False
+        return watch
+
     def read(self, timeout: float | None = None) -> tuple[DirectoryEvent, ...]:
         deadline = deadline_for(timeout)
         with self._reader:
             while not self._closing:
                 completion = self._kernel.receive(self._port, remaining(deadline))
-                if completion is None or self._closing:
+                if completion is None:
                     return ()
-                key, count, error, address = completion
-                if key == 0 and address is None and not error:
-                    with self._state:
-                        self._wake_pending = False
+                watch = self._completed_watch(completion)
+                if watch is None or self._closing:
                     return ()
-                watch = self._watches.get(key)
-                if watch is None or address != ctypes.addressof(watch.overlapped):
-                    raise EventBackendError(EventErrorKind.INVALID_EVENT, "unknown directory completion")
-                watch.pending = False
+                _, count, error, _ = completion
                 if error in (2, 3, 5):
                     return self._plan.invalidated(watch.directory)
                 if error not in (0, 1022):  # ERROR_NOTIFY_ENUM_DIR is lost notification data.
@@ -231,11 +235,19 @@ class WindowsEventSource(SourceLifecycle):
 
     def _dispose(self) -> None:
         failures = []
-        for key, watch in tuple(self._watches.items()):
+        for watch in self._watches.values():
             try:
-                self._kernel.cancel_and_wait(watch)
+                self._kernel.cancel(watch)
             except EventBackendError as exc:
                 failures.append(exc)
+        # IOCP requests complete through this port, not GetOverlappedResult on
+        # the directory handle. Drain both cancellations and requests which
+        # completed before CancelIoEx; never rearm while disposing.
+        while any(watch.pending for watch in self._watches.values()):
+            completion = self._kernel.receive(self._port, None)
+            if completion is not None:
+                self._completed_watch(completion)
+        for key, watch in tuple(self._watches.items()):
             if not watch.pending:
                 try:
                     self._kernel.close(watch.handle)

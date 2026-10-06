@@ -126,6 +126,7 @@ class FakeKernel:
         self.failure = failure
         self.entered = Event()
         self.overwrite_on_arm = False
+        self.queued = set()
 
     def create_port(self):
         self.calls.append(("port", 100))
@@ -156,17 +157,25 @@ class FakeKernel:
     def receive(self, port, timeout):
         self.entered.set()
         try:
-            return self.queue.get(timeout=timeout)
+            completion = self.queue.get(timeout=timeout)
         except Empty:
             return None
+        key, _, _, address = completion
+        if address is not None:
+            self.queued.discard(key)
+            self.calls.append(("completed", next(h for h, k in self.keys.items() if k == key)))
+        return completion
 
     def wake(self, port):
         self.calls.append(("wake", port))
         self.queue.put((0, 0, 0, None))
 
-    def cancel_and_wait(self, watch):
-        self.calls.append(("cancel_wait", watch.handle))
-        watch.pending = False
+    def cancel(self, watch):
+        self.calls.append(("cancel", watch.handle))
+        key = self.keys.get(watch.handle)
+        if watch.pending and key not in self.queued:
+            self.queued.add(key)
+            self.queue.put((key, 0, 995, ctypes.addressof(watch.overlapped)))
 
     def close(self, handle):
         self.calls.append(("close", handle))
@@ -174,6 +183,7 @@ class FakeKernel:
     def send(self, source, directory, data=b"", error=0):
         key, watch = next((key, watch) for key, watch in source._watches.items() if watch.directory == directory)
         ctypes.memmove(watch.buffer, data, len(data))
+        self.queued.add(key)
         self.queue.put((key, len(data), error, ctypes.addressof(watch.overlapped)))
 
 
@@ -190,7 +200,9 @@ def test_windows_partial_subscription_failure_releases_completed_resources(tmp_p
     closed = [handle for action, handle in kernel.calls if action == "close"]
     assert set(closed) == opened and len(closed) == len(opened)
     for handle in kernel.handles:
-        assert kernel.calls.index(("cancel_wait", handle)) < kernel.calls.index(("close", handle))
+        assert kernel.calls.index(("cancel", handle)) < kernel.calls.index(("close", handle))
+        if ("arm", handle) in kernel.calls:
+            assert kernel.calls.index(("completed", handle)) < kernel.calls.index(("close", handle))
 
 
 def test_windows_copies_completed_bytes_before_rearm_and_filters_nested_directory_metadata(tmp_path):
@@ -277,25 +289,85 @@ def test_windows_native_call_uses_nonrecursive_aligned_buffer_and_no_access_filt
 
 
 @pytest.mark.parametrize("cancelled,error", [(1, 0), (0, 1168), (0, 5)])
-def test_windows_cancellation_always_waits_before_releasing_buffer(tmp_path, monkeypatch, cancelled, error):
+def test_windows_cancellation_retains_buffer_until_completion_receipt(tmp_path, monkeypatch, cancelled, error):
     kernel = object.__new__(windows._Kernel32)
     calls = []
     def cancel(*args):
         calls.append("cancel")
         return cancelled
-    def completed(*args):
-        assert args[-1] is True
-        calls.append("completed")
-        return 0  # ERROR_OPERATION_ABORTED is also a completed operation.
-    kernel.dll = SimpleNamespace(CancelIoEx=cancel, GetOverlappedResult=completed)
+    kernel.dll = SimpleNamespace(CancelIoEx=cancel)
     monkeypatch.setattr(ctypes, "get_last_error", lambda: error, raising=False)
     watch = windows._Watch(tmp_path, 123, pending=True)
     if error == 5:
         with pytest.raises(EventBackendError):
-            kernel.cancel_and_wait(watch)
+            kernel.cancel(watch)
     else:
-        kernel.cancel_and_wait(watch)
-    assert calls == ["cancel", "completed"] and not watch.pending
+        kernel.cancel(watch)
+    assert calls == ["cancel"] and watch.pending
+
+
+@pytest.mark.parametrize("completion_error", [0, 995, 1022, 5])
+def test_windows_close_drains_already_completed_and_cancelled_requests(tmp_path, completion_error):
+    kernel = FakeKernel()
+    source = windows.WindowsEventSource((tmp_path,), _kernel=kernel)
+    watches = tuple(source._watches.values())
+    kernel.send(source, tmp_path, windows_records((1, 'late.zip')), error=completion_error)
+    source.wake()
+    source.close()
+    for watch in watches:
+        assert not watch.pending
+        assert kernel.calls.count(('completed', watch.handle)) == 1
+        assert kernel.calls.count(('close', watch.handle)) == 1
+        assert kernel.calls.index(('completed', watch.handle)) < kernel.calls.index(('close', watch.handle))
+        assert kernel.calls.count(('arm', watch.handle)) == 1
+    assert kernel.calls[-1] == ('close', 100)
+    assert not source._watches and source._port is None
+
+
+def test_windows_close_waits_for_asynchronous_cancellation_receipts(tmp_path):
+    class DelayedKernel(FakeKernel):
+        def __init__(self):
+            super().__init__()
+            self.pending = []
+            self.cancelled = Event()
+        def cancel(self, watch):
+            self.pending.append(watch)
+            if len(self.pending) == len(self.handles):
+                self.cancelled.set()
+    kernel = DelayedKernel()
+    source = windows.WindowsEventSource((tmp_path,), _kernel=kernel)
+    closed = Event()
+    def close():
+        source.close()
+        closed.set()
+    closer = Thread(target=close, daemon=True)
+    closer.start()
+    try:
+        assert kernel.cancelled.wait(2)
+        assert not closed.is_set()
+        assert not any(action == 'close' for action, _ in kernel.calls)
+        assert all(watch.pending for watch in kernel.pending)
+    finally:
+        for watch in reversed(kernel.pending):
+            kernel.send(source, watch.directory, error=995)
+        closer.join(2)
+    assert closed.is_set() and not closer.is_alive()
+
+
+def test_windows_reader_accounts_for_completion_racing_with_close(tmp_path):
+    class ClosingKernel(FakeKernel):
+        def receive(self, port, timeout):
+            packet = super().receive(port, timeout)
+            source._closing = True  # close wins after the native receive.
+            return packet
+    kernel = ClosingKernel()
+    source = windows.WindowsEventSource((tmp_path,), _kernel=kernel)
+    watch = next(w for w in source._watches.values() if w.directory == tmp_path)
+    kernel.send(source, tmp_path, windows_records((1, 'race.zip')))
+    assert source.read(0) == () and not watch.pending
+    source.close()
+    assert kernel.calls.count(('completed', watch.handle)) == 1
+    assert kernel.calls.count(('arm', watch.handle)) == 1
 
 
 @pytest.mark.parametrize("interrupted", [False, True])

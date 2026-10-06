@@ -56,9 +56,17 @@ class RunningWatcher:
         assert self.subscribed.wait(10), self.errors
         return self
 
-    def __exit__(self, *unused):
+    def __exit__(self, exception_type, exception, traceback):
         self.stop.request_stop()
         self.thread.join(20)
+        if self.thread.is_alive():
+            import traceback as tracebacks
+            frame = sys._current_frames().get(self.thread.ident)
+            if frame is not None:
+                tracebacks.print_stack(frame)
+            if exception is not None:
+                exception.add_note('watcher did not release event handles/worker; stack printed above')
+                return False
         assert not self.thread.is_alive(), 'watcher did not release event handles/worker'
         assert not self.errors, self.errors
 
@@ -146,16 +154,28 @@ def test_real_event_loop_ignores_neighbor_download_until_its_own_quiet_period(tm
     api.configure_exchange_directory(a, repository=repo_a)
     api.configure_exchange_directory(b, repository=repo_b)
     write_package(a / 'ready', context)
-    downloading, finished, stop_writer = Event(), Event(), Event()
+    downloading, finished, stop_writer, neighbor_scanned = Event(), Event(), Event(), Event()
     calls = []
+    writes = []
+    writer_errors = []
     def writer():
-        with (b / 'download.zip').open('ab') as stream:
-            while not stop_writer.is_set():
-                stream.write(b'partial'); stream.flush()
-                downloading.set()
-                stop_writer.wait(0.15)
+        try:
+            with (b / 'download.zip').open('ab') as stream:
+                while not stop_writer.is_set():
+                    written_at = monotonic()
+                    stream.write(b'partial'); stream.flush()
+                    # Windows size/last-write notifications require the OS
+                    # cache to reach disk; flush() alone only drains Python.
+                    os.fsync(stream.fileno())
+                    writes.append(written_at)
+                    downloading.set()
+                    stop_writer.wait(0.15)
+        except BaseException as exc:
+            writer_errors.append(exc)
     def delegate(*, exchanges):
-        calls.append(exchanges)
+        calls.append((monotonic(), tuple(t.directory for t in exchanges)))
+        if b in calls[-1][1]:
+            neighbor_scanned.set()
         result = delegate_to_automatic_apply(exchanges=exchanges, environment=project_environment())
         if result.progress.status == 'attempted':
             finished.set()
@@ -166,7 +186,13 @@ def test_real_event_loop_ignores_neighbor_download_until_its_own_quiet_period(tm
             writing.start()
             assert downloading.wait(2)
             assert finished.wait(20), watcher.errors
-            assert all(tuple(t.directory for t in scope) == (a,) for scope in calls)
+            assert not writer_errors and len(writes) > 1, (writes, writer_errors)
+            assert all(scope == (a,) for _, scope in calls), (calls, writes)
+            stop_writer.set()
+            writing.join(5)
+            assert not writing.is_alive() and not writer_errors, writer_errors
+            assert neighbor_scanned.wait(15), (calls, writes, watcher.errors)
+            assert all(when >= writes[-1] + 5 for when, scope in calls if b in scope), (calls, writes)
     finally:
         stop_writer.set()
         writing.join(5)

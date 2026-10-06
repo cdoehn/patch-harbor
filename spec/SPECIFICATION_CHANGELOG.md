@@ -1,5 +1,20 @@
 # PatchHarbor – Spezifikations-Changelog
 
+## 2026-10-06 – WE-4: Windows-Abschlussbehandlung korrigiert
+
+- Bundle 020 ist tatsächlich angewendet; die folgende manuelle CI bestätigt die
+  Testsetup-Korrektur, meldet aber drei Windows-Watcher-Integrationsfehler.
+- Bundle 021 verarbeitet ausstehende Abbruch- und Abschlussmeldungen über den
+  Completion Port, bevor Puffer und Handles freigegeben werden. Ein gleichzeitig
+  schließender Reader verliert keinen bereits empfangenen Abschluss.
+- Zusätzliche Abbruchrennen und begrenzte native Kindprozesse prüfen die
+  Freigabe. Der Download-Test erzeugt beobachtbare Schreibereignisse und prüft
+  die volle anschließende Ruhefrist. Bei Hängern bleibt die erste Ausnahme sichtbar.
+- Verzögerte Windows-Dateicache-Meldungen und atomare Bundle-Bereitstellung sind
+  dokumentiert. Apply-/Integritätsprüfungen und ereignisloser Leerlauf bleiben.
+- Tatsächlicher Apply und native Windows-Abnahme von 021 stehen aus. Keine
+  zusätzliche CI; nächste reguläre CI bleibt 024.
+
 ## 2026-10-06 – WE-4: Windows-Testsetup korrigiert, Abschluss offen
 
 - Alle fünf Plancommits sind angewendet und gepusht; die lokalen Abschlussgates
