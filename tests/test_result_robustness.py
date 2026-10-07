@@ -117,6 +117,8 @@ def legacy_source(tmp_path_factory):
     shutil.copytree(PROJECT_ROOT / "src", root / "src", ignore=shutil.ignore_patterns("__pycache__", "*.pyc", "*.egg-info"))
     fixtures = Path(__file__).parent / "fixtures/result_format1"
     provenance = json.loads((fixtures / "provenance.json").read_bytes())
+    # Freeze the inspection consumer with its reader: current inspection may
+    # require reference APIs that did not exist in this historical boundary.
     for name, record in provenance["files"].items():
         # Git may use CRLF in a Windows worktree. Restore the historical LF
         # bytes before their digest check and before loading the frozen module.
@@ -159,14 +161,12 @@ def test_mixed_exchange_uses_actual_current_and_frozen_reader_decisions(canonica
         # Prove that the child uses the frozen code, not an installed/current
         # module accidentally shadowing the fixture through PYTHONPATH.
         probe = subprocess.run([sys.executable, "-c", """
-import hashlib, json
+import hashlib, importlib, json, sys
 from pathlib import Path
-import patchharbor.result_reader as reader
-import patchharbor.exchange as exchange
-import patchharbor.archive_evidence as archive
+modules = [importlib.import_module("patchharbor." + Path(name).stem) for name in sys.argv[1:]]
 print(json.dumps({Path(m.__file__).name: hashlib.sha256(Path(m.__file__).read_bytes()).hexdigest()
-                  for m in (reader, exchange, archive)}))
-"""], cwd=repo, env=project_environment(env), capture_output=True, text=True)
+                  for m in modules}))
+""", *provenance["files"]], cwd=repo, env=project_environment(env), capture_output=True, text=True)
         assert probe.returncode == 0, probe.stderr
         assert json.loads(probe.stdout) == {name: row["sha256"] for name, row in provenance["files"].items()}
     scanned = run_cli(repo, "apply", "--json", environment_overrides=env)

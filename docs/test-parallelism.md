@@ -2,12 +2,17 @@
 
 Plan: `planning/test-parallel/commit-plan.md` (15 echte W/R/C-Zwischenstände).
 Historischer Vertrag: `planning/test-parallel/specification.md`.
-Bisherige Nutzerregel vom 3. Oktober 2026: Development ausschließlich parallel;
-Apply-Zwischenstände parallel, nur am Bundle-Ende seriell und parallel.
-**Auf dem Pixel wird diese Regel durch die nachstehende Entscheidung vom
-7. Oktober 2026 ersetzt, bis der Nutzer ausdrücklich zum Laptop wechselt.**
+**Aktuelle Nutzerentscheidung vom 7. Oktober 2026:** Development und Apply
+führen nur vollständige parallele Tests aus, auch am Bundle-Ende. Keine seriellen
+Gates. Nur Christian selbst startet den weiterhin manuellen CI-Workflow.
+Codex und Entrypoints starten keine CI; der frühere Fünfertakt entfällt.
+Die aktive Schleife arbeitet den bestehenden Plan ohne feste Korrekturgrenze ab.
+Der vorhandene Watcher übernimmt ausschließlich fertig veröffentlichte Pakete.
+Details und aktuelle Resultbindung: aktiver PYZ/PACK-Plan, Abschnitt 1.10.
 
-## Aktive Pixel-Phase: nur automatisch gestartete parallele CI
+## Historische Pixel-Phase: durch den Laptop-Wechsel beendet
+
+Der folgende Abschnitt beschreibt die frühere Ausnahme und ist aktuell nicht aktiv.
 
 Gilt für PatchHarbor ab Bundle **027 / PP-01-FIX1** und für alle folgenden
 Pixel-Bundles, bis Christian ausdrücklich seinen Wechsel auf den Laptop
@@ -188,27 +193,12 @@ PowerShell- und Docker-Gates bleiben blockierend und verwenden die parallele
 Runner-Policy. Keine optionalen Tests, kein continue-on-error und keine stillen
 Retries.
 
-**Außerhalb der aktiven Pixel-Phase gilt die nachfolgende Basispolicy. Während
-der Pixel-Phase tritt an ihre Stelle die CI-Pflicht pro Änderung aus dem
-Anfang dieses Dokuments; die lokalen Gate-Befehle unten bleiben deaktiviert.**
-
-Seit der Nutzeranweisung vom 4. Oktober 2026 läuft reguläre GitHub-CI nur nach
-jeweils fünf weiteren Bundles: Basis ist der manuelle Lauf zu Bundle 009,
-nächste Stände 014, 019 usw., nach tatsächlichem Apply/Push. Zwischenbundles
-brauchen keinen eigenen Lauf; fehlende CI auf ihrem Commit allein blockiert
-keinen Folgepatch. Bekannte CI-Fehler weiter auswerten; zusätzliche Läufe nur
-auf ausdrücklichen Auftrag. Native Freigaben gelten für die tatsächlich
-geprüften Stände. Die lokalen parallelen bzw. finalen seriellen/parallelen
-Gates bleiben unverändert.
-
-Bei fälligen Bundles startet der ausdrücklich beauftragte Apply-Entrypoint nach
-erfolgreichem Push den vorhandenen Workflow per `workflow_dispatch` und wartet
-auf alle vorgeschriebenen Jobs einschließlich Windows. Er gibt Run-ID, URL,
-vollständigen geprüften Commit, Job-Ergebnisse sowie relevante Testnachweise
-oder Fehlerdiagnosen über das Ausführungslog im Result zurück. GitHub-Zugang
-mit passenden Rechten muss vorhanden sein. Fehlende/rote CI bleibt sichtbar;
-kein vorzeitiger Gesamterfolg, kein automatischer Retry. Diese Regel gehört
-zu PatchHarbor, nicht zur allgemeinen S-Schleife.
+Der Workflow wird ausschließlich von Christian selbst gestartet. Codex und
+Apply-Entrypoints führen keinen Dispatch aus. Der bisherige automatische
+Fünfertakt gilt nicht mehr. Fehlende CI allein blockiert keinen Folgepatch;
+native Plattformabnahmen und Releasefreigabe bleiben bis zum passenden Nachweis
+offen. Bekannte CI-Fehler werden weiterhin anhand tatsächlicher Ergebnisse
+ausgewertet. Ein paralleler Linux-Lauf ersetzt keinen nativen Windows-Beleg.
 
 Die native Packaging-Lane speichert seit `1.c.R-FIX1` ihren Controller-Bericht
 unter `${{ runner.temp }}/patchharbor-packaging-tests.json` und lädt ihn auch bei
@@ -220,24 +210,20 @@ und Zuordnung zum tatsächlichen Run-HEAD stehen in `docs/runtime-artifact.md`.
 Die DACL-Tests ändern ausschließlich Rechte ihrer privaten temporären Fixtures;
 Linux-Ausführung und Windows-Skips ersetzen keinen nativen Windows-Beleg.
 
-Im Development läuft jeder Zwischenstand ausschließlich parallel. Im lokalen
-Apply-Entrypoint läuft vor jedem Zwischencommit die vollständige parallele Suite.
-Nur der letzte Zustand am Bundle-Ende durchläuft diese beiden vollständigen
-Gates auf unveränderten Quellen, vor dem letzten Commit:
+Im Development und im Apply läuft vor jedem Commitstand dieselbe vollständige
+parallele Suite. Dies gilt auch am Bundle-Ende; kein serieller Vorlauf und kein
+Vergleich mit einer seriellen Referenz:
 
 ```sh
-.venv/bin/python tools/run_tests.py --suite all --serial
 .venv/bin/python tools/run_tests.py --suite all
 ```
 
-Der abschließende parallele Lauf verwendet `auto` und erfüllt zugleich das
-Commit-Gate des letzten Zustands; ein zusätzlicher identischer Vorlauf ist nicht
-erforderlich. Erst nach beiden grünen Endgates entstehen letzter Commit und
-genau ein normaler Push auf den bestätigten Zielbranch, ohne Tag oder Force-Push.
-Ein Pushfehler erhält die erfolgreichen lokalen Commits. Diagnosebundles mit
-null Commits haben auftragsbezogene Prüfungen und keinen Push. Diese Nutzerregel
-ersetzt serielle Tests vor jedem Zwischencommit. Der Modusverifier bleibt ein
-explizites Diagnosewerkzeug; CI startet nur durch den beauftragten Dispatch.
+Der Launcher verwendet standardmäßig xdist `auto`; eine ausdrücklich gewählte
+positive Workerzahl bleibt zulässig. Der erfolgreiche Controller-Bericht muss
+vollständige Sammlung, Workerabschlüsse, Phasen und unveränderte Quellen belegen.
+Erst danach Commit und schließlich genau ein normaler Push. Erfolgreiche
+Teilcommits und erhaltene Payloads bleiben bei Fehlern Grundlage der Korrektur.
+Der Modusverifier bleibt ein explizites Diagnosewerkzeug außerhalb dieser Schleife.
 
 Funktionale Tests prüfen auch ausführbare CI-/Docker-Verträge, nicht den Wortlaut
 der Dokumentation oder die Konsolendarstellung. Ein erzeugtes Patchpaket, ein

@@ -23,25 +23,19 @@ PP-00 was completed by repair Bundle 025, commit
 `7a28bbc2189cdb2a78590e62a45e4d96b0ff893d`, with all six jobs successful in
 CI run `37635401106`, as recorded in its returned Result.
 
-PP-01 / Bundle 026 prepared the shared immutable reference capture and internal
-validation path. Its local full-suite run on the Pixel was interrupted before
-staging, commit, push or CI. The returned dirty Result preserves those changes;
-they must not be reset or applied again from the old clean-state package.
-[Bundle 027 / PP-01-FIX1](planning/pyz-pack/commit-plan.md#18-pp-01-fix1--bundle-027-pixel-phase-nur-parallele-ci)
-continues the same plan position (2/16), preserving the source and test bytes.
-Its own apply, commit, push and CI success remain pending.
+PP-01 is committed as `e6ed2895c6922c1bf0f8f13ec6af58bb70fd7c3d`.
+Bundle 028 installed the consistent historical test fixture, but stopped before
+tests and commit because of trailing whitespace in the plan. Bundle 029 /
+PP-01-FIX3 recovers that verified dirty state; production code stays unchanged.
 
-**Current user policy (7 October 2026): no project tests or test installations
-on the Pixel until Christian explicitly switches to the laptop.** This is not
-a one-bundle exception. No pytest, smoke suite, serial/parallel local suite,
-mode verifier, development-environment setup or test hooks may be started there.
-Each change-bearing bundle commits and pushes, then automatically dispatches the
-existing parallel acceptance CI once and waits for its commit-bound results.
-The five-bundle CI cadence is suspended during this phase; do not wait for 029
-or start a second run at the old cadence. See the
-[current test policy](docs/test-parallelism.md#aktive-pixel-phase-nur-automatisch-gestartete-parallele-ci).
-Package/binding checks and Git/CI-result checks remain mandatory; they are not
-local project tests. Failed or missing CI is not a successful apply or release.
+**Current policy, explicitly updated by Christian on 7 October 2026:**
+Development and Apply run full parallel suites only, including at bundle end.
+After the successful per-commit gates, the watcher commits and pushes once.
+Only Christian starts the manual GitHub CI workflow; no automated dispatch or
+five-bundle cadence. The active loop continues the existing plan after verified
+Results, without a fixed correction-attempt limit.
+See [test policy](docs/test-parallelism.md) and [plan section 1.10](planning/pyz-pack/commit-plan.md).
+The prepared correction is not yet an Apply or CI success.
 
 The planned Result PYZ contains the shared Core **without the watcher**;
 `pack` will be a normal CLI/API operation. Neither is publicly available in
@@ -621,10 +615,10 @@ python tools/run_tests.py --workers 4
 ```
 
 `scripts/test.sh` bootstraps the local `.venv` and uses the same launcher.
-Development runs parallel tests only. Apply checks each intermediate commit
-with the full parallel suite. Only at bundle end does the final unchanged state
-run the full serial suite followed by the full parallel suite, before its commit
-and the single final push. CI is started manually; CI and Docker select the same
+Development and Apply run full parallel suites only. Each commit requires its
+own successful gate on unchanged sources; bundle end uses the same parallel gate.
+No serial suite runs. After the commits, exactly one normal push is made.
+Only Christian starts CI manually; CI and Docker select the same
 named suites via `--suite`. The launcher checks complete collection,
 worker completion and setup/call/teardown results even without a saved report.
 Only its controller can write an optional `--report` JSON file. Declared skips

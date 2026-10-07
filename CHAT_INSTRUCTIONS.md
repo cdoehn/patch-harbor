@@ -331,53 +331,32 @@ ist mit dessen erfolgreichem Abschluss erfüllt. Result
 `7a28bbc2189cdb2a78590e62a45e4d96b0ff893d` und sechs grüne Jobs in CI-Run
 `37635401106`. Bundle 026 startete danach lokale PP-01-Tests. Diese wurden laut
 `patch-harbor_Result_160403_1007_ee4cb0.zip` vor Staging/Commit/Push/CI
-unterbrochen; die PP-01-Dateien sind vorhanden und uncommitted. Das ist kein
+unterbrochen; damals waren die PP-01-Dateien vorhanden und uncommitted. Das ist kein
 bestandener PP-01-Testlauf. Bundle 027 / PP-01-FIX1 setzt diese Änderungen fort.
 
-### Aktive Pixel-Phase: Tests ausschließlich in automatisch gestarteter CI
+### Aktive Laptop-Phase: volle parallele Tests, CI nur durch den Nutzer
 
-Die **spätere ausdrückliche Nutzerentscheidung vom 7. Oktober 2026** ersetzt
-für die Entwicklung von **PatchHarbor auf dem Pixel** die bisherigen lokalen
-Gates und die Fünferregel: Bis Christian ausdrücklich den Wechsel zum Laptop
-bestätigt, laufen **keinerlei Produkttests oder Testinstallationen auf dem
-Pixel**. Weder eine neue Bundle-Nummer noch der Abschluss von PP-01 beendet
-diese Phase. Auch Linux-/Ubuntu-Erkennung ist kein Laptop-Nachweis.
+Die spätere ausdrückliche Nutzeranweisung vom 7. Oktober 2026 ersetzt ältere
+lokale serielle Gates, die Pixel-CI-only-Regel und den CI-Fünfertakt.
+Development und Apply prüfen jeden Commitstand vollständig parallel, auch am
+Bundle-Ende. Kein serieller Lauf und keine verkürzte Auswahl als Vollabnahme.
+Nur Christian startet den manuellen CI-Workflow; Codex und Entrypoints tun das nie.
 
-- Keine lokale Voll-/Teil-/Smoke-Suite, kein pytest oder Collection-Lauf,
-  kein serieller/parallel-lokaler Lauf, kein Modusvergleich und kein Testaufbau
-  durch venv, pip, uv, scripts/test.sh oder indirekte Testhooks. Keine lokale
-  Ersatzprüfung starten, falls CI fehlt oder fehlschlägt. Auch eine als
-  Diagnose bezeichnete Ausführung darf diese Testgrenze nicht umgehen.
-- Notwendige Paket-, Bindungs-, Datei-/Hash-, Syntax-, Git-Scope- und
-  CI-Zugangs-/Ergebnisprüfungen bleiben erlaubt. Sie sind Übergabe- und
-  Integritätsprüfungen, keine bestandenen Produkttests. Keine Core-Sicherheits-
-  oder Repositoryprüfung ausschalten.
-- Ein fachlich geschlossener Commit und normaler Push nach dem bestätigten
-  Zielbranch sind vor den externen Testergebnissen ausdrücklich erlaubt.
-  Commit-/Push-Hooks werden nur für diese Befehle über
-  `git -c core.hooksPath=/dev/null ...` deaktiviert, nicht persistent.
-- Nach dem Push **automatisch genau einmal** den vorhandenen
-  `scripts/run_handoff_ci.py` auf den tatsächlichen vollständigen Commit
-  ansetzen. Unveränderter `workflow_dispatch`-Workflow, eindeutige Handoff-ID,
-  parallele Suites mit xdist `auto`, sämtliche sechs nativen/Docker-Jobs und
-  ihre vorhandenen Nachweise. Keine zusätzliche serielle CI-Suite.
-- Dies gilt für **jedes** änderungsführende Pixel-Bundle, nicht erst 029.
-  Die frühere Fünferregel ist während dieser Phase ausgesetzt, kein zweiter
-  Dispatch bei einem alten Zähltermin. Bei mehreren echten Zwischencommits
-  muss vor dem nächsten fachlichen Zustand dessen jeweilige gebundene CI
-  erfolgreich sein; im Zweifel in getrennte Bundles aufteilen. Für Bundle 027
-  sind genau ein Commit, ein Push und ein CI-Dispatch vorgesehen.
-- Während die CI arbeitet, wartet der Pixel nur und liest ihre Nachweise.
-  Kein Gesamterfolg vor vollständiger grüner commitgebundener CI und sauberem
-  unverändertem HEAD. Fehler, Abbruch oder fehlender Zugang bleiben offen;
-  keine automatische Wiederholung, kein Zurücksetzen vorhandener Änderungen.
-- Erst ein ausdrücklicher Laptop-Wechsel erlaubt die Neubewertung der lokalen
-  Gate-/CI-Policy. Diese Projektregel gilt nicht pauschal für andere Repositorys.
+Die aktive Schleife setzt nach vollständig geprüften Watcher-Results den
+PYZ/PACK-Plan fort, ohne feste Zahl erlaubter Korrekturen. Vorhandene Teilfortschritte
+bleiben erhalten. Bei Planabschluss oder Nutzerstopp endet die Schleife.
+Sicherheitsgrenzen und belastbare Resultbindung bleiben Voraussetzung.
 
-Der aktive Plan, Abschnitt 1.8, und `docs/test-parallelism.md` halten diesen
-Vorrang fest. Sie ersetzen für diese Phase insbesondere die alten Aussagen
-„Ausnahme endet nach PP-00“ und „keine CI vor 029“. `pack` und PYZ bleiben bis
-zu ihren tatsächlichen Umsetzungsschritten Zielzustand; kein Watcher in der PYZ.
+Development bleibt ausschließlich in `patchharbor-codex`. Nur die fertig und
+vollständig geprüfte kanonische Patch-ZIP gelangt atomar in den Exchange.
+Der bereits laufende Watcher übernimmt allein den Apply. Keine direkten
+Development-Commits, Apply-Mutationen, Hook-Umgehungen oder Watcher-Neustarts.
+Nach erfolgreichen Commit-Gates genau ein normaler Push; kein automatisches Tag.
+
+PP-01 ist committed. Bundle 028 hinterließ seine Fixture-Reparatur uncommitted;
+Bundle 029 / PP-01-FIX3 setzt das aktuelle dirty Result fort. Erst nach dessen
+tatsächlichem Erfolg folgt PP-02A. Maßgeblich sind Plan Abschnitt 1.10 und
+`docs/test-parallelism.md`. Native CI-Nachweise und Produktfreigabe bleiben separat.
 
 Bestimme die aktive Zielversion aus dem Repository. Eine laut Plan erst zum
 Release erfolgende Versionsanhebung ist kein Widerspruch; tatsächlich

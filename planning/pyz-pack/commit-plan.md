@@ -1,13 +1,13 @@
 # PatchHarbor – Implementierungsplan: Result-PYZ und `pack`
 
-**Plan-ID:** `PYZ-PACK`  
-**Planpfad:** `planning/pyz-pack/commit-plan.md`  
-**Revision:** 5  
-**Stand:** 7. Oktober 2026  
-**Status:** PP-00 abgeschlossen; PP-01 aus Bundle 026 vorhanden, lokaler Testlauf abgebrochen. Fortsetzung PP-01-FIX1 in Bundle 027 vorbereitet: keine Pixel-Tests, automatisch gestartete parallele CI; Abschlussnachweis noch offen.  
-**Geplanter Umfang:** 9 Arbeitspakete `PP-00` bis `PP-08`, zunächst 16 vorgeschlagene Commit-Schritte. Keine feste Anzahl von Patch-Bündeln.  
-**Fortschritt:** 1/16 Commit-Schritte abgeschlossen; PP-00 (1/9 Arbeitspakete) abgenommen. PP-01-Dateien ausgebracht, aber noch nicht committet oder abgenommen; keine Übertragung alter CI auf neuen Code.  
-**Nächster Schritt:** `PP-01-FIX1` (weiterhin 2/16) – Bundle 027 auf dem abgebrochenen Zustand anwenden, Commit/Push und automatische parallele CI auswerten; erst danach PP-02A.  
+**Plan-ID:** `PYZ-PACK`
+**Planpfad:** `planning/pyz-pack/commit-plan.md`
+**Revision:** 7
+**Stand:** 7. Oktober 2026
+**Status:** PP-00 abgenommen; PP-01 committed, Reparatur noch nicht abgenommen. Bundle 028 brach vor Tests/Commit an fünf nachgestellten Leerzeichen im Plan ab; Bundle 029 / PP-01-FIX3 setzt den erhaltenen Teilzustand fort.
+**Geplanter Umfang:** 9 Arbeitspakete `PP-00` bis `PP-08`, zunächst 16 vorgeschlagene Commit-Schritte. Keine feste Anzahl von Patch-Bündeln.
+**Fortschritt:** 2/16 Planpositionen committed, 1/16 abgenommen; PP-01-FIX3 ist keine zusätzliche Planposition.
+**Nächster Schritt:** PP-01-FIX3 über den Watcher abschließen, danach automatisch PP-02A gemäß aktiver Schleife.
 **Ziel-Produktversion:** noch festzulegen; keine erfundene Releaseversion, kein automatischer Tag oder Release.
 
 > **Verbindliche Grundlage ist der gemeinsame Spezifikationssatz:**
@@ -76,7 +76,7 @@ Für die Planung der Codeänderungen ist der Snapshot maßgeblich. Das eingebett
 
 Im gelesenen Snapshot bezeichnet sich `planning/watcher-events/commit-plan.md` als Revision 7 und abgeschlossen. `planning/result-publication/commit-plan.md` führt `CIFS-1` als vorbereitet und tatsächliche Apply-/Zielplattformnachweise noch als offen. Diese Angaben sind beim Umsetzungsstart anhand realer Nachweise zu aktualisieren, nicht aus vorhandenen Codezeilen als erledigt abzuleiten. Bereits angewendete Änderungen werden nicht zurückgesetzt oder erneut eingespielt.
 
-Die ursprüngliche Planerstellung führte nichts auf dem Host aus. Die folgenden Abschnitte 1.4–1.6 dokumentieren Vorbereitung und Reparatur von PP-00; den PP-00-Abschluss und die frühere PP-01-Basis enthält Abschnitt 1.7. Maßgeblich für die Fortsetzung und die aktive Pixel-Testpolicy ist nun Abschnitt 1.8.
+Die ursprüngliche Planerstellung führte nichts auf dem Host aus. Die folgenden Abschnitte 1.4–1.6 dokumentieren Vorbereitung und Reparatur von PP-00; den PP-00-Abschluss und die frühere PP-01-Basis enthält Abschnitt 1.7. Die Pixel-Testpolicy in Abschnitt 1.8 ist historisch. Maßgeblich ist die spätere Nutzerentscheidung und Reparaturgrundlage in Abschnitt 1.10.
 
 ### 1.4 PP-00: aktueller Abgleich für Bundle 024
 
@@ -222,7 +222,7 @@ PP-01 und spätere Schritte erhalten keine Ausnahme. Der weitere reguläre
 CI-Termin 029 wird durch den ausdrücklich notwendigen Reparaturlauf nicht
 stillschweigend neu gezählt; tatsächlich erbrachte Läufe werden dokumentiert.
 
-**Status:** 024 ist fehlgeschlagen; 025 ist vorbereitet. PP-00 bleibt bis zum
+**Status:** PP-00 abgeschlossen; PP-01 auf `e6ed2895c6922c1bf0f8f13ec6af58bb70fd7c3d` committed. Vier E2E-Fehler im historischen Fixture reproduziert; minimale Reparatur PP-01-FIX2 / Bundle 028 vorbereitet. Laptop-Testpolicy wieder aktiv; tatsächlicher Reparatur-Apply noch offen.
 zugehörigen tatsächlichen Apply-/CI-Nachweis offen. Ein Prüfversuch des
 Entrypoints in der Chat-Umgebung ist kein Produkt-, Host- oder CI-Nachweis.
 
@@ -283,6 +283,8 @@ gibt es einen normalen Push nach `origin/dev`. Alte CI ist kein Testnachweis
 für PP-01. Dessen tatsächliche Ausführung bleibt bis zum nächsten Result offen.
 
 ### 1.8 PP-01-FIX1 / Bundle 027: Pixel-Phase nur parallele CI
+
+**Historisch; seit dem ausdrücklichen Laptop-Wechsel durch Abschnitt 1.9 ersetzt.**
 
 **Spätere ausdrückliche Nutzerentscheidung vom 7. Oktober 2026:** Ab jetzt
 keinerlei Produkttests oder Testinstallationen auf dem Pixel, bis Christian
@@ -360,6 +362,101 @@ nichts ausgeführt. Apply, Commit, Push und neue CI sind bis zum zugehörigen
 Result offen. Die 52 neuen PP-01-Fälle bleiben in den regulären CI-Suites und
 werden weder weggelassen noch aufgrund des abgebrochenen Laufs als bestanden
 gezählt. Offene native/CIFS-Nachweise bleiben von dieser Änderung unberührt.
+
+### 1.9 PP-01-FIX2 / Bundle 028: Laptop und konsistente Legacy-Fixture
+
+Historischer Vorbereitungsstand; tatsächlicher Abbruch und spätere Policy siehe 1.10.
+
+Christian hat am 7. Oktober 2026 ausdrücklich die Fortsetzung auf dem Laptop
+beauftragt. Damit ist die Pixel-CI-only-Phase beendet. Development bleibt in
+`patchharbor-codex`; allein der vorhandene Watcher wendet das fertige Paket auf
+`patchharbor-apply` an. Kein direkter Commit, Checkout oder Apply durch Development.
+
+| Gegenstand | Bestätigte aktuelle Grundlage |
+|---|---|
+| Result | `patchharbor-apply_Result_201726_1007_21672a.zip` |
+| Result-SHA-256 | `e930a4ab76dcec9cf44962383187b57866af2c6b824013ad2fe67b07b52bfcba` |
+| repo_id | `e7a93d72-62dc-4759-97e8-6bf6cdf10e90` |
+| base_commit | `e6ed2895c6922c1bf0f8f13ec6af58bb70fd7c3d` |
+| state_fingerprint / Algorithmus | `7c9d2a24e397e0e5` / `patchharbor-state-v1` |
+| Ergebnis | Erfolgreiches manuelles `bundle`, clean, kein Dry-Run; kein Apply-/Testnachweis dieses Results |
+| Quellkontrolle | 293 Base-Dateien gegen Größen, Git-Blob-IDs, tatsächlichen Apply-Commit und sauberen Apply-Working-Tree abgeglichen |
+| Runtime | `unavailable: source_not_prepared`; etablierte Prüfung mit vertrauenswürdigem vorhandenen Core, kein vorgetäuschter Wheel-Test |
+| Entwicklung | Lokaler Dev-Git-HEAD noch `68dba9216b72dc0b6441df83f49c9047b8b038b9`, vorhandene Änderungen erhalten; isolierter Result-Snapshot innerhalb der Development-Arbeitskopie |
+
+Der Nutzer meldet PP-01 als committed und nach origin/dev gepusht. Der lokale
+Apply-HEAD und sein sauberer Snapshot bestätigen den Commit; dieses manuelle
+Result belegt weder den vorausgehenden Push noch eine grüne PP-01-CI.
+Die gemeldeten Laptop-Gruppen waren core 1807/1, platform 30/2, packaging 96/3
+(passed/skipped), E2E 4 failed / 544 passed / 4 skipped. Die vier betroffenen
+`frozen_format1`-Fälle wurden auf der unveränderten Referenz parallel reproduziert.
+
+**Ursache und Umfang:** Das Fixture ersetzte drei Reader-Module durch historische
+Dateien, behielt aber die neue `patch_inspection.py` aus PP-01. Deren Import von
+`CapturedResultReference` und `capture_result_reference` scheitert am alten
+Reader, bevor der Prozess seine konservative Entscheidung treffen kann.
+Zusätzlich wird jetzt ausschließlich die dazugehörige `patch_inspection.py`
+aus demselben historischen Commit `d31047b2feca049c2db5443bb61df2ce7ce5e7f6`
+mit Provenienz/SHA-256 eingefroren. Die Kindprozessprobe prüft alle inventarisierten
+historischen Module. Die echte Exit-10-, Archivierungs- und Unverändertheitsprüfung
+bleibt erhalten. Keine optionalen Produktimports, Test-Skips oder API-Aufweichung.
+Der produktive PP-01-Code und beide normativen Spezifikationen bleiben bytegleich.
+
+**Gates:** Gezielte Regression und PP-01-Prüfer, anschließend vollständige lokale
+Development-Suite ausschließlich parallel, mit Quellbindung und Controller-Bericht.
+Die Auslieferung ist erst nach erfolgreichem vollständigem Gate zulässig; konkrete
+Befehle, Zähler und Hashes stehen im Handoff-/Ausführungsnachweis. Im Apply laufen
+vor dem einen Korrekturcommit auf demselben Endstand die vollständige serielle
+und danach parallele Suite mit Ergebnisvergleich. Danach genau ein normaler
+Push nach origin/dev, ohne Hook-Bypass. Es werden keine Tests oder Installationen
+im tatsächlichen Apply-Repository außerhalb dieses geprüften Entrypoints gestartet.
+
+Die reguläre Fünferregel gilt wieder: Bundle 028 verlangt keinen Zusatzlauf;
+der nächste reguläre CI-Termin bleibt 029 einschließlich Windows nach Apply/Push.
+Bekannte fehlgeschlagene CI und offene native/CIFS-Nachweise bleiben offen,
+bis neue passende Nachweise vorliegen. Ein Linux-Lauf ersetzt sie nicht.
+
+**Status:** Ein Korrekturcommit `test(result): keep frozen reader and inspection consistent [PP-01-FIX2]`
+ist vorgesehen. Kein PP-02-Schritt, keine neue PYZ, kein `pack`, kein Writerwechsel.
+PP-01-Abnahme erst nach erfolgreichem tatsächlichen Reparatur-Apply und seinen
+vorgeschriebenen lokalen Endgates; keine automatische Planfortsetzung durch 028.
+
+### 1.10 PP-01-FIX3 / Bundle 029: erhaltenen Teilzustand fortsetzen
+
+Das vollständig geprüfte tatsächliche Apply-Result
+`patchharbor-apply_Result_204228_1007_dba7f3.zip`, SHA-256
+`b4be31d89de55cd9485dc8ad350dbf474189277825b9daff90d9e53b783e78d0`,
+bestätigt für Patch-SHA-256
+`04ac3941e0ed38ac14402fcf3bfc2b6a35b0524220e21eaa3f6652b0db06ec6a`
+einen Entrypoint-Abbruch mit Exit 1. `git diff --check` beanstandete fünf
+nachgestellte Leerzeichen in diesem Plan. Keine Tests, kein Commit, kein Push.
+Alle acht vorgesehenen Dateien sind im dirty Teilzustand erhalten und vollständig
+gegen die ausgelieferten Bytes und das tatsächliche Apply-Repository geprüft.
+
+Neue Patchbindung: `repo_id=e7a93d72-62dc-4759-97e8-6bf6cdf10e90`,
+`base_commit=e6ed2895c6922c1bf0f8f13ec6af58bb70fd7c3d`,
+`state_fingerprint=5b93b0f9950d5100`, `fingerprint_algorithm=patchharbor-state-v1`.
+Die erwartete clean Bindung des alten Patches ist keine Reparaturgrundlage.
+
+Die ursprüngliche historische Fixture-Reparatur bleibt erhalten. FIX3 bereinigt
+die problematischen Planzeilen und passt ausschließlich die Übergabe- und
+Statusdokumentation an die neueste ausdrückliche Nutzeranweisung an:
+
+- Development und jeder Apply-Commit erhalten eine vollständige parallele Suite;
+  auch am Bundle-Ende keine serielle Suite und kein Vergleich mit einer solchen.
+- GitHub-CI bleibt `workflow_dispatch`; ausschließlich Christian startet sie.
+  Kein automatischer Dispatch durch Codex oder Entrypoints und kein Fünfertakt.
+- Die Schleife setzt nach bestätigten Results den bestehenden Plan fort.
+  Belegte Korrekturen sind ohne feste Versuchszahl erlaubt; Sicherheitsgrenzen
+  und das Verbot spekulativer Patches bleiben bestehen.
+
+Die finale Payload wird vor Auslieferung zusätzlich mit dem echten lesenden
+`git diff --no-index --check` gegen die Commitbasis geprüft. Der Entrypoint
+gibt bei einem fehlgeschlagenen Git-Befehl dessen konkrete Diagnose weiter.
+Ein Commit `test(result): complete consistent historical fixture recovery [PP-01-FIX3]`
+ist vorgesehen; tatsächliche Abnahme bleibt bis zum Watcher-Result offen.
+Neue Produktfunktionen, globale Installation und Watcher-Neustart sind kein Teil
+dieser Korrektur. Produktquellen und beide normativen Dateien bleiben bytegleich.
 
 ## 2. Architektur und unveränderliche Grenzen
 
@@ -445,12 +542,12 @@ Die lineare Standardreihenfolge in Abschnitt 4 verhindert unnötige gleichzeitig
 
 Die folgende Folge ist die anfängliche prüfbare Zerlegung. Sie ist **keine Verpflichtung zu 16 Patch-ZIPs**. Kleine sicher zusammengehörige Schritte dürfen mit dokumentierter Plananpassung zusammengelegt werden. Bei Split oder Zusammenlegung werden Positionen, Gesamtzahl, Messages und Nachweiszuordnung vor der betroffenen Auslieferung aktualisiert. Kein nur nominelles Zerlegen eines bereits vollständig installierten Endzustands.
 
-PP-00 ist durch Bundle 025 abgeschlossen. PP-01 steht auf **vorbereitet (Bundle 026; Apply/Endgates offen)**; die übrigen Schritte bleiben **geplant**. Die Message ist die vorgeschlagene tatsächliche Git-Commitmessage. Die API-/Writer-Funktionen werden erst in den dafür genannten sicheren vollständigen Schritten öffentlich beziehungsweise produktiv aktiviert.
+PP-00 ist durch Bundle 025 abgeschlossen. PP-01 steht auf **committed; Regression und Reparatur-Endgates offen (Bundle 028 / PP-01-FIX2)**; die übrigen Schritte bleiben **geplant**. Die Message ist die vorgeschlagene tatsächliche Git-Commitmessage. Die API-/Writer-Funktionen werden erst in den dafür genannten sicheren vollständigen Schritten öffentlich beziehungsweise produktiv aktiviert.
 
 | Position | ID | Arbeitspaket | Abhängigkeit | Vorgeschlagene Commitmessage | Status |
 |---:|---|---|---|---|---|
 | 1/16 | **PP-00** | PP-00 | Ausgangsabgleich | `docs(plan): establish PYZ and pack implementation baseline [PP-00]` | angewendet: 7a28bbc2189cdb2a78590e62a45e4d96b0ff893d; CI 37635401106 grün |
-| 2/16 | **PP-01** | PP-01 | PP-00 | `refactor(reference): share verified reference facts for packing [PP-01]` | 026 unterbrochen; 027/PP-01-FIX1 vorbereitet |
+| 2/16 | **PP-01** | PP-01 | PP-00 | `refactor(reference): share verified reference facts for packing [PP-01]` | e6ed2895c6922c1bf0f8f13ec6af58bb70fd7c3d committed; 028/PP-01-FIX2 vorbereitet, Abnahme offen |
 | 3/16 | **PP-02A** | PP-02 | PP-01 | `feat(pack): capture bounded immutable package inputs [PP-02A]` | geplant |
 | 4/16 | **PP-02B** | PP-02 | PP-02A | `feat(pack): build bound manifests and target handoff data [PP-02B]` | geplant |
 | 5/16 | **PP-02C** | PP-02 | PP-02B | `feat(pack): publish validated packages through the public API [PP-02C]` | geplant |
@@ -477,8 +574,8 @@ Die folgenden Testangaben sind **zu erbringende Nachweise**, keine Ergebnisse be
 
 ### PP-00 – Vertrag und tatsächlichen Ausgangsstand festhalten
 
-**Normbezug:** GOV-01–04, PLAN-01–04, TEST-04/05/07, CHAT-06.  
-**Voraussetzung:** aktueller bereitgestellter Ausgangsstand.  
+**Normbezug:** GOV-01–04, PLAN-01–04, TEST-04/05/07, CHAT-06.
+**Voraussetzung:** aktueller bereitgestellter Ausgangsstand.
 **Betroffene Stellen:** Beide Spezifikationen, dieser Plan, `README.md`, `CHAT_INSTRUCTIONS.md`, `spec/SPECIFICATION_CHANGELOG.md`; vorhandene Watcher-/CIFS-Pläne und Test-/CI-Regeln lesen.
 
 **Umsetzung:** Aktuelles Result und Arbeitsstand abgleichen, neue Änderungen gegenüber dem hier gebundenen Snapshot erfassen und keine alten Bindungswerte fest einbauen. Den ausdrücklich aktiven Plan und beide Normpfade in den bestehenden Dokumentverweisen einordnen. Vorhandene abgeschlossene Pläne nicht umschreiben. Aktuelle Bundle-Zählung, letzte tatsächlich geprüfte CI, offene CIFS-/Windows-Nachweise und verfügbare lokale Regeln aufnehmen. Die schon vorhandenen 120 Minuten am Acceptance-Job erhalten statt erneut als unerledigtes Feature zu planen. Ziel-Releaseversion und deren Festlegungszuständigkeit dokumentieren; eine noch offene Entscheidung nicht durch eine erfundene Versionsnummer ersetzen. Requirement-/Test-Zuordnung dieses Plans gegen den aktuellen Stand bestätigen.
@@ -491,8 +588,8 @@ Die folgenden Testangaben sind **zu erbringende Nachweise**, keine Ergebnisse be
 
 ### PP-01 – Eine stabile, vollständig geprüfte Referenzerfassung wiederverwenden
 
-**Normbezug:** ARCH-01, PACK-06/07, GOV-04, CHECK-01/02, MIG-05/06.  
-**Voraussetzung:** PP-00.  
+**Normbezug:** ARCH-01, PACK-06/07, GOV-04, CHECK-01/02, MIG-05/06.
+**Voraussetzung:** PP-00.
 **Betroffene Stellen:** `result_reader.py`, `patch_inspection.py`, `bundle_handoff.py`, `json_document.py`; bestehende sichere Reader und Publikationsadapter.
 
 **Umsetzung:** Einen schmalen internen erfassten Referenzwert vorsehen: geprüfte ResultFacts, Referenzhash, benötigte unveränderliche passive Kontext-/Environmentdaten und Suffix aus derselben Byteerfassung. Der aktuelle ResultFacts-Wert enthält nicht alle für pack benötigten Handoff-Daten; deshalb keine zweite ungeschützte ZIP-Lesestrecke ergänzen. Öffentliche Ergebnisse und den bisherigen read_result_reference-Aufruf kompatibel halten. Einen gemeinsamen internen Validierungsweg über diese erfassten Fakten ermöglichen, während die öffentliche API weiterhin ausdrücklich Dateipfade akzeptiert. Bestehende Pfad-/Modus-/Interpreterprüfer und reine Renderer auffinden und unverändert wiederverwenden. Result-Retry-/Replace-Zuständigkeiten markieren; hier noch keinen globalen Publikationsumbau durchführen.
@@ -505,8 +602,8 @@ Die folgenden Testangaben sind **zu erbringende Nachweise**, keine Ergebnisse be
 
 ### PP-02A – Begrenzte sichere Inhaltsaufnahme und Modusprüfung
 
-**Normbezug:** PACK-02/08–13/21–23, SEM-01/02, TEST-03.  
-**Voraussetzung:** PP-01.  
+**Normbezug:** PACK-02/08–13/21–23, SEM-01/02, TEST-03.
+**Voraussetzung:** PP-01.
 **Betroffene Stellen:** Neuer schmaler interner Scanner, z. B. `pack_sources.py`; `platform/filesystem.py`, `platform/file_handles.py`, `bundle_paths.py`, `payload_modes.py`, `resource_policy.py`.
 
 **Umsetzung:** Inhaltswurzel einmal kontrolliert auflösen. Den expliziten Baum vollständig, aber mit Knotenzähler erfassen; leere Verzeichnisse zusammengefasst melden. Keine .gitignore-Filter und kein stilles Weglassen. Reservierte Eingaben, unsichere Pfade, case-/Präfixkollisionen und Sonderdateien ablehnen. Sichere Datei-/Verzeichnisidentitäten über Öffnen und Lesen erhalten, unterhalb der Wurzel keine Symlink-/Reparse-Umleitungen; erkennbare Quellhardlinks ablehnen. Begrenzte Byteerfassung oder Spooling nur im später ausdrücklich freigegebenen Ausgabebereich; vor Finalisierung erneut Inventarkonsistenz prüfen. Modi standardmäßig 0644, explizite geprüfte Anforderungen separat erfassen. Entrypoint ausschließlich statisch prüfen; keine installierte Shell verlangen. Noch keine unvollständige öffentliche Pack-Funktion anbieten.
@@ -519,8 +616,8 @@ Die folgenden Testangaben sind **zu erbringende Nachweise**, keine Ergebnisse be
 
 ### PP-02B – Paketmetadaten, Name, Handoff und ZIP-Kandidat
 
-**Normbezug:** PACK-04/12–17, SEM-01/02, DOC-02.  
-**Voraussetzung:** PP-02A.  
+**Normbezug:** PACK-04/12–17, SEM-01/02, DOC-02.
+**Voraussetzung:** PP-02A.
 **Betroffene Stellen:** Neue Pack-Fachlogik; `patch_manifest.py`, `bundle_handoff.py`, `chat_instructions.py`, `bundle_names.py`, bestehende Suffixprüfung.
 
 **Umsetzung:** Aus der geprüften Referenz genau das siebenfeldrige Patchformat-1-Manifest generieren. Für beide Ausgabearten eine UUID v4 und einen UTC-Zeitpunkt pro Auftrag fixieren. Automatischen Namen, Repositorynamen-Sanitizing, Legacyfallback und Suffix gemäß PACK-15 erzeugen; explizite Namen nicht umbenennen. Handoff mit der eigenen kanonischen statischen Vorlage rendern, aber alle Zielsystemdaten einschließlich ursprünglichem captured_at aus der Referenz übernehmen. Fehlende Legacywerte bleiben unbekannt. Die referenzspezifisch gerenderte alte Root-Anleitung niemals nochmals als Vorlage verwenden. Pflichtdateien und Nutzinventar in sortiertes ZIP_DEFLATED/Level-6-Format mit festen Zeitstempeln und expliziten Modi überführen. Paket-UUID, Chat-Nummer und Referenz-Run-ID getrennt halten; kein zusätzliches Manifestfeld oder Zählerzustand.
@@ -533,8 +630,8 @@ Die folgenden Testangaben sind **zu erbringende Nachweise**, keine Ergebnisse be
 
 ### PP-02C – Endvalidierung, sichere Veröffentlichung und öffentliche Pack-API
 
-**Normbezug:** PACK-03/04/18–23, ARCH-01, GOV-04, CHECK-01/02.  
-**Voraussetzung:** PP-02B.  
+**Normbezug:** PACK-03/04/18–23, ARCH-01, GOV-04, CHECK-01/02.
+**Voraussetzung:** PP-02B.
 **Betroffene Stellen:** `api.py`, `api_types.py`, neues `patch_pack.py` und gegebenenfalls `pack_publication.py`; gezielte Plattformadapter und bestehender Validator.
 
 **Umsetzung:** Den vollständigen Requestpfad implementieren: Argumenttypen und eigenes Modusmapping, Referenz-/Vorlagenbindung, Inventar, Kandidat, eigene .partial-Datei, Flush/Close/Sync, native Endvalidierung gegen dieselbe Referenz, erneuter Hash-/Identitätsabgleich und No-replace-Publikation. Ausgabeverzeichnis muss existieren; physische Aliase zu Quelle, Referenz oder verwendeter Runtime verhindern. Geeignete exklusive Publikationsprimitive je Plattform testen; bei fehlender Unterstützung abbrechen, nie auf überschreibendes Rename oder Schreiben unter finalem Namen ausweichen. Result-Publikation nicht auf diese Politik umstellen. pack wartet bei FileChangedDuringRead nicht automatisch. Unveränderliches PatchPackResult erst mit bestätigter Veröffentlichung liefern. Cleanupfehler danach ergeben vollständigen Erfolg mit Warnung, auch ohne Observer. Alle fachlichen Daten vor dem Veröffentlichungspunkt sichern, damit ein separater Watcher die Enddatei sofort übernehmen darf. Erlaubte/unerlaubte Nebenwirkungen und Unterbrechungsphasen gezielt unterscheiden.
@@ -547,8 +644,8 @@ Die folgenden Testangaben sind **zu erbringende Nachweise**, keine Ergebnisse be
 
 ### PP-03 – Reguläres Unterkommando, JSON und manueller Pack-Durchstich
 
-**Normbezug:** PACK-01–05/15/20/22, ARCH-01, SCOPE-04, DOC-01/02.  
-**Voraussetzung:** PP-02C.  
+**Normbezug:** PACK-01–05/15/20/22, ARCH-01, SCOPE-04, DOC-01/02.
+**Voraussetzung:** PP-02C.
 **Betroffene Stellen:** `cli.py`, vorhandener Ausgabe-/JSON-Adapter, `api.py`; neue Pack-CLI-/API-Tests, README und API-Dokumentation.
 
 **Umsetzung:** Parser auf den festgelegten Pflichtvertrag erweitern: Inhaltsordner, Referenz, Entrypoint und exakt eine Ausgabealternative. Wiederholte Modusangaben vor Mappingbildung auf Duplikate prüfen; Oktalsyntax und fachlich verbotene Modi trennen. CLI ausschließlich auf api.pack_patch delegieren. Vollständiges output_version-2-Pack-Envelope inklusive bestehendem validation_json_result serialisieren; keine gekürzten IDs und kein Prosa-stdout im JSON-Modus. Parserfehler behalten Usage 2. Nach bestätigter Veröffentlichung Ausgabefehler 7 beziehungsweise Ausgabeunterbrechung 130 getrennt behandeln; kein zweiter widersprüchlicher Envelope, kein Neubau. Beide Ausgabewege in einer regulär installierten Distribution manuell nachvollziehbar testen.
@@ -561,8 +658,8 @@ Die folgenden Testangaben sind **zu erbringende Nachweise**, keine Ergebnisse be
 
 ### PP-04A – Kanonisches PYZ-Datenprofil und Build-Rezept
 
-**Normbezug:** PYZ-03/06–09/12, SCOPE-01/03, PLAN-03.  
-**Voraussetzung:** PP-03.  
+**Normbezug:** PYZ-03/06–09/12, SCOPE-01/03, PLAN-03.
+**Voraussetzung:** PP-03.
 **Betroffene Stellen:** Neues `runtime_pyz.py`, `build_backend.py`, `scripts/build_release.py`, `MANIFEST.in` und Packaging-Tests; `runtime_wheel.py` als Legacyvertrag erhalten.
 
 **Umsetzung:** Marker/Profile/Content-ID-Verfahren und das geschlossene Rezept nach Revision 2 umsetzen. Die zyklusfreie producer_id → Identitätsdatei → content_id → Artefakthash-Ableitung exakt abbilden. Root-Einstieg aus inventarisierter pyz-main-Ressource erzeugen, ohne Interpreter-kompatibilitätsabhängigen Code vor der Versionskontrolle. Kanonischen ZIP_STORED-Writer und reinen Datenreader mit lokalen/zentralen Header- und Inventarprüfungen implementieren. Watcher, dist-info, alte generierte Wheel-Identitäten, fremde Module und rekursiv eingebettete Artefakte aus dem PYZ-Profil ausschließen, Legacy-Lesecode aber erhalten. Build erzeugt/verifiziert vorbereitete Ressourcen ohne verunreinigten Checkout. Wenn beide Profile übergangsweise vorbereitet werden, ihre Inventare und Identitäten ausdrücklich trennen; keine Hashzyklen oder doppelten Runtime-Artefakte im Result.
@@ -575,8 +672,8 @@ Die folgenden Testangaben sind **zu erbringende Nachweise**, keine Ergebnisse be
 
 ### PP-04B – ZIP-taugliche, herkunftsgebundene Ressourcen
 
-**Normbezug:** PYZ-04/06/07/10, ARCH-01/03, PLAN-03.  
-**Voraussetzung:** PP-04A.  
+**Normbezug:** PYZ-04/06/07/10, ARCH-01/03, PLAN-03.
+**Voraussetzung:** PP-04A.
 **Betroffene Stellen:** `chat_instructions.py`, `runtime_artifact.py`, `result_resources.py`, Ressourcenadapter und Build-Paketdaten.
 
 **Umsetzung:** Dateisystemannahmen aus eigenen Ressourcenlesern entfernen. Derselbe verankerte Reader muss installierte Paketressourcen und ZIP-Ressourcen unterstützen, ohne auf CWD, Zielrepository oder zufällige gleichnamige Distribution auszuweichen. Eigene geladenen Identitätsliterale gegen den überprüften Ressourcensatz binden. Lizenz, API-Dokumentation, Rezept, Einstieg und statische Chat-Vorlage über diesen Pfad verfügbar machen. Lesende Prüffunktionen dürfen keine Extraktion/Schreibzugriffe erhalten; pack lädt nur seine benötigten Vorlagen. Übergang mit altem Provider bewusst kompatibel halten. Gemeinsames frühes Pinning vorbereiten; dessen vollständige Apply-Selbstupdateabnahme gehört zum Provider-Durchstich.
@@ -589,8 +686,8 @@ Die folgenden Testangaben sind **zu erbringende Nachweise**, keine Ergebnisse be
 
 ### PP-04C – PYZ-Einstieg, Core-Import und Python-only-Bootstrap vorbereiten
 
-**Normbezug:** PYZ-01/02/05, ARCH-02/03, CHAT-01/02/04, TEST-01.  
-**Voraussetzung:** PP-04B.  
+**Normbezug:** PYZ-01/02/05, ARCH-02/03, CHAT-01/02/04, TEST-01.
+**Voraussetzung:** PP-04B.
 **Betroffene Stellen:** `__main__.py` als generiertes Artefakt, `patchharbor/_runtime/pyz-main.py`, `scripts/runtime_bootstrap.py`, kanonische `CHAT_INSTRUCTIONS.md`; isolierte Runtime-/Bootstraptests.
 
 **Umsetzung:** Root-Einstieg direkt auf die Core-CLI führen, inklusive früher Python-3.12-Untergrenzenkontrolle. Direktaufruf und -I -S -B außerhalb des Checkouts prüfen. Alle Core-Kommandos müssen importierbar sein; einzelne Repositoryfunktionen benötigen weiterhin Git/Registry/Interpreter. Statische Chat-Werkzeuge und pack ohne Git/Shell testen. Einen kontrollierten In-Process-Zugang mit vorheriger Herkunftsprüfung vorbereiten; vorhandene fremde patchharbor-Module nicht durch sys.modules-Löschen austauschen. Bootstrap-Vorcheck allein mit Standardbibliothek, ohne installierten Core; sichere Einzelextraktion statt extractall. Für Format 3 zunächst Testartefakte/Fixtures verwenden, bis der neue vollständige Reader integriert ist. Die tatsächlich einzubettende Vorlage bereits mit dem neuen Startweg abstimmen.
@@ -603,8 +700,8 @@ Die folgenden Testangaben sind **zu erbringende Nachweise**, keine Ergebnisse be
 
 ### PP-05A – Resultformat 3 und Runtime-Metadaten 2 streng lesen
 
-**Normbezug:** FMT-01–05, MIG-01/05, PYZ-12, PACK-06/07.  
-**Voraussetzung:** PP-04C.  
+**Normbezug:** FMT-01–05, MIG-01/05, PYZ-12, PACK-06/07.
+**Voraussetzung:** PP-04C.
 **Betroffene Stellen:** `result_reader.py`, `result_runtime.py`, `result_verification.py`, `runtime_pyz.py`, gemeinsame Ressourcenbilanz; neue `test_result_format3`-Fixtures.
 
 **Umsetzung:** Alte Resultformate 1/2 explizit von Format 3 trennen. In Format 3 artifact.type=pyz und das neue Metadatenschema einschließlich Profil, capabilities und null-Vertrag für unavailable prüfen. Alte wheel-Felder nicht umdeuten. Geschlossene Objekte, bool-statt-int, doppelte Schlüssel, Hash-/Größen-/Pfad-/Versionswidersprüche sowie zusätzliche Archiveinträge ablehnen. Äußere und innere Runtimebudgets gemeinsam bilanzieren. Pythoncode aus der Referenz niemals importieren. Die über PP-01 genutzte gemeinsame Referenzprüfung erschließt automatisch pack mit gültigen Format-3-Fixtures; kein eigener Pack-Reader. Defekte deklarierte Runtime bleibt Referenzfehler, gültiges unavailable bleibt lesbar.
@@ -617,8 +714,8 @@ Die folgenden Testangaben sind **zu erbringende Nachweise**, keine Ergebnisse be
 
 ### PP-05B – Alle Result-Verbraucher und den eingebetteten Bootstrap integrieren
 
-**Normbezug:** MIG-02/03/05, FMT-05, CHAT-01/02/06, GOV-03/04.  
-**Voraussetzung:** PP-05A.  
+**Normbezug:** MIG-02/03/05, FMT-05, CHAT-01/02/06, GOV-03/04.
+**Voraussetzung:** PP-05A.
 **Betroffene Stellen:** `exchange.py`, `exchange_archive.py`, `archive_evidence.py`, `exchange_recovery.py`, `result_verification.py` und ihre Aufrufpfade; Bootstrap-Skript und kanonische Vorlage.
 
 **Umsetzung:** Klassifikation, Wiederverarbeitung, Archivierung und Recovery auf vollständige korrekte Format-3-Lesefähigkeit prüfen. Strukturelle Erkennung, vollständige Referenzprüfung und Erfolgs-/Commitbeleg bewusst auseinanderhalten. Eingefrorene Altleser mit belegter Herkunft ergänzen, ohne sie beim Ändern des neuen Readers mitzupatchen. Nachweisen, dass neue Results und standalone PYZ weder als Patch gestartet noch ohne belegten Erfolg entfernt werden. Bootstrap mit exakt dem neuen Metadaten-/Profilvertrag abstimmen; Legacywege bleiben ausdrücklich versioniert. Beide Spezifikationen in der kanonischen Anweisung gemeinsam auswählen. Eine noch wheelbasierte Produktion benötigt eine weiterhin zutreffende formatabhängige Anleitung; kein vorzeitiger Wegfall ihres funktionierenden Startwegs.
@@ -631,8 +728,8 @@ Die folgenden Testangaben sind **zu erbringende Nachweise**, keine Ergebnisse be
 
 ### PP-06A – Gemeinsamen PYZ-Provider und request-lokale Result-Ressourcen vervollständigen
 
-**Normbezug:** PYZ-06/10/11, FMT-02–04, MIG-04/06, PLAN-03.  
-**Voraussetzung:** PP-05B.  
+**Normbezug:** PYZ-06/10/11, FMT-02–04, MIG-04/06, PLAN-03.
+**Voraussetzung:** PP-05B.
 **Betroffene Stellen:** `runtime_artifact.py`, `result_resources.py`, `result_bundle_writer.py`, Result-Capture-/Handoff-Grenzen, Buildbackend und Runtimeproduktions-Tests.
 
 **Umsetzung:** Den Provider so vervollständigen, dass reguläre vorbereitete Installation und geladene PYZ aus demselben endlichen Ressourceninventar denselben kanonischen Artefaktbestand erzeugen. Runtime, Identität und statische Vorlage vor Apply-Mutation gemeinsam request-lokal fixieren. Aktuell wheelbenannte interne Werte gezielt verallgemeinern, ohne Legacyreader umzudeuten. Die Format-3-Payload und Writerbausteine intern/über Tests bereitstellen, aber noch keinen unabhängig auslieferbaren Produktionswechsel aktivieren. Runtime-only-Fehler, vollständiger Snapshot/Logerhalt und begrenzter bestehender Fallback vorbereiten; Pflichtvorlagenfehler nicht als harmlos verschleiern. Kein Build, kein Installer-Cache und kein Netzwerk im Request. Testpfade für dreifache Reproduktion und Selbstupdate herstellen.
@@ -645,8 +742,8 @@ Die folgenden Testangaben sind **zu erbringende Nachweise**, keine Ergebnisse be
 
 ### PP-06B – Format-3-Writer atomar mit seinem funktionsfähigen Bootstrap aktivieren
 
-**Normbezug:** MIG-02/04/06, FMT-01–05, PYZ-10/11, ARCH-02, CHAT-01/02, E-10.  
-**Voraussetzung:** PP-06A.  
+**Normbezug:** MIG-02/04/06, FMT-01–05, PYZ-10/11, ARCH-02, CHAT-01/02, E-10.
+**Voraussetzung:** PP-06A.
 **Betroffene Stellen:** Gemeinsame Result-Erzeugungsgrenze, `result_bundle_writer.py`, `result_resources.py`, Publikations-/Fallbackpfade, kanonische Anleitung und Runtime-Buildressourcen.
 
 **Umsetzung:** Neue Produktion an der gemeinsamen Grenze auf Result 3/Runtime-Metadaten 2 umstellen: manuelles bundle, Apply-Erfolg/-Fehler, Dry-Run, manueller Runner und installierter Watcher über den Core. Genau eine PYZ bei embedded, keine parallele Runtime-Wheelproduktion; Legacyreader und normale Installationswheels behalten. Minimalen Bootstrap und tatsächlich gebaute/eingebettete Anleitung synchron aktivieren. Result-Replace/Sync/typisierte endliche CIFS-Retries/geteiltes Budget und Hashbindung bis zur Veröffentlichung unverändert erhalten. Neue Standardinstallation darf nicht regelmäßig unavailable liefern. Vollständige PYZ-Core-Parität einschließlich resultproduzierender Wege und drei echte isolierte Result/PYZ-Generationen testen. Den ersten umgestellten Resultoutput ausschließlich anhand seiner eigenen Anweisung in frischer Umgebung benutzen und damit gegen genau sich selbst packen/validieren.
@@ -659,8 +756,8 @@ Die folgenden Testangaben sind **zu erbringende Nachweise**, keine Ergebnisse be
 
 ### PP-07 – Chat-Vertrag, Beispiele und Dokumentation vollständig abgleichen
 
-**Normbezug:** CHAT-01–06, DOC-01/02, GOV-01/03/04, CHECK-01/02, PLAN-04.  
-**Voraussetzung:** PP-06B.  
+**Normbezug:** CHAT-01–06, DOC-01/02, GOV-01/03/04, CHECK-01/02, PLAN-04.
+**Voraussetzung:** PP-06B.
 **Betroffene Stellen:** Alle Dokumente aus Abschnitt 10; kanonische Chat-Vorlage, gebaute Ressourcen und vorhandene Release-/Buildaudits.
 
 **Umsetzung:** Voll-Datei-, Diff-, Misch- und Diagnosebeispiele über installierte CLI, PYZ und API funktional nachvollziehen. Plan-/Normsatzwahl, Inhaltserstellerverantwortung, obligatorische Referenz und explizites Ausgabeziel deutlich machen. Technischen Startfallback von inhaltlicher Validatorablehnung trennen; kein Umgehen kaputter Bindung oder nativer Referenzprüfung. Finale kanonische ZIP, Paket-Hash und unabhängige Chat-Bundle-Nummer erhalten; kein automatischer Versand oder Watcherstart. Eine syntaktisch kaputte, formal gültige Entrypointdatei als Grenze des Prüfnachweises demonstrieren, ohne Erfolg einer Ausführung zu behaupten. Historische Dokumente nicht auf neues Format umschreiben. Änderungen an eingebetteten Vorlagen ändern die PYZ-Identität; danach Artefakte neu bauen und betroffene E-10-/Roundtrip-Prüfungen wiederholen.
@@ -673,8 +770,8 @@ Die folgenden Testangaben sind **zu erbringende Nachweise**, keine Ergebnisse be
 
 ### PP-08A – Gesamte Funktions-/Robustheitsmatrix in den bestehenden Lanes absichern
 
-**Normbezug:** TEST-01–07, DONE-01; gesamte Z-/F-/P-/S-/E-Matrix.  
-**Voraussetzung:** PP-07.  
+**Normbezug:** TEST-01–07, DONE-01; gesamte Z-/F-/P-/S-/E-Matrix.
+**Voraussetzung:** PP-07.
 **Betroffene Stellen:** Neue und bestehende Testmodule, `tools/test_policy.py` nur bei nötiger fachlicher Zuordnung, bestehende CI-/Docker-/native Windows-Acceptanceeinbindung.
 
 **Umsetzung:** Die 76 spezifizierten Testszenarien mit konkreten Test-Node-IDs oder ausdrücklich manuellen Review-/Praxisnachweisen vervollständigen. Prüfen, dass Marker/Selektoren neue Tests tatsächlich in die vorgesehenen Lanes aufnehmen; besonders der gesonderte Windows-PowerShell-7-Selektor ist derzeit dateibasiert und darf neue relevante Applyfälle nicht versehentlich auslassen. Race-/Fehlerinjektion mit deterministischen Synchronisationspunkten, sichere Nebenwirkungsinstrumentierung und Quell-/Referenz-/Outputstabilität vollständig abdecken. Laufende normale Installation mit Watcher unverändert testen, ohne realen systemd-Dienst zu starten. Bestehende Ressourcen-/Mode-/Replay-/Recovery-/Publikationsregressionen erhalten. Größen-, Start-, Pack- und Speicherwerte kontrolliert messen; keine pauschale Leistungszusage und keine künstlich engen Timingassertions.
@@ -687,8 +784,8 @@ Die folgenden Testangaben sind **zu erbringende Nachweise**, keine Ergebnisse be
 
 ### PP-08B – Finale Artefakte auditieren und Abschlussnachweise binden
 
-**Normbezug:** DONE-01, TEST-04–07, PLAN-01/04, GOV-02, MIG-06.  
-**Voraussetzung:** PP-08A.  
+**Normbezug:** DONE-01, TEST-04–07, PLAN-01/04, GOV-02, MIG-06.
+**Voraussetzung:** PP-08A.
 **Betroffene Stellen:** `scripts/build_release.py`, bestehende Release-/Packaging-Audits und finale Dokumentation; Result-/Log-/CI-Nachweise des tatsächlichen geprüften Stands.
 
 **Umsetzung:** Nur noch erforderliche Releaseaudit-/Inventar-/Dokumentkorrekturen vornehmen, die gewählte Produktversion konsistent setzen und alle finalen Installationsartefakte sowie die kanonische PYZ aus genau diesem Stand neu erzeugen. Bei keinem tatsächlichen Dateidelta keinen leeren Commit verlangen, sondern diesen Schritt als dokumentiertes Abnahmegate schließen. Vollständige lokalen Gates und tatsächlichen Apply-Nachweis erbringen. Die nach bestehender Policy fällige oder ausdrücklich autorisierte CI auf den vollständigen Endcommit binden und sämtliche vorgeschriebenen Jobs auswerten. Reale Linux→Windows-CIFS-Prüfung separat erbringen; offene Alt-Abnahmen nicht umetikettieren. Artefakthashes, Interpreter, Tests, Skips, CI und Praxisnachweise zu einer eindeutigen Abschlussbewertung zusammenführen. Kein Tag, Releaseupload oder globales Hostupgrade ohne eigenen Auftrag.
@@ -740,13 +837,11 @@ Eng gekoppelte Provider-/Bootstrap-/Writeränderungen dürfen zusammenfallen. Di
 
 ## 7. Testausführung, Plattformen und CI
 
-**Aktueller Vorrang:** Die Pixel-Phase aus Abschnitt 1.8 gilt bis zum ausdrücklich
-bestätigten Laptop-Wechsel, nicht nur für PP-00 oder ein einzelnes Bundle.
-Auf dem Pixel keine lokalen Produkttests oder Testinstallationen; Commit/Push
-vor externer CI sind erlaubt, automatische parallele CI pro Änderung bleibt
-Pflicht. Die folgenden lokalen Beispiele gelten nur außerhalb dieser Phase.
-Soweit andere Arbeitspakete lokale Vorcommit-/Endgates nennen, gilt ebenfalls
-dieser Vorrang. Testinhalte und offene native/CIFS-Nachweise werden nicht gestrichen.
+**Aktueller Vorrang:** Der ausdrücklich bestätigte Laptop-Wechsel beendet die
+Pixel-Phase. Abschnitt 1.9 und die folgenden Development-/Apply-Gates gelten.
+Development ausschließlich parallel; Apply-Endstand seriell und danach parallel
+vor dem letzten Commit und dem einzigen Push. Reguläre CI wieder im Fünfertakt,
+nächster Termin 029. Offene native/CIFS-Nachweise bleiben bestehen.
 
 ### 7.1 Bestehende Tests wiederverwenden
 
@@ -772,26 +867,20 @@ Neue Testdateien werden erst nach ihrer Implementierung mit ihrem wirklichen Nam
 
 ### 7.2 Development und Apply nicht vermischen
 
-Die im Ausgangsstand geltende Policy aus Hauptspezifikation §33 und `docs/test-parallelism.md` bleibt bestehen, soweit beim Umsetzungsstart keine spätere ausdrückliche Nutzerentscheidung vorliegt:
+Die ausdrückliche Nutzeranweisung aus Abschnitt 1.10 hat Vorrang vor älteren
+seriellen Endgates. Jeder Entwicklungs- und Apply-Stand wird vollständig parallel
+mit `python tools/run_tests.py --suite all` geprüft. Vor jedem tatsächlichen
+Commit müssen dessen unveränderte Quellen und vollständige Controller-Nachweise
+erfolgreich geprüft sein. Auch am Bundle-Ende läuft keine serielle Suite.
+Nach den geprüften Commits erfolgt genau ein normaler Push auf den bestätigten
+Zielbranch. Ein Fehler erhält bereits eingespielte Dateien und erfolgreiche
+Teilcommits; die Fortsetzung bindet das neue tatsächliche Result.
 
-| Ort / Phase | Vorgeschriebene Prüfung |
-|---|---|
-| Development | Ausschließlich parallele Tests; vor dem vorgesehenen Commit vollständige parallele Suite |
-| Apply-Zwischenstand vor einem Zwischencommit | Vollständige parallele Suite auf genau diesem Zwischenstand |
-| Apply-Bundle-Ende | Auf unverändertem Endstand zuerst vollständige Suite seriell, danach vollständig parallel; letzter paralleler Lauf ist zugleich Gate des letzten Zustands |
-| Nach bestandenem Bundle-Endgate | Letzter Commit und genau der vorgesehene normale Push; keine vorgezogenen Endcommits |
-| Reines Diagnosebundle ohne Commit | Nur ausdrücklich beauftragter Diagnoseumfang, keine erfundene Commit-/Vollsuitepflicht |
-
-Beispiel für das **Apply-Endgate**, nicht für einen zusätzlichen seriellen Development-Lauf:
-
-```bash
-python tools/run_tests.py --suite all --serial
-python tools/run_tests.py --suite all
-```
-
-Unter Ubuntu wird im vorhandenen Apply-Vertrag der eingerichtete `.venv/bin/python` verwendet, unter Windows der passende eingerichtete Interpreter. Ein optionaler `--report` schreibt Nachweise in einen pro Lauf eindeutigen freigegebenen Bereich **außerhalb** des getesteten Quellstands. Der Testcontroller bleibt alleiniger Berichtersteller. Vergleichsberichte werden nur nach dem vorhandenen Launcher-Vertrag verwendet; keine geerbten Worker-/Timeoutoptionen umgehen.
-
-Kein künstlich verkürztes Suite-Timeout und keine neue UI-Testpflicht. Kontrollierte Fault-Injection/Barrieren ersetzen zufällige Sleep-Rennen; fachliche Prozess- und Timeouttests bleiben bestehen. Tests dürfen die erzeugte PYZ niemals durch einen Sourceimport oder eine zufällige Hostinstallation als grün erscheinen lassen.
+Verwendet wird die bestehende Entwicklungsumgebung. Berichte liegen außerhalb
+des getesteten Quellstands. Keine verkürzten Timeouts, Testauswahl als Vollabnahme
+oder neue Tests auf Prosa, UI, Farben und Formatierung. Der vorhandene
+Modusverifier bleibt als Werkzeug erhalten, wird in dieser Schleife aber nicht
+ausgeführt. Native Plattformnachweise werden nicht aus Linux-Tests abgeleitet.
 
 ### 7.3 Plattformmatrix auf Grundlage des gelieferten Workflows
 
@@ -811,19 +900,17 @@ Die Python-Untergrenze 3.12 und der zusätzliche Interpreter 3.14 werden nicht d
 
 Normale Wheel-/sdist-/pip-/pipx-/uv-Wege werden nach der vorhandenen repräsentativen Packaging-Policy geprüft. Kein unnötiges vollständiges Kreuzprodukt aller Varianten. Echte gebaute Artefakte, ihre installierten Inventare und ihre Importherkunft müssen nachweisbar sein.
 
-### 7.4 CI-Takt und Freigabe
+### 7.4 CI-Start und Freigabe
 
-**Während der Pixel-Phase:** Automatische parallele CI nach jedem
-änderungsführenden Bundle gemäß Abschnitt 1.8. Dies ist die ausdrückliche
-Freigabe für diese Läufe. Die folgende Fünferregel ist dann ausgesetzt; keine
-Doppelausführung an deren alten Zählterminen. Außerhalb dieser Phase bleibt sie
-der historische Ausgangspunkt für die erneut abzugleichende Nutzerpolicy.
+CI bleibt ausschließlich per `workflow_dispatch` startbar. Nur Christian selbst
+startet den Workflow; weder Codex noch ein Apply-Entrypoint lösen ihn aus.
+Der frühere Fünfertakt entfällt. Keine Push-/PR-/Zeitplantrigger, keine automatischen
+Retries. Die vorhandenen parallelen Lanes und ihre Timeouts bleiben unverändert.
 
-Der gelesene Workflow wird ausschließlich per `workflow_dispatch` gestartet. Die vorhandene Nutzerpolicy verlangt reguläre CI nach jeweils fünf weiteren Bundles seit der tatsächlichen Zählbasis 009, nicht nach jedem Planpunkt oder Git-Commit. **Der zum Umsetzungszeitpunkt nächste fällige Lauf wird aus den echten aktuellen Bundle-/CI-Nachweisen ermittelt; hier wird keine nächste Nummer geraten.**
-
-Für ein fälliges Bundle gilt der bestehende Auftrag an dessen Apply-Entrypoint: nach erfolgreichem Push vorhandenen Workflow auf dem erwarteten vollständigen Commit starten, alle vorgeschriebenen Jobs einschließlich Windows abwarten und Run-/Job-/Fehlernachweise über Log/Result zurückgeben. Zwischenbundles benötigen keinen eigenen zusätzlichen CI-Lauf. Keine neuen Push-, Pull-Request- oder Zeitplantrigger, kein automatischer Retry und keine zusätzliche serielle CI-Vollsuite.
-
-Das bereits vorhandene Timeout der nativen Acceptance-Matrix bleibt **120 Minuten**; die gesonderten PowerShell-/Docker-Grenzen werden nicht beiläufig verändert. Zusätzliche CI außerhalb des bestehenden Takts erfordert eine ausdrückliche Freigabe. Ist für den finalen Stand noch kein zulässiger vollständiger Lauf vorhanden, ist die Releaseabnahme offen, nicht automatisch bestanden.
+Fehlende CI allein blockiert keinen Entwicklungsschritt. Tatsächliche native
+Abnahme und Releasefreigabe bleiben davon getrennt: fehlende Windows-, Python-3.12-,
+Docker- oder CIFS-Nachweise werden offen ausgewiesen, niemals als bestanden
+behauptet. Ein später vom Nutzer gestarteter passender Lauf kann ausgewertet werden.
 
 ### 7.5 Messungen und negative Nachweise
 
@@ -1182,12 +1269,13 @@ Die mechanische Prüfung dieses Markdownplans kontrolliert eindeutige Schrittken
 | 2 | 2026-10-07 | PP-00 / Bundle 024 integriert: aktuelle bytegleiche Referenz vom Pixel, Norm-/Planverweise, offene Alt-Nachweise, vorbereiteter Status; ausdrücklich einmalige CI-only-Ausnahme ohne Tests oder Testinstallation im Apply, ein Commit/Push und automatische parallele CI mit Ergebnisprüfung. |
 | 3 | 2026-10-07 | PP-00-FIX1 / Bundle 025: Abbruch von 024 vor Staging/Commit/CI belegt; dirty Result als Reparaturbasis, SSH-Alias-Auflösung statt URL-Stringliste, unveränderte Konfiguration und Fortsetzung der ersten Pixel-CI-only-Ausnahme. Kein Fortschritt vor Apply-/CI-Nachweis. |
 | 4 | 2026-10-07 | PP-00-Erfolg und CI 37635401106 aus dem damaligen Result bestätigt; PP-01 in 026 vorbereitet. Die damaligen lokalen Endgates und CI-Pause sind durch Revision 5 für die Pixel-Phase ersetzt. |
+| 7 | 2026-10-07 | Bundle 028 scheitert nach Payload-Ausbringung vor Tests/Commit am Whitespace-Gate; FIX3 / 029 setzt die bestätigte dirty Bindung fort. Vollständige Tests ausschließlich parallel, CI nur durch den Nutzer, Schleife ohne feste Korrekturgrenze. |
+| 6 | 2026-10-07 | Laptop-Wechsel bestätigt, aktueller clean PP-01-Commit gebunden; vier Legacy-Importfehler reproduziert und konsistente historische Inspection-Fixture für PP-01-FIX2 / Bundle 028 vorbereitet. Reguläre lokale Gates und CI-Termin 029 wieder aktiv. Kein Produktcode oder Normsatz geändert. |
 | 5 | 2026-10-07 | PP-01-FIX1 / Bundle 027: unterbrochenes dirty Result ausgewertet; bestehende PP-01-Code-/Testbytes erhalten. Spätere Nutzeranweisung dauerhaft für die Pixel-Phase verankert: keine lokalen Produkttests/Testinstallationen, Commit/Push und automatisch genau eine parallele CI pro Änderung; Fünferregel ausgesetzt bis ausdrücklich bestätigtem Laptop-Wechsel. Kein vorweggenommener Abschlussnachweis. |
 
 ---
 
-**PP-00 ist durch Bundle 025 abgeschlossen. PP-01 liegt uncommitted aus dem
-unterbrochenen Bundle 026 vor; PP-01-FIX1 in Bundle 027 setzt ohne lokale Tests
-mit Commit/Push und automatisch gestarteter paralleler CI fort. Der neue
-Abschlussnachweis bleibt offen.** Erst danach PP-02A; auch dort bleibt die
-Pixel-CI-only-Regel aktiv. Keine automatische Fortsetzung oder Releasefreigabe.
+**PP-00 ist abgeschlossen. PP-01 ist committed, seine Abnahme wegen der
+Legacy-Fixture-Regression noch offen. Bundle 028 / PP-01-FIX2 wird auf dem
+Laptop mit den regulären lokalen Gates vorbereitet.** Erst nach bestätigtem
+Reparatur-Result PP-02A. Keine automatische Fortsetzung oder Releasefreigabe.

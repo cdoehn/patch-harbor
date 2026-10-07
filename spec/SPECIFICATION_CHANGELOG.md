@@ -1,5 +1,34 @@
 # PatchHarbor – Spezifikations-Changelog
 
+## 2026-10-07 – PP-01-FIX3 / Bundle 029: Whitespace-Abbruch und neue Testpolicy
+
+- Result von 028 vollständig geprüft: Exit 1 vor Tests, Commit und Push;
+  alle acht Payload-Dateien erhalten, HEAD unverändert, tatsächlicher Fingerprint
+  `5b93b0f9950d5100`. Korrektur bindet genau diesen dirty Teilzustand.
+- Problematische Leerzeichen im Plan bereinigt; vollständige finale Unterschiede
+  vor Auslieferung mit Git lesend geprüft. Git-Fehlerdiagnosen gehen in das Log.
+- Spätere ausdrückliche Nutzerentscheidung: Development und Apply ausschließlich
+  volle parallele Tests, CI nur vom Nutzer manuell gestartet, Schleife ohne feste
+  Korrekturgrenze. Plan Revision 7 und aktuelle Hinweise führen diese Policy.
+- Historische Fixture-Reparatur erhalten; Produktquellen und beide Normdateien
+  bytegleich. Tatsächlicher Reparaturerfolg bleibt bis zum Watcher-Result offen.
+
+## 2026-10-07 – PP-01-FIX2 / Bundle 028: konsistente Legacy-Fixture auf dem Laptop
+
+- Frisches clean Result bindet den vorhandenen PP-01-Commit
+  `e6ed2895c6922c1bf0f8f13ec6af58bb70fd7c3d`; vier E2E-Importfehler auf
+  unverändertem Snapshot parallel reproduziert.
+- Historische `patch_inspection.py` aus demselben Commit wie die eingefrorenen
+  Reader ergänzen, Provenienz hashen und alle historischen Importe im echten
+  Kindprozess prüfen. Keine optionalen Produktimports, Skips oder gelockerten
+  Exit-/Archivierungsprüfungen; Produktquellen und beide Normdateien unverändert.
+- Plan Revision 6 und aktuelle Statushinweise ordnen den ausdrücklich bestätigten
+  Laptop-Wechsel ein: Development parallel, Apply-Endstand seriell/parallel vor
+  Commit/Push, kein Hook-Bypass. Reguläre nächste CI 029; kein Zusatzlauf für 028.
+- Auslieferung nur nach bestandenem vollständigem lokalen Gate; tatsächlicher
+  Reparatur-Apply und dessen Nachweise bleiben bis zum neuen Result offen.
+
+
 ## 2026-10-07 – PP-01-FIX1 / Bundle 027: Tests nur in CI während der Pixel-Phase
 
 - Spätere ausdrückliche Nutzerentscheidung: Bis Christian ausdrücklich auf den

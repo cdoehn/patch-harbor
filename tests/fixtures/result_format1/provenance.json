@@ -1,5 +1,5 @@
 {
-  "purpose": "Frozen pre-Format-2 reader modules; supporting infrastructure comes from the tested checkout.",
+  "purpose": "Frozen pre-Format-2 reader and inspection boundary from one historical commit; supporting infrastructure comes from the tested checkout.",
   "source_commit": "d31047b2feca049c2db5443bb61df2ce7ce5e7f6",
   "source_result_sha256": "00e6f34878e1d2a9d3cdf16f1915abe662494d2e24bb8552b6e9024fc2665b01",
   "files": {
@@ -14,6 +14,10 @@
     "archive_evidence.py": {
       "source_path": "src/patchharbor/archive_evidence.py",
       "sha256": "23ed7114d578907bc4f4d3570eb40cb1585f880af4f85aae42c23a32c0468a5f"
+    },
+    "patch_inspection.py": {
+      "source_path": "src/patchharbor/patch_inspection.py",
+      "sha256": "44b59beb593a766426a7421f6682493c6c902ae5c5e0c0a18f05d4326a8bf5bb"
     }
   }
 }
