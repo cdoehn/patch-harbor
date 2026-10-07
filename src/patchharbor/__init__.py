@@ -12,4 +12,13 @@ except ModuleNotFoundError as exc:
         raise
     _runtime_resource_id = None
 
+# Independently prepared PYZ identity. Legacy wheel recipes never inventory
+# this generated file; canonical PYZ recipes never inventory the wheel literal.
+try:
+    from patchharbor._pyz_identity import RESOURCE_ID as _pyz_resource_id
+except ModuleNotFoundError as exc:
+    if exc.name != __name__ + "._pyz_identity":
+        raise
+    _pyz_resource_id = None
+
 __all__ = ["__version__"]

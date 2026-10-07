@@ -1,4 +1,54 @@
-# Kanonische Runtime, Rezeptformat 1
+# Kanonische Runtimeprofile: PYZ und Legacy-Wheel
+
+
+## PP-04A: vorbereiteter Core-PYZ-Kandidat
+
+Das neue geschlossene Profil `patchharbor-core-no-watcher-v1` verwendet
+`patchharbor/_runtime/pyz-recipe.json`, Marker `patch-harbor-pyz-recipe`,
+Rezeptversion 1 und Content-ID-Verfahren `patchharbor-pyz-content-v1`.
+`runtime_pyz.py` prüft Daten; es führt keine darin beschriebenen Module aus.
+
+Das sortierte finite Inventar enthält Root-`__main__.py`, Core-Code, Typingmarker,
+Chatvorlage, API-Dokumentation, Lizenz und das generierte `_pyz_identity.py`.
+`__main__.py` stammt ausschließlich aus der inventarisierten Ressource
+`patchharbor/_runtime/pyz-main.py` mit gleichen Bytes. Der Einstieg prüft
+Python >=3.12 vor dem ersten Core-Import. Watcher, dist-info, alte generierte
+Wheel-Identitäten/-Rezepte, fremde Pakete, Bytecode, Hooks und Runtime-Artefakte
+sind ausgeschlossen. Legacy-Wheel-Lesecode bleibt im Core.
+
+Die Ableitung ist endlich: Producer-ID aus versioniertem Inventar ohne eigene
+Identitätsdatei; daraus feste Identitätsbytes; vollständiges Inventar samt
+Identitätsdatei ergibt Content-ID; erst das fertige ZIP ergibt den Artefakthash.
+Kanonisches JSON ist ASCII-kompatibles UTF-8 mit sortierten Schlüsseln, kompakten
+Separatoren und genau einem LF. Rezept und Identität hashen sich nicht selbst.
+
+Das ZIP verwendet STORED, v20, reguläre 0644-Dateien, Unix-Erzeuger, feste 1980-Zeit,
+lexikografische Reihenfolge sowie leere Flags/Extra-/Kommentarfelder. Vor dem
+ZipFile-Inventar wird das tatsächliche begrenzte Zentralverzeichnis durchlaufen;
+gefälschte Zähler verbergen keine zusätzlichen Einträge. Lokale Header, Inventar,
+CRC/Größen und sämtliche finalen kanonischen Bytes werden geprüft. Grenzen:
+16 MiB Artefakt, 32 MiB Inhalte, 1.000 Einträge, 1 MiB Rezept; das übergeordnete
+Resultbudget bleibt zusätzlich relevant.
+
+Der normale Build liefert zwei bewusst unabhängige vorbereitete Profile.
+Der kanonische Legacy-Wheel-Satz enthält keine erzeugten PYZ-Ressourcen; die PYZ
+enthält keine erzeugten Wheel-Ressourcen. Dadurch entstehen weder Hashzyklen
+noch rekursiv eingebettete Artefakte. Die Installation trägt beide Datensätze;
+der produktive Writer bleibt vorerst Format 2 und bettet allein das Wheel ein.
+Build-Helfer werden über einen privaten am Quellpfad verankerten Namensraum geladen,
+niemals aus einem zufälligen gleichnamigen Paket in CWD oder Site-Packages.
+
+`scripts/build_release.py --outdir dist` erzeugt Wheel, sdist und den kanonischen
+PYZ-Kandidaten. Die bestehende Python-Rückgabe `(wheel, source_distribution)` bleibt
+kompatibel. Kandidat und installierte Rezeptmaterialisierung müssen bytegleich sein.
+Das ist in PP-04A noch keine Freigabe aller PYZ-Kommandos: ZIP-Ressourcenzugriff,
+Python-only-Bootstrap und Result-3-Writer haben nachfolgende Gates.
+
+## Fortgeführter Legacy-Wheel-Vertrag
+
+Die folgende Beschreibung dokumentiert den historischen Wheel-Aufbau. Sein
+Datenvertrag bleibt für alte Results erhalten; frühe 1.c-Statusangaben beschreiben
+keinen neuen aktiven Plan. Der aktuelle Produktionswriter ist Format 2.
 
 Stand 1.c.C mit nativ bestätigten Abnahmekorrekturen FIX1–FIX3:
 interner Provider, Herkunftsprüfung und getrenntes Buildverfahren. Neue Results bleiben Format 1;

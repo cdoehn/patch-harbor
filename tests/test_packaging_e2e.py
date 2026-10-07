@@ -97,6 +97,8 @@ EXPECTED_RUNTIME_FILES = {
     "patchharbor/runtime_artifact.py",
     "patchharbor/result_runtime.py",
     "patchharbor/runtime_wheel.py",
+    "patchharbor/runtime_zip.py",
+    "patchharbor/runtime_pyz.py",
     "patchharbor/result_bundle_target.py",
     "patchharbor/result_bundle_writer.py",
     "patchharbor/locks.py",
@@ -353,6 +355,16 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
         f"patchharbor-{RELEASE_VERSION}.tar.gz"
     ]
     assert wheels[0].stat().st_size <= MAX_WHEEL_BYTES
+    from patchharbor import runtime_pyz
+    from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY
+    pyz_artifacts = list(distribution_dir.glob("patchharbor-*.pyz"))
+    assert [path.name for path in pyz_artifacts] == [f"patchharbor-{RELEASE_VERSION}.pyz"]
+    pyz_raw = pyz_artifacts[0].read_bytes()
+    pyz_recipe = runtime_pyz.read_pyz(pyz_raw, policy=DEFAULT_RESOURCE_POLICY,
+                                      remaining_bytes=runtime_pyz.MAX_CONTENT_BYTES)
+    with zipfile.ZipFile(wheels[0]) as transport:
+        assert transport.read(runtime_pyz.RECIPE_PATH) == pyz_recipe.data
+        assert runtime_pyz.materialize(pyz_recipe, lambda name,size:transport.read(name)) == pyz_raw
 
     wheel_metadata_contract: tuple[
         tuple[tuple[str, tuple[str, ...]], ...],
@@ -367,8 +379,10 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
             if name.startswith(("patchharbor/", "patchharbor_watcher/"))
             and not name.startswith("patchharbor/_runtime/")
         }
-        assert runtime_files == EXPECTED_RUNTIME_FILES | {"patchharbor/_runtime_identity.py"}
+        assert runtime_files == EXPECTED_RUNTIME_FILES | {"patchharbor/_runtime_identity.py", "patchharbor/_pyz_identity.py"}
         assert {name for name in names if name.startswith("patchharbor/_runtime/")} == {
+            "patchharbor/_runtime/pyz-recipe.json", "patchharbor/_runtime/pyz-main.py",
+            "patchharbor/_runtime/LICENSE",
             "patchharbor/_runtime/recipe.json", "patchharbor/_runtime/CHAT_INSTRUCTIONS.md",
             "patchharbor/_runtime/python-api.md", "patchharbor/_runtime/metadata/METADATA",
             "patchharbor/_runtime/metadata/WHEEL", "patchharbor/_runtime/metadata/entry_points.txt",

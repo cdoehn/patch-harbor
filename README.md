@@ -30,7 +30,9 @@ PP-02A / Bundle 031 is confirmed by commit
 `d487a84c55857ea0f64914f1cd636e5fc796a3fb` and its full parallel Apply gate
 (2,561 passed, 8 skipped). Bundle 032 confirms the full `api.pack_patch` operation at commit
 `e2f6388c7d511b700ad825b64aea2aca6841ca51` (2687 passed, 8 skipped).
-Bundle 033 adds the CLI adapter; its actual Apply is pending.
+Bundle 033 confirms the CLI adapter at commit `9bebc3c5a9da4da0cb6f846469a79bf9965a415a`
+(2734 passed, 8 skipped). Bundle 034 prepares the separate
+canonical Core-PYZ profile; full ZIP-resource operation follows later.
 
 **Current policy, explicitly updated by Christian on 7 October 2026:**
 Development and Apply run full parallel suites only, including at bundle end.
@@ -39,9 +41,9 @@ Only Christian starts the manual GitHub CI workflow; no automated dispatch or
 five-bundle cadence. The active loop continues the existing plan after verified
 Results, without a fixed correction-attempt limit.
 See [test policy](docs/test-parallelism.md) and [plan section 1.10](planning/pyz-pack/commit-plan.md).
-The prepared PP-03 step is not yet an Apply or CI success.
+The prepared PP-04A step is not yet an Apply or CI success.
 
-The planned Result PYZ contains the shared Core **without the watcher**.
+The prepared Result-PYZ profile contains the shared Core **without the watcher**.
 The new public `api.pack_patch` accepts explicit contents, a Result reference,
 and an explicit output location; see the [pack guide](docs/pack.md).
 The `patchharbor pack` CLI uses the same public API; PYZ distribution follows

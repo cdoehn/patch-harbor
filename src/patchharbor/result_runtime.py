@@ -9,6 +9,7 @@ from zipfile import BadZipFile, ZIP_STORED, ZipFile
 from patchharbor.json_document import parse_json_document
 from patchharbor.resource_policy import ResourcePolicy
 from patchharbor import runtime_wheel as wheel
+from patchharbor.runtime_zip import bounded_directory as _bounded_directory
 
 
 METADATA_PATH = "runtime/runtime.json"
@@ -73,32 +74,6 @@ def _capabilities(value: object) -> tuple[tuple[str, ...], tuple[int, ...], tupl
                  and versions in choices, "unsupported runtime read versions")
     return tuple(value["operations"]), tuple(value["patch_formats"]), tuple(value["result_formats"])
 
-
-def _bounded_directory(raw: bytes, policy: ResourcePolicy) -> int:
-    """Bound metadata allocation before ZipFile builds its complete member list.
-
-    This only preflights the fixed canonical envelope; ZipFile and the profile
-    checks below still validate every header and all content. A forged small
-    EOCD count cannot hide extra central-directory entries.
-    """
-    end = len(raw) - 22
-    _require(end >= 0, "truncated runtime ZIP boundary")
-    signature, disk, directory_disk, disk_count, count, size, offset, comment = struct.unpack_from(
-        "<4s4H2IH", raw, end)
-    _require(signature == b"PK\x05\x06" and disk == directory_disk == comment == 0
-             and disk_count == count and 0 < count <= min(wheel.MAX_ENTRIES, policy.max_zip_entries),
-             "unsupported runtime ZIP directory or entry budget")
-    _require(offset + size == end and count * 47 <= size <= count * (46 + 512),
-             "runtime ZIP directory budget or bounds exceeded")
-    cursor = offset
-    for _ in range(count):
-        _require(cursor + 46 <= end and raw[cursor:cursor + 4] == b"PK\x01\x02",
-                 "invalid runtime ZIP directory member")
-        name, extra, comment = struct.unpack_from("<3H", raw, cursor + 28)
-        _require(0 < name <= 512 and extra == comment == 0, "noncanonical runtime ZIP directory data")
-        cursor += 46 + name
-    _require(cursor == end, "runtime ZIP directory count mismatch")
-    return count
 
 
 def _read_wheel(raw: bytes, *, policy: ResourcePolicy, remaining_bytes: int) -> wheel.RuntimeRecipe:

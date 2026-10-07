@@ -1,5 +1,13 @@
 # PatchHarbor – Spezifikations-Changelog
 
+## 2026-10-08 – PP-03 bestätigt; PYZ-Profil in Bundle 034
+
+- CLI-Commit `9bebc3c5a9da4da0cb6f846469a79bf9965a415a` durch tatsächlichen Apply bestätigt.
+- Geschlossener Core-only-PYZ-Datenvertrag, eigene Identitätsableitung, streng
+  geprüftes kanonisches ZIP und getrennte endliche Buildprofile vorbereitet.
+- Normale Installationsartefakte und Legacy-Wheel-Produktion bleiben erhalten;
+  keine vorgezogene Writerumschaltung oder automatische CI. Beide Normdateien unverändert.
+
 ## 2026-10-08 – PP-02B/C bestätigt; CLI-Pack in Bundle 033
 
 - Gemeinsamer PP-02BC-Commit `e2f6388c7d511b700ad825b64aea2aca6841ca51` durch echtes Result bestätigt.

@@ -4,6 +4,8 @@
 from __future__ import annotations
 
 import argparse
+import importlib.util
+from types import SimpleNamespace
 from configparser import ConfigParser
 from email.message import Message
 from email.parser import BytesParser
@@ -254,15 +256,34 @@ def _copy_release_inputs(destination: Path) -> None:
     _assert_clean_release_stage(destination)
 
 
+def _materialize_pyz_candidate(wheel: Path) -> Path:
+    """Official builds emit the same finite bytes prepared in the installation."""
+    spec = importlib.util.spec_from_file_location(
+        '_patchharbor_release_backend', PROJECT_ROOT / 'build_backend.py')
+    if spec is None or spec.loader is None:
+        raise RuntimeError('missing anchored build backend')
+    backend = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(backend)
+    profile = backend._pyz_recipe_module()
+    with zipfile.ZipFile(wheel) as archive:
+        recipe = profile.parse_recipe(archive.read(profile.RECIPE_PATH))
+        raw = profile.materialize(recipe, lambda name, size: archive.read(name))
+    profile.read_pyz(raw, policy=SimpleNamespace(max_zip_entries=1000, max_content_bytes=256*1024*1024),
+                     remaining_bytes=profile.MAX_CONTENT_BYTES)
+    output = wheel.parent / recipe.pyz_name
+    output.write_bytes(raw)
+    return output
+
+
 def _remove_previous_project_artifacts(output_directory: Path) -> None:
     output_directory.mkdir(parents=True, exist_ok=True)
-    for pattern in ("patchharbor-*.whl", "patchharbor-*.tar.gz"):
+    for pattern in ("patchharbor-*.whl", "patchharbor-*.tar.gz", "patchharbor-*.pyz"):
         for artifact in output_directory.glob(pattern):
             artifact.unlink()
 
 
 def build_release(output_directory: Path) -> tuple[Path, Path]:
-    """Build one wheel and one source distribution into *output_directory*."""
+    """Build wheel/sdist plus their canonical PYZ candidate; preserve the tuple API."""
     output_directory = output_directory.resolve()
     _remove_previous_project_artifacts(output_directory)
 
@@ -295,6 +316,7 @@ def build_release(output_directory: Path) -> tuple[Path, Path]:
         )
     wheel, source_distribution = wheels[0], source_distributions[0]
     _audit_release_artifacts(wheel, source_distribution)
+    _materialize_pyz_candidate(wheel)
     return wheel, source_distribution
 
 
@@ -316,6 +338,7 @@ def main() -> int:
     wheel, source_distribution = build_release(arguments.outdir)
     print(wheel)
     print(source_distribution)
+    print(wheel.with_name(wheel.name.removesuffix("-py3-none-any.whl") + ".pyz"))
     return 0
 
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+import importlib.util
 from collections.abc import Iterable
 from pathlib import Path
 import sys
@@ -15,6 +16,8 @@ PACKAGE_ROOTS = {
 }
 
 ENTRYPOINT_MODULES = {
+    # PP-04A stages a data-only build profile, consumed by the PP-04B provider.
+    "patchharbor.runtime_pyz",
     "patchharbor.cli",
     "patchharbor_watcher",
     "patchharbor_watcher.cli",
@@ -70,7 +73,14 @@ def _project_imports(path: Path) -> frozenset[str]:
     for node in ast.walk(tree):
         names: tuple[str, ...] = ()
         if isinstance(node, ast.ImportFrom) and node.module:
-            names = (node.module,)
+            if node.level:
+                package, root = next((package, root) for package, root in PACKAGE_ROOTS.items()
+                                     if path.is_relative_to(root))
+                module = _module_name(package, root, path)
+                parent = module if path.name == '__init__.py' else module.rpartition('.')[0]
+                names = (importlib.util.resolve_name('.' * node.level + node.module, parent),)
+            else:
+                names = (node.module,)
         elif isinstance(node, ast.Import):
             names = tuple(alias.name for alias in node.names)
         imports.update(
@@ -90,8 +100,16 @@ def _import_roots(path: Path) -> frozenset[str]:
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
             roots.update(alias.name.split(".", 1)[0] for alias in node.names)
-        elif isinstance(node, ast.ImportFrom) and node.module:
-            roots.add(node.module.split(".", 1)[0])
+        elif isinstance(node, ast.ImportFrom):
+            if node.level:
+                package, root = next((package, root) for package, root in PACKAGE_ROOTS.items()
+                                     if path.is_relative_to(root))
+                module = _module_name(package, root, path)
+                parent = module if path.name == '__init__.py' else module.rpartition('.')[0]
+                absolute = importlib.util.resolve_name('.' * node.level + (node.module or ''), parent)
+                roots.add(absolute.split('.', 1)[0])
+            elif node.module:
+                roots.add(node.module.split(".", 1)[0])
     return frozenset(roots)
 
 

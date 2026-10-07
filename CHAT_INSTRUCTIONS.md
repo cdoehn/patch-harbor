@@ -353,13 +353,13 @@ Der bereits laufende Watcher übernimmt allein den Apply. Keine direkten
 Development-Commits, Apply-Mutationen, Hook-Umgehungen oder Watcher-Neustarts.
 Nach erfolgreichen Commit-Gates genau ein normaler Push; kein automatisches Tag.
 
-PP-00 bis PP-02C sind durch tatsächlich geprüfte Results bestätigt. Bundle 033
-führt den regulären `patchharbor pack`-Befehl als Adapter auf `api.pack_patch`
-ein. Nach tatsächlichem Erfolg folgt PP-04 für die PYZ. Maßgeblich sind Plan
-Abschnitt 1.13 und `docs/test-parallelism.md`. Native CI-Nachweise und Produktfreigabe
-bleiben separat. Ein alter eingebetteter Core besitzt `pack` gegebenenfalls noch
-nicht; bis eine geeignete Runtime tatsächlich vorliegt, bleibt der vorhandene
-geprüfte manuelle Paketvertrag nutzbar.
+PP-00 bis PP-03 sind durch tatsächlich geprüfte Results bestätigt. Bundle 034
+bereitet das getrennte kanonische PYZ-Datenprofil vor; der produktive Result-Writer
+bleibt Format 2 mit Wheel. Volle ZIP-Ressourcenfunktion und neuer Bootstrap folgen
+vor dem Writerwechsel. Maßgeblich sind Plan Abschnitt 1.14 und die aktuelle
+Testpolicy. Ein älterer mitgelieferter Core kann weiterhin `pack` vermissen;
+bis eine geeignete Runtime tatsächlich bereitsteht, bleibt der geprüfte manuelle
+Paketvertrag nutzbar. Keine vorgezogene PYZ- oder Releasefreigabe.
 
 Bestimme die aktive Zielversion aus dem Repository. Eine laut Plan erst zum
 Release erfolgende Versionsanhebung ist kein Widerspruch; tatsächlich

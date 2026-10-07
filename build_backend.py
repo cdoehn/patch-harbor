@@ -8,6 +8,10 @@ from __future__ import annotations
 from email.parser import BytesParser
 from email.policy import default as email_policy
 import importlib.util
+import importlib.machinery
+import importlib
+from types import ModuleType, SimpleNamespace
+from uuid import uuid4
 import os
 from pathlib import Path
 import shutil
@@ -41,6 +45,53 @@ def _recipe_module():
     return module
 
 
+def _pyz_recipe_module():
+    # A private package namespace permits anchored relative data-helper imports
+    # without executing patchharbor.__init__ or selecting an installed package.
+    name = '_patchharbor_build_profiles_' + uuid4().hex
+    package = ModuleType(name)
+    package.__path__ = [str(_ROOT / 'src/patchharbor')]
+    package.__package__ = name
+    package.__spec__ = importlib.machinery.ModuleSpec(name, loader=None, is_package=True)
+    sys.modules[name] = package
+    try:
+        return importlib.import_module(name + '.runtime_pyz')
+    finally:
+        for key in tuple(sys.modules):
+            if key == name or key.startswith(name + '.'):
+                del sys.modules[key]
+
+
+def _prepare_pyz_transport(transport: dict[str, bytes], *, version: str,
+                           requires_python: str, chat: bytes, documentation: bytes,
+                           license: bytes) -> dict[str, bytes]:
+    pyz = _pyz_recipe_module()
+    canonical = {name: raw for name, raw in transport.items()
+                 if name.startswith('patchharbor/') and not name.startswith(pyz.RESOURCE_ROOT)
+                 and name not in {pyz.IDENTITY_PATH, 'patchharbor/_runtime_identity.py'}}
+    canonical.update({pyz.CHAT_PATH: chat, pyz.DOC_PATH: documentation,
+                      pyz.LICENSE_PATH: license, pyz.MAIN_PATH: pyz.MAIN_BYTES,
+                      '__main__.py': pyz.MAIN_BYTES})
+    recipe, identity = pyz.create_recipe(canonical, version=version, requires_python=requires_python)
+    canonical[pyz.IDENTITY_PATH] = identity
+    candidate = pyz.materialize(recipe, lambda name, size: canonical[name])
+    checked = pyz.read_pyz(candidate,
+        policy=SimpleNamespace(max_zip_entries=1000, max_content_bytes=256*1024*1024),
+        remaining_bytes=pyz.MAX_CONTENT_BYTES)
+    if checked != recipe:
+        raise RuntimeError('built PYZ differs from its prepared recipe')
+    prepared = dict(transport)
+    prepared.update({name: raw for name, raw in canonical.items()
+                     if name.startswith(pyz.RESOURCE_ROOT) or name == pyz.IDENTITY_PATH})
+    prepared[pyz.RECIPE_PATH] = recipe.data
+    runtime = _recipe_module()
+    record_path = f'patchharbor-{version}.dist-info/RECORD'
+    prepared[record_path] = runtime.wheel_record(
+        ((name, runtime.sha256(raw), len(raw)) for name, raw in prepared.items() if name != record_path),
+        record_path)
+    return prepared
+
+
 def _prepare_recipe(runtime, payloads: dict[str, bytes], *, version: str, requires_python: str):
     """Build-only recipe construction; validate with the anchored runtime reader."""
     dist_info = f"patchharbor-{version}.dist-info/"
@@ -62,7 +113,8 @@ def _prepare_transport(runtime, transport: dict[str, bytes], *, version: str,
     dist_info = f"patchharbor-{version}.dist-info"
     canonical = {name: raw for name, raw in transport.items()
                  if name.startswith(("patchharbor/", "patchharbor_watcher/"))
-                 and not name.startswith(runtime.RESOURCE_ROOT) and name != runtime.IDENTITY_PATH}
+                 and not name.startswith(runtime.RESOURCE_ROOT)
+                 and name not in {runtime.IDENTITY_PATH, "patchharbor/_pyz_identity.py"}}
     canonical[runtime.CHAT_PATH] = chat
     canonical[runtime.DOC_PATH] = documentation
     for name, raw in transport.items():
@@ -80,7 +132,8 @@ def _prepare_transport(runtime, transport: dict[str, bytes], *, version: str,
     runtime.materialize(recipe, lambda name, size: canonical[name])
     record_path = dist_info + "/RECORD"
     prepared = {name: raw for name, raw in transport.items()
-                if not name.startswith(runtime.RESOURCE_ROOT) and name != record_path}
+                if not name.startswith(runtime.RESOURCE_ROOT)
+                and name not in {record_path, "patchharbor/_pyz_identity.py"}}
     prepared.update({name: raw for name, raw in canonical.items()
                      if name.startswith(runtime.RESOURCE_ROOT) or name == runtime.IDENTITY_PATH})
     prepared[runtime.RECIPE_PATH] = recipe.data
@@ -104,7 +157,7 @@ def build_wheel(wheel_directory, config_settings=None, metadata_directory=None):
                 shutil.copy2(_ROOT / name, source / name)
         for name in ("src", "docs"):
             shutil.copytree(_ROOT / name, source / name, ignore=shutil.ignore_patterns(
-                "__pycache__", "*.pyc", "*.pyo", "*.egg-info", "_runtime", "_runtime_identity.py"))
+                "__pycache__", "*.pyc", "*.pyo", "*.egg-info", "_runtime", "_runtime_identity.py", "_pyz_identity.py"))
         previous_cwd = Path.cwd()
         try:
             os.chdir(source)
@@ -129,6 +182,12 @@ def build_wheel(wheel_directory, config_settings=None, metadata_directory=None):
             recipe_module, transport, version=version, requires_python=requires,
             chat=(source / "CHAT_INSTRUCTIONS.md").read_bytes(),
             documentation=(source / "docs/python-api.md").read_bytes(),
+        )
+        transport = _prepare_pyz_transport(
+            transport, version=version, requires_python=requires,
+            chat=(source / "CHAT_INSTRUCTIONS.md").read_bytes(),
+            documentation=(source / "docs/python-api.md").read_bytes(),
+            license=(source / "LICENSE").read_bytes(),
         )
         staged = Path(temporary) / (filename + ".prepared")
         with ZipFile(staged, "w", compression=ZIP_DEFLATED) as wheel:
