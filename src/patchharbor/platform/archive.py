@@ -20,6 +20,9 @@ from patchharbor.platform.filesystem import (
     FileChangedDuringRead, PathKind, path_kind, read_stable_regular_file_with_sha256,
     sync_directory_best_effort,
 )
+from patchharbor.platform.directories import (
+    open_directory_nofollow as _open_directory, pin_windows_directory as _pin_windows_directory,
+)
 from patchharbor.platform.paths import physically_canonicalize
 from patchharbor.platform.runtime import is_windows
 
@@ -42,34 +45,6 @@ class ArchiveLocation:
                 raise OSError("archive directory identity changed")
         if self.directory.parent != self.exchange:
             raise OSError("archive must remain a direct Exchange child")
-
-
-def _open_directory(path: Path, *, parent_fd: int | None = None) -> int:
-    flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0)
-    return os.open(path, flags, dir_fd=parent_fd)
-
-
-def _pin_windows_directory(path: Path) -> tuple[object, object]:
-    """Deny delete sharing while maintenance uses this physical directory."""
-    from ctypes import wintypes
-
-    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
-    create = kernel.CreateFileW
-    create.argtypes = [wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD, wintypes.LPVOID,
-                       wintypes.DWORD, wintypes.DWORD, wintypes.HANDLE]
-    create.restype = wintypes.HANDLE
-    close = kernel.CloseHandle
-    close.argtypes = [wintypes.HANDLE]
-    close.restype = wintypes.BOOL
-    # FILE_READ_ATTRIBUTES, FILE_SHARE_READ|WRITE (not DELETE), OPEN_EXISTING,
-    # BACKUP_SEMANTICS|OPEN_REPARSE_POINT. No attributes are changed.
-    handle = create(str(path), 0x80, 0x3, None, 3, 0x02200000, None)
-    if handle == wintypes.HANDLE(-1).value:
-        raise ctypes.WinError(ctypes.get_last_error())
-    if path_kind(path) is not PathKind.DIRECTORY:
-        close(handle)
-        raise OSError("archive directory is a reparse point or not a directory")
-    return handle, close
 
 
 @contextmanager

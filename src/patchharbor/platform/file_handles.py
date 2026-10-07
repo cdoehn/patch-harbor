@@ -47,16 +47,21 @@ def _windows_open(path: Path, *, writable: bool) -> int:
             close(handle)
 
 
-def open_regular_nofollow(path: Path, *, writable: bool = False) -> int:
+def open_regular_nofollow(path: Path, *, writable: bool = False, parent_fd: int | None = None) -> int:
     """Return an owned descriptor; reject special files before any content I/O."""
-    if not stat.S_ISREG(path.lstat().st_mode):
+    metadata = (path.lstat() if parent_fd is None
+                else os.stat(path, dir_fd=parent_fd, follow_symlinks=False))
+    if not stat.S_ISREG(metadata.st_mode):
         raise OSError(errno.EINVAL, "regular non-link file required")
     if is_windows():
+        if parent_fd is not None:
+            raise ValueError("relative directory descriptors are unavailable on Windows")
         descriptor = _windows_open(path, writable=writable)
     else:
         flags = os.O_RDWR if writable else os.O_RDONLY
         flags |= os.O_NOFOLLOW | os.O_NONBLOCK | getattr(os, "O_CLOEXEC", 0)
-        descriptor = os.open(path, flags)
+        descriptor = (os.open(path, flags) if parent_fd is None
+                      else os.open(path, flags, dir_fd=parent_fd))
     try:
         if not stat.S_ISREG(os.fstat(descriptor).st_mode):
             raise OSError(errno.EINVAL, "opened target is not a regular file")

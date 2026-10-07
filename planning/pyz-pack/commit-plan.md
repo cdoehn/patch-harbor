@@ -2,12 +2,12 @@
 
 **Plan-ID:** `PYZ-PACK`
 **Planpfad:** `planning/pyz-pack/commit-plan.md`
-**Revision:** 7
+**Revision:** 8
 **Stand:** 7. Oktober 2026
-**Status:** PP-00 abgenommen; PP-01 committed, Reparatur noch nicht abgenommen. Bundle 028 brach vor Tests/Commit an fünf nachgestellten Leerzeichen im Plan ab; Bundle 029 / PP-01-FIX3 setzt den erhaltenen Teilzustand fort.
+**Status:** PP-00 und PP-01 abgenommen. Bundle 030 hat die Fixture-Reparatur nach vollem parallelem Gate committed und gepusht. PP-02A wird als Bundle 031 vorbereitet.
 **Geplanter Umfang:** 9 Arbeitspakete `PP-00` bis `PP-08`, zunächst 16 vorgeschlagene Commit-Schritte. Keine feste Anzahl von Patch-Bündeln.
-**Fortschritt:** 2/16 Planpositionen committed, 1/16 abgenommen; PP-01-FIX3 ist keine zusätzliche Planposition.
-**Nächster Schritt:** PP-01-FIX3 über den Watcher abschließen, danach automatisch PP-02A gemäß aktiver Schleife.
+**Fortschritt:** 2/16 Planpositionen committed und abgenommen; PP-02A ist Position 3/16, tatsächlicher Apply noch offen.
+**Nächster Schritt:** PP-02A vollständig parallel prüfen und übergeben; nach bestätigtem Result automatisch PP-02B.
 **Ziel-Produktversion:** noch festzulegen; keine erfundene Releaseversion, kein automatischer Tag oder Release.
 
 > **Verbindliche Grundlage ist der gemeinsame Spezifikationssatz:**
@@ -458,6 +458,54 @@ ist vorgesehen; tatsächliche Abnahme bleibt bis zum Watcher-Result offen.
 Neue Produktfunktionen, globale Installation und Watcher-Neustart sind kein Teil
 dieser Korrektur. Produktquellen und beide normativen Dateien bleiben bytegleich.
 
+### 1.11 PP-01 bestätigt; PP-02A / Bundle 031
+
+Das echte Apply-Result `patchharbor-apply_Result_213505_1007_b74ddc.zip`, SHA-256
+`615f40caebc6265973a44227507e5a51b513a40d7f56636e436717559cadbbbe`, bestätigt die PP-01-Fixture-Reparatur durch Bundle 030.
+Commit und normaler Push: `e34a81c517d66c079f85cc43033b233f8c9f90a8`,
+`test(result): complete consistent historical fixture recovery [PP-01-FIX4]`.
+Alle 294 Result-Base-Dateien sind gegen den ausgelieferten Stand und den tatsächlichen
+Arbeitsbaum geprüft. Keine staged/unstaged Deltas oder untracked Einträge.
+
+Neue Bindung: `repo_id=e7a93d72-62dc-4759-97e8-6bf6cdf10e90`,
+`base_commit=e34a81c517d66c079f85cc43033b233f8c9f90a8`,
+`state_fingerprint=7c9d2a24e397e0e5`,
+`fingerprint_algorithm=patchharbor-state-v1`.
+Nur dieses neue Result bildet die technische Grundlage von Bundle 031.
+
+Das vollständige parallele Apply-Gate bestand mit 2.480 Tests und acht Skips,
+zwölf Workern und Exit 0. Report-SHA-256:
+`0e9c70e9ee93c972f70bee61ba875fc8825d6e6fba9027627b8f78c09205bff9`.
+Development bestand mit 2.505 Tests und sieben Skips einschließlich 24 separater
+Entrypoint-Prüffälle. Ein vorheriger lokaler Lauf enthielt einen korrigierten
+Handoff-Testaufruf und einen im vollständigen Wiederholungslauf nicht erneut
+aufgetretenen Signal-/Prozessbaumfehler. Dessen genaue Umgebungsursache bleibt offen.
+
+Bundle 029 hatte bereits ein grünes Apply-Gate, brach aber vor dem Commit an
+einem falsch verglichenen Test-Hash ab: Die lokale ignorierte `AGENTS.override.md`
+gehört zum Apply-Testkontext, nicht zum portablen Snapshot. FIX4 erfasst diesen
+Kontext vor dem Gate und bindet Bericht sowie Nachkontrolle daran. Alle Projekt-
+dateien bleiben zusätzlich vor/nach Tests und Commit vollständig gehasht.
+Keine gelockerte Testprüfung, Produktimport-Fallbacks oder neue PP-01-Produktfunktion.
+
+**PP-02A:** Interne begrenzte Aufnahme des expliziten Inhaltsbaums. Gemeinsame
+Verzeichnishandles sind aus dem vorhandenen Archivadapter extrahiert; dessen
+Publikationslogik bleibt unverändert. Quelldateien verwenden den bestehenden
+No-follow-Dateiadapter, POSIX-relative Handles und auf Windows gepinnte Vorfahren.
+Bytes, Pfade, Modi, statischer Entrypoint, 10.000 Knoten und 1.000 spätere
+ZIP-Einträge einschließlich generierter Metadaten werden geprüft. Abschließende
+Inventur vergleicht auch erneut geöffnete Handle-Metadaten, ohne Inhalte erneut
+aufzunehmen oder eine Stabilitätswiederholung einzuführen.
+
+Neue fachliche Tests in `tests/test_pack_sources.py` behandeln P-08–P-11,
+S-01–S-06, S-14/S-15/S-17 auf Bausteinebene. `docs/pack.md` beschreibt Grenzen
+und internen Stand. `pack_sources` ist bis PP-02B ein ausdrücklich vorbereiteter
+Architektur-Einstieg; danach übernimmt sein tatsächlicher Verbraucher diese Rolle.
+Öffentliche API/CLI, Format-2-Writer und Runtime-Wheel bleiben unverändert.
+Vor Auslieferung und vor dem tatsächlichen Commit ist das volle parallele Gate
+Pflicht. Das folgende Result liefert den Nachweis; CI startet ausschließlich der
+Nutzer. Native Windows-/3.12-/Docker-/CIFS-Freigaben werden nicht vorweggenommen.
+
 ## 2. Architektur und unveränderliche Grenzen
 
 ### 2.1 Produktumfang
@@ -547,8 +595,8 @@ PP-00 ist durch Bundle 025 abgeschlossen. PP-01 steht auf **committed; Regressio
 | Position | ID | Arbeitspaket | Abhängigkeit | Vorgeschlagene Commitmessage | Status |
 |---:|---|---|---|---|---|
 | 1/16 | **PP-00** | PP-00 | Ausgangsabgleich | `docs(plan): establish PYZ and pack implementation baseline [PP-00]` | angewendet: 7a28bbc2189cdb2a78590e62a45e4d96b0ff893d; CI 37635401106 grün |
-| 2/16 | **PP-01** | PP-01 | PP-00 | `refactor(reference): share verified reference facts for packing [PP-01]` | e6ed2895c6922c1bf0f8f13ec6af58bb70fd7c3d committed; 028/PP-01-FIX2 vorbereitet, Abnahme offen |
-| 3/16 | **PP-02A** | PP-02 | PP-01 | `feat(pack): capture bounded immutable package inputs [PP-02A]` | geplant |
+| 2/16 | **PP-01** | PP-01 | PP-00 | `refactor(reference): share verified reference facts for packing [PP-01]` | abgenommen; Reparaturcommit e34a81c517d66c079f85cc43033b233f8c9f90a8 durch Result 030 bestätigt |
+| 3/16 | **PP-02A** | PP-02 | PP-01 | `feat(pack): capture bounded immutable package inputs [PP-02A]` | Bundle 031 vorbereitet; tatsächlicher Apply offen |
 | 4/16 | **PP-02B** | PP-02 | PP-02A | `feat(pack): build bound manifests and target handoff data [PP-02B]` | geplant |
 | 5/16 | **PP-02C** | PP-02 | PP-02B | `feat(pack): publish validated packages through the public API [PP-02C]` | geplant |
 | 6/16 | **PP-03** | PP-03 | PP-02C | `feat(cli): expose pack with validated output and mode options [PP-03]` | geplant |
@@ -1269,13 +1317,13 @@ Die mechanische Prüfung dieses Markdownplans kontrolliert eindeutige Schrittken
 | 2 | 2026-10-07 | PP-00 / Bundle 024 integriert: aktuelle bytegleiche Referenz vom Pixel, Norm-/Planverweise, offene Alt-Nachweise, vorbereiteter Status; ausdrücklich einmalige CI-only-Ausnahme ohne Tests oder Testinstallation im Apply, ein Commit/Push und automatische parallele CI mit Ergebnisprüfung. |
 | 3 | 2026-10-07 | PP-00-FIX1 / Bundle 025: Abbruch von 024 vor Staging/Commit/CI belegt; dirty Result als Reparaturbasis, SSH-Alias-Auflösung statt URL-Stringliste, unveränderte Konfiguration und Fortsetzung der ersten Pixel-CI-only-Ausnahme. Kein Fortschritt vor Apply-/CI-Nachweis. |
 | 4 | 2026-10-07 | PP-00-Erfolg und CI 37635401106 aus dem damaligen Result bestätigt; PP-01 in 026 vorbereitet. Die damaligen lokalen Endgates und CI-Pause sind durch Revision 5 für die Pixel-Phase ersetzt. |
+| 8 | 2026-10-07 | Bundle 030 bestätigt PP-01 samt parallelem Apply-Gate und sauberem Commit/Push. PP-02A: begrenzte unveränderte Inhaltsaufnahme, gemeinsame sichere Handles, Modi/Inventur und kontrollierte Fehlertests; noch keine öffentliche Pack-Funktion. |
 | 7 | 2026-10-07 | Bundle 028 scheitert nach Payload-Ausbringung vor Tests/Commit am Whitespace-Gate; FIX3 / 029 setzt die bestätigte dirty Bindung fort. Vollständige Tests ausschließlich parallel, CI nur durch den Nutzer, Schleife ohne feste Korrekturgrenze. |
 | 6 | 2026-10-07 | Laptop-Wechsel bestätigt, aktueller clean PP-01-Commit gebunden; vier Legacy-Importfehler reproduziert und konsistente historische Inspection-Fixture für PP-01-FIX2 / Bundle 028 vorbereitet. Reguläre lokale Gates und CI-Termin 029 wieder aktiv. Kein Produktcode oder Normsatz geändert. |
 | 5 | 2026-10-07 | PP-01-FIX1 / Bundle 027: unterbrochenes dirty Result ausgewertet; bestehende PP-01-Code-/Testbytes erhalten. Spätere Nutzeranweisung dauerhaft für die Pixel-Phase verankert: keine lokalen Produkttests/Testinstallationen, Commit/Push und automatisch genau eine parallele CI pro Änderung; Fünferregel ausgesetzt bis ausdrücklich bestätigtem Laptop-Wechsel. Kein vorweggenommener Abschlussnachweis. |
 
 ---
 
-**PP-00 ist abgeschlossen. PP-01 ist committed, seine Abnahme wegen der
-Legacy-Fixture-Regression noch offen. Bundle 028 / PP-01-FIX2 wird auf dem
-Laptop mit den regulären lokalen Gates vorbereitet.** Erst nach bestätigtem
-Reparatur-Result PP-02A. Keine automatische Fortsetzung oder Releasefreigabe.
+**PP-00 und PP-01 sind abgeschlossen. PP-02A / Bundle 031 ist vorbereitet;
+sein tatsächlicher Apply bleibt bis zum nächsten Result offen. Die aktive
+Schleife führt danach PP-02B fort. Keine Releasefreigabe.**

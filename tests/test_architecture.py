@@ -15,6 +15,8 @@ PACKAGE_ROOTS = {
 }
 
 ENTRYPOINT_MODULES = {
+    # PP-02A intentionally stages this internal boundary; PP-02B will consume it.
+    "patchharbor.pack_sources",
     "patchharbor.cli",
     "patchharbor_watcher",
     "patchharbor_watcher.cli",

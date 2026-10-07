@@ -353,9 +353,10 @@ Der bereits laufende Watcher übernimmt allein den Apply. Keine direkten
 Development-Commits, Apply-Mutationen, Hook-Umgehungen oder Watcher-Neustarts.
 Nach erfolgreichen Commit-Gates genau ein normaler Push; kein automatisches Tag.
 
-PP-01 ist committed. Bundle 028 hinterließ seine Fixture-Reparatur uncommitted;
-Bundle 029 / PP-01-FIX3 setzt das aktuelle dirty Result fort. Erst nach dessen
-tatsächlichem Erfolg folgt PP-02A. Maßgeblich sind Plan Abschnitt 1.10 und
+PP-01 einschließlich konsistenter historischer Fixture ist durch das erfolgreiche
+Result von Bundle 030 bestätigt. PP-02A / Bundle 031 bereitet die interne sichere
+Inhaltsaufnahme vor; noch keine öffentliche Pack-API/CLI oder PYZ. Nach seinem
+tatsächlichen Erfolg folgt PP-02B. Maßgeblich sind Plan Abschnitt 1.11 und
 `docs/test-parallelism.md`. Native CI-Nachweise und Produktfreigabe bleiben separat.
 
 Bestimme die aktive Zielversion aus dem Repository. Eine laut Plan erst zum

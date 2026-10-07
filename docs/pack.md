@@ -1,9 +1,9 @@
-# Pack-Grundlagen – Implementierungsstand PP-01
+# Pack-Grundlagen – interner Implementierungsstand PP-02A
 
 Normativ gelten [die Hauptspezifikation](../spec/SPECIFICATION.md) und
 [die PYZ/PACK-Erweiterung, Revision 2](../spec/SPECIFICATION_EXTENSION_PYZ_PACK.md)
 gemeinsam. Der aktive [Implementierungsplan](../planning/pyz-pack/commit-plan.md)
-ordnet diesen vorbereitenden Schritt als PP-01 (2/16) ein.
+ordnet Referenzerfassung und Inhaltsaufnahme als PP-01 und PP-02A ein.
 
 **Noch kein öffentlicher `patchharbor pack`-Befehl und keine `api.pack_patch`.**
 Diese Seite beschreibt die interne Grundlage für die späteren Pack-Schritte.
@@ -76,6 +76,47 @@ und der `FileChangedDuringRead`-Ursachenkette bleibt erhalten. Dieser gemeinsame
 Referenzreader selbst wiederholt nichts. Der spätere Packer bekommt ausdrücklich
 No-replace **ohne** Stabilitäts-Retries. Eine gemeinsame Lesefunktion verschmilzt
 nicht diese unterschiedlichen Publikationsregeln.
+
+## Expliziter Inhaltsordner und unveränderte Dateien
+
+Der interne Baustein `pack_sources.capture_sources` erfasst einen ausdrücklich
+gewählten Inhaltsordner vollständig. Die Wurzel darf einmal kontrolliert
+aufgelöst werden. Darunter werden Symlinks, Reparse-Punkte, erkennbare Hardlinks
+und Sonderdateien abgelehnt. POSIX-Zugriffe sind an offene Verzeichnisdeskriptoren
+gebunden; Windows hält die Vorfahren über nicht verschiebbare Verzeichnishandles.
+Die vorhandenen Datei-, Pfad-, Modus- und statischen Skriptprüfer bleiben die
+gemeinsame Regelquelle. Eine installierte Bash oder PowerShell ist dafür unnötig.
+
+Dotfiles und eine enthaltene Repository-`CHAT_INSTRUCTIONS.md` sind Nutzdateien.
+Es gibt keine `.gitignore`-Filterung und keine Auswahl angrenzender Dateien.
+Die generierten Wurzelpfade `patch.json` und `PATCHHARBOR_META` sind reserviert;
+interne `.git`-/`.patchharbor`-Pfade bleiben verboten. Leere Verzeichnisse zählen
+zum Scanbudget und erzeugen eine zusammengefasste Warnung.
+
+Alle Nutzbytes einschließlich Binärdaten und Zeilenenden bleiben erhalten.
+Der voreingestellte Paketmodus ist `0644`, unabhängig von den Quellrechten.
+Explizite Modi wie `0755` werden geprüft; ihre Schlüssel müssen tatsächlich
+enthaltene reguläre Dateien bezeichnen. Dies ändert keine Apply-Regel für bereits
+vorhandene POSIX-Zielrechte und ergänzt keine fehlenden Skriptmarker.
+
+Die Aufnahme prüft höchstens 10.000 Dateisystemknoten einschließlich Wurzel und
+Verzeichnissen. Von den 1.000 ZIP-Einträgen bleiben drei für Manifest und passive
+Handoff-Dateien reserviert. Die gemeinsamen Grenzen von 256 MiB pro Inhalt und
+512 MiB insgesamt werden vor und während der Byteaufnahme durchgesetzt. Die
+später erzeugten Metadaten werden im Kandidatenbau zusätzlich geprüft.
+
+Erkannte Änderungen beim Öffnen, Lesen oder bei der abschließenden erneuten
+Inventur führen zu einem Fehler ohne Stabilitäts-Retry. Dies ist kein atomarer
+Snapshot eines beliebig gleichzeitig manipulierten Verzeichnisbaums. Eine
+spätere Veröffentlichung muss die erfassten Eingaben nochmals revalidieren.
+Die Ausgabepfadprüfung akzeptiert nur ein neues Ziel außerhalb des Inhaltsbaums
+in einem vorhandenen Verzeichnis. PP-02A erzeugt keine Ausgabe und schreibt
+weder Eingaben noch Repository-/Registrydaten.
+
+`tests/test_pack_sources.py` deckt die Eingabe-, Modus-, Budget- und Fehlergrenzen
+sowie kontrollierte Datei-/Verzeichnisaustausche ab. Native Windows-Nachweise
+werden durch Linux-Tests nicht ersetzt. Der interne Scanner ist bis PP-02B ein
+ausdrücklich vorbereiteter Architektur-Einstieg ohne öffentliche Pack-API.
 
 ## Nachweise und Grenzen
 

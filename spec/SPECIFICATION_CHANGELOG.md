@@ -1,5 +1,19 @@
 # PatchHarbor – Spezifikations-Changelog
 
+## 2026-10-07 – PP-01 bestätigt; PP-02A / Bundle 031 vorbereitet
+
+- Bundle 030 bestätigt die Fixture-Reparatur, volles paralleles Apply-Gate,
+  Commit `e34a81c517d66c079f85cc43033b233f8c9f90a8`, normalen Push und sauberen Baum.
+  Der Handoff prüft den tatsächlichen lokalen Testkontext einschließlich lokaler
+  ignorierter Anleitungen zusätzlich zur vollständigen Projektinventur.
+- Plan Revision 8 und Statushinweise führen den nächsten Schritt PP-02A:
+  begrenzter vollständiger Quellscan, unveränderte Bytes, explizite Modi,
+  gemeinsame sichere Handles und abschließende Inventur ohne Stabilitäts-Retry.
+- Keine öffentliche Pack-Funktion, kein Formatwechsel und keine Änderung an
+  den beiden normativen Spezifikationen. Neue Verhaltenstests und Pack-Dokumentation;
+  volle parallele Gates, tatsächlicher neuer Apply und native Nachweise getrennt.
+
+
 ## 2026-10-07 – PP-01-FIX3 / Bundle 029: Whitespace-Abbruch und neue Testpolicy
 
 - Result von 028 vollständig geprüft: Exit 1 vor Tests, Commit und Push;

@@ -23,10 +23,11 @@ PP-00 was completed by repair Bundle 025, commit
 `7a28bbc2189cdb2a78590e62a45e4d96b0ff893d`, with all six jobs successful in
 CI run `37635401106`, as recorded in its returned Result.
 
-PP-01 is committed as `e6ed2895c6922c1bf0f8f13ec6af58bb70fd7c3d`.
-Bundle 028 installed the consistent historical test fixture, but stopped before
-tests and commit because of trailing whitespace in the plan. Bundle 029 /
-PP-01-FIX3 recovers that verified dirty state; production code stays unchanged.
+PP-01 and its historical fixture correction are complete. Result Bundle 030
+confirms commit `e34a81c517d66c079f85cc43033b233f8c9f90a8`, a successful full
+parallel Apply gate (2,480 passed, 8 skipped), a normal push and a clean tree.
+PP-02A / Bundle 031 prepares bounded, unchanged content capture for the packer;
+its actual Apply remains pending until its own verified Result.
 
 **Current policy, explicitly updated by Christian on 7 October 2026:**
 Development and Apply run full parallel suites only, including at bundle end.
@@ -35,7 +36,7 @@ Only Christian starts the manual GitHub CI workflow; no automated dispatch or
 five-bundle cadence. The active loop continues the existing plan after verified
 Results, without a fixed correction-attempt limit.
 See [test policy](docs/test-parallelism.md) and [plan section 1.10](planning/pyz-pack/commit-plan.md).
-The prepared correction is not yet an Apply or CI success.
+The prepared PP-02A step is not yet an Apply or CI success.
 
 The planned Result PYZ contains the shared Core **without the watcher**;
 `pack` will be a normal CLI/API operation. Neither is publicly available in
