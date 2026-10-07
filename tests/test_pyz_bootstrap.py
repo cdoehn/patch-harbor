@@ -214,3 +214,28 @@ def test_special_bootstrap_input_is_rejected_before_a_potentially_blocking_open(
     path=tmp_path/'not-a-regular-result';os.mkfifo(path)
     monkeypatch.setattr(bootstrap.os,'open',lambda *a,**k:pytest.fail('special input reached open'))
     with pytest.raises(ValueError):bootstrap.assess(path)
+
+
+@pytest.mark.parametrize('fault',['unknown','capabilities','bool_format','inner_float','provenance','dependencies'])
+def test_bootstrap_rejects_noncanonical_runtime_metadata_before_import(reference,fault):
+    path,files,raw=reference
+    def corrupt(doc):
+        if fault=='unknown':doc['unknown']=True
+        elif fault=='capabilities':doc['capabilities']['operations'].remove('pack_patch')
+        elif fault=='bool_format':doc['capabilities']['patch_formats']=[True]
+        elif fault=='inner_float':doc['artifact']['size']=float(len(raw))
+        elif fault=='provenance':doc['provenance']['recipe_format_version']=True
+        elif fault=='dependencies':doc['runtime_dependencies']=['installer-required']
+    edit_metadata(files,corrupt);write_reference(path,files)
+    with pytest.raises(ValueError):trusted(path)
+
+
+@pytest.mark.parametrize('fault',['unknown_result','unavailable_claim'])
+def test_unknown_format_and_invalid_unavailable_are_errors_not_legacy_fallback(reference,fault):
+    path,files,_=reference
+    if fault=='unknown_result':edit_document(files,'manifest.json',lambda d:d.update(format_version=4))
+    else:
+        files=attach_pyz(files,None)
+        edit_metadata(files,lambda d:d.update(profile=pyz.PROFILE))
+    write_reference(path,files)
+    with pytest.raises(ValueError):trusted(path)

@@ -1,0 +1,46 @@
+{
+  "purpose": "Complete historical Format-2 runtime, never mixed with current modules",
+  "source_result": "patchharbor-apply_Result_232439_1007_4e70d8.zip",
+  "source_result_sha256": "f4762f5f2e5f2e94bbe347b9584e9104502a738dc7d19c03a42899f09e7a46ab",
+  "source_runtime_metadata": {
+    "marker": "patch-harbor-runtime",
+    "format_version": 1,
+    "status": "embedded",
+    "reason": null,
+    "distribution": "patchharbor",
+    "version": "1.2.1",
+    "requires_python": ">=3.12",
+    "content_id": "d2a7871b8d1c39b8470d09e808f925cdad77361a212421a0af81e33bb7bdd0e2",
+    "content_id_algorithm": "patchharbor-runtime-content-v1",
+    "wheel": {
+      "path": "runtime/patchharbor-1.2.1-py3-none-any.whl",
+      "size": 996014,
+      "sha256": "e9a587c49819419cda30adb8a9746bade5de4cc31d13619ed88157dabff79fe1"
+    },
+    "tags": [
+      "py3-none-any"
+    ],
+    "runtime_dependencies": [],
+    "provenance": {
+      "mode": "canonical_resources",
+      "source_commit": null,
+      "recipe_format_version": 1
+    },
+    "capabilities": {
+      "operations": [
+        "inspect_patch",
+        "validate_patch"
+      ],
+      "patch_formats": [
+        1
+      ],
+      "result_formats": [
+        1,
+        2
+      ]
+    }
+  },
+  "wheel_file": "patchharbor-1.2.1-py3-none-any.whl",
+  "wheel_sha256": "e9a587c49819419cda30adb8a9746bade5de4cc31d13619ed88157dabff79fe1",
+  "wheel_size": 996014
+}

@@ -51,7 +51,10 @@ private repository-only diagnostic reader can exclude only the reserved runtime
 namespace; it retains all other integrity checks and is never used by `pack` or
 full native reference validation. No downgrade or repaired reference is invented.
 
-Format-3 Exchange/archive/recovery integration, frozen legacy consumer proofs and
-the embedded bootstrap are checked in PP-05B before the PP-06 writer gate. Existing
+PP-05B verifies Format-3 Exchange/archive/recovery integration using real consumer
+processes, including frozen Format-1 and complete Format-2 runtimes. A standalone
+PYZ remains a non-patch artifact. Unavailable, corrupt and future Results cannot
+become archival/recovery success proofs. The canonical handoff includes the
+reviewed executable bootstrap before the PP-06 writer gate. Existing
 Result ownership, sync, finite typed CIFS retries, shared wait budget and final
 verified hash binding remain unchanged; `pack` retains its separate no-retry policy.

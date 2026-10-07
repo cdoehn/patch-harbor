@@ -1,5 +1,12 @@
 # PatchHarbor – Spezifikations-Changelog
 
+## 2026-10-08 – PP-05A bestätigt; Verbraucher und Bootstrap in Bundle 038
+
+- Commit `f892ae6aaaeebcabb83baf25997799d259b63e6f` durch tatsächlichen Apply bestätigt.
+- Vollständige Verbraucherprüfung für Format 3 mit eingefrorenen Altlesern und
+  ausführbarem Bootstrap in der tatsächlich gebauten kanonischen Anleitung.
+- Writer bleibt Format 2. Keine CI-Automatik; beide Normdateien unverändert.
+
 ## 2026-10-08 – PP-04C bestätigt; neuer Result-Reader in Bundle 037
 
 - Commit `d13709e8ccb9e4b45bd126fcb41829f784270861` durch tatsächlichen Apply bestätigt.

@@ -1,7 +1,7 @@
 # Installation-free PYZ bootstrap and legacy handoff
 
 
-## PP-04C: stdlib-only PYZ bootstrap
+## Stdlib-only PYZ bootstrap and embedded executable
 
 `scripts/pyz_bootstrap.py` is a reviewed example tool, not another Core validator
 or a public application subcommand. It has no import-time PatchHarbor dependency.
@@ -48,11 +48,20 @@ clears `sys.modules`; use a fresh process after a conflict or failed partial
 import. The checked path stays on `sys.path` for later lazy imports/resources.
 The resulting object is the ordinary public API, including `pack_patch`.
 
-In PP-04C, complete native checks use valid Format-1/2 references. The standalone
-precheck of synthetic Format 3 is not a claim that the native new reader or writer
-is already enabled. PP-05 integrates that reader and embeds this bootstrap in the
-actual canonical instruction; PP-06 gates the first writer with its own E-10 proof.
-The previous wheel helper below remains available for real legacy references.
+PP-05A enables the native Format-3 reader. PP-05B embeds the complete reviewed
+stdlib program in the canonical `CHAT_INSTRUCTIONS.md`: save that executable
+code from the actual trusted Result handoff, assess and prepare its exact PYZ,
+then pack/inspect/validate against that same original reference. No repository
+helper or installed Core is required to start. The functional fixture test uses
+the built handoff resource in a fresh stdlib-only process, and proves that a
+successful descriptor precheck cannot bypass a corrupt repository snapshot.
+
+Metadata fields, capabilities, artifact descriptors and provenance are closed;
+unknown future Results are rejected, while legacy Formats 1/2 select their own
+path. The old wheel helper reports `result_format_requires_pyz_bootstrap` for
+valid Format 3 without accessing wheel fields or installing anything. Production
+still emits Format 2 until PP-06B's real first-output E-10 gate; these synthetic
+fixtures are preparation evidence, not a claim of a switched producer.
 
 ## Legacy wheel bootstrap
 

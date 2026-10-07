@@ -78,6 +78,9 @@ def assess(reference: Path, *, trusted_source_sha256: str | None = None) -> Asse
     except (PatchHarborError, ValueError, KeyError, TypeError, UnicodeError, RecursionError, OverflowError):
         return Assessment(reference, captured.sha256, binding, False, "runtime_invalid")
     runtime = complete.runtime
+    if complete.format_version == 3:
+        return Assessment(reference, captured.sha256, binding, True,
+                          "result_format_requires_pyz_bootstrap")
     if runtime is None or runtime.status != "embedded":
         return Assessment(reference, captured.sha256, binding, True,
                           runtime.reason if runtime is not None else "legacy_result_without_runtime")

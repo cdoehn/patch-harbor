@@ -110,3 +110,11 @@ der übrigen Test-Infrastruktur des aktuellen Quellstands; dies
 behauptet keine Prüfung einer vollständigen historischen Binärdistribution.
 Sie archivieren gültige ältere Format-1-Results weiterhin, behalten neue
 Format-2-Results konservativ und wählen weder Results noch Wheels als Patch.
+
+
+## Reader-first successor
+
+[Result format 3](result-format-3.md) uses PYZ metadata 2 and a separate `artifact`
+contract. Its reader does not reinterpret the legacy `wheel` field. During
+PP-05B the producer still writes this Format 2; its offline wheel/previous-handoff
+path remains supported. Old consumers conservatively retain new Results.

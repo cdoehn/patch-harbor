@@ -26,6 +26,9 @@ MAX_ENTRIES = 1000
 MAX_PYZ = 16 * 1024 * 1024
 MAX_METADATA = 128 * 1024
 HEX = re.compile(r'[0-9a-f]{64}')
+METADATA_FIELDS = {'marker','format_version','status','reason','distribution','version',
+                   'requires_python','profile','content_id','content_id_algorithm','artifact',
+                   'runtime_dependencies','provenance','capabilities'}
 VERSION = re.compile(r'[0-9]+(?:\.[0-9]+)*(?:(?:a|b|rc)[0-9]+)?(?:\.post[0-9]+)?(?:\.dev[0-9]+)?')
 
 
@@ -172,15 +175,16 @@ def assess(reference, *, trusted_source_sha256=None):
         manifest = _json(_read(archive, 'manifest.json', MAX_INPUT))
         _require(manifest.get('marker') == 'patch-harbor-result-bundle'
                  and type(manifest.get('format_version')) is int, 'not a supported Result')
-        if manifest['format_version'] != 3:
+        if manifest['format_version'] in (1,2):
             raise BootstrapUnavailable('legacy Result: use its documented wheel/previous handoff path')
+        _require(manifest['format_version'] == 3, 'unsupported Result version')
         runtime = manifest.get('runtime')
         _require(type(runtime) is dict and set(runtime) == {'status','reason','metadata','artifact'},
                  'outer runtime schema')
         metadata_descriptor = _descriptor(runtime['metadata'])
         _require(metadata_descriptor['path'] == 'runtime/runtime.json', 'runtime metadata path')
         metadata = _json(_checked(archive, metadata_descriptor, MAX_METADATA))
-        _require(metadata.get('marker') == 'patch-harbor-runtime'
+        _require(set(metadata) == METADATA_FIELDS and metadata.get('marker') == 'patch-harbor-runtime'
                  and type(metadata.get('format_version')) is int and metadata['format_version'] == 2
                  and metadata.get('distribution') == 'patchharbor', 'runtime metadata identity')
         _require(metadata.get('status') == runtime['status'] and metadata.get('reason') == runtime['reason']
@@ -188,10 +192,17 @@ def assess(reference, *, trusted_source_sha256=None):
         runtime_names = {name for name in names if name.startswith('runtime/')}
         if runtime['status'] == 'unavailable':
             _require(runtime['artifact'] is None and type(runtime['reason']) is str
-                     and runtime_names == {'runtime/runtime.json'}, 'invalid unavailable runtime')
+                     and runtime['reason'] in {'source_not_prepared','source_changed','artifact_missing',
+                                               'artifact_mismatch','artifact_corrupt','artifact_unsupported',
+                                               'resource_limit','read_error'}
+                     and runtime_names == {'runtime/runtime.json'}
+                     and all(metadata[key] is None for key in ('artifact','profile','content_id',
+                         'content_id_algorithm','runtime_dependencies','provenance','capabilities')),
+                     'invalid unavailable runtime')
             raise BootstrapUnavailable('runtime unavailable: ' + runtime['reason'])
         _require(runtime['status'] == 'embedded' and runtime['reason'] is None, 'runtime status')
         artifact = _descriptor(runtime['artifact'], artifact=True)
+        _descriptor(metadata['artifact'], artifact=True)
         version = metadata.get('version')
         _require(type(version) is str and VERSION.fullmatch(version), 'runtime version profile')
         name = 'patchharbor-' + version + '.pyz'
@@ -202,6 +213,23 @@ def assess(reference, *, trusted_source_sha256=None):
                  and metadata.get('content_id_algorithm') == 'patchharbor-pyz-content-v1'
                  and type(metadata.get('content_id')) is str and HEX.fullmatch(metadata['content_id']),
                  'unsupported PYZ profile or Python requirement')
+        capabilities = metadata['capabilities']
+        _require(type(capabilities) is dict and set(capabilities) == {'operations','patch_formats','result_formats'}
+                 and capabilities['operations'] == ['inspect_patch','validate_patch','pack_patch'],
+                 'unsupported runtime capabilities')
+        for key, expected in (('patch_formats',[1]), ('result_formats',[1,2,3])):
+            values = capabilities[key]
+            _require(type(values) is list and all(type(v) is int for v in values)
+                     and values == expected, 'unsupported runtime read versions')
+        provenance = metadata['provenance']
+        _require(metadata['runtime_dependencies'] == [] and type(provenance) is dict
+                 and set(provenance) == {'mode','source_commit','recipe_format_version'}
+                 and provenance['mode'] == 'canonical_resources'
+                 and type(provenance['recipe_format_version']) is int and provenance['recipe_format_version'] == 1,
+                 'unsupported runtime provenance')
+        commit = provenance['source_commit']
+        _require(commit is None or (type(commit) is str and re.fullmatch(r'[0-9a-f]{40}|[0-9a-f]{64}',commit)),
+                 'invalid runtime source commit')
         artifact_bytes = _checked(archive, artifact, MAX_PYZ)
     return PyzAssessment(path, digest, name, artifact['sha256'], version, artifact_bytes,
                          trusted_source_sha256 is not None)
