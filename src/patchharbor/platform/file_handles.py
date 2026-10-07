@@ -9,7 +9,7 @@ import stat
 from patchharbor.platform.runtime import is_windows
 
 
-def _windows_open(path: Path, *, writable: bool) -> int:
+def _windows_open(path: Path, *, writable: bool, publication: bool = False) -> int:
     import ctypes
     from ctypes import wintypes
     import msvcrt
@@ -29,7 +29,9 @@ def _windows_open(path: Path, *, writable: bool) -> int:
     close.argtypes = (wintypes.HANDLE,)
     close.restype = wintypes.BOOL
     access = 0x80000000 | (0x40000000 if writable else 0)  # GENERIC_READ / WRITE
-    handle = create(str(path), access, 7, None, 3, 0x00200000, None)
+    if publication:
+        access |= 0x00010000  # DELETE: rename exactly this pinned file handle.
+    handle = create(str(path), access, 1 if publication else 7, None, 3, 0x00200000, None)
     if handle == ctypes.c_void_p(-1).value:
         raise ctypes.WinError(ctypes.get_last_error())
     try:
@@ -47,7 +49,8 @@ def _windows_open(path: Path, *, writable: bool) -> int:
             close(handle)
 
 
-def open_regular_nofollow(path: Path, *, writable: bool = False, parent_fd: int | None = None) -> int:
+def open_regular_nofollow(path: Path, *, writable: bool = False, parent_fd: int | None = None,
+                         publication: bool = False) -> int:
     """Return an owned descriptor; reject special files before any content I/O."""
     metadata = (path.lstat() if parent_fd is None
                 else os.stat(path, dir_fd=parent_fd, follow_symlinks=False))
@@ -56,7 +59,8 @@ def open_regular_nofollow(path: Path, *, writable: bool = False, parent_fd: int 
     if is_windows():
         if parent_fd is not None:
             raise ValueError("relative directory descriptors are unavailable on Windows")
-        descriptor = _windows_open(path, writable=writable)
+        descriptor = (_windows_open(path, writable=writable, publication=True) if publication
+                      else _windows_open(path, writable=writable))
     else:
         flags = os.O_RDWR if writable else os.O_RDONLY
         flags |= os.O_NOFOLLOW | os.O_NONBLOCK | getattr(os, "O_CLOEXEC", 0)

@@ -14,6 +14,7 @@ from patchharbor.bundle_handoff import (
     encode_environment,
 )
 from patchharbor.errors import result_bundle_error
+from patchharbor.platform.filesystem import FileReadLimitExceeded
 
 
 def _template_path() -> Path:
@@ -121,5 +122,7 @@ def render_chat_handoff(
     ).encode("utf-8")
     environment = encode_environment(document)
     if len(generated) > MAX_HANDOFF_ENTRY_BYTES or len(environment) > MAX_HANDOFF_ENTRY_BYTES:
-        raise result_bundle_error("generated chat handoff exceeds its size limit")
+        raise result_bundle_error("generated chat handoff exceeds its size limit") from FileReadLimitExceeded(
+            "generated handoff exceeds its size limit"
+        )
     return BundleHandoff(generated, environment)

@@ -1,5 +1,16 @@
 # PatchHarbor – Spezifikations-Changelog
 
+## 2026-10-08 – PP-02A bestätigt; Pack-Core/API als Bundle 032
+
+- Bundle 031 mit Commit `d487a84c55857ea0f64914f1cd636e5fc796a3fb`,
+  vollem parallelem Apply-Gate und normalem Push bestätigt.
+- Planrevision 9 fasst PP-02B/C vor Übergabe zu einem Commit zusammen:
+  unveränderte Inhalte, gebundene Manifest-/Handoff-Erzeugung, gemeinsame
+  Prüfung der realen ZIP und No-replace-Veröffentlichung über die öffentliche API.
+- Fachliche Fehler behalten ihre Kategorien; Cleanup nach Publikation liefert
+  vollständigen Erfolg mit Warnung. Die CI bleibt ausschließlich nutzergestartet.
+  Beide normativen Spezifikationen, Resultformat 2 und Wheel-Writer bleiben erhalten.
+
 ## 2026-10-07 – PP-01 bestätigt; PP-02A / Bundle 031 vorbereitet
 
 - Bundle 030 bestätigt die Fixture-Reparatur, volles paralleles Apply-Gate,

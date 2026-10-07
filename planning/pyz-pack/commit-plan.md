@@ -2,12 +2,12 @@
 
 **Plan-ID:** `PYZ-PACK`
 **Planpfad:** `planning/pyz-pack/commit-plan.md`
-**Revision:** 8
-**Stand:** 7. Oktober 2026
-**Status:** PP-00 und PP-01 abgenommen. Bundle 030 hat die Fixture-Reparatur nach vollem parallelem Gate committed und gepusht. PP-02A wird als Bundle 031 vorbereitet.
+**Revision:** 9
+**Stand:** 8. Oktober 2026
+**Status:** PP-00, PP-01 und PP-02A tatsächlich committed/gepusht. Bundle 032 verbindet PP-02B und PP-02C zu einem gemeinsam geprüften Pack-Core-/API-Commit; Apply noch offen.
 **Geplanter Umfang:** 9 Arbeitspakete `PP-00` bis `PP-08`, zunächst 16 vorgeschlagene Commit-Schritte. Keine feste Anzahl von Patch-Bündeln.
-**Fortschritt:** 2/16 Planpositionen committed und abgenommen; PP-02A ist Position 3/16, tatsächlicher Apply noch offen.
-**Nächster Schritt:** PP-02A vollständig parallel prüfen und übergeben; nach bestätigtem Result automatisch PP-02B.
+**Fortschritt:** 3/16 ursprüngliche Planpositionen committed; Positionen 4 und 5 werden gemeinsam vorbereitet. Plattformübergreifende Abnahme bleibt getrennt.
+**Nächster Schritt:** PP-02B/C vollständig parallel prüfen und übergeben; nach bestätigtem Result PP-03.
 **Ziel-Produktversion:** noch festzulegen; keine erfundene Releaseversion, kein automatischer Tag oder Release.
 
 > **Verbindliche Grundlage ist der gemeinsame Spezifikationssatz:**
@@ -222,7 +222,7 @@ PP-01 und spätere Schritte erhalten keine Ausnahme. Der weitere reguläre
 CI-Termin 029 wird durch den ausdrücklich notwendigen Reparaturlauf nicht
 stillschweigend neu gezählt; tatsächlich erbrachte Läufe werden dokumentiert.
 
-**Status:** PP-00 abgeschlossen; PP-01 auf `e6ed2895c6922c1bf0f8f13ec6af58bb70fd7c3d` committed. Vier E2E-Fehler im historischen Fixture reproduziert; minimale Reparatur PP-01-FIX2 / Bundle 028 vorbereitet. Laptop-Testpolicy wieder aktiv; tatsächlicher Reparatur-Apply noch offen.
+**Status:** PP-00, PP-01 und PP-02A tatsächlich committed/gepusht. Bundle 032 verbindet PP-02B und PP-02C zu einem gemeinsam geprüften Pack-Core-/API-Commit; Apply noch offen.
 zugehörigen tatsächlichen Apply-/CI-Nachweis offen. Ein Prüfversuch des
 Entrypoints in der Chat-Umgebung ist kein Produkt-, Host- oder CI-Nachweis.
 
@@ -416,7 +416,7 @@ der nächste reguläre CI-Termin bleibt 029 einschließlich Windows nach Apply/P
 Bekannte fehlgeschlagene CI und offene native/CIFS-Nachweise bleiben offen,
 bis neue passende Nachweise vorliegen. Ein Linux-Lauf ersetzt sie nicht.
 
-**Status:** Ein Korrekturcommit `test(result): keep frozen reader and inspection consistent [PP-01-FIX2]`
+**Status:** PP-00, PP-01 und PP-02A tatsächlich committed/gepusht. Bundle 032 verbindet PP-02B und PP-02C zu einem gemeinsam geprüften Pack-Core-/API-Commit; Apply noch offen.
 ist vorgesehen. Kein PP-02-Schritt, keine neue PYZ, kein `pack`, kein Writerwechsel.
 PP-01-Abnahme erst nach erfolgreichem tatsächlichen Reparatur-Apply und seinen
 vorgeschriebenen lokalen Endgates; keine automatische Planfortsetzung durch 028.
@@ -505,6 +505,49 @@ Architektur-Einstieg; danach übernimmt sein tatsächlicher Verbraucher diese Ro
 Vor Auslieferung und vor dem tatsächlichen Commit ist das volle parallele Gate
 Pflicht. Das folgende Result liefert den Nachweis; CI startet ausschließlich der
 Nutzer. Native Windows-/3.12-/Docker-/CIFS-Freigaben werden nicht vorweggenommen.
+
+### 1.12 PP-02A bestätigt; PP-02B/C gemeinsam in Bundle 032
+
+Result `patchharbor-apply_Result_215703_1007_0001d3.zip`, SHA-256
+`f0560b5635c06858babbdc8869b4dc524f03870ac0f026397b99a54a78d68db2`,
+bestätigt den tatsächlichen Apply von Bundle 031, ein vollständiges paralleles
+Gate mit 2.561 bestandenen Tests und 8 Skips, einen normalen Push und sauberen
+Baum. Commit: `d487a84c55857ea0f64914f1cd636e5fc796a3fb`.
+Alle 298 Snapshot-Dateien stimmen mit der geprüften Übergabe überein.
+
+Nur dieses neue Result bindet Bundle 032: Repository-ID
+`e7a93d72-62dc-4759-97e8-6bf6cdf10e90`, Base-Commit wie oben, Fingerprint
+`7c9d2a24e397e0e5`, Algorithmus `patchharbor-state-v1`. Beide normativen
+Spezifikationen behalten ihre in Abschnitt 1.2 genannten Bytes.
+
+**Nachvollziehbare Zusammenlegung vor Übergabe:** PP-02B (Manifest, Handoff,
+ZIP-Kandidat) und PP-02C (Endvalidierung, Veröffentlichung, öffentliche API)
+werden als ein echter Dateizustand mit einem Commit `PP-02BC` geprüft. Es werden
+keine künstlichen W/R/C-Zwischenzustände oder zwei bereits ausgeführte Commits
+behauptet. Die ursprünglichen 16 fachlichen Positionen bleiben zur Zuordnung
+erhalten; die vorgesehene Commitanzahl sinkt durch diese Zusammenlegung auf 15.
+
+`api.pack_patch` erzeugt ein referenzgebundenes Format-1-Paket, prüft die realen
+temporären Bytes vollständig und veröffentlicht exklusiv. Die finale Datei
+wird über ihren gepinnten Handle ausgewählt: Linux nutzt `linkat` über procfs,
+Windows `SetFileInformationByHandle(FileRenameInfo)` ohne Ersetzen. Ein Ziel
+mit nicht unterstützter sicherer Primitive wird abgelehnt. Eigentum, Sync,
+Quellinventar und abschließender Hash werden ohne Stabilitäts-Retry geprüft.
+Cleanup bleibt im gepinnten Ausgabeverzeichnis; nach bestätigter Publikation
+bleibt vollständiger Erfolg mit Warnung zugänglich, auch wenn ein Watcher die
+finale Datei bereits übernommen hat. Kein Git, Build, Installer, Netzwerk oder
+Entrypoint-Aufruf durch Pack. Die CLI folgt in PP-03.
+
+`tests/test_pack_candidate.py` und `tests/test_pack_api.py` prüfen P-01–P-18
+soweit ohne CLI/PYZ anwendbar, S-07–S-11/S-14–S-18 sowie die begrenzte Aussage
+E-04. Die vorhandenen PP-01-/PP-02A- und Result-Regressionsfälle bleiben im vollen
+parallelen Gate. Neue Module sind Teil der expliziten Distributionsinventare;
+die temporäre Architektur-Ausnahme für `pack_sources` entfällt.
+
+Vor Veröffentlichung sowie im Apply vor dem Commit gilt jeweils die gesamte
+parallele Suite. Lokale Testreceipts, Paket-Hashes und der spätere tatsächliche
+Apply stehen im Handoff/Result. Native Windows-, Python-3.12- und CIFS-Nachweise
+bleiben bis zu realen Läufen offen. CI startet ausschließlich Christian.
 
 ## 2. Architektur und unveränderliche Grenzen
 
@@ -596,9 +639,9 @@ PP-00 ist durch Bundle 025 abgeschlossen. PP-01 steht auf **committed; Regressio
 |---:|---|---|---|---|---|
 | 1/16 | **PP-00** | PP-00 | Ausgangsabgleich | `docs(plan): establish PYZ and pack implementation baseline [PP-00]` | angewendet: 7a28bbc2189cdb2a78590e62a45e4d96b0ff893d; CI 37635401106 grün |
 | 2/16 | **PP-01** | PP-01 | PP-00 | `refactor(reference): share verified reference facts for packing [PP-01]` | abgenommen; Reparaturcommit e34a81c517d66c079f85cc43033b233f8c9f90a8 durch Result 030 bestätigt |
-| 3/16 | **PP-02A** | PP-02 | PP-01 | `feat(pack): capture bounded immutable package inputs [PP-02A]` | Bundle 031 vorbereitet; tatsächlicher Apply offen |
-| 4/16 | **PP-02B** | PP-02 | PP-02A | `feat(pack): build bound manifests and target handoff data [PP-02B]` | geplant |
-| 5/16 | **PP-02C** | PP-02 | PP-02B | `feat(pack): publish validated packages through the public API [PP-02C]` | geplant |
+| 3/16 | **PP-02A** | PP-02 | PP-01 | `feat(pack): capture bounded immutable package inputs [PP-02A]` | Bundle 031 tatsächlich angewendet/gepusht; Linux-Gate bestätigt |
+| 4/16 | **PP-02B** | PP-02 | PP-02A | `feat(pack): build and publish validated packages through the public API [PP-02BC]` | Bundle 032 gemeinsam mit PP-02C vorbereitet |
+| 5/16 | **PP-02C** | PP-02 | PP-02B | `feat(pack): build and publish validated packages through the public API [PP-02BC]` | Bundle 032 gemeinsam mit PP-02B vorbereitet |
 | 6/16 | **PP-03** | PP-03 | PP-02C | `feat(cli): expose pack with validated output and mode options [PP-03]` | geplant |
 | 7/16 | **PP-04A** | PP-04 | PP-03 | `feat(runtime): define canonical core-only PYZ artifacts [PP-04A]` | geplant |
 | 8/16 | **PP-04B** | PP-04 | PP-04A | `refactor(runtime): load producer resources from directories or PYZ [PP-04B]` | geplant |
@@ -1317,6 +1360,7 @@ Die mechanische Prüfung dieses Markdownplans kontrolliert eindeutige Schrittken
 | 2 | 2026-10-07 | PP-00 / Bundle 024 integriert: aktuelle bytegleiche Referenz vom Pixel, Norm-/Planverweise, offene Alt-Nachweise, vorbereiteter Status; ausdrücklich einmalige CI-only-Ausnahme ohne Tests oder Testinstallation im Apply, ein Commit/Push und automatische parallele CI mit Ergebnisprüfung. |
 | 3 | 2026-10-07 | PP-00-FIX1 / Bundle 025: Abbruch von 024 vor Staging/Commit/CI belegt; dirty Result als Reparaturbasis, SSH-Alias-Auflösung statt URL-Stringliste, unveränderte Konfiguration und Fortsetzung der ersten Pixel-CI-only-Ausnahme. Kein Fortschritt vor Apply-/CI-Nachweis. |
 | 4 | 2026-10-07 | PP-00-Erfolg und CI 37635401106 aus dem damaligen Result bestätigt; PP-01 in 026 vorbereitet. Die damaligen lokalen Endgates und CI-Pause sind durch Revision 5 für die Pixel-Phase ersetzt. |
+| 9 | 2026-10-08 | PP-02A durch Result/Commit/Push bestätigt. PP-02B/C nachvollziehbar in einem Commit für Bundle 032 zusammengeführt; vollständige Pack-API, No-replace, verpflichtende Endvalidierung und funktionale Fehler-/Konkurrenztests. Native Abnahme bleibt offen. |
 | 8 | 2026-10-07 | Bundle 030 bestätigt PP-01 samt parallelem Apply-Gate und sauberem Commit/Push. PP-02A: begrenzte unveränderte Inhaltsaufnahme, gemeinsame sichere Handles, Modi/Inventur und kontrollierte Fehlertests; noch keine öffentliche Pack-Funktion. |
 | 7 | 2026-10-07 | Bundle 028 scheitert nach Payload-Ausbringung vor Tests/Commit am Whitespace-Gate; FIX3 / 029 setzt die bestätigte dirty Bindung fort. Vollständige Tests ausschließlich parallel, CI nur durch den Nutzer, Schleife ohne feste Korrekturgrenze. |
 | 6 | 2026-10-07 | Laptop-Wechsel bestätigt, aktueller clean PP-01-Commit gebunden; vier Legacy-Importfehler reproduziert und konsistente historische Inspection-Fixture für PP-01-FIX2 / Bundle 028 vorbereitet. Reguläre lokale Gates und CI-Termin 029 wieder aktiv. Kein Produktcode oder Normsatz geändert. |
@@ -1324,6 +1368,6 @@ Die mechanische Prüfung dieses Markdownplans kontrolliert eindeutige Schrittken
 
 ---
 
-**PP-00 und PP-01 sind abgeschlossen. PP-02A / Bundle 031 ist vorbereitet;
-sein tatsächlicher Apply bleibt bis zum nächsten Result offen. Die aktive
-Schleife führt danach PP-02B fort. Keine Releasefreigabe.**
+**PP-00, PP-01 und PP-02A sind tatsächlich angewendet. PP-02B/C werden gemeinsam
+in Bundle 032 vorbereitet; ihr tatsächlicher Apply bleibt bis zum nächsten
+Result offen. Danach folgt PP-03. Keine Releasefreigabe.**

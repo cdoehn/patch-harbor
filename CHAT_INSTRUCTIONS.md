@@ -353,10 +353,11 @@ Der bereits laufende Watcher übernimmt allein den Apply. Keine direkten
 Development-Commits, Apply-Mutationen, Hook-Umgehungen oder Watcher-Neustarts.
 Nach erfolgreichen Commit-Gates genau ein normaler Push; kein automatisches Tag.
 
-PP-01 einschließlich konsistenter historischer Fixture ist durch das erfolgreiche
-Result von Bundle 030 bestätigt. PP-02A / Bundle 031 bereitet die interne sichere
-Inhaltsaufnahme vor; noch keine öffentliche Pack-API/CLI oder PYZ. Nach seinem
-tatsächlichen Erfolg folgt PP-02B. Maßgeblich sind Plan Abschnitt 1.11 und
+PP-01 einschließlich konsistenter historischer Fixture und PP-02A sind durch
+vollständig geprüfte Results bestätigt. Bundle 032 führt PP-02B und PP-02C in
+einem Commit zusammen: `api.pack_patch` mit exklusiver Veröffentlichung und
+vollständigem Referenznachweis. Der CLI-Adapter und die PYZ folgen erst später.
+Nach tatsächlichem Erfolg folgt PP-03. Maßgeblich sind Plan Abschnitt 1.12 und
 `docs/test-parallelism.md`. Native CI-Nachweise und Produktfreigabe bleiben separat.
 
 Bestimme die aktive Zielversion aus dem Repository. Eine laut Plan erst zum

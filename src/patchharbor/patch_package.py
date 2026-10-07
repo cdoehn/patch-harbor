@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import os
 from pathlib import Path
 
 from patchharbor.progress import activity
@@ -18,7 +19,7 @@ from patchharbor.patch_manifest import (
     parse_patch_manifest,
 )
 from patchharbor.platform.filesystem import (
-    FileChangedDuringRead, FileSystemOperationError, UnsupportedFileTypeError,
+    FileChangedDuringRead, FileReadLimitExceeded, FileSystemOperationError, UnsupportedFileTypeError,
     read_stable_regular_file_with_sha256,
 )
 from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY, ResourcePolicy
@@ -139,23 +140,26 @@ def resolve_patch_package(
     path: Path,
     *,
     resource_policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY,
+    expected_identity: os.stat_result | None = None,
 ) -> ValidatedPatchPackage:
     """Read every ZIP member, then apply format-1 package roles."""
     activity("OPEN", f"Open explicit patch and capture stable content with SHA-256: {path}")
     try:
-        target = path.resolve(strict=True)
-        if target.stat().st_size > resource_policy.max_input_artifact_bytes:
+        target = path.resolve(strict=True) if expected_identity is None else path
+        if target.lstat().st_size > resource_policy.max_input_artifact_bytes:
             raise _unsafe_patch_zip(path, "input artifact exceeds the resource limit")
+        owned = ({} if expected_identity is None else
+                 {'expected_identity': expected_identity, 'max_bytes': resource_policy.max_input_artifact_bytes})
         captured = read_stable_regular_file_with_sha256(
             target, retained_content_limit=resource_policy.max_input_artifact_bytes,
-            allow_path_identity_fallback=True,
+            allow_path_identity_fallback=expected_identity is None, **owned,
         )
         if captured.content is None:
             raise _unsafe_patch_zip(path, "input artifact exceeds the resource limit")
         payloads = read_zip_payload_bytes(captured.content, policy=resource_policy)
     except NotZipArchiveError as exc:
         raise patch_package_error("patch package is not a ZIP archive") from exc
-    except (ZipPayloadError, FileChangedDuringRead, FileSystemOperationError,
+    except (ZipPayloadError, FileChangedDuringRead, FileReadLimitExceeded, FileSystemOperationError,
             UnsupportedFileTypeError, OSError, RuntimeError, UnicodeError) as exc:
         raise _unsafe_patch_zip(path, exc) from exc
 

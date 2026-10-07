@@ -42,6 +42,7 @@ print(report.success, report.result_bundle.status)
 | `context(repository=".")` | `context` | `RepositoryContext` |
 | `inspect_patch(patch)` | `inspect PATCH_ZIP` | `PatchInspection` |
 | `validate_patch(patch, repository=None, reference_bundle=None)` | `validate PATCH_ZIP` | `PatchValidationResult` |
+| `pack_patch(content_directory, reference_bundle=..., entrypoint=..., output=None, output_directory=None, modes=None)` | CLI follows in PP-03 | `PatchPackResult` |
 | `bundle(repository=".", output_directory=None)` | `bundle` | `BundleResult` |
 | `apply(patch=None, repository=None, dry_run=False, ...)` | manual `apply` | `RunReport` |
 | `dry_run(patch=None, repository=None, ...)` | `apply --dry-run` | `RunReport` |
@@ -512,3 +513,37 @@ imports and execution. The full platform release gates still determine whether
 a particular release commit is ready to use; this document is not a CI receipt.
 
 Weitere Betriebs- und Abnahmedetails: [Ereignis-Watcher](watcher-events.md).
+
+## Packing explicit prepared contents
+
+```python
+from patchharbor import api
+
+packed = api.pack_patch(
+    "prepared-contents", reference_bundle="received-result.zip",
+    entrypoint="run.sh", output_directory="existing-output",
+    modes={"scripts/new-tool.sh": 0o755},
+)
+print(packed.path, packed.package_sha256, packed.reference_sha256)
+```
+
+Exactly one of `output` and `output_directory` is required; an explicit filename
+must end in `.zip` plus the verified reference suffix. The output directory must
+already exist outside the content tree. Existing targets are never replaced,
+including targets created by concurrent requests. No registry, Git, shell,
+build, installation, tests or network is used by this operation.
+
+`PatchPackResult` is frozen and contains an absolute `path`, a request-local
+UUID-v4 `package_id`, UTC `created_at`, complete `validation` with reference scope
+and matching binding, and an immutable `warnings` tuple. `package_sha256`,
+`package_size` and `reference_sha256` derive from that same validation evidence.
+The source and reference are captured and checked for known changes. The actual
+written archive is validated before exclusive publication. There are no automatic
+stability retries. An error before publication preserves its shared failure
+category; formal argument errors remain `TypeError`/`ValueError`.
+
+After confirmed publication, optional cleanup failures retain the entire result
+with warnings naming any remaining owned path. Success does not require reopening
+the final file: an external watcher may already have moved it. This evidence does
+not assert shell syntax, executed tests, authenticity or unchanged target state
+at a later Apply. See [pack details](pack.md).

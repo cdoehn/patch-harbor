@@ -14,6 +14,7 @@ The full contract and examples live in docs/python-api.md.
 from __future__ import annotations
 
 import math
+from collections.abc import Mapping
 import os
 from pathlib import Path
 from typing import TextIO
@@ -29,6 +30,7 @@ from patchharbor.api_types import (
     RunToolError, ScriptPrepared, ScriptResult, UnregisterResult,
     PatchEntry, PatchEntryRole, PatchInspection, PatchManifest, PatchMessage,
     PatchValidationResult, PatchValidationScope, ReferenceContext,
+    PatchPackResult,
     ApplyLock, ApplyLockKind, ApplyReadiness, AutomaticApplyResult,
     AutomaticApplyStatus, ExchangeWatchTarget, WatchControlPaths, WatchTargets,
 )
@@ -57,7 +59,40 @@ __all__ = [
     "ApplyLock", "ApplyLockKind", "ApplyReadiness", "AutomaticApplyResult",
     "AutomaticApplyStatus", "ExchangeWatchTarget", "WatchControlPaths", "WatchTargets",
     "watch_targets", "watch_control_paths", "apply_readiness",
+    "pack_patch", "PatchPackResult",
 ]
+
+
+def pack_patch(
+    content_directory: PathInput, *, reference_bundle: PathInput, entrypoint: str,
+    output: PathInput | None = None, output_directory: PathInput | None = None,
+    modes: Mapping[str,int] | None = None, observer: ProgressObserver | None = None,
+) -> PatchPackResult:
+    """Pack explicit contents and a verified Result without applying or replacing.
+
+    Exactly one output choice is required. Success retains its complete evidence
+    even if optional cleanup of an owned temporary name produces warnings.
+    """
+    if (output is None)==(output_directory is None):
+        raise ValueError('exactly one of output and output_directory is required')
+    contents=_path(content_directory,'content_directory')
+    reference=_path(reference_bundle,'reference_bundle')
+    destination=_optional_path(output,'output')
+    directory=_optional_path(output_directory,'output_directory')
+    if not isinstance(entrypoint,str):
+        raise TypeError('entrypoint must be text')
+    if not entrypoint:
+        raise ValueError('entrypoint must be nonempty')
+    if modes is not None and not isinstance(modes,Mapping):
+        raise TypeError('modes must be a mapping or None')
+    requested=dict(modes or {})
+    if any(not isinstance(key,str) or type(value) is not int for key,value in requested.items()):
+        raise TypeError('modes require string paths and integer values, not bool')
+    selected_observer=_observer(observer)
+    from patchharbor.patch_pack import pack_patch as _pack_patch
+    with _observe_activity(selected_observer):
+        return _pack_patch(contents,reference_bundle=reference,entrypoint=entrypoint,
+                           output=destination,output_directory=directory,modes=requested)
 
 
 def _path(value: PathInput, name: str) -> Path:

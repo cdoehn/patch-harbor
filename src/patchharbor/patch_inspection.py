@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import Enum
 from hashlib import sha256
+import os
 from pathlib import Path
 
 from patchharbor.bundle_handoff import PATCH_HANDOFF_DIRECTORY
@@ -74,8 +75,10 @@ class PatchValidationResult:
 
 def inspect_patch(
     path: Path, *, resource_policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY,
+    expected_identity: os.stat_result | None = None,
 ) -> PatchInspection:
-    package = resolve_patch_package(path, resource_policy=resource_policy)
+    owned = {} if expected_identity is None else {'expected_identity': expected_identity}
+    package = resolve_patch_package(path, resource_policy=resource_policy, **owned)
     script = parse_package_entrypoint(package.entrypoint)
     # Whitelist the syntax, but do not look for an installed shell.
     select_interpreter(script.text)
@@ -121,6 +124,7 @@ def validate_patch(
 def validate_patch_against_reference(
     path: Path, reference: CapturedResultReference, *,
     resource_policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY,
+    expected_identity: os.stat_result | None = None,
 ) -> PatchValidationResult:
     """Internal pack seam: inspect actual package bytes against one captured Result.
 
@@ -128,7 +132,8 @@ def validate_patch_against_reference(
     request. This avoids another reference-path read, not the package inspection
     or the common binding check. Public APIs continue to accept explicit paths.
     """
-    inspection = inspect_patch(path, resource_policy=resource_policy)
+    owned = {} if expected_identity is None else {'expected_identity': expected_identity}
+    inspection = inspect_patch(path, resource_policy=resource_policy, **owned)
     return _validation_result(inspection, scope=PatchValidationScope.REFERENCE,
                               context=reference.facts.context, reference_sha256=reference.sha256)
 

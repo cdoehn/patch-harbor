@@ -1,7 +1,7 @@
 """Internal, bounded capture of explicitly prepared Patch-Package contents.
 
-No public pack operation or publication is provided at this stage. The shared
-format-1 path, mode and static script validators retain their error categories.
+The shared format-1 path, mode and static script validators retain their error
+categories; the public pack engine consumes this immutable capture.
 """
 from __future__ import annotations
 
@@ -134,8 +134,16 @@ def _inventory(root: SourceDirectory, policy: ResourcePolicy,
     return tuple(sorted(entries,key=lambda e:e.path)),empty
 
 
+def resolve_content_root(contents: Path) -> Path:
+    try:
+        return contents.resolve(strict=True)
+    except (OSError, ValueError, RuntimeError) as exc:
+        raise _source_error(contents, exc) from exc
+
+
 def capture_sources(contents: Path, entrypoint: str, *, modes: Mapping[str,int] | None=None,
-                    resource_policy: ResourcePolicy=DEFAULT_RESOURCE_POLICY) -> CapturedSources:
+                    resource_policy: ResourcePolicy=DEFAULT_RESOURCE_POLICY,
+                    resolved_root: Path | None=None) -> CapturedSources:
     """Capture all selected files without rewriting any bytes or running scripts."""
     if not isinstance(contents,Path) or not isinstance(entrypoint,str):
         raise TypeError('contents must be Path and entrypoint must be str')
@@ -151,10 +159,7 @@ def capture_sources(contents: Path, entrypoint: str, *, modes: Mapping[str,int] 
         for name,mode in requested.items():
             normalize_bundle_path(name)
             validate_payload_mode(mode)
-        try:
-            root=contents.resolve(strict=True)
-        except RuntimeError as exc:
-            raise _source_error(contents,exc) from exc
+        root=resolve_content_root(contents) if resolved_root is None else resolved_root
         with open_source_root(root) as directory:
             inventory,empty=_inventory(directory,resource_policy)
             files={e.path:e for e in inventory if not e.directory}
