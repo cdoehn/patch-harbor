@@ -6,6 +6,7 @@ import argparse
 from collections.abc import Callable, Iterator, Sequence
 from contextlib import contextmanager, nullcontext
 import math
+import re
 from pathlib import Path
 import sys
 from typing import Any, BinaryIO, TextIO
@@ -19,7 +20,7 @@ from patchharbor.context_output import context_json_result, write_context_block
 from patchharbor.errors import format_tool_message
 from patchharbor.exit_status import ExitCode, exit_code_for_error
 from patchharbor.identifier_presentation import shorten_identifier
-from patchharbor.inspection_output import inspection_json_result, validation_json_result
+from patchharbor.inspection_output import inspection_json_result, validation_json_result, pack_json_result
 from patchharbor.json_document import serialize_json_document
 from patchharbor.platform.errors import describe_os_error
 from patchharbor.presentation import (
@@ -82,6 +83,24 @@ def _explicit_package_path(value: str) -> Path:
     if not value or "\x00" in value:
         raise argparse.ArgumentTypeError("must be a nonempty file path without NUL")
     return Path(value)
+
+
+class _PackModeAction(argparse.Action):
+    def __call__(self, parser, namespace, value, option_string=None):
+        name, separator, digits = value.rpartition('=')
+        if not separator or not name or re.fullmatch(r'[0-7]{4}', digits) is None:
+            raise argparse.ArgumentError(self, 'expected PACKAGE_PATH=0644 with four octal digits')
+        modes = dict(getattr(namespace, self.dest, None) or {})
+        if name in modes:
+            raise argparse.ArgumentError(self, 'duplicate mode path')
+        modes[name] = int(digits, 8)
+        setattr(namespace, self.dest, modes)
+
+
+def _pack_entrypoint(value: str) -> str:
+    if not value:
+        raise argparse.ArgumentTypeError('entrypoint must be nonempty')
+    return value
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -297,6 +316,19 @@ def _build_parser() -> argparse.ArgumentParser:
             binding = package_parser.add_mutually_exclusive_group()
             binding.add_argument("--repository", type=_explicit_package_path, metavar="REPOSITORY")
             binding.add_argument("--reference-bundle", type=_explicit_package_path, metavar="RESULT_ZIP")
+
+    pack_parser = commands.add_parser(
+        'pack', help='create and validate a patch package from explicit prepared contents',
+        description='Pack selected contents against a Result reference; never execute or replace a target.',
+    )
+    pack_parser.add_argument('content_directory', type=_explicit_package_path, metavar='CONTENT_DIRECTORY')
+    pack_parser.add_argument('--reference-bundle', required=True, type=_explicit_package_path, metavar='RESULT_ZIP')
+    pack_parser.add_argument('--entrypoint', required=True, type=_pack_entrypoint, metavar='PACKAGE_PATH')
+    pack_target = pack_parser.add_mutually_exclusive_group(required=True)
+    pack_target.add_argument('--output', type=_explicit_package_path, metavar='PATCH_ZIP')
+    pack_target.add_argument('--output-dir', type=_explicit_package_path, metavar='DIRECTORY')
+    pack_parser.add_argument('--mode', action=_PackModeAction, dest='modes', metavar='PACKAGE_PATH=0644')
+    pack_parser.add_argument('--json', action='store_true', dest='json_output')
 
     bundle_parser = commands.add_parser(
         "bundle",
@@ -712,6 +744,57 @@ def _package_command(
         for warning in info.warnings:
             print(format_tool_message(warning), file=stderr)
     return 0
+
+
+def _pack_output_diagnostic(stderr: TextIO, error: BaseException, packed: api.PatchPackResult | None) -> None:
+    detail = 'pack output could not be delivered: ' + str(error)
+    if packed is not None:
+        detail += f'; already published: {packed.path}; sha256: {packed.package_sha256}'
+    try:
+        print(format_tool_message(detail), file=stderr)
+        stderr.flush()
+    except (OSError, UnicodeError, KeyboardInterrupt):
+        pass
+
+
+def _pack_command(args: argparse.Namespace, *, stdout: TextIO, stderr: TextIO) -> int:
+    # Keep this operation's output boundary separate from all existing commands.
+    packed = None
+    error = None
+    try:
+        packed = api.pack_patch(
+            args.content_directory, reference_bundle=args.reference_bundle,
+            entrypoint=args.entrypoint, output=args.output,
+            output_directory=args.output_dir, modes=args.modes, observer=None,
+        )
+    except PatchHarborError as exc:
+        error = exc
+    except KeyboardInterrupt as exc:
+        error = PatchHarborError('pack interrupted before a confirmed result', api.FailureReason.INTERRUPTED)
+        error.__cause__ = exc
+    code = 0 if error is None else int(exit_code_for_error(error))
+    try:
+        if args.json_output:
+            _write_json_document(_json_envelope(
+                'pack', result=None if packed is None else pack_json_result(packed),
+                error=error, process_exit_code=code, output_version=2,
+            ), stdout)
+        elif packed is not None:
+            print(str(packed.path), file=stdout)
+            print('sha256: ' + packed.package_sha256, file=stdout)
+            for warning in packed.warnings:
+                print(format_tool_message(warning), file=stderr)
+        else:
+            print(format_tool_message(str(error)), file=stderr)
+        stdout.flush()
+        stderr.flush()
+    except (OSError, UnicodeError) as exc:
+        _pack_output_diagnostic(stderr, exc, packed)
+        return int(ExitCode.EXECUTION_ERROR)
+    except KeyboardInterrupt as exc:
+        _pack_output_diagnostic(stderr, exc, packed)
+        return int(ExitCode.INTERRUPTED)
+    return code
 
 
 def _registry_list_json_result(
@@ -1370,6 +1453,9 @@ def main(
             stderr=actual_stderr,
             verbose=args.verbose, force_plain=args.plain, no_color=args.no_color,
         )
+
+    if args.command == 'pack':
+        return _pack_command(args, stdout=actual_stdout, stderr=actual_stderr)
 
     if args.command in ("inspect", "validate"):
         return _package_command(

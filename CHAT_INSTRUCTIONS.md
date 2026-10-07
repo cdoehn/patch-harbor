@@ -353,12 +353,13 @@ Der bereits laufende Watcher übernimmt allein den Apply. Keine direkten
 Development-Commits, Apply-Mutationen, Hook-Umgehungen oder Watcher-Neustarts.
 Nach erfolgreichen Commit-Gates genau ein normaler Push; kein automatisches Tag.
 
-PP-01 einschließlich konsistenter historischer Fixture und PP-02A sind durch
-vollständig geprüfte Results bestätigt. Bundle 032 führt PP-02B und PP-02C in
-einem Commit zusammen: `api.pack_patch` mit exklusiver Veröffentlichung und
-vollständigem Referenznachweis. Der CLI-Adapter und die PYZ folgen erst später.
-Nach tatsächlichem Erfolg folgt PP-03. Maßgeblich sind Plan Abschnitt 1.12 und
-`docs/test-parallelism.md`. Native CI-Nachweise und Produktfreigabe bleiben separat.
+PP-00 bis PP-02C sind durch tatsächlich geprüfte Results bestätigt. Bundle 033
+führt den regulären `patchharbor pack`-Befehl als Adapter auf `api.pack_patch`
+ein. Nach tatsächlichem Erfolg folgt PP-04 für die PYZ. Maßgeblich sind Plan
+Abschnitt 1.13 und `docs/test-parallelism.md`. Native CI-Nachweise und Produktfreigabe
+bleiben separat. Ein alter eingebetteter Core besitzt `pack` gegebenenfalls noch
+nicht; bis eine geeignete Runtime tatsächlich vorliegt, bleibt der vorhandene
+geprüfte manuelle Paketvertrag nutzbar.
 
 Bestimme die aktive Zielversion aus dem Repository. Eine laut Plan erst zum
 Release erfolgende Versionsanhebung ist kein Widerspruch; tatsächlich

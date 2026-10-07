@@ -1,5 +1,13 @@
 # PatchHarbor – Spezifikations-Changelog
 
+## 2026-10-08 – PP-02B/C bestätigt; CLI-Pack in Bundle 033
+
+- Gemeinsamer PP-02BC-Commit `e2f6388c7d511b700ad825b64aea2aca6841ca51` durch echtes Result bestätigt.
+- CLI delegiert an die öffentliche API; Pflichtoptionen, explizite Ziele,
+  wiederholbare Modi, vollständiges Version-2-JSON und getrennte Ausgabefehler.
+- Funktionale gebaute Distributions-/Apply-Beispiele und volle parallele Gates;
+  keine automatische CI, kein Format-3-Writer und unveränderte normative Dateien.
+
 ## 2026-10-08 – PP-02A bestätigt; Pack-Core/API als Bundle 032
 
 - Bundle 031 mit Commit `d487a84c55857ea0f64914f1cd636e5fc796a3fb`,

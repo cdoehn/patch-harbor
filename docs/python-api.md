@@ -42,7 +42,7 @@ print(report.success, report.result_bundle.status)
 | `context(repository=".")` | `context` | `RepositoryContext` |
 | `inspect_patch(patch)` | `inspect PATCH_ZIP` | `PatchInspection` |
 | `validate_patch(patch, repository=None, reference_bundle=None)` | `validate PATCH_ZIP` | `PatchValidationResult` |
-| `pack_patch(content_directory, reference_bundle=..., entrypoint=..., output=None, output_directory=None, modes=None)` | CLI follows in PP-03 | `PatchPackResult` |
+| `pack_patch(content_directory, reference_bundle=..., entrypoint=..., output=None, output_directory=None, modes=None)` | `pack CONTENT_DIRECTORY` | `PatchPackResult` |
 | `bundle(repository=".", output_directory=None)` | `bundle` | `BundleResult` |
 | `apply(patch=None, repository=None, dry_run=False, ...)` | manual `apply` | `RunReport` |
 | `dry_run(patch=None, repository=None, ...)` | `apply --dry-run` | `RunReport` |

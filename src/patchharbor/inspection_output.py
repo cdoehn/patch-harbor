@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from patchharbor.patch_inspection import PatchInspection, PatchValidationResult
 from patchharbor.context_output import context_json_result
+from patchharbor.pack_types import PatchPackResult
 
 
 def inspection_json_result(info: PatchInspection) -> dict[str, object]:
@@ -36,4 +37,15 @@ def validation_json_result(report: PatchValidationResult) -> dict[str, object]:
         "reference_sha256": report.reference_sha256,
         "checked_at": report.checked_at.isoformat().replace("+00:00", "Z"),
         "not_checked": list(report.not_checked),
+    }
+
+
+def pack_json_result(report: PatchPackResult) -> dict[str, object]:
+    return {
+        'path': str(report.path), 'package_id': str(report.package_id),
+        'created_at': report.created_at.isoformat().replace('+00:00', 'Z'),
+        'package_sha256': report.package_sha256, 'package_size': report.package_size,
+        'reference_sha256': report.reference_sha256,
+        'validation': validation_json_result(report.validation),
+        'warnings': list(report.warnings),
     }

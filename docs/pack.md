@@ -3,7 +3,26 @@
 Der Vertrag steht gemeinsam in [Hauptspezifikation](../spec/SPECIFICATION.md)
 und [PYZ/PACK-Ergänzung, Revision 2](../spec/SPECIFICATION_EXTENSION_PYZ_PACK.md).
 Der [aktive Plan](../planning/pyz-pack/commit-plan.md) führt den Fortschritt.
-PP-02B/C bietet die öffentliche Python-API; CLI und PYZ folgen in späteren Schritten.
+CLI und öffentliche Python-API verwenden denselben Pack-Core. Die PYZ folgt
+in späteren Schritten.
+
+```bash
+patchharbor pack ./patch-inhalt --reference-bundle ./result.zip \
+  --entrypoint apply.sh --output-dir ./vorhandene-ausgabe \
+  --mode scripts/neues-tool.sh=0755 --json
+```
+
+`--reference-bundle`, `--entrypoint` und genau eine der Optionen `--output-dir`
+oder `--output` sind Pflicht. `--mode` ist wiederholbar und verlangt genau vier
+oktale Ziffern; doppelte Pfade sind Nutzungsfehler. Die CLI korrigiert keine
+unsicheren Paketpfade oder Modi und bietet kein Überschreib-/Validierungs-Aus-Flag.
+Ohne `--json` werden Pfad und Hash ausgegeben. JSON verwendet `output_version: 2`,
+`command: "pack"` und enthält den vollständigen Validierungsnachweis samt Warnungen.
+Fehlende Optionen/Modussyntax ergeben Exit 2, fachliche Fehler behalten die
+bestehenden Codes. Scheitert nach Veröffentlichung nur die Ausgabe oder ihr Flush,
+endet die CLI mit 7 (I/O) beziehungsweise 130 (Unterbrechung), ohne erneut zu bauen.
+Soweit stderr funktioniert, nennt sie den veröffentlichten Pfad und Hash. Es wird
+kein zweiter Fehler-Envelope an eine teilweise geschriebene Erfolgsantwort gehängt.
 
 ```python
 from patchharbor import api
@@ -94,4 +113,4 @@ Pack startet weder Git, Shell, Netzwerk, Installer, Build noch Apply.
 Die Tests für Referenzen, Inhaltsaufnahme, Kandidatenbau und öffentliche API laufen
 in der vollständigen parallelen Suite. Linux-Nachweise ersetzen keine native
 Windows-/CIFS-Abnahme. Der tatsächliche Handoff- und Apply-Status steht im Plan und
-im zugehörigen Result. CLI-Ausgabe und PYZ-Durchstiche folgen ihren eigenen Gates.
+im zugehörigen Result. Die CLI-Ausgabe ist separat geprüft; PYZ-Durchstiche folgen ihren eigenen Gates.
