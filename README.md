@@ -33,8 +33,9 @@ PP-02A / Bundle 031 is confirmed by commit
 Bundle 033 confirms the CLI adapter at commit `9bebc3c5a9da4da0cb6f846469a79bf9965a415a`
 (2734 passed, 8 skipped). Bundle 034 confirms the canonical Core-PYZ profile at commit `a9ac74e00fd0ac0042d7474a52a95e1fb17a4d59`
 (2802 passed, 8 skipped). Bundle 035 confirms producer-bound directory/PYZ resources at commit `25057ec9fa5c108a92a6a31be434c0d2c5e30118`
-(2831 passed, 8 skipped). Bundle 036 prepares a stdlib-only
-bootstrap and direct/API use of the built PYZ; the new Result reader/writer follow later.
+(2831 passed, 8 skipped). Bundle 036 confirms the stdlib-only bootstrap and direct/API PYZ use at commit
+`d13709e8ccb9e4b45bd126fcb41829f784270861` (2859 passed, 8 skipped). Bundle 037
+prepares full Result-3 reference reading; production still writes Result 2.
 
 **Current policy, explicitly updated by Christian on 7 October 2026:**
 Development and Apply run full parallel suites only, including at bundle end.
@@ -43,7 +44,7 @@ Only Christian starts the manual GitHub CI workflow; no automated dispatch or
 five-bundle cadence. The active loop continues the existing plan after verified
 Results, without a fixed correction-attempt limit.
 See [test policy](docs/test-parallelism.md) and [plan section 1.10](planning/pyz-pack/commit-plan.md).
-The prepared PP-04C step is not yet an Apply or CI success.
+The prepared PP-05A step is not yet an Apply or CI success.
 
 The prepared Result-PYZ profile contains the shared Core **without the watcher**.
 The new public `api.pack_patch` accepts explicit contents, a Result reference,

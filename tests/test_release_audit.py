@@ -80,6 +80,7 @@ EXPECTED_CORE_RUNTIME_FILES = {
     "result_resources.py",
     "runtime_artifact.py",
     "result_runtime.py",
+    "result_pyz.py",
     "runtime_wheel.py",
     "runtime_zip.py",
     "runtime_pyz.py",

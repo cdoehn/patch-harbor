@@ -207,3 +207,10 @@ def test_direct_pyz_cli_pack_inspect_validate_outside_checkout(built_result_sour
     assert inspected['package_sha256']==packed['package_sha256']
     assert validated['binding_matches'] and validated['scope']=='reference'
     assert validated['reference_sha256']==hashlib.sha256(reference.read_bytes()).hexdigest()
+
+
+@pytest.mark.skipif(os.name == 'nt', reason='POSIX FIFO input boundary')
+def test_special_bootstrap_input_is_rejected_before_a_potentially_blocking_open(tmp_path,monkeypatch):
+    path=tmp_path/'not-a-regular-result';os.mkfifo(path)
+    monkeypatch.setattr(bootstrap.os,'open',lambda *a,**k:pytest.fail('special input reached open'))
+    with pytest.raises(ValueError):bootstrap.assess(path)

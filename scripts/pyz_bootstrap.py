@@ -60,14 +60,18 @@ def _state(info):
 
 def _capture(path, maximum):
     """One stable, bounded, no-follow regular-file capture, with no retry."""
-    descriptor = os.open(path, os.O_RDONLY | getattr(os, 'O_BINARY', 0) | getattr(os, 'O_NOFOLLOW', 0))
+    initial = path.lstat()
+    _require(stat.S_ISREG(initial.st_mode) and not path.is_symlink()
+             and not getattr(path, 'is_junction', lambda: False)(), 'linked or special input')
+    descriptor = os.open(path, os.O_RDONLY | getattr(os, 'O_BINARY', 0)
+                         | getattr(os, 'O_NOFOLLOW', 0) | getattr(os, 'O_NONBLOCK', 0))
     with os.fdopen(descriptor, 'rb') as stream:
         before = os.fstat(stream.fileno())
         _require(stat.S_ISREG(before.st_mode) and before.st_size <= maximum, 'file type or size limit')
         _require(not path.is_symlink() and not getattr(path, 'is_junction', lambda: False)(), 'linked input')
         raw = stream.read(maximum + 1)
         after = os.fstat(stream.fileno())
-        _require(len(raw) <= maximum and _state(before) == _state(after) == _state(path.lstat()),
+        _require(len(raw) <= maximum and _state(initial) == _state(before) == _state(after) == _state(path.lstat()),
                  'input changed during capture')
     return raw
 

@@ -1,5 +1,12 @@
 # PatchHarbor – Spezifikations-Changelog
 
+## 2026-10-08 – PP-04C bestätigt; neuer Result-Reader in Bundle 037
+
+- Commit `d13709e8ccb9e4b45bd126fcb41829f784270861` durch tatsächlichen Apply bestätigt.
+- Reader-first-Unterstützung für Result 3 / Runtime 2 mit strengem kanonischem
+  PYZ-Datenreader und gemeinsamem Budget; alte Datenprofile/API-Verträge bleiben.
+- Produktiver Writer bleibt Format 2. Keine CI-Automatik; beide Normdateien unverändert.
+
 ## 2026-10-08 – PP-04B bestätigt; installationsfreier Bootstrap in Bundle 036
 
 - Commit `25057ec9fa5c108a92a6a31be434c0d2c5e30118` durch tatsächlichen Apply bestätigt.

@@ -96,6 +96,7 @@ EXPECTED_RUNTIME_FILES = {
     "patchharbor/result_resources.py",
     "patchharbor/runtime_artifact.py",
     "patchharbor/result_runtime.py",
+    "patchharbor/result_pyz.py",
     "patchharbor/runtime_wheel.py",
     "patchharbor/runtime_zip.py",
     "patchharbor/runtime_pyz.py",

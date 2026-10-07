@@ -20,6 +20,7 @@ from patchharbor.exchange_state import ExchangePatchSelection
 from patchharbor.exit_status import reason_for_exit_code
 from patchharbor.json_document import parse_json_document as _document
 from patchharbor.result_runtime import ResultRuntime, read_result_runtime
+from patchharbor.result_pyz import ResultPyzRuntime, read_result_pyz
 from patchharbor.models import BundlePayload, GitObjectFormat, GitObjectId, RepositoryId
 from patchharbor.platform.filesystem import (
     FileChangedDuringRead, FileSystemOperationError, UnsupportedFileTypeError,
@@ -101,7 +102,7 @@ class ResultFacts:
     patch_sha256: str | None
     completed_commit: GitObjectId | None
     format_version: int = 1
-    runtime: ResultRuntime | None = None
+    runtime: ResultRuntime | ResultPyzRuntime | None = None
     handoff_present: bool = False
 
 
@@ -263,9 +264,9 @@ def _parse_result_payloads(payloads: tuple[BundlePayload, ...], *,
     context = _document(files["context.json"])
     run = _document(files["logs/run.json"])
     version = manifest.get("format_version")
-    manifest_fields = _MANIFEST_FIELDS | ({"runtime"} if version == 2 else set())
+    manifest_fields = _MANIFEST_FIELDS | ({"runtime"} if version in (2, 3) else set())
     _require(manifest.get("marker") == _RESULT_MARKER
-             and type(version) is int and version in (1, 2)
+             and type(version) is int and version in (1, 2, 3)
              and set(manifest) in (manifest_fields, manifest_fields | _APPLY_FIELDS,
                                    manifest_fields | _APPLY_FIELDS | _RECEIPT_FIELDS)
              and set(context) in (_BINDING_FIELDS | {"dirty", "created_at"},
@@ -341,17 +342,19 @@ def _parse_result_payloads(payloads: tuple[BundlePayload, ...], *,
         expected_files.add("logs/execution.log")
     handoff = _handoff(files, context, run)
     _require(version == 1 or handoff == {"environment.json", CHAT_INSTRUCTIONS_NAME},
-             "Result 2 requires passive handoff data")
+             "Result 2/3 requires passive handoff data")
     expected_files.update(handoff)
     runtime = None
-    if version == 2 and verify_runtime:
-        runtime = read_result_runtime(manifest["runtime"], files, resource_policy=resource_policy)
+    if version in (2, 3) and verify_runtime:
+        read_runtime = read_result_runtime if version == 2 else read_result_pyz
+        runtime = read_runtime(manifest["runtime"], files, resource_policy=resource_policy)
         _require(runtime.status != "unavailable" or bool(run["warnings"]),
                  "unavailable runtime requires a run warning")
         expected_files.add(runtime.metadata.path)
-        if runtime.wheel is not None:
-            expected_files.add(runtime.wheel.path)
-    elif version == 2:
+        artifact = runtime.wheel if version == 2 else runtime.artifact
+        if artifact is not None:
+            expected_files.add(artifact.path)
+    elif version in (2, 3):
         # Only this reserved namespace may be excluded from the private
         # repository-only assessment. Unknown root/snapshot members still fail.
         expected_files.update(name for name in files if name.startswith("runtime/"))

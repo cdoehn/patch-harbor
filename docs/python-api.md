@@ -561,3 +561,14 @@ Afterwards use the returned `api.inspect_patch`, `api.validate_patch` and
 `api.pack_patch` normally. Full native reference validation remains separate
 from bootstrap checks; no installation or subprocess is needed for these calls.
 New Result-3 production is gated by subsequent reader/provider/Writer work.
+
+
+## Reader-first Result 3 (PP-05A)
+
+`validate_patch(..., reference_bundle=...)` and `pack_patch` now use the same
+full reader for Result formats 1, 2 and 3. The new format verifies its PYZ as
+strict data, without importing it. Public signatures/scopes are unchanged;
+corrupt references retain source-error category 4. A private repository-only
+diagnostic fallback is never a successful full reference or a `pack` input.
+See [Result format 3](result-format-3.md). Production remains Format 2 until
+the subsequent consumer/bootstrap/provider/Writer gates.

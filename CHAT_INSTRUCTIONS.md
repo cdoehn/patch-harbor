@@ -377,14 +377,13 @@ Der bereits laufende Watcher übernimmt allein den Apply. Keine direkten
 Development-Commits, Apply-Mutationen, Hook-Umgehungen oder Watcher-Neustarts.
 Nach erfolgreichen Commit-Gates genau ein normaler Push; kein automatisches Tag.
 
-PP-00 bis PP-04B sind durch tatsächlich geprüfte Results bestätigt. Bundle 036
-bereitet einen installationsfreien Standardbibliothek-Bootstrap und direkten/API-
-Start der PYZ vor. Der produktive Writer bleibt Format 2 mit Wheel. Vollständige
-Format-3-Lesefähigkeit und tatsächlich eingebetteter Bootstrap folgen vor der
-Writerumschaltung. Maßgeblich sind Plan Abschnitt 1.16 und die aktuelle Testpolicy.
-Ein älterer mitgelieferter Core kann weiterhin `pack` vermissen; bis eine geeignete
-Runtime tatsächlich bereitsteht, bleibt der geprüfte manuelle Paketvertrag nutzbar.
-Keine vorgezogene Freigabe resultgenerierender PYZ-Kommandos oder eines Releases.
+PP-00 bis PP-04C sind durch tatsächlich geprüfte Results bestätigt. Bundle 037
+bereitet den vollständigen Result-3-/PYZ-Reader vor. Der produktive Writer bleibt
+Format 2 mit Wheel. Verbraucher-/Legacy-Nachweise und eingebetteter Bootstrap
+folgen vor der Writerumschaltung. Maßgeblich sind Plan Abschnitt 1.17 und die
+aktuelle Testpolicy. Ein älterer mitgelieferter Core kann weiterhin `pack` oder
+Format 3 vermissen; bis eine geeignete Runtime tatsächlich bereitsteht, bleibt
+der geprüfte manuelle Paketvertrag nutzbar. Keine vorgezogene Writerfreigabe.
 
 Bestimme die aktive Zielversion aus dem Repository. Eine laut Plan erst zum
 Release erfolgende Versionsanhebung ist kein Widerspruch; tatsächlich
