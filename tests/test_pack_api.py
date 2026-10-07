@@ -311,6 +311,7 @@ def test_missing_own_template_fails_without_borrowing_reference_instructions(req
             from types import SimpleNamespace
             return SimpleNamespace(artifact=None, reason='integrity_failure')
     monkeypatch.setattr(core, 'RuntimeProvider', Missing)
+    monkeypatch.setattr(core, 'PyzProvider', Missing)
     fail(FailureReason.PAYLOAD_PREPARATION_ERROR, lambda: pack(request_files))
     assert not list(request_files[2].iterdir())
 

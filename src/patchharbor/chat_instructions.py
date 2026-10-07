@@ -6,6 +6,7 @@ from importlib import metadata
 import json
 from pathlib import Path
 import shlex
+from zipimport import zipimporter
 
 from patchharbor.bundle_handoff import (
     BundleHandoff,
@@ -14,7 +15,11 @@ from patchharbor.bundle_handoff import (
     encode_environment,
 )
 from patchharbor.errors import result_bundle_error
-from patchharbor.platform.filesystem import FileReadLimitExceeded
+from patchharbor.platform.filesystem import (
+    FileReadLimitExceeded, FileChangedDuringRead, UnsupportedFileTypeError,
+)
+from patchharbor.pyz_artifact import PyzProvider
+from patchharbor.runtime_sources import read_directory_resource
 
 
 def _template_path() -> Path:
@@ -31,6 +36,10 @@ def _template_path() -> Path:
             return source_template
     try:
         distribution = metadata.distribution("patchharbor")
+        # A legacy shared-data layout is valid only for the distribution that
+        # owns this exact loaded module, never a same-named foreign installation.
+        if Path(distribution.locate_file("patchharbor/chat_instructions.py")).resolve() != module:
+            raise result_bundle_error("chat template belongs to a different distribution")
         matches = tuple(
             entry for entry in distribution.files or ()
             if entry.as_posix().endswith("share/patchharbor/" + CHAT_INSTRUCTIONS_NAME)
@@ -50,12 +59,19 @@ def _normalize_line_endings(text: str) -> str:
 def load_chat_template() -> str:
     """Read fresh UTF-8 template text with LF newlines; never rewrite its file."""
     try:
-        with _template_path().open("rb") as stream:
-            raw = stream.read(MAX_HANDOFF_ENTRY_BYTES + 1)
+        if isinstance(__loader__, zipimporter):
+            provision = PyzProvider().capture()
+            if provision.artifact is None:
+                raise ValueError('own PYZ template unavailable: ' + str(provision.reason))
+            raw = provision.artifact.chat_template
+        else:
+            path = _template_path()
+            raw = read_directory_resource(path.parent, path.name, MAX_HANDOFF_ENTRY_BYTES)
         if not raw or len(raw) > MAX_HANDOFF_ENTRY_BYTES or raw.startswith(b"\xef\xbb\xbf"):
             raise ValueError("invalid template size or encoding")
         return _normalize_line_endings(raw.decode("utf-8"))
-    except (OSError, UnicodeError, ValueError) as exc:
+    except (OSError, UnicodeError, ValueError, FileReadLimitExceeded,
+            FileChangedDuringRead, UnsupportedFileTypeError) as exc:
         raise result_bundle_error("cannot read installed chat-instructions template") from exc
 
 

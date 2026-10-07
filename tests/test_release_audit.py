@@ -83,6 +83,8 @@ EXPECTED_CORE_RUNTIME_FILES = {
     "runtime_wheel.py",
     "runtime_zip.py",
     "runtime_pyz.py",
+    "runtime_sources.py",
+    "pyz_artifact.py",
     "result_bundle_target.py",
     "result_bundle_writer.py",
     "locks.py",

@@ -87,12 +87,26 @@ def test_installed_template_is_resolved_from_distribution_file_record(tmp_path: 
     template.write_text("installed canonical contract\n")
     monkeypatch.setattr(instructions_module, "__file__", str(module))
     entry = Path("../../../share/patchharbor") / CHAT_INSTRUCTIONS_NAME
-    distribution = SimpleNamespace(files=[entry], locate_file=lambda item: template)
+    distribution = SimpleNamespace(files=[entry], locate_file=lambda item: module if str(item) == "patchharbor/chat_instructions.py" else template)
     monkeypatch.setattr(instructions_module.metadata, "distribution", lambda name: distribution)
     assert load_chat_template() == "installed canonical contract\n"
     distribution.files = []
     with pytest.raises(PatchHarborError):
         load_chat_template()
+
+
+def test_legacy_template_rejects_distribution_metadata_for_a_foreign_module(tmp_path, monkeypatch):
+    module = tmp_path / "own" / "patchharbor" / "chat_instructions.py"
+    module.parent.mkdir(parents=True); module.touch()
+    foreign = tmp_path / "foreign" / "patchharbor" / "chat_instructions.py"
+    foreign.parent.mkdir(parents=True); foreign.touch()
+    template = tmp_path / "foreign" / "template.md"; template.write_bytes(b"foreign contract")
+    monkeypatch.setattr(instructions_module, "__file__", str(module))
+    entry = Path("../../../share/patchharbor") / CHAT_INSTRUCTIONS_NAME
+    distribution = SimpleNamespace(files=[entry], locate_file=lambda item: (
+        foreign if str(item) == "patchharbor/chat_instructions.py" else template))
+    monkeypatch.setattr(instructions_module.metadata, "distribution", lambda name: distribution)
+    with pytest.raises(PatchHarborError): load_chat_template()
 
 
 @pytest.mark.parametrize("directory", ["src", "site-packages"])
@@ -178,7 +192,7 @@ def test_installed_template_line_endings_are_lf(
     template.write_bytes(raw)
     monkeypatch.setattr(instructions_module, "__file__", str(module))
     entry = Path("../../../share/patchharbor") / CHAT_INSTRUCTIONS_NAME
-    distribution = SimpleNamespace(files=[entry], locate_file=lambda item: template)
+    distribution = SimpleNamespace(files=[entry], locate_file=lambda item: module if str(item) == "patchharbor/chat_instructions.py" else template)
     monkeypatch.setattr(instructions_module.metadata, "distribution", lambda name: distribution)
     assert load_chat_template() == "installed canonical contract\n"
     assert render_chat_handoff(patch_environment()).instructions.endswith(b"installed canonical contract\n")

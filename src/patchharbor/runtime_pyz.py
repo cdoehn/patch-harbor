@@ -218,7 +218,10 @@ def read_pyz(raw: bytes, *, policy, remaining_bytes: int) -> PyzRecipe:
     """Validate a bounded archive as data, including its complete canonical bytes."""
     if len(raw) > MAX_PYZ_BYTES:
         raise RuntimeLimitError('PYZ artifact exceeds budget')
-    count = bounded_directory(raw, policy, max_entries=MAX_ENTRIES)
+    try:
+        count = bounded_directory(raw, policy, max_entries=MAX_ENTRIES)
+    except ValueError as exc:
+        raise RuntimeDataError('invalid PYZ directory boundary') from exc
     try:
         with ZipFile(BytesIO(raw)) as archive:
             infos = archive.infolist()

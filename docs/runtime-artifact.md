@@ -44,6 +44,33 @@ kompatibel. Kandidat und installierte Rezeptmaterialisierung müssen bytegleich 
 Das ist in PP-04A noch keine Freigabe aller PYZ-Kommandos: ZIP-Ressourcenzugriff,
 Python-only-Bootstrap und Result-3-Writer haben nachfolgende Gates.
 
+## PP-04B: herkunftsgebundene Ressourcen
+
+`runtime_sources.py` bindet Ressourcen an das tatsächlich geladene Modul. Für
+Verzeichnisinstallationen prüft der gemeinsame Reader reguläre Dateien,
+No-follow-Elternidentitäten, Größen und stabile Lesevorgänge. Für ZIP-Importe
+wird das konkrete Archiv des geladenen `zipimporter` begrenzt erfasst und sein
+gesamtes kanonisches PYZ-Profil geprüft. Kein konstruierter Dateisystempfad
+innerhalb eines ZIPs, keine Extraktion, kein Cache oder fremdes Metadatenpaket.
+
+`PyzProvider` ist auf einen Auftrag begrenzt. Er bindet das beim Paketimport
+festgehaltene `_pyz_resource_id` an das vorbereitete Rezept und alle aktuellen
+Ressourcenbytes. Ein später kohärent ersetzter Build gleicher Version wird als
+`source_changed` erkannt. Bereits fixierte Bytes bleiben für den laufenden
+Auftrag verwendbar. Fehlende, ungültige und zu große Ressourcen werden getrennt
+als unavailable gemeldet; unerwartete Programmfehler und Abbrüche bleiben sichtbar.
+
+`pack` verwendet bei vorhandenem PYZ-Literal diesen Provider für seine Vorlage,
+sonst den unveränderten Legacy-Provider oder den ausdrücklich verankerten
+Source-Vertrag. Ein defektes eigenes PYZ-Profil wird nicht mit einem Wheel oder
+CWD-Dokument verdeckt. Die API benötigt dafür keine Installation, Schreibrechte
+im Runtimeverzeichnis oder externen Werkzeuge. Verzeichnis und daraus gebaute
+PYZ liefern dieselben kanonischen Artefaktbytes und Dokumente.
+
+Der Result-Writer ist weiterhin Format 2. Der gemeinsame request-lokale
+Result-Capture wird erst zusammen mit den späteren Reader-/Writer-Gates auf
+PYZ umgestellt; PP-04B behauptet noch keine resultgenerierende Core-Parität.
+
 ## Fortgeführter Legacy-Wheel-Vertrag
 
 Die folgende Beschreibung dokumentiert den historischen Wheel-Aufbau. Sein

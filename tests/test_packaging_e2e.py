@@ -99,6 +99,8 @@ EXPECTED_RUNTIME_FILES = {
     "patchharbor/runtime_wheel.py",
     "patchharbor/runtime_zip.py",
     "patchharbor/runtime_pyz.py",
+    "patchharbor/runtime_sources.py",
+    "patchharbor/pyz_artifact.py",
     "patchharbor/result_bundle_target.py",
     "patchharbor/result_bundle_writer.py",
     "patchharbor/locks.py",

@@ -1,5 +1,12 @@
 # PatchHarbor – Spezifikations-Changelog
 
+## 2026-10-08 – PP-04A bestätigt; eigene PYZ-Ressourcen in Bundle 035
+
+- Commit `a9ac74e00fd0ac0042d7474a52a95e1fb17a4d59` durch tatsächlichen Apply bestätigt.
+- Begrenzte Verzeichnis-/ZIP-Ressourcen an geladenen Erzeuger gebunden; immutable
+  request-lokale PYZ-Captures und eigene Vorlagen für `pack` vorbereitet.
+- Result-2-Writer und beide Normdateien bleiben unverändert; keine automatische CI.
+
 ## 2026-10-08 – PP-03 bestätigt; PYZ-Profil in Bundle 034
 
 - CLI-Commit `9bebc3c5a9da4da0cb6f846469a79bf9965a415a` durch tatsächlichen Apply bestätigt.

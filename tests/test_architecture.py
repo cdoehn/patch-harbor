@@ -17,7 +17,6 @@ PACKAGE_ROOTS = {
 
 ENTRYPOINT_MODULES = {
     # PP-04A stages a data-only build profile, consumed by the PP-04B provider.
-    "patchharbor.runtime_pyz",
     "patchharbor.cli",
     "patchharbor_watcher",
     "patchharbor_watcher.cli",

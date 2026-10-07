@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 from uuid import uuid4
 
+from patchharbor.pyz_artifact import PyzProvider, own_pyz_profile_present
 from patchharbor.bundle_handoff import CHAT_INSTRUCTIONS_NAME, MAX_HANDOFF_ENTRY_BYTES
 from patchharbor.errors import FailureReason, PatchHarborError
 from patchharbor.pack_candidate import prepare_metadata, prepare_candidate, write_prepared_candidate
@@ -33,11 +34,12 @@ def _error(message: str, reason: FailureReason, exc: BaseException) -> PatchHarb
 
 def capture_pack_template() -> str:
     """Pin the executing producer's verified template without foreign fallback."""
-    provision=RuntimeProvider().capture()
     try:
+        selected_pyz = own_pyz_profile_present()
+        provision=(PyzProvider() if selected_pyz else RuntimeProvider()).capture()
         if provision.artifact is not None:
             raw=provision.artifact.chat_template
-        elif provision.reason=='source_not_prepared':
+        elif provision.reason=='source_not_prepared' and not selected_pyz:
             # An explicit source checkout has its own canonical source document.
             # Never consult CWD or metadata.distribution for another installation.
             module=Path(__file__).resolve()

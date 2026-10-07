@@ -2,12 +2,12 @@
 
 **Plan-ID:** `PYZ-PACK`
 **Planpfad:** `planning/pyz-pack/commit-plan.md`
-**Revision:** 11
+**Revision:** 12
 **Stand:** 8. Oktober 2026
-**Status:** PP-00 bis PP-03 tatsächlich angewendet/gepusht. PP-04A / Bundle 034 bereitet das kanonische PYZ-Datenprofil und beide getrennten Buildprofile vor; Apply noch offen.
+**Status:** PP-00 bis PP-04A tatsächlich angewendet/gepusht. PP-04B / Bundle 035 bindet Verzeichnis- und PYZ-Ressourcen an den geladenen Erzeuger; Apply noch offen.
 **Geplanter Umfang:** 9 Arbeitspakete `PP-00` bis `PP-08`, zunächst 16 vorgeschlagene Commit-Schritte. Keine feste Anzahl von Patch-Bündeln.
-**Fortschritt:** 6/16 ursprüngliche Planpositionen committed. PP-04A ist Position 7; native Abnahme bleibt separat.
-**Nächster Schritt:** PP-04A vollständig parallel prüfen und übergeben; danach PP-04B für ZIP-Ressourcen.
+**Fortschritt:** 7/16 ursprüngliche Planpositionen committed. PP-04B ist Position 8; native Abnahme bleibt separat.
+**Nächster Schritt:** PP-04B vollständig parallel prüfen und übergeben; danach PP-04C für Bootstrap und Core-Start.
 **Ziel-Produktversion:** noch festzulegen; keine erfundene Releaseversion, kein automatischer Tag oder Release.
 
 > **Verbindliche Grundlage ist der gemeinsame Spezifikationssatz:**
@@ -605,6 +605,38 @@ Der Root-Einstieg importiert die gemeinsame CLI; volle ZIP-Ressourcenfähigkeit,
 Python-only-Bootstrap und spätere Result-Erzeugung folgen PP-04B/C und PP-05/06.
 Dies ist noch keine Freigabe resultgenerierender PYZ-Kommandos.
 
+### 1.15 PP-04A bestätigt; PP-04B / Bundle 035
+
+Result `patchharbor-apply_Result_225941_1007_7e86ff.zip`, SHA-256
+`f219d300d2c0841b97db572018316cf1c92f9e505f320e063d40739985fded4f`, bestätigt den tatsächlichen PP-04A-Commit
+`a9ac74e00fd0ac0042d7474a52a95e1fb17a4d59`, normalen Push und sauberen Baum. Das vollständige parallele Gate
+bestand mit 2802 bestandenen Tests und 8 Skips.
+Dieses Result liefert alle vier vollständigen Bindungswerte für Bundle 035.
+
+PP-04B führt einen gemeinsamen begrenzten Verzeichnisleser und einen am
+Ausführungsarchiv verankerten ZIP-Ressourcenzugang ein. Der neue PYZ-Provider
+prüft das gesamte vorbereitete Profil gegen das beim Paketimport geladene
+Identitätsliteral. Lizenz, API-Dokumentation und Chatvorlage stammen aus genau
+diesen geprüften Bytes. Wiederholte oder gleichzeitige Zugriffe eines Auftrags
+verwenden seinen unveränderlichen Capture; ein neuer Auftrag prüft neu.
+Gleichnamige Fremdinstallationen, CWD-Vorlagen, Buildcache, Netzwerk und temporäre
+Extraktion werden nicht als Ersatz herangezogen. Ein altes Shared-Data-Layout
+wird nur akzeptiert, wenn die Distribution das tatsächlich geladene Modul besitzt.
+
+`pack` bevorzugt das eigene vorbereitete PYZ-Profil, sobald dessen Identität
+geladen ist. Ein defektes ausgewähltes Profil führt zu einem Fehler statt zum
+unbemerkten Rückfall auf das Wheel. Der frühere Provider verwendet denselben
+begrenzten Verzeichnisleser und bewahrt seine Legacy-Daten- und Fehlerverträge.
+Der produktive Writer bleibt Format 2. Die vollständige gemeinsame
+Result-Ressourcenfixierung und deren Selbstupdateintegration folgen PP-06.
+
+`tests/test_pyz_resources.py` prüft Identitätswechsel bei gleicher Version,
+Mutation, fehlende/zu große Ressourcen, Symlinks, Konkurrenz, einmalige Captures,
+keine externen Aufrufe sowie reale Verzeichnis- und PYZ-Importe ohne Checkout.
+Die gebaute PYZ packt und validiert mit eigenen Ressourcen aus einem schreibgeschützten
+Runtimebereich; die funktionierenden Legacy-Build-/Writerpfade bleiben Vollsuite.
+Das ist noch keine Freigabe des neuen Result-Writers oder ein nativer CI-Nachweis.
+
 ## 2. Architektur und unveränderliche Grenzen
 
 ### 2.1 Produktumfang
@@ -699,8 +731,8 @@ PP-00 ist durch Bundle 025 abgeschlossen. PP-01 steht auf **committed; Regressio
 | 4/16 | **PP-02B** | PP-02 | PP-02A | `feat(pack): build and publish validated packages through the public API [PP-02BC]` | Bundle 032 tatsächlich angewendet/gepusht, gemeinsam mit PP-02C |
 | 5/16 | **PP-02C** | PP-02 | PP-02B | `feat(pack): build and publish validated packages through the public API [PP-02BC]` | Bundle 032 tatsächlich angewendet/gepusht, gemeinsam mit PP-02B |
 | 6/16 | **PP-03** | PP-03 | PP-02C | `feat(cli): expose pack with validated output and mode options [PP-03]` | Bundle 033 tatsächlich angewendet/gepusht |
-| 7/16 | **PP-04A** | PP-04 | PP-03 | `feat(runtime): define canonical core-only PYZ artifacts [PP-04A]` | Bundle 034 vorbereitet; tatsächlicher Apply offen |
-| 8/16 | **PP-04B** | PP-04 | PP-04A | `refactor(runtime): load producer resources from directories or PYZ [PP-04B]` | geplant |
+| 7/16 | **PP-04A** | PP-04 | PP-03 | `feat(runtime): define canonical core-only PYZ artifacts [PP-04A]` | Bundle 034 tatsächlich angewendet/gepusht |
+| 8/16 | **PP-04B** | PP-04 | PP-04A | `refactor(runtime): load producer resources from directories or PYZ [PP-04B]` | Bundle 035 vorbereitet; tatsächlicher Apply offen |
 | 9/16 | **PP-04C** | PP-04 | PP-04B | `feat(runtime): launch the shared core directly from PYZ [PP-04C]` | geplant |
 | 10/16 | **PP-05A** | PP-05 | PP-04C | `feat(result): read PYZ runtime metadata and Result format 3 [PP-05A]` | geplant |
 | 11/16 | **PP-05B** | PP-05 | PP-05A | `feat(result): integrate format 3 consumers before writer activation [PP-05B]` | geplant |
@@ -1416,6 +1448,7 @@ Die mechanische Prüfung dieses Markdownplans kontrolliert eindeutige Schrittken
 | 2 | 2026-10-07 | PP-00 / Bundle 024 integriert: aktuelle bytegleiche Referenz vom Pixel, Norm-/Planverweise, offene Alt-Nachweise, vorbereiteter Status; ausdrücklich einmalige CI-only-Ausnahme ohne Tests oder Testinstallation im Apply, ein Commit/Push und automatische parallele CI mit Ergebnisprüfung. |
 | 3 | 2026-10-07 | PP-00-FIX1 / Bundle 025: Abbruch von 024 vor Staging/Commit/CI belegt; dirty Result als Reparaturbasis, SSH-Alias-Auflösung statt URL-Stringliste, unveränderte Konfiguration und Fortsetzung der ersten Pixel-CI-only-Ausnahme. Kein Fortschritt vor Apply-/CI-Nachweis. |
 | 4 | 2026-10-07 | PP-00-Erfolg und CI 37635401106 aus dem damaligen Result bestätigt; PP-01 in 026 vorbereitet. Die damaligen lokalen Endgates und CI-Pause sind durch Revision 5 für die Pixel-Phase ersetzt. |
+| 12 | 2026-10-08 | PP-04A durch tatsächliches Result bestätigt; PP-04B herkunftsgebundene Verzeichnis-/PYZ-Ressourcen und request-lokaler Provider vorbereitet. Legacy-Writer bleibt erhalten. |
 | 11 | 2026-10-08 | PP-03 durch echtes Result bestätigt; PP-04A kanonisches Core-PYZ-Profil, Datenreader, getrennte Buildidentitäten und bytegleicher Release-Kandidat vorbereitet. Format-2-Writer bleibt erhalten. |
 | 10 | 2026-10-08 | PP-02B/C durch Result/Commit/Push bestätigt; PP-03 CLI mit Pflichtoptionen, Modesyntax, Version-2-JSON, getrennten Ausgabefehlern und funktionalen Distributions-/Apply-Beispielen vorbereitet. |
 | 9 | 2026-10-08 | PP-02A durch Result/Commit/Push bestätigt. PP-02B/C nachvollziehbar in einem Commit für Bundle 032 zusammengeführt; vollständige Pack-API, No-replace, verpflichtende Endvalidierung und funktionale Fehler-/Konkurrenztests. Native Abnahme bleibt offen. |
@@ -1426,6 +1459,6 @@ Die mechanische Prüfung dieses Markdownplans kontrolliert eindeutige Schrittken
 
 ---
 
-**PP-00 bis PP-03 sind tatsächlich angewendet. PP-04A wird in Bundle 034
+**PP-00 bis PP-04A sind tatsächlich angewendet. PP-04B wird in Bundle 035
 vorbereitet; sein tatsächlicher Apply bleibt bis zum nächsten Result offen.
-Danach folgt PP-04B. Keine Releasefreigabe.**
+Danach folgt PP-04C. Keine Releasefreigabe.**
