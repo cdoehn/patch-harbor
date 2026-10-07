@@ -9,6 +9,44 @@ and applies a package only to the exact registered state named in its
 PatchHarbor also retains the explicit `fs run` command for generated Bash and
 PowerShell scripts and legacy ZIP PatchBundles.
 
+## Active development: PYZ and pack
+
+The current feature plan is [PYZ/PACK](planning/pyz-pack/commit-plan.md).
+Its binding requirements are the **joint specification set**:
+[existing specification](spec/SPECIFICATION.md) **and**
+[PYZ/PACK extension, revision 2](spec/SPECIFICATION_EXTENSION_PYZ_PACK.md).
+Neither file is an alternative to the other. This explicit feature selection
+supersedes stale active-plan headings in historical documents; the unchanged
+package version does not reactivate a completed version/RIV/watcher plan.
+
+PP-00 in Bundle 024 integrates these documents and their references only.
+The planned Result PYZ contains the shared Core **without the watcher**;
+`pack` will be a normal CLI/API operation. Neither feature is implemented by
+this documentation bundle. The installed distribution and current Result
+Format 2 / wheel runtime remain unchanged.
+
+**One-bundle test exception, explicitly requested on 2026-10-07:** PP-00 is
+applied on the Pixel without local project tests or test-dependency installation.
+Its entrypoint creates one scoped commit, pushes normally to `dev`, then
+starts the existing parallel acceptance CI automatically by `workflow_dispatch`
+and waits for all required results. No serial CI suite, extra trigger or retry
+is added. Commit/push hooks are suppressed for these invocations only so they
+cannot start local tests. This exception does not extend to later bundles;
+see [the exact scope and failure rules](planning/pyz-pack/commit-plan.md#15-ausdrückliche-einmalige-testausnahme-pp-00-auf-dem-pixel).
+
+**PP-00-FIX1 / Bundle 025:** The first attempt (024) stopped before staging,
+commit, push or CI because its entrypoint compared `origin` with a fixed URL
+allowlist. Its six written documents remain the input for this repair. The
+repair accepts GitHub SSH aliases only after resolving and checking their
+configured host; it changes neither remotes nor SSH configuration. It completes
+the same one-commit PP-00 handoff, with the same no-local-tests / automatic
+parallel-CI exception, not a new feature step. Actual apply and CI remain open.
+
+The watcher plan is completed. Open native/CIFS evidence in the
+[result-publication plan](planning/result-publication/commit-plan.md) remains
+open unless a matching real result is supplied. PP-00 does not publish a
+release or change the package version.
+
 ## Installation
 
 The RIV development line adds static package inspection through
@@ -18,7 +56,9 @@ either `--reference-bundle result.zip` or `--repository /workspace/repository`
 to compare the complete binding. Package/reference checks require no Git or
 registration; repository checks require the existing registered instance.
 These commands execute no scripts and create no Result Bundle. Offline runtime
-and Result Format 2 follow in the [active plan](planning/runtime-inspect-validate/commit-plan.md).
+and Result Format 2 are present in this source baseline; their
+[RIV plan](planning/runtime-inspect-validate/commit-plan.md) is completed.
+The active successor is the [PYZ/PACK plan](planning/pyz-pack/commit-plan.md).
 See the [Python API contract](docs/python-api.md#static-package-inspection-riv-development-addition)
 for result fields and examples. These additions have not been released yet.
 

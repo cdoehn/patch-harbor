@@ -5,6 +5,33 @@ Historischer Vertrag: `planning/test-parallel/specification.md`.
 Aktuelle Nutzerregel vom 3. Oktober 2026: Development ausschließlich parallel;
 Apply-Zwischenstände parallel, nur am Bundle-Ende seriell und parallel.
 
+## Einmalige Nutzer-Ausnahme: erstes PYZ/PACK-Bundle auf dem Pixel
+
+Am 7. Oktober 2026 wurde ausschließlich für **PP-00 / Bundle 024** ausdrücklich
+beauftragt: **keine Projekttests im Apply, sondern nur automatisch gestartete
+parallele CI**. Die vollständige Abgrenzung steht im
+[aktiven PYZ/PACK-Plan, Abschnitt 1.5](../planning/pyz-pack/commit-plan.md#15-ausdrückliche-einmalige-testausnahme-pp-00-auf-dem-pixel).
+
+Für diesen einen Dokumentationscommit entfallen lokale Tests einschließlich
+serieller/paralleler Endgates, Testinstallation und durch Git-Hooks gestartete
+Tests. Commit/Push erfolgen daher vor der CI. Nach einem normalen Push startet
+der vorhandene Handoff-Helfer einmal den unveränderten Acceptance-Workflow,
+wartet auf alle sechs Jobs und prüft die zugeordneten Nachweise. Native und
+Docker-Suites verwenden bereits xdist `auto`; weder serieller Vollvergleich
+noch Modusverifier werden ergänzt. Der Workflow bleibt `workflow_dispatch`-only.
+Ein CI-/Zugangsfehler bleibt Fehler, kein automatischer Retry oder Rollback.
+
+Die Reparatur **PP-00-FIX1 / Bundle 025** setzt denselben ersten PP-00-Schritt
+unter dieser Ausnahme fort: Bundle 024 hat noch keine lokale Suite, keinen
+Commit und keine CI ausgelöst. Auch im Reparatur-Apply keine Produkttests oder
+Testinstallation; derselbe vorhandene parallele Workflow startet automatisch
+einmal nach dem Commit/Push. Es entsteht keine dauerhafte Testausnahme und
+keine eigenständige neue CI-Automatik. Details: aktiver Plan, Abschnitt 1.6.
+
+Die folgenden allgemeinen lokalen Testregeln gelten unverändert für spätere
+Bundles. Diese Ausnahme ändert keine Produktsicherheitsprüfung und macht
+Archiv-/Syntax-/Hashprüfungen nicht zu bestandenen Produkttests.
+
 ## Teststart
 
 In der Entwicklungs-venv die deklarierten Abhängigkeiten installieren:

@@ -295,6 +295,55 @@ Autorisierung und bytegleich, ohne eine zweite ZIP wegen eines Backupfehlers.
 
 ## 4. Zielversion, Commit-Plan und Spezifikation finden
 
+### Ausdrücklich ausgewählte Featurepläne und gemeinsame Normsätze
+
+Ein durch den aktuellen Nutzerauftrag und vorhandene Projektverweise eindeutig
+aktivierter Featureplan hat Vorrang vor einem allein aus der unveränderten
+Paketversion abgeleiteten historischen Plan. Die untenstehende Suchreihenfolge
+ist der Fallback, nicht die Erlaubnis, einen ausdrücklich aktiven Auftrag zu
+verdrängen. Ein im Plan ausdrücklich als gemeinsam geltend erklärter
+Spezifikationssatz wird vollständig gelesen; seine Bestandteile sind keine
+konkurrierenden Alternativen. Echte unaufgelöste Konkurrenz bleibt ein STOP.
+
+Für die Entwicklung von **PatchHarbor selbst**, solange der beauftragte
+PYZ/PACK-Auftrag aktiv ist, gilt konkret:
+
+```text
+Plan: planning/pyz-pack/commit-plan.md
+Normsatz: spec/SPECIFICATION.md
+          spec/SPECIFICATION_EXTENSION_PYZ_PACK.md (Revision 2)
+```
+
+Die Paketversion bleibt vorerst 1.2.1; das reaktiviert keinen abgeschlossenen
+Versions-, RIV- oder Watcher-Plan. Die gezielten Ausnahmen stehen in der
+Erweiterung, unberührte Basisverträge gelten weiter. Der vorhandene CIFS-Plan
+behält seine offenen Nachweise. Diese Projektzuordnung gilt nicht pauschal für
+andere Repositorys, denen PatchHarbor dieselbe generische Vorlage mitliefert.
+
+Der erste Schritt PP-00 / Bundle 024 integriert nur Dokumente und Verweise.
+`pack` und die PYZ sind bis zu ihren nachgewiesenen Umsetzungsschritten
+Zielzustand, keine bereits nutzbaren Befehle oder Artefakte. Die aktuellen
+Wheel-/Result-2-Regeln und der etablierte Paketbau bleiben vorerst wirksam.
+
+Für **dieses erste Bundle allein** hat der Nutzer am 7. Oktober 2026 Tests
+im Apply ausdrücklich ausgeschlossen: keine lokale Suite, kein Modusvergleich,
+keine Testinstallation und keine lokalen Testhooks. Ein Dokumentationscommit,
+ein normaler Push, anschließend automatischer einmaliger Dispatch des
+bestehenden parallelen Acceptance-Workflows und Warten auf dessen vollständige
+Ergebnisse. Keine serielle CI-Vollsuite. Die genaue Ausnahme und ihre Grenzen
+stehen im aktiven Plan, Abschnitt 1.5, und haben Vorrang vor den sonstigen
+Vorcommit-/Bundle-End-Testvorgaben. Erst der erfolgreiche zugeordnete CI-Lauf
+und der unveränderte saubere Zielzustand erlauben Gesamterfolg; kein früher
+Erfolgsmarker bei fehlendem Zugang oder roter/unvollständiger CI.
+
+
+PP-00-FIX1 / Bundle 025 setzt ausschließlich diesen fehlgeschlagenen ersten
+PP-00-Versuch fort. Result `patch-harbor_Result_134816_1007_61119e.zip`
+bestätigt: sechs Dokumente geschrieben, kein Commit/Push/CI erreicht. Die
+CI-only-Ausnahme gilt auch für genau diese Reparatur des ersten Schritts,
+nicht für PP-01 oder spätere fachliche Schritte. Der aktive Plan dokumentiert
+in Abschnitt 1.6 den Fehler, die neue Bindung und die offenen Abschlussnachweise.
+
 Bestimme die aktive Zielversion aus dem Repository. Eine laut Plan erst zum
 Release erfolgende Versionsanhebung ist kein Widerspruch; tatsächlich
 widersprüchliche Zielversionen: `PLAN_AMBIGUOUS` oder `PLAN_SPEC_CONFLICT`.

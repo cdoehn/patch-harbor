@@ -1,5 +1,51 @@
 # PatchHarbor – Spezifikations-Changelog
 
+## 2026-10-07 – PP-00-FIX1 vorbereitet: GitHub-SSH-Alias im Handoff
+
+- Result `patch-harbor_Result_134816_1007_61119e.zip` belegt den Abbruch von
+  Bundle 024 vor Staging/Commit/Push/CI. Sechs Dokumente liegen uncommitted vor;
+  der Basiscommit ist unverändert. Kein Reset, keine Rücknahme der Dokumente.
+- Bundle 025 repariert ausschließlich die Übergabe dieses ersten PP-00-Schritts:
+  semantische Repository-/Transportprüfung statt sechs exakter URL-Strings,
+  SSH-Hostauflösung über die vorhandene Konfiguration, unveränderte Remotes.
+- Fetch- und Pushziel müssen weiterhin eindeutig `cdoehn/patch-harbor` sein.
+  Git-Remote-Stand und GitHub-API-Ref werden an denselben vollständigen Commit
+  gebunden. Keine Zugangsdaten, URLs mit Tokens oder SSH-Schlüsselpfade im Log.
+- Plan Revision 3 hält Ursache, tatsächlichen schmutzigen Ausgangsstand und
+  Fortsetzung derselben Pixel-Ausnahme fest. Ein Dokumentationscommit, normaler
+  Push, automatische parallele CI über den unveränderten Handoff-Helfer.
+  Tatsächlicher Reparatur-Apply, Commit, Push und CI-Erfolg stehen noch aus.
+- Hauptspezifikation, Ergänzung Revision 2, Produktcode, CI-Workflow und
+  CI-Helfer bleiben bytegleich. Keine Produkt- oder Releasefreigabe.
+
+## 2026-10-07 – PYZ/PACK PP-00: Normsatz und aktiver Plan integriert
+
+- Die unveränderte Ergänzung Revision 2 liegt neben der Hauptspezifikation
+  unter `spec/SPECIFICATION_EXTENSION_PYZ_PACK.md`. Beide Dateien gelten für
+  den Auftrag gemeinsam; GOV-01/GOV-03/GOV-04 grenzen Vorrang und Ausnahmen ab.
+- Neuer aktiver Plan `planning/pyz-pack/commit-plan.md`, Revision 2: neun
+  Arbeitspakete, 16 vorgeschlagene Commit-Schritte. PP-00 ist in Bundle 024
+  vorbereitet; tatsächlicher Apply, Push und CI-Erfolg werden nicht vorweggenommen.
+- Aktuelle Quelle ist `patch-harbor_Result_132210_1007_306573.zip`:
+  289 überprüfte Base-Dateien, bytegleich mit der bisherigen Planungsgrundlage;
+  keine neue fachliche Implementierung, keine Produktversionsänderung.
+- README und Chat-Vorlage verankern den aktiven Plan und gemeinsamen Normsatz,
+  ohne abgeschlossene Pläne zu reaktivieren oder offene CIFS-/Windows-Nachweise
+  zu schließen. Die Hauptspezifikation selbst bleibt bytegleich.
+- Explizite Nutzerentscheidung nur für das erste Feature-Bundle auf dem Pixel:
+  keine Produkttests oder Testinstallation im Apply. Ein Commit und normaler
+  Push, dann automatisch ein `workflow_dispatch` des bestehenden parallelen
+  Acceptance-Workflows; sämtliche sechs Jobs und deren Nachweise bleiben Pflicht.
+  Der Entrypoint wartet auf deren Ergebnis. Keine serielle Zusatzsuite, keine
+  neuen Trigger, kein Retry und kein Gesamterfolg bei fehlender/roter CI.
+  Kommando-lokales Abschalten von Commit-/Push-Hooks verhindert Teststarts
+  durch vorhandene Hooks; persistente Git-Einstellungen bleiben unangetastet.
+- Außerhalb von PP-00 bleibt die bisherige Test-/CI-Policy erhalten. Runtime
+  bleibt im Result ein Wheel / Format 2; PYZ ohne Watcher und `pack` folgen erst
+  in den geplanten Implementierungsschritten. Kein Release, Tag, Upgrade oder
+  Watcher-Neustart durch PP-00.
+
+
 ## 2026-10-06 – CIFS-1: Eigene temporäre Results vor Verifikation stabilisieren
 
 - Bundle 022 und sein vollständiger grüner CI-Lauf bestätigen den Abschluss
