@@ -12,7 +12,9 @@ from patchharbor.interpreters import select_interpreter
 from patchharbor.models import RepositoryContext
 from patchharbor.errors import state_mismatch_error
 from patchharbor.exchange_state import ExchangePatchSelection
-from patchharbor.result_reader import ReferenceContext, read_result_reference
+from patchharbor.result_reader import (
+    CapturedResultReference, ReferenceContext, capture_result_reference,
+)
 from patchharbor.repository_state import capture_repository_context
 from patchharbor.parser import Message as PatchMessage
 from patchharbor.patch_manifest import PATCH_MANIFEST_NAME, PatchManifest
@@ -106,19 +108,42 @@ def validate_patch(
     if repository is not None and reference_bundle is not None:
         raise ValueError("repository and reference_bundle are mutually exclusive")
     inspection = inspect_patch(path, resource_policy=resource_policy)
-    context = None
-    reference_sha256 = None
-    scope = PatchValidationScope.PACKAGE
-    not_checked = ("authenticity", "execution", "interpreter_availability", "tests", "ci", "replay")
     if reference_bundle is not None:
-        reference, reference_sha256 = read_result_reference(reference_bundle, resource_policy=resource_policy)
-        context = reference.context
-        scope = PatchValidationScope.REFERENCE
+        reference = capture_result_reference(reference_bundle, resource_policy=resource_policy)
+        return _validation_result(inspection, scope=PatchValidationScope.REFERENCE,
+                                  context=reference.facts.context, reference_sha256=reference.sha256)
+    if repository is not None:
+        context = capture_repository_context(repository, read_only=True)
+        return _validation_result(inspection, scope=PatchValidationScope.REPOSITORY, context=context)
+    return _validation_result(inspection, scope=PatchValidationScope.PACKAGE)
+
+
+def validate_patch_against_reference(
+    path: Path, reference: CapturedResultReference, *,
+    resource_policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY,
+) -> PatchValidationResult:
+    """Internal pack seam: inspect actual package bytes against one captured Result.
+
+    Callers must obtain the reference from capture_result_reference in the same
+    request. This avoids another reference-path read, not the package inspection
+    or the common binding check. Public APIs continue to accept explicit paths.
+    """
+    inspection = inspect_patch(path, resource_policy=resource_policy)
+    return _validation_result(inspection, scope=PatchValidationScope.REFERENCE,
+                              context=reference.facts.context, reference_sha256=reference.sha256)
+
+
+def _validation_result(
+    inspection: PatchInspection, *, scope: PatchValidationScope,
+    context: RepositoryContext | ReferenceContext | None = None,
+    reference_sha256: str | None = None,
+) -> PatchValidationResult:
+    """One binding check and one set of scope/not-checked facts for both paths."""
+    not_checked = ("authenticity", "execution", "interpreter_availability", "tests", "ci", "replay")
+    if scope is PatchValidationScope.REFERENCE:
         not_checked += ("live_repository_state", "local_registration", "reconstructed_state_fingerprint",
                         "legacy_delta_log_hashes")
-    elif repository is not None:
-        context = capture_repository_context(repository, read_only=True)
-        scope = PatchValidationScope.REPOSITORY
+    elif scope is PatchValidationScope.REPOSITORY:
         not_checked += ("future_repository_state",)
     else:
         not_checked += ("repository_binding", "repository_state")

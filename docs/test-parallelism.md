@@ -2,35 +2,72 @@
 
 Plan: `planning/test-parallel/commit-plan.md` (15 echte W/R/C-Zwischenstände).
 Historischer Vertrag: `planning/test-parallel/specification.md`.
-Aktuelle Nutzerregel vom 3. Oktober 2026: Development ausschließlich parallel;
+Bisherige Nutzerregel vom 3. Oktober 2026: Development ausschließlich parallel;
 Apply-Zwischenstände parallel, nur am Bundle-Ende seriell und parallel.
+**Auf dem Pixel wird diese Regel durch die nachstehende Entscheidung vom
+7. Oktober 2026 ersetzt, bis der Nutzer ausdrücklich zum Laptop wechselt.**
 
-## Einmalige Nutzer-Ausnahme: erstes PYZ/PACK-Bundle auf dem Pixel
+## Aktive Pixel-Phase: nur automatisch gestartete parallele CI
 
-Am 7. Oktober 2026 wurde ausschließlich für **PP-00 / Bundle 024** ausdrücklich
-beauftragt: **keine Projekttests im Apply, sondern nur automatisch gestartete
-parallele CI**. Die vollständige Abgrenzung steht im
-[aktiven PYZ/PACK-Plan, Abschnitt 1.5](../planning/pyz-pack/commit-plan.md#15-ausdrückliche-einmalige-testausnahme-pp-00-auf-dem-pixel).
+Gilt für PatchHarbor ab Bundle **027 / PP-01-FIX1** und für alle folgenden
+Pixel-Bundles, bis Christian ausdrücklich seinen Wechsel auf den Laptop
+bestätigt. Keine automatische Rückkehr zu lokalen Tests beim nächsten
+Planpunkt, Bundle oder Datum. Die ursprünglich nur für PP-00 erklärte
+Ausnahme ist historisch; diese spätere Nutzerregel ist nicht einmalig.
 
-Für diesen einen Dokumentationscommit entfallen lokale Tests einschließlich
-serieller/paralleler Endgates, Testinstallation und durch Git-Hooks gestartete
-Tests. Commit/Push erfolgen daher vor der CI. Nach einem normalen Push startet
-der vorhandene Handoff-Helfer einmal den unveränderten Acceptance-Workflow,
-wartet auf alle sechs Jobs und prüft die zugeordneten Nachweise. Native und
-Docker-Suites verwenden bereits xdist `auto`; weder serieller Vollvergleich
-noch Modusverifier werden ergänzt. Der Workflow bleibt `workflow_dispatch`-only.
-Ein CI-/Zugangsfehler bleibt Fehler, kein automatischer Retry oder Rollback.
+**Auf dem Pixel keine Produkttests und keine Testinstallation.** Das umfasst
+lokale Voll-, Teil- und Smoke-Suites, pytest/Collection, serielle oder parallele
+Läufe, Modusverifier und Development-Setup über venv/pip/uv/test.sh. Vorhandene
+Testberichte, ignorierte Entwicklungsumgebungen und unterbrochene Änderungen
+bleiben erhalten. Sie werden weder gelöscht noch als grüne Nachweise verwendet.
+Commit- und Push-Hooks werden nur in diesen Aufrufen mit
+`git -c core.hooksPath=/dev/null ...` deaktiviert; keine dauerhafte Einstellung.
 
-Die Reparatur **PP-00-FIX1 / Bundle 025** setzt denselben ersten PP-00-Schritt
-unter dieser Ausnahme fort: Bundle 024 hat noch keine lokale Suite, keinen
-Commit und keine CI ausgelöst. Auch im Reparatur-Apply keine Produkttests oder
-Testinstallation; derselbe vorhandene parallele Workflow startet automatisch
-einmal nach dem Commit/Push. Es entsteht keine dauerhafte Testausnahme und
-keine eigenständige neue CI-Automatik. Details: aktiver Plan, Abschnitt 1.6.
+Der Ablauf eines eincommittigen Bundles lautet:
 
-Die folgenden allgemeinen lokalen Testregeln gelten unverändert für spätere
-Bundles. Diese Ausnahme ändert keine Produktsicherheitsprüfung und macht
-Archiv-/Syntax-/Hashprüfungen nicht zu bestandenen Produkttests.
+```text
+Core-/Bindungs-/Datei-/Git-Scopeprüfungen (keine Produkttests)
+→ ein fachlicher Commit → normaler Push
+→ einmaliger automatischer Dispatch des vorhandenen CI-Workflows
+→ alle sechs Jobs und die zum Commit gehörenden Nachweise prüfen
+→ unveränderten sauberen Zielzustand bestätigen → Gesamterfolg
+```
+
+Die Tests laufen ausschließlich in der GitHub-CI, parallel mit dem vorhandenen
+xdist-`auto`-Vertrag. Keine zusätzliche serielle Suite, kein Modusvergleich und
+keine neue Triggerinfrastruktur. `scripts/run_handoff_ci.py` wartet auf den
+korrelierten Workflow inklusive Windows/Docker; Ergebnis-/Berichtsprüfung auf
+dem Pixel ist kein lokaler Testlauf. Der native Bericht muss tatsächlich Worker
+belegen. Plattform-Skips bleiben Skips, keine erfundenen Zielplattformnachweise.
+
+**Jedes änderungsführende Pixel-Bundle benötigt seinen zugeordneten Lauf.** Die
+Fünferregel ist während dieser Phase ausgesetzt: nicht bis 029 warten, keinen
+zweiten Lauf an einem alten Zähltermin starten. Bei mehreren Zwischenzuständen
+muss die externe CI jedes zu prüfenden Zustands vor dessen Fortsetzung grün sein;
+vorzugsweise getrennte Bundles statt ungetesteter nomineller Commitketten.
+Bundle 027 führt genau einen Commit/Push und einen Dispatch aus.
+
+Fehlender Zugang, fehlende/rote/unvollständige CI oder Abbruch führt nicht zu
+lokalen Ersatztests oder einem Erfolgsmarker. Kein automatischer Retry, Rerun,
+Force-Push oder Rollback. Ein bereits erzeugter Commit bleibt bestehen. Ein
+Laptop-Wechsel wird nicht aus Betriebssystem oder Pfad geraten; die dann wieder
+maßgebliche Testpolicy wird nach dem ausdrücklichen Wechsel neu eingeordnet.
+
+Paket-/Bindungsprüfung und leichte Syntax-/Hash-/Git-Prüfungen bleiben erlaubt;
+sie werden nie als bestandene Produkt- oder Plattformtests ausgegeben.
+Details und aktuelle Bindung: [aktiver Plan, Abschnitt 1.8](../planning/pyz-pack/commit-plan.md#18-pp-01-fix1--bundle-027-pixel-phase-nur-parallele-ci).
+
+### Historie der vorherigen Ausnahmen
+
+PP-00 / Bundles 024/025 hatten eine einmalige CI-only-Ausnahme. Das Result von
+025 bestätigt Commit `7a28bbc2189cdb2a78590e62a45e4d96b0ff893d` und sechs
+erfolgreiche Jobs in CI-Run `37635401106`. Bundle 026 kehrte zu lokalen Gates
+zurück; sein serieller Lauf wurde auf dem Pixel unterbrochen, bevor Commit,
+Push oder CI erreicht wurden. Das hat die obige spätere Dauerregel ausgelöst.
+Alte Aussagen „PP-00 allein“ und „nächste CI 029“ beschreiben nur diese Historie.
+
+**Die folgenden lokalen Beispiele dokumentieren die Basispolicy außerhalb
+der aktiven Pixel-Phase. Auf dem Pixel sind sie derzeit nicht auszuführen.**
 
 ## Teststart
 
@@ -150,6 +187,10 @@ kein zusätzlicher serieller Volltestlauf. Die vorhandenen Linux-, Windows-,
 PowerShell- und Docker-Gates bleiben blockierend und verwenden die parallele
 Runner-Policy. Keine optionalen Tests, kein continue-on-error und keine stillen
 Retries.
+
+**Außerhalb der aktiven Pixel-Phase gilt die nachfolgende Basispolicy. Während
+der Pixel-Phase tritt an ihre Stelle die CI-Pflicht pro Änderung aus dem
+Anfang dieses Dokuments; die lokalen Gate-Befehle unten bleiben deaktiviert.**
 
 Seit der Nutzeranweisung vom 4. Oktober 2026 läuft reguläre GitHub-CI nur nach
 jeweils fünf weiteren Bundles: Basis ist der manuelle Lauf zu Bundle 009,

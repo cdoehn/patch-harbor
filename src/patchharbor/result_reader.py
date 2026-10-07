@@ -9,7 +9,10 @@ import os
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from uuid import UUID
 
-from patchharbor.bundle_handoff import CHAT_INSTRUCTIONS_NAME, ENVIRONMENT_MARKER, MAX_HANDOFF_ENTRY_BYTES
+from patchharbor.bundle_handoff import (
+    BundleHandoff, CHAT_INSTRUCTIONS_NAME, ENVIRONMENT_NAME, ENVIRONMENT_MARKER,
+    MAX_HANDOFF_ENTRY_BYTES,
+)
 from patchharbor.bundle_names import validate_bundle_suffix
 from patchharbor.bundle_paths import BundlePathError, normalize_bundle_path
 from patchharbor.errors import ErrorKind, FailureReason, PatchHarborError
@@ -100,6 +103,22 @@ class ResultFacts:
     format_version: int = 1
     runtime: ResultRuntime | None = None
     handoff_present: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class CapturedResultReference:
+    """Internal request-local facts from one completely validated byte capture.
+
+    The small handoff pair retains its exact immutable bytes, not mutable JSON
+    objects or the full archive. Decode those bytes when rendering new metadata;
+    never reopen the reference path for its suffix or target environment. This
+    value is not an authenticity token and must come from capture_result_reference.
+    """
+
+    facts: ResultFacts
+    sha256: str
+    bundle_suffix: str
+    handoff: BundleHandoff | None
 
 
 def _require(condition: bool, message: str) -> None:
@@ -379,9 +398,14 @@ def _parse_result_payloads(payloads: tuple[BundlePayload, ...], *,
                        tuple(sorted(inventory)), expected, digest, completed, version, runtime, bool(handoff))
 
 
-def read_result_reference(path: Path, *, resource_policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY,
-                          expected_identity: os.stat_result | None = None) -> tuple[ResultFacts, str]:
-    """Own one stable byte capture; all reference failures are input errors."""
+def capture_result_reference(path: Path, *, resource_policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY,
+                             expected_identity: os.stat_result | None = None) -> CapturedResultReference:
+    """Own one stable read and complete validation, with no retries or fallback.
+
+    Source errors retain their category. The optional identity is forwarded for
+    publication callers; this reader does not change their separate sync/retry
+    policy. In particular, it never weakens runtime validation for a pack caller.
+    """
     activity("REFERENCE", f"Read and validate explicit Result reference: {path}")
     try:
         try:
@@ -395,8 +419,25 @@ def read_result_reference(path: Path, *, resource_policy: ResourcePolicy = DEFAU
             expected_identity=expected_identity, max_bytes=resource_policy.max_input_artifact_bytes)
         _require(captured.content is not None, "reference exceeds resource limit")
         payloads = read_zip_payload_bytes(captured.content, policy=resource_policy, path_normalizer=result_member_path)
-        return parse_result_payloads(payloads, resource_policy=resource_policy), captured.sha256
+        facts = parse_result_payloads(payloads, resource_policy=resource_policy)
+        # These are the very bytes just validated, not a second ZIP/path read.
+        # Decode only the bounded context again; all semantic checks stay in the
+        # existing parser. No mutable parsed object escapes this boundary.
+        selected = {entry.relative_path: entry.content for entry in payloads
+                    if entry.relative_path in {"context.json", CHAT_INSTRUCTIONS_NAME, ENVIRONMENT_NAME}}
+        suffix = _document(selected["context.json"]).get("bundle_suffix", "")
+        handoff = (BundleHandoff(selected[CHAT_INSTRUCTIONS_NAME], selected[ENVIRONMENT_NAME])
+                   if facts.handoff_present else None)
+        return CapturedResultReference(facts, captured.sha256, suffix, handoff)
     except (FileChangedDuringRead, FileSystemOperationError, UnsupportedFileTypeError,
             NotZipArchiveError, ZipPayloadError, OSError, ValueError, TypeError, KeyError,
             UnicodeError, RecursionError, OverflowError, PatchHarborError) as exc:
         raise PatchHarborError(f"invalid Result reference {path}: {exc}", FailureReason.SOURCE_ERROR) from exc
+
+
+def read_result_reference(path: Path, *, resource_policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY,
+                          expected_identity: os.stat_result | None = None) -> tuple[ResultFacts, str]:
+    """Compatibility facade: keep the existing facts/hash result and arguments."""
+    captured = capture_result_reference(path, resource_policy=resource_policy,
+                                        expected_identity=expected_identity)
+    return captured.facts, captured.sha256

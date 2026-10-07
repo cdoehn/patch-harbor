@@ -1,5 +1,55 @@
 # PatchHarbor – Spezifikations-Changelog
 
+## 2026-10-07 – PP-01-FIX1 / Bundle 027: Tests nur in CI während der Pixel-Phase
+
+- Spätere ausdrückliche Nutzerentscheidung: Bis Christian ausdrücklich auf den
+  Laptop wechselt, keine lokalen Produkttests oder Testinstallationen auf dem
+  Pixel. Die frühere Beschränkung auf PP-00 und die Fünferregel sind während
+  dieser Phase ersetzt, nicht nur für das nächste Bundle.
+- Das Result `patch-harbor_Result_160403_1007_ee4cb0.zip` belegt den Abbruch von
+  026 im seriellen Testlauf (Exit 130), vor neuem Commit/Push/CI. Tatsächlicher
+  Fingerprint `44ec92f72a0fd9dd`, HEAD weiterhin
+  `7a28bbc2189cdb2a78590e62a45e4d96b0ff893d`. Die PP-01-Dateien sind erhalten.
+- Fortsetzungsbundle 027 / PP-01-FIX1 bleibt Position 2/16. Plan Revision 5,
+  README, Chat-Anweisungen und Testdokumentation verankern den Vorrang. Kein
+  erneutes Ausbringen oder Ändern der PP-01-Core-/Testdateien; beide normativen
+  Spezifikationen bleiben bytegleich. Ältere Einträge unten sind Historie.
+- Ein fachlicher PP-01-Commit, normaler Push und automatisch einmal vorhandene
+  parallele Acceptance-CI. Alle sechs nativen/Docker-Jobs und die zugeordneten
+  Nachweise bleiben Pflicht; keine zusätzliche serielle CI-Suite. Derselbe
+  Ablauf gilt für folgende änderungsführende Pixel-Bundles, kein Warten auf 029.
+- Ausschließlich kommando-lokales Abschalten der Commit-/Push-Hooks verhindert
+  indirekte lokale Tests. Keine Änderung an Remote, Registry, persistenter
+  Git-Konfiguration, Workflow, CI-Helfer oder Testwerkzeugen. Keine Installation,
+  kein Watcher-Neustart und keine neue PYZ-/Pack-Funktion durch diese Reparatur.
+- Der Pixel wartet auf die CI und prüft deren Berichte. Keine lokale Ersatzsuite
+  und kein Erfolgsmarker bei fehlender/roter CI. Kein automatischer Retry oder
+  Rollback; vorhandene Testberichte und Commits bleiben erhalten. Die endgültige
+  Abnahme von PP-01 wird erst anhand des tatsächlichen neuen Results bestätigt.
+
+## 2026-10-07 – PP-00 bestätigt, PP-01 / Bundle 026 vorbereitet
+
+- Result `patch-harbor_Result_141601_1007_ef9735.zip` bestätigt PP-00/FIX1:
+  Commit `7a28bbc2189cdb2a78590e62a45e4d96b0ff893d`, normaler Push und
+  CI-Run `37635401106` mit sechs grünen Jobs. Ältere offene PP-00-Passagen
+  unten sind historische Vorbereitung, nicht der aktuelle Abschlussstatus.
+- Plan Revision 4: PP-00 abgeschlossen, PP-01 vorbereitet (2/16), keine
+  vorweggenommene Ausführung des neuen Codes. Beide Spezifikationen unverändert.
+- PP-01 führt intern eine einzige vollständig geprüfte Result-Erfassung mit
+  Fakten, Hash, Suffix und unveränderlichem Handoff zusammen. Der bisherige
+  Reader-Vertrag bleibt erhalten. Der interne Pack-Anschluss prüft tatsächliche
+  Paketbytes mit derselben Bindungs-/Ergebnisfunktion wie die öffentliche API.
+- 52 neue funktionale Prüffälle; Sammlung und Syntax geprüft. Elf manuelle
+  API-Gegenproben in zwei parallelen Prozessen erfolgreich, aber reguläre
+  Development-Vollsuite mangels installierbarer Testabhängigkeiten hier nicht
+  gestartet (`REDUCED_TEST_SCOPE`). Keine fingierte Vollsuite-/CI-Freigabe.
+- Lokaler Apply führt vor dem einzelnen Commit beide regulären Vollsuite-
+  Endgates seriell/parallel aus und prüft die Controller-Äquivalenz. Die einmalige
+  Pixel-Ausnahme endet mit PP-00. Kein zusätzlicher CI-Lauf in 026; Termin 029
+  bleibt unverändert. Kein Hook-Bypass, Tag, produktives Upgrade oder Watcherstart.
+- Keine neue Pack-CLI/API, keine PYZ und kein Resultformat 3 in diesem Schritt.
+  Result-Sync/Replace/CIFS-Retry und späteres Pack-No-replace bleiben getrennt.
+
 ## 2026-10-07 – PP-00-FIX1 vorbereitet: GitHub-SSH-Alias im Handoff
 
 - Result `patch-harbor_Result_134816_1007_61119e.zip` belegt den Abbruch von

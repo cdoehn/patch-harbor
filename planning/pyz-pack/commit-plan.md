@@ -2,12 +2,12 @@
 
 **Plan-ID:** `PYZ-PACK`  
 **Planpfad:** `planning/pyz-pack/commit-plan.md`  
-**Revision:** 3  
+**Revision:** 5  
 **Stand:** 7. Oktober 2026  
-**Status:** PP-00 / Bundle 024 vor Commit und CI fehlgeschlagen; Fortsetzung PP-00-FIX1 in Bundle 025 vorbereitet, noch nicht angewendet.  
+**Status:** PP-00 abgeschlossen; PP-01 aus Bundle 026 vorhanden, lokaler Testlauf abgebrochen. Fortsetzung PP-01-FIX1 in Bundle 027 vorbereitet: keine Pixel-Tests, automatisch gestartete parallele CI; Abschlussnachweis noch offen.  
 **Geplanter Umfang:** 9 Arbeitspakete `PP-00` bis `PP-08`, zunächst 16 vorgeschlagene Commit-Schritte. Keine feste Anzahl von Patch-Bündeln.  
-**Fortschritt:** PP-00 als Dateistand vorbereitet; 0/16 Commit-Schritte als tatsächlich angewendet nachgewiesen; 0/9 Arbeitspakete abgenommen. Keine vorweggenommene CI-Freigabe.  
-**Nächster Schritt:** `PP-00-FIX1` (1/16) – dieselbe Dokumentintegration mit aliasfähiger Remoteprüfung abschließen; danach PP-01.  
+**Fortschritt:** 1/16 Commit-Schritte abgeschlossen; PP-00 (1/9 Arbeitspakete) abgenommen. PP-01-Dateien ausgebracht, aber noch nicht committet oder abgenommen; keine Übertragung alter CI auf neuen Code.  
+**Nächster Schritt:** `PP-01-FIX1` (weiterhin 2/16) – Bundle 027 auf dem abgebrochenen Zustand anwenden, Commit/Push und automatische parallele CI auswerten; erst danach PP-02A.  
 **Ziel-Produktversion:** noch festzulegen; keine erfundene Releaseversion, kein automatischer Tag oder Release.
 
 > **Verbindliche Grundlage ist der gemeinsame Spezifikationssatz:**
@@ -46,7 +46,7 @@ spec/SPECIFICATION_EXTENSION_PYZ_PACK.md
 
 Es handelt sich nicht um konkurrierende Spezifikationen. Die Vorrang- und Auswahlregeln der Ergänzung `GOV-01`, `GOV-03` und `GOV-04` sind anzuwenden. Nicht eingeordnete konkurrierende Fassungen bleiben ein Konflikt. Fehlt eine benötigte Datei, darf sie nicht durch eine vermutete Fassung ersetzt werden.
 
-Die Ergänzung bleibt eine nebenliegende Datei. Dieser Auftrag erzeugt weder eine zweite Gesamtspezifikation noch einen Core-Spezifikationsscanner. Die Hauptspezifikation wird durch die Erstellung dieses Plans nicht verändert. Die aktuellen Planverweise sind im vorbereiteten PP-00-Dateistand in Anleitung, README und Changelog hergestellt; alte Statuspassagen sind nicht eigenständig der Nachweis eines aktuellen Arbeitsauftrags.
+Die Ergänzung bleibt eine nebenliegende Datei. Dieser Auftrag erzeugt weder eine zweite Gesamtspezifikation noch einen Core-Spezifikationsscanner. Die Hauptspezifikation wird durch die Erstellung dieses Plans nicht verändert. Die aktuellen Planverweise sind durch PP-00 in Anleitung, README und Changelog integriert; alte Statuspassagen sind nicht eigenständig der Nachweis eines aktuellen Arbeitsauftrags.
 
 Der ausdrücklich aktive Featureplan ist dieser Plan, nicht ein aus `1.2.1` erratener historischer Versionsplan. Die vorhandenen Watcher- und Result-/CIFS-Pläne werden nicht überschrieben oder pauschal reaktiviert.
 
@@ -76,7 +76,7 @@ Für die Planung der Codeänderungen ist der Snapshot maßgeblich. Das eingebett
 
 Im gelesenen Snapshot bezeichnet sich `planning/watcher-events/commit-plan.md` als Revision 7 und abgeschlossen. `planning/result-publication/commit-plan.md` führt `CIFS-1` als vorbereitet und tatsächliche Apply-/Zielplattformnachweise noch als offen. Diese Angaben sind beim Umsetzungsstart anhand realer Nachweise zu aktualisieren, nicht aus vorhandenen Codezeilen als erledigt abzuleiten. Bereits angewendete Änderungen werden nicht zurückgesetzt oder erneut eingespielt.
 
-Die ursprüngliche Planerstellung führte nichts auf dem Host aus. Der jetzt ausdrücklich beauftragte erste Patch bereitet PP-00 vor; seine lokale Ausführung und CI erfolgen erst beim Apply nach dem folgenden Vertrag.
+Die ursprüngliche Planerstellung führte nichts auf dem Host aus. Die folgenden Abschnitte 1.4–1.6 dokumentieren Vorbereitung und Reparatur von PP-00; den PP-00-Abschluss und die frühere PP-01-Basis enthält Abschnitt 1.7. Maßgeblich für die Fortsetzung und die aktive Pixel-Testpolicy ist nun Abschnitt 1.8.
 
 ### 1.4 PP-00: aktueller Abgleich für Bundle 024
 
@@ -226,6 +226,141 @@ stillschweigend neu gezählt; tatsächlich erbrachte Läufe werden dokumentiert.
 zugehörigen tatsächlichen Apply-/CI-Nachweis offen. Ein Prüfversuch des
 Entrypoints in der Chat-Umgebung ist kein Produkt-, Host- oder CI-Nachweis.
 
+### 1.7 PP-00 bestätigt; PP-01 / Bundle 026 vorbereitet
+
+**Historischer Stand von Bundle 026:** Die dort vorgesehenen lokalen Gates
+und der CI-Termin 029 gelten nicht mehr für die Fortsetzung. Abschnitt 1.8
+ersetzt sie aufgrund des späteren Nutzerauftrags für die gesamte Pixel-Phase.
+
+Das Result `patch-harbor_Result_141601_1007_ef9735.zip` (SHA-256
+`ca5149bd2ad89abaa204a460736a4f6cd71b1d8ff6446c4b82da72661683859a`)
+belegt den erfolgreichen Reparatur-Apply von Bundle 025. Der tatsächliche neue
+Commit ist `7a28bbc2189cdb2a78590e62a45e4d96b0ff893d`, Message
+`docs(plan): establish PYZ and pack implementation baseline [PP-00]`.
+Das Ausführungslog bestätigt normalen Push, genau einen Dispatch und CI-Run
+`37635401106` mit passender Commitbindung und sechs erfolgreichen Jobs.
+Dies ist der Nachweis des gelieferten Results, kein erneuter Live-Abruf.
+
+Alle 291 Base-Dateien wurden auf Größe und Git-Blob-ID abgeglichen. Der aktuelle
+Arbeitsstand ist sauber; staged/unstaged Deltas sind leer und es gibt keine
+untracked Einträge. Die aktuelle Bindung verwendet den obigen **tatsächlichen**
+Commit, `repo_id=23a55eed-715d-4a28-926e-5410a23bf6e8`,
+`state_fingerprint=7c9d2a24e397e0e5`, `fingerprint_algorithm=patchharbor-state-v1`.
+Die alten `expected_*`-Werte des Reparatur-Applies sind keine neue Patchbindung.
+Hauptspezifikation und Erweiterung Revision 2 bleiben bytegleich.
+
+**PP-01, 2/16, Bundle 026:** `capture_result_reference` hält vollständige
+ResultFacts, Result-SHA-256, geprüftes Suffix und die exakten unveränderlichen
+Handoff-Bytes aus einer stabilen Erfassung zusammen. `read_result_reference`
+behält Signatur und Tupelergebnis. Der interne Endvalidierungspfad
+`validate_patch_against_reference` liest die tatsächlichen Patchbytes und
+benutzt dieselbe Bindungsprüfung/Ergebnisbildung wie `validate_patch`, ohne
+die Referenzdatei erneut zu öffnen. Kein öffentlicher neuer Pack-Befehl,
+keine PYZ, kein Formatwechsel und keine geänderte Publikationspolitik.
+
+Der Refactor bekommt 52 funktionale Prüffälle in
+`tests/test_captured_reference.py`; P-05/P-06/P-07/S-04 werden damit auf
+Referenzbausteinebene vorbereitet, nicht als vollständige Pack-Abnahme markiert.
+Die neue Testdatei wurde erfolgreich gesammelt und syntaktisch geprüft.
+Elf manuelle API-Gegenproben in zwei parallel gestarteten Prozessen bestanden.
+Die reguläre parallele Development-Suite konnte in der Chat-Laufzeit nicht
+starten: pytest-xdist/build-Abhängigkeiten fehlen, Paketbezug war nicht
+verfügbar. Das ist `REDUCED_TEST_SCOPE`, keine bestandene Vollsuite und keine
+neue Ausnahme für den Zielrechner. Native Windows-/CIFS-Abnahmen bleiben separat.
+
+**Apply-Gate für 026:** Die einmalige PP-00-Pixel-Ausnahme ist beendet.
+Der Entrypoint richtet nur die bestehende Entwicklungs-venv ein, führt vor dem
+einen Commit dieselbe vollständige Suite seriell und parallel (`auto`) aus
+und verlangt äquivalente Controller-Nachweise auf unveränderten Quellen.
+Es gibt keinen zusätzlichen identischen parallelen Vorlauf. Fehler verhindern
+Commit/Push; keine Deaktivierung von Hooks, kein Rollback und kein Retry.
+Normale Push-Zielprüfung einschließlich SSH-Aliassen bleibt erhalten.
+
+Bundle 026 löst gemäß unveränderter Fünferregel **keinen zusätzlichen CI-Lauf**
+aus. Nächster regulärer Termin bleibt 029; der ausdrücklich beauftragte
+Reparaturlauf 025 verschiebt ihn nicht. Nach erfolgreichem lokalen Endgate
+gibt es einen normalen Push nach `origin/dev`. Alte CI ist kein Testnachweis
+für PP-01. Dessen tatsächliche Ausführung bleibt bis zum nächsten Result offen.
+
+### 1.8 PP-01-FIX1 / Bundle 027: Pixel-Phase nur parallele CI
+
+**Spätere ausdrückliche Nutzerentscheidung vom 7. Oktober 2026:** Ab jetzt
+keinerlei Produkttests oder Testinstallationen auf dem Pixel, bis Christian
+explizit den Wechsel auf den Laptop bestätigt. Tests nur in der automatisch
+gestarteten parallelen GitHub-CI. Gemäß GOV-01 hat diese Entscheidung Vorrang
+vor den bisherigen lokalen Vorcommit-/Endgates, dem Modusvergleich, der nur
+PP-00 betreffenden Ausnahme und der Fünferregel. Die Phase endet nicht durch
+einen neuen Planpunkt, eine Bundle-Nummer, ein Datum oder Linux-Erkennung.
+
+| Gegenstand | Aktuelle Fortsetzungsgrundlage |
+|---|---|
+| Result | `patch-harbor_Result_160403_1007_ee4cb0.zip` |
+| Result-SHA-256 | `ebfae4a0657017604e658ffe42fd71ddb30782612b59e64fc3ce882da65a905f` |
+| repo_id | `23a55eed-715d-4a28-926e-5410a23bf6e8` |
+| base_commit | `7a28bbc2189cdb2a78590e62a45e4d96b0ff893d` |
+| Tatsächlicher state_fingerprint | `44ec92f72a0fd9dd` |
+| fingerprint_algorithm | `patchharbor-state-v1` |
+| Resultstatus | `interrupted`, Prozess-Exit 130; kein completed_commit |
+| Index | Staged-Diff leer; sieben modifizierte bestehende Pfade und zwei untracked Dateien im übergebenen Arbeitsstand |
+| Quellkontrolle | 291 Base-Dateien in Größe/Git-Blob-ID geprüft; neun PP-01-Nutzdateien nach Rekonstruktion bytegleich mit Bundle 026 |
+| Ausführung 026 | Lokale Testinstallation erfolgt, serieller Lauf vor Abschluss unterbrochen; kein neuer Commit, Push oder CI-Dispatch erreicht |
+| Fortsetzung | Bundle 027, PP-01-FIX1, unverändert Planposition 2/16; keine 17. Planposition |
+
+Die `actual_*`-/Context-Werte sind die Bindung. Insbesondere darf der alte
+saubere Fingerprint `7c9d2a24e397e0e5` nicht für das Fortsetzungs-ZIP verwendet
+werden. Der neue Apply prüft diesen aktuellen dirty Zustand erneut. Kein
+Reset, Clean, Stash oder erneutes Ausbringen aus dem alten Bundle 026.
+
+**Umfang:** Keine Änderung an den bereits ausgebrachten beiden PP-01-Coredateien,
+der neuen funktionalen Testdatei oder `docs/pack.md`. Bundle 027 passt fünf
+Dokumente und seinen privaten Entrypoint an. Der eine tatsächliche Commit
+enthält dadurch die neun noch uncommitteten PP-01-Pfade insgesamt, Message
+`refactor(reference): share verified reference facts for packing [PP-01]`.
+PP-01-FIX1 bezeichnet die Reparatur des Ablaufs, nicht einen zusätzlichen
+Produktplan-Commit. Beide Spezifikationen, CI-Workflow, CI-Helfer, Testwerkzeuge,
+normal installierte Runtime und Watcher bleiben unverändert.
+
+**Verbindlicher Ablauf während der aktiven Pixel-Phase:**
+
+1. Keine lokale Voll-/Teil-/Smoke-Suite, kein pytest/Collection, kein serieller
+   oder paralleler lokaler Lauf, kein Modusverifier, kein venv-/pip-/uv-Testsetup
+   und keine Testhooks. Fehlende CI löst keine lokale Ersatzprüfung aus.
+   Vorhandene ignorierte Testumgebungen/Berichte bleiben erhalten. Paket-,
+   Bindungs-, Hash-, Syntax-, Git-Scope- und CI-Ergebnisprüfungen bleiben erlaubt
+   und werden nicht als Produkttests bezeichnet.
+2. Nach unveränderten Datei-/Scope-/Branch-/Remote- und CI-Zugangsprüfungen
+   genau den vorgesehenen Commit erzeugen und normal nach `origin/dev` pushen.
+   Die Commit-/Push-Aufrufe verwenden ausschließlich kommando-lokal
+   `core.hooksPath=/dev/null`; keine persistente Konfigurationsänderung.
+3. Unmittelbar danach automatisch einmal `scripts/run_handoff_ci.py` mit
+   vollständigem tatsächlichem Commit und eindeutiger Handoff-ID aufrufen.
+   Der vorhandene Workflow bleibt `workflow_dispatch`-only. Alle sechs
+   nativen/Docker-Jobs und ihre Nachweise bleiben Pflicht, parallel über die
+   vorhandenen xdist-`auto`-Aufrufe; keine zusätzliche serielle CI-Suite.
+4. Der Pixel wartet nur und liest CI-Berichte. Für die nativen Berichte werden
+   positive Workerzahlen verlangt; ein serieller Bericht erfüllt das Gate
+   nicht. Gesamterfolg erst nach zugeordneter grüner CI, bestätigtem Commit und
+   sauberem unverändertem Arbeitsstand. Keine frühzeitige Erfolgsmarkierung.
+5. Rote, fehlende oder unvollständige CI, fehlender Zugang oder Abbruch bleiben
+   offen. Bereits erzeugte Commits bleiben erhalten; kein automatischer
+   Retry/Rerun, Force-Push oder Rollback. Die im Log genannte Handoff-ID ist
+   vor jedem bewussten Wiederholungsauftrag auf vorhandene Nachweise zu prüfen.
+
+Dies gilt für **jedes änderungsführende Pixel-Bundle**, nicht nur 027. Die
+Fünferregel ist währenddessen ausgesetzt; keine zweite CI am alten Termin 029.
+Für mehrere echte Zwischenzustände darf erst nach erfolgreicher gebundener CI
+des jeweiligen Zustands weitergearbeitet werden; im Zweifel getrennte Bundles.
+Der Abschluss von PP-01 reaktiviert lokale Tests ausdrücklich **nicht**.
+Ein späterer Laptop-Wechsel wird nur aus Christians ausdrücklicher Mitteilung
+abgeleitet; dann wird die gültige lokale/CI-Policy neu eingeordnet.
+
+**Prüfstatus dieser Auslieferung:** Quell-/ZIP-/Bindungs-/Syntaxkontrollen sind
+keine Produkttests. Auf dem Host wurde durch das Erstellen von Bundle 027
+nichts ausgeführt. Apply, Commit, Push und neue CI sind bis zum zugehörigen
+Result offen. Die 52 neuen PP-01-Fälle bleiben in den regulären CI-Suites und
+werden weder weggelassen noch aufgrund des abgebrochenen Laufs als bestanden
+gezählt. Offene native/CIFS-Nachweise bleiben von dieser Änderung unberührt.
+
 ## 2. Architektur und unveränderliche Grenzen
 
 ### 2.1 Produktumfang
@@ -310,12 +445,12 @@ Die lineare Standardreihenfolge in Abschnitt 4 verhindert unnötige gleichzeitig
 
 Die folgende Folge ist die anfängliche prüfbare Zerlegung. Sie ist **keine Verpflichtung zu 16 Patch-ZIPs**. Kleine sicher zusammengehörige Schritte dürfen mit dokumentierter Plananpassung zusammengelegt werden. Bei Split oder Zusammenlegung werden Positionen, Gesamtzahl, Messages und Nachweiszuordnung vor der betroffenen Auslieferung aktualisiert. Kein nur nominelles Zerlegen eines bereits vollständig installierten Endzustands.
 
-PP-00 steht in dieser Revision auf **vorbereitet (Bundle 024; Apply/CI offen)**; die übrigen Schritte bleiben **geplant**. Die Message ist die vorgeschlagene tatsächliche Git-Commitmessage. Die API-/Writer-Funktionen werden erst in den dafür genannten sicheren vollständigen Schritten öffentlich beziehungsweise produktiv aktiviert.
+PP-00 ist durch Bundle 025 abgeschlossen. PP-01 steht auf **vorbereitet (Bundle 026; Apply/Endgates offen)**; die übrigen Schritte bleiben **geplant**. Die Message ist die vorgeschlagene tatsächliche Git-Commitmessage. Die API-/Writer-Funktionen werden erst in den dafür genannten sicheren vollständigen Schritten öffentlich beziehungsweise produktiv aktiviert.
 
 | Position | ID | Arbeitspaket | Abhängigkeit | Vorgeschlagene Commitmessage | Status |
 |---:|---|---|---|---|---|
-| 1/16 | **PP-00** | PP-00 | Ausgangsabgleich | `docs(plan): establish PYZ and pack implementation baseline [PP-00]` | 024 fehlgeschlagen; FIX1/025 vorbereitet |
-| 2/16 | **PP-01** | PP-01 | PP-00 | `refactor(reference): share verified reference facts for packing [PP-01]` | geplant |
+| 1/16 | **PP-00** | PP-00 | Ausgangsabgleich | `docs(plan): establish PYZ and pack implementation baseline [PP-00]` | angewendet: 7a28bbc2189cdb2a78590e62a45e4d96b0ff893d; CI 37635401106 grün |
+| 2/16 | **PP-01** | PP-01 | PP-00 | `refactor(reference): share verified reference facts for packing [PP-01]` | 026 unterbrochen; 027/PP-01-FIX1 vorbereitet |
 | 3/16 | **PP-02A** | PP-02 | PP-01 | `feat(pack): capture bounded immutable package inputs [PP-02A]` | geplant |
 | 4/16 | **PP-02B** | PP-02 | PP-02A | `feat(pack): build bound manifests and target handoff data [PP-02B]` | geplant |
 | 5/16 | **PP-02C** | PP-02 | PP-02B | `feat(pack): publish validated packages through the public API [PP-02C]` | geplant |
@@ -352,7 +487,7 @@ Die folgenden Testangaben sind **zu erbringende Nachweise**, keine Ergebnisse be
 
 **Dokumentation:** Ergänzung Revision 2 unverändert integrieren, Planverweis und Changelog aufnehmen. Alte Statusangaben sichtbar einordnen, nicht als Freigabe kopieren.
 
-**Abschlussgate:** Der gemeinsame Normsatz und aktive Plan sind integriert; tatsächlicher Commit/Push und vollständige erfolgreiche parallele CI von Bundle 024 sind im Result belegt. Keine lokale Testsuite ist dafür gefordert oder als bestanden auszugeben. Fehlende Alt-Nachweise bleiben offen. Ein vorbereiteter Dateistand ist noch kein Apply-Nachweis.
+**Abschlussgate:** Der gemeinsame Normsatz und aktive Plan sind integriert; tatsächlicher Commit/Push und vollständige erfolgreiche parallele CI der PP-00-Fortsetzung (Bundle 025) sind im Result belegt. Keine lokale Testsuite ist dafür gefordert oder als bestanden auszugeben. Fehlende Alt-Nachweise bleiben offen. Ein vorbereiteter Dateistand ist noch kein Apply-Nachweis.
 
 ### PP-01 – Eine stabile, vollständig geprüfte Referenzerfassung wiederverwenden
 
@@ -605,7 +740,13 @@ Eng gekoppelte Provider-/Bootstrap-/Writeränderungen dürfen zusammenfallen. Di
 
 ## 7. Testausführung, Plattformen und CI
 
-**Einmaliger Vorrang:** Für PP-00 / Bundle 024 gilt ausschließlich die ausdrücklich beauftragte CI-only-Ausnahme aus Abschnitt 1.5. Die allgemeinen lokalen Gate-Beispiele unten gelten unverändert erst wieder außerhalb dieser Ausnahme.
+**Aktueller Vorrang:** Die Pixel-Phase aus Abschnitt 1.8 gilt bis zum ausdrücklich
+bestätigten Laptop-Wechsel, nicht nur für PP-00 oder ein einzelnes Bundle.
+Auf dem Pixel keine lokalen Produkttests oder Testinstallationen; Commit/Push
+vor externer CI sind erlaubt, automatische parallele CI pro Änderung bleibt
+Pflicht. Die folgenden lokalen Beispiele gelten nur außerhalb dieser Phase.
+Soweit andere Arbeitspakete lokale Vorcommit-/Endgates nennen, gilt ebenfalls
+dieser Vorrang. Testinhalte und offene native/CIFS-Nachweise werden nicht gestrichen.
 
 ### 7.1 Bestehende Tests wiederverwenden
 
@@ -671,6 +812,12 @@ Die Python-Untergrenze 3.12 und der zusätzliche Interpreter 3.14 werden nicht d
 Normale Wheel-/sdist-/pip-/pipx-/uv-Wege werden nach der vorhandenen repräsentativen Packaging-Policy geprüft. Kein unnötiges vollständiges Kreuzprodukt aller Varianten. Echte gebaute Artefakte, ihre installierten Inventare und ihre Importherkunft müssen nachweisbar sein.
 
 ### 7.4 CI-Takt und Freigabe
+
+**Während der Pixel-Phase:** Automatische parallele CI nach jedem
+änderungsführenden Bundle gemäß Abschnitt 1.8. Dies ist die ausdrückliche
+Freigabe für diese Läufe. Die folgende Fünferregel ist dann ausgesetzt; keine
+Doppelausführung an deren alten Zählterminen. Außerhalb dieser Phase bleibt sie
+der historische Ausgangspunkt für die erneut abzugleichende Nutzerpolicy.
 
 Der gelesene Workflow wird ausschließlich per `workflow_dispatch` gestartet. Die vorhandene Nutzerpolicy verlangt reguläre CI nach jeweils fünf weiteren Bundles seit der tatsächlichen Zählbasis 009, nicht nach jedem Planpunkt oder Git-Commit. **Der zum Umsetzungszeitpunkt nächste fällige Lauf wird aus den echten aktuellen Bundle-/CI-Nachweisen ermittelt; hier wird keine nächste Nummer geraten.**
 
@@ -1034,7 +1181,13 @@ Die mechanische Prüfung dieses Markdownplans kontrolliert eindeutige Schrittken
 | 1 | 2026-10-07 | Gemeinsamer Implementierungsplan aus Ergänzung Revision 2 und gebundenem Bestand. Neun Arbeitspakete, zunächst 16 sichere Commit-Schnitte, vollständige Requirement-/Testzuordnung, konkretes Writer-/Bootstrap-Gate und fortgeltende Test-/CI-/Publikationspolicy. Keine Produktimplementierung. |
 | 2 | 2026-10-07 | PP-00 / Bundle 024 integriert: aktuelle bytegleiche Referenz vom Pixel, Norm-/Planverweise, offene Alt-Nachweise, vorbereiteter Status; ausdrücklich einmalige CI-only-Ausnahme ohne Tests oder Testinstallation im Apply, ein Commit/Push und automatische parallele CI mit Ergebnisprüfung. |
 | 3 | 2026-10-07 | PP-00-FIX1 / Bundle 025: Abbruch von 024 vor Staging/Commit/CI belegt; dirty Result als Reparaturbasis, SSH-Alias-Auflösung statt URL-Stringliste, unveränderte Konfiguration und Fortsetzung der ersten Pixel-CI-only-Ausnahme. Kein Fortschritt vor Apply-/CI-Nachweis. |
+| 4 | 2026-10-07 | PP-00-Erfolg und CI 37635401106 aus dem damaligen Result bestätigt; PP-01 in 026 vorbereitet. Die damaligen lokalen Endgates und CI-Pause sind durch Revision 5 für die Pixel-Phase ersetzt. |
+| 5 | 2026-10-07 | PP-01-FIX1 / Bundle 027: unterbrochenes dirty Result ausgewertet; bestehende PP-01-Code-/Testbytes erhalten. Spätere Nutzeranweisung dauerhaft für die Pixel-Phase verankert: keine lokalen Produkttests/Testinstallationen, Commit/Push und automatisch genau eine parallele CI pro Änderung; Fünferregel ausgesetzt bis ausdrücklich bestätigtem Laptop-Wechsel. Kein vorweggenommener Abschlussnachweis. |
 
 ---
 
-**PP-00 bleibt nach dem fehlgeschlagenen Bundle 024 offen; PP-00-FIX1 ist in Bundle 025 vorbereitet.** Erst der tatsächliche Apply-/CI-Nachweis schließt den Schritt. Der Plan setzt keine automatische Fortsetzung oder Releasefreigabe voraus.
+**PP-00 ist durch Bundle 025 abgeschlossen. PP-01 liegt uncommitted aus dem
+unterbrochenen Bundle 026 vor; PP-01-FIX1 in Bundle 027 setzt ohne lokale Tests
+mit Commit/Push und automatisch gestarteter paralleler CI fort. Der neue
+Abschlussnachweis bleibt offen.** Erst danach PP-02A; auch dort bleibt die
+Pixel-CI-only-Regel aktiv. Keine automatische Fortsetzung oder Releasefreigabe.

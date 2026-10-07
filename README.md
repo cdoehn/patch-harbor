@@ -19,28 +19,35 @@ Neither file is an alternative to the other. This explicit feature selection
 supersedes stale active-plan headings in historical documents; the unchanged
 package version does not reactivate a completed version/RIV/watcher plan.
 
-PP-00 in Bundle 024 integrates these documents and their references only.
+PP-00 was completed by repair Bundle 025, commit
+`7a28bbc2189cdb2a78590e62a45e4d96b0ff893d`, with all six jobs successful in
+CI run `37635401106`, as recorded in its returned Result.
+
+PP-01 / Bundle 026 prepared the shared immutable reference capture and internal
+validation path. Its local full-suite run on the Pixel was interrupted before
+staging, commit, push or CI. The returned dirty Result preserves those changes;
+they must not be reset or applied again from the old clean-state package.
+[Bundle 027 / PP-01-FIX1](planning/pyz-pack/commit-plan.md#18-pp-01-fix1--bundle-027-pixel-phase-nur-parallele-ci)
+continues the same plan position (2/16), preserving the source and test bytes.
+Its own apply, commit, push and CI success remain pending.
+
+**Current user policy (7 October 2026): no project tests or test installations
+on the Pixel until Christian explicitly switches to the laptop.** This is not
+a one-bundle exception. No pytest, smoke suite, serial/parallel local suite,
+mode verifier, development-environment setup or test hooks may be started there.
+Each change-bearing bundle commits and pushes, then automatically dispatches the
+existing parallel acceptance CI once and waits for its commit-bound results.
+The five-bundle CI cadence is suspended during this phase; do not wait for 029
+or start a second run at the old cadence. See the
+[current test policy](docs/test-parallelism.md#aktive-pixel-phase-nur-automatisch-gestartete-parallele-ci).
+Package/binding checks and Git/CI-result checks remain mandatory; they are not
+local project tests. Failed or missing CI is not a successful apply or release.
+
 The planned Result PYZ contains the shared Core **without the watcher**;
-`pack` will be a normal CLI/API operation. Neither feature is implemented by
-this documentation bundle. The installed distribution and current Result
-Format 2 / wheel runtime remain unchanged.
-
-**One-bundle test exception, explicitly requested on 2026-10-07:** PP-00 is
-applied on the Pixel without local project tests or test-dependency installation.
-Its entrypoint creates one scoped commit, pushes normally to `dev`, then
-starts the existing parallel acceptance CI automatically by `workflow_dispatch`
-and waits for all required results. No serial CI suite, extra trigger or retry
-is added. Commit/push hooks are suppressed for these invocations only so they
-cannot start local tests. This exception does not extend to later bundles;
-see [the exact scope and failure rules](planning/pyz-pack/commit-plan.md#15-ausdrückliche-einmalige-testausnahme-pp-00-auf-dem-pixel).
-
-**PP-00-FIX1 / Bundle 025:** The first attempt (024) stopped before staging,
-commit, push or CI because its entrypoint compared `origin` with a fixed URL
-allowlist. Its six written documents remain the input for this repair. The
-repair accepts GitHub SSH aliases only after resolving and checking their
-configured host; it changes neither remotes nor SSH configuration. It completes
-the same one-commit PP-00 handoff, with the same no-local-tests / automatic
-parallel-CI exception, not a new feature step. Actual apply and CI remain open.
+`pack` will be a normal CLI/API operation. Neither is publicly available in
+this preparatory refactor. Existing public `inspect`/`validate` signatures and
+results are preserved; see the [internal packing foundation](docs/pack.md).
+Result Format 2, its wheel runtime and the normal installation remain unchanged.
 
 The watcher plan is completed. Open native/CIFS evidence in the
 [result-publication plan](planning/result-publication/commit-plan.md) remains
