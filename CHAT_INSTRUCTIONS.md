@@ -234,6 +234,30 @@ Ein fehlgeschlagener Patch kann Dateien geändert oder neu erzeugt haben. Arbeit
 immer auf dem tatsächlich zurückgegebenen Snapshot weiter und unterstelle keine
 globale Rückabwicklung.
 
+### Vorbereiteter installationsfreier PYZ-Weg
+
+Das Format des konkreten Results entscheidet über seinen Runtime-Vertrag.
+Format 1/2 verwendet weiterhin den bisherigen Weg unten. Der neue PYZ-Bootstrap
+ist für Format 3 vorbereitet; vor der Writerfreigabe werden vollständiger
+Format-3-Reader und die eigene eingebettete Startanweisung gemeinsam geprüft.
+
+Der geprüfte Beispielhelfer `scripts/pyz_bootstrap.py` benötigt nur Python-
+Standardbibliothek. Er prüft vor Codeausführung die ausdrücklich ausgewiesenen
+Runtime-Deskriptoren, Memberpfade/-typen, Budgets, Python-Anforderung und SHA-256.
+Sein `runtime_descriptor_precheck` ist keine vollständige native Resultvalidierung.
+Nach bewusster Verwendung einer vertrauten Quelle entnimmt er genau eine PYZ in
+ein neues privates Verzeichnis. Keine pip-/venv-Installation und kein `extractall`.
+Ein mitgelieferter Hash allein beweist keine Herkunft.
+
+Der bevorzugte neue CLI-Aufruf wird `python -I -S -B /absolut/patchharbor.pyz ...`;
+die Schalter stehen vor der PYZ und bilden keine Sandbox. Der einfache Aufruf
+bleibt unterstützt. Für Python-only dient `import_api` nach Vorprüfung/Entnahme:
+vorhandene fremde PatchHarbor-Module ergeben einen Herkunftskonflikt statt eines
+unsicheren Löschens aus `sys.modules`. Der ausgewählte Pfad bleibt für spätere
+Imports erhalten. Das öffentliche `api.pack_patch` ist der reguläre Fachpfad.
+Ein technischer Startfehler erlaubt den bisherigen dokumentierten Übergabeweg;
+eine fachliche Ablehnung oder falsche Bindung darf damit nicht umgangen werden.
+
 ### Geprüfte Runtime und verbindlicher bisheriger Übergabeweg
 
 Result-Format 2 ergänzt `runtime/runtime.json` und gegebenenfalls ein kanonisches
@@ -353,10 +377,11 @@ Der bereits laufende Watcher übernimmt allein den Apply. Keine direkten
 Development-Commits, Apply-Mutationen, Hook-Umgehungen oder Watcher-Neustarts.
 Nach erfolgreichen Commit-Gates genau ein normaler Push; kein automatisches Tag.
 
-PP-00 bis PP-04A sind durch tatsächlich geprüfte Results bestätigt. Bundle 035
-bereitet herkunftsgebundene Verzeichnis-/PYZ-Ressourcen vor; der produktive
-Result-Writer bleibt Format 2 mit Wheel. Der neue Bootstrap folgt vor dem
-Writerwechsel. Maßgeblich sind Plan Abschnitt 1.15 und die aktuelle Testpolicy.
+PP-00 bis PP-04B sind durch tatsächlich geprüfte Results bestätigt. Bundle 036
+bereitet einen installationsfreien Standardbibliothek-Bootstrap und direkten/API-
+Start der PYZ vor. Der produktive Writer bleibt Format 2 mit Wheel. Vollständige
+Format-3-Lesefähigkeit und tatsächlich eingebetteter Bootstrap folgen vor der
+Writerumschaltung. Maßgeblich sind Plan Abschnitt 1.16 und die aktuelle Testpolicy.
 Ein älterer mitgelieferter Core kann weiterhin `pack` vermissen; bis eine geeignete
 Runtime tatsächlich bereitsteht, bleibt der geprüfte manuelle Paketvertrag nutzbar.
 Keine vorgezogene Freigabe resultgenerierender PYZ-Kommandos oder eines Releases.

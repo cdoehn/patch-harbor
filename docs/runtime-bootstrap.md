@@ -1,4 +1,60 @@
-# Verified offline bootstrap and previous handoff procedure
+# Installation-free PYZ bootstrap and legacy handoff
+
+
+## PP-04C: stdlib-only PYZ bootstrap
+
+`scripts/pyz_bootstrap.py` is a reviewed example tool, not another Core validator
+or a public application subcommand. It has no import-time PatchHarbor dependency.
+Use a trusted copy of the helper and an explicitly trusted Result. A digest
+copied from an unknown archive does not authenticate its sender. The current
+production writer remains Format 2; Format-3 fixtures exercise this preparation.
+
+Read-only assessment and optional single-file preparation:
+
+```text
+python -I -S -B /trusted/tools/pyz_bootstrap.py /exchange/result.zip
+python -I -S -B /trusted/tools/pyz_bootstrap.py /exchange/result.zip --trusted-source-sha256 <full-trusted-result-sha256> --prepare-in /private/new-pyz-runtime
+```
+
+The precheck bounds archive metadata before `ZipFile` allocation, rejects unsafe
+paths, duplicate/special members, and verifies the selected runtime metadata and
+artifact descriptors, size/hash and Python requirement. It never guesses the
+first `.pyz`, imports archived code, installs a package or extracts the snapshot.
+`scope=runtime_descriptor_precheck` and `full_reference_valid=false` distinguish
+these data checks from the full native reference reader. Legacy and unavailable
+runtimes select an explicit documented fallback. Corrupt data is not success.
+
+Preparation requires Python >=3.12 and a new private directory. Exactly the
+captured hash-verified PYZ is copied there, with no pip, venv, network or cache.
+Then use the returned absolute path:
+
+```text
+python -I -S -B /private/new-pyz-runtime/patchharbor-<version>.pyz inspect /exchange/patch.zip --json
+python -I -S -B /private/new-pyz-runtime/patchharbor-<version>.pyz validate /exchange/patch.zip --reference-bundle /exchange/result.zip --json
+python -I -S -B /private/new-pyz-runtime/patchharbor-<version>.pyz pack /private/contents --reference-bundle /exchange/result.zip --entrypoint run.sh --output-dir /private/output --json
+```
+
+The actual descriptor supplies `<version>`; do not hardcode it or use an arbitrary
+neighboring PYZ. Interpreter switches precede the archive. They reduce ambient
+imports/site/bytecode effects but are not a security sandbox. The ordinary
+`python archive.pyz ...` form remains supported. Inspect/validate/pack require no
+Git or shell; other Core operations retain their normal Git/registry/interpreter
+requirements. The PYZ contains no Watcher.
+
+In a Python-only environment, load the trusted helper, call `assess`, `prepare`,
+and then `import_api(prepared)`. It verifies the selected artifact again and
+refuses any already loaded `patchharbor` module from another origin. It never
+clears `sys.modules`; use a fresh process after a conflict or failed partial
+import. The checked path stays on `sys.path` for later lazy imports/resources.
+The resulting object is the ordinary public API, including `pack_patch`.
+
+In PP-04C, complete native checks use valid Format-1/2 references. The standalone
+precheck of synthetic Format 3 is not a claim that the native new reader or writer
+is already enabled. PP-05 integrates that reader and embeds this bootstrap in the
+actual canonical instruction; PP-06 gates the first writer with its own E-10 proof.
+The previous wheel helper below remains available for real legacy references.
+
+## Legacy wheel bootstrap
 
 The bootstrap is an explicit consumer action, separate from read-only inspection.
 Finding a wheel in a Result never installs or imports it. A digest proves byte
@@ -111,7 +167,11 @@ Its gate commands are fixture checks, not nested runs of the project suite.
 Both are selected by existing blocking packaging/E2E gates. Native Windows/CI
 evidence must come from actual runs, never from these Linux development results.
 
-## PatchHarbor project CI at the handoff boundary
+## Historical RIV project CI at the handoff boundary
+
+The active PYZ/PACK policy supersedes this historical section: only Christian
+starts CI, and Development/Apply gates run full parallel suites only.
+No automatic five-bundle dispatch applies to the active plan.
 
 The project, not Core, requests acceptance CI every fifth bundle after 009
 (014, 019, ...). Intermediate bundles do not spend an extra CI run. The prepared

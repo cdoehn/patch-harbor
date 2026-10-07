@@ -547,3 +547,17 @@ with warnings naming any remaining owned path. Success does not require reopenin
 the final file: an external watcher may already have moved it. This evidence does
 not assert shell syntax, executed tests, authenticity or unchanged target state
 at a later Apply. See [pack details](pack.md).
+
+
+## Prepared Python-only PYZ access (PP-04C)
+
+The public API is shared with the built Core-only PYZ. Before importing it,
+perform the stdlib descriptor/trust precheck described in
+[runtime bootstrap](runtime-bootstrap.md) and privately prepare the selected
+artifact. `scripts/pyz_bootstrap.py` supplies the reviewed example
+`import_api(prepared)`: it retains the checked path, rejects preloaded foreign
+PatchHarbor modules, and never clears module caches to fake a version switch.
+Afterwards use the returned `api.inspect_patch`, `api.validate_patch` and
+`api.pack_patch` normally. Full native reference validation remains separate
+from bootstrap checks; no installation or subprocess is needed for these calls.
+New Result-3 production is gated by subsequent reader/provider/Writer work.

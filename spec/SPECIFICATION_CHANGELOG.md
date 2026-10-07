@@ -1,5 +1,13 @@
 # PatchHarbor – Spezifikations-Changelog
 
+## 2026-10-08 – PP-04B bestätigt; installationsfreier Bootstrap in Bundle 036
+
+- Commit `25057ec9fa5c108a92a6a31be434c0d2c5e30118` durch tatsächlichen Apply bestätigt.
+- Standardbibliothek-Vorabcheck, einzelne geprüfte PYZ-Entnahme und kontrollierter
+  Python-only-Import vorbereitet; direkte CLI/API-Nutzung mit gebautem Artefakt.
+- Legacy-Wheel-Helfer bleibt bestehen. Keine Writerumschaltung, automatische CI
+  oder Behauptung vollständiger nativer Format-3-Prüfung; beide Normdateien unverändert.
+
 ## 2026-10-08 – PP-04A bestätigt; eigene PYZ-Ressourcen in Bundle 035
 
 - Commit `a9ac74e00fd0ac0042d7474a52a95e1fb17a4d59` durch tatsächlichen Apply bestätigt.
