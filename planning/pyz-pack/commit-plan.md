@@ -2,12 +2,12 @@
 
 **Plan-ID:** `PYZ-PACK`
 **Planpfad:** `planning/pyz-pack/commit-plan.md`
-**Revision:** 18
+**Revision:** 19
 **Stand:** 8. Oktober 2026
-**Status:** PP-00 bis PP-06B tatsächlich angewendet/gepusht. PP-07 / Bundle 041 gleicht Dokumentation und funktionale Beispiele ab; Apply noch offen.
+**Status:** PP-00 bis PP-07 tatsächlich angewendet/gepusht. PP-08A / Bundle 042 vervollständigt Testzuordnung und native Auswahl; Apply noch offen.
 **Geplanter Umfang:** 9 Arbeitspakete `PP-00` bis `PP-08`, zunächst 16 vorgeschlagene Commit-Schritte. Keine feste Anzahl von Patch-Bündeln.
-**Fortschritt:** 13/16 ursprüngliche Planpositionen committed. PP-07 ist Position 14; native Abschlussabnahme bleibt separat.
-**Nächster Schritt:** PP-07 mit neu gebauten Ressourcen und vollständiger paralleler Suite übergeben; anschließend PP-08A Testzuordnung und PP-08B Abschlussnachweise.
+**Fortschritt:** 14/16 ursprüngliche Planpositionen committed. PP-08A ist Position 15; PP-08B bleibt Abschlussgate mit offenen externen Voraussetzungen.
+**Nächster Schritt:** PP-08A vollständig parallel prüfen und übergeben. PP-08B benötigt Versionsentscheidung, finale Artefakte und tatsächliche manuelle CI-/native-/CIFS-Nachweise.
 **Ziel-Produktversion:** noch festzulegen; keine erfundene Releaseversion, kein automatischer Tag oder Release.
 
 > **Verbindliche Grundlage ist der gemeinsame Spezifikationssatz:**
@@ -874,6 +874,36 @@ geprüft. Der PP-06B-Nachweis ist kein Nachweis für geänderte Artefaktbytes.
 Native Windows-/Python-3.12-/CIFS-Abnahme, Versionsentscheidung und manuell vom
 Nutzer zu startende CI bleiben PP-08B zugeordnet. Kein automatischer Dispatch.
 
+### 1.22 PP-07 bestätigt; PP-08A / Bundle 042
+
+Result `patchharbor-apply_Result_004100_1008_12b90f.zip`, SHA-256
+`aa44057d755ec7dbddbfedcb2c3a6999baae9068eabe594060ecaf8c13deefd6`, bestätigt Commit `ec20be5d49829ad95eed33c2b4328ab85449a653`,
+sauberen Baum und normalen Push. Das vollständige parallele Apply-Gate bestand
+mit 3019 bestandenen Tests und 8 Skips. Dieses Result
+ist die Bindungsgrundlage für PP-08A.
+
+`test-matrix.md` ordnet alle 76 Szenarien der Revision 2 konkreten Testfunktionen
+oder ausdrücklich fachlichen/historischen Reviews zu. Die existierenden Lanes
+bleiben bestehen. Der bisher nur eine Datei umfassende PowerShell-7-Selektor
+nimmt die relevanten neuen PYZ-/Pack-/Apply- und Runtime-Roundtripdateien auf.
+Geteilte native Testskripte wählen die im Lane vorgegebene PowerShell-Engine
+explizit; ein erfolgreicher Test mit unbemerkt anderer Engine reicht nicht.
+Keine zusätzlichen CI-Trigger oder automatischen Starts.
+
+Ein synchronisierter echter `api.apply_next`-Durchstich sieht vor Publikation
+nur eine `.partial`-Datei und keinen Kandidaten, nach Publikation das vollständige
+Paket. Keine Kurz-Sleeps als Race-Orakel. Drei getrennte PYZ-Starts und Pack-Läufe
+messen mit 1-MiB-Eingabe Start-/Pack-Zeit und Python-Spitzenspeicher; Interpreter,
+Plattform, Bytes und Hash werden strukturiert erfasst, ohne enge Timingassertions.
+Bestehende drei Generationen erfassen Größe, Resultmehrbedarf und Speicher separat.
+
+Die vollständige parallele Suite prüft den tatsächlichen Stand. Result, Quell-
+bindung, Tests und externe Messberichte werden vor Übergabe vollständig geprüft.
+Lokale Linux-/Fault-Nachweise schließen keine native Windows-/Python-3.12- oder
+reale Linux→Windows-CIFS-Abnahme. Version und finale native Nachweise bleiben
+PP-08B vorbehalten. Der Workflow wird ausschließlich vom Nutzer gestartet;
+Codex und Apply-Entrypoint starten keine CI. Beide Normdateien bleiben unverändert.
+
 ## 2. Architektur und unveränderliche Grenzen
 
 ### 2.1 Produktumfang
@@ -975,8 +1005,8 @@ PP-00 ist durch Bundle 025 abgeschlossen. PP-01 steht auf **committed; Regressio
 | 11/16 | **PP-05B** | PP-05 | PP-05A | `feat(result): integrate format 3 consumers before writer activation [PP-05B]` | Bundle 038 tatsächlich angewendet/gepusht |
 | 12/16 | **PP-06A** | PP-06 | PP-05B | `feat(runtime): pin reproducible PYZ resources for Result production [PP-06A]` | Bundle 039 tatsächlich angewendet/gepusht |
 | 13/16 | **PP-06B** | PP-06 | PP-06A | `feat(result): ship PYZ runtimes with a working bootstrap [PP-06B]` | Bundle 040 tatsächlich angewendet/gepusht |
-| 14/16 | **PP-07** | PP-07 | PP-06B | `docs(runtime): complete PYZ and pack workflows and compatibility guidance [PP-07]` | Bundle 041 vorbereitet; tatsächlicher Apply offen |
-| 15/16 | **PP-08A** | PP-08 | PP-07 | `test(runtime): complete cross-platform PYZ and pack acceptance coverage [PP-08A]` | geplant |
+| 14/16 | **PP-07** | PP-07 | PP-06B | `docs(runtime): complete PYZ and pack workflows and compatibility guidance [PP-07]` | Bundle 041 tatsächlich angewendet/gepusht |
+| 15/16 | **PP-08A** | PP-08 | PP-07 | `test(runtime): complete cross-platform PYZ and pack acceptance coverage [PP-08A]` | Bundle 042 vorbereitet; tatsächlicher Apply offen |
 | 16/16 | **PP-08B** | PP-08 | PP-08A | `chore(release): audit PYZ and pack artifacts and acceptance readiness [PP-08B]` | geplant |
 
 
@@ -1685,6 +1715,7 @@ Die mechanische Prüfung dieses Markdownplans kontrolliert eindeutige Schrittken
 | 2 | 2026-10-07 | PP-00 / Bundle 024 integriert: aktuelle bytegleiche Referenz vom Pixel, Norm-/Planverweise, offene Alt-Nachweise, vorbereiteter Status; ausdrücklich einmalige CI-only-Ausnahme ohne Tests oder Testinstallation im Apply, ein Commit/Push und automatische parallele CI mit Ergebnisprüfung. |
 | 3 | 2026-10-07 | PP-00-FIX1 / Bundle 025: Abbruch von 024 vor Staging/Commit/CI belegt; dirty Result als Reparaturbasis, SSH-Alias-Auflösung statt URL-Stringliste, unveränderte Konfiguration und Fortsetzung der ersten Pixel-CI-only-Ausnahme. Kein Fortschritt vor Apply-/CI-Nachweis. |
 | 4 | 2026-10-07 | PP-00-Erfolg und CI 37635401106 aus dem damaligen Result bestätigt; PP-01 in 026 vorbereitet. Die damaligen lokalen Endgates und CI-Pause sind durch Revision 5 für die Pixel-Phase ersetzt. |
+| 19 | 2026-10-08 | PP-07 bestätigt; konkrete 76-Szenarien-Matrix, native PowerShell-7-Auswahl und Mess-/Exchange-Durchstich in PP-08A vorbereitet. |
 | 18 | 2026-10-08 | PP-06B durch tatsächliches Result bestätigt; PP-07 Dokumentreview und funktionale Beispiele mit erneuertem Artefaktgate vorbereitet. |
 | 17 | 2026-10-08 | PP-06A durch tatsächliches Result bestätigt; PP-06B atomare Result-3-/PYZ-Produktion mit eigener E-10-Erstnutzung, Core-Parität und drei tatsächlichen Generationen vorbereitet. |
 | 16 | 2026-10-08 | PP-05B durch tatsächliches Result bestätigt; PP-06A request-lokale PYZ-Result-Ressourcen und begrenzter Pflichtvorlagenfallback vorbereitet. Produktiver Writer bleibt Format 2. |
@@ -1702,6 +1733,7 @@ Die mechanische Prüfung dieses Markdownplans kontrolliert eindeutige Schrittken
 
 ---
 
-**PP-00 bis PP-06B sind tatsächlich angewendet. PP-07 wird in Bundle 041
+**PP-00 bis PP-07 sind tatsächlich angewendet. PP-08A wird in Bundle 042
 vorbereitet; tatsächlicher Apply bleibt bis zum nächsten Result offen.
-PP-08A und PP-08B folgen. Keine Releasefreigabe.**
+PP-08B bleibt bis zur Versionsentscheidung und konkreten finalen lokalen,
+Apply-, nativen CI- und CIFS-Nachweisen offen. Keine Releasefreigabe.**

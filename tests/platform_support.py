@@ -45,7 +45,16 @@ def native_value(posix: _T, windows: _T) -> _T:
 def native_script(posix_body: str, windows_body: str) -> str:
     """Build one marker-valid script from the current platform body."""
     body = native_value(posix_body, windows_body).rstrip("\n")
-    return f"{REQUIRED_MARKER}\n{body}\n"
+    # The separate native acceptance lane must execute these shared fixtures
+    # through its requested PowerShell engine, not silently the OS default.
+    shebang = ""
+    if IS_WINDOWS:
+        engine = os.environ.get("PATCHHARBOR_WINDOWS_ACCEPTANCE_ENGINE", "")
+        if engine:
+            if engine not in {"powershell.exe", "pwsh"}:
+                raise AssertionError(f"unsupported Windows acceptance engine: {engine}")
+            shebang = f"#!{engine}\n"
+    return f"{shebang}{REQUIRED_MARKER}\n{body}\n"
 
 
 def native_python_script(code: str, *, python: str = sys.executable) -> str:

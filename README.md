@@ -19,12 +19,12 @@ Neither file is an alternative to the other. This explicit feature selection
 supersedes stale active-plan headings in historical documents; the unchanged
 package version does not reactivate a completed version/RIV/watcher plan.
 
-PP-00 through PP-06B are confirmed by actual Apply Results. The latest is
-commit `f3edbeb7216101f2435a2752f1168562097673f3` with 3004 passed tests and 8 skips
-in the full parallel Apply gate. The plan records the complete sequence.
-Bundle 041 prepares the final documentation review and functional full-file,
-diff, mixed, diagnostic and failing-script examples. Final native acceptance
-and the product-version decision remain open; the global installation is unchanged.
+PP-00 through PP-07 are confirmed by actual Apply Results, most recently
+commit `ec20be5d49829ad95eed33c2b4328ab85449a653` with 3019 passed tests and 8 skips.
+Bundle 042 prepares the complete [acceptance mapping](planning/pyz-pack/test-matrix.md),
+PowerShell-7 test selection and recorded local measurements. Final native/CIFS
+acceptance and the product-version decision remain open. The global installation
+is unchanged; the plan records the complete sequence and evidence.
 
 **Current policy, explicitly updated by Christian on 7 October 2026:**
 Development and Apply run full parallel suites only, including at bundle end.
@@ -33,7 +33,7 @@ Only Christian starts the manual GitHub CI workflow; no automated dispatch or
 five-bundle cadence. The active loop continues the existing plan after verified
 Results, without a fixed correction-attempt limit.
 See [test policy](docs/test-parallelism.md) and [plan section 1.10](planning/pyz-pack/commit-plan.md).
-The prepared PP-07 step is not yet an Apply or CI success.
+The prepared PP-08A step is not yet an Apply or CI success.
 
 The Result-PYZ profile contains the shared Core **without the watcher**.
 The new public `api.pack_patch` accepts explicit contents, a Result reference,

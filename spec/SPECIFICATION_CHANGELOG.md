@@ -1,5 +1,13 @@
 # PatchHarbor – Spezifikations-Changelog
 
+## 2026-10-08 – PP-07 bestätigt; Gesamtmatrix PP-08A
+
+- Commit `ec20be5d49829ad95eed33c2b4328ab85449a653` durch tatsächlichen Apply bestätigt.
+- Alle 76 normativen Szenarien zugeordnet; bestehende native PowerShell-7-Auswahl
+  um neue relevante Wege ergänzt, Enginewahl explizit.
+- Synchronisierter Exchange-Durchstich und kontrollierte Größen-/Zeit-/Speichermessung.
+- Normdateien unverändert; externe Nachweise und Versionsentscheidung bleiben offen.
+
 ## 2026-10-08 – PP-06B bestätigt; Dokumentreview PP-07
 
 - Commit `f3edbeb7216101f2435a2752f1168562097673f3` durch tatsächlichen Apply bestätigt.

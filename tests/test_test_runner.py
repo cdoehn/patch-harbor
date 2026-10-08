@@ -171,7 +171,21 @@ def test_report_and_reference_are_explicit_child_arguments(tmp_path):
     ("e2e", ["-m", "e2e or acceptance", "tests"]),
     ("platform", ["-m", "platform", "tests"]),
     ("packaging", ["-m", "packaging", "tests"]),
-    ("windows", ["tests/test_windows_acceptance_e2e.py"]),
+    ("windows", [
+        "tests/test_windows_acceptance_e2e.py",
+        "tests/test_pyz_result_e2e.py",
+        "tests/test_pack_examples.py",
+        "tests/test_pyz_bootstrap.py",
+        "tests/test_pyz_resources.py",
+        "tests/test_pack_sources.py",
+        "tests/test_pack_api.py",
+        "tests/test_pack_cli.py",
+        "tests/test_result_runtime_roundtrip.py",
+        "tests/test_runtime_packaging.py",
+        "tests/test_result3_publication_policy.py",
+        "tests/test_result_runtime_publication.py",
+        "tests/test_pack_exchange_e2e.py",
+    ]),
 ])
 def test_ci_and_docker_scopes_use_the_same_launcher(scope, targets):
     command, _ = runner.prepare_invocation(["--suite", scope], environment={})

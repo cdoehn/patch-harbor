@@ -747,14 +747,11 @@ Der bereits laufende Watcher übernimmt allein den Apply. Keine direkten
 Development-Commits, Apply-Mutationen, Hook-Umgehungen oder Watcher-Neustarts.
 Nach erfolgreichen Commit-Gates genau ein normaler Push; kein automatisches Tag.
 
-PP-00 bis PP-06B sind durch tatsächliche Results bestätigt. Der gemeinsame
-Writer erzeugt Result 3 mit einer Core-PYZ. Bundle 041 prüft die vollständige
-Dokumentation und die funktionalen Beispiele; artefaktwirksame Vorlagenänderungen
-erfordern erneut die volle Suite einschließlich Erstnutzung und Roundtrip.
-Maßgeblich sind Plan Abschnitt 1.21 und die aktuelle Testpolicy. Eine ältere
-laufende globale Installation behält ihren eigenen Stand. Fehlen dort `pack`
-oder Format 3, gilt der dokumentierte technische Altweg. Versionsentscheidung,
-native Abschlussabnahme und Release bleiben offen.
+PP-00 bis PP-07 sind durch tatsächliche Results bestätigt. Bundle 042 bereitet
+die vollständige Testzuordnung und native Auswahl vor. Maßgeblich sind Plan
+Abschnitt 1.22 und die aktuelle Testpolicy. Eine ältere globale Installation
+bleibt unverändert. Versionsentscheidung und finale lokale/Apply-/native-/CIFS-
+Abnahme gehören zu PP-08B; ein Quellpatch oder Linux-Test schließt diese nicht.
 
 Bestimme die aktive Zielversion aus dem Repository. Eine laut Plan erst zum
 Release erfolgende Versionsanhebung ist kein Widerspruch; tatsächlich
