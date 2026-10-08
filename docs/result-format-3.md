@@ -1,7 +1,8 @@
 # Result format 3: PYZ runtime metadata 2
 
-PP-05A/B established the full reader and consumer compatibility before PP-06B
-switches normal production to Result 3. Standard installations prepare the Core-PYZ
+Normal production uses Result 3. PP-05A/B established the full reader and
+consumer compatibility before PP-06B activated that writer. Standard installations
+prepare the Core-PYZ
 without building or installing anything while handling a request. The productive
 writer uses one runtime shape; old 1/2 data contracts remain read-only compatibility.
 
@@ -56,6 +57,6 @@ PP-05B verifies Format-3 Exchange/archive/recovery integration using real consum
 processes, including frozen Format-1 and complete Format-2 runtimes. A standalone
 PYZ remains a non-patch artifact. Unavailable, corrupt and future Results cannot
 become archival/recovery success proofs. The canonical handoff includes the
-reviewed executable bootstrap before the PP-06 writer gate. Existing
+reviewed executable bootstrap used by the active Format-3 writer. Existing
 Result ownership, sync, finite typed CIFS retries, shared wait budget and final
 verified hash binding remain unchanged; `pack` retains its separate no-retry policy.

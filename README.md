@@ -1,848 +1,283 @@
-# PatchHarbor
+# PatchHarbor 1.3.0
 
-PatchHarbor is a controlled cross-platform bridge between an external
-development chat and local Git repositories. It registers repository instances,
-creates complete Result Bundles, validates repository-bound ZIP patch packages,
-and applies a package only to the exact registered state named in its
-`patch.json`.
+PatchHarbor transfers work between a development environment and a local Git
+repository using verified ZIP packages. A **Result Bundle** describes the actual
+repository state. A **Patch package** is bound to that repository and exact state;
+Apply checks the binding before writing its payloads and running its entrypoint.
 
-PatchHarbor also retains the explicit `fs run` command for generated Bash and
-PowerShell scripts and legacy ZIP PatchBundles.
+- `bundle` captures a repository; `apply` applies an explicitly prepared package.
+- `pack` builds a patch from chosen contents and a Result reference.
+- `inspect` and `validate` check packages without executing their code.
+- The optional watcher runs Apply after filesystem changes in Exchange have
+  settled for five seconds.
+- Results normally carry an installation-free **Core-PYZ, without the watcher**.
+  CLI and Python callers use the same public API.
 
-## Active development: PYZ and pack
+This source tree uses version **1.3.0**. The version string, an installed version,
+and a published release are different facts. Implementation and acceptance
+evidence, including outstanding platform gates, are recorded in the
+[PYZ/PACK plan](planning/pyz-pack/commit-plan.md) and
+[test matrix](planning/pyz-pack/test-matrix.md); a development checkout is not
+itself a release announcement.
 
-The current feature plan is [PYZ/PACK](planning/pyz-pack/commit-plan.md).
-Its binding requirements are the **joint specification set**:
-[existing specification](spec/SPECIFICATION.md) **and**
-[PYZ/PACK extension, revision 2](spec/SPECIFICATION_EXTENSION_PYZ_PACK.md).
-Neither file is an alternative to the other. This explicit feature selection
-supersedes stale active-plan headings in historical documents; the selected
-product version does not reactivate a completed version/RIV/watcher plan.
+## Requirements and installation
 
-PP-00 through PP-08B are confirmed by actual Apply Results, most recently
-commit `15d777c7f9f7d61a7f2a7ce56628cf22366f3ed7` with 3021 passed tests and 8 skips.
-Christian selected **1.3.0** and confirmed his successful CIFS practice check.
-Bundle 044 prepares a correction for large snapshots: 250,000 repository files,
-250,010 outer ZIP entries, ZIP64 bootstrap support and explicit limit diagnostics.
-Byte limits and inner runtime limits remain in force. The complete
-[acceptance mapping](planning/pyz-pack/test-matrix.md) and local measurements
-remain available. The correction's actual Apply and user-started final CI remain
-to be confirmed; this is not a release publication.
-The plan records the complete sequence and the scope of each piece of evidence.
+Python **3.12 or newer** is required. Repository operations also require Git;
+executing a patch requires its declared Bash or PowerShell interpreter.
+Static `pack`, `inspect` and reference-based `validate` need neither Git nor
+the target shell. The Core has no third-party runtime dependencies.
 
-**Current policy, explicitly updated by Christian on 7 October 2026:**
-Development and Apply run full parallel suites only, including at bundle end.
-After the successful per-commit gates, the watcher commits and pushes once.
-Only Christian starts the manual GitHub CI workflow; no automated dispatch or
-five-bundle cadence. The active loop continues the existing plan after verified
-Results, without a fixed correction-attempt limit.
-See [test policy](docs/test-parallelism.md) and [plan section 1.10](planning/pyz-pack/commit-plan.md).
-Final acceptance is tied to the actual 1.3.0 commit and its artifact hashes.
-
-The Result-PYZ profile contains the shared Core **without the watcher**.
-The new public `api.pack_patch` accepts explicit contents, a Result reference,
-and an explicit output location; see the [pack guide](docs/pack.md).
-The `patchharbor pack` CLI uses the same public API; the built Core-PYZ supports these operations without installation. Both paths require an explicit Result and output location.
-Existing public `inspect`/`validate` signatures and results remain compatible.
-New Results use Format 3 with exactly one Core-PYZ. Readers preserve legacy
-Result-1/2 support; normal wheel/sdist installation and the installed watcher remain.
-
-The watcher plan is completed. Christian's successful CIFS practice check is
-recorded as user-confirmed evidence in the PYZ/PACK plan; no unprovided commit or
-artifact hash is inferred. Historical records in the
-[result-publication plan](planning/result-publication/commit-plan.md) are retained.
-The baseline specification describes the 1.2.1 contract; its joint use with the
-PYZ/PACK extension governs the selected 1.3.0 implementation.
-
-## Installation
-
-The RIV development line adds static package inspection through
-`patchharbor inspect patch.zip` and `patchharbor validate patch.zip`, with
-`--json` for complete machine-readable facts. `validate` additionally accepts
-either `--reference-bundle result.zip` or `--repository /workspace/repository`
-to compare the complete binding. Package/reference checks require no Git or
-registration; repository checks require the existing registered instance.
-These commands execute no scripts and create no Result Bundle. Offline runtime
-and Result Format 3 with its Core-PYZ are present in this source baseline; their
-[RIV plan](planning/runtime-inspect-validate/commit-plan.md) is completed.
-The active successor is the [PYZ/PACK plan](planning/pyz-pack/commit-plan.md).
-See the [Python API contract](docs/python-api.md#static-package-inspection-riv-development-addition)
-for result fields and examples. These additions have not been released yet.
-
-PatchHarbor requires Python 3.12 or newer and [pipx](https://pipx.pypa.io/).
-Install the published release with:
+For the normal CLI **and watcher**, install a reviewed wheel or source checkout.
+For example, with an existing Python 3.12+ and pipx:
 
 ```bash
-pipx install patchharbor
+pipx install --python python3 /absolute/path/patchharbor-1.3.0-py3-none-any.whl
+patchharbor --version
+patchharbor --help
 ```
 
-Use the `CHAT_INSTRUCTIONS.md` shipped with the same PatchHarbor version. In a
-source checkout or source distribution it is in the project root; an installed
-wheel also carries it under its shared `share/patchharbor/` data directory.
-Every new Result Bundle embeds a freshly rendered copy of that template plus
-local environment data. The original repository file is never overwritten.
+The wheel path is an artifact you obtain and verify; this command does not assume
+that version 1.3.0 has been published on a package index. **pipx is optional**:
+a dedicated virtual environment is another installation route. Wheel and sdist
+remain supported for normal installations; the PYZ replaces the runtime embedded
+in new Results, not the installed watcher. See
+[installation and safe updates](docs/install-and-update.md), especially if a
+watcher is already running. Updating repository files alone does not upgrade it.
 
-## Repository-local setup
+## Quick start
 
-Each registered local repository owns **all of its PatchHarbor settings** in
-`.patchharbor/config.json`, next to its `.patchharbor/id`. There is no global
-Exchange setting and no global fallback. Only the registry (repository UUID to
-physical repository path), locks and technical replay/runtime state are shared
-per operating-system user; they are not a second configuration store.
-
-Register first, then run the configuration command **from inside that repository**:
+Use a local Git repository with an existing committed `HEAD`. Choose an Exchange
+directory outside every registered repository. In a POSIX shell:
 
 ```bash
-cd /path/to/repository
+cd /absolute/path/to/repository
 patchharbor register
-patchharbor configure exchange-directory ~/Downloads
+patchharbor configure exchange-directory /absolute/path/to/exchange
 patchharbor configure show
-```
-
-All `configure` commands resolve the current working directory to its registered
-Git repository. Subdirectories work too. Outside a repository, in an unregistered
-repository, or with missing/invalid local metadata, the command fails without
-creating or repairing a configuration. `register` never asks for an Exchange
-path: a genuinely fresh registration creates this complete local Format-1 file:
-
-```json
-{
-  "format_version": 1,
-  "exchange_directory": null,
-  "bundle_suffix": "",
-  "archive_directory": "PatchHarbor-Archive"
-}
-```
-
-This is a **new repository-local schema**, not the old global Format 1.
-All four fields are required; additional, duplicate or invalid fields, BOMs and
-unsupported versions are rejected. `null` means registration is complete but
-no Exchange directory has been chosen. It is not a missing configuration file.
-`configure show` can display this state. Suffix and archive preferences can be
-set before Exchange is chosen; operations needing Exchange fail until it is set.
-
-The Exchange argument must be absolute (the shell expands `~/Downloads`).
-The setter creates the directory if needed and stores its physically resolved
-absolute path. It may not equal, contain, or be inside **any** registered
-repository. Setters update the existing valid document atomically and preserve
-all other settings. They never initialize a missing file.
-`.patchharbor/` is excluded through Git's local `info/exclude`, not through a
-change to the project's versioned `.gitignore`. It is not committed or included
-as repository files in Result Bundles. A dot-prefixed name is hidden on Linux;
-PatchHarbor does not set a Windows Hidden attribute.
-
-### Shared or separate Exchange directories
-
-Both are supported, with settings remaining independent:
-
-```bash
-cd /path/to/repository-a
-patchharbor configure exchange-directory ~/Downloads
-cd /path/to/repository-b
-patchharbor configure exchange-directory ~/Downloads
-cd /path/to/repository-c
-patchharbor configure exchange-directory ~/Downloads/Repository-C
-```
-
-All three repositories must already be registered. A and B share a physical
-folder; C uses another one. The watcher scans each distinct physical Exchange
-folder once per poll. Manifest `repo_id`, not the filename or another project's
-preferences, determines ownership. Automatic discovery accepts a package only
-from its target repository's configured Exchange. An explicit `apply PATCH_ZIP`
-can read a package elsewhere, but still uses its manifest target's settings.
-
-The flat Exchange directory may contain patch packages, Result Bundles, old
-packages, and unrelated files together. PatchHarbor identifies content rather
-than relying on filenames. Conservative automatic archival moves only bundles
-with complete obsolescence proofs into a direct child folder; nothing is deleted.
-Other downloads and unprovable bundles remain untouched. Shared Exchange folders
-may have different suffix and archive preferences for each repository.
-
-### Manual upgrade from global configuration
-
-This is an intentional breaking change in the 1.2.0 development line, with
-**no migration code, no automatic repair and no dual reading**. Earlier global
-configuration formats are not accepted as local configuration formats.
-An old `${XDG_CONFIG_HOME:-$HOME/.config}/patchharbor/config.json` on Linux or
-`%APPDATA%\PatchHarbor\config.json` on Windows is ignored, even when it exists.
-`watcher.json` and `paths.json` are not configuration sources either.
-
-Finish any running Apply and stop the watcher before changing the installation
-or editing local metadata. Update the CLI and watcher together. Keep the central
-registry, `.patchharbor/id`, Git's local exclusion and the replay ledger; do not
-delete locks or replay records to work around a configuration error.
-
-For each **already registered** repository whose local config is missing, create
-`.patchharbor/config.json` deliberately in an editor using the four-field JSON
-above. Do not overwrite an existing valid file and do not copy an old global
-JSON document wholesale. A damaged file requires deliberate manual correction;
-`register`, `register --new-id` and `configure` are not repair commands.
-Then, from that repository, run `configure exchange-directory` with the intended
-absolute path and set any suffix/archive preference. These may be read manually
-from the old settings, but the application never imports them. `configure show`
-displays only that repository's values. Repeat for every local checkout.
-
-For genuinely new repositories and ordinary Git clones, use the normal
-`register` then `configure` workflow instead. A clone does not inherit ignored
-metadata. `unregister` removes only the registry mapping: ID, config and the
-local exclusion stay intact. Re-registering reuses them. After moving the entire
-local repository, re-register at the new path; the old registered path must no
-longer exist. A copied identity at two existing paths is a conflict, not a move.
-A deliberate `register --new-id` can give the copy its own ID when its retained
-local metadata is valid; it does not reset its settings.
-
-### Conservative automatic Exchange archival
-
-The default archive is **`PatchHarbor-Archive`**, directly inside the configured
-Exchange directory. It is created on demand during normal Apply discovery,
-Watcher scans, or manual bundle creation. No separate cleanup command is needed.
-Configure its single folder name from the owning repository:
-
-```bash
-patchharbor configure archive-dir PatchHarbor-Archive
-patchharbor configure archive-dir .PatchHarbor-Archive
-patchharbor configure show
-```
-
-A leading dot uses normal Linux hidden-file semantics. On Windows it is simply
-part of the name; PatchHarbor does not set a Hidden attribute. Absolute paths,
-path separators, `.`/`..`, traversal and non-portable names are rejected. The
-name supports 1–128 ASCII letters, digits, dots, underscores and hyphens, but no
-trailing dot or Windows reserved device name. Disable automatic archival for
-this repository with either setting (existing archive files are retained):
-
-```bash
-patchharbor configure archive-dir --clear
-patchharbor configure archive-dir ""
-```
-
-**A timestamp, filename or mere successful exit is never enough.** The existing
-replay state now records a full `completed_commit` only when a successful tracked
-Apply moves the repository to a new, clean descendant commit. A patch can be
-archived only if its exact path/content identity, full manifest binding and
-successful completion receipt agree, and the current clean repository still
-contains that commit in its original Git history. Explicit exchange packages
-also record this evidence, without changing explicit retry eligibility. Legacy
-records without a completion receipt remain conservatively unarchived.
-
-A Result Bundle can be archived only when it describes a successful, clean,
-completed run at a strict ancestor of the current clean HEAD. Its manifest,
-context and run log must agree; every snapshot blob hash, size and mode is
-checked against the complete actual Git tree, and unexpected contents are
-rejected. Current, dirty, failed, incomplete, contradictory or damaged results
-remain. Unknown repositories, shallow/grafted/replaced histories, Git failures
-and unavailable proofs always mean **keep the original file**.
-
-Manual parameterless Apply and bundle creation maintain only the current
-registered repository. Explicit Apply maintains the package's repository, but
-never archives the explicitly selected file before executing it. The Watcher
-remains global across registered repositories. Dry-run never archives. Only
-top-level files are considered; the archive is never scanned recursively.
-
-Directories are physically checked, pinned and revalidated; links/junctions
-cannot redirect the destination. Bundle bytes and repository evidence are
-rechecked immediately before a no-overwrite rename. Name collisions use a fresh
-unique destination name; existing files are never replaced. A failed or
-unsupported safe rename leaves the source in place (no copy-and-delete
-fallback). Retained replay receipts continue to prevent unintended reprocessing.
-
-Within one scan, validated candidates are grouped by repository and share one
-initial consistent state capture. Current results and patches without a usable
-completion receipt need no ancestry query. Each actual move still rehashes the
-file and captures the full repository state again, then checks fresh Git,
-registration, configuration and replay evidence. Nothing authorizing a move is
-cached across scans or reused in place of this final check.
-
-### Optional bundle filename suffix
-
-Configure a suffix for the current registered repository, using its local
-configuration. For example, append `.txt` **after** the `.zip` extension:
-
-```bash
-patchharbor configure bundle-suffix .txt
-patchharbor configure show
-```
-
-All newly generated Result Bundles for this repository then use
-`<Repository>_Result_<HHMMSS>_<MMDD>_<ID6>.zip.txt`, including manual `bundle`,
-automatic Apply results (success, failure, dry-run), Watcher results, and explicit
-`--output-dir` targets. There is no suffix argument on `apply` or `bundle`.
-Disable it with:
-
-```bash
-patchharbor configure bundle-suffix --clear
-```
-
-An empty `bundle_suffix` produces the unchanged `.zip` name. The suffix is literal:
-no dot is inserted automatically. It may contain at most 32 ASCII letters,
-digits, dots, underscores or hyphens, must include a letter or digit, and must
-not contain `..` or end with a dot. Paths, whitespace, control characters and
-incomplete-download endings such as `.part`, `.tmp` or `.crdownload` are rejected.
-Suffix and archive preferences may be set while Exchange is still `null`.
-Once an Exchange path is stored, setters revalidate it. An unavailable old path
-can be replaced deliberately with `configure exchange-directory`, preserving the
-other preferences; this is an explicit setting change, not automatic repair.
-Reads and writes accept only the complete repository-local Format 1. The global
-Format-4 replay ledger is separate from this configuration schema and remains
-intact. Upgrade all installed PatchHarbor entrypoints together.
-
-Patch packages are created by the development chat, not by a new local command.
-The new Result Bundle's `context.json` carries `bundle_suffix` as optional
-filename metadata. The matching chat instructions require the same suffix on
-`<Repository>_Patch_<HHMMSS>_<MMDD>_<ID6>.zip`. Missing metadata in older bundles
-means no suffix. After changing the setting, give the chat a fresh Result Bundle.
-Do not put this field in `patch.json`: it is not part of repository binding.
-`patchharbor context --json` keeps its existing closed schema; a standalone
-context therefore needs the naming preference supplied separately.
-
-The content stays ZIP, not text. Renaming alone does not guarantee that another
-application can read it. The suffix setting never renames existing files. Old `.zip` and new
-`.zip.txt` packages may coexist; selection, state binding, `mtime_ns`, manual
-retry and the Watcher guard remain content-based and unchanged. Result Bundles
-are never executed as patches, regardless of their filename.
-
-Explicit `--output-dir` can bypass an unset or unavailable Exchange directory,
-**not a missing or malformed local configuration**. It always uses the target
-repository's valid local suffix, never another project's settings or a default
-fallback. Default output requires an available Exchange directory. Result target
-preparation revalidates the local identity, Exchange value and suffix before
-publication; concurrent changes cause a controlled error.
-
-## Initialize a repository
-
-A repository must be a local Git repository with a committed `HEAD`. Registration
-creates a local `.patchharbor/id`, the complete `.patchharbor/config.json`
-with unset Exchange, and a user-specific central mapping from its UUID to the
-physical repository path. Existing identities require valid local metadata.
-
-### New Git repository
-
-Create the Git repository and its first commit, then register it once:
-
-```bash
-cd /path/to/new-repository
-git init
-# Add the initial files and create the first Git commit.
-patchharbor register
-patchharbor configure exchange-directory ~/Downloads
 patchharbor bundle
 ```
 
-### Existing unregistered repository
+Registration is needed once per local repository instance. Settings belong to
+`.patchharbor/config.json` in that instance; there is no global Exchange fallback.
+An existing registered repository with valid settings can start at `bundle`.
+See [repository setup](docs/repository-workflow.md) for clones, moves, shared
+Exchanges, old configuration migration and automatic archival.
+
+1. Give the resulting ZIP to the developer or chat. Its `CHAT_INSTRUCTIONS.md`,
+   `context.json` and `environment.json` contain the handoff and full binding.
+2. Develop and test from that actual state. Prepare the payload files and an
+   entrypoint, then use `pack` as below. A bundle may have zero commits for
+   diagnosis, one commit, or several genuine sequential commit states.
+3. Inspect the finished patch and publish exactly one complete ZIP in Exchange.
+4. Let the existing watcher process it, **or**, in manual mode, run:
+
+   ```bash
+   patchharbor apply --dry-run
+   patchharbor apply
+   ```
+
+5. Read the new Result and execution log. A Dry Run checks the package; it does
+   not prove a successful actual Apply. A failed Apply may leave changed files
+   or completed commits, which become the basis of the next patch.
+
+The entrypoint defines the target project's tests, commits and optional push.
+The watcher does not invent that policy. Do not run a second watcher or another
+Apply orchestrator for the same repositories.
+
+## Build and check a patch
+
+Prepare an explicit contents directory containing only the desired payloads and
+the entrypoint. The output directory must already exist outside that contents
+tree. For example:
 
 ```bash
-cd /path/to/existing-repository
-patchharbor register
-patchharbor configure exchange-directory ~/Downloads
-patchharbor bundle
+patchharbor pack /work/contents --reference-bundle /work/result.zip \
+  --entrypoint run.sh --output-dir /work/ready --json
+patchharbor inspect /work/ready/NAME.zip --json
+patchharbor validate /work/ready/NAME.zip \
+  --reference-bundle /work/result.zip --json
 ```
 
-### Already registered repository
+Replace `NAME.zip` with the path returned by `pack`. Windows targets may use a
+PowerShell entrypoint such as `run.ps1`. The entrypoint must satisfy the existing
+Bash/PowerShell marker contract; pack neither writes nor executes it.
 
-With a valid local configuration and Exchange path, no re-registration is
-needed. Create a fresh snapshot whenever the repository state changes:
+Pack copies all permitted files in the chosen directory; it does not use
+`.gitignore` to select a diff. Ordinary payloads are written into the repository
+**before** the entrypoint runs. A diff is a payload that the entrypoint must
+explicitly apply. `patch.json` and `PATCHHARBOR_META` are generated/reserved.
+Pack validates the final ZIP and its complete Result binding, but does not prove
+shell syntax, target tests, replay eligibility or a future Apply.
+
+The same operation is available to Python callers:
+
+```python
+from patchharbor import api
+
+packed = api.pack_patch(
+    "/work/contents",
+    reference_bundle="/work/result.zip",
+    entrypoint="run.sh",
+    output_directory="/work/ready",
+)
+print(packed.path, packed.package_sha256)
+```
+
+See the [pack contract](docs/pack.md), [working examples](docs/pack-examples.md)
+and [public Python API](docs/python-api.md). A normal import uses the calling
+interpreter's installation; an isolated CLI installation is not automatically
+visible to a different Python environment. The verified PYZ bootstrap also
+provides `import_api(prepared)` for API use without installing PatchHarbor.
+
+## Use the runtime supplied in a Result
+
+New Results use **Format 3**. When runtime embedding succeeds, they contain
+exactly one `runtime/patchharbor-<version>.pyz`. A valid `unavailable` status
+instead contains runtime metadata and a warning, with no executable artifact.
+Legacy Format-1/2 Results remain readable.
+
+Use the executable bootstrap from the trusted Result's handoff, or a separately
+reviewed copy of `scripts/pyz_bootstrap.py`, to assess and prepare its exact PYZ.
+After source trust and integrity checks, Python 3.12+ can run it directly:
 
 ```bash
-cd /path/to/registered-repository
-patchharbor context
-patchharbor bundle
+python -I -S -B /private/runtime/patchharbor-VERSION.pyz inspect /work/patch.zip --json
+python -I -S -B /private/runtime/patchharbor-VERSION.pyz validate /work/patch.zip \
+  --reference-bundle /work/result.zip --json
+python -I -S -B /private/runtime/patchharbor-VERSION.pyz pack /work/contents \
+  --reference-bundle /work/result.zip --entrypoint run.sh --output-dir /work/ready
 ```
 
-`context` is an optional human-readable check. Human-facing terminal output,
-including the context printed by `patchharbor register`, shortens long technical
-identifiers to their first six characters plus `…`. This shortened text is
-presentation only: do not copy it into `patch.json` or use it as chat or machine
-input. Run `patchharbor context --json` from the repository root, or
-`patchharbor context --json REPOSITORY` from elsewhere, when complete values are
-required. `register` itself deliberately has no `--json` option.
+Use the actual prepared path/version, not an arbitrary neighboring archive.
+This requires no pip, venv, network or host installation. The PYZ contains Core
+operations, **no watcher or service installer**. Git/apply operations still have
+their normal repository and interpreter requirements.
 
-The Result Bundle already contains the full repository ID, base commit, state
-fingerprint, committed snapshot, staged and unstaged changes, and non-ignored
-untracked regular files. For standard chat initialization, upload that Result
-Bundle instead of copying either form of terminal context output. Its
-`context.json` is the authoritative source of complete repository-binding values.
+If the runtime is absent or technically unusable, use the
+[documented previous handoff procedure](docs/runtime-bootstrap.md#mandatory-previous-procedure)
+with trusted compatible tools and record the reason. A semantic validation
+failure or invalid binding remains an error; fallback is not a bypass.
+The [bootstrap guide](docs/runtime-bootstrap.md) covers trust, extraction,
+Python-only API use and legacy wheels.
 
-Use `patchharbor registry list` to inspect all registrations. Its normal rows
-also shorten repository UUIDs. Use `patchharbor registry list --json` when a full
-UUID is needed for machine processing or `unregister`; alternatively pass the
-exact repository path to `patchharbor unregister REPOSITORY_OR_REPO_ID`. A
-six-character display prefix is never a valid repository selector. Use
-`patchharbor register --new-id` only when intentionally replacing the local
-instance identity.
+## Manual operation and watcher
 
-## Initialize a new development chat
+Manual `patchharbor apply` selects an eligible patch only for the registered
+repository containing the current working directory. An explicit path,
+`patchharbor apply /path/to/patch.zip`, selects the repository from its manifest
+and still checks the full binding. `--output-dir` changes only the Result
+destination. See [selection, retries and recovery](docs/repository-workflow.md#manual-workflow).
 
-Upload the newest Result Bundle produced by `patchharbor bundle` and the
-development request. Ask the chat to read the root `CHAT_INSTRUCTIONS.md` and
-initialize itself from that bundle. It already contains the version-matching
-contract plus a fresh local-environment section; no extra command or separate
-instructions file is required. For old bundles without embedded instructions,
-provide the version-matching `CHAT_INSTRUCTIONS.md` separately.
-
-The local repository path or Exchange path in `environment.json` helps the chat
-write commands for the development computer. These paths are informational,
-never repository selectors or additions to `patch.json`. The Result Bundle
-supplies the repository identity and exact state, while local PatchHarbor
-resolves the registered path. The chat takes all
-repository-binding identifiers from the bundle's complete `context.json`, never
-from shortened human-facing terminal output.
-
-The chat contract requires one downloadable repository-bound ZIP patch package.
-Patch filenames use
-`<Repository>_Patch_<HHMMSS>_<MMDD>_<ID6>.zip`, followed by `bundle_suffix`
-from the Result Bundle when configured. After an Apply, upload the
-newly created Result Bundle back to the same chat. For a failed entrypoint or
-test run, that bundle contains the actual remaining repository state plus
-`logs/run.json` and, when execution started, `logs/execution.log`.
-
-## Self-contained bundle handoff
-
-Every Result Bundle contains freshly generated root `CHAT_INSTRUCTIONS.md` and
-`environment.json`, including manual `bundle`, Apply success, failure, Dry Run,
-Watcher results, and explicit `--output-dir` targets. Both documents are verified
-and published atomically with the snapshot and logs. No sidecar is written and
-no `chat-instructions` command is introduced. Existing bundles are not rewritten.
-
-Generated instructions use canonical LF line endings on every platform. The
-loader normalizes CRLF and lone CR in the installed UTF-8 template; the shared
-renderer applies the same rule to an explicitly supplied template for external
-Patch authors. Other text, blank lines and the presence or absence of a final
-newline are preserved. Template size/encoding checks remain strict and use the
-original input bytes. This affects only generated documentation: the template
-file, repository snapshots, received payload bytes and JSON values are not
-rewritten or normalized.
-
-`environment.json` uses marker `patch-harbor-environment`, format version 1. It
-includes the actual resolved repository name/path and full binding values, the
-configured Exchange path, the distinct actual output directory, bundle suffix,
-filename schemas and UTC convention, and an allowlisted runtime description:
-OS/distribution, kernel release, architecture, Python version/implementation,
-`uv` version, configured shell, and PatchHarbor version. A new capture is made
-for each publication; no prior bundle or target-project instructions are reused.
-
-Missing facts are `null`, not guesses. For example, a missing or unresponsive
-`uv --version` does not prevent a Result Bundle; its optional local probe is
-limited to two seconds. OS detection makes no network requests. The distribution
-identifies the running userland (such as Ubuntu inside Termux/proot); its kernel
-may belong to the host. The configured shell comes only from `SHELL`/`COMSPEC`
-and is not evidence of the currently active shell. Command examples are quoted
-for POSIX shells or PowerShell, explicitly labelled, and omitted when unknown.
-
-Only allowlisted fields are collected, not hostnames, IP addresses, user-name
-fields, hardware serial numbers, tokens or the complete environment. Required
-absolute paths may naturally contain a user name. Review bundles before sharing.
-An explicit output directory can bypass an unset or unavailable Exchange path,
-but never a missing or invalid repository-local configuration. The environment
-records the selected repository's configured values, not a substituted Exchange
-path inferred from the output directory. `context.json`, `patch.json`,
-fingerprints and replay identities do not gain environment-dependent fields.
-
-External chat-generated Patch packages carry the same passive documents under
-`PATCHHARBOR_META/CHAT_INSTRUCTIONS.md` and `PATCHHARBOR_META/environment.json`.
-The root `CHAT_INSTRUCTIONS.md` remains available as a genuine repository payload
-when a documentation change requires it. The reserved metadata pair is validated
-and excluded from mutation and execution; it cannot be an entrypoint. Existing
-packages without it still work. Each metadata file is UTF-8 without BOM, at most
-128 KiB, with the ordinary ZIP safety/resource rules still enforced. Unknown or
-incomplete reserved entries and metadata bindings that differ from `patch.json`
-are rejected. This is passive documentation, not authentication or orchestration.
-
-The chat generates a fresh handoff for each Patch using the latest target
-machine's environment snapshot, retaining its capture time and unknown values,
-not probing the chat sandbox as if it were the development machine. PatchHarbor
-Core creates Result Bundles; it does not create chat patches or edit received
-packages. See the chat contract for the first-upgrade bootstrap rule for older
-runners. The installed shared template is required; if missing, publication
-fails cleanly instead of emitting an apparently self-contained incomplete bundle.
-
-## Manual workflow
-
-Manual mode is the normal interactive workflow and the recommended mode on
-Termux/Android.
+The watcher observes **all configured Exchanges of registered repositories**;
+its working directory is not a repository filter. It has no Exchange argument.
+Linux uses inotify and Windows uses ReadDirectoryChangesW. Start it in the
+foreground with `patchharbor-watcher`, or install the optional Linux user unit:
 
 ```bash
-cd /path/to/registered-repository
-patchharbor bundle
-# Upload the new Result Bundle; its chat instructions are already inside.
-# Save the chat's one returned patch ZIP in the configured Exchange directory.
-patchharbor apply --dry-run
-patchharbor apply
-```
-
-A deliberate manual parameterless `patchharbor apply` first resolves the
-current working directory to exactly one registered Git repository. Calls from
-any subdirectory of that repository resolve to the same repository root. If the
-current directory is not inside a uniquely registered repository, Apply stops
-without scanning for a fallback package belonging to another repository.
-
-PatchHarbor then scans only the top level of the configured Exchange directory
-and considers packages for that one `repo_id`. It filters by base commit, state
-fingerprint, package validity, and manual replay eligibility before ranking the
-remaining candidates. The greatest nanosecond modification time (`mtime_ns`)
-wins. Equal `mtime_ns` values use the lexicographically first filename after
-Unicode NFC normalization, with the original filename as a final deterministic
-fallback. A newer foreign, state-mismatched, or replay-ineligible package never
-blocks an older eligible package. Filenames do not determine repository or state
-binding; they are used only for that final tie-breaker.
-
-The default timeout for one script or repository entrypoint is 10,800 seconds
-(three hours). Use `--timeout SECONDS` to override it for one invocation.
-
-A Dry Run validates the selected package without changing the repository or its
-replay state. A non-Dry-Run Apply records `attempted` immediately before mutation
-or entrypoint execution and publishes `failed` or `succeeded` from the actual
-result. A successful package remains replay-protected. A failed package can be
-retried by another deliberate manual parameterless `patchharbor apply` while its
-complete repository binding still matches. An explicit package path remains a
-separate deliberate override.
-
-### Recovering an interrupted Apply
-
-An `attempted` record alone is not evidence of a crash or success. A run can
-still be working even when `screen -ls` shows no socket. Recovery must acquire
-the **same exclusive repository lock** as Apply. A busy lock, dirty repository,
-missing receipt or contradiction leaves the attempt untouched. PatchHarbor does
-not infer liveness from process names and never automatically resets files.
-
-New Apply Result manifests record the full `patch_sha256` of the exact validated
-ZIP bytes and an optional `completed_commit`, alongside the existing `run_id`,
-repository ID and expected/actual state binding. A completion is recorded only
-for a successful executed entrypoint and a verified clean forward commit. Dry
-runs, failures and successful no-op runs have no completion proof.
-
-For tracked Exchange attempts the existing local replay ledger (Format 4) also
-stores `attempt_run_id` and `result_sha256`. The order is:
-
-1. Persist `attempted` and its run ID before mutation.
-2. Execute the entrypoint and capture its actual result and repository snapshot.
-3. Write and verify the Result ZIP; pin its full SHA-256 in the local ledger
-   **before** atomically publishing that ZIP.
-4. Publish the terminal replay outcome after the Result publication attempt.
-
-A later non-dry Exchange scan can repair `attempted` to `succeeded` and restore
-`completed_commit` only when the original patch identity, pinned Result digest,
-run ID, repository ID, complete original binding, successful report, clean full
-snapshot and original Git history all agree. The required history is
-`expected_base_commit -> completed_commit -> current HEAD`, where the first
-step must advance. It revalidates the evidence under the repository, registry
-and replay-state locks before a compare-and-swap. An edited Result cannot be
-made into proof just by retaining its filenames or JSON identifiers. Hashes are
-integrity/correlation checks anchored in the trusted local ledger, not digital
-signatures or authentication against somebody who can rewrite that ledger.
-
-Recovery runs before archival for manual CWD-scoped Apply, package-scoped
-explicit Apply and the global watcher, and during manual bundle maintenance.
-It also runs when archival is disabled. Dry runs do not repair state. A still
-pending receipt is protected from archival. Once proven, the existing archival
-rules may move the consumed patch; a current Result still remains active.
-
-Only the active Exchange level is searched. A Result moved or renamed within
-that level keeps the same proof if its bytes are identical; an explicit output
-outside Exchange must be brought into the active Exchange to be found. The
-original tracked patch path/content identity must still exist there. Archived
-subdirectories are not recursively searched.
-
-**Limits:** a crash before a success Result is published (even after a Git
-commit) does not prove success. It remains `attempted`; no automatic retry or
-rollback is attempted. Formats 1–3 remain readable without inventing run IDs,
-hashes or completion proofs; writes migrate to Format 4. This cannot retroactively
-repair old upgrade attempts that never recorded these proofs. A still-running
-older executable also does not gain the new receipt protocol by changing files:
-reinstall the current version before subsequent Apply runs.
-
-### Compact console and verbose diagnostics
-
-Normal `apply`, `fs run` and `bundle` output shows important phases, results,
-warnings and errors. File reads/writes, ZIP members, SHA checks and individual
-Git queries are grouped instead of printed line by line. A running internal
-operation appends **at most one dot every 0.8 seconds** to its current line.
-There is no carriage return, cursor movement, redraw or catch-up burst. Fast
-operations need no dots; completion or another visible message ends the line.
-
-Use `--verbose` (or `-v`) to show the complete technical activity stream:
-
-```sh
-patchharbor apply --verbose
-patchharbor bundle --verbose
-patchharbor --verbose context
-patchharbor fs run --verbose generated.sh
-```
-
-The option works before or after the command. `--plain` and `--no-color` only
-change decoration, not detail selection. Colors and short human-readable IDs
-remain. `--json` suppresses both human activity and dots even with `--verbose`;
-its machine schema, complete identifiers and exit statuses do not change.
-
-`MESSAGE` blocks and live script stdout/stderr are **never filtered by verbosity**.
-Dots stop while child output is active and are never inserted into raw logs.
-Library calls without an observer remain silent. Small configuration/context
-commands keep their existing compact summaries; `--verbose` enables their
-internal activity too. Use verbose mode for individual scan rejection reasons.
-There are no automated tests of console text, colors, symbols or dot formatting;
-functional data, error, recovery and process tests remain in place.
-
-### Explicit path overrides
-
-An explicit patch path bypasses parameterless package selection. Its complete
-`repo_id` may resolve another registered repository even when it differs from
-the repository containing the current working directory. This is a deliberate
-user selection; all package, state-binding, path, and revalidation checks remain
-mandatory. An explicit `--output-dir` overrides only the Result Bundle
-destination:
-
-```bash
-patchharbor bundle --output-dir /path/to/results /path/to/repository
-patchharbor apply --dry-run --output-dir /path/to/results /path/to/patch.zip
-patchharbor apply --output-dir /path/to/results /path/to/patch.zip
-```
-
-Supplying both an explicit `PATCH_ZIP` and explicit `--output-dir` also permits
-Apply when the target repository's Exchange path is unset or unavailable. Its
-local configuration must nevertheless exist and validate; the target
-repository's configured suffix still applies. Explicit output directories must
-remain outside all registered repositories.
-
-The separate manual script runner is intentionally explicit and operates in the
-current working directory:
-
-```bash
-patchharbor fs run /path/to/script-or-bundle
-```
-
-## Development tests
-
-Install the `dev` extra in a development environment; no pytest dependency is
-added to the installed product. The shared launcher defaults to pytest-xdist:
-
-```bash
-python -m pip install -e '.[dev]'
-python tools/run_tests.py
-python tools/run_tests.py --workers 4
-```
-
-`scripts/test.sh` bootstraps the local `.venv` and uses the same launcher.
-Development and Apply run full parallel suites only. Each commit requires its
-own successful gate on unchanged sources; bundle end uses the same parallel gate.
-No serial suite runs. After the commits, exactly one normal push is made.
-Only Christian starts CI manually; CI and Docker select the same
-named suites via `--suite`. The launcher checks complete collection,
-worker completion and setup/call/teardown results even without a saved report.
-Only its controller can write an optional `--report` JSON file. Declared skips
-remain explicit, never counted as passed tests.
-
-The explicit serial/2/4/auto equivalence diagnostic is outside ordinary local
-development and Apply gates. When separately requested, use a fresh directory:
-
-```bash
-python tools/verify_test_modes.py --outdir /tmp/patchharbor-mode-check-001
-```
-
-This executes seven full suites, retaining reports and stopping on any failed
-or incomplete run. Worker scheduling remains exclusively pytest-xdist's job.
-Raw `python -m pytest -n auto` is still available but does not automatically
-activate the launcher's extra completeness checks. See
-[development test contracts](docs/test-parallelism.md) for isolation, report
-bindings, deliberate failure probes and partial-test selection.
-
-The prepared [canonical Core-PYZ](docs/runtime-artifact.md) reproduces identical
-archive bytes offline from a normal installation or from the PYZ itself. New
-Results embed that PYZ, including their own bootstrap instructions. If the runtime
-cannot be used, follow the [documented technical fallback](docs/runtime-bootstrap.md);
-a validator rejection remains a failure.
-
-## Termux and Android
-
-Use manual mode on Termux. PatchHarbor does not treat the Android background
-process lifecycle as a reliable systemd service environment. Download the patch
-ZIP into the configured Exchange directory and run `patchharbor apply` manually;
-reusing the previous shell command is sufficient. No Termux-specific watcher
-support is claimed by PatchHarbor 1.3.0.
-
-Functional CLI test helpers have no default subprocess deadline; slow Git or
-shared storage must not turn a correct scan into an arbitrary 20-second failure.
-Explicitly requested lifecycle/timeout checks retain their bounds. Termux patch
-entrypoints run pytest without per-test or whole-suite deadlines. The product's
-10,800-second default entrypoint timeout is unchanged. The native acceptance
-matrix has a 120-minute job limit; separate PowerShell/Docker bounds are unchanged.
-
-## Linux watcher
-
-The optional watcher observes native filesystem events and triggers Core's
-automatic Apply mode after five seconds of quiet in each Exchange root. It has no input-directory argument and no separate
-configuration or file-classification logic. Its selection scope remains global:
-it can inspect eligible packages for every registered repository and does not
-use the watcher's current working directory as a repository restriction. Unlike
-a deliberate manual Apply, this mode does not retry an unchanged failed package
-on later automatic requests.
-
-Register and configure each repository first. The following example configures
-one already registered repository, then installs the disabled systemd user unit:
-
-```bash
-cd /path/to/registered-repository
-patchharbor configure exchange-directory ~/Downloads
 patchharbor-watcher --install-systemd-user-unit
 systemctl --user daemon-reload
 systemctl --user enable --now patchharbor-watcher.service
 ```
 
-The installer never enables or starts the service. Run the watcher directly in
-the foreground with `patchharbor-watcher`. The quiet period is fixed at five
-seconds; the former `--poll-interval` option is rejected.
+Each Exchange root is scanned after five seconds without a relevant change.
+Existing files receive an initial quiet period on startup. Reads and changes
+inside existing subdirectories do not trigger scans. There is no idle
+one-second polling; `--poll-interval` is obsolete. Results may trigger a scan
+but are never executed as patches. Repeated identical `no_candidate` messages
+are suppressed. Failed unchanged packages are not automatically retried.
 
-Inspect or stop the service with:
+Native event delivery on network/virtual filesystems depends on that filesystem;
+there is no silent polling fallback. See [watcher behavior](docs/watcher-events.md).
+Termux/Android should use manual Apply; a reliable Android background service
+is not part of the supported watcher contract. Windows supports the foreground
+watcher; the systemd unit is Linux-specific.
+
+### Publish only complete ZIPs
+
+Five seconds of quiet is not proof that a download finished. Build and validate
+the ZIP outside the watched root. If copying across filesystems, copy into a
+staging subdirectory on the **Exchange filesystem**, finish and verify that copy,
+then publish it with a same-filesystem atomic operation without overwriting an
+existing file. An ordinary cross-filesystem move can become a partial copy.
+
+`pack` performs its own exclusive, verified publication into an explicitly
+chosen output directory. If its safe filesystem primitives are unsupported,
+it fails instead of falling back to an unsafe copy. Choose one canonical final
+ZIP and preserve its bytes and full SHA-256 during handoff.
+
+Result names follow `<Repository>_Result_<HHMMSS>_<MMDD>_<ID6>.zip`; patch names
+follow `<Repository>_Patch_<HHMMSS>_<MMDD>_<ID6>.zip` (UTC). Filenames are not
+repository-binding evidence. To use a transport suffix such as `.zip.txt`:
 
 ```bash
-journalctl --user -u patchharbor-watcher.service
-systemctl --user disable --now patchharbor-watcher.service
+patchharbor configure bundle-suffix .txt
+patchharbor configure bundle-suffix --clear
 ```
 
-Startup validates the central registry, then subscribes to Core's Exchange and
-control paths before starting a five-second quiet period for existing bundles.
-Every direct create/write/delete/rename resets its Exchange deadline. Reads and
-changes inside existing subdirectories do not trigger a scan. Idle watchers
-block on native events without periodic scans or worker starts. Events continue
-to arrive during Apply; at most one worker runs, restricted to quiet Exchanges.
+These are alternative settings, applied from the registered repository. The
+`bundle_suffix` is naming metadata in a fresh Result's `context.json`, not a field
+in `patch.json`. Content remains ZIP. Old and new names may coexist.
 
-Registry and local configuration changes refresh subscriptions through Core.
-Unset Exchanges and missing repository paths are skipped. Damaged configuration
-suspends Apply until a relevant repair event; missing known roots are observed
-through their existing parents. Watcher hints never replace Core validation.
-Known lock conflicts use readiness-only backoff (5, 10, 20, 40, 80, 160, then
-300 seconds), without bundle scans. Backend failures are reported; there is no
-silent polling fallback. Git changes outside Exchange do not trigger a scan:
-use a new Exchange change, restart, or a deliberate manual Apply in that case.
+## Snapshots, limits and errors
 
-Linux and Windows use native adapters without new dependencies. Native Windows evidence for the current PYZ/PACK end state remains pending
-a CI run started manually by the user. A running installed
-watcher must be restarted after upgrading, once any active Apply has finished.
-Manual Apply remains available. Result-3 PYZ and legacy Result-2 wheel consumers
-retain their documented technical fallback; neither bypasses invalid binding.
+Results contain a full base snapshot **without Git history**, staged/unstaged
+deltas and non-ignored untracked regular files. `.git`, local `.patchharbor`
+metadata and ignored untracked files are excluded. Review Results before sharing:
+there is no general secret detector.
 
-The watcher uses the same repository-local configuration, package validation,
-persistent replay state, repository locks and Result Bundle behavior as Core. A
-failed package remains available for a later manual Apply but is not immediately
-repeated by the watcher. Do not run the autonomous watcher and Repo Assist or
-another orchestrator for the same repositories at the same time.
+| Resource | Limit |
+| --- | --- |
+| Stored repository files in one Result (base + untracked) | 250,000 |
+| Outer ZIP entries, including auxiliary data | 250,010 |
+| Input ZIP and each expanded outer member | 256 MiB each |
+| Total expanded content, including inspected inner runtime content | 512 MiB |
+| Pack contents scan (files and directories) | 10,000 nodes |
+| Inner runtime archive | 1,000 entries; separate artifact/profile byte limits |
 
-## Security and responsibility boundaries
+These limits apply together: 250,000 files does not allow unlimited total bytes.
+Outer Result ZIP64 is supported. The larger outer limit does not enlarge pack's
+scan budget or the runtime archive budget. See [pack limits](docs/pack.md#grenzen-und-nachweise)
+and [runtime limits](docs/runtime-bootstrap.md).
 
-PatchHarbor is not a sandbox. Entrypoints run with the rights of the current
-user. Repository ID, base commit, and fingerprint verify the selected local
-state; they do not authenticate who created a patch package. Run only trusted
-packages.
+For a failed Apply, inspect `logs/run.json` and `logs/execution.log` when present.
+If Result creation itself fails, preserve the reported emergency diagnostics
+directory. An entrypoint may already have committed or pushed: **missing Result
+does not mean rollback**. Check the actual repository and logs before retrying;
+after fixing the publication problem, `patchharbor bundle` captures its current
+state. See [error codes and recovery](docs/troubleshooting.md), including
+[Linux-to-Windows CIFS publication](docs/result-publication-cifs.md).
 
-Payload files are replaced atomically one by one, but a package is not a global
-transaction and earlier successful writes are not automatically rolled back.
-PatchHarbor does not run target-project tests or create Git commits. Repo Assist
-owns commit plans, journals, reproducibility, and commit management;
-PromptBridge owns chat, network, upload, and download transport.
+## Security and responsibility
 
-## Result Bundles
+PatchHarbor is not a sandbox. Entrypoints run with the current user's rights.
+Hashes, repository ID, base commit and fingerprint check integrity and state;
+they do not authenticate the package's author. Execute only trusted packages.
+Payload replacement is atomic per file, not a package transaction: earlier
+successful writes are not automatically rolled back.
 
-`patchharbor bundle [REPOSITORY]` creates a complete repository snapshot
-without Git history. It contains every file from the current base commit, staged
-and unstaged changes, and every non-ignored untracked regular file. Without
-`--output-dir`, it publishes directly in the configured Exchange directory. The
-filename is `<Repository>_Result_<HHMMSS>_<MMDD>_<ID6>.zip`, using UTC, no
-year, and the first six run-ID characters without an ellipsis. Filenames are
-presentation only; Exchange classification still uses validated content.
+PatchHarbor does not run target-project tests or create Git commits as an
+independent Core policy. An authorized entrypoint can run tests, make zero or
+several commits, and push according to that project's workflow. Static checks
+and successful pack creation do not establish those execution results.
+The explicit legacy `patchharbor fs run` script runner remains available; it
+does not replace repository-bound Apply.
 
-Review a Result Bundle before sharing it. It can contain complete source code
-and secrets from non-ignored files. PatchHarbor excludes `.git`, the local
-`.patchharbor/` directory, and ignored untracked files, but it does not perform general
-secret detection.
+## Documentation and development
 
-## Command reference
+- [Installation and updates](docs/install-and-update.md)
+- [Repository configuration, archives, retries and permissions](docs/repository-workflow.md)
+- [Troubleshooting](docs/troubleshooting.md)
+- [Pack](docs/pack.md), [examples](docs/pack-examples.md), [Python API](docs/python-api.md)
+- [Runtime bootstrap](docs/runtime-bootstrap.md), [Result 3](docs/result-format-3.md)
+- [Watcher](docs/watcher-events.md), [CIFS publication](docs/result-publication-cifs.md)
+- [Development tests and manual CI policy](docs/test-parallelism.md)
+- Joint requirements: [main specification](spec/SPECIFICATION.md) and
+  [PYZ/PACK extension, revision 3](spec/SPECIFICATION_EXTENSION_PYZ_PACK.md)
+- [Implementation and acceptance record](planning/pyz-pack/commit-plan.md)
 
-The installed `patchharbor --help`, `patchharbor COMMAND --help`, and
-`patchharbor-watcher --help` screens are the complete user-facing CLI reference.
-Only implemented commands and options are shown there.
-
-
-### Application and public API boundaries
-
-Application workflows now publish immutable, request-local facts through
-`progress.py`. Repository and script records carry full data; only the CLI
-adapter knows colors, shortening or verbosity. Observation is optional and
-cannot authorize mutation or override recovery checks. Child output is separate
-and requires an explicitly supplied `OutputTargets`; the default is silent.
-Directory selection is an explicit callback, with the interactive menu owned by
-the CLI. Unknown choices are rejected before a file is executed.
-
-The public `patchharbor.api` facade uses these boundaries in version 1.3.0.
-Library callers supply `api.OutputStreams` and receive structured results.
-The main CLI and the Watcher use the same API; neither duplicates Core decisions.
-
-
-Tool failures internally carry a `FailureReason`, not a CLI exit number.
-`exit_status.py` is the shared compatibility adapter used by the CLI and the
-existing JSON/Result serializers. Numeric schemas and exit priorities remain
-unchanged. Child-process exit codes remain actual process data, including values
-such as 124 or 130; they are not mistaken for PatchHarbor timeout/interruption.
-The Application makes decisions from semantic outcomes, not serialized statuses.
-
-
-## Python-Bibliothek – PatchHarbor 1.3.0
-
-`from patchharbor import api` stellt Konfiguration, Registry, Kontext, Bundles,
-Apply/Dry-Run, den automatischen Einzelpoll und den expliziten Skriptrunner bereit.
-Die Aufrufe bleiben ohne explizite Streams/Beobachter still und liefern typisierte
-Resultate bzw. fachliche Fehler. Kein CLI-Subprozess ist erforderlich.
-
-Der vollständige Vertrag mit Beispielen steht in [docs/python-api.md](docs/python-api.md).
-[Plan](planning/1.2.0/commit-plan.md) und [Spec](planning/1.2.0/specification.md)
-dokumentieren die vier umgesetzten Schritte: Bibliotheksgrenze, CLI, Watcher
-und Release. `patchharbor.api` ist die unterstützte öffentliche Python-Schnittstelle
-ab 1.2.0; alle anderen Implementierungsimporte bleiben intern.
-
-Die Haupt-CLI verwendet die API für alle fachlichen Operationen. Der Watcher
-verwendet sie zur Registry-Prüfung und im separaten Prozess jedes durch Ereignisse ausgelösten Apply-Scans;
-Core lädt dabei die repositorylokalen Einstellungen.
-Eine CLI-Installation mit `uv tool` stellt das Modul nicht automatisch in anderen
-Python-Umgebungen bereit. Zum Importieren muss PatchHarbor in der Umgebung des
-aufrufenden Python-Programms installiert sein. Das Wheel enthält `py.typed` und
-die API-Dokumentation; neue Runtime-Abhängigkeiten gibt es nicht.
-
-Die RIV-Entwicklung ergänzt lesende `inspect`-/`validate`-Operationen und
-Result-Format 3 mit einer installationsfrei startbaren Core-PYZ. Der
-[Bootstrap-Ablauf](docs/runtime-bootstrap.md) prüft Herkunft und Integrität vor
-Codeausführung und verwendet bei technisch nicht nutzbarer PYZ beziehungsweise
-Legacy-Wheel verbindlich den bisherigen geprüften Übergabeweg. Diagnosebundles dürfen null Commits enthalten, Entwicklungsbundles
-einen oder mehrere echte geprüfte Zustände. Die Planabnahme verlangt noch den
-tatsächlichen finalen Apply und dessen CI; Veröffentlichung bleibt separat.
-
-
-### Watcher als API-Verbraucher (API-3)
-
-Der Watcher prüft beim Start die Registry über `api.repositories()`.
-Nach dem Start sowie nach relevanten Dateisystemereignissen mit fünf Sekunden
-Ruhezeit liest jeder Core-Scan die repositorylokalen Einstellungen frisch.
-Der Apply-Worker bleibt ein eigener Prozess derselben Installation; dessen privater Worker ruft `api.apply_next()`
-direkt auf, nicht mehr den CLI-Parser. Betriebs-JSON, globaler Scope, Replay und
-Failed-Retry-Schutz bleiben erhalten. Die Prozess-/Signalgrenze und der Linux-
-Servicevertrag bleiben unverändert. Die Paketversion ist 1.3.0.
-
-
-### Repository payload permissions
-
-On POSIX, core payload replacement preserves existing ordinary rwx bits,
-including `0664`, `0666` and `0777`; this respects local policy without endorsing
-its security. Existing setuid, setgid and sticky bits are rejected. New files
-use safe explicit Unix ZIP permissions, or `0644` when absent; scripts use `0755`.
-ZIP/API modes reject special bits and group/other-write even for existing targets.
-Explicit `0600` is respected, not treated as missing. Checks precede mutation. The mode is set on the staged file before
-atomic publication. Private registry/config/state writes remain private.
-Windows keeps native permissions; no Unix ACL emulation is introduced.
-Ownership, ACLs and extended attributes are outside this contract. Previously
-affected `0600` files are not automatically broadened.
-
-Entrypoints should use actual existing core functions for payload publication,
-path validation, state and archives, rather than implementing parallel copies.
-`patchharbor.payload_files.write_bundle_payloads` is a low-level core boundary,
-not a replacement for registered/state-bound `apply`: it does not acquire the
-repository lock or perform the base/fingerprint gate. Reuse it only within an
-already controlled application/entrypoint context. See the
-[POSIX contract](planning/posix-mode/specification.md) and `CHAT_INSTRUCTIONS.md`.
-
-Weitere Betriebs- und Abnahmedetails: [Ereignis-Watcher](docs/watcher-events.md).
+For development, install `.[dev]` in a dedicated environment and run
+`python tools/run_tests.py --suite all`. Development and Apply use full parallel
+gates. GitHub CI is manual and started only by the project owner. Local tests
+do not substitute for native Windows acceptance or release publication.
+For available options, use `patchharbor --help`, `patchharbor COMMAND --help`
+and `patchharbor-watcher --help`.

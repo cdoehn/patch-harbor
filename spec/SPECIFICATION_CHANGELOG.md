@@ -1,5 +1,19 @@
 # PatchHarbor – Spezifikations-Changelog
 
+## 2026-10-08 – Grenzkorrektur bestätigt; Off-Plan-Dokumentation 045
+
+- Bundle 044 tatsächlich angewendet/gepusht: Commit
+  `ffbc32122d866dce9e44c036f68d1e7e727f7b04`, 3035 parallele Apply-Tests,
+  8 Skips und sauberer Baum. 250.000 Snapshot-Dateien sind im Produkt umgesetzt.
+- Zusätzlich beauftragtes Bundle 045 macht die README zur aktuellen
+  Nutzeranleitung; Betriebsdetails bleiben verlinkt. Korrigiert werden
+  Installation, pack/PYZ, Watcher-Zuständigkeit, Limits und veralteter Status.
+- Sichere Updates mit laufendem Watcher, atomare Übergabe und Diagnose nach
+  fehlgeschlagener Result-Erzeugung werden erklärt. Beide Normdateien und
+  Produkt-/Testcode bleiben unverändert; keine neue Planposition oder Version.
+- 045 verlangt vollständige parallele Development-/Apply-Gates. Nur Christian
+  startet die finale manuelle CI; kein automatischer Tag oder Release.
+
 ## 2026-10-08 – PP-08B bestätigt; Korrektur für große Snapshots
 
 - Tatsächlicher Apply/Push von Bundle 043 bestätigt Commit

@@ -2,12 +2,12 @@
 
 **Plan-ID:** `PYZ-PACK`
 **Planpfad:** `planning/pyz-pack/commit-plan.md`
-**Revision:** 21
+**Revision:** 22
 **Stand:** 8. Oktober 2026
-**Status:** PP-00 bis PP-08B tatsächlich angewendet/gepusht. Bundle 044 / PP-08B-FIX1 korrigiert die beauftragte Snapshot-Grenze vor der noch offenen manuellen CI.
+**Status:** PP-00 bis PP-08B und die Grenzkorrektur PP-08B-FIX1 / Bundle 044 tatsächlich angewendet/gepusht. Finale manuelle CI bleibt offen; zusätzlich beauftragtes Dokumentationsbundle 045 außerhalb des Plans.
 **Geplanter Umfang:** 9 Arbeitspakete `PP-00` bis `PP-08`, 16 ursprüngliche Commit-Schritte sowie belegte Korrekturen. Keine feste Anzahl von Patch-Bündeln.
-**Fortschritt:** 16/16 ursprüngliche Planpositionen committed; finale Abnahme erst nach Korrektur-Apply und konkretem manuellem CI-Nachweis.
-**Nächster Schritt:** Grenzkorrektur vollständig parallel prüfen und Bundle 044 übergeben; danach tatsächlichen Apply auswerten. Finale CI startet nur Christian.
+**Fortschritt:** 16/16 ursprüngliche Planpositionen committed, Korrektur-Apply bestätigt; finale Abnahme benötigt den konkreten manuellen CI-Nachweis. Bundle 045 fügt keine Planposition hinzu.
+**Nächster Schritt:** Beauftragte Dokumentationskorrektur 045 vollständig parallel prüfen, ausliefern und ihren tatsächlichen Apply auswerten. Finale CI startet nur Christian; keine automatische Planerweiterung.
 **Ziel-Produktversion:** **1.3.0**, ausdrücklich von Christian am 8. Oktober 2026 festgelegt; kein automatischer Tag oder Release.
 
 > **Verbindliche Grundlage ist der gemeinsame Spezifikationssatz:**
@@ -979,6 +979,40 @@ und Austauschprüfungen. Die lokale Suite und der echte Korrektur-Apply müssen
 vor Abschluss erfolgreich nachgewiesen werden. Es gibt keinen neuen Plan und
 keine automatisch gestartete CI.
 
+
+### 1.25 PP-08B-FIX1 bestätigt; Off-Plan-Dokumentation / Bundle 045
+
+Result `patchharbor-apply_Result_064719_1008_c2e439.zip`, SHA-256
+`ac9f1547888f197be467712c8853563d202dbab7d157da167ccaf2e1727acc45`,
+bestätigt den tatsächlichen Apply/normalen Push von Bundle 044 und Commit
+`ffbc32122d866dce9e44c036f68d1e7e727f7b04`. Der Apply-Baum ist sauber;
+3035 Tests bestanden mit zwölf Workern, 8 Skips. Die lokale volle Suite hatte
+3058 bestandene Tests und 9 Skips einschließlich der privaten Handoff-Prüfer.
+Die neue Snapshot-Grenze ist damit im Produkt angewendet, nicht nur vorbereitet.
+
+Christian beauftragt anschließend ausdrücklich **ein weiteres Off-Plan-Bundle**
+mit den Ergebnissen des README-Reviews. Bundle 045 / `OFF-PLAN-README-1` bindet
+sich an genau dieses Result: repo_id `e7a93d72-62dc-4759-97e8-6bf6cdf10e90`,
+base_commit wie oben, Fingerprint `7c9d2a24e397e0e5`, Algorithmus
+`patchharbor-state-v1`. Es ist eine Dokumentationsänderung, keine neue
+Produktfunktion, Planposition, Versionsänderung oder Releasefreigabe.
+
+Die README wird zur kompakten Nutzeranleitung mit Installation, Quickstart,
+pack/PYZ/API, Watcher, Grenzen und Fehlerbehandlung. Stabile Detailverträge
+bleiben in verlinkten Betriebsdokumenten erhalten. Veraltete Aussagen zu Polling,
+Paketbau, verpflichtendem pipx, garantiert eingebetteter Runtime und ausstehendem
+044-Apply werden korrigiert. Ein Updatepfad berücksichtigt den laufenden Watcher.
+Beide Normdateien und sämtliche Produkt-/Testquellen bleiben unverändert.
+
+Vor Übergabe gilt das volle parallele Development-Gate; der geprüfte Entrypoint
+führt vor seinem einen Dokumentationscommit das volle parallele Apply-Gate und
+danach einen normalen Push aus. Er startet keine CI. Lokale Berichte, fertige
+Artefakthashes, Paketprüfung und anschließender echter Apply werden im Exchange
+unter `reports/patchharbor-pyz-pack-045-*` dokumentiert. Ein vorbereiteter Text
+behauptet den noch ausstehenden Apply von 045 nicht als Erfolg. Danach keine
+weiteren automatischen Bundles; die finale CI auf dem tatsächlichen Endcommit
+startet ausschließlich Christian. Der PYZ/PACK-Stand bleibt 16/16.
+
 ---
 
 ## 2. Architektur und unveränderliche Grenzen
@@ -1065,7 +1099,7 @@ Die lineare Standardreihenfolge in Abschnitt 4 verhindert unnötige gleichzeitig
 
 Die folgende Folge ist die anfängliche prüfbare Zerlegung. Sie ist **keine Verpflichtung zu 16 Patch-ZIPs**. Kleine sicher zusammengehörige Schritte dürfen mit dokumentierter Plananpassung zusammengelegt werden. Bei Split oder Zusammenlegung werden Positionen, Gesamtzahl, Messages und Nachweiszuordnung vor der betroffenen Auslieferung aktualisiert. Kein nur nominelles Zerlegen eines bereits vollständig installierten Endzustands.
 
-PP-00 bis PP-08A sind durch tatsächliche Results bestätigt; PP-08B wird als versionierter Endstand vorbereitet. Die ursprünglichen Messages und sicheren Aktivierungsschritte bleiben nachvollziehbar. Der aktuelle Nachweisstand steht in den Abschnitten 1.10 bis 1.23 und in der Statustabelle.
+PP-00 bis PP-08B sowie PP-08B-FIX1 sind durch tatsächliche Results bestätigt. Die ursprünglichen Messages und sicheren Aktivierungsschritte bleiben nachvollziehbar. Der aktuelle Nachweisstand steht in Abschnitt 1.25 und in der Statustabelle; die finale manuelle CI bleibt offen.
 
 | Position | ID | Arbeitspaket | Abhängigkeit | Vorgeschlagene Commitmessage | Status |
 |---:|---|---|---|---|---|
@@ -1084,7 +1118,7 @@ PP-00 bis PP-08A sind durch tatsächliche Results bestätigt; PP-08B wird als ve
 | 13/16 | **PP-06B** | PP-06 | PP-06A | `feat(result): ship PYZ runtimes with a working bootstrap [PP-06B]` | Bundle 040 tatsächlich angewendet/gepusht |
 | 14/16 | **PP-07** | PP-07 | PP-06B | `docs(runtime): complete PYZ and pack workflows and compatibility guidance [PP-07]` | Bundle 041 tatsächlich angewendet/gepusht |
 | 15/16 | **PP-08A** | PP-08 | PP-07 | `test(runtime): complete cross-platform PYZ and pack acceptance coverage [PP-08A]` | Bundle 042 tatsächlich angewendet/gepusht |
-| 16/16 | **PP-08B** | PP-08 | PP-08A | `chore(release): prepare version 1.3.0 and final artifact evidence [PP-08B]` | Bundle 043 tatsächlich angewendet/gepusht; Korrektur 044 und manuelle CI offen |
+| 16/16 | **PP-08B** | PP-08 | PP-08A | `chore(release): prepare version 1.3.0 and final artifact evidence [PP-08B]` | Bundle 043 und Korrektur 044 tatsächlich angewendet/gepusht; manuelle CI offen |
 
 
 Die Initialfolge folgt bereits einer topologischen Ordnung. Querschnittliche Anforderungen wie API-/CLI-Parität und PYZ-Resultproduktion erhalten zusätzlich die Abschlussgates aus Abschnitt 6. Ein bestandener früher Unit-Test ersetzt nicht deren späteren Artefaktdurchstich.
@@ -1740,7 +1774,7 @@ Wird ein beobachtetes Exchange-Verzeichnis ausdrücklich als Pack-Ausgabe gewäh
 
 ### 12.1 Definition of Done
 
-Die Erweiterung gilt erst als vollständig umgesetzt, wenn die folgende Liste mit tatsächlichen Nachweisen geschlossen werden kann. Die folgende Gesamtliste wird erst mit den konkreten Abschlussnachweisen geschlossen; der bestätigte Teilfortschritt steht in Abschnitt 1.23:
+Die Erweiterung gilt erst als vollständig umgesetzt, wenn die folgende Liste mit tatsächlichen Nachweisen geschlossen werden kann. Die folgende Gesamtliste wird erst mit den konkreten Abschlussnachweisen geschlossen; der bestätigte Teilfortschritt steht in Abschnitt 1.25:
 
 - [ ] Beide Spezifikationen sind gemeinsam eingeordnet, der aktive Featureplan ist eindeutig und der aktuelle Ausgangsstand einschließlich offener Alt-Nachweise wurde abgeglichen.
 - [ ] Installiertes `pack`, PYZ-`pack` und `api.pack_patch` verwenden dieselbe vollständige Fachlogik und erfüllen den spezifizierten Eingabe-, Modus-, Namens-, Handoff-, Fehler- und Publikationsvertrag.
@@ -1792,6 +1826,7 @@ Die mechanische Prüfung dieses Markdownplans kontrolliert eindeutige Schrittken
 | 2 | 2026-10-07 | PP-00 / Bundle 024 integriert: aktuelle bytegleiche Referenz vom Pixel, Norm-/Planverweise, offene Alt-Nachweise, vorbereiteter Status; ausdrücklich einmalige CI-only-Ausnahme ohne Tests oder Testinstallation im Apply, ein Commit/Push und automatische parallele CI mit Ergebnisprüfung. |
 | 3 | 2026-10-07 | PP-00-FIX1 / Bundle 025: Abbruch von 024 vor Staging/Commit/CI belegt; dirty Result als Reparaturbasis, SSH-Alias-Auflösung statt URL-Stringliste, unveränderte Konfiguration und Fortsetzung der ersten Pixel-CI-only-Ausnahme. Kein Fortschritt vor Apply-/CI-Nachweis. |
 | 4 | 2026-10-07 | PP-00-Erfolg und CI 37635401106 aus dem damaligen Result bestätigt; PP-01 in 026 vorbereitet. Die damaligen lokalen Endgates und CI-Pause sind durch Revision 5 für die Pixel-Phase ersetzt. |
+| 22 | 2026-10-08 | Grenzkorrektur 044 durch tatsächlichen Apply bestätigt; zusätzlich beauftragtes Off-Plan-Dokumentationsbundle 045, keine weitere Planposition. README und verlinkte Betriebsanleitungen berichtigt; finale manuelle CI bleibt offen. |
 | 21 | 2026-10-08 | PP-08B tatsächlich bestätigt; beauftragte 250.000-Dateien-Grenze als PP-08B-FIX1 in 044 vorbereitet. Normkorrektur, ZIP64-Bootstrap und konkrete Anzahl-Diagnose; finale manuelle CI bleibt offen. |
 | 20 | 2026-10-08 | PP-08A tatsächlich bestätigt; autorisierte Produktversion 1.3.0 und Nutzerbestätigung erfolgreicher CIFS-Praxisabnahme erfasst. PP-08B mit finalen Artefakten vorbereitet; tatsächlicher Apply und manuelle CI bleiben offen. |
 | 19 | 2026-10-08 | PP-07 bestätigt; konkrete 76-Szenarien-Matrix, native PowerShell-7-Auswahl und Mess-/Exchange-Durchstich in PP-08A vorbereitet. |
@@ -1812,8 +1847,8 @@ Die mechanische Prüfung dieses Markdownplans kontrolliert eindeutige Schrittken
 
 ---
 
-**PP-00 bis PP-08B sind tatsächlich angewendet. Zielversion ist 1.3.0;
-erfolgreiche CIFS-Praxisabnahme ist vom Nutzer bestätigt. Die beauftragte
-Grenzkorrektur wird in Bundle 044 vorbereitet und benötigt vollständige parallele
-Gates und tatsächlichen Apply. Finale native CI startet nur Christian;
-keine vorweggenommene Releasefreigabe.**
+**PP-00 bis PP-08B und Grenzkorrektur 044 sind tatsächlich angewendet.
+Zielversion ist 1.3.0; erfolgreiche CIFS-Praxisabnahme ist vom Nutzer bestätigt.
+Das zusätzlich beauftragte Off-Plan-Dokumentationsbundle 045 benötigt seine
+vollen parallelen Gates und tatsächlichen Apply. Finale native CI startet
+nur Christian; keine vorweggenommene Releasefreigabe.**

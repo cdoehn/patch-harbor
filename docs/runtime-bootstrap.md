@@ -7,7 +7,9 @@
 or a public application subcommand. It has no import-time PatchHarbor dependency.
 Use a trusted copy of the helper and an explicitly trusted Result. A digest
 copied from an unknown archive does not authenticate its sender. The current
-production writer emits Format 3 with exactly one Core-PYZ. Legacy 1/2 references
+production writer emits Format 3 with exactly one Core-PYZ when runtime
+embedding succeeds. A valid `unavailable` result instead contains runtime
+metadata and a warning, with no executable artifact. Legacy 1/2 references
 retain their versioned previous path. Upgrading repository files does not restart
 or replace an already running older global installation.
 

@@ -1,11 +1,9 @@
 # Ereignisgesteuerter Exchange-Watcher
 
-Der Development-Stand von WE-3/WE-4 verwendet native Dateisystemereignisse.
-WE-0 bis WE-4 und die Korrekturen aus Bundle 020/021 sind durch tatsächliche
-Results bestätigt. Die Windows-E2E-Prüfungen bestehen. Bundle 022 korrigiert
-die Prüfung einer Windows-Umbenennungssperre; sein Apply und die abschließende
-native Windows-Abnahme stehen noch aus.
-Produktversion und Tags ändern sich dadurch nicht.
+Der Watcher verwendet native Dateisystemereignisse. Der Watcher-Plan samt
+Korrekturen bis Bundle 022 ist durch tatsächlichen Apply und native CI
+abgeschlossen; konkrete Nachweise stehen unten und im verlinkten Plan.
+Diese historische Abnahme ersetzt keine Nachweise späterer Produktstände.
 
 ## Betrieb
 
@@ -77,7 +75,7 @@ Wurzel nicht; ihre Ereigniserkennung bleibt aktiv.
 Git-Änderungen außerhalb des Exchanges lösen keine Prüfung aus. Für ein dadurch
 passend gewordenes Bundle sind ein neues Exchange-Ereignis, Watcher-Neustart
 oder bewusster manueller Apply möglich. Manuelle Verarbeitung und der vorhandene
-Wheel-/Offline-Runtime-Fallback bleiben erhalten. Netzwerk-/virtuelle
+PYZ-/Legacy-Wheel-Fallback bleiben erhalten. Netzwerk-/virtuelle
 Dateisysteme erhalten keine weitergehende Garantie als ihre nativen Ereignisse.
 
 ## Nachweise

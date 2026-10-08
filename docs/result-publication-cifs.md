@@ -10,9 +10,13 @@ Dateiserver macht daraus keinen nativen Windows-Prozess.
 `FileChangedDuringRead` beim ersten Vergleich zwischen Pfad und geöffnetem Handle
 der gerade geschriebenen temporären Result-ZIP. Der bestehende Fallback ist
 aktiv; an dieser Stelle muss Größe oder Änderungszeit abweichen. Eine verzögerte
-CIFS-Metadatenaktualisierung ist plausibel. Die konkreten Werte und die Wirksamkeit
-des Fixes müssen am betroffenen Mount nachgewiesen werden. Grüne lokale Tests
-sind kein Nachweis für diese Windows-Freigabe.
+CIFS-Metadatenaktualisierung ist plausibel. Die Wirksamkeit am betroffenen Mount braucht einen realen Praxisnachweis;
+grüne lokale Tests allein ersetzen ihn nicht. Christian hat am 8. Oktober
+2026 seinen erfolgreichen CIFS-Praxistest bestätigt. Die Bestätigung nennt
+keinen konkreten Commit oder Artefakthash; ihr Umfang ist im
+[PYZ/PACK-Plan](../planning/pyz-pack/commit-plan.md#123-pp-08a-bestätigt-version-130-und-pp-08b--bundle-043)
+festgehalten. Die folgende Anleitung bleibt für reproduzierbare Prüfungen
+auf weiteren Mounts und späteren Ständen gültig.
 
 ## Ablauf und Wartezeiten
 
@@ -85,8 +89,9 @@ Lokale Regressionen simulieren Cacheabweichungen und Zeitabläufe ohne echte
 Minutenpausen, einschließlich Erschöpfung, Abbruch, Dateiaustausch, Symlink-/FIFO-
 Rennen, Integritätsfehlern und Inhaltsänderungen gleicher Länge bei wiederhergestellter
 `mtime`. Development und Apply verwenden nach der aktuellen Nutzerentscheidung
-nur vollständige parallele Gates. Native Windows- und reale CIFS-Abnahme bleiben
-bis zu ihren tatsächlichen Nachweisen offen. Ausschließlich Christian startet die
+nur vollständige parallele Gates. Die oben genannte Nutzerbestätigung ist
+reale CIFS-Praxisevidenz; sie ist keine hashgebundene Plattformabnahme jedes
+späteren Builds. Native Windows-Nachweise werden separat geführt. Ausschließlich Christian startet die
 manuelle GitHub-CI; es gibt keinen automatischen Bundle-Termin.
 
 Grundlagen: [CIFS-Mountoptionen](https://man7.org/linux/man-pages/man8/mount.cifs.8.html),

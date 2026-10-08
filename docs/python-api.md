@@ -12,9 +12,11 @@ but configuration calls now require a registered target repository.
 Additional enum values or diagnostic event wording must not be treated as an
 exhaustive state machine. Private modules and undocumented helpers remain free
 to evolve.
-There are no new runtime dependencies. Install PatchHarbor into the Python
-environment of the calling program; installing the CLI with a tool manager does
-not install it into every other Python environment.
+There are no new runtime dependencies. For an ordinary import, install PatchHarbor
+into the calling program's Python environment; installing the CLI with a tool
+manager does not install it into every other environment. Alternatively, the
+[verified PYZ bootstrap](runtime-bootstrap.md) supplies `import_api(prepared)`
+without installation. Both routes expose the same public API.
 
 ```python
 from pathlib import Path
@@ -486,8 +488,8 @@ fallback; configuration repair and root restoration are driven by filtered event
 
 ## Installation and scope of support
 
-Use Python 3.12 or newer. For an application that imports PatchHarbor, install the
-repository or built wheel into that application's own environment, for example:
+Use Python 3.12 or newer. For a normally installed API, install the repository or
+built wheel into that application's own environment, for example:
 
 ```bash
 python -m venv .venv

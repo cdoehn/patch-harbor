@@ -127,12 +127,12 @@ Prozess-/Locktests bleiben erhalten; es wird kein echter systemd-Dienst gestarte
 ## Controller-Nachweise
 
 Jeder Launcher-Lauf aktiviert die Vollständigkeitsprüfung, auch ohne gespeicherte
-Datei. Eine persistente JSON-Datei ist optional. Development benötigt nur den
-parallelen Bericht; das Vergleichspaar gehört ans Apply-Bundle-Ende:
+Datei. Eine persistente JSON-Datei ist optional. Development und Apply
+verwenden ausschließlich den vollständigen parallelen Bericht, auch am
+Bundle-Ende. Eine serielle Referenz ist dafür nicht erforderlich:
 
 ```sh
-python tools/run_tests.py --serial --report /tmp/ph-serial.json
-python tools/run_tests.py --workers 4 --report /tmp/ph-parallel.json --reference /tmp/ph-serial.json
+python tools/run_tests.py --suite all --workers 4 --report /tmp/ph-parallel.json
 ```
 
 Berichte gehören außerhalb der getesteten Quellen. Jeder gleichzeitige Aufruf
@@ -152,17 +152,18 @@ und Untertestfehler werden durch absichtliche Fehlerfälle überprüft.
 
 Die Sammlung enthält ausführbare Test-IDs separat von bereits bei der Sammlung
 übersprungenen Modulen. Skips werden nicht als bestandene Tests ausgegeben.
-Ein vollständiger Bericht darf deklarierte Skips enthalten; ein neuer Skip oder
-ein veränderter Skip-Grund kann nicht mit der seriellen Referenz übereinstimmen.
+Ein vollständiger Bericht darf deklarierte Skips enthalten. Bei einem separat
+beauftragten Modusvergleich müssen auch die Skip-Gründe übereinstimmen.
 Ein reiner Collection-Lauf ist niemals ein erfolgreicher Laufzeitnachweis.
 
 Die Vergleichsbindung umfasst Quellbytes sowie Python-, Betriebssystem-, pytest-
 und xdist-Version und die ausgewählte Windows-Engine. Quellen dürfen während
 eines Laufs nicht wechseln. Lauf-ID, Zeit, Reihenfolge und Worker-Zuteilung
-werden dagegen nicht fachlich verglichen. Ein Quellenwechsel erfordert eine
-neue serielle Referenz, auch wenn nur Dokumentation geändert wurde. Development
-führt keine seriellen Referenzläufe aus und vergleicht seinen neuen parallelen
-Bericht nicht mit einem veralteten seriellen Stand.
+werden dagegen nicht fachlich verglichen. Ein Quellenwechsel erfordert einen
+neuen vollständigen parallelen Gate-Bericht, auch bei Dokumentänderungen.
+Alte Berichte eines anderen Standes sind kein Gate für neue Quellen. Nur der
+separat beauftragte Modusverifier benötigt zusätzlich seine passende serielle
+Referenz; er gehört nicht zum Development-/Apply-Ablauf.
 
 ## Vollständige Modusabnahme
 

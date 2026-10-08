@@ -1,7 +1,7 @@
 # Pakete aus vorbereiteten Inhalten erzeugen
 
 Der Vertrag steht gemeinsam in [Hauptspezifikation](../spec/SPECIFICATION.md)
-und [PYZ/PACK-Ergänzung, Revision 2](../spec/SPECIFICATION_EXTENSION_PYZ_PACK.md).
+und [PYZ/PACK-Ergänzung, Revision 3](../spec/SPECIFICATION_EXTENSION_PYZ_PACK.md).
 Der [aktive Plan](../planning/pyz-pack/commit-plan.md) führt den Fortschritt.
 Installierte CLI, Core-PYZ und öffentliche Python-API verwenden denselben
 Pack-Core. Python ab 3.12 ist nötig. Die PYZ enthält den Core ohne Watcher und
@@ -99,8 +99,12 @@ Pack startet selbst keinen Watcher und hat keinen impliziten Exchange-Ausgabeort
 
 ## Grenzen und Nachweise
 
-Die Erfassung ist auf 10.000 Knoten, 1.000 ZIP-Einträge einschließlich der drei
-generierten Dateien, 256 MiB je Inhalt/fertigem ZIP und 512 MiB unkomprimiert begrenzt.
+Die Inhaltsaufnahme ist auf 10.000 Dateisystemknoten (Dateien und Verzeichnisse)
+begrenzt. Daneben gilt die gemeinsame äußere ZIP-Grenze von 250.010 Einträgen,
+einschließlich der drei generierten Dateien; sie hebt die engere Scan-Grenze
+nicht auf. Es gelten weiterhin 256 MiB je Inhalt/fertigem ZIP und 512 MiB
+unkomprimiert. Die Result-Referenz darf bis zu 250.000 Base-/Untracked-Dateien
+zusammen enthalten; ihre innere Runtime bleibt auf 1.000 Einträge begrenzt.
 Handoff-Dateien dürfen je 128 KiB erreichen. Links, Reparse-Punkte, Sonderdateien,
 unsichere Archivpfade und case-ambige Kollisionen werden abgelehnt. Bekannte Änderungen
 führen ohne Neuaufnahme zum Abbruch; ein beliebig parallel manipulierter Baum wird
