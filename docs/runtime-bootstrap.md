@@ -7,7 +7,9 @@
 or a public application subcommand. It has no import-time PatchHarbor dependency.
 Use a trusted copy of the helper and an explicitly trusted Result. A digest
 copied from an unknown archive does not authenticate its sender. The current
-production writer remains Format 2; Format-3 fixtures exercise this preparation.
+production writer emits Format 3 with exactly one Core-PYZ. Legacy 1/2 references
+retain their versioned previous path. Upgrading repository files does not restart
+or replace an already running older global installation.
 
 Read-only assessment and optional single-file preparation:
 
@@ -60,8 +62,9 @@ Metadata fields, capabilities, artifact descriptors and provenance are closed;
 unknown future Results are rejected, while legacy Formats 1/2 select their own
 path. The old wheel helper reports `result_format_requires_pyz_bootstrap` for
 valid Format 3 without accessing wheel fields or installing anything. Production
-still emits Format 2 until PP-06B's real first-output E-10 gate; these synthetic
-fixtures are preparation evidence, not a claim of a switched producer.
+emits Format 3 from PP-06B. Its E-10 test obtains the executable helper from the
+first actual Result produced by a real installation, then performs pack, full
+reference validation and regular Apply through the selected PYZ.
 
 ## Legacy wheel bootstrap
 

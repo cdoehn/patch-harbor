@@ -182,7 +182,7 @@ print(json.dumps({Path(m.__file__).name: hashlib.sha256(Path(m.__file__).read_by
 
 
 @pytest.mark.e2e
-def test_mixed_exchange_selects_only_real_patch_and_writer_produces_format2(canonical, tmp_path):
+def test_mixed_exchange_selects_only_real_patch_and_writer_produces_current_format(canonical, tmp_path):
     from tests.test_exchange_archive_e2e import _world
     from tests.test_exchange_e2e import _write_custom_package
     env, exchange, repo, context = _world(tmp_path)
@@ -199,6 +199,6 @@ def test_mixed_exchange_selects_only_real_patch_and_writer_produces_format2(cano
     document = json.loads(result.stdout)
     produced = Path(document["result"]["result_bundle"]["path"])
     with ZipFile(produced) as archive:
-        assert json.loads(archive.read("manifest.json"))["format_version"] == 2
+        assert json.loads(archive.read("manifest.json"))["format_version"] == 3
         assert json.loads(archive.read("runtime/runtime.json"))["reason"] == "source_not_prepared"
     assert (exchange / "embedded.zip").is_file() and (exchange / "unavailable.zip").is_file()

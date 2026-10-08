@@ -90,3 +90,14 @@ Nachweisen offen. GitHub-CI bleibt manuell; nächster regulärer Termin ist Bund
 
 Grundlagen: [CIFS-Mountoptionen](https://man7.org/linux/man-pages/man8/mount.cifs.8.html),
 [CreateFileW](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilew).
+
+
+## Format-3 activation (PP-06B)
+
+Result 3 passes the new PYZ or unavailable payload through this same publication
+boundary. Its typed finite retries, shared budget, sync/no-follow operations,
+owned cleanup and verified SHA publication are unchanged. The expanded tests
+exercise both runtime states; an integrity failure still cannot become a retry
+or a weaker reference success. These tests simulate faults and do not close the
+separate real Linux-to-Windows CIFS acceptance requirement. `pack` continues to
+use its different no-replace/no-stability-retry publication contract.

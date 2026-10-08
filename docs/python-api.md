@@ -74,7 +74,7 @@ repositories.
 ## Static package inspection (RIV development addition)
 
 This development line implements package/binding validation, portable offline
-runtime and Result Format 2; no release is implied. The existing
+runtime, `pack_patch` and Result Format 3; no release is implied. The existing
 `dry_run` keeps its Apply semantics and still creates a Result Bundle.
 
 ```python
@@ -135,8 +135,8 @@ and to archival/recovery policy. A valid reference does not itself prove a
 successful Apply: those consumers still require a clean, completed success,
 no warnings or dry run, the appropriate expected binding and, for recovery,
 the existing receipt, local digest and Git evidence. Their conservative ZIP
-path policy is unchanged. Current writers emit format 2 with a verified embedded
-runtime or a declared runtime-only restriction; readers also accept format 1.
+path policy is unchanged. Current writers emit format 3 with one verified Core-PYZ
+or a declared runtime-only restriction; readers also accept formats 1 and 2.
 Full reference validation rejects a corrupt declared runtime. The separately
 reviewed [bootstrap and previous handoff procedure](runtime-bootstrap.md) can
 check repository evidence independently when only that optional addition fails.
@@ -549,7 +549,7 @@ not assert shell syntax, executed tests, authenticity or unchanged target state
 at a later Apply. See [pack details](pack.md).
 
 
-## Prepared Python-only PYZ access (PP-04C)
+## Python-only PYZ access
 
 The public API is shared with the built Core-only PYZ. Before importing it,
 perform the stdlib descriptor/trust precheck described in
@@ -560,7 +560,7 @@ PatchHarbor modules, and never clears module caches to fake a version switch.
 Afterwards use the returned `api.inspect_patch`, `api.validate_patch` and
 `api.pack_patch` normally. Full native reference validation remains separate
 from bootstrap checks; no installation or subprocess is needed for these calls.
-New Result-3 production is gated by subsequent reader/provider/Writer work.
+Result-3 production uses the same shared Core and request-local resource capture.
 
 
 ## Reader-first Result 3 (PP-05A)
@@ -570,5 +570,5 @@ full reader for Result formats 1, 2 and 3. The new format verifies its PYZ as
 strict data, without importing it. Public signatures/scopes are unchanged;
 corrupt references retain source-error category 4. A private repository-only
 diagnostic fallback is never a successful full reference or a `pack` input.
-See [Result format 3](result-format-3.md). Production remains Format 2 until
-the subsequent consumer/bootstrap/provider/Writer gates.
+See [Result format 3](result-format-3.md). Production uses this format from PP-06B;
+legacy reader schemas and public validation scopes remain unchanged.

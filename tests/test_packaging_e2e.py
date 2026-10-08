@@ -382,14 +382,12 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
             if name.startswith(("patchharbor/", "patchharbor_watcher/"))
             and not name.startswith("patchharbor/_runtime/")
         }
-        assert runtime_files == EXPECTED_RUNTIME_FILES | {"patchharbor/_runtime_identity.py", "patchharbor/_pyz_identity.py"}
+        assert runtime_files == EXPECTED_RUNTIME_FILES | {"patchharbor/_pyz_identity.py"}
         assert {name for name in names if name.startswith("patchharbor/_runtime/")} == {
             "patchharbor/_runtime/pyz-recipe.json", "patchharbor/_runtime/pyz-main.py",
             "patchharbor/_runtime/LICENSE",
-            "patchharbor/_runtime/recipe.json", "patchharbor/_runtime/CHAT_INSTRUCTIONS.md",
-            "patchharbor/_runtime/python-api.md", "patchharbor/_runtime/metadata/METADATA",
-            "patchharbor/_runtime/metadata/WHEEL", "patchharbor/_runtime/metadata/entry_points.txt",
-            "patchharbor/_runtime/metadata/top_level.txt", "patchharbor/_runtime/metadata/licenses/LICENSE",
+            "patchharbor/_runtime/CHAT_INSTRUCTIONS.md",
+            "patchharbor/_runtime/python-api.md",
         }
         assert "patchharbor/input.py" not in names
         assert "patchharbor/files.py" not in names
@@ -890,6 +888,12 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
     assert (worker_repository / "release-applied.txt").read_text(encoding="utf-8") == "entrypoint-ok"
     assert not (worker_repository / worker_entrypoint).exists()
     with zipfile.ZipFile(worker_result["result_bundle"]["path"]) as result_archive:
+        assert json.loads(result_archive.read('manifest.json'))['format_version'] == 3
+        runtime_metadata = json.loads(result_archive.read('runtime/runtime.json'))
+        assert runtime_metadata['format_version'] == 2 and runtime_metadata['status'] == 'embedded'
+        assert runtime_metadata['artifact']['type'] == 'pyz'
+        assert {n for n in result_archive.namelist() if n.startswith('runtime/')} == {
+            'runtime/runtime.json', runtime_metadata['artifact']['path']}
         assert b"installed-apply" in result_archive.read("logs/execution.log")
         installed_handoff = json.loads(result_archive.read("environment.json"))
         assert installed_handoff["runtime"]["patchharbor_version"] == RELEASE_VERSION

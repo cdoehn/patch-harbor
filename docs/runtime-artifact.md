@@ -1,7 +1,7 @@
 # Kanonische Runtimeprofile: PYZ und Legacy-Wheel
 
 
-## PP-04A: vorbereiteter Core-PYZ-Kandidat
+## Kanonisches Core-PYZ-Profil
 
 Das neue geschlossene Profil `patchharbor-core-no-watcher-v1` verwendet
 `patchharbor/_runtime/pyz-recipe.json`, Marker `patch-harbor-pyz-recipe`,
@@ -30,19 +30,20 @@ CRC/Größen und sämtliche finalen kanonischen Bytes werden geprüft. Grenzen:
 16 MiB Artefakt, 32 MiB Inhalte, 1.000 Einträge, 1 MiB Rezept; das übergeordnete
 Resultbudget bleibt zusätzlich relevant.
 
-Der normale Build liefert zwei bewusst unabhängige vorbereitete Profile.
-Der kanonische Legacy-Wheel-Satz enthält keine erzeugten PYZ-Ressourcen; die PYZ
-enthält keine erzeugten Wheel-Ressourcen. Dadurch entstehen weder Hashzyklen
-noch rekursiv eingebettete Artefakte. Die Installation trägt beide Datensätze;
-der produktive Writer bleibt vorerst Format 2 und bettet allein das Wheel ein.
+Der normale Build bereitet seit PP-06B ausschließlich das PYZ-Profil vor.
+Installationswheel und sdist bleiben normale Distributionsartefakte; neue Results
+enthalten genau eine PYZ oder ein begründetes unavailable ohne Artefakt.
+Alte Wheel-Identitäten/-Ressourcen werden weder in die PYZ noch in das neue
+vorbereitete Profil übernommen. Die Legacy-Buildhelfer dienen ausdrücklich den
+Tests des historischen Datenvertrags, nicht einer zweiten Produktivproduktion.
 Build-Helfer werden über einen privaten am Quellpfad verankerten Namensraum geladen,
 niemals aus einem zufälligen gleichnamigen Paket in CWD oder Site-Packages.
 
 `scripts/build_release.py --outdir dist` erzeugt Wheel, sdist und den kanonischen
 PYZ-Kandidaten. Die bestehende Python-Rückgabe `(wheel, source_distribution)` bleibt
 kompatibel. Kandidat und installierte Rezeptmaterialisierung müssen bytegleich sein.
-Das ist in PP-04A noch keine Freigabe aller PYZ-Kommandos: ZIP-Ressourcenzugriff,
-Python-only-Bootstrap und Result-3-Writer haben nachfolgende Gates.
+Die gemeinsame Core-Parität, eigene Ressourcen und produktive Result-Erzeugung
+werden ab PP-06B einschließlich Erstnutzung und drei Generationen geprüft.
 
 ## PP-04B: herkunftsgebundene Ressourcen
 
@@ -67,15 +68,17 @@ CWD-Dokument verdeckt. Die API benötigt dafür keine Installation, Schreibrecht
 im Runtimeverzeichnis oder externen Werkzeuge. Verzeichnis und daraus gebaute
 PYZ liefern dieselben kanonischen Artefaktbytes und Dokumente.
 
-Der Result-Writer ist weiterhin Format 2. Der gemeinsame request-lokale
-Result-Capture wird erst zusammen mit den späteren Reader-/Writer-Gates auf
-PYZ umgestellt; PP-04B behauptet noch keine resultgenerierende Core-Parität.
+Der gemeinsame Result-Capture verwendet ab PP-06B diese PYZ. Bei optionalen
+Runtimefehlern darf eine Pflichtvorlage nur durch eine begrenzte eigene Prüfung
+gegen geladenen Producer-ID, Rezept und exakte Vorlagenbytes erhalten bleiben.
+Diese Prüfung behauptet keinen vollständigen gültigen Runtime-Artefaktbestand.
 
 ## Fortgeführter Legacy-Wheel-Vertrag
 
 Die folgende Beschreibung dokumentiert den historischen Wheel-Aufbau. Sein
 Datenvertrag bleibt für alte Results erhalten; frühe 1.c-Statusangaben beschreiben
-keinen neuen aktiven Plan. Der aktuelle Produktionswriter ist Format 2.
+keinen neuen aktiven Plan. Der aktuelle Produktionswriter verwendet Format 3;
+die folgenden Installations-/Produzentenangaben beschreiben den Altstand.
 
 Stand 1.c.C mit nativ bestätigten Abnahmekorrekturen FIX1–FIX3:
 interner Provider, Herkunftsprüfung und getrenntes Buildverfahren. Neue Results bleiben Format 1;

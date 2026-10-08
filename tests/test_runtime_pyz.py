@@ -213,22 +213,19 @@ def test_runtime_resource_and_shared_budgets_are_independent(monkeypatch):
 @pytest.mark.packaging
 def test_normal_wheel_prepares_distinct_finite_profiles_without_watcher_in_pyz(built_result_source):
     from patchharbor import runtime_wheel
-    from patchharbor.result_runtime import _read_wheel
     pyz_recipe=pyz.parse_recipe((built_result_source/pyz.RECIPE_PATH).read_bytes())
     pyz_raw=pyz.materialize(pyz_recipe,lambda name,size:(built_result_source/name).read_bytes())
     assert read(pyz_raw)==pyz_recipe
-    wheel_recipe=runtime_wheel.parse_recipe((built_result_source/runtime_wheel.RECIPE_PATH).read_bytes())
-    wheel_raw=runtime_wheel.materialize(wheel_recipe,lambda name,size:(built_result_source/name).read_bytes())
-    assert _read_wheel(wheel_raw,policy=DEFAULT_RESOURCE_POLICY,remaining_bytes=32*1024*1024)==wheel_recipe
+    # Production installation retains the Watcher, while only its Core-PYZ
+    # runtime profile is prepared. Legacy wheel readers have separate fixtures.
+    assert (built_result_source/'patchharbor_watcher/__init__.py').is_file()
+    assert not (built_result_source/runtime_wheel.RECIPE_PATH).exists()
+    assert not (built_result_source/runtime_wheel.IDENTITY_PATH).exists()
     with ZipFile(BytesIO(pyz_raw)) as archive:
         assert not any(name.startswith('patchharbor_watcher/') for name in archive.namelist())
         assert runtime_wheel.RECIPE_PATH not in archive.namelist()
         assert runtime_wheel.IDENTITY_PATH not in archive.namelist()
         assert 'patchharbor/runtime_wheel.py' in archive.namelist()
-    with ZipFile(BytesIO(wheel_raw)) as archive:
-        assert 'patchharbor_watcher/__init__.py' in archive.namelist()
-        assert pyz.RECIPE_PATH not in archive.namelist() and pyz.IDENTITY_PATH not in archive.namelist()
-    assert pyz_recipe.content_id != wheel_recipe.content_id
 
 
 @pytest.mark.parametrize('version', [(3, 8), (3, 11)])

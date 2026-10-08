@@ -1,6 +1,8 @@
 # Result-Format 2: festgelegter Leservertrag
 
-Stand `1.e.W`. Alle regulären Result-Wege erzeugen Format 2.
+Historischer Stand `1.e.W`: damals erzeugten die regulären Result-Wege Format 2.
+Ab PP-06B schreibt der aktuelle Core [Result 3](result-format-3.md). Der hier
+beschriebene geschlossene Leservertrag für vorhandene Result-2-Dateien bleibt gültig.
 Vorbereitete Standardinstallationen betten ihre Runtime ein; unvorbereiteter
 Quellbetrieb liefert `unavailable/source_not_prepared` mit Warnung. Allgemeine Referenzgültigkeit und Archiv-/Recovery-Erfolg bleiben
 getrennt. Der Leser importiert, installiert oder startet keinen Wheel-Code.
@@ -89,7 +91,7 @@ Result-Verbraucher sind gemeinsam; ihre verschiedenen Policies bleiben getrennt.
 Die schnelle
 Exchange-Klassifikation bleibt ein sicherer Typ-Hinweis und akzeptiert auch
 unbekannte Result-Versionen ausdrücklich nicht als ausführbares Patch-Paket.
-Der gemeinsame produktive Writer ist seit `1.e.W` auf Format 2 umgestellt.
+Der damalige gemeinsame Writer wurde in `1.e.W` auf Format 2 umgestellt.
 Die vor dem Apply festgehaltenen Runtime-/Vorlagenbytes gehören zum Erzeuger;
 der spätere Repositorysnapshot kann bereits dessen Nachfolgestand enthalten.
 Vor Veröffentlichung wird das gesamte zusätzliche Runtime-Budget berücksichtigt.
@@ -100,8 +102,8 @@ Positive und negative Eingaben werden in `tests/test_result_format2.py` aus
 festgelegten Metadaten-Fixtures und einem tatsächlich gebauten kanonischen Wheel
 erzeugt; bestehende Format-1-Referenz-, Archiv-/Recovery- und Writer-Tests bleiben.
 
-`tests/fixtures/result_format1/` enthält die drei unveränderten Lesermodule
-`result_reader.py`, `archive_evidence.py` und `exchange.py` vom tatsächlichen
+`tests/fixtures/result_format1/` enthält vier zusammengehörige historische Module:
+`result_reader.py`, `archive_evidence.py`, `exchange.py` und `patch_inspection.py` vom tatsächlichen
 Commit `d31047b2feca049c2db5443bb61df2ce7ce5e7f6`. Herkunft und Datei-SHA-256 sind
 in provenance.json festgehalten. Vor dem Hashvergleich werden ausschließlich
 Git-Checkout-Zeilenenden von CRLF zu LF normalisiert; der Kindprozess erhält die
@@ -115,6 +117,6 @@ Format-2-Results konservativ und wählen weder Results noch Wheels als Patch.
 ## Reader-first successor
 
 [Result format 3](result-format-3.md) uses PYZ metadata 2 and a separate `artifact`
-contract. Its reader does not reinterpret the legacy `wheel` field. During
-PP-05B the producer still writes this Format 2; its offline wheel/previous-handoff
-path remains supported. Old consumers conservatively retain new Results.
+contract. Its reader does not reinterpret the legacy `wheel` field. Since PP-06B
+new production uses Format 3; the legacy offline wheel/previous-handoff path
+remains supported. Old consumers conservatively retain new Results.

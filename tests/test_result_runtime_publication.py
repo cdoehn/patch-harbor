@@ -13,10 +13,9 @@ from patchharbor import result_bundle_writer as writer, result_resources as reso
 from patchharbor.errors import result_bundle_error
 from patchharbor.resource_policy import ResourcePolicy
 from patchharbor.result_reader import read_result_reference
-from patchharbor.runtime_artifact import RuntimeProvision
+from patchharbor.pyz_artifact import PyzProvision
 from tests.platform_support import native_script, native_value
 from tests.registration_support import git
-from tests.test_runtime_artifact import prepared
 from tests.test_result_runtime_writer import artifact, repository, package
 
 
@@ -31,9 +30,9 @@ def test_dirty_snapshot_and_explicit_target_survive_runtime_restrictions(
     (root / "tracked.txt").write_bytes(b"working tree\n")
     untracked = b"\x00actual untracked bytes\xff\n"
     (root / "untracked.bin").write_bytes(untracked)
-    provision = (RuntimeProvision("unavailable", "resources_missing", None)
-                 if runtime_state == "missing" else RuntimeProvision("embedded", None, artifact))
-    monkeypatch.setattr(resources.RuntimeProvider, "capture", lambda self: provision)
+    provision = (PyzProvision("unavailable", "resources_missing", None)
+                 if runtime_state == "missing" else PyzProvision("embedded", None, artifact))
+    monkeypatch.setattr(resources.PyzProvider, "capture", lambda self: provision)
     if runtime_state == "budget":
         monkeypatch.setattr(result_bundle, "runtime_fits", partial(resources.runtime_fits,
                             policy=ResourcePolicy(max_zip_total_bytes=128 * 1024)))
@@ -77,14 +76,14 @@ def test_real_publication_failures_preserve_primary_and_latest_proven_context(
     with ZipFile(patch, "w") as archive:
         archive.writestr("patch.json", manifest)
         archive.writestr(native_value("run.sh", "run.ps1"), body)
-    monkeypatch.setattr(resources.RuntimeProvider, "capture",
-                        lambda self: RuntimeProvision("embedded", None, artifact))
+    monkeypatch.setattr(resources.PyzProvider, "capture",
+                        lambda self: PyzProvision("embedded", None, artifact))
     writes = []
     original = writer._write_entry
 
     def write(archive, name, raw, **options):
         writes.append(name)
-        if ((fault == "runtime_write" and name.endswith(".whl"))
+        if ((fault == "runtime_write" and name.endswith(".pyz"))
                 or (fault == "snapshot_write" and name.startswith("base/"))):
             raise PermissionError("simulated write denied")
         return original(archive, name, raw, **options)
@@ -112,8 +111,8 @@ def test_real_publication_failures_preserve_primary_and_latest_proven_context(
 
 def test_publication_abort_is_not_converted_to_runtime_fallback(repository, artifact, monkeypatch):
     root, exchange = repository
-    monkeypatch.setattr(resources.RuntimeProvider, "capture",
-                        lambda self: RuntimeProvision("embedded", None, artifact))
+    monkeypatch.setattr(resources.PyzProvider, "capture",
+                        lambda self: PyzProvision("embedded", None, artifact))
     def interrupted(*args, **kwargs):
         raise KeyboardInterrupt
     monkeypatch.setattr(publication, "_verify_result_bundle", interrupted)

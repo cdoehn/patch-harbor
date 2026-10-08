@@ -13,8 +13,6 @@ from patchharbor.errors import PatchHarborError, result_bundle_error
 from patchharbor.json_document import serialize_json_document
 from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY, ResourcePolicy
 from patchharbor.result_runtime import METADATA_PATH, UNAVAILABLE_REASONS
-from patchharbor.runtime_artifact import RuntimeArtifact, RuntimeProvider
-from patchharbor.runtime_wheel import CONTENT_ALGORITHM
 from patchharbor.pyz_artifact import PyzArtifact, PyzProvider, own_pyz_profile_present
 from patchharbor import runtime_pyz
 from patchharbor.platform.filesystem import FileChangedDuringRead, FileReadLimitExceeded, UnsupportedFileTypeError
@@ -39,7 +37,10 @@ class ResultRuntimePayload:
     artifact_path: str | None = None
     artifact_bytes: bytes | None = None
     inner_content_bytes: int = 0
-    result_format: int = 2
+
+    @property
+    def result_format(self) -> int:
+        return 3
 
     def entries(self) -> tuple[tuple[str, bytes], ...]:
         result = ((METADATA_PATH, self.metadata),)
@@ -50,57 +51,22 @@ class ResultRuntimePayload:
     def document(self) -> dict[str, object]:
         descriptor = (None if self.artifact_path is None or self.artifact_bytes is None
                       else _descriptor(self.artifact_path, self.artifact_bytes))
-        if self.result_format == 3 and descriptor is not None:
+        if descriptor is not None:
             descriptor = {'type':'pyz', **descriptor}
         return {"status":self.status, "reason":self.reason,
                 "metadata":_descriptor(METADATA_PATH,self.metadata),
-                "artifact" if self.result_format == 3 else "wheel":descriptor}
+                "artifact":descriptor}
 
     def unavailable(self, reason: str) -> ResultRuntimePayload:
-        return (pyz_runtime_payload(None, reason=reason) if self.result_format == 3
-                else runtime_payload(None, reason=reason))
+        return runtime_payload(None, reason=reason)
 
     @property
     def warnings(self) -> tuple[str, ...]:
         return () if self.status == "embedded" else (f"runtime unavailable: {self.reason}",)
 
 
-def runtime_payload(artifact: RuntimeArtifact | None, *, reason: str | None = None) -> ResultRuntimePayload:
-    """Translate the private provider response to the closed Result-2 contract."""
-    if artifact is None:
-        if reason not in UNAVAILABLE_REASONS:
-            raise ValueError("unsupported runtime unavailability reason")
-        doc = {
-            "marker": "patch-harbor-runtime", "format_version": 1,
-            "status": "unavailable", "reason": reason, "distribution": "patchharbor",
-            "version": __version__, "requires_python": None, "content_id": None,
-            "content_id_algorithm": None, "wheel": None, "tags": None,
-            "runtime_dependencies": None, "provenance": None, "capabilities": None,
-        }
-        return ResultRuntimePayload("unavailable", reason, serialize_json_document(doc).encode("utf-8"))
-    recipe = artifact.recipe
-    wheel_path = "runtime/" + recipe.wheel_name
-    doc = {
-        "marker": "patch-harbor-runtime", "format_version": 1,
-        "status": "embedded", "reason": None, "distribution": "patchharbor",
-        "version": recipe.version, "requires_python": recipe.requires_python,
-        "content_id": recipe.content_id, "content_id_algorithm": CONTENT_ALGORITHM,
-        "wheel": _descriptor(wheel_path, artifact.wheel_bytes), "tags": ["py3-none-any"],
-        "runtime_dependencies": [],
-        "provenance": {"mode": "canonical_resources", "source_commit": recipe.source_commit,
-                       "recipe_format_version": 1},
-        "capabilities": {"operations": ["inspect_patch", "validate_patch"],
-                         "patch_formats": [1], "result_formats": [1, 2]},
-    }
-    # Reading central metadata does not extract or duplicate wheel payloads.
-    with ZipFile(BytesIO(artifact.wheel_bytes)) as archive:
-        inner_bytes = sum(info.file_size for info in archive.infolist())
-    return ResultRuntimePayload("embedded", None, serialize_json_document(doc).encode("utf-8"),
-                                wheel_path, artifact.wheel_bytes, inner_bytes)
-
-
-def pyz_runtime_payload(artifact: PyzArtifact | None, *, reason: str | None = None) -> ResultRuntimePayload:
-    """Prepare the exact Format-3 metadata; production switches in PP-06B."""
+def runtime_payload(artifact: PyzArtifact | None, *, reason: str | None = None) -> ResultRuntimePayload:
+    """Prepare the sole production Runtime-2/PYZ payload for Result format 3."""
     doc = {
         'marker':'patch-harbor-runtime', 'format_version':2,
         'status':'unavailable', 'reason':reason, 'distribution':'patchharbor',
@@ -111,7 +77,7 @@ def pyz_runtime_payload(artifact: PyzArtifact | None, *, reason: str | None = No
     if artifact is None:
         if reason not in UNAVAILABLE_REASONS:
             raise ValueError('unsupported runtime unavailability reason')
-        return ResultRuntimePayload('unavailable',reason,serialize_json_document(doc).encode(),result_format=3)
+        return ResultRuntimePayload('unavailable',reason,serialize_json_document(doc).encode())
     recipe = artifact.recipe
     path = 'runtime/' + recipe.pyz_name
     doc.update(status='embedded',reason=None,version=recipe.version,requires_python=recipe.requires_python,
@@ -124,7 +90,7 @@ def pyz_runtime_payload(artifact: PyzArtifact | None, *, reason: str | None = No
     with ZipFile(BytesIO(artifact.pyz_bytes)) as archive:
         inner_bytes = sum(info.file_size for info in archive.infolist())
     return ResultRuntimePayload('embedded',None,serialize_json_document(doc).encode(),
-                                path,artifact.pyz_bytes,inner_bytes,3)
+                                path,artifact.pyz_bytes,inner_bytes)
 
 
 @dataclass(frozen=True, slots=True)
@@ -140,26 +106,12 @@ class PinnedResultResources:
 
 
 def capture_result_resources() -> PinnedResultResources:
-    """Capture once before mutation; a missing mandatory template stays a Result error."""
-    provision = RuntimeProvider().capture()
-    reason = {"resources_missing": "artifact_missing", "resources_invalid": "artifact_corrupt"}.get(
-        provision.reason, provision.reason)
-    runtime = runtime_payload(provision.artifact, reason=reason)
-    try:
-        template = (provision.artifact.chat_template.decode("utf-8")
-                    if provision.artifact is not None else load_chat_template())
-    except (PatchHarborError, UnicodeError) as exc:
-        return PinnedResultResources(runtime, None, str(exc))
-    return PinnedResultResources(runtime, template)
-
-
-def capture_pyz_result_resources() -> PinnedResultResources:
-    """Private writer preparation; bind runtime/template to one executing producer."""
+    """Bind runtime/template to the executing producer before request mutation."""
     provider = PyzProvider()
     provision = provider.capture()
     reason = {'resources_missing':'artifact_missing','resources_invalid':'artifact_corrupt'}.get(
         provision.reason,provision.reason)
-    runtime = pyz_runtime_payload(provision.artifact,reason=reason)
+    runtime = runtime_payload(provision.artifact,reason=reason)
     try:
         if provision.artifact is not None or own_pyz_profile_present():
             template = provider.capture_required_template().decode('utf-8')

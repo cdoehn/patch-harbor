@@ -13,8 +13,10 @@ from zipfile import ZipFile
 import pytest
 
 from patchharbor import result_resources
-from patchharbor.runtime_artifact import RuntimeProvider
-from patchharbor.runtime_wheel import RECIPE_PATH, parse_recipe, producer_id
+from patchharbor.pyz_artifact import PyzProvider
+from patchharbor import pyz_artifact
+from patchharbor.runtime_sources import DirectoryResources
+from patchharbor.runtime_pyz import RECIPE_PATH, parse_recipe, producer_id
 from scripts.build_release import _copy_release_inputs
 from tests import platform_support
 
@@ -40,25 +42,26 @@ def built_result_source(tmp_path_factory):
 def unavailable_result_producer(monkeypatch):
     """Select the source fallback explicitly, including inside installed tests."""
     def provider():
-        captured = RuntimeProvider()
+        captured = PyzProvider()
         captured._producer_id = None
         return captured
 
     assert provider().capture().reason == "source_not_prepared"
-    monkeypatch.setattr(result_resources, "RuntimeProvider", provider)
+    monkeypatch.setattr(result_resources, "own_pyz_profile_present", lambda: False)
+    monkeypatch.setattr(result_resources, "PyzProvider", provider)
 
 
 @pytest.fixture
 def prepared_result_producer(built_result_source, monkeypatch):
     identity = producer_id(parse_recipe((built_result_source / RECIPE_PATH).read_bytes()))
+    monkeypatch.setattr(pyz_artifact, "own_resources", lambda: DirectoryResources(built_result_source))
 
     def provider():
-        captured = RuntimeProvider()
-        captured._root = built_result_source
+        captured = PyzProvider()
         captured._producer_id = identity
         return captured
 
     assert provider().capture().status == "embedded"
-    monkeypatch.setattr(result_resources, "RuntimeProvider", provider)
+    monkeypatch.setattr(result_resources, "PyzProvider", provider)
     monkeypatch.setattr(platform_support, "CLI_SOURCE_PATH", built_result_source)
     return built_result_source

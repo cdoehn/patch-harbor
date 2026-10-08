@@ -15,9 +15,9 @@ from zipfile import ZipFile, ZIP_STORED
 
 import pytest
 
-from build_backend import _prepare_recipe, _prepare_transport, _prepare_pyz_transport
+from build_backend import _prepare_recipe, _prepare_transport
 from patchharbor.runtime_artifact import RuntimeProvider
-from patchharbor import runtime_wheel as runtime
+from patchharbor import __version__, runtime_wheel as runtime
 from patchharbor.platform.filesystem import FileReadLimitExceeded, read_stable_regular_file_bounded
 from scripts.build_release import _copy_release_inputs
 
@@ -33,7 +33,10 @@ def prepared(tmp_path_factory):
     assert completed.returncode == 0, completed.stdout + completed.stderr
     with ZipFile(next(output.glob("*.whl"))) as wheel:
         payloads = {name: wheel.read(name) for name in wheel.namelist()}
-    return payloads
+    # Explicit legacy data-profile fixture. New normal builds prepare only PYZ;
+    # these tests continue checking the old reader/profile without a dual writer.
+    return _prepare_transport(runtime,payloads,version=__version__,requires_python='>=3.12',
+                              chat=payloads[runtime.CHAT_PATH],documentation=payloads[runtime.DOC_PATH])
 
 
 def _recipe(payloads):
@@ -262,13 +265,10 @@ def test_repreparing_transport_replaces_stale_resources_without_mutating_input(p
     rebuilt = _prepare_transport(runtime, stale, version=recipe.version,
                                  requires_python=recipe.requires_python,
                                  chat=prepared[runtime.CHAT_PATH], documentation=prepared[runtime.DOC_PATH])
-    # Rebuild both independent prepared profiles in the production order.
-    # The legacy recipe must stay identical despite a stale PYZ identity.
     assert _recipe(rebuilt) == recipe
     assert "patchharbor/_pyz_identity.py" not in {entry.path for entry in _recipe(rebuilt).entries}
-    rebuilt = _prepare_pyz_transport(rebuilt, version=recipe.version,
-        requires_python=recipe.requires_python, chat=prepared[runtime.CHAT_PATH],
-        documentation=prepared[runtime.DOC_PATH], license=prepared["patchharbor/_runtime/LICENSE"])
+    assert "patchharbor/_runtime/obsolete.json" not in rebuilt
+
     assert stale == before
     assert rebuilt == prepared
     assert _capture(rebuilt) == _capture(prepared)

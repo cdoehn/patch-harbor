@@ -31,6 +31,16 @@ def handoff(tmp_path, prepared_result_producer):
     exchange = tmp_path / "exchange"
     api.configure_exchange_directory(exchange, repository=repo)
     reference = api.bundle(repo).path
+    # This legacy bootstrap consumes a real frozen Format-2 runtime; the current
+    # producer now emits Format 3 and must not keep an old writer just for tests.
+    fixture=Path(__file__).parent/'fixtures/result_format2'
+    provenance=json.loads((fixture/'provenance.json').read_bytes())
+    raw=(fixture/provenance['wheel_file']).read_bytes()
+    assert sha256(raw).hexdigest()==provenance['wheel_sha256']
+    with ZipFile(reference) as archive:files={name:archive.read(name) for name in archive.namelist()}
+    files=attach_runtime(files,raw)
+    with ZipFile(reference,'w') as archive:
+        for name,data in files.items():archive.writestr(name,data)
     patch = package(repo, exchange)
     return reference, patch
 

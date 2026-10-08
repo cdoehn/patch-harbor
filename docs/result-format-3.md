@@ -1,8 +1,9 @@
 # Result format 3: PYZ runtime metadata 2
 
-PP-05A adds the full data reader before any production writer switch. The normal
-writer still emits Result 2. Synthetic format-3 fixtures prove the new reference
-reader; they are not evidence of a successful new producer or installed upgrade.
+PP-05A/B established the full reader and consumer compatibility before PP-06B
+switches normal production to Result 3. Standard installations prepare the Core-PYZ
+without building or installing anything while handling a request. The productive
+writer uses one runtime shape; old 1/2 data contracts remain read-only compatibility.
 
 The normative contract is the joint main specification and
 [PYZ/PACK extension](../spec/SPECIFICATION_EXTENSION_PYZ_PACK.md), especially

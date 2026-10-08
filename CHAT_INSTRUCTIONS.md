@@ -237,8 +237,9 @@ globale Rückabwicklung.
 ### Installationsfreier Start aus dem vorliegenden Format-3-Result
 
 Das konkrete Resultformat entscheidet: Format 1/2 behält den unten beschriebenen
-Legacyweg; Format 3 mit `embedded` verwendet genau seine PYZ. Der Writer dieser
-Zwischenversion produziert weiterhin Format 2. Python 3.12 oder neuer ist nötig.
+Legacyweg; Format 3 mit `embedded` verwendet genau seine PYZ. Der neue Writer
+produziert Format 3. Bereits laufende alte Installationen behalten ihr bisheriges
+Format bis zu einem gesonderten Upgrade. Python 3.12 oder neuer ist nötig.
 Die PYZ enthält den vollständigen Core ohne Watcher. Es gibt keinen pip-, venv-,
 Build- oder Downloadschritt und keine Änderung der vorhandenen Installation.
 
@@ -743,13 +744,14 @@ Der bereits laufende Watcher übernimmt allein den Apply. Keine direkten
 Development-Commits, Apply-Mutationen, Hook-Umgehungen oder Watcher-Neustarts.
 Nach erfolgreichen Commit-Gates genau ein normaler Push; kein automatisches Tag.
 
-PP-00 bis PP-05B sind durch tatsächlich geprüfte Results bestätigt. Bundle 039
-bereitet die gemeinsamen request-lokalen PYZ-Result-Ressourcen vor. Der produktive
-Writer bleibt Format 2 mit Wheel; PP-06B muss die neue Produktion zusammen mit
-eigener E-10-Erstnutzung und dreifacher Reproduktion freigeben. Maßgeblich sind
-Plan Abschnitt 1.19 und die aktuelle Testpolicy. Ein älterer mitgelieferter Core
-kann weiterhin `pack` oder Format 3 vermissen; dann bleibt der geprüfte manuelle
-Paketvertrag nutzbar. Keine vorgezogene Writerfreigabe.
+PP-00 bis PP-06A sind durch tatsächlich geprüfte Results bestätigt. Bundle 040
+schaltet den gemeinsamen Writer auf Result 3 mit einer Core-PYZ um. Eigene
+E-10-Erstnutzung, drei tatsächliche Generationen, normale Installation und
+Core-Parität werden vor Übergabe vollständig parallel geprüft. Maßgeblich sind
+Plan Abschnitt 1.20 und die aktuelle Testpolicy. Bereits laufende ältere globale
+Installationen behalten ihren eigenen Stand; ein Quellpatch ersetzt sie nicht.
+Ein älterer mitgelieferter Core kann `pack` oder Format 3 vermissen; dann bleibt
+der geprüfte manuelle Paketvertrag nutzbar. Native Abnahme und Release bleiben offen.
 
 Bestimme die aktive Zielversion aus dem Repository. Eine laut Plan erst zum
 Release erfolgende Versionsanhebung ist kein Widerspruch; tatsächlich

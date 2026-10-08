@@ -58,129 +58,105 @@ def test_standard_installation_and_three_offline_canonical_generations(tmp_path,
     source, output, outside = tmp_path / "source", tmp_path / "dist", tmp_path / "outside"
     source.mkdir(); outside.mkdir()
     _copy_release_inputs(source)
-    environment = {key: value for key, value in os.environ.items() if key not in ("PYTHONHOME", "PYTHONPATH")}
-    environment.update({"PIP_NO_INDEX": "1", "PIP_DISABLE_PIP_VERSION_CHECK": "1",
-                        "PIP_CACHE_DIR": str(tmp_path / "installer-cache")})
-    _run([sys.executable, "-m", "build", "--wheel", "--sdist", "--no-isolation", "--outdir", str(output)],
-         source, environment)
-    install_input = {"wheel": next(output.glob("*.whl")), "source": source,
-                     "sdist": next(output.glob("*.tar.gz"))}[route]
-    python = _venv(tmp_path / "installed-0", outside, environment)
-    if route != "wheel":
-        # Offline build dependency, prepared locally for the real pip install.
-        _install_builder(python, outside, environment)
-    _run([sys.executable, "-m", "pip", "--python", str(python), "install", "--no-index", "--no-deps",
-          "--no-cache-dir", "--no-build-isolation", "--no-compile", str(install_input)], outside, environment)
-    shutil.rmtree(source); shutil.rmtree(output)
-    shutil.rmtree(tmp_path / "installer-cache", ignore_errors=True)
-    cache = tmp_path / "blocked-cache"
-    cache.write_bytes(b"not a writable cache directory")
-    environment["XDG_CACHE_HOME"] = environment["PIP_CACHE_DIR"] = str(cache)
-    fingerprints = []
-    previous = None
-    patch = outside / "patch.zip"
-    write_package(patch)
+    environment = {key:value for key,value in os.environ.items() if key not in ('PYTHONHOME','PYTHONPATH')}
+    environment.update(PIP_NO_INDEX='1',PIP_DISABLE_PIP_VERSION_CHECK='1',PIP_CACHE_DIR=str(tmp_path/'installer-cache'))
+    _run([sys.executable,'-m','build','--wheel','--sdist','--no-isolation','--outdir',str(output)],source,environment)
+    install_input={'wheel':next(output.glob('*.whl')),'source':source,'sdist':next(output.glob('*.tar.gz'))}[route]
+    python=_venv(tmp_path/'installed-0',outside,environment)
+    if route!='wheel':_install_builder(python,outside,environment)
+    _run([sys.executable,'-m','pip','--python',str(python),'install','--no-index','--no-deps',
+          '--no-cache-dir','--no-build-isolation','--no-compile',str(install_input)],outside,environment)
+    shutil.rmtree(source);shutil.rmtree(output)
+    shutil.rmtree(tmp_path/'installer-cache',ignore_errors=True)
+    cache=tmp_path/'blocked-cache';cache.write_bytes(b'not a writable cache directory')
+    environment['XDG_CACHE_HOME']=environment['PIP_CACHE_DIR']=str(cache)
+    fingerprints=[];previous=None;current=None
+    patch=outside/'patch.zip';write_package(patch)
     for generation in range(3):
-        destination = outside / str(generation)
-        destination.mkdir()
-        script = '''
-import hashlib, json, os, socket, subprocess, sys
+        destination=outside/f'generation-{generation}';destination.mkdir()
+        runtime_argument='-' if current is None else str(current)
+        active_python=str(python) if current is None else sys.executable
+        script=r'''
+import hashlib,json,os,socket,subprocess,sys
 from pathlib import Path
-from patchharbor.runtime_artifact import RuntimeProvider
+if sys.argv[3]!='-':sys.path.insert(0,sys.argv[3])
+from patchharbor.pyz_artifact import PyzProvider
 from patchharbor.chat_instructions import load_chat_template
 from patchharbor import api
-def forbidden(*args, **kwargs):
-    raise AssertionError('provider attempted external work')
-socket.socket = subprocess.run = subprocess.Popen = forbidden
-os.environ['PATH'] = ''
-provider = RuntimeProvider()
-provision = provider.capture()
-assert provision.status == 'embedded', provision
-artifact = provision.artifact
+def forbidden(*args,**kwargs):raise AssertionError('provider attempted external work')
+socket.socket=subprocess.run=subprocess.Popen=forbidden
+os.environ['PATH']=''
+provider=PyzProvider();provision=provider.capture()
+assert provision.status=='embedded',provision
+artifact=provision.artifact
 assert artifact is not None and artifact.recipe.source_commit is None
 assert provider.capture() is provision
-assert artifact.chat_template.decode('utf-8') == load_chat_template()
-patch = Path(sys.argv[2])
-inspection = api.inspect_patch(patch)
-assert inspection.package_sha256 == hashlib.sha256(patch.read_bytes()).hexdigest()
-assert api.validate_patch(patch).inspection == inspection
-assert not (Path.cwd() / 'SHOULD_NOT_EXIST').exists()
-target = Path(sys.argv[1]) / artifact.recipe.wheel_name
-target.write_bytes(artifact.wheel_bytes)
-print(json.dumps({'sha256': artifact.wheel_sha256, 'size': len(artifact.wheel_bytes),
-                  'content_id': artifact.recipe.content_id, 'requires_python': artifact.recipe.requires_python}))
+assert artifact.chat_template.decode().replace('\r\n','\n')==load_chat_template()
+patch=Path(sys.argv[2]);inspection=api.inspect_patch(patch)
+assert inspection.package_sha256==hashlib.sha256(patch.read_bytes()).hexdigest()
+assert api.validate_patch(patch).inspection==inspection
+assert 'patchharbor_watcher' not in sys.modules
+if sys.argv[3]!='-':assert api.__file__.startswith(sys.argv[3]+os.sep)
+target=Path(sys.argv[1])/artifact.recipe.pyz_name;target.write_bytes(artifact.pyz_bytes)
+print(json.dumps({'sha256':artifact.pyz_sha256,'size':len(artifact.pyz_bytes),
+                  'content_id':artifact.recipe.content_id,'requires_python':artifact.recipe.requires_python}))
 '''
-        with _readonly_installation(python, outside, environment):
-            proof = json.loads(_run([str(python), "-I", "-B", "-c", script, str(destination), str(patch)], outside, environment))
-            cli = json.loads(_run([str(python), "-I", "-B", "-c",
-                                  "from patchharbor.cli import main; raise SystemExit(main())",
-                                  "validate", "--json", str(patch)], outside, environment))
-            repository = create_repository(outside / f'foreign-repository-{generation}')
-            produced = json.loads(_run([str(python), '-I', '-B', '-c', r'''
-import hashlib, io, json, socket, sys, tracemalloc
+        permissions=(_readonly_installation(python,outside,environment) if current is None else
+                     readonly_tree(current.parent,owner=outside.parent,environment=environment))
+        with permissions:
+            proof=json.loads(_run([active_python,'-I','-B','-c',script,str(destination),str(patch),runtime_argument],outside,environment))
+            cli_prefix=([str(python),'-I','-B','-m','patchharbor.cli'] if current is None else
+                        [sys.executable,'-I','-S','-B',str(current)])
+            cli=json.loads(_run([*cli_prefix,'validate','--json',str(patch)],outside,environment))
+            repository=create_repository(outside/f'foreign-repository-{generation}')
+            target=next(destination.glob('*.pyz'))
+            produced=json.loads(_run([active_python,'-I','-B','-c',r'''
+import hashlib,io,json,socket,sys,tracemalloc
 from pathlib import Path
 from zipfile import ZipFile
+if sys.argv[3]!='-':sys.path.insert(0,sys.argv[3])
 from patchharbor import api
 from patchharbor.result_reader import read_result_reference
-def forbidden(*args, **kwargs):
-    raise AssertionError('Result attempted Python networking')
-socket.socket = forbidden
-repo = Path(sys.argv[1])
-api.register(repo)
-api.configure_exchange_directory(repo.parent / (repo.name + '-results'), repository=repo)
-tracemalloc.start()
-bundle = api.bundle(repo)
-peak_python_bytes = tracemalloc.get_traced_memory()[1]
-tracemalloc.stop()
-facts, digest = read_result_reference(bundle.path)
-assert facts.format_version == 2 and facts.runtime.status == 'embedded'
-assert not facts.warnings and facts.context.repository_path == str(repo)
+def forbidden(*args,**kwargs):raise AssertionError('Result attempted Python networking')
+socket.socket=forbidden
+repo=Path(sys.argv[1]);api.register(repo)
+api.configure_exchange_directory(repo.parent/(repo.name+'-results'),repository=repo)
+tracemalloc.start();bundle=api.bundle(repo);peak=tracemalloc.get_traced_memory()[1];tracemalloc.stop()
+facts,digest=read_result_reference(bundle.path)
+assert facts.format_version==3 and facts.runtime.status=='embedded'
+assert not facts.warnings and facts.context.repository_path==str(repo)
 with ZipFile(bundle.path) as archive:
-    raw = archive.read(facts.runtime.wheel.path)
-    assert len(raw) == facts.runtime.wheel.size
-    assert hashlib.sha256(raw).hexdigest() == facts.runtime.wheel.sha256
-    # Reconstruct the comparable mandatory ZIP without runtime data to measure
-    # additional compressed bytes. Preserve member attributes/compression.
-    baseline = io.BytesIO()
-    with ZipFile(baseline, 'w') as prior:
+    raw=archive.read(facts.runtime.artifact.path)
+    assert len(raw)==facts.runtime.artifact.size and hashlib.sha256(raw).hexdigest()==facts.runtime.artifact.sha256
+    assert not any(n.startswith('runtime/') and n.endswith('.whl') for n in archive.namelist())
+    baseline=io.BytesIO()
+    with ZipFile(baseline,'w') as prior:
         for info in archive.infolist():
-            if info.filename.startswith('runtime/'):
-                continue
-            content = archive.read(info.filename)
-            if info.filename == 'manifest.json':
-                manifest = json.loads(content)
-                manifest.pop('runtime'); manifest['format_version'] = 1
-                content = (json.dumps(manifest, ensure_ascii=True, indent=2) + '\n').encode()
-            prior.writestr(info, content)
-    compressed_addition = bundle.path.stat().st_size - len(baseline.getvalue())
-target = Path(sys.argv[2])
-# The next generation is installed from the actual Result, not the independent
-# provider probe above. The trusted fixture source supplied this wheel.
-target.write_bytes(raw)
-measurement = {'wheel_sha256': facts.runtime.wheel.sha256, 'size': len(raw),
-               'peak_python_bytes': peak_python_bytes, 'compressed_addition': compressed_addition}
-(repo.parent / (repo.name + '-metrics.json')).write_text(json.dumps(measurement))
+            if info.filename.startswith('runtime/'):continue
+            content=archive.read(info)
+            if info.filename=='manifest.json':
+                manifest=json.loads(content);manifest.pop('runtime');manifest['format_version']=1
+                content=(json.dumps(manifest,ensure_ascii=True,indent=2)+'\n').encode()
+            prior.writestr(info,content)
+    compressed_addition=bundle.path.stat().st_size-len(baseline.getvalue())
+# The next generation consumes this actual Result's PYZ, with no installation.
+Path(sys.argv[2]).write_bytes(raw)
+measurement={'pyz_sha256':facts.runtime.artifact.sha256,'size':len(raw),'peak_python_bytes':peak,
+             'compressed_addition':compressed_addition,'result_sha256':digest,'result':str(bundle.path)}
+(repo.parent/(repo.name+'-metrics.json')).write_text(json.dumps(measurement))
 print(json.dumps(measurement))
-''', str(repository), str(destination / next(destination.glob('*.whl')).name)], outside, environment))
-            assert produced['wheel_sha256'] == proof['sha256'] and produced['size'] == proof['size']
-            assert 0 < produced['compressed_addition'] < 2 * 1024 * 1024
-            # A bounded small-repository allocation regression check. This
-            # measures Python allocations, not total process RSS.
-            assert 0 < produced['peak_python_bytes'] < 128 * 1024 * 1024
-        assert cli["result"]["scope"] == "package"
-        assert not (outside / "SHOULD_NOT_EXIST").exists()
-        assert proof["requires_python"] == ">=3.12"
+''',str(repository),str(target),runtime_argument],outside,environment))
+            assert produced['pyz_sha256']==proof['sha256'] and produced['size']==proof['size']
+            assert 0<produced['compressed_addition']<2*1024*1024
+            assert 0<produced['peak_python_bytes']<128*1024*1024
+        assert cli['result']['scope']=='package'
+        assert not (outside/'SHOULD_NOT_EXIST').exists()
+        assert proof['requires_python']=='>=3.12'
         fingerprints.append(proof)
-        current = next(destination.glob("*.whl"))
-        if previous is not None:
-            assert current.read_bytes() == previous
-        previous = current.read_bytes()
-        if generation < 2:
-            python = _venv(tmp_path / f"installed-{generation + 1}", outside, environment)
-            _run([sys.executable, "-m", "pip", "--python", str(python), "install", "--no-index", "--no-deps",
-                  "--no-cache-dir", "--no-compile", str(current)], outside, environment)
-        current.unlink()
-    assert fingerprints[0] == fingerprints[1] == fingerprints[2]
+        raw=target.read_bytes()
+        if previous is not None:assert raw==previous
+        previous=raw;current=target
+    assert fingerprints[0]==fingerprints[1]==fingerprints[2]
 
 
 @pytest.mark.parametrize("pin_before_update", [False, True])
@@ -201,7 +177,7 @@ def test_same_version_reinstallation_is_bound_to_loaded_producer(tmp_path, pin_b
         wheel = next(output.glob("*.whl"))
         wheels.append(wheel)
         with ZipFile(wheel) as archive:
-            content_ids.append(json.loads(archive.read("patchharbor/_runtime/recipe.json"))["content_id"])
+            content_ids.append(json.loads(archive.read("patchharbor/_runtime/pyz-recipe.json"))["content_id"])
     assert wheels[0].name == wheels[1].name and content_ids[0] != content_ids[1]
     python = _venv(tmp_path / "installed", outside, environment)
     install = [sys.executable, "-m", "pip", "--python", str(python), "install", "--no-index", "--no-deps",
@@ -211,21 +187,21 @@ def test_same_version_reinstallation_is_bound_to_loaded_producer(tmp_path, pin_b
 import json, sys
 import patchharbor
 if sys.argv[1] == 'True':
-    from patchharbor.runtime_artifact import RuntimeProvider
-    provider = RuntimeProvider()
+    from patchharbor.pyz_artifact import PyzProvider
+    provider = PyzProvider()
     pinned = provider.capture()
     assert pinned.status == 'embedded'
 else:
-    assert 'patchharbor.runtime_artifact' not in sys.modules
+    assert 'patchharbor.pyz_artifact' not in sys.modules
 print('READY', flush=True)
 assert sys.stdin.readline() == 'capture\\n'
-from patchharbor.runtime_artifact import RuntimeProvider
-current = RuntimeProvider().capture()
+from patchharbor.pyz_artifact import PyzProvider
+current = PyzProvider().capture()
 assert current.status == 'unavailable' and current.reason == 'source_changed', current
 if sys.argv[1] == 'True':
     assert provider.capture() is pinned
     assert pinned.artifact.recipe.content_id == sys.argv[2]
-print(json.dumps({'reason': current.reason, 'producer_id': patchharbor._runtime_resource_id}))
+print(json.dumps({'reason': current.reason, 'producer_id': patchharbor._pyz_resource_id}))
 '''
     process = subprocess.Popen([str(python), "-I", "-B", "-u", "-c", script, str(pin_before_update), content_ids[0]],
                                cwd=outside, env=environment, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
@@ -247,8 +223,8 @@ print(json.dumps({'reason': current.reason, 'producer_id': patchharbor._runtime_
             process.kill()
         process.communicate()
     fresh = _run([str(python), "-I", "-B", "-c",
-                  "from patchharbor.runtime_artifact import RuntimeProvider; "
-                  "p = RuntimeProvider().capture(); assert p.status == 'embedded', p; "
+                  "from patchharbor.pyz_artifact import PyzProvider; "
+                  "p = PyzProvider().capture(); assert p.status == 'embedded', p; "
                   "print(p.artifact.recipe.content_id)"], outside, environment).strip()
     assert fresh == content_ids[1]
 
@@ -263,11 +239,11 @@ def test_editable_installation_never_claims_prepared_runtime(tmp_path):
     _install_builder(python, outside, environment)
     _run([sys.executable, "-m", "pip", "--python", str(python), "install", "--no-index", "--no-deps",
           "--no-cache-dir", "--no-build-isolation", "--editable", str(source)], outside, environment)
-    script = ("from patchharbor.runtime_artifact import RuntimeProvider; "
-              "p = RuntimeProvider().capture(); assert p.status == 'unavailable' and "
+    script = ("from patchharbor.pyz_artifact import PyzProvider; "
+              "p = PyzProvider().capture(); assert p.status == 'unavailable' and "
               "p.reason == 'source_not_prepared' and p.artifact is None, p")
     _run([str(python), "-I", "-B", "-c", script], outside, environment)
-    code = source / "src/patchharbor/runtime_wheel.py"
+    code = source / "src/patchharbor/runtime_pyz.py"
     code.write_bytes(code.read_bytes() + b"\n# editable change\n")
     _run([str(python), "-I", "-B", "-c", script], outside, environment)
 
@@ -283,7 +259,7 @@ def test_source_build_ignores_stale_build_outputs_and_preserves_prepared_metadat
     (stale.parent / "extra.py").write_bytes(b"raise AssertionError('stale module')\n")
     generated = source / "src/patchharbor/_runtime_identity.py"
     generated.write_bytes(b"raise AssertionError('stale generated identity')\n")
-    resource = source / "src/patchharbor/_runtime/recipe.json"
+    resource = source / "src/patchharbor/_runtime/pyz-recipe.json"
     resource.parent.mkdir()
     resource.write_bytes(b"stale generated recipe")
     assert not (source / ".git").exists()
@@ -305,7 +281,8 @@ with ZipFile(Path('../dist') / name) as wheel:
     with ZipFile(wheel) as archive:
         assert archive.read("patchharbor/api.py") == (source / "src/patchharbor/api.py").read_bytes()
         assert "patchharbor/extra.py" not in archive.namelist()
-        assert archive.read("patchharbor/_runtime_identity.py") != generated.read_bytes()
+        assert "patchharbor/_runtime_identity.py" not in archive.namelist()
+        assert archive.read("patchharbor/_pyz_identity.py") != generated.read_bytes()
     assert resource.read_bytes() == b"stale generated recipe"
     assert stale.read_bytes() == b"raise AssertionError('stale code must never ship')\n"
     outside = tmp_path / "outside"

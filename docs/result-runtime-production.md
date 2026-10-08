@@ -1,75 +1,62 @@
-# Runtime in erzeugten Results
+# PYZ in erzeugten Results
 
-Seit RIV 1.e erzeugen alle regulären Bundle-, Apply-, Dry-Run- und Watcher-Pfade
-Result-Format 2. Eine normale, unveränderte Installation liefert das kanonische
-Wheel. Ein unvorbereiteter Source-/Editable-Checkout liefert dagegen
-`unavailable/source_not_prepared`; dies ist eine Diagnose und kein Buildauftrag.
+Ab PP-06B erzeugt der gemeinsame Core Result-Format 3 mit Runtime-Metadaten 2.
+Eine normale Wheel-, Source- oder sdist-Installation enthält die vorbereiteten
+Ressourcen für genau eine kanonische Core-PYZ ohne Watcher. Neue Results betten
+kein zusätzliches Runtime-Wheel ein. Der normale Installationsvertrag mit Wheel,
+sdist, CLI und separat installiertem Watcher bleibt bestehen.
 
-Nach sicherer Repositoryauflösung und vor Payload/Entrypoint fixiert der Request
-Runtime-Bytes und kanonische statische Vorlage gemeinsam. Die spätere
-Snapshotaufnahme erfasst den tatsächlichen Repositoryzustand. Auch nach einer
-Neuinstallation derselben Version im Entrypoint stammen Runtime und Vorlage aus
-dem ursprünglichen Prozess; das Result darf bereits den neuen Commit enthalten.
-Ein frisch gestarteter Prozess verwendet die neue Installation. Ein alter Prozess
-erkennt geänderte Ressourcen anhand ihrer Inhaltsidentität.
+Ein Source-/Editable-Checkout ohne vorbereitete Ressourcen liefert
+`unavailable/source_not_prepared`. Das ist eine Diagnose, kein Buildauftrag.
+Eine noch laufende alte Installation produziert weiterhin ihr eigenes Format;
+ein Repository-Patch aktualisiert weder globale Installation noch laufenden Dienst.
+
+Nach Repositoryauflösung und vor Payload/Entrypoint fixiert der Request Runtime
+und statische Vorlage gemeinsam aus seinem tatsächlich geladenen Erzeuger. Der
+spätere Snapshot beschreibt den tatsächlichen Repositoryzustand. Selbst bei einem
+Update gleicher Version während Apply stammen Runtime und Anleitung aus den
+fixierten alten Bytes, während der Snapshot schon den neuen Commit enthalten darf.
+Ein frischer Prozess nutzt die neue Installation; ein alter erkennt geänderte
+Ressourcen an seinem beim Import festgehaltenen Producer-ID.
 
 | Befund | Ergebnis |
 |---|---|
-| Runtime fehlt, ist beschädigt oder überschreitet das Zusatzbudget | Vollständiges Result mit begründetem `unavailable` und Warnung, soweit Pflichtdaten publizierbar sind |
-| Pflichtvorlage oder Snapshot fehlt | Echter Result-Fehler; bisherige Notfalldiagnose |
-| Schreiben, Verifikation oder atomare Publikation scheitert | Kein fertiges Teil-ZIP; Primärergebnis und Ausführungslog bleiben in der Notfalldiagnose |
-| Snapshot war bereits erfolgreich erfasst | Notfallbericht behält dessen geprüften Kontext, auch nach einem neuen Commit |
-| Abbruchsignal | Keine Umdeutung in einen Runtime-Fallback oder erfolgreichen Lauf |
+| Optionale Runtime fehlt, ist beschädigt oder zu groß | Vollständiges Result mit `unavailable`, solange alle Pflichtdaten nachweisbar bleiben |
+| Runtime defekt, eigene Pflichtvorlage noch gültig | Begrenzte Vorlagenprüfung gegen geladenen Producer-ID, Rezept, Größe und SHA; keine behauptete Runtime-Vollvalidierung |
+| Pflichtvorlage oder Snapshot fehlt/ist unprüfbar | Echter Resultfehler und vorhandene Notfalldiagnose |
+| Schreiben, Verifikation oder Publikation scheitert | Kein fertiges Teil-ZIP; Primärergebnis, Log und letzter geprüfter Kontext bleiben erhalten |
+| Abbruch oder Programmierfehler | Keine Umdeutung in erfolgreichen Runtime-Fallback |
 
-Der gemeinsame interne Dokumentensatz hält Report, Handoff, Manifest, Kontext
-und Runtime zusammen. Beide Erzeugungswege nutzen denselben Publikationshelfer;
-der Runtime-Fallback wird vor Öffnen der temporären ZIP entschieden.
+Result-Sync, No-follow, atomare Ersetzung, typisierte endliche CIFS-Retries,
+gemeinsames Wartebudget und geprüfte SHA bis zur Veröffentlichung bleiben
+unverändert. Runtime-Fallback wird vor dem ZIP-Schreiben entschieden und entfernt
+keine Snapshot-, Änderungs- oder Logdaten. Warnungsbehaftete Results sind weiterhin
+kein warnungsfreier Archivierungs-/Recovery-Erfolgsbeweis. `pack` besitzt seinen
+separaten No-replace-/No-retry-Vertrag.
 
-Nur eigene temporäre Dateien werden entfernt. Vorhandene fremde Dateien und
-geänderte Reservierungen bleiben geschützt. Runtime-Fallback entfernt keine
-Snapshot-, Änderungs- oder Untracked-Dateien. Results mit Warnungen sind weiterhin
-kein warnungsfreier Archivierungs- oder Recovery-Nachweis.
+Die Packaging-Prüfungen installieren aus Wheel, Source und sdist, entfernen
+Buildquellen und Installer-Caches und erzeugen drei echte Result-/PYZ-Generationen.
+Ab der zweiten Generation läuft ausschließlich die vorherige Result-PYZ in einem
+frischen Prozess, ohne Neuinstallation. Ihre SHA-256, Größe und Bytes müssen
+identisch bleiben; schreibgeschützte Runtimeverzeichnisse werden mitgeprüft.
+Die Self-update-Tests ersetzen eine echte isolierte Installation während Apply
+und prüfen erfolgreichen sowie fehlgeschlagenen Entrypoint mit neuem Commit.
 
-Die installierten Packaging-Tests erzeugen für Wheel-, Repository- und
-sdist-Installation jeweils Result A, installieren dessen enthaltenes Wheel in
-eine frische Umgebung und wiederholen dies bis Result C. Wheel-SHA und Größe
-bleiben identisch. Die Standardinstallationen werden schreibgeschützt geprüft;
-ursprüngliche Builds und Installer-Caches stehen dabei nicht mehr zur Verfügung.
-Die zusätzlichen Self-update-Tests ersetzen eine echte isolierte Installation
-während eines wirklichen Apply und prüfen Erfolg sowie Fehler nach dem Commit.
+E-10 entnimmt den Bootstrap ausschließlich der eigenen Root-Anleitung des ersten
+neuen Results aus einer echten Installation. Der frische Python-only-Prozess
+packt und validiert gegen genau dieses Result. Danach führen vollständige Dateien,
+Diff-Payload und gemischte Pakete einen regulären Apply im isolierten Repository
+aus. Dieselbe PYZ unterstützt Kontext, Registry/Konfiguration, Result-Erzeugung
+und den älteren `fs run`-Weg. Der installierte Watcher nutzt den gemeinsamen Core;
+Watcher-Code wird nicht in die PYZ aufgenommen.
 
-Die Result-Roundtrips messen pro Generation kanonische Wheel-Größe, zusätzliche
-komprimierte ZIP-Bytes und maximale durch `tracemalloc` erfasste Python-Allokation.
-Für das kleine Fremdprojekt gelten Regressionsgrenzen von 2 MiB komprimiertem
-Mehrbedarf und 128 MiB Python-Allokation. Dies ist keine Aussage über den gesamten
-Prozess-RSS oder beliebig große Repository-Snapshots. Messwerte werden im jeweiligen
-isolierten Testverzeichnis als `foreign-repository-*-metrics.json` gespeichert.
-Native Windows-Nachweise kommen aus dem fälligen CI-Lauf; ein lokaler Linux-Test
-ersetzt sie nicht.
+Pro Generation werden Artefaktgröße, komprimierter Result-Mehrbedarf und maximale
+`tracemalloc`-Python-Allokation unter `foreign-repository-*-metrics.json` erfasst.
+Die kleinen Fixture-Repositories haben Grenzen von 2 MiB komprimiertem Mehrbedarf
+und 128 MiB Python-Allokation. Das ist keine Messung des gesamten Prozess-RSS und
+keine Behauptung über beliebig große Snapshots. Native Windows-/Python-3.12-CI
+startet nur Christian manuell; reale Linux→Windows-CIFS-Nachweise bleiben separat.
 
-Die Verwendung des eingebetteten Wheels folgt dem separat geprüften
-[Bootstrap- und Fallback-Vertrag](runtime-bootstrap.md). Ein beschädigter
-Runtime-Zusatz darf nicht als native Vollintegrität ausgewiesen werden;
-Repository-only-Evidence gehört ausschließlich zum dort beschriebenen bisherigen
-Übergabeweg und verändert keine Archivierungs-/Recovery-Regeln.
-
-
-## PP-06A: prepared PYZ resources before the writer switch
-
-The current production selection remains Result 2 until PP-06B. The private
-`capture_pyz_result_resources` path prepares immutable Format-3 metadata and
-PYZ bytes through the same Result writer/publication boundary. A payload carries
-its format, and a resource-budget fallback preserves that format's unavailable
-schema. No new user switch or CLI command is introduced.
-
-Runtime and required template are pinned before repository mutation. A failed
-optional PYZ resource does not discard a separately proven mandatory template:
-the loaded producer ID, canonical recipe, exact template length/hash and bounded
-own-directory/own-ZIP reads must agree. No other installation, cache, builder or
-network is consulted. Missing/corrupt required documents retain normal Result
-failure and emergency diagnostics; cancellation/programming failures propagate.
-
-The preparation tests generate real fixture Results through the existing routes,
-including failed Apply, and check full Format-3 integrity and snapshot/log
-preservation. The production switch, normal-installation self-update and three
-actual Result/PYZ generations remain PP-06B gates, including first-output E-10.
+Der [Bootstrap-Vertrag](runtime-bootstrap.md) trennt begrenzte Runtime-Vorprüfung,
+Herkunftsentscheidung und vollständige native Referenzvalidierung. Defekte
+Runtime-Zusätze dürfen nicht als native Vollintegrität ausgegeben werden.

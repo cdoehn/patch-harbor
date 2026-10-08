@@ -1,5 +1,14 @@
 # PatchHarbor – Spezifikations-Changelog
 
+## 2026-10-08 – PP-06A bestätigt; Result-3-Writer in Bundle 040
+
+- Commit `0a806c1b2c00b8e2b3c3a6e9d03559ca9c36fa51` durch tatsächlichen Apply bestätigt.
+- Gemeinsame Produktion auf Result 3 mit einer Core-PYZ und Runtime-Metadaten 2
+  umgestellt; normaler Build bereitet nur das PYZ-Profil vor. Alte Reader bleiben.
+- Eigene Erstnutzung, drei tatsächliche Generationen, Installation/Selbstupdate,
+  Core-Parität und unveränderte Publikationspolitik werden vor Übergabe geprüft.
+- Keine CI-Automatik und kein globales Upgrade; beide Normdateien unverändert.
+
 ## 2026-10-08 – PP-05B bestätigt; PYZ-Result-Ressourcen in Bundle 039
 
 - Commit `1da90f0c080cb6e5dd8feed5d204fbc2826e55ab` durch tatsächlichen Apply bestätigt.

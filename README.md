@@ -38,7 +38,10 @@ Bundle 033 confirms the CLI adapter at commit `9bebc3c5a9da4da0cb6f846469a79bf99
 confirms full Result-3 reference reading at commit `f892ae6aaaeebcabb83baf25997799d259b63e6f`
 (2939 passed, 8 skipped). Bundle 038 confirms complete consumer evidence and the executable embedded bootstrap
 at commit `1da90f0c080cb6e5dd8feed5d204fbc2826e55ab` (2968 passed, 8 skipped).
-Bundle 039 prepares pinned PYZ Result resources; production still writes Result 2.
+Bundle 039 confirms pinned PYZ Result resources at commit
+`0a806c1b2c00b8e2b3c3a6e9d03559ca9c36fa51` (2997 passed, 8 skipped).
+Bundle 040 prepares the productive Result-3 switch with its own embedded bootstrap,
+three-generation roundtrips and Core parity. The existing global installation is unchanged.
 
 **Current policy, explicitly updated by Christian on 7 October 2026:**
 Development and Apply run full parallel suites only, including at bundle end.
@@ -47,14 +50,15 @@ Only Christian starts the manual GitHub CI workflow; no automated dispatch or
 five-bundle cadence. The active loop continues the existing plan after verified
 Results, without a fixed correction-attempt limit.
 See [test policy](docs/test-parallelism.md) and [plan section 1.10](planning/pyz-pack/commit-plan.md).
-The prepared PP-06A step is not yet an Apply or CI success.
+The prepared PP-06B step is not yet an Apply or CI success.
 
-The prepared Result-PYZ profile contains the shared Core **without the watcher**.
+The Result-PYZ profile contains the shared Core **without the watcher**.
 The new public `api.pack_patch` accepts explicit contents, a Result reference,
 and an explicit output location; see the [pack guide](docs/pack.md).
 The `patchharbor pack` CLI uses the same public API; the built Core-PYZ supports these operations without installation. Both paths require an explicit Result and output location.
 Existing public `inspect`/`validate` signatures and results remain compatible.
-Result Format 2, its wheel runtime and the normal installation remain unchanged.
+New Results use Format 3 with exactly one Core-PYZ. Readers preserve legacy
+Result-1/2 support; normal wheel/sdist installation and the installed watcher remain.
 
 The watcher plan is completed. Open native/CIFS evidence in the
 [result-publication plan](planning/result-publication/commit-plan.md) remains
@@ -70,7 +74,7 @@ either `--reference-bundle result.zip` or `--repository /workspace/repository`
 to compare the complete binding. Package/reference checks require no Git or
 registration; repository checks require the existing registered instance.
 These commands execute no scripts and create no Result Bundle. Offline runtime
-and Result Format 2 are present in this source baseline; their
+and Result Format 3 with its Core-PYZ are present in this source baseline; their
 [RIV plan](planning/runtime-inspect-validate/commit-plan.md) is completed.
 The active successor is the [PYZ/PACK plan](planning/pyz-pack/commit-plan.md).
 See the [Python API contract](docs/python-api.md#static-package-inspection-riv-development-addition)
@@ -809,7 +813,7 @@ aufrufenden Python-Programms installiert sein. Das Wheel enthält `py.typed` und
 die API-Dokumentation; neue Runtime-Abhängigkeiten gibt es nicht.
 
 Die RIV-Entwicklung ergänzt lesende `inspect`-/`validate`-Operationen und
-Result-Format 2 mit einer offline installierbaren Runtime. Der
+Result-Format 3 mit einer installationsfrei startbaren Core-PYZ. Der
 [Bootstrap-Ablauf](docs/runtime-bootstrap.md) prüft Herkunft und Integrität vor
 Codeausführung und verwendet bei Wheel-Ausfall verbindlich den bisherigen
 Übergabeweg. Diagnosebundles dürfen null Commits enthalten, Entwicklungsbundles

@@ -80,7 +80,9 @@ def _prepare_pyz_transport(transport: dict[str, bytes], *, version: str,
         remaining_bytes=pyz.MAX_CONTENT_BYTES)
     if checked != recipe:
         raise RuntimeError('built PYZ differs from its prepared recipe')
-    prepared = dict(transport)
+    prepared = {name:raw for name,raw in transport.items()
+                if not name.startswith(pyz.RESOURCE_ROOT)
+                and name not in {pyz.IDENTITY_PATH,'patchharbor/_runtime_identity.py'}}
     prepared.update({name: raw for name, raw in canonical.items()
                      if name.startswith(pyz.RESOURCE_ROOT) or name == pyz.IDENTITY_PATH})
     prepared[pyz.RECIPE_PATH] = recipe.data
@@ -177,12 +179,6 @@ def build_wheel(wheel_directory, config_settings=None, metadata_directory=None):
         dist_info = f"patchharbor-{version}.dist-info"
         if metadata_name != dist_info + "/METADATA" or filename != f"patchharbor-{version}-py3-none-any.whl":
             raise RuntimeError("unexpected transport identity")
-        recipe_module = _recipe_module()
-        transport = _prepare_transport(
-            recipe_module, transport, version=version, requires_python=requires,
-            chat=(source / "CHAT_INSTRUCTIONS.md").read_bytes(),
-            documentation=(source / "docs/python-api.md").read_bytes(),
-        )
         transport = _prepare_pyz_transport(
             transport, version=version, requires_python=requires,
             chat=(source / "CHAT_INSTRUCTIONS.md").read_bytes(),

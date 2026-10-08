@@ -70,32 +70,32 @@ import hashlib, json, socket, sys
 from pathlib import Path
 from zipfile import ZipFile
 from patchharbor import api
-from patchharbor.runtime_artifact import RuntimeProvider
+from patchharbor.pyz_artifact import PyzProvider
 from patchharbor.result_reader import read_result_reference
 def no_network(*args, **kwargs):
     raise AssertionError('Apply producer attempted Python networking')
 socket.socket = no_network
-before = RuntimeProvider().capture().artifact
+before = PyzProvider().capture().artifact
 assert before is not None
 report = api.apply(Path(sys.argv[1]))
 assert report.process_exit_code == int(sys.argv[2])
 facts, _ = read_result_reference(report.result_bundle.path)
 assert facts.runtime.status == 'embedded' and not facts.warnings
-assert facts.runtime.wheel.sha256 == before.wheel_sha256
+assert facts.runtime.artifact.sha256 == before.pyz_sha256
 assert facts.runtime.content_id == before.recipe.content_id
 with ZipFile(report.result_bundle.path) as archive:
-    assert archive.read(facts.runtime.wheel.path) == before.wheel_bytes
+    assert archive.read(facts.runtime.artifact.path) == before.pyz_bytes
     assert archive.read('CHAT_INSTRUCTIONS.md').endswith(before.chat_template)
     assert archive.read('base/tracked.txt') == b'new committed snapshot\n'
     assert archive.read('logs/execution.log')
     new_context = json.loads(archive.read('context.json'))
-assert RuntimeProvider().capture().reason == 'source_changed'
+assert PyzProvider().capture().reason == 'source_changed'
 print(json.dumps({'base_commit': new_context['base_commit'], 'old_content_id': before.recipe.content_id}))
 ''', str(patch), str(exit_code)], outside, environment))
     assert proof["base_commit"] == git(repository, "rev-parse", "HEAD").stdout.strip()
     assert proof["base_commit"] != str(context.base_commit)
     fresh = _run([str(python), "-I", "-B", "-c",
-                  "from patchharbor.runtime_artifact import RuntimeProvider; "
-                  "p=RuntimeProvider().capture(); assert p.status=='embedded'; print(p.artifact.recipe.content_id)"],
+                  "from patchharbor.pyz_artifact import PyzProvider; "
+                  "p=PyzProvider().capture(); assert p.status=='embedded'; print(p.artifact.recipe.content_id)"],
                  outside, environment).strip()
     assert fresh != proof["old_content_id"]

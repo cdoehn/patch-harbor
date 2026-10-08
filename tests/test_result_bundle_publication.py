@@ -40,12 +40,13 @@ def test_result_bundle_filename_starts_with_repository_and_uses_short_run_id() -
     ) == "patch-harbor_Result_102139_0830_123456.zip"
 
 
-def _publish(publication: ResultBundlePublication, **options) -> None:
+def _publish(publication: ResultBundlePublication, *, runtime=None, **options) -> None:
     from patchharbor.result_bundle import _context_document, _manifest_document
     from patchharbor.result_resources import runtime_payload
     final_path = publication.final_path
     report = successful_bundle_run_report(final_path.parent / "repository", final_path)
-    runtime = runtime_payload(None, reason="source_not_prepared")
+    if runtime is None:
+        runtime = runtime_payload(None, reason="source_not_prepared")
     report = replace(report, warnings=runtime.warnings)
     snapshot = build_result_bundle_snapshot(base_entries=(), staged_patch=b"", unstaged_patch=b"", untracked_entries=())
     context = _context_document(report)

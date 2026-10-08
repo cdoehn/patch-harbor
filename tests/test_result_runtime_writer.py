@@ -1,4 +1,4 @@
-"""Result-2 producer integration through actual registered fixture repositories."""
+"""Result-3 producer integration through actual registered fixture repositories."""
 from __future__ import annotations
 
 import json
@@ -12,17 +12,21 @@ import patchharbor.application as application
 import patchharbor.result_bundle as result_bundle
 import patchharbor.result_resources as resources
 from patchharbor.result_reader import read_result_reference
-from patchharbor.runtime_artifact import RuntimeArtifact, RuntimeProvision
-from patchharbor.runtime_wheel import CHAT_PATH, sha256
+from patchharbor.pyz_artifact import PyzArtifact, PyzProvision
+from patchharbor import runtime_pyz as pyz
 from tests.platform_support import native_script, native_value
 from tests.registration_support import create_repository, git
-from tests.test_runtime_artifact import prepared, _capture, _recipe
+from tests.test_runtime_pyz import prepared, inputs
 
 
 @pytest.fixture(scope="module")
-def artifact(prepared):
-    raw = _capture(prepared)
-    return RuntimeArtifact(_recipe(prepared), raw, sha256(raw), prepared[CHAT_PATH])
+def artifact():
+    fixture_inputs = inputs()
+    # Keep the runtime above the explicit 128-KiB publication-test budget.
+    fixture_inputs["patchharbor/budget_fixture.py"] = b"# Runtime budget fixture\n" * 10000
+    recipe,payloads,raw=prepared(fixture_inputs)
+    return PyzArtifact(recipe,raw,pyz.sha256(raw),payloads[pyz.CHAT_PATH],
+                       payloads[pyz.DOC_PATH],payloads[pyz.LICENSE_PATH])
 
 
 @pytest.fixture
@@ -54,8 +58,8 @@ def test_all_result_routes_embed_same_producer_runtime(repository, artifact, mon
     calls = []
     def capture(self):
         calls.append(True)
-        return RuntimeProvision("embedded", None, artifact)
-    monkeypatch.setattr(resources.RuntimeProvider, "capture", capture)
+        return PyzProvision("embedded", None, artifact)
+    monkeypatch.setattr(resources.PyzProvider, "_capture", capture)
     before = git(root, "rev-parse", "HEAD").stdout
     patch = package(root, exchange, exit_code=27 if route == "failure" else 0)
     if route == "bundle":
@@ -67,17 +71,17 @@ def test_all_result_routes_embed_same_producer_runtime(repository, artifact, mon
     assert len(calls) == 1
     assert report.process_exit_code == (27 if route == "failure" else 0)
     facts, _ = read_result_reference(report.result_bundle.path)
-    assert facts.format_version == 2 and facts.runtime.status == "embedded"
-    assert facts.runtime.wheel.sha256 == artifact.wheel_sha256
+    assert facts.format_version == 3 and facts.runtime.status == "embedded"
+    assert facts.runtime.artifact.sha256 == artifact.pyz_sha256
     assert facts.runtime.content_id == artifact.recipe.content_id
     assert facts.context.repository_path == str(root)
     assert facts.dry_run == (route == "dry_run")
     assert facts.primary_result.entrypoint_started == (route not in {"bundle", "dry_run"})
     assert not facts.warnings
     with ZipFile(report.result_bundle.path) as archive:
-        assert archive.read(facts.runtime.wheel.path) == artifact.wheel_bytes
+        assert archive.read(facts.runtime.artifact.path) == artifact.pyz_bytes
         assert {name for name in archive.namelist() if name.startswith("runtime/")} == {
-            facts.runtime.wheel.path, "runtime/runtime.json"}
+            facts.runtime.artifact.path, "runtime/runtime.json"}
         assert not any(name.startswith("base/runtime/") for name in archive.namelist())
     assert git(root, "rev-parse", "HEAD").stdout == before
     assert not git(root, "status", "--porcelain").stdout
@@ -90,8 +94,8 @@ def test_all_result_routes_embed_same_producer_runtime(repository, artifact, mon
 ])
 def test_runtime_failure_preserves_actual_failed_apply_and_log(repository, monkeypatch, reason, expected):
     root, exchange = repository
-    monkeypatch.setattr(resources.RuntimeProvider, "capture",
-                        lambda self: RuntimeProvision("unavailable", reason, None))
+    monkeypatch.setattr(resources.PyzProvider, "capture",
+                        lambda self: PyzProvision("unavailable", reason, None))
     report = api.apply(package(root, exchange, exit_code=23))
     assert report.process_exit_code == 23
     facts, _ = read_result_reference(report.result_bundle.path)
@@ -108,13 +112,13 @@ def test_runtime_and_template_are_pinned_before_actual_entrypoint(repository, ar
     calls = []
     def capture(self):
         calls.append(True)
-        return RuntimeProvision("embedded", None, artifact)
-    monkeypatch.setattr(resources.RuntimeProvider, "capture", capture)
+        return PyzProvision("embedded", None, artifact)
+    monkeypatch.setattr(resources.PyzProvider, "_capture", capture)
     execute = application.execute_prepared_script_with_log
     def changed_installation(*args, **kwargs):
         import patchharbor.chat_instructions as chat
         assert calls == [True]
-        monkeypatch.setattr(resources.RuntimeProvider, "capture", lambda self: pytest.fail("late runtime capture"))
+        monkeypatch.setattr(resources.PyzProvider, "capture", lambda self: pytest.fail("late runtime capture"))
         monkeypatch.setattr(resources, "load_chat_template", lambda: pytest.fail("late template read"))
         monkeypatch.setattr(chat, "load_chat_template", lambda: pytest.fail("late template read"))
         return execute(*args, **kwargs)
@@ -122,7 +126,7 @@ def test_runtime_and_template_are_pinned_before_actual_entrypoint(repository, ar
     report = api.apply(package(root, exchange))
     assert report.process_exit_code == 0
     facts, _ = read_result_reference(report.result_bundle.path)
-    assert facts.runtime.wheel.sha256 == artifact.wheel_sha256
+    assert facts.runtime.artifact.sha256 == artifact.pyz_sha256
     with ZipFile(report.result_bundle.path) as archive:
         # Template byte identity is a provenance contract, not a prose snapshot.
         assert archive.read("CHAT_INSTRUCTIONS.md").endswith(artifact.chat_template)
@@ -132,7 +136,7 @@ def test_runtime_budget_falls_back_without_losing_snapshot(repository, artifact,
     from functools import partial
     from patchharbor.resource_policy import ResourcePolicy
     root, exchange = repository
-    monkeypatch.setattr(resources.RuntimeProvider, "capture", lambda self: RuntimeProvision("embedded", None, artifact))
+    monkeypatch.setattr(resources.PyzProvider, "capture", lambda self: PyzProvision("embedded", None, artifact))
     monkeypatch.setattr(result_bundle, "runtime_fits", partial(resources.runtime_fits,
                         policy=ResourcePolicy(max_zip_total_bytes=128 * 1024)))
     report = api.apply(package(root, exchange))
@@ -148,8 +152,8 @@ def test_missing_mandatory_template_remains_a_result_error(repository, monkeypat
     def missing():
         raise result_bundle_error("missing canonical template")
     monkeypatch.setattr(resources, "load_chat_template", missing)
-    monkeypatch.setattr(resources.RuntimeProvider, "capture",
-                        lambda self: RuntimeProvision("unavailable", "resources_missing", None))
+    monkeypatch.setattr(resources.PyzProvider, "capture",
+                        lambda self: PyzProvision("unavailable", "resources_missing", None))
     report = api.apply(package(root, exchange, exit_code=27))
     assert report.primary_result.entrypoint_exit_code == 27
     assert report.result_bundle.status is api.ResultBundleStatus.FAILED

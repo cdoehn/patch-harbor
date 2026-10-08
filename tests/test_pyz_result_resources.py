@@ -16,18 +16,12 @@ from tests.test_reference_validation import reference_entries, write_reference, 
 from tests.test_result_runtime_writer import repository, package
 
 
-def select_future_resources(monkeypatch):
-    # Private preparation seam, not a product CLI flag or a second writer.
-    monkeypatch.setattr(application,'capture_result_resources',resources.capture_pyz_result_resources)
-    monkeypatch.setattr(result_bundle,'capture_result_resources',resources.capture_pyz_result_resources)
-
-
 @pytest.mark.parametrize('kind',['directory','zip'])
 @pytest.mark.parametrize('embedded',[True,False])
 def test_prepared_payload_matches_strict_native_reader(monkeypatch,tmp_path,kind,embedded):
     provider,_,_,_=provider_for(monkeypatch,tmp_path,kind=kind)
     artifact=provider.capture().artifact if embedded else None
-    payload=resources.pyz_runtime_payload(artifact,reason=None if embedded else 'source_not_prepared')
+    payload=resources.runtime_payload(artifact,reason=None if embedded else 'source_not_prepared')
     files,_=reference_entries(handoff=True)
     files.update(dict(payload.entries()))
     edit_document(files,'manifest.json',lambda d:d.update(format_version=3,runtime=payload.document()))
@@ -79,7 +73,6 @@ def test_required_template_is_from_the_same_captured_artifact_after_changes(monk
 def test_private_format3_resources_run_through_actual_existing_writer_routes(repository,monkeypatch,tmp_path,route):
     provider,_,_,_=provider_for(monkeypatch,tmp_path)
     artifact=provider.capture().artifact
-    select_future_resources(monkeypatch)
     root,exchange=repository
     patch=package(root,exchange,exit_code=23 if route=='failure' else 0)
     if route=='bundle':report=api.bundle(root).report
@@ -99,7 +92,6 @@ def test_private_format3_resources_run_through_actual_existing_writer_routes(rep
 def test_runtime_only_failure_keeps_snapshot_and_actual_failure_log(repository,monkeypatch,tmp_path,kind):
     _,source,_,_=provider_for(monkeypatch,tmp_path,kind=kind)
     damage(source,kind,pyz.DOC_PATH)
-    select_future_resources(monkeypatch)
     root,exchange=repository
     from tests.platform_support import native_script
     patch=package(root,exchange,exit_code=23)
@@ -119,7 +111,6 @@ def test_runtime_only_failure_keeps_snapshot_and_actual_failure_log(repository,m
 
 def test_format3_budget_fallback_cannot_reintroduce_legacy_wheel_contract(repository,monkeypatch,tmp_path):
     provider_for(monkeypatch,tmp_path)
-    select_future_resources(monkeypatch)
     monkeypatch.setattr(result_bundle,'runtime_fits',partial(resources.runtime_fits,policy=ResourcePolicy(max_zip_total_bytes=1)))
     report=api.apply(package(*repository))
     assert report.process_exit_code==0
@@ -133,7 +124,6 @@ def test_format3_budget_fallback_cannot_reintroduce_legacy_wheel_contract(reposi
 def test_prepared_runtime_and_template_are_frozen_before_mutation(repository,monkeypatch,tmp_path):
     provider,source,_,_=provider_for(monkeypatch,tmp_path)
     expected=provider.capture().artifact
-    select_future_resources(monkeypatch)
     original=application.execute_prepared_script_with_log
     def mutate(*args,**kwargs):
         damage(source,'directory',pyz.CHAT_PATH)
@@ -151,7 +141,6 @@ def test_prepared_runtime_and_template_are_frozen_before_mutation(repository,mon
 def test_required_template_failure_still_preserves_actual_error_diagnostics(repository,monkeypatch,tmp_path):
     _,source,_,_=provider_for(monkeypatch,tmp_path)
     damage(source,'directory',pyz.CHAT_PATH)
-    select_future_resources(monkeypatch)
     report=api.apply(package(*repository,exit_code=23))
     assert report.primary_result.entrypoint_exit_code==23
     assert report.result_bundle.status is api.ResultBundleStatus.FAILED
@@ -160,11 +149,11 @@ def test_required_template_failure_still_preserves_actual_error_diagnostics(repo
 
 def test_default_writer_retains_current_contract_until_switch(repository):
     report=api.bundle(repository[0]).report
-    assert read_result_reference(report.result_bundle.path)[0].format_version==2
+    assert read_result_reference(report.result_bundle.path)[0].format_version==3
 
 
 @pytest.mark.parametrize('fault',[RuntimeError('programming failure'),ValueError('programming failure'),KeyboardInterrupt(),SystemExit(9)])
 def test_unexpected_provider_failures_and_cancellation_are_not_runtime_fallback(monkeypatch,fault):
     def fail(*args,**kwargs):raise fault
     monkeypatch.setattr(resources.PyzProvider,'capture',fail)
-    with pytest.raises(type(fault)):resources.capture_pyz_result_resources()
+    with pytest.raises(type(fault)):resources.capture_result_resources()
