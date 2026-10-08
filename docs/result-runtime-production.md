@@ -52,3 +52,24 @@ Die Verwendung des eingebetteten Wheels folgt dem separat geprüften
 Runtime-Zusatz darf nicht als native Vollintegrität ausgewiesen werden;
 Repository-only-Evidence gehört ausschließlich zum dort beschriebenen bisherigen
 Übergabeweg und verändert keine Archivierungs-/Recovery-Regeln.
+
+
+## PP-06A: prepared PYZ resources before the writer switch
+
+The current production selection remains Result 2 until PP-06B. The private
+`capture_pyz_result_resources` path prepares immutable Format-3 metadata and
+PYZ bytes through the same Result writer/publication boundary. A payload carries
+its format, and a resource-budget fallback preserves that format's unavailable
+schema. No new user switch or CLI command is introduced.
+
+Runtime and required template are pinned before repository mutation. A failed
+optional PYZ resource does not discard a separately proven mandatory template:
+the loaded producer ID, canonical recipe, exact template length/hash and bounded
+own-directory/own-ZIP reads must agree. No other installation, cache, builder or
+network is consulted. Missing/corrupt required documents retain normal Result
+failure and emergency diagnostics; cancellation/programming failures propagate.
+
+The preparation tests generate real fixture Results through the existing routes,
+including failed Apply, and check full Format-3 integrity and snapshot/log
+preservation. The production switch, normal-installation self-update and three
+actual Result/PYZ generations remain PP-06B gates, including first-output E-10.

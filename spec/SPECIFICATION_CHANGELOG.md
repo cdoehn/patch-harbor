@@ -1,5 +1,12 @@
 # PatchHarbor – Spezifikations-Changelog
 
+## 2026-10-08 – PP-05B bestätigt; PYZ-Result-Ressourcen in Bundle 039
+
+- Commit `1da90f0c080cb6e5dd8feed5d204fbc2826e55ab` durch tatsächlichen Apply bestätigt.
+- Vorbereiteter request-lokaler PYZ-Pfad mit unveränderlichen Runtime-/Vorlagenbytes,
+  formatgetreuem Budgetfallback und strikter Erzeugerbindung für Pflichtvorlagen.
+- Writerauswahl bleibt Format 2. Keine CI-Automatik; beide Normdateien unverändert.
+
 ## 2026-10-08 – PP-05A bestätigt; Verbraucher und Bootstrap in Bundle 038
 
 - Commit `f892ae6aaaeebcabb83baf25997799d259b63e6f` durch tatsächlichen Apply bestätigt.

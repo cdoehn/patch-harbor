@@ -2,12 +2,12 @@
 
 **Plan-ID:** `PYZ-PACK`
 **Planpfad:** `planning/pyz-pack/commit-plan.md`
-**Revision:** 15
+**Revision:** 16
 **Stand:** 8. Oktober 2026
-**Status:** PP-00 bis PP-05A tatsächlich angewendet/gepusht. PP-05B / Bundle 038 integriert Verbrauchernachweise und eingebetteten Bootstrap; Writer bleibt Format 2, Apply noch offen.
+**Status:** PP-00 bis PP-05B tatsächlich angewendet/gepusht. PP-06A / Bundle 039 bereitet request-lokale PYZ-Result-Ressourcen vor; Writer bleibt Format 2, Apply noch offen.
 **Geplanter Umfang:** 9 Arbeitspakete `PP-00` bis `PP-08`, zunächst 16 vorgeschlagene Commit-Schritte. Keine feste Anzahl von Patch-Bündeln.
-**Fortschritt:** 10/16 ursprüngliche Planpositionen committed. PP-05B ist Position 11; native Abnahme bleibt separat.
-**Nächster Schritt:** PP-05B vollständig parallel prüfen und übergeben; danach gemeinsame PYZ-Result-Ressourcen und atomare Writerumschaltung PP-06A/B.
+**Fortschritt:** 11/16 ursprüngliche Planpositionen committed. PP-06A ist Position 12; native Abnahme bleibt separat.
+**Nächster Schritt:** PP-06A vollständig parallel prüfen und übergeben; danach atomare Format-3-Writerumschaltung mit eigener E-10-Erstnutzung in PP-06B.
 **Ziel-Produktversion:** noch festzulegen; keine erfundene Releaseversion, kein automatischer Tag oder Release.
 
 > **Verbindliche Grundlage ist der gemeinsame Spezifikationssatz:**
@@ -752,6 +752,44 @@ Der Writer bleibt Format 2. Die eigene produktive E-10-Erstnutzung, dreifache
 PYZ-Result-Reproduktion und Core-Parität bleiben vor Freigabe PP-06B fällig.
 Result-Publikationspolitik und Pack-No-retry bleiben getrennt und unverändert.
 
+### 1.19 PP-05B bestätigt; PP-06A / Bundle 039
+
+Result `patchharbor-apply_Result_234637_1007_eda9b5.zip`, SHA-256
+`7c055dd34959cef90ddb387be67510020b4e245f313eeee7aeccddd8e1888d16`, bestätigt den tatsächlichen PP-05B-Commit
+`1da90f0c080cb6e5dd8feed5d204fbc2826e55ab`, normalen Push und sauberen Baum. Das vollständige parallele Gate
+bestand mit 2968 bestandenen Tests und 8 Skips.
+Dieses Result liefert alle vier vollständigen Bindungswerte für Bundle 039.
+
+PP-06A ergänzt die gemeinsamen Result-Ressourcen für die nachfolgende sichere
+Writerumschaltung. Das interne unveränderliche Payloadobjekt benutzt allgemeine
+Artefaktfelder und trägt seinen expliziten Resultvertrag. Das alte Format-2-
+Dokument bleibt ein Wheel-Dokument; das neue Format-3-Dokument hat `artifact`
+mit Typ `pyz` und Runtime-Metadaten 2. Der Writer schreibt weiterhin denselben
+vorgeprüften Dokument-/Snapshotbestand durch die vorhandene Publikationsgrenze.
+Sein Budgetfallback behält jeweils das passende Format, ohne Umdeutung.
+
+Der private PYZ-Capturepfad hält Runtime und Pflichtvorlage vor Mutation aus
+Daten des tatsächlich geladenen Erzeugers fest. Bei einem defekten optionalen
+Ressourceneintrag darf eine Pflichtvorlage nur anhand des geladenen Producer-IDs,
+seines geschlossenen Rezepts und ihrer exakten Größe/SHA weiterverwendet werden.
+Das gilt für eigene Verzeichnisse und eigene PYZ. Ein fremder Erzeuger oder
+fehlendes/defektes Template bleibt ein Resultfehler. Dieses begrenzte Template-
+Prüfergebnis ist ausdrücklich keine vollständige Runtime- oder Resultvalidierung.
+
+Neue Tests üben den vorbereiteten Pfad über reale registrierte Fixture-Repositories
+und die vorhandenen bundle/apply/dry-run/failure/Watcher-Core-Wege aus. Sie belegen
+vollständige native Format-3-Lesbarkeit, Template-/Runtime-Pinning, Format-3-
+Budgetfallback, Erhalt von Snapshot und tatsächlichen Fehlerlogs bei optionalen
+Ausfällen sowie unveränderte Fehlerpriorität bei fehlender Pflichtvorlage.
+Programmierfehler und Abbrüche werden nicht als harmloses unavailable verschluckt.
+
+Die Auswahl in der laufenden Produktanwendung bleibt bis PP-06B ausdrücklich
+Format 2. Es gibt keinen neuen Benutzerumschalter. Die Tests verwenden eine
+private Capturegrenze zur Vorbereitung desselben Writers; PP-06B entfernt die
+nicht mehr benötigte Übergangsproduktion und aktiviert den PYZ-Pfad gemeinsam
+mit echten Installations-, Selbstupdate-, Core-Paritäts-, E-10- und dreifachen
+Result-/PYZ-Roundtripnachweisen. Keine geänderte Result-Sync-/Retry-/CIFS-Politik.
+
 ## 2. Architektur und unveränderliche Grenzen
 
 ### 2.1 Produktumfang
@@ -850,8 +888,8 @@ PP-00 ist durch Bundle 025 abgeschlossen. PP-01 steht auf **committed; Regressio
 | 8/16 | **PP-04B** | PP-04 | PP-04A | `refactor(runtime): load producer resources from directories or PYZ [PP-04B]` | Bundle 035 tatsächlich angewendet/gepusht |
 | 9/16 | **PP-04C** | PP-04 | PP-04B | `feat(runtime): launch the shared core directly from PYZ [PP-04C]` | Bundle 036 tatsächlich angewendet/gepusht |
 | 10/16 | **PP-05A** | PP-05 | PP-04C | `feat(result): read PYZ runtime metadata and Result format 3 [PP-05A]` | Bundle 037 tatsächlich angewendet/gepusht |
-| 11/16 | **PP-05B** | PP-05 | PP-05A | `feat(result): integrate format 3 consumers before writer activation [PP-05B]` | Bundle 038 vorbereitet; tatsächlicher Apply offen |
-| 12/16 | **PP-06A** | PP-06 | PP-05B | `feat(runtime): pin reproducible PYZ resources for Result production [PP-06A]` | geplant |
+| 11/16 | **PP-05B** | PP-05 | PP-05A | `feat(result): integrate format 3 consumers before writer activation [PP-05B]` | Bundle 038 tatsächlich angewendet/gepusht |
+| 12/16 | **PP-06A** | PP-06 | PP-05B | `feat(runtime): pin reproducible PYZ resources for Result production [PP-06A]` | Bundle 039 vorbereitet; tatsächlicher Apply offen |
 | 13/16 | **PP-06B** | PP-06 | PP-06A | `feat(result): ship PYZ runtimes with a working bootstrap [PP-06B]` | geplant |
 | 14/16 | **PP-07** | PP-07 | PP-06B | `docs(runtime): complete PYZ and pack workflows and compatibility guidance [PP-07]` | geplant |
 | 15/16 | **PP-08A** | PP-08 | PP-07 | `test(runtime): complete cross-platform PYZ and pack acceptance coverage [PP-08A]` | geplant |
@@ -1563,6 +1601,7 @@ Die mechanische Prüfung dieses Markdownplans kontrolliert eindeutige Schrittken
 | 2 | 2026-10-07 | PP-00 / Bundle 024 integriert: aktuelle bytegleiche Referenz vom Pixel, Norm-/Planverweise, offene Alt-Nachweise, vorbereiteter Status; ausdrücklich einmalige CI-only-Ausnahme ohne Tests oder Testinstallation im Apply, ein Commit/Push und automatische parallele CI mit Ergebnisprüfung. |
 | 3 | 2026-10-07 | PP-00-FIX1 / Bundle 025: Abbruch von 024 vor Staging/Commit/CI belegt; dirty Result als Reparaturbasis, SSH-Alias-Auflösung statt URL-Stringliste, unveränderte Konfiguration und Fortsetzung der ersten Pixel-CI-only-Ausnahme. Kein Fortschritt vor Apply-/CI-Nachweis. |
 | 4 | 2026-10-07 | PP-00-Erfolg und CI 37635401106 aus dem damaligen Result bestätigt; PP-01 in 026 vorbereitet. Die damaligen lokalen Endgates und CI-Pause sind durch Revision 5 für die Pixel-Phase ersetzt. |
+| 16 | 2026-10-08 | PP-05B durch tatsächliches Result bestätigt; PP-06A request-lokale PYZ-Result-Ressourcen und begrenzter Pflichtvorlagenfallback vorbereitet. Produktiver Writer bleibt Format 2. |
 | 15 | 2026-10-08 | PP-05A durch tatsächliches Result bestätigt; PP-05B vollständige Verbrauchernachweise, eingefrorene Format-2-Laufzeit und ausführbarer eingebetteter PYZ-Bootstrap vorbereitet. Writer bleibt Format 2. |
 | 14 | 2026-10-08 | PP-04C durch tatsächliches Result bestätigt; PP-05A vollständiger Format-3-/Runtime-2-Reader, gemeinsames Budget und strikte Pack-Referenzen vorbereitet. Writer bleibt Format 2. |
 | 13 | 2026-10-08 | PP-04B durch tatsächliches Result bestätigt; PP-04C installationsfreier Bootstrap und direkter/API-Core-Start vorbereitet. Native Format-3-Prüfung und Writerumschaltung bleiben nachfolgenden Gates vorbehalten. |
@@ -1577,6 +1616,6 @@ Die mechanische Prüfung dieses Markdownplans kontrolliert eindeutige Schrittken
 
 ---
 
-**PP-00 bis PP-05A sind tatsächlich angewendet. PP-05B wird in Bundle 038
+**PP-00 bis PP-05B sind tatsächlich angewendet. PP-06A wird in Bundle 039
 vorbereitet; sein tatsächlicher Apply bleibt bis zum nächsten Result offen.
-Danach folgen PP-06A/B. Keine Releasefreigabe.**
+Danach folgt PP-06B. Keine Releasefreigabe.**

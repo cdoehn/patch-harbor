@@ -743,13 +743,13 @@ Der bereits laufende Watcher übernimmt allein den Apply. Keine direkten
 Development-Commits, Apply-Mutationen, Hook-Umgehungen oder Watcher-Neustarts.
 Nach erfolgreichen Commit-Gates genau ein normaler Push; kein automatisches Tag.
 
-PP-00 bis PP-05A sind durch tatsächlich geprüfte Results bestätigt. Bundle 038
-bereitet die Verbrauchernachweise und den oben vollständig eingebetteten
-PYZ-Bootstrap vor. Der produktive Writer bleibt Format 2 mit Wheel; PP-06 muss
-die neue Produktion zusammen mit eigener E-10-Erstnutzung freigeben. Maßgeblich
-sind Plan Abschnitt 1.18 und die aktuelle Testpolicy. Ein älterer mitgelieferter
-Core kann weiterhin `pack` oder Format 3 vermissen; dann bleibt der geprüfte
-manuelle Paketvertrag nutzbar. Keine vorgezogene Writerfreigabe.
+PP-00 bis PP-05B sind durch tatsächlich geprüfte Results bestätigt. Bundle 039
+bereitet die gemeinsamen request-lokalen PYZ-Result-Ressourcen vor. Der produktive
+Writer bleibt Format 2 mit Wheel; PP-06B muss die neue Produktion zusammen mit
+eigener E-10-Erstnutzung und dreifacher Reproduktion freigeben. Maßgeblich sind
+Plan Abschnitt 1.19 und die aktuelle Testpolicy. Ein älterer mitgelieferter Core
+kann weiterhin `pack` oder Format 3 vermissen; dann bleibt der geprüfte manuelle
+Paketvertrag nutzbar. Keine vorgezogene Writerfreigabe.
 
 Bestimme die aktive Zielversion aus dem Repository. Eine laut Plan erst zum
 Release erfolgende Versionsanhebung ist kein Widerspruch; tatsächlich

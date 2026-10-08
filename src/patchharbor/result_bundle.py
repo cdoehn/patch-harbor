@@ -34,7 +34,7 @@ from patchharbor.result_bundle_handoff import create_result_handoff
 from patchharbor.result_bundle_capture import capture_result_bundle
 from patchharbor.result_resources import (
     PinnedResultResources, ResultRuntimePayload, capture_result_resources,
-    runtime_fits, runtime_payload,
+    runtime_fits,
 )
 from patchharbor.result_bundle_publication import (
     PublicationDurability,
@@ -67,7 +67,6 @@ from patchharbor.user_paths import registration_user_paths
 
 
 _RESULT_MARKER = "patch-harbor-result-bundle"
-_RESULT_FORMAT_VERSION = 2
 
 
 @dataclass(frozen=True)
@@ -189,7 +188,7 @@ def _manifest_document(
         raise ValueError("successful Result Bundle report has no context")
     document: dict[str, object] = {
         "marker": _RESULT_MARKER,
-        "format_version": _RESULT_FORMAT_VERSION,
+        "format_version": runtime.result_format,
         "created_at": report.timing.started_at_text,
         "run_id": report.run_id_text,
         "repo_id": str(context.repo_id),
@@ -256,7 +255,7 @@ def _publication_documents(
         documents.runtime, manifest=documents.manifest, context_document=context,
         handoff=handoff, run_report=documents.report, snapshot=snapshot, execution_log=execution_log,
     ):
-        documents = assemble(runtime_payload(None, reason="resource_limit"))
+        documents = assemble(resources.runtime.unavailable("resource_limit"))
     return documents
 
 
