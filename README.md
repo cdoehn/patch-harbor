@@ -16,15 +16,17 @@ Its binding requirements are the **joint specification set**:
 [existing specification](spec/SPECIFICATION.md) **and**
 [PYZ/PACK extension, revision 2](spec/SPECIFICATION_EXTENSION_PYZ_PACK.md).
 Neither file is an alternative to the other. This explicit feature selection
-supersedes stale active-plan headings in historical documents; the unchanged
-package version does not reactivate a completed version/RIV/watcher plan.
+supersedes stale active-plan headings in historical documents; the selected
+product version does not reactivate a completed version/RIV/watcher plan.
 
-PP-00 through PP-07 are confirmed by actual Apply Results, most recently
-commit `ec20be5d49829ad95eed33c2b4328ab85449a653` with 3019 passed tests and 8 skips.
-Bundle 042 prepares the complete [acceptance mapping](planning/pyz-pack/test-matrix.md),
-PowerShell-7 test selection and recorded local measurements. Final native/CIFS
-acceptance and the product-version decision remain open. The global installation
-is unchanged; the plan records the complete sequence and evidence.
+PP-00 through PP-08A are confirmed by actual Apply Results, most recently
+commit `71f367db6c14241bcbb861cc86e488edbcc36fcd` with 3021 passed tests and 8 skips.
+The complete [acceptance mapping](planning/pyz-pack/test-matrix.md), native test
+selection and local measurements are in place. Christian selected **1.3.0** and
+confirmed his successful CIFS practice check. Bundle 043 prepares the versioned
+artifacts and final parallel gates for PP-08B. Its actual Apply and the manually
+started CI remain to be confirmed; this is not a release publication.
+The plan records the complete sequence and the scope of each piece of evidence.
 
 **Current policy, explicitly updated by Christian on 7 October 2026:**
 Development and Apply run full parallel suites only, including at bundle end.
@@ -33,7 +35,7 @@ Only Christian starts the manual GitHub CI workflow; no automated dispatch or
 five-bundle cadence. The active loop continues the existing plan after verified
 Results, without a fixed correction-attempt limit.
 See [test policy](docs/test-parallelism.md) and [plan section 1.10](planning/pyz-pack/commit-plan.md).
-The prepared PP-08A step is not yet an Apply or CI success.
+Final acceptance is tied to the actual 1.3.0 commit and its artifact hashes.
 
 The Result-PYZ profile contains the shared Core **without the watcher**.
 The new public `api.pack_patch` accepts explicit contents, a Result reference,
@@ -43,10 +45,12 @@ Existing public `inspect`/`validate` signatures and results remain compatible.
 New Results use Format 3 with exactly one Core-PYZ. Readers preserve legacy
 Result-1/2 support; normal wheel/sdist installation and the installed watcher remain.
 
-The watcher plan is completed. Open native/CIFS evidence in the
-[result-publication plan](planning/result-publication/commit-plan.md) remains
-open unless a matching real result is supplied. PP-00 does not publish a
-release or change the package version.
+The watcher plan is completed. Christian's successful CIFS practice check is
+recorded as user-confirmed evidence in the PYZ/PACK plan; no unprovided commit or
+artifact hash is inferred. Historical records in the
+[result-publication plan](planning/result-publication/commit-plan.md) are retained.
+The baseline specification describes the 1.2.1 contract; its joint use with the
+PYZ/PACK extension governs the selected 1.3.0 implementation.
 
 ## Installation
 
@@ -650,7 +654,7 @@ Use manual mode on Termux. PatchHarbor does not treat the Android background
 process lifecycle as a reliable systemd service environment. Download the patch
 ZIP into the configured Exchange directory and run `patchharbor apply` manually;
 reusing the previous shell command is sufficient. No Termux-specific watcher
-support is claimed by PatchHarbor 1.2.1.
+support is claimed by PatchHarbor 1.3.0.
 
 Functional CLI test helpers have no default subprocess deadline; slow Git or
 shared storage must not turn a correct scan into an arbitrary 20-second failure.
@@ -764,7 +768,7 @@ and requires an explicitly supplied `OutputTargets`; the default is silent.
 Directory selection is an explicit callback, with the interactive menu owned by
 the CLI. Unknown choices are rejected before a file is executed.
 
-The public `patchharbor.api` facade uses these boundaries in version 1.2.1.
+The public `patchharbor.api` facade uses these boundaries in version 1.3.0.
 Library callers supply `api.OutputStreams` and receive structured results.
 The main CLI and the Watcher use the same API; neither duplicates Core decisions.
 
@@ -777,7 +781,7 @@ such as 124 or 130; they are not mistaken for PatchHarbor timeout/interruption.
 The Application makes decisions from semantic outcomes, not serialized statuses.
 
 
-## Python-Bibliothek – PatchHarbor 1.2.1
+## Python-Bibliothek – PatchHarbor 1.3.0
 
 `from patchharbor import api` stellt Konfiguration, Registry, Kontext, Bundles,
 Apply/Dry-Run, den automatischen Einzelpoll und den expliziten Skriptrunner bereit.
@@ -815,7 +819,7 @@ Ruhezeit liest jeder Core-Scan die repositorylokalen Einstellungen frisch.
 Der Apply-Worker bleibt ein eigener Prozess derselben Installation; dessen privater Worker ruft `api.apply_next()`
 direkt auf, nicht mehr den CLI-Parser. Betriebs-JSON, globaler Scope, Replay und
 Failed-Retry-Schutz bleiben erhalten. Die Prozess-/Signalgrenze und der Linux-
-Servicevertrag bleiben unverändert. Die Paketversion ist 1.2.1.
+Servicevertrag bleiben unverändert. Die Paketversion ist 1.3.0.
 
 
 ### Repository payload permissions

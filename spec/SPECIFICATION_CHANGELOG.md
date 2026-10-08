@@ -1,5 +1,17 @@
 # PatchHarbor – Spezifikations-Changelog
 
+## 2026-10-08 – PP-08A bestätigt; Produktversion 1.3.0 / PP-08B
+
+- Commit `71f367db6c14241bcbb861cc86e488edbcc36fcd` durch tatsächliches Result
+  bestätigt: 3021 bestandene parallele Apply-Tests, 8 Skips, sauberer Baum und Push.
+- Christian legt Version 1.3.0 fest und bestätigt den erfolgreichen CIFS-Praxistest.
+  Die Nutzerbestätigung enthält keinen genauen Commit oder Artefakthash.
+- Produktversion, aktive Anleitung und vorhandene Artefakttests werden angeglichen;
+  historische Testartefakte und beide gemeinsam geltenden Normdateien bleiben erhalten.
+- Finale Artefakte werden aus dem vollständig parallel geprüften Stand auditiert.
+  Apply und manuell gestartete native CI bleiben bis zu ihren echten Nachweisen offen.
+  Kein automatischer Tag, Releaseupload oder Hostupgrade.
+
 ## 2026-10-08 – PP-07 bestätigt; Gesamtmatrix PP-08A
 
 - Commit `ec20be5d49829ad95eed33c2b4328ab85449a653` durch tatsächlichen Apply bestätigt.

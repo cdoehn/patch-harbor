@@ -6,6 +6,7 @@ import zipfile
 
 import pytest
 
+from patchharbor import __version__
 from patchharbor.bundle_handoff import CHAT_INSTRUCTIONS_NAME, ENVIRONMENT_NAME, PATCH_HANDOFF_DIRECTORY
 from patchharbor.chat_instructions import render_chat_handoff
 from patchharbor.errors import PatchHarborError
@@ -75,7 +76,7 @@ def test_manual_bundle_embeds_current_environment_without_touching_repository(tm
     assert data["repository_name"] == repository.name
     assert data["exchange_directory"] == data["output_directory"] == str(exchange)
     assert data["runtime"]["python_version"]
-    assert data["runtime"]["patchharbor_version"] == "1.2.1"
+    assert data["runtime"]["patchharbor_version"] == __version__
     assert data["filename_timezone"] == "UTC"
     assert data["filename_schemas"]["Patch"].endswith(".zip<bundle_suffix>")
     assert git(repository, "status", "--porcelain").stdout == ""

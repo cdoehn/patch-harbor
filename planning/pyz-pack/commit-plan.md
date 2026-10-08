@@ -2,13 +2,13 @@
 
 **Plan-ID:** `PYZ-PACK`
 **Planpfad:** `planning/pyz-pack/commit-plan.md`
-**Revision:** 19
+**Revision:** 20
 **Stand:** 8. Oktober 2026
-**Status:** PP-00 bis PP-07 tatsächlich angewendet/gepusht. PP-08A / Bundle 042 vervollständigt Testzuordnung und native Auswahl; Apply noch offen.
+**Status:** PP-00 bis PP-08A tatsächlich angewendet/gepusht. PP-08B / Bundle 043 setzt die gewählte Version 1.3.0 und bereitet finale Artefakte vor; Apply und manuelle CI noch offen.
 **Geplanter Umfang:** 9 Arbeitspakete `PP-00` bis `PP-08`, zunächst 16 vorgeschlagene Commit-Schritte. Keine feste Anzahl von Patch-Bündeln.
-**Fortschritt:** 14/16 ursprüngliche Planpositionen committed. PP-08A ist Position 15; PP-08B bleibt Abschlussgate mit offenen externen Voraussetzungen.
-**Nächster Schritt:** PP-08A vollständig parallel prüfen und übergeben. PP-08B benötigt Versionsentscheidung, finale Artefakte und tatsächliche manuelle CI-/native-/CIFS-Nachweise.
-**Ziel-Produktversion:** noch festzulegen; keine erfundene Releaseversion, kein automatischer Tag oder Release.
+**Fortschritt:** 15/16 ursprüngliche Planpositionen committed. PP-08B ist Position 16; finale Abnahme erst nach konkreten Apply-/CI-Nachweisen.
+**Nächster Schritt:** Version 1.3.0 vollständig parallel prüfen, Artefakte auditieren und Bundle 043 übergeben; danach tatsächlichen Apply und vom Nutzer gestartete finale CI auswerten.
+**Ziel-Produktversion:** **1.3.0**, ausdrücklich von Christian am 8. Oktober 2026 festgelegt; kein automatischer Tag oder Release.
 
 > **Verbindliche Grundlage ist der gemeinsame Spezifikationssatz:**
 > [Hauptspezifikation](../../spec/SPECIFICATION.md) **und**
@@ -904,6 +904,48 @@ reale Linux→Windows-CIFS-Abnahme. Version und finale native Nachweise bleiben
 PP-08B vorbehalten. Der Workflow wird ausschließlich vom Nutzer gestartet;
 Codex und Apply-Entrypoint starten keine CI. Beide Normdateien bleiben unverändert.
 
+
+### 1.23 PP-08A bestätigt; Version 1.3.0 und PP-08B / Bundle 043
+
+Result `patchharbor-apply_Result_005552_1008_7f073e.zip`, SHA-256
+`898db7e2f232780caa14d550c1a2116822e96f80d456e9eb0f32dea3913417e9`, bestätigt
+Commit `71f367db6c14241bcbb861cc86e488edbcc36fcd`, sauberen Baum und normalen Push.
+Alle 331 Projektdateien stimmen mit dem geprüften Endstand von Bundle 042 überein.
+Die vollständige parallele Apply-Suite bestand mit 3021 Tests und 8 Skips;
+Development bestand mit 3044 Tests und 9 Skips einschließlich des Handoff-Harness.
+Dieses Result liefert die vollständige Bindung für Bundle 043.
+
+**Nutzerentscheidung vom 8. Oktober 2026:** Christian legt die Produktversion
+auf **1.3.0** fest und bestätigt: „Cifs Nachweis habe ich schon gemacht gestern
+das hat geklappt“. Diese Aussage wird als erfolgreiche CIFS-Praxisabnahme des
+Nutzers angenommen. Rohlog, genaue Testversion, Commit und Artefakthash wurden
+dabei nicht mitgeteilt und werden nicht erfunden. Es wird kein weiterer
+CIFS-Lauf allein wegen fehlender lokaler CIFS-Mounts verlangt. Historische
+Nachweisstände bleiben als Historie erhalten.
+
+PP-08B setzt die Produktversion, aktive Nutzerdokumentation und die vorhandenen
+versionsabhängigen Artefaktprüfungen konsistent auf 1.3.0. Laufzeitgebundene
+PYZ-Testressourcen verwenden die aktuelle Produktversion; der unabhängige
+Identitätsvektor und eingefrorene Format-1/2-Artefakte behalten ihre festgelegten
+historischen Eingaben. Beide normativen Dateien bleiben bytegleich: Der
+Bestandsvertrag 1.2.1 und die Ergänzung Revision 2 gelten gemeinsam für 1.3.0.
+Es werden keine neuen Prosa-/Layouttests eingeführt.
+
+Die volle parallele Suite baut Wheel, sdist und kanonische Core-PYZ aus dem
+finalen Stand und prüft reale Installationen, eigene Resultproduktion,
+Bootstrap, Pack und den Roundtrip über drei Generationen. Diese tatsächlich
+getesteten Artefakte, ihre Größen und SHA-256 sowie Messdaten werden außerhalb
+des Produkts aufbewahrt und an den Test-/Quellstand gebunden. Der Watcher erhält
+genau eine vollständig geprüfte Patch-ZIP; sein Entrypoint prüft den Stand
+vollständig parallel, committet einmal und pusht einmal.
+
+Der tatsächliche Apply von 043 und die finale native CI sind bei Erstellung
+dieses Dokuments offen. Nur Christian startet diese CI manuell auf dem nach
+Apply entstandenen vollständigen Commit. Vorhandene Results und externe
+Nachweisberichte dürfen die Abnahme ohne zusätzlichen Statuscommit schließen.
+Kein Tag, Releaseupload, globales Installationsupgrade oder Watcher-Neustart.
+
+
 ## 2. Architektur und unveränderliche Grenzen
 
 ### 2.1 Produktumfang
@@ -988,7 +1030,7 @@ Die lineare Standardreihenfolge in Abschnitt 4 verhindert unnötige gleichzeitig
 
 Die folgende Folge ist die anfängliche prüfbare Zerlegung. Sie ist **keine Verpflichtung zu 16 Patch-ZIPs**. Kleine sicher zusammengehörige Schritte dürfen mit dokumentierter Plananpassung zusammengelegt werden. Bei Split oder Zusammenlegung werden Positionen, Gesamtzahl, Messages und Nachweiszuordnung vor der betroffenen Auslieferung aktualisiert. Kein nur nominelles Zerlegen eines bereits vollständig installierten Endzustands.
 
-PP-00 ist durch Bundle 025 abgeschlossen. PP-01 steht auf **committed; Regression und Reparatur-Endgates offen (Bundle 028 / PP-01-FIX2)**; die übrigen Schritte bleiben **geplant**. Die Message ist die vorgeschlagene tatsächliche Git-Commitmessage. Die API-/Writer-Funktionen werden erst in den dafür genannten sicheren vollständigen Schritten öffentlich beziehungsweise produktiv aktiviert.
+PP-00 bis PP-08A sind durch tatsächliche Results bestätigt; PP-08B wird als versionierter Endstand vorbereitet. Die ursprünglichen Messages und sicheren Aktivierungsschritte bleiben nachvollziehbar. Der aktuelle Nachweisstand steht in den Abschnitten 1.10 bis 1.23 und in der Statustabelle.
 
 | Position | ID | Arbeitspaket | Abhängigkeit | Vorgeschlagene Commitmessage | Status |
 |---:|---|---|---|---|---|
@@ -1006,8 +1048,8 @@ PP-00 ist durch Bundle 025 abgeschlossen. PP-01 steht auf **committed; Regressio
 | 12/16 | **PP-06A** | PP-06 | PP-05B | `feat(runtime): pin reproducible PYZ resources for Result production [PP-06A]` | Bundle 039 tatsächlich angewendet/gepusht |
 | 13/16 | **PP-06B** | PP-06 | PP-06A | `feat(result): ship PYZ runtimes with a working bootstrap [PP-06B]` | Bundle 040 tatsächlich angewendet/gepusht |
 | 14/16 | **PP-07** | PP-07 | PP-06B | `docs(runtime): complete PYZ and pack workflows and compatibility guidance [PP-07]` | Bundle 041 tatsächlich angewendet/gepusht |
-| 15/16 | **PP-08A** | PP-08 | PP-07 | `test(runtime): complete cross-platform PYZ and pack acceptance coverage [PP-08A]` | Bundle 042 vorbereitet; tatsächlicher Apply offen |
-| 16/16 | **PP-08B** | PP-08 | PP-08A | `chore(release): audit PYZ and pack artifacts and acceptance readiness [PP-08B]` | geplant |
+| 15/16 | **PP-08A** | PP-08 | PP-07 | `test(runtime): complete cross-platform PYZ and pack acceptance coverage [PP-08A]` | Bundle 042 tatsächlich angewendet/gepusht |
+| 16/16 | **PP-08B** | PP-08 | PP-08A | `chore(release): prepare version 1.3.0 and final artifact evidence [PP-08B]` | Bundle 043 vorbereitet; tatsächlicher Apply und manuelle CI offen |
 
 
 Die Initialfolge folgt bereits einer topologischen Ordnung. Querschnittliche Anforderungen wie API-/CLI-Parität und PYZ-Resultproduktion erhalten zusätzlich die Abschlussgates aus Abschnitt 6. Ein bestandener früher Unit-Test ersetzt nicht deren späteren Artefaktdurchstich.
@@ -1663,7 +1705,7 @@ Wird ein beobachtetes Exchange-Verzeichnis ausdrücklich als Pack-Ausgabe gewäh
 
 ### 12.1 Definition of Done
 
-Die Erweiterung gilt erst als vollständig umgesetzt, wenn die folgende Liste mit tatsächlichen Nachweisen geschlossen werden kann. Aktuell sind sämtliche Implementierungs-/Abnahmefelder offen:
+Die Erweiterung gilt erst als vollständig umgesetzt, wenn die folgende Liste mit tatsächlichen Nachweisen geschlossen werden kann. Die folgende Gesamtliste wird erst mit den konkreten Abschlussnachweisen geschlossen; der bestätigte Teilfortschritt steht in Abschnitt 1.23:
 
 - [ ] Beide Spezifikationen sind gemeinsam eingeordnet, der aktive Featureplan ist eindeutig und der aktuelle Ausgangsstand einschließlich offener Alt-Nachweise wurde abgeglichen.
 - [ ] Installiertes `pack`, PYZ-`pack` und `api.pack_patch` verwenden dieselbe vollständige Fachlogik und erfüllen den spezifizierten Eingabe-, Modus-, Namens-, Handoff-, Fehler- und Publikationsvertrag.
@@ -1715,6 +1757,7 @@ Die mechanische Prüfung dieses Markdownplans kontrolliert eindeutige Schrittken
 | 2 | 2026-10-07 | PP-00 / Bundle 024 integriert: aktuelle bytegleiche Referenz vom Pixel, Norm-/Planverweise, offene Alt-Nachweise, vorbereiteter Status; ausdrücklich einmalige CI-only-Ausnahme ohne Tests oder Testinstallation im Apply, ein Commit/Push und automatische parallele CI mit Ergebnisprüfung. |
 | 3 | 2026-10-07 | PP-00-FIX1 / Bundle 025: Abbruch von 024 vor Staging/Commit/CI belegt; dirty Result als Reparaturbasis, SSH-Alias-Auflösung statt URL-Stringliste, unveränderte Konfiguration und Fortsetzung der ersten Pixel-CI-only-Ausnahme. Kein Fortschritt vor Apply-/CI-Nachweis. |
 | 4 | 2026-10-07 | PP-00-Erfolg und CI 37635401106 aus dem damaligen Result bestätigt; PP-01 in 026 vorbereitet. Die damaligen lokalen Endgates und CI-Pause sind durch Revision 5 für die Pixel-Phase ersetzt. |
+| 20 | 2026-10-08 | PP-08A tatsächlich bestätigt; autorisierte Produktversion 1.3.0 und Nutzerbestätigung erfolgreicher CIFS-Praxisabnahme erfasst. PP-08B mit finalen Artefakten vorbereitet; tatsächlicher Apply und manuelle CI bleiben offen. |
 | 19 | 2026-10-08 | PP-07 bestätigt; konkrete 76-Szenarien-Matrix, native PowerShell-7-Auswahl und Mess-/Exchange-Durchstich in PP-08A vorbereitet. |
 | 18 | 2026-10-08 | PP-06B durch tatsächliches Result bestätigt; PP-07 Dokumentreview und funktionale Beispiele mit erneuertem Artefaktgate vorbereitet. |
 | 17 | 2026-10-08 | PP-06A durch tatsächliches Result bestätigt; PP-06B atomare Result-3-/PYZ-Produktion mit eigener E-10-Erstnutzung, Core-Parität und drei tatsächlichen Generationen vorbereitet. |
@@ -1733,7 +1776,7 @@ Die mechanische Prüfung dieses Markdownplans kontrolliert eindeutige Schrittken
 
 ---
 
-**PP-00 bis PP-07 sind tatsächlich angewendet. PP-08A wird in Bundle 042
-vorbereitet; tatsächlicher Apply bleibt bis zum nächsten Result offen.
-PP-08B bleibt bis zur Versionsentscheidung und konkreten finalen lokalen,
-Apply-, nativen CI- und CIFS-Nachweisen offen. Keine Releasefreigabe.**
+**PP-00 bis PP-08A sind tatsächlich angewendet. Zielversion ist 1.3.0;
+erfolgreiche CIFS-Praxisabnahme ist vom Nutzer bestätigt. PP-08B wird in Bundle
+043 vorbereitet und benötigt finale parallele Gates, tatsächlichen Apply und
+die von Christian gestartete native CI. Keine vorweggenommene Releasefreigabe.**

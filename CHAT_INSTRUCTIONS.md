@@ -1,6 +1,6 @@
-# PatchHarbor 1.2.1 – Chat-Initialisierung
+# PatchHarbor 1.3.0 – Chat-Initialisierung
 
-**Vertragsversion:** 1.2.1<br>
+**Vertragsversion:** 1.3.0<br>
 **Patch-Paketmarker:** `patch-harbor`<br>
 **Patch-Paketformat:** `1`<br>
 **Result-Bundle-Marker:** `patch-harbor-result-bundle`<br>
@@ -705,10 +705,10 @@ Normsatz: spec/SPECIFICATION.md
           spec/SPECIFICATION_EXTENSION_PYZ_PACK.md (Revision 2)
 ```
 
-Die Paketversion bleibt vorerst 1.2.1; das reaktiviert keinen abgeschlossenen
+Die gewählte Produktversion ist 1.3.0; das reaktiviert keinen abgeschlossenen
 Versions-, RIV- oder Watcher-Plan. Die gezielten Ausnahmen stehen in der
-Erweiterung, unberührte Basisverträge gelten weiter. Der vorhandene CIFS-Plan
-behält seine offenen Nachweise. Diese Projektzuordnung gilt nicht pauschal für
+Erweiterung, unberührte Basisverträge gelten weiter. Der PYZ/PACK-Plan hält
+Christians erfolgreiche CIFS-Praxisprüfung als Nutzerbestätigung fest. Diese Projektzuordnung gilt nicht pauschal für
 andere Repositorys, denen PatchHarbor dieselbe generische Vorlage mitliefert.
 
 **Historischer Planstart:** PP-00 integrierte nur Dokumente und Verweise.
@@ -747,11 +747,13 @@ Der bereits laufende Watcher übernimmt allein den Apply. Keine direkten
 Development-Commits, Apply-Mutationen, Hook-Umgehungen oder Watcher-Neustarts.
 Nach erfolgreichen Commit-Gates genau ein normaler Push; kein automatisches Tag.
 
-PP-00 bis PP-07 sind durch tatsächliche Results bestätigt. Bundle 042 bereitet
-die vollständige Testzuordnung und native Auswahl vor. Maßgeblich sind Plan
-Abschnitt 1.22 und die aktuelle Testpolicy. Eine ältere globale Installation
-bleibt unverändert. Versionsentscheidung und finale lokale/Apply-/native-/CIFS-
-Abnahme gehören zu PP-08B; ein Quellpatch oder Linux-Test schließt diese nicht.
+PP-00 bis PP-08A sind durch tatsächliche Results bestätigt. Christian hat
+Version 1.3.0 gewählt und seine erfolgreiche CIFS-Praxisprüfung bestätigt.
+Bundle 043 bereitet die versionierten Artefakte und vollständigen parallelen
+Gates vor; maßgeblich sind Planabschnitt 1.23 und die aktuelle Testpolicy.
+Die finale Abnahme benötigt den tatsächlichen Apply und die von Christian
+gestartete native CI auf diesem Endcommit. Eine ältere globale Installation
+wird durch diesen Quellpatch nicht automatisch aktualisiert.
 
 Bestimme die aktive Zielversion aus dem Repository. Eine laut Plan erst zum
 Release erfolgende Versionsanhebung ist kein Widerspruch; tatsächlich

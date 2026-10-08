@@ -7,7 +7,7 @@ from zipfile import ZipFile, ZipInfo, ZIP_STORED, ZIP_DEFLATED
 
 import pytest
 
-from patchharbor import runtime_pyz as pyz
+from patchharbor import __version__, runtime_pyz as pyz
 from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY
 
 
@@ -21,9 +21,9 @@ def inputs():
     return payloads
 
 
-def prepared(payloads=None, **kwargs):
+def prepared(payloads=None, *, version=__version__, **kwargs):
     payloads = inputs() if payloads is None else payloads
-    recipe, identity = pyz.create_recipe(payloads, version='1.2.1', requires_python='>=3.12', **kwargs)
+    recipe, identity = pyz.create_recipe(payloads, version=version, requires_python='>=3.12', **kwargs)
     payloads = {**payloads, pyz.IDENTITY_PATH: identity}
     artifact = pyz.materialize(recipe, lambda name, size: payloads[name])
     return recipe, payloads, artifact
@@ -47,7 +47,7 @@ def test_pyz_profile_roundtrips_canonically_without_code_execution(monkeypatch):
     assert read(artifact) == recipe
     assert pyz.materialize(recipe, lambda name, size: source[name]) == artifact
     assert pyz.parse_recipe(recipe.data) == recipe
-    assert recipe.pyz_name == 'patchharbor-1.2.1.pyz'
+    assert recipe.pyz_name == f'patchharbor-{__version__}.pyz'
     with ZipFile(BytesIO(artifact)) as archive:
         assert archive.namelist() == sorted(archive.namelist())
         assert archive.namelist() == sorted(set(source) | {pyz.RECIPE_PATH})
@@ -62,7 +62,7 @@ def test_pyz_profile_roundtrips_canonically_without_code_execution(monkeypatch):
 
 
 def test_producer_content_and_artifact_ids_follow_distinct_finite_contracts():
-    recipe, source, artifact = prepared(source_commit='a'*40)
+    recipe, source, artifact = prepared(version='1.2.1', source_commit='a'*40)
     document = json.loads(recipe.data)
     entries = [entry for entry in document['entries'] if entry['path'] != pyz.IDENTITY_PATH]
     identity_input = dict(algorithm='patchharbor-pyz-producer-v1', version='1.2.1',
@@ -76,7 +76,7 @@ def test_producer_content_and_artifact_ids_follow_distinct_finite_contracts():
     assert pyz.sha256(pyz.recipe_json(unsigned)) == recipe.content_id
     assert len({producer, recipe.content_id, pyz.sha256(artifact)}) == 3
     changed = inputs(); changed[pyz.DOC_PATH] += b'new information\n'
-    new, _, new_artifact = prepared(changed, source_commit='a'*40)
+    new, _, new_artifact = prepared(changed, version='1.2.1', source_commit='a'*40)
     assert new.content_id != recipe.content_id and pyz.producer_id(new) != producer
     assert pyz.sha256(new_artifact) != pyz.sha256(artifact)
 
