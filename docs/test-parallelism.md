@@ -71,8 +71,9 @@ zurück; sein serieller Lauf wurde auf dem Pixel unterbrochen, bevor Commit,
 Push oder CI erreicht wurden. Das hat die obige spätere Dauerregel ausgelöst.
 Alte Aussagen „PP-00 allein“ und „nächste CI 029“ beschreiben nur diese Historie.
 
-**Die folgenden lokalen Beispiele dokumentieren die Basispolicy außerhalb
-der aktiven Pixel-Phase. Auf dem Pixel sind sie derzeit nicht auszuführen.**
+**Die folgenden Beispiele beschreiben die vorhandenen Werkzeuge. Für den aktiven
+Auftrag gilt die oben genannte Laptop-Policy mit vollständigen parallelen Gates.
+Ein beschriebener Modusvergleich ist kein Auftrag, serielle Tests zu starten.**
 
 ## Teststart
 

@@ -98,9 +98,11 @@ Begrenzte Kindprozesse prüfen den nativen Abschluss offener und bereits
 abgeschlossener Anfragen sowie den Wechsel auf eine neue Quelle. Ein Hänger
 liefert einen Stacktrace und lässt nicht den gesamten Testworker warten.
 
-Die lokalen Nachweise stammen von Linux. Native Windows-Nachweise stehen bis zur
-vorgesehenen CI aus; Simulationen gelten nicht als Windows-Abnahme. Alle nativen
-Tests bleiben für die vollständigen seriellen und parallelen CI-Suiten aktiviert.
+Die lokalen Nachweise stammen von Linux. Historische native Windows-Nachweise
+sind im abgeschlossenen Watcher-Plan gebunden; spätere Änderungen benötigen
+Nachweise ihres eigenen Stands. Simulationen gelten nicht als Windows-Abnahme.
+Die nativen Tests bleiben in den bestehenden parallelen CI-Lanes enthalten;
+der aktuelle Nutzerauftrag sieht keine seriellen Gates vor.
 
 Keine neuen Laufzeitabhängigkeiten, kein automatischer Polling-Fallback und
 keine neue Termux-Service-Zusage. Netzwerk-/virtuelle Dateisysteme und Änderungen

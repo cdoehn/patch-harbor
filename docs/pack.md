@@ -3,8 +3,10 @@
 Der Vertrag steht gemeinsam in [Hauptspezifikation](../spec/SPECIFICATION.md)
 und [PYZ/PACK-Ergänzung, Revision 2](../spec/SPECIFICATION_EXTENSION_PYZ_PACK.md).
 Der [aktive Plan](../planning/pyz-pack/commit-plan.md) führt den Fortschritt.
-CLI und öffentliche Python-API verwenden denselben Pack-Core. Die PYZ folgt
-in späteren Schritten.
+Installierte CLI, Core-PYZ und öffentliche Python-API verwenden denselben
+Pack-Core. Python ab 3.12 ist nötig. Die PYZ enthält den Core ohne Watcher und
+braucht keine Installation; ihr Start aus einem Result folgt dem
+[geprüften Bootstrap](runtime-bootstrap.md).
 
 ```bash
 patchharbor pack ./patch-inhalt --reference-bundle ./result.zip \
@@ -113,4 +115,7 @@ Pack startet weder Git, Shell, Netzwerk, Installer, Build noch Apply.
 Die Tests für Referenzen, Inhaltsaufnahme, Kandidatenbau und öffentliche API laufen
 in der vollständigen parallelen Suite. Linux-Nachweise ersetzen keine native
 Windows-/CIFS-Abnahme. Der tatsächliche Handoff- und Apply-Status steht im Plan und
-im zugehörigen Result. Die CLI-Ausgabe ist separat geprüft; PYZ-Durchstiche folgen ihren eigenen Gates.
+im zugehörigen Result. Die Erstnutzung aus der eigenen eingebetteten Anleitung
+und drei echte Result-/PYZ-Generationen sind eigene vollständige Tests.
+[Funktionsbeispiele](pack-examples.md) zeigen Voll-Datei-, Diff-, Misch- und
+Diagnosepakete sowie die Grenze einer erfolgreichen statischen Prüfung.

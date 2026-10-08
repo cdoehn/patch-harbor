@@ -1,9 +1,10 @@
-# PatchHarbor 1.2.0 – public Python API
+# PatchHarbor – public Python API
 
 Use `from patchharbor import api`. This is the only supported public Python
 namespace; implementation modules remain internal. The documented names and
-value fields form the supported 1.2.0 compatibility surface. Within the 1.x
-series, fixes and compatible additions preserve documented calls and result
+value fields form the supported compatibility surface introduced in 1.2.0 and
+extended by the joint PYZ/PACK specification. Within the 1.x series, fixes and
+compatible additions preserve documented calls and result
 semantics. Exception: this explicitly approved repository-local configuration
 revision of the 1.2.0 development line supersedes the earlier global-setting
 semantics. It has no migration or compatibility fallback; the method names stay,
@@ -124,7 +125,7 @@ computed observations, not new declared hashes in format-1 `patch.json`.
 frozen `ReferenceContext`. Its fields are `repo_id`, `base_commit` (the existing
 typed IDs), `state_fingerprint`, `fingerprint_algorithm`, `dirty` and
 `repository_path` (recorded text, including foreign Windows paths; never resolved
-on this machine). This reader checks the complete format-1/2 inventory, blob IDs,
+on this machine). This reader checks the complete format-1/2/3 inventory, blob IDs,
 untracked SHA-256 and metadata consistency, accepting consistent dirty, failure
 and dry-run Results. It uses actual context, never the previous expected binding.
 Repository snapshot paths retain the existing portable UTF-8 repository rules;

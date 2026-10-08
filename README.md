@@ -19,29 +19,12 @@ Neither file is an alternative to the other. This explicit feature selection
 supersedes stale active-plan headings in historical documents; the unchanged
 package version does not reactivate a completed version/RIV/watcher plan.
 
-PP-00 was completed by repair Bundle 025, commit
-`7a28bbc2189cdb2a78590e62a45e4d96b0ff893d`, with all six jobs successful in
-CI run `37635401106`, as recorded in its returned Result.
-
-PP-01 and its historical fixture correction are complete. Result Bundle 030
-confirms commit `e34a81c517d66c079f85cc43033b233f8c9f90a8`, a successful full
-parallel Apply gate (2,480 passed, 8 skipped), a normal push and a clean tree.
-PP-02A / Bundle 031 is confirmed by commit
-`d487a84c55857ea0f64914f1cd636e5fc796a3fb` and its full parallel Apply gate
-(2,561 passed, 8 skipped). Bundle 032 confirms the full `api.pack_patch` operation at commit
-`e2f6388c7d511b700ad825b64aea2aca6841ca51` (2687 passed, 8 skipped).
-Bundle 033 confirms the CLI adapter at commit `9bebc3c5a9da4da0cb6f846469a79bf9965a415a`
-(2734 passed, 8 skipped). Bundle 034 confirms the canonical Core-PYZ profile at commit `a9ac74e00fd0ac0042d7474a52a95e1fb17a4d59`
-(2802 passed, 8 skipped). Bundle 035 confirms producer-bound directory/PYZ resources at commit `25057ec9fa5c108a92a6a31be434c0d2c5e30118`
-(2831 passed, 8 skipped). Bundle 036 confirms the stdlib-only bootstrap and direct/API PYZ use at commit
-`d13709e8ccb9e4b45bd126fcb41829f784270861` (2859 passed, 8 skipped). Bundle 037
-confirms full Result-3 reference reading at commit `f892ae6aaaeebcabb83baf25997799d259b63e6f`
-(2939 passed, 8 skipped). Bundle 038 confirms complete consumer evidence and the executable embedded bootstrap
-at commit `1da90f0c080cb6e5dd8feed5d204fbc2826e55ab` (2968 passed, 8 skipped).
-Bundle 039 confirms pinned PYZ Result resources at commit
-`0a806c1b2c00b8e2b3c3a6e9d03559ca9c36fa51` (2997 passed, 8 skipped).
-Bundle 040 prepares the productive Result-3 switch with its own embedded bootstrap,
-three-generation roundtrips and Core parity. The existing global installation is unchanged.
+PP-00 through PP-06B are confirmed by actual Apply Results. The latest is
+commit `f3edbeb7216101f2435a2752f1168562097673f3` with 3004 passed tests and 8 skips
+in the full parallel Apply gate. The plan records the complete sequence.
+Bundle 041 prepares the final documentation review and functional full-file,
+diff, mixed, diagnostic and failing-script examples. Final native acceptance
+and the product-version decision remain open; the global installation is unchanged.
 
 **Current policy, explicitly updated by Christian on 7 October 2026:**
 Development and Apply run full parallel suites only, including at bundle end.
@@ -50,7 +33,7 @@ Only Christian starts the manual GitHub CI workflow; no automated dispatch or
 five-bundle cadence. The active loop continues the existing plan after verified
 Results, without a fixed correction-attempt limit.
 See [test policy](docs/test-parallelism.md) and [plan section 1.10](planning/pyz-pack/commit-plan.md).
-The prepared PP-06B step is not yet an Apply or CI success.
+The prepared PP-07 step is not yet an Apply or CI success.
 
 The Result-PYZ profile contains the shared Core **without the watcher**.
 The new public `api.pack_patch` accepts explicit contents, a Result reference,
@@ -655,9 +638,11 @@ activate the launcher's extra completeness checks. See
 [development test contracts](docs/test-parallelism.md) for isolation, report
 bindings, deliberate failure probes and partial-test selection.
 
-The prepared [canonical runtime](docs/runtime-artifact.md) can reproduce its
-wheel offline from a normal installation. Result embedding follows in the next
-RIV stages; an unavailable wheel still requires the established handoff method.
+The prepared [canonical Core-PYZ](docs/runtime-artifact.md) reproduces identical
+archive bytes offline from a normal installation or from the PYZ itself. New
+Results embed that PYZ, including their own bootstrap instructions. If the runtime
+cannot be used, follow the [documented technical fallback](docs/runtime-bootstrap.md);
+a validator rejection remains a failure.
 
 ## Termux and Android
 
@@ -722,10 +707,11 @@ Known lock conflicts use readiness-only backoff (5, 10, 20, 40, 80, 160, then
 silent polling fallback. Git changes outside Exchange do not trigger a scan:
 use a new Exchange change, restart, or a deliberate manual Apply in that case.
 
-Linux and Windows use native adapters without new dependencies. The new Windows
-end-to-end acceptance remains pending the scheduled CI. A running installed
+Linux and Windows use native adapters without new dependencies. Native Windows evidence for the current PYZ/PACK end state remains pending
+a CI run started manually by the user. A running installed
 watcher must be restarted after upgrading, once any active Apply has finished.
-The existing manual Apply and wheel/runtime fallback remain available.
+Manual Apply remains available. Result-3 PYZ and legacy Result-2 wheel consumers
+retain their documented technical fallback; neither bypasses invalid binding.
 
 The watcher uses the same repository-local configuration, package validation,
 persistent replay state, repository locks and Result Bundle behavior as Core. A
@@ -805,7 +791,7 @@ und Release. `patchharbor.api` ist die unterstützte öffentliche Python-Schnitt
 ab 1.2.0; alle anderen Implementierungsimporte bleiben intern.
 
 Die Haupt-CLI verwendet die API für alle fachlichen Operationen. Der Watcher
-verwendet sie zur Registry-Prüfung und im separaten Prozess jedes Apply-Polls;
+verwendet sie zur Registry-Prüfung und im separaten Prozess jedes durch Ereignisse ausgelösten Apply-Scans;
 Core lädt dabei die repositorylokalen Einstellungen.
 Eine CLI-Installation mit `uv tool` stellt das Modul nicht automatisch in anderen
 Python-Umgebungen bereit. Zum Importieren muss PatchHarbor in der Umgebung des
@@ -815,8 +801,8 @@ die API-Dokumentation; neue Runtime-Abhängigkeiten gibt es nicht.
 Die RIV-Entwicklung ergänzt lesende `inspect`-/`validate`-Operationen und
 Result-Format 3 mit einer installationsfrei startbaren Core-PYZ. Der
 [Bootstrap-Ablauf](docs/runtime-bootstrap.md) prüft Herkunft und Integrität vor
-Codeausführung und verwendet bei Wheel-Ausfall verbindlich den bisherigen
-Übergabeweg. Diagnosebundles dürfen null Commits enthalten, Entwicklungsbundles
+Codeausführung und verwendet bei technisch nicht nutzbarer PYZ beziehungsweise
+Legacy-Wheel verbindlich den bisherigen geprüften Übergabeweg. Diagnosebundles dürfen null Commits enthalten, Entwicklungsbundles
 einen oder mehrere echte geprüfte Zustände. Die Planabnahme verlangt noch den
 tatsächlichen finalen Apply und dessen CI; Veröffentlichung bleibt separat.
 
@@ -824,8 +810,9 @@ tatsächlichen finalen Apply und dessen CI; Veröffentlichung bleibt separat.
 ### Watcher als API-Verbraucher (API-3)
 
 Der Watcher prüft beim Start die Registry über `api.repositories()`.
-Jeder automatische Poll liest die repositorylokalen Einstellungen frisch und bleibt ein eigener
-Prozess derselben Installation; dessen privater Worker ruft `api.apply_next()`
+Nach dem Start sowie nach relevanten Dateisystemereignissen mit fünf Sekunden
+Ruhezeit liest jeder Core-Scan die repositorylokalen Einstellungen frisch.
+Der Apply-Worker bleibt ein eigener Prozess derselben Installation; dessen privater Worker ruft `api.apply_next()`
 direkt auf, nicht mehr den CLI-Parser. Betriebs-JSON, globaler Scope, Replay und
 Failed-Retry-Schutz bleiben erhalten. Die Prozess-/Signalgrenze und der Linux-
 Servicevertrag bleiben unverändert. Die Paketversion ist 1.2.1.

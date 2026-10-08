@@ -57,7 +57,7 @@ ZIP-Hash wird festgehalten. Ein optionaler Recovery-Beleg verwendet genau diesen
 Hash und wird einmal geschrieben. Vor dem atomaren Rename müssen die aktuellen
 Bytes erneut denselben Hash liefern. Ein inhaltlich anderes Result wird nicht
 durch längeres Warten akzeptiert. Apply, Entrypoint, Commit und Push sind außerhalb
-der Wiederholung. Bestehende Wheel-/Offline-Fallbacks bleiben erhalten.
+der Wiederholung. Die dokumentierten PYZ-/Legacy-Wheel-Fallbacks bleiben erhalten.
 
 ## Diagnose und Praxisabnahme
 
@@ -84,9 +84,10 @@ Für die Abnahme auf der betroffenen Linux→Windows-CIFS-Verbindung:
 Lokale Regressionen simulieren Cacheabweichungen und Zeitabläufe ohne echte
 Minutenpausen, einschließlich Erschöpfung, Abbruch, Dateiaustausch, Symlink-/FIFO-
 Rennen, Integritätsfehlern und Inhaltsänderungen gleicher Länge bei wiederhergestellter
-`mtime`. Development läuft ausschließlich parallel; Apply endet seriell und danach
-parallel. Native Windows- und CIFS-Abnahme bleiben bis zu ihren tatsächlichen
-Nachweisen offen. GitHub-CI bleibt manuell; nächster regulärer Termin ist Bundle 024.
+`mtime`. Development und Apply verwenden nach der aktuellen Nutzerentscheidung
+nur vollständige parallele Gates. Native Windows- und reale CIFS-Abnahme bleiben
+bis zu ihren tatsächlichen Nachweisen offen. Ausschließlich Christian startet die
+manuelle GitHub-CI; es gibt keinen automatischen Bundle-Termin.
 
 Grundlagen: [CIFS-Mountoptionen](https://man7.org/linux/man-pages/man8/mount.cifs.8.html),
 [CreateFileW](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilew).

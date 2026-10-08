@@ -99,4 +99,5 @@ bestätigen Commit `44cc77a42b492fc1f31267db5139253ef7545b9f` einschließlich al
 sechs Jobs und Windows-Packaging. Der [Plan](../planning/watcher-events/commit-plan.md)
 dokumentiert Result-Bindung, vorherige Fehler und vollständigen Abschluss.
 Diese Abnahme gilt für diesen Endstand; spätere Änderungen brauchen eigene
-Nachweise. Der nächste reguläre CI-Termin bleibt Bundle 024.
+Nachweise. Für die aktive PYZ/PACK-Entwicklung startet ausschließlich Christian
+die manuelle CI; die historische Bundle-Taktung ist aufgehoben.

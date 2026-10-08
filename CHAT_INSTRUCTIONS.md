@@ -90,7 +90,7 @@ keine ignorierten Metadaten. Nach echtem Verschieben kann Register den Pfad
 aktualisieren, wenn der alte Pfad nicht mehr existiert.
 
 Mehrere Repositorys dürfen denselben Exchange-Ordner nutzen oder getrennte
-Ordner wählen. Der Watcher lädt pro Poll ihre lokalen Einstellungen über Core,
+Ordner wählen. Der Watcher lädt bei jedem freigegebenen Core-Scan ihre lokalen Einstellungen,
 scannt physisch identische Ordner nur einmal und ordnet Pakete per vollständiger
 `repo_id` zu. Automatische Auswahl akzeptiert nur Pakete im Exchange ihres
 Zielrepositorys. Suffix und Archivregeln gelten immer pro Zielrepository,
@@ -625,7 +625,7 @@ if __name__ == '__main__':
         raise SystemExit(2)
 ```
 
-### Geprüfte Runtime und verbindlicher bisheriger Übergabeweg
+### Legacy-Result 2: geprüftes Wheel und bisheriger Übergabeweg
 
 Result-Format 2 ergänzt `runtime/runtime.json` und gegebenenfalls ein kanonisches
 Wheel. Format 1 sowie `unavailable` bleiben gültige Referenzen. `runtime/` ist
@@ -711,10 +711,10 @@ Erweiterung, unberührte Basisverträge gelten weiter. Der vorhandene CIFS-Plan
 behält seine offenen Nachweise. Diese Projektzuordnung gilt nicht pauschal für
 andere Repositorys, denen PatchHarbor dieselbe generische Vorlage mitliefert.
 
-Der erste Schritt PP-00 / Bundle 024 integriert nur Dokumente und Verweise.
-`pack` und die PYZ sind bis zu ihren nachgewiesenen Umsetzungsschritten
-Zielzustand, keine bereits nutzbaren Befehle oder Artefakte. Die aktuellen
-Wheel-/Result-2-Regeln und der etablierte Paketbau bleiben vorerst wirksam.
+**Historischer Planstart:** PP-00 integrierte nur Dokumente und Verweise.
+Die folgenden Umsetzungsschritte führten `pack`, den Core-PYZ-Start und den
+Result-3-Writer ein. Prüfe den tatsächlichen Stand des gelieferten Results: Eine
+alte globale Installation wird durch eine Quelländerung nicht automatisch ersetzt.
 
 **Historie:** Die einmalige CI-only-Ausnahme für PP-00 / Bundles 024/025
 ist mit dessen erfolgreichem Abschluss erfüllt. Result
@@ -725,7 +725,10 @@ ist mit dessen erfolgreichem Abschluss erfüllt. Result
 unterbrochen; damals waren die PP-01-Dateien vorhanden und uncommitted. Das ist kein
 bestandener PP-01-Testlauf. Bundle 027 / PP-01-FIX1 setzt diese Änderungen fort.
 
-### Aktive Laptop-Phase: volle parallele Tests, CI nur durch den Nutzer
+### PatchHarbor-Projekt: aktive Laptop-Phase
+
+Dieser Abschnitt gilt nur für die ausdrücklich beauftragte Entwicklung von
+PatchHarbor selbst. Andere Zielprojekte behalten ihre eigenen Test-/CI-Regeln.
 
 Die spätere ausdrückliche Nutzeranweisung vom 7. Oktober 2026 ersetzt ältere
 lokale serielle Gates, die Pixel-CI-only-Regel und den CI-Fünfertakt.
@@ -744,14 +747,14 @@ Der bereits laufende Watcher übernimmt allein den Apply. Keine direkten
 Development-Commits, Apply-Mutationen, Hook-Umgehungen oder Watcher-Neustarts.
 Nach erfolgreichen Commit-Gates genau ein normaler Push; kein automatisches Tag.
 
-PP-00 bis PP-06A sind durch tatsächlich geprüfte Results bestätigt. Bundle 040
-schaltet den gemeinsamen Writer auf Result 3 mit einer Core-PYZ um. Eigene
-E-10-Erstnutzung, drei tatsächliche Generationen, normale Installation und
-Core-Parität werden vor Übergabe vollständig parallel geprüft. Maßgeblich sind
-Plan Abschnitt 1.20 und die aktuelle Testpolicy. Bereits laufende ältere globale
-Installationen behalten ihren eigenen Stand; ein Quellpatch ersetzt sie nicht.
-Ein älterer mitgelieferter Core kann `pack` oder Format 3 vermissen; dann bleibt
-der geprüfte manuelle Paketvertrag nutzbar. Native Abnahme und Release bleiben offen.
+PP-00 bis PP-06B sind durch tatsächliche Results bestätigt. Der gemeinsame
+Writer erzeugt Result 3 mit einer Core-PYZ. Bundle 041 prüft die vollständige
+Dokumentation und die funktionalen Beispiele; artefaktwirksame Vorlagenänderungen
+erfordern erneut die volle Suite einschließlich Erstnutzung und Roundtrip.
+Maßgeblich sind Plan Abschnitt 1.21 und die aktuelle Testpolicy. Eine ältere
+laufende globale Installation behält ihren eigenen Stand. Fehlen dort `pack`
+oder Format 3, gilt der dokumentierte technische Altweg. Versionsentscheidung,
+native Abschlussabnahme und Release bleiben offen.
 
 Bestimme die aktive Zielversion aus dem Repository. Eine laut Plan erst zum
 Release erfolgende Versionsanhebung ist kein Widerspruch; tatsächlich
@@ -839,6 +842,14 @@ auch mehrere Folgen dürfen in einem Bundle liegen. W/R/C ist kein allgemeiner
 Default.
 
 ## 7. Genau ein sicheres Patch-Paket erzeugen
+
+Verwende mit einer nutzbaren aktuellen Runtime `pack` beziehungsweise
+`api.pack_patch` für den bewusst vorbereiteten Inhaltsordner, genau das geprüfte
+Result, einen Entrypoint und einen expliziten vorhandenen Ausgabeordner außerhalb
+der Inhalte. Pack erzeugt Manifest und frische Begleitdaten selbst und validiert
+die tatsächlich geschriebenen Bytes gegen diese Referenz. Es führt keine Tests,
+Skripte oder Commits aus. Die folgenden Formatregeln bleiben auch für den
+technischen Altweg verbindlich; fachliche Ablehnungen sind kein Fallbackgrund.
 
 Erzeuge genau eine herunterladbare ZIP-Datei im sicheren PatchHarbor-Format.
 Liefere keine parallele Shell-Datei, keinen zweiten Patch und keine alternative
@@ -964,10 +975,10 @@ CI-Auslöser, Oracles, Ausschlüsse und Ergebnisnachweise. Fehlen konkrete Befeh
 leite angemessene Prüfungen aus Testinfrastruktur und Auftrag ab und benenne sie.
 Starte GitHub-CI nicht allein aufgrund eines PatchHarbor-Defaults.
 
-**Projektbezogener Vorrang:** Während der oben erklärten aktiven Pixel-Phase
-laufen keine lokalen Produkttests. Der dort ausdrücklich erlaubte Commit/Push
-vor der externen CI ersetzt die folgenden lokalen Vorcommit-Beispiele für
-PatchHarbor auf dem Pixel. Die Erfolgsmeldung bleibt bis zur grünen CI gesperrt.
+**PatchHarbor-Projekt:** Für die aktive Laptop-Entwicklung gelten die oben
+festgehaltenen vollständigen parallelen Commit-Gates. Die frühere Pixel-CI-only-
+Ausnahme ist beendet. Externe CI startet ausschließlich der Nutzer; notwendige
+native Abschlussnachweise bleiben bis zur tatsächlichen Auswertung offen.
 
 > Vor jedem Commit müssen alle für genau diesen Zwischenstand vorgeschriebenen
 > Prüfungen erfolgreich abgeschlossen sein. Die Prüfungen bestimmt das
@@ -1078,8 +1089,8 @@ Vor der finalen Antwort:
    `PatchHarbor-Backups/Patches` sichern. Keine öffentliche Freigabe; Erfolg nur
    nach Tool-Bestätigung, Bytegleichheit nur nach SHA-256-Rückprüfung oder
    geeigneter Anbieter-Prüfsumme behaupten.
-4. Eigene Gmail-Adresse aus dem verbundenen Konto auflösen und dieselbe ZIP
-   senden; bei Anhangsgrenzen bestätigten privaten Drive-Link plus Dateiname und
+4. Nur bei autorisiertem Versand die eigene Gmail-Adresse aus dem verbundenen
+   Konto auflösen und dieselbe ZIP senden; bei Anhangsgrenzen bestätigten privaten Drive-Link plus Dateiname und
    SHA-256 senden. Schutzgrenzen nicht umgehen; Statusmail allein ist kein Backup.
 5. `Chat-Link`, `Drive-Backup`, `E-Mail` und `SHA-256` unmittelbar vor dem
    Abschlussblock ausgeben. Backups sind Best Effort; unklaren Status prüfen und

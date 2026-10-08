@@ -1,5 +1,13 @@
 # PatchHarbor – Spezifikations-Changelog
 
+## 2026-10-08 – PP-06B bestätigt; Dokumentreview PP-07
+
+- Commit `f3edbeb7216101f2435a2752f1168562097673f3` durch tatsächlichen Apply bestätigt.
+- Aktuelle Dokumentation für PYZ/pack, Diagnose und statische Prüfgrenzen
+  abgeglichen; historische Result-2-Verträge bleiben historische Lesefähigkeit.
+- Funktionale CLI-/PYZ-/API-Beispiele und erneute Artefaktgates in Bundle 041.
+- Normdateien unverändert; Version, externe Abnahme und Release bleiben offen.
+
 ## 2026-10-08 – PP-06A bestätigt; Result-3-Writer in Bundle 040
 
 - Commit `0a806c1b2c00b8e2b3c3a6e9d03559ca9c36fa51` durch tatsächlichen Apply bestätigt.
