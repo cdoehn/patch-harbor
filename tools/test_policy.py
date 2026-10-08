@@ -27,6 +27,7 @@ SUITES = {
         "tests/test_pyz_result_e2e.py",
         "tests/test_pack_examples.py",
         "tests/test_pyz_bootstrap.py",
+        "tests/test_result_file_limits.py",
         "tests/test_pyz_resources.py",
         "tests/test_pack_sources.py",
         "tests/test_pack_api.py",

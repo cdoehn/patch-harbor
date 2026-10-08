@@ -1032,7 +1032,23 @@ Verbindliche Anfangswerte:
 - Warning ab 10 MiB für einen einzelnen Skript- oder Nutzdateiinhalt,
 - höchstens 256 MiB pro Eingabeartefakt oder ZIP-Eintrag,
 - höchstens 512 MiB unkomprimierte Gesamtdaten eines Eingabe-ZIP-Archivs einschließlich Skripten, Manifest und Nutzdateien,
-- höchstens 1.000 ZIP-Einträge einschließlich Verzeichnis-, Skript-, Manifest- und Nutzdateieinträgen.
+- höchstens 250.010 äußere ZIP-Einträge einschließlich Verzeichnis-, Skript-, Manifest- und Nutzdateieinträgen.
+
+**Autorisierte Grenzkorrektur für 1.3.0, 8. Oktober 2026:** Vollständige
+Result-Snapshots erlauben insgesamt höchstens **250.000 Dateien** aus
+`base_entries` und `untracked_entries`. Bis zu zehn zusätzliche Einträge für
+Manifest, Kontext, Run-/Ausführungslog, Handoff-Paar, Diff-Paar und
+Runtime-Metadaten/-Artefakt sind im gemeinsamen äußeren ZIP-Budget reserviert.
+Writer und Reader setzen dieselbe Snapshot-Grenze durch; der Writer lehnt eine
+Überschreitung vor dem Öffnen des ZIP-Schreibers ab. Die gemeinsame äußere Grenze
+gilt auch für Patch-Reader und `pack`; dessen eigener Scan-Schutz bleibt erhalten.
+Standardkonforme einteilige ZIP64-Result-Archive sind zulässig. Der Bootstrap
+prüft auch dafür Verzeichniszahl und -grenzen vor der ZIP-Metadatenallokation.
+Innere Runtime-Wheel-/PYZ-Archive bleiben auf 1.000 Einträge begrenzt; sämtliche
+Bytebudgets bleiben erhalten. Die Dateigrenze ist keine Zusage für beliebig große
+Dateien. Eine Eintragsüberschreitung nennt Ressource, tatsächliche Anzahl und
+Grenze, auch bei der abschließenden Result-Verifikation. Ein solcher
+deterministischer Fehler löst keine CIFS-Stabilisierungswiederholung aus.
 
 Eine Pipe setzt das harte Eingabebudget bereits während des Empfangs durch.
 

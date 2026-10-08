@@ -1,5 +1,17 @@
 # PatchHarbor – Spezifikations-Changelog
 
+## 2026-10-08 – PP-08B bestätigt; Korrektur für große Snapshots
+
+- Tatsächlicher Apply/Push von Bundle 043 bestätigt Commit
+  `15d777c7f9f7d61a7f2a7ce56628cf22366f3ed7`, 3021 parallele Tests und 8 Skips.
+- Nutzerbeauftragte Grenze: 250.000 Snapshot-Dateien plus zehn Hilfseinträge.
+  Hauptspezifikation 10.5 und PYZ/PACK-Ergänzung Revision 3 explizit angeglichen.
+- Writer, sämtliche gemeinsamen Reader und ZIP64-Bootstrap verwenden die neue
+  Grenze; Verifikationsfehler bewahren konkrete Ressource, Istwert und Limit.
+- Bytebudgets, innere Runtime-Limits und CIFS-Retrybedingungen bleiben erhalten.
+  Bundle 044 benötigt vollständige parallele Gates und echten Apply-Nachweis;
+  finale CI startet weiterhin ausschließlich Christian.
+
 ## 2026-10-08 – PP-08A bestätigt; Produktversion 1.3.0 / PP-08B
 
 - Commit `71f367db6c14241bcbb861cc86e488edbcc36fcd` durch tatsächliches Result

@@ -52,6 +52,11 @@ class InvalidZipArchiveError(ZipPayloadError):
 class ZipResourceLimitError(ZipPayloadError):
     """The declared or observed ZIP data exceeds the shared policy."""
 
+    def __init__(self, message: str, *, resource: str | None = None,
+                 actual: int | None = None, limit: int | None = None) -> None:
+        super().__init__(message)
+        self.resource, self.actual, self.limit = resource, actual, limit
+
 
 class ZipArchiveReadError(ZipPayloadError):
     """The ZIP artifact or one member could not be read completely."""
@@ -76,7 +81,8 @@ class _ZipReadBudget:
     ) -> None:
         if len(entries) > self.policy.max_zip_entries:
             raise ZipResourceLimitError(
-                f"more than {self.policy.max_zip_entries} entries"
+                f"ZIP entry limit exceeded: actual={len(entries)}, limit={self.policy.max_zip_entries}",
+                resource="zip_entries", actual=len(entries), limit=self.policy.max_zip_entries,
             )
 
         declared_total = 0

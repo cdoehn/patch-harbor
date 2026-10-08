@@ -185,12 +185,13 @@ def test_exact_file_and_scan_budgets_include_generated_entries_and_directories(c
 def test_real_thousand_entry_boundary_reserves_all_three_generated_files(contents, monkeypatch):
     for number in range(996):
         (contents / f'payload-{number}').write_bytes(b'')
-    captured = capture_sources(contents, 'run.sh')
+    policy = replace(DEFAULT_RESOURCE_POLICY, max_zip_entries=1_000)
+    captured = capture_sources(contents, 'run.sh', resource_policy=policy)
     assert len(captured.files) + sources.GENERATED_ENTRIES == 1_000
     (contents / 'one-too-many').write_bytes(b'')
     monkeypatch.setattr(tree.SourceDirectory, 'read_file',
                         lambda *a, **k: pytest.fail('over-budget contents read'))
-    fails(FailureReason.SOURCE_ERROR, lambda: capture_sources(contents, 'run.sh'))
+    fails(FailureReason.SOURCE_ERROR, lambda: capture_sources(contents, 'run.sh', resource_policy=policy))
 
 
 def test_real_ten_thousand_node_boundary_counts_empty_directories(contents, monkeypatch):

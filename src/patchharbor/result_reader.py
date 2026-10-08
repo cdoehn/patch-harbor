@@ -28,7 +28,7 @@ from patchharbor.platform.filesystem import (
 )
 from patchharbor.progress import activity
 from patchharbor.repository_paths import RepositoryRelativePath, validate_repository_paths
-from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY, ResourcePolicy
+from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY, ResourcePolicy, check_result_file_count
 from patchharbor.run_report import PrimaryResult, PrimaryResultKind
 from patchharbor.state_fingerprint import state_fingerprint_digest
 from patchharbor.zip_payloads import InvalidZipArchiveError, NotZipArchiveError, ZipPayloadError, read_zip_payload_bytes
@@ -256,8 +256,9 @@ def _parse_result_payloads(payloads: tuple[BundlePayload, ...], *,
     files = {entry.relative_path: entry.content for entry in payloads}
     modes = {entry.relative_path: entry.unix_mode for entry in payloads}
     _require(len(files) == len(payloads), "duplicate result members")
-    _require(len(payloads) <= resource_policy.max_zip_entries
-             and all(len(raw) <= resource_policy.max_content_bytes for raw in files.values())
+    _require(len(payloads) <= resource_policy.max_zip_entries,
+             f"ZIP entry limit exceeded: actual={len(payloads)}, limit={resource_policy.max_zip_entries}")
+    _require(all(len(raw) <= resource_policy.max_content_bytes for raw in files.values())
              and sum(len(raw) for raw in files.values()) <= resource_policy.max_zip_total_bytes,
              "Result payload budget exceeded")
     manifest = _document(files["manifest.json"])
@@ -360,6 +361,9 @@ def _parse_result_payloads(payloads: tuple[BundlePayload, ...], *,
         expected_files.update(name for name in files if name.startswith("runtime/"))
     inventory = []
     repository_paths = []
+    _require(type(manifest["base_entries"]) is list and type(manifest["untracked_entries"]) is list,
+             "invalid result inventory")
+    check_result_file_count(len(manifest["base_entries"]), len(manifest["untracked_entries"]))
     for kind in ("base", "untracked"):
         entries = manifest[kind + "_entries"]
         _require(type(entries) is list, "invalid result inventory")

@@ -22,7 +22,7 @@ from zipimport import zipimporter
 
 MAX_INPUT = 256 * 1024 * 1024
 MAX_TOTAL = 512 * 1024 * 1024
-MAX_ENTRIES = 1000
+MAX_ENTRIES = 250_010  # 250,000 snapshot files plus at most ten auxiliary members.
 MAX_PYZ = 16 * 1024 * 1024
 MAX_METADATA = 128 * 1024
 HEX = re.compile(r'[0-9a-f]{64}')
@@ -85,22 +85,42 @@ def _directory_budget(raw):
     position = raw.rfind(b'PK\x05\x06', start)
     _require(position >= 0 and position + 22 <= len(raw), 'missing ZIP boundary')
     _, disk, directory_disk, disk_count, count, size, offset, comment = struct.unpack_from('<4s4H2IH', raw, position)
-    _require(disk == directory_disk == 0 and disk_count == count and 0 < count <= MAX_ENTRIES,
-             'ZIP entry budget or unsupported multipart/ZIP64 archive')
-    _require(position + 22 + comment == len(raw) and offset + size == position,
+    _require(disk == directory_disk == 0 and position + 22 + comment == len(raw),
+             'ZIP boundary or unsupported multipart archive')
+    directory_end = position
+    if position >= 20 and raw[position-20:position-16] == b'PK\x06\x07':
+        _, record_disk, record_offset, disks = struct.unpack_from('<4sLQL', raw, position-20)
+        _require(record_disk == 0 and disks == 1 and 0 <= record_offset <= position-76,
+                 'invalid ZIP64 locator')
+        # Match the fixed ZIP64 record read by all supported Python versions.
+        # PatchHarbor does not emit an extensible data sector.
+        signature, record_size, made, needed, z_disk, z_directory_disk, z_disk_count, z_count, z_size, z_offset = struct.unpack_from('<4sQ2H2L4Q', raw, record_offset)
+        _require(signature == b'PK\x06\x06' and record_size == 44
+                 and record_offset + 12 + record_size == position-20
+                 and z_disk == z_directory_disk == 0 and z_disk_count == z_count,
+                 'invalid ZIP64 end record')
+        _require(disk_count in (0xffff, z_disk_count) and count in (0xffff, z_count)
+                 and size in (0xffffffff, z_size) and offset in (0xffffffff, z_offset),
+                 'inconsistent ZIP64 directory facts')
+        count, disk_count, size, offset = z_count, z_disk_count, z_size, z_offset
+        directory_end = record_offset
+    _require(disk_count == count and 0 < count <= MAX_ENTRIES,
+             f'ZIP entry limit exceeded: actual={count}, limit={MAX_ENTRIES}')
+    _require(offset + size == directory_end,
              'ZIP directory boundary mismatch')
     cursor = offset
     for _ in range(count):
-        _require(cursor + 46 <= position and raw[cursor:cursor+4] == b'PK\x01\x02', 'ZIP directory mismatch')
+        _require(cursor + 46 <= directory_end and raw[cursor:cursor+4] == b'PK\x01\x02', 'ZIP directory mismatch')
         name, extra, note = struct.unpack_from('<3H', raw, cursor+28)
         _require(0 < name <= 4096, 'ZIP member name budget')
         cursor += 46 + name + extra + note
-    _require(cursor == position, 'ZIP directory count mismatch')
+    _require(cursor == directory_end, 'ZIP directory count mismatch')
 
 
 def _members(archive):
     infos = archive.infolist()
-    _require(len(infos) <= MAX_ENTRIES, 'ZIP entry budget')
+    _require(len(infos) <= MAX_ENTRIES,
+             f'ZIP entry limit exceeded: actual={len(infos)}, limit={MAX_ENTRIES}')
     names = set()
     for info in infos:
         name = info.filename

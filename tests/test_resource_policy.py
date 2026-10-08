@@ -16,7 +16,7 @@ def test_default_resource_policy_contains_the_version_one_budgets() -> None:
         max_input_artifact_bytes=256 * 1024 * 1024,
         max_content_bytes=256 * 1024 * 1024,
         max_zip_total_bytes=512 * 1024 * 1024,
-        max_zip_entries=1_000,
+        max_zip_entries=250_010,
     )
 
 

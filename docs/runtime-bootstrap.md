@@ -11,6 +11,13 @@ production writer emits Format 3 with exactly one Core-PYZ. Legacy 1/2 reference
 retain their versioned previous path. Upgrading repository files does not restart
 or replace an already running older global installation.
 
+Result snapshots support up to 250,000 stored repository files, with ten further
+outer ZIP slots for auxiliary data. The Core reader and stdlib bootstrap accept
+single-disk ZIP64 Results needed above the classic 65,535-member boundary. The
+bootstrap checks ZIP64 directory counts and offsets before allocating ZIP members.
+All byte budgets and the 1,000-member inner runtime limit still apply. A producer
+or reader entry-limit failure reports the actual count and limit without retrying.
+
 Read-only assessment and optional single-file preparation:
 
 ```text

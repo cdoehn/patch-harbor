@@ -14,6 +14,7 @@ from patchharbor.json_document import serialize_json_document
 from patchharbor.result_bundle_snapshot import ResultBundleSnapshot
 from patchharbor.run_report import RunReport
 from patchharbor.result_resources import ResultRuntimePayload
+from patchharbor.resource_policy import ResultSnapshotLimitError, check_result_file_count
 
 
 def _zip_info(name: str, *, executable: bool = False) -> zipfile.ZipInfo:
@@ -52,6 +53,10 @@ def write_result_bundle(
     runtime: ResultRuntimePayload | None = None,
 ) -> None:
     """Write one captured Result Bundle to a caller-owned binary stream."""
+    try:
+        check_result_file_count(len(snapshot.base_entries), len(snapshot.untracked_entries))
+    except ResultSnapshotLimitError as exc:
+        raise result_bundle_error(str(exc)) from exc
     if run_report.execution_present != (execution_log is not None):
         raise result_bundle_error(
             "Result Bundle execution state and execution log disagree"

@@ -1,11 +1,11 @@
 # PatchHarbor – Spezifikationserweiterung: Result-PYZ und `pack`
 
 **Dokument-ID:** `PYZ-PACK`  
-**Revision:** 2  
+**Revision:** 3
 **Stand:** 7. Oktober 2026  
 **Vorgesehener Ablageort:** `spec/SPECIFICATION_EXTENSION_PYZ_PACK.md`  
 **Basisdokument:** danebenliegende [`SPECIFICATION.md`](SPECIFICATION.md), gebundener Bestandsvertrag 1.2.1 einschließlich RIV und der bereits enthaltenen Result-/CIFS-Publikationsregeln  
-**Status:** Korrigierter Zielvertrag nach dem Integrationsreview; ersetzt Revision 1 dieser Ergänzung, nicht die Hauptspezifikation; noch kein Implementierungs-, Test- oder Release-Nachweis  
+**Status:** Zielvertrag mit autorisierter Grenzkorrektur vom 8. Oktober 2026; ersetzt Revision 2 dieser Ergänzung, nicht die Hauptspezifikation; Ausführungsnachweise stehen im Plan
 **Ziel-Produktversion:** vor der Release-Umsetzung gesondert festzulegen; dieses Dokument behauptet keine neue veröffentlichte Version
 
 > **Ziel:** Neue Result-Bundles liefern PatchHarbor als direkt mit Python aufrufbare PYZ statt als zu installierendes Runtime-Wheel. Die PYZ enthält den PatchHarbor-Core mit dessen CLI und öffentlicher Python-API, **aber keinen Watcher**. Zusätzlich erhält PatchHarbor das reguläre Unterkommando `pack` und die öffentliche Funktion `api.pack_patch(...)`, um vorbereitete Inhalte als referenzgebundenes, abschließend validiertes Patch-Paket zu erzeugen.
@@ -794,8 +794,14 @@ Damit kann ein Windows- oder Chat-Ersteller ein neues ausführbares POSIX-Skript
 | Einzelner Eingabeinhalt/ZIP-Eintrag | 256 MiB |
 | Fertiges ZIP als späteres Eingabeartefakt | 256 MiB |
 | Summe unkomprimierter ZIP-Inhalte | 512 MiB |
-| ZIP-Einträge insgesamt | 1.000 |
+| Äußere ZIP-Einträge insgesamt | 250.010 |
 | Je generierte Handoff-Datei | 128 KiB |
+
+Revision 3 übernimmt die ausdrücklich beauftragte Korrektur aus Hauptspezifikation
+10.5: maximal 250.000 Snapshot-Dateien plus bis zu zehn Hilfseinträge im Result,
+gemeinsames äußeres ZIP-Budget 250.010 und ZIP64-fähiger Result-Bootstrap. Die
+inneren Runtime-Limits in Abschnitt 6 bleiben unverändert. Alle Bytegrenzen und
+der folgende eigenständige Pack-Scan-Schutz gelten weiterhin.
 
 Manifest, Entrypoint und Handoff-Dateien zählen mit. Ein Inhaltsordner darf nicht erst durch unkontrolliertes vollständiges Einlesen gegen die Limits geprüft werden. Zusätzlich wird der lokale Scan auf **10.000 besuchte Dateisystemknoten einschließlich Verzeichnissen** begrenzt; dies ist ein eigener Pack-Scan-Schutz, keine Änderung des allgemeinen Patchformats.
 
@@ -1343,6 +1349,7 @@ Die technischen Primärquellen aus Revision 1 werden für Revision 2 unveränder
 |---|---|---|
 | 1 | 2026-10-07 | Erste vollständige separate Spezifikationserweiterung für Result-PYZ ohne Watcher und reguläres `pack`, einschließlich Formatübergang, CLI/API, Fehler-/Sicherheitsvertrag, Dokumentation, Testmatrix und Umsetzungsplan. |
 | 2 | 2026-10-07 | Integrationsreview umgesetzt: gemeinsamer Spezifikationssatz und eng begrenzte Bestandsausnahmen; unveränderte Prüferkategorien; Bootstrap als Writer-Gate; Result-/CIFS-Bestandsschutz und ausdrücklich getrennte Pack-Publikationspolitik; vollständiger Erfolg trotz Cleanup-Warnung und getrennte CLI-Ausgabefehler; Paket-ID/Zeit für beide Ausgabearten und Abgrenzung zum Chat-Zähler. Testmatrix, Dokumentationspflichten, Plan und Abnahme entsprechend nachgeführt. Keine Implementierung oder Produktabnahme. |
+| 3 | 2026-10-08 | Nutzerkorrektur: 250.000 Snapshot-Dateien und 250.010 äußere ZIP-Einträge, durchgängiges Lesen/Schreiben einschließlich ZIP64-Bootstrap und konkrete Grenzdiagnosen. Bytebudgets, 1.000 innere Runtime-Einträge und Pack-Scan-Schutz bleiben erhalten. |
 
 ### 20.4 Nachverfolgung der Korrekturen aus dem Integrationsreview
 

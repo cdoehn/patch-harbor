@@ -19,13 +19,15 @@ Neither file is an alternative to the other. This explicit feature selection
 supersedes stale active-plan headings in historical documents; the selected
 product version does not reactivate a completed version/RIV/watcher plan.
 
-PP-00 through PP-08A are confirmed by actual Apply Results, most recently
-commit `71f367db6c14241bcbb861cc86e488edbcc36fcd` with 3021 passed tests and 8 skips.
-The complete [acceptance mapping](planning/pyz-pack/test-matrix.md), native test
-selection and local measurements are in place. Christian selected **1.3.0** and
-confirmed his successful CIFS practice check. Bundle 043 prepares the versioned
-artifacts and final parallel gates for PP-08B. Its actual Apply and the manually
-started CI remain to be confirmed; this is not a release publication.
+PP-00 through PP-08B are confirmed by actual Apply Results, most recently
+commit `15d777c7f9f7d61a7f2a7ce56628cf22366f3ed7` with 3021 passed tests and 8 skips.
+Christian selected **1.3.0** and confirmed his successful CIFS practice check.
+Bundle 044 prepares a correction for large snapshots: 250,000 repository files,
+250,010 outer ZIP entries, ZIP64 bootstrap support and explicit limit diagnostics.
+Byte limits and inner runtime limits remain in force. The complete
+[acceptance mapping](planning/pyz-pack/test-matrix.md) and local measurements
+remain available. The correction's actual Apply and user-started final CI remain
+to be confirmed; this is not a release publication.
 The plan records the complete sequence and the scope of each piece of evidence.
 
 **Current policy, explicitly updated by Christian on 7 October 2026:**

@@ -8,6 +8,8 @@ from patchharbor.errors import ErrorKind, FailureReason, PatchHarborError
 from patchharbor.platform.cifs import publication_wait_budget
 from patchharbor.platform.filesystem import FileChangedDuringRead, MetadataSyncStatus
 from patchharbor.progress import activity
+from patchharbor.resource_policy import ResultSnapshotLimitError
+from patchharbor.zip_payloads import ZipResourceLimitError
 
 
 RETRY_DELAYS = (2, 3, 5, 10, 20, 20, 30, 30, 60, 60, 60)
@@ -22,6 +24,8 @@ class ResultVerificationError(PatchHarborError):
         fields = ("verification_stage", "verification_error_type", "verification_attempts",
                   "stable_read_mismatch")
         detail = ", ".join(f"{field}={diagnostics[field]}" for field in fields)
+        if diagnostics.get("verification_error_detail"):
+            detail += ", verification_error_detail=" + str(diagnostics["verification_error_detail"])
         super().__init__(f"Result Bundle integrity verification failed ({detail})",
                          FailureReason.RESULT_BUNDLE_ERROR, error_kind=ErrorKind.RESULT_BUNDLE_ERROR)
 
@@ -33,6 +37,19 @@ def _read_failure(error: BaseException) -> FileChangedDuringRead | None:
     while id(error) not in seen:
         seen.add(id(error))
         if isinstance(error, FileChangedDuringRead):
+            return error
+        if not isinstance(error, PatchHarborError) or error.__cause__ is None:
+            break
+        error = error.__cause__
+    return None
+
+
+def _limit_failure(error: BaseException) -> ZipResourceLimitError | ResultSnapshotLimitError | None:
+    """Preserve a typed budget failure through explicit publication wrappers."""
+    seen: set[int] = set()
+    while id(error) not in seen:
+        seen.add(id(error))
+        if isinstance(error, (ZipResourceLimitError, ResultSnapshotLimitError)):
             return error
         if not isinstance(error, PatchHarborError) or error.__cause__ is None:
             break
@@ -73,9 +90,13 @@ class ResultVerification:
                 changed = _read_failure(exc)
                 delay = next(self._delays, None) if changed is not None else None
                 if changed is None or delay is None:
+                    limit = _limit_failure(exc)
                     raise ResultVerificationError({
                         "verification_stage": stage,
-                        "verification_error_type": "FileChangedDuringRead" if changed else "PatchHarborError",
+                        "verification_error_type": "FileChangedDuringRead" if changed else type(limit).__name__ if limit else "PatchHarborError",
+                        "verification_error_detail": str(limit) if limit else str(exc),
+                        "resource_limit": ({"resource": limit.resource, "actual": limit.actual,
+                                            "limit": limit.limit} if limit else None),
                         "verification_attempts": attempts,
                         "stable_read_mismatch": changed.category if changed else None,
                         "metadata": changed.metadata if changed else {},

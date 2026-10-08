@@ -8,6 +8,7 @@ from hashlib import sha256
 
 from patchharbor.errors import result_bundle_error
 from patchharbor.models import GitObjectId
+from patchharbor.resource_policy import ResultSnapshotLimitError, check_result_file_count
 from patchharbor.repository_paths import (
     RepositoryRelativePath,
     validate_repository_paths,
@@ -130,6 +131,10 @@ def build_result_bundle_snapshot(
     """Build one validated shared snapshot from already captured bytes."""
     raw_base_entries = tuple(base_entries)
     raw_untracked_entries = tuple(untracked_entries)
+    try:
+        check_result_file_count(len(raw_base_entries), len(raw_untracked_entries))
+    except ResultSnapshotLimitError as exc:
+        raise result_bundle_error(str(exc)) from exc
     base_paths = tuple(entry[0] for entry in raw_base_entries)
     untracked_paths = tuple(entry[0] for entry in raw_untracked_entries)
     _require_unique_paths(base_paths, "base")

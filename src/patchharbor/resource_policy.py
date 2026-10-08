@@ -6,6 +6,27 @@ from dataclasses import dataclass
 
 
 _MIB = 1024 * 1024
+MAX_RESULT_FILES = 250_000
+# Manifest, context, run/execution logs, handoff pair, diffs and runtime pair.
+RESULT_AUXILIARY_ENTRIES = 10
+
+
+class ResultSnapshotLimitError(ValueError):
+    """A complete snapshot exceeds the supported repository-file count."""
+
+    def __init__(self, actual: int) -> None:
+        self.resource = "result_snapshot_files"
+        self.actual = actual
+        self.limit = MAX_RESULT_FILES
+        super().__init__(
+            f"Result snapshot file limit exceeded: actual={actual}, limit={self.limit}"
+        )
+
+
+def check_result_file_count(base_count: int, untracked_count: int) -> None:
+    actual = base_count + untracked_count
+    if actual > MAX_RESULT_FILES:
+        raise ResultSnapshotLimitError(actual)
 
 
 @dataclass(frozen=True, slots=True)
@@ -16,7 +37,7 @@ class ResourcePolicy:
     max_input_artifact_bytes: int = 256 * _MIB
     max_content_bytes: int = 256 * _MIB
     max_zip_total_bytes: int = 512 * _MIB
-    max_zip_entries: int = 1_000
+    max_zip_entries: int = MAX_RESULT_FILES + RESULT_AUXILIARY_ENTRIES
 
     def __post_init__(self) -> None:
         values = {

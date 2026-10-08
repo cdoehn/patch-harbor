@@ -208,7 +208,7 @@ def _verify_result_bundle(path: Path, *, execution_present: bool,
     try:
         facts, digest = read_result_reference(path, expected_identity=expected_identity)
     except (PatchHarborError, OSError, RuntimeError, ValueError) as exc:
-        raise result_bundle_error("Result Bundle integrity verification failed") from exc
+        raise result_bundle_error(f"Result Bundle integrity verification failed: {exc}") from exc
     if not facts.handoff_present:
         raise result_bundle_error("Result publication requires passive handoff data")
     if facts.primary_result.entrypoint_started != execution_present:
