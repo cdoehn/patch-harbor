@@ -1,5 +1,20 @@
 # PatchHarbor – Spezifikations-Changelog
 
+## 2026-10-08 – CI 37750308948 ausgewertet; PP-08B-FIX2 / Bundle 046
+
+- Dokumentationsbundle 045 ist auf Commit
+  `9b69c6a25c7332cbd7b3412ca784611b99edc586` tatsächlich angewendet/gepusht.
+- Die vom Nutzer gestartete CI bestätigt zwei grüne native Ubuntu-Lanes und
+  Fehler auf Windows sowie Docker. Finale Releaseabnahme bleibt offen.
+- Der stdlib-PYZ-Bootstrap unterscheidet Windows-Erstellungszeit im Pfadvergleich
+  von Änderungszeit im Handlevergleich; eingebetteter Programmblock gleichgezogen.
+  Identitäts-, Größen-, Hash- und Änderungsprüfungen bleiben erhalten.
+- Pack-Fehlerinjektion verwendet den richtigen nativen Reader statt gewöhnlichem
+  CRT-Open einer Windows-gesperrten Datei. Der Pflichtvorlagentest simuliert
+  Source- und vorbereitete Installation ausdrücklich. Keine Prüffälle entfallen.
+- Keine Norm- oder Versionsänderung; vollständige parallele Tests und tatsächlicher
+  Apply erforderlich. Ausschließlich der Nutzer startet die erneute native CI.
+
 ## 2026-10-08 – Grenzkorrektur bestätigt; Off-Plan-Dokumentation 045
 
 - Bundle 044 tatsächlich angewendet/gepusht: Commit

@@ -35,6 +35,13 @@ first `.pyz`, imports archived code, installs a package or extracts the snapshot
 these data checks from the full native reference reader. Legacy and unavailable
 runtimes select an explicit documented fallback. Corrupt data is not success.
 
+Stable input capture compares the same file identity, size and write time across
+path and handle observations. On Windows it compares creation time through
+`st_birthtime_ns` across those views; handle `st_ctime_ns` is checked separately
+before and after reading to detect actual changes. Differing meanings of path
+and handle `ctime` must not reject unchanged files. These checks add no retry,
+identity fallback or exception to the trusted digest requirement.
+
 Preparation requires Python >=3.12 and a new private directory. Exactly the
 captured hash-verified PYZ is copied there, with no pip, venv, network or cache.
 Then use the returned absolute path:

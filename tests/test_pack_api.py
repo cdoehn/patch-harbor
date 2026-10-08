@@ -167,11 +167,17 @@ def test_pack_does_not_run_tools_or_change_process_state(request_files, monkeypa
 @pytest.mark.parametrize('reason', [FailureReason.SOURCE_ERROR, FailureReason.PATCH_PACKAGE_ERROR, FailureReason.STATE_MISMATCH])
 def test_mandatory_written_archive_validation_cannot_be_skipped_or_reclassified(request_files, monkeypatch, reason):
     calls = []
+    original = core.validate_patch_against_reference
     def rejected(path, reference, **kwargs):
         calls.append(path)
         assert path.is_file() and path.name.endswith('.partial')
         assert 'expected_identity' in kwargs
-        with ZipFile(path) as archive: assert archive.read('run.sh') == SCRIPT
+        # Use the native reader while Windows pins this file with DELETE
+        # access. An ordinary CRT open lacks compatible FILE_SHARE_DELETE.
+        checked = original(path, reference, **kwargs)
+        assert checked.binding_matches and checked.inspection.entrypoint == 'run.sh'
+        entry = next(item for item in checked.inspection.entries if item.path == 'run.sh')
+        assert entry.size == len(SCRIPT) and entry.sha256 == hashlib.sha256(SCRIPT).hexdigest()
         assert not any(p.name.endswith('.zip.txt') for p in request_files[2].iterdir())
         raise PatchHarborError('controlled validator rejection', reason)
     monkeypatch.setattr(core, 'validate_patch_against_reference', rejected)

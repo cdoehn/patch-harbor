@@ -2,12 +2,12 @@
 
 **Plan-ID:** `PYZ-PACK`
 **Planpfad:** `planning/pyz-pack/commit-plan.md`
-**Revision:** 22
+**Revision:** 23
 **Stand:** 8. Oktober 2026
-**Status:** PP-00 bis PP-08B und die Grenzkorrektur PP-08B-FIX1 / Bundle 044 tatsächlich angewendet/gepusht. Finale manuelle CI bleibt offen; zusätzlich beauftragtes Dokumentationsbundle 045 außerhalb des Plans.
+**Status:** Alle 16 Planpositionen, Grenzkorrektur 044 und Dokumentation 045 tatsächlich angewendet/gepusht. Manuelle CI auf 045 bestätigt Windows-/Docker-Fehler; Korrektur 046 / PP-08B-FIX2 in Vorbereitung.
 **Geplanter Umfang:** 9 Arbeitspakete `PP-00` bis `PP-08`, 16 ursprüngliche Commit-Schritte sowie belegte Korrekturen. Keine feste Anzahl von Patch-Bündeln.
 **Fortschritt:** 16/16 ursprüngliche Planpositionen committed, Korrektur-Apply bestätigt; finale Abnahme benötigt den konkreten manuellen CI-Nachweis. Bundle 045 fügt keine Planposition hinzu.
-**Nächster Schritt:** Beauftragte Dokumentationskorrektur 045 vollständig parallel prüfen, ausliefern und ihren tatsächlichen Apply auswerten. Finale CI startet nur Christian; keine automatische Planerweiterung.
+**Nächster Schritt:** Belegte Bootstrap-/Fixture-Korrektur vollständig parallel prüfen und als Bundle 046 übergeben. Anschließend tatsächlichen Apply prüfen; erneute native CI startet ausschließlich Christian.
 **Ziel-Produktversion:** **1.3.0**, ausdrücklich von Christian am 8. Oktober 2026 festgelegt; kein automatischer Tag oder Release.
 
 > **Verbindliche Grundlage ist der gemeinsame Spezifikationssatz:**
@@ -416,7 +416,7 @@ der nächste reguläre CI-Termin bleibt 029 einschließlich Windows nach Apply/P
 Bekannte fehlgeschlagene CI und offene native/CIFS-Nachweise bleiben offen,
 bis neue passende Nachweise vorliegen. Ein Linux-Lauf ersetzt sie nicht.
 
-**Status:** PP-00 bis PP-03 tatsächlich angewendet/gepusht. PP-04A / Bundle 034 bereitet das kanonische PYZ-Datenprofil und beide getrennten Buildprofile vor; Apply noch offen.
+**Status:** Alle 16 Planpositionen, Grenzkorrektur 044 und Dokumentation 045 tatsächlich angewendet/gepusht. Manuelle CI auf 045 bestätigt Windows-/Docker-Fehler; Korrektur 046 / PP-08B-FIX2 in Vorbereitung.
 ist vorgesehen. Kein PP-02-Schritt, keine neue PYZ, kein `pack`, kein Writerwechsel.
 PP-01-Abnahme erst nach erfolgreichem tatsächlichen Reparatur-Apply und seinen
 vorgeschriebenen lokalen Endgates; keine automatische Planfortsetzung durch 028.
@@ -1013,6 +1013,64 @@ behauptet den noch ausstehenden Apply von 045 nicht als Erfolg. Danach keine
 weiteren automatischen Bundles; die finale CI auf dem tatsächlichen Endcommit
 startet ausschließlich Christian. Der PYZ/PACK-Stand bleibt 16/16.
 
+### 1.26 Bundle 045 bestätigt; native CI-Korrektur PP-08B-FIX2 / Bundle 046
+
+Result `patchharbor-apply_Result_081642_1008_72ae81.zip`, SHA-256
+`0103c34d3cc98cadb5a2c3735f2ab8a7f4ed258696d06f4a00cbd39c9c8d46b5`,
+bestätigt tatsächlichen Apply, normalen Push und sauberen Commit
+`9b69c6a25c7332cbd7b3412ca784611b99edc586` für Dokumentationsbundle 045.
+Development: 3058 passed / 9 skipped mit vier Workern; Apply: 3035 passed /
+8 skipped mit zwölf Workern. Alle 335 Snapshot-Dateien und der Commitumfang
+sind abgeglichen. Der Dokumentationsauftrag ist damit angewendet.
+
+Christian hat die finale CI selbst gestartet. Die vollständig gelieferte
+Log-ZIP `logs_102270400377.zip`, SHA-256
+`a8120e838cdfd975cc2b87656c47cf963bfa590e62504f9e721804d483175587`,
+gehört zu [Run 37750308948](https://github.com/cdoehn/patch-harbor/actions/runs/37750308948)
+auf genau diesem Commit. Ubuntu 24.04/26.04 bestehen alle vier nativen Suites.
+Windows Core: 13 failed / 2198 passed / 102 skipped; PowerShell-7-Lane:
+17 failed / 286 passed / 17 skipped. Beide Docker-Lanes scheitern an demselben
+Vorlagentest (je 1 failed / 2312 passed / 1 skipped). Nachfolgende durch Fehler
+übersprungene Jobs/Schritte sind kein positiver Nachweis. Die Textlogs wurden
+vollständig ausgewertet; rohe Controller-Artefakte wurden nicht zusätzlich geladen.
+
+Drei Ursachen und ihr begrenzter Reparaturumfang:
+
+1. Der stdlib-only Bootstrap vergleicht bisher Windows-Pfad-`ctime` (Erstellung)
+   mit Handle-`ctime` (Änderung). Dadurch scheitert die unveränderte Datei vor
+   ZIP-/PYZ-Prüfung. Der gemeinsame Vergleich verwendet dort `st_birthtime_ns`;
+   Handle-`ctime` wird weiter separat vor/nach dem Lesen geprüft. Identität,
+   Größe, `mtime`, Grenzen und Digest bleiben verbindlich; kein Retry/Fallback.
+   Der standalone Helfer und sein ausführbarer Block im Chat-Vertrag werden
+   zusammen geändert. Kontrollierte Metadatenfälle prüfen beide Zeitsemantiken
+   sowie Identitäts-, Größen- und Zeitänderungen; native E2E bleiben erhalten.
+2. Der Pack-Fehlerinjektionstest öffnet die Windows-Publikationsdatei mit normalem
+   `ZipFile(path)` trotz gehaltenem DELETE-Handle. Der Test benutzt künftig den
+   echten gemeinsamen Validator samt `expected_identity`; Entrypointgröße/hash,
+   Bindung, genau ein Aufruf, unveröffentlichte Ausgabe und unveränderte
+   Fehlerkategorie werden weiter geprüft. Produktiver Sharing-/Readervertrag
+   bleibt unverändert.
+3. Der Test für eine fehlende Pflichtvorlage manipuliert nur den Source-Loader.
+   Docker verwendet einen vorbereiteten Producer und findet daher zu Recht
+   dessen weiterhin gültige Vorlage. Der Test wählt Source/Prepared ausdrücklich
+   und simuliert das Fehlen am jeweiligen Loader. Beide Fälle müssen das echte
+   Entrypoint-Ergebnis 27 und den Result-Erzeugungsfehler erhalten. Vorhandene
+   positive Tests für erlaubten Runtime-only-Fallback bleiben unverändert.
+
+CPython 3.12.10 bestätigt die unterschiedliche `ctime`-Abbildung in
+[Pfad-stat](https://github.com/python/cpython/blob/v3.12.10/Modules/posixmodule.c#L2015)
+und [Handle-Metadaten](https://github.com/python/cpython/blob/v3.12.10/Python/fileutils.c#L1036).
+Die lokale Simulation ist keine neue native Windows-Freigabe.
+
+Bundle 046 bindet sich an das oben genannte Result: repo_id
+`e7a93d72-62dc-4759-97e8-6bf6cdf10e90`, tatsächlicher Base-Commit wie oben,
+Fingerprint `7c9d2a24e397e0e5`, Algorithmus `patchharbor-state-v1`.
+Ein Korrekturcommit nach vollständigen parallelen Development-/Apply-Gates,
+danach genau ein normaler Push. Keine seriellen Tests, neue Abhängigkeiten,
+Normänderung, automatische CI, Versionsänderung, Tags oder Hostinstallation.
+Der Plan bleibt bei 16 ursprünglichen Positionen. Tatsächlicher 046-Apply und
+neue manuell gestartete native CI bleiben bis zu ihren echten Nachweisen offen.
+
 ---
 
 ## 2. Architektur und unveränderliche Grenzen
@@ -1099,7 +1157,7 @@ Die lineare Standardreihenfolge in Abschnitt 4 verhindert unnötige gleichzeitig
 
 Die folgende Folge ist die anfängliche prüfbare Zerlegung. Sie ist **keine Verpflichtung zu 16 Patch-ZIPs**. Kleine sicher zusammengehörige Schritte dürfen mit dokumentierter Plananpassung zusammengelegt werden. Bei Split oder Zusammenlegung werden Positionen, Gesamtzahl, Messages und Nachweiszuordnung vor der betroffenen Auslieferung aktualisiert. Kein nur nominelles Zerlegen eines bereits vollständig installierten Endzustands.
 
-PP-00 bis PP-08B sowie PP-08B-FIX1 sind durch tatsächliche Results bestätigt. Die ursprünglichen Messages und sicheren Aktivierungsschritte bleiben nachvollziehbar. Der aktuelle Nachweisstand steht in Abschnitt 1.25 und in der Statustabelle; die finale manuelle CI bleibt offen.
+PP-00 bis PP-08B sowie PP-08B-FIX1 sind durch tatsächliche Results bestätigt. Die ursprünglichen Messages und sicheren Aktivierungsschritte bleiben nachvollziehbar. Der aktuelle Nachweisstand steht in Abschnitt 1.26 und in der Statustabelle; die finale manuelle CI bleibt offen.
 
 | Position | ID | Arbeitspaket | Abhängigkeit | Vorgeschlagene Commitmessage | Status |
 |---:|---|---|---|---|---|
@@ -1118,7 +1176,7 @@ PP-00 bis PP-08B sowie PP-08B-FIX1 sind durch tatsächliche Results bestätigt. 
 | 13/16 | **PP-06B** | PP-06 | PP-06A | `feat(result): ship PYZ runtimes with a working bootstrap [PP-06B]` | Bundle 040 tatsächlich angewendet/gepusht |
 | 14/16 | **PP-07** | PP-07 | PP-06B | `docs(runtime): complete PYZ and pack workflows and compatibility guidance [PP-07]` | Bundle 041 tatsächlich angewendet/gepusht |
 | 15/16 | **PP-08A** | PP-08 | PP-07 | `test(runtime): complete cross-platform PYZ and pack acceptance coverage [PP-08A]` | Bundle 042 tatsächlich angewendet/gepusht |
-| 16/16 | **PP-08B** | PP-08 | PP-08A | `chore(release): prepare version 1.3.0 and final artifact evidence [PP-08B]` | Bundle 043 und Korrektur 044 tatsächlich angewendet/gepusht; manuelle CI offen |
+| 16/16 | **PP-08B** | PP-08 | PP-08A | `chore(release): prepare version 1.3.0 and final artifact evidence [PP-08B]` | Bundle 043, Korrektur 044 und Off-Plan 045 angewendet; CI auf 045 rot, Korrektur 046 vorbereitet |
 
 
 Die Initialfolge folgt bereits einer topologischen Ordnung. Querschnittliche Anforderungen wie API-/CLI-Parität und PYZ-Resultproduktion erhalten zusätzlich die Abschlussgates aus Abschnitt 6. Ein bestandener früher Unit-Test ersetzt nicht deren späteren Artefaktdurchstich.
@@ -1774,7 +1832,7 @@ Wird ein beobachtetes Exchange-Verzeichnis ausdrücklich als Pack-Ausgabe gewäh
 
 ### 12.1 Definition of Done
 
-Die Erweiterung gilt erst als vollständig umgesetzt, wenn die folgende Liste mit tatsächlichen Nachweisen geschlossen werden kann. Die folgende Gesamtliste wird erst mit den konkreten Abschlussnachweisen geschlossen; der bestätigte Teilfortschritt steht in Abschnitt 1.25:
+Die Erweiterung gilt erst als vollständig umgesetzt, wenn die folgende Liste mit tatsächlichen Nachweisen geschlossen werden kann. Die folgende Gesamtliste wird erst mit den konkreten Abschlussnachweisen geschlossen; der bestätigte Teilfortschritt steht in Abschnitt 1.26:
 
 - [ ] Beide Spezifikationen sind gemeinsam eingeordnet, der aktive Featureplan ist eindeutig und der aktuelle Ausgangsstand einschließlich offener Alt-Nachweise wurde abgeglichen.
 - [ ] Installiertes `pack`, PYZ-`pack` und `api.pack_patch` verwenden dieselbe vollständige Fachlogik und erfüllen den spezifizierten Eingabe-, Modus-, Namens-, Handoff-, Fehler- und Publikationsvertrag.
@@ -1826,6 +1884,7 @@ Die mechanische Prüfung dieses Markdownplans kontrolliert eindeutige Schrittken
 | 2 | 2026-10-07 | PP-00 / Bundle 024 integriert: aktuelle bytegleiche Referenz vom Pixel, Norm-/Planverweise, offene Alt-Nachweise, vorbereiteter Status; ausdrücklich einmalige CI-only-Ausnahme ohne Tests oder Testinstallation im Apply, ein Commit/Push und automatische parallele CI mit Ergebnisprüfung. |
 | 3 | 2026-10-07 | PP-00-FIX1 / Bundle 025: Abbruch von 024 vor Staging/Commit/CI belegt; dirty Result als Reparaturbasis, SSH-Alias-Auflösung statt URL-Stringliste, unveränderte Konfiguration und Fortsetzung der ersten Pixel-CI-only-Ausnahme. Kein Fortschritt vor Apply-/CI-Nachweis. |
 | 4 | 2026-10-07 | PP-00-Erfolg und CI 37635401106 aus dem damaligen Result bestätigt; PP-01 in 026 vorbereitet. Die damaligen lokalen Endgates und CI-Pause sind durch Revision 5 für die Pixel-Phase ersetzt. |
+| 23 | 2026-10-08 | 045-Apply bestätigt; manuelle CI 37750308948 mit Windows-/Docker-Fehlern ausgewertet. Bootstrap-Zeitvergleich und zwei umgebungsabhängige Fixtures in 046 / PP-08B-FIX2 korrigiert; volle parallele Gates und neuer nativer CI-Nachweis erforderlich. |
 | 22 | 2026-10-08 | Grenzkorrektur 044 durch tatsächlichen Apply bestätigt; zusätzlich beauftragtes Off-Plan-Dokumentationsbundle 045, keine weitere Planposition. README und verlinkte Betriebsanleitungen berichtigt; finale manuelle CI bleibt offen. |
 | 21 | 2026-10-08 | PP-08B tatsächlich bestätigt; beauftragte 250.000-Dateien-Grenze als PP-08B-FIX1 in 044 vorbereitet. Normkorrektur, ZIP64-Bootstrap und konkrete Anzahl-Diagnose; finale manuelle CI bleibt offen. |
 | 20 | 2026-10-08 | PP-08A tatsächlich bestätigt; autorisierte Produktversion 1.3.0 und Nutzerbestätigung erfolgreicher CIFS-Praxisabnahme erfasst. PP-08B mit finalen Artefakten vorbereitet; tatsächlicher Apply und manuelle CI bleiben offen. |
@@ -1847,8 +1906,8 @@ Die mechanische Prüfung dieses Markdownplans kontrolliert eindeutige Schrittken
 
 ---
 
-**PP-00 bis PP-08B und Grenzkorrektur 044 sind tatsächlich angewendet.
-Zielversion ist 1.3.0; erfolgreiche CIFS-Praxisabnahme ist vom Nutzer bestätigt.
-Das zusätzlich beauftragte Off-Plan-Dokumentationsbundle 045 benötigt seine
-vollen parallelen Gates und tatsächlichen Apply. Finale native CI startet
-nur Christian; keine vorweggenommene Releasefreigabe.**
+**Alle ursprünglichen Planpositionen, Grenzkorrektur 044 und Dokumentation 045
+sind tatsächlich angewendet. Version 1.3.0; CIFS-Praxis vom Nutzer bestätigt.
+Die manuelle finale CI auf 045 ist rot. Korrektur 046 verlangt volle parallele
+Gates und tatsächlichen Apply; native CI startet nur Christian erneut.
+Keine vorweggenommene Releasefreigabe.**

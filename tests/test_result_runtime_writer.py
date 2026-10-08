@@ -146,12 +146,17 @@ def test_runtime_budget_falls_back_without_losing_snapshot(repository, artifact,
     assert facts.warnings and facts.base_entries
 
 
-def test_missing_mandatory_template_remains_a_result_error(repository, monkeypatch):
+@pytest.mark.parametrize('prepared', [False, True])
+def test_missing_mandatory_template_remains_a_result_error(repository, monkeypatch, prepared):
     from patchharbor.errors import result_bundle_error
     root, exchange = repository
-    def missing():
+    def missing(*args):
         raise result_bundle_error("missing canonical template")
+    # Missing means missing in the selected producer, including a prepared
+    # installation such as Docker's wheel, not only the source-tree loader.
+    monkeypatch.setattr(resources, "own_pyz_profile_present", lambda: prepared)
     monkeypatch.setattr(resources, "load_chat_template", missing)
+    monkeypatch.setattr(resources.PyzProvider, "capture_required_template", missing)
     monkeypatch.setattr(resources.PyzProvider, "capture",
                         lambda self: PyzProvision("unavailable", "resources_missing", None))
     report = api.apply(package(root, exchange, exit_code=27))

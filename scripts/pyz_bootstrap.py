@@ -25,6 +25,7 @@ MAX_TOTAL = 512 * 1024 * 1024
 MAX_ENTRIES = 250_010  # 250,000 snapshot files plus at most ten auxiliary members.
 MAX_PYZ = 16 * 1024 * 1024
 MAX_METADATA = 128 * 1024
+_WINDOWS = sys.platform == 'win32'
 HEX = re.compile(r'[0-9a-f]{64}')
 METADATA_FIELDS = {'marker','format_version','status','reason','distribution','version',
                    'requires_python','profile','content_id','content_id_algorithm','artifact',
@@ -58,7 +59,10 @@ def _json(raw):
 
 
 def _state(info):
-    return info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns, info.st_ctime_ns
+    # Windows path stat exposes creation time as ctime, while fstat exposes
+    # change time. Compare birth time across views and ctime within the handle.
+    timestamp = info.st_birthtime_ns if _WINDOWS else info.st_ctime_ns
+    return info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns, timestamp
 
 
 def _capture(path, maximum):
@@ -72,9 +76,11 @@ def _capture(path, maximum):
         before = os.fstat(stream.fileno())
         _require(stat.S_ISREG(before.st_mode) and before.st_size <= maximum, 'file type or size limit')
         _require(not path.is_symlink() and not getattr(path, 'is_junction', lambda: False)(), 'linked input')
+        _require(_state(initial) == _state(before), 'input changed before capture')
         raw = stream.read(maximum + 1)
         after = os.fstat(stream.fileno())
-        _require(len(raw) <= maximum and _state(initial) == _state(before) == _state(after) == _state(path.lstat()),
+        _require(len(raw) <= maximum and before.st_ctime_ns == after.st_ctime_ns
+                 and _state(initial) == _state(before) == _state(after) == _state(path.lstat()),
                  'input changed during capture')
     return raw
 

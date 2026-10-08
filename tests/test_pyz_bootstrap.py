@@ -9,6 +9,7 @@ import socket
 import stat
 import subprocess
 import sys
+from types import SimpleNamespace
 from zipfile import ZipFile, ZipInfo
 
 import pytest
@@ -35,6 +36,60 @@ def reference(tmp_path):
 
 def trusted(path):
     return bootstrap.assess(path,trusted_source_sha256=hashlib.sha256(path.read_bytes()).hexdigest())
+
+
+@pytest.mark.parametrize('windows', [False, True])
+@pytest.mark.parametrize('fault', [None, 'opened_identity', 'handle_identity', 'change_time',
+                                  'birth_time', 'size', 'mtime', 'final_identity'])
+def test_capture_distinguishes_cross_view_times_from_real_file_changes(tmp_path, monkeypatch, windows, fault):
+    path = tmp_path / 'input.zip'
+    content = b'unchanged input bytes'
+    path.write_bytes(content)
+    real_fstat = os.fstat
+    original = path.stat()
+    monkeypatch.setattr(bootstrap, '_WINDOWS', windows)
+    path_reads = handle_reads = 0
+
+    def metadata(info, *, opened, changed=False):
+        values = {name: getattr(info, name) for name in
+                  ('st_mode', 'st_dev', 'st_ino', 'st_size', 'st_mtime_ns')}
+        values.update(st_birthtime_ns=100, st_ctime_ns=200 if opened or not windows else 100)
+        if fault == 'opened_identity' and opened:
+            values['st_ino'] += 1
+        if changed:
+            field = {'handle_identity': 'st_ino', 'final_identity': 'st_ino',
+                     'change_time': 'st_ctime_ns', 'birth_time': 'st_birthtime_ns',
+                     'size': 'st_size', 'mtime': 'st_mtime_ns'}.get(fault)
+            if field is not None:
+                values[field] += 1
+        return SimpleNamespace(**values)
+
+    class Input:
+        def __fspath__(self):
+            return str(path)
+
+        def lstat(self):
+            nonlocal path_reads
+            path_reads += 1
+            return metadata(original, opened=False,
+                            changed=path_reads > 1 and fault == 'final_identity')
+
+        def is_symlink(self):
+            return False
+
+    def observed(descriptor):
+        nonlocal handle_reads
+        handle_reads += 1
+        return metadata(real_fstat(descriptor), opened=True,
+                        changed=handle_reads > 1 and fault != 'final_identity')
+
+    monkeypatch.setattr(bootstrap.os, 'fstat', observed)
+    if fault is None or (fault == 'birth_time' and not windows):
+        assert bootstrap._capture(Input(), len(content)) == content
+    else:
+        with pytest.raises(ValueError):
+            bootstrap._capture(Input(), len(content))
+    assert path.read_bytes() == content
 
 
 def test_stdlib_precheck_is_readonly_and_does_not_claim_native_reference_success(reference, tmp_path, monkeypatch):
