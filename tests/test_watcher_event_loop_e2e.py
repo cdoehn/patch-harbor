@@ -14,6 +14,8 @@ from zipfile import ZipFile
 
 import pytest
 
+from patchharbor.compat import add_exception_note
+
 from patchharbor import api
 from patchharbor_watcher.apply_boundary import delegate_to_automatic_apply
 from patchharbor_watcher.lifecycle import WatcherStopController
@@ -65,7 +67,7 @@ class RunningWatcher:
             if frame is not None:
                 tracebacks.print_stack(frame)
             if exception is not None:
-                exception.add_note('watcher did not release event handles/worker; stack printed above')
+                add_exception_note(exception, 'watcher did not release event handles/worker; stack printed above')
                 return False
         assert not self.thread.is_alive(), 'watcher did not release event handles/worker'
         assert not self.errors, self.errors

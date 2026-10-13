@@ -740,9 +740,10 @@ oder PYZ/PACK-Plan. Der neue Normsatz ändert nur seine ausdrücklich benannten
 Python-Anforderungen. Diese Projektzuordnung gilt nicht pauschal für andere
 Repositorys, denen PatchHarbor dieselbe generische Vorlage mitliefert.
 
-**Aktueller Planstart:** CP-00 übernimmt ausschließlich Spezifikation, Plan und
-Verweise. Laufzeit, Python-Metadaten und das ausführbare Bootstrapprogramm oben
-bleiben unverändert. Python 3.10/3.11 sind Ziele, noch kein bestätigter Support.
+**Aktueller Implementierungsschritt:** CP-00 ist durch tatsächliches Apply
+bestätigt. CP-01 bereitet Sprach-, Fehler- und Dateisystemkompatibilität vor.
+Python-Metadaten und das ausführbare Bootstrapprogramm oben bleiben unverändert.
+Python 3.10/3.11 sind weiterhin Ziele, noch kein vollständig bestätigter Support.
 Prüfe stets den gelieferten Resultstand: Eine alte globale Installation wird
 durch eine Quelländerung nicht automatisch ersetzt.
 
@@ -766,9 +767,9 @@ Development und Apply prüfen jeden Commitstand vollständig parallel, auch am
 Bundle-Ende. Kein serieller Lauf und keine verkürzte Auswahl als Vollabnahme.
 Nur Christian startet den manuellen CI-Workflow; Codex und Entrypoints tun das nie.
 
-Der aktuelle Auftrag endet mit dem bestätigten Startcommit CP-00. Er startet
-keine dauerhafte Schleife und autorisiert keine sofortige Umsetzung von CP-01
-bis CP-05. Eine später ausdrücklich beauftragte Fortsetzung wertet vollständige
+Der aktuelle Folgeauftrag umfasst genau das erste Implementierungsbundle CP-01.
+Er startet keine dauerhafte Schleife und autorisiert keine sofortige Umsetzung
+von CP-02 bis CP-05. Eine später ausdrücklich beauftragte Fortsetzung wertet vollständige
 Watcher-Results samt Teilfortschritten aus. Sicherheitsgrenzen und belastbare
 Resultbindung bleiben Voraussetzung; Tokenmeter bleibt gestoppt.
 

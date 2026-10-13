@@ -17,7 +17,7 @@ from patchharbor.platform.directories import open_directory_nofollow, pin_window
 from patchharbor.platform.file_handles import open_regular_nofollow
 from patchharbor.platform.filesystem import (
     FileChangedDuringRead, FileReadLimitExceeded, UnsupportedFileTypeError,
-    _same_open_file_state, _same_path_and_open_file_state,
+    _same_open_file_state, _same_path_and_open_file_state, capture_descriptor_metadata,
 )
 from patchharbor.platform.runtime import is_windows
 
@@ -108,7 +108,7 @@ class SourceDirectory:
         path=self.path/name if self.descriptor is None else Path(name)
         descriptor=open_regular_nofollow(path,parent_fd=self.descriptor)
         try:
-            opened=os.fstat(descriptor)
+            opened=capture_descriptor_metadata(descriptor)
             _plain(opened,directory=False)
             if not _same_path_and_open_file_state(initial,opened,allow_path_identity_fallback=False):
                 raise FileChangedDuringRead('source-file-open-changed')
@@ -117,7 +117,7 @@ class SourceDirectory:
             if metadata_signature(current)!=metadata_signature(initial):
                 raise FileChangedDuringRead('source-file-path-changed')
             yield descriptor, opened
-            finished=os.fstat(descriptor)
+            finished=capture_descriptor_metadata(descriptor)
             _plain(finished,directory=False)
             if not _same_open_file_state(opened,finished):
                 raise FileChangedDuringRead('source-file-changed-during-read')

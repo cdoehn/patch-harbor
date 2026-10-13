@@ -16,12 +16,14 @@ import secrets
 import stat
 import sys
 
+from patchharbor.compat import add_exception_note
+
 from patchharbor.platform.directories import open_directory_nofollow, pin_windows_directory
 from patchharbor.platform.file_handles import open_regular_nofollow
 from patchharbor.platform.filesystem import (
     FileChangedDuringRead, require_file_identity, sync_directory_best_effort,
     read_stable_regular_file_with_sha256,
-    _same_open_file_state,
+    _same_open_file_state, capture_descriptor_metadata,
 )
 from patchharbor.platform.runtime import is_windows
 
@@ -66,9 +68,9 @@ class OutputDirectory:
             try:
                 os.close(fd)
             except (OSError,KeyboardInterrupt) as cleanup:
-                exc.add_note('cannot close reserved pack handle: '+str(cleanup))
+                add_exception_note(exc, 'cannot close reserved pack handle: '+str(cleanup))
             for warning in owned.cleanup():
-                exc.add_note(warning)
+                add_exception_note(exc, warning)
             raise
 
 
@@ -150,7 +152,7 @@ class OwnedPackFile:
             if observed.st_nlink!=1:
                 raise FileChangedDuringRead('pack temporary file acquired a foreign hardlink')
             if self.descriptor is not None:
-                opened=os.fstat(self.descriptor)
+                opened=capture_descriptor_metadata(self.descriptor)
                 require_file_identity(opened,self.identity)
                 if self.verified_state is not None and not _same_open_file_state(self.verified_state,opened):
                     raise FileChangedDuringRead('pack output metadata changed after validation')
@@ -168,14 +170,14 @@ class OwnedPackFile:
 
     def verify_hash(self,expected: str,maximum: int) -> None:
         self.require_owned()
-        before=os.fstat(self.descriptor)
+        before=capture_descriptor_metadata(self.descriptor)
         captured=read_stable_regular_file_with_sha256(
             self.path,retained_content_limit=1,max_bytes=maximum,
             expected_identity=self.identity,allow_path_identity_fallback=False,
         )
         if captured.sha256!=expected:
             raise FileChangedDuringRead('pack output changed after complete validation')
-        after=os.fstat(self.descriptor)
+        after=capture_descriptor_metadata(self.descriptor)
         if not _same_open_file_state(before,after):
             raise FileChangedDuringRead('pack output changed during final hash verification')
         self.verified_state=after

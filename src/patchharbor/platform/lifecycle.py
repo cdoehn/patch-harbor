@@ -8,7 +8,10 @@ from enum import Enum, auto
 import subprocess
 import time
 from types import TracebackType
-from typing import BinaryIO, Self
+from typing import BinaryIO, TypeVar
+
+
+_ProcessTreeT = TypeVar("_ProcessTreeT", bound="ProcessTree")
 
 
 GRACEFUL_STOP_SECONDS = 2.0
@@ -74,7 +77,7 @@ class ProcessTree(ABC):
             raise RuntimeError("script process output is not captured")
         return stream
 
-    def __enter__(self) -> Self:
+    def __enter__(self: _ProcessTreeT) -> _ProcessTreeT:
         return self
 
     def __exit__(

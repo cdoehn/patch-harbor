@@ -1,5 +1,19 @@
 # PatchHarbor – Spezifikations-Changelog
 
+## 2026-10-13 – CP-00 bestätigt; CP-01 / Bundle 048 vorbereitet
+
+- Startcommit CP-00 `73d7317dbd7221576b4930c27eec44eb38a50bff` tatsächlich
+  angewendet/gepusht; vollständiges paralleles Apply-Gate grün, Baum sauber.
+- Erstes Implementierungsbundle nach neuem Nutzerauftrag: portable Typannotation
+  und Exception-Notizen, native Windows-Änderungszeit für ältere Interpreter,
+  Reparse-Erkennung und private Verzeichnisse mit DACL ab ihrer Erzeugung.
+- Verhaltenstests erhalten Fehlerkategorien, Ursachen, Sicherheitsgrenzen und
+  Cleanup-Nachweise; native Windows-Tests ergänzen die vorhandenen Gates.
+- Keine Änderung der drei Normdateien oder Produkt-/Python-Metadaten. CP-01
+  ist noch keine Freigabe der älteren Interpreter; echte 3.10-/3.11- und
+  Windows-Nachweise bleiben offen. Volle parallele lokale/Apply-Gates sind Pflicht;
+  CI weiterhin ausschließlich von Christian manuell gestartet.
+
 ## 2026-10-13 – CPython 3.10/3.11: Norm- und Planstart CP-00 / Bundle 047
 
 - Neuer ausdrücklicher Auftrag: vollständige öffentliche API, Core-PYZ, CLI

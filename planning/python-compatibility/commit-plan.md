@@ -1,9 +1,9 @@
 # PatchHarbor – Implementierungsplan CPython 3.10/3.11
 
 **Plan-ID:** `CPYTHON-310-311`
-**Revision:** 1 · 13. Oktober 2026
-**Status:** CP-00 vorbereitet; sechs Schritte, noch kein Apply dieses Plans bestätigt.
-**Aktueller Auftrag:** ausschließlich ein Startcommit für Norm- und Planerweiterung.
+**Revision:** 2 · 13. Oktober 2026
+**Status:** CP-00 durch tatsächliches Result bestätigt; CP-01 in Bundle 048 vorbereitet. Sechs Planpositionen, noch keine Freigabe der älteren Interpreter.
+**Aktueller Auftrag:** erstes Implementierungsbundle CP-01; danach stoppen und das tatsächliche Apply auswerten.
 **Zielversion:** gesondert festzulegen; veröffentlichte Basis bleibt 1.3.0.
 **Normen gemeinsam:** [Hauptspec](../../spec/SPECIFICATION.md),
 [PYZ/PACK](../../spec/SPECIFICATION_EXTENSION_PYZ_PACK.md) und
@@ -35,9 +35,9 @@ unveränderte Apply-Repository erneut geprüft. Der Dev-Root besitzt historische
 uncommittete Änderungen; gearbeitet wird in einem isolierten, aus dem Result
 rekonstruierten Verzeichnis unter `patchharbor-codex/build/`.
 
-CP-00 verändert nur die acht Norm-/Plan-/Verweisdateien dieses Startbundles.
+CP-00 änderte nur die acht Norm-/Plan-/Verweisdateien des Startbundles.
 Produktquellen, Paketversion, `Requires-Python`, Bootstrap-Programmbytes,
-Tests, Abhängigkeiten und Workflow-YAML bleiben unverändert. Ein Plan ist kein
+Tests, Abhängigkeiten und Workflow-YAML blieben dabei unverändert. Ein Plan ist kein
 Kompatibilitätsnachweis. Der tatsächliche Commit entsteht ausschließlich durch
 den bestehenden Watcher/Entrypoint im Apply-Repository.
 
@@ -76,8 +76,9 @@ Sechs Planpositionen sind keine Pflicht zu sechs Bundles: fachlich abgrenzbare
 aufeinanderfolgende Zustände dürfen gemeinsam übergeben werden. Jeder Commit
 braucht sein vollständiges paralleles Gate. Korrekturen erhalten eigene
 FIX-Kennungen und belegte Ausgangszustände; keine künstliche Fehleranzahlgrenze.
-Der Auftrag für dieses Bundle endet nach CP-00. CP-01 bis CP-05 sind Planung,
-keine Erlaubnis zur sofortigen automatischen Weiterarbeit in diesem Turn.
+Der ursprüngliche Bootstrap-Auftrag endete nach CP-00. Mit dem neuen ausdrücklichen
+Auftrag wird jetzt ausschließlich CP-01 umgesetzt. CP-02 bis CP-05 folgen in
+späteren beauftragten Durchläufen; keine automatische Fortsetzung dieses Bundles.
 
 ### CP-00 – Startvertrag übernehmen
 
@@ -238,7 +239,7 @@ Geplante KI-Kontrollen frühestens nach 300 Sekunden; zuverlässiges Prozessende
 darf sofort ausgewertet werden. Kein zweiter Watcher, keine kurzen Modell-Polls.
 CP-00 startet keine dauerhafte S-Schleife. Tokenmeter bleibt gestoppt.
 
-- [ ] CP-00 tatsächlich angewendet; neueste Resultbindung und Planposition erfasst.
+- [x] CP-00 tatsächlich angewendet; neueste Resultbindung und Planposition erfasst.
 - [ ] CP-01/02 erhalten Fehler- und Dateisicherheit sowie originale Altartefakte.
 - [ ] CP-03 weist erste neue Result-/PYZ-Produktion mit eigener Anleitung nach.
 - [ ] Öffentliche API, CLI, PYZ und Watcher auf echtem 3.10 und 3.11 bestätigt.
@@ -247,6 +248,82 @@ CP-00 startet keine dauerhafte S-Schleife. Tokenmeter bleibt gestoppt.
 - [ ] Produktversion, vollständiger Endcommit und konkrete Artefakthashes festgelegt.
 - [ ] Abschluss gespeichert; keine weiteren Bundles oder automatische Fortsetzung.
 
-CP-00 wird erst durch seinen tatsächlichen Apply bestätigt. Änderungen nach einer
+CP-00 ist durch das unten gebundene tatsächliche Apply bestätigt. CP-01 benötigt
+seinen eigenen erfolgreichen Apply; der vorbereitete Quellstand genügt nicht. Änderungen nach einer
 Abnahme erfordern neue passende Nachweise; die frühere 1.3.0-CI wird nicht als
 Test dieses geänderten Dokumentations- oder zukünftigen Laufzeitstands ausgegeben.
+
+
+## 7. CP-01 / Bundle 048: bestätigte Basis und vorbereitete Änderungen
+
+Startcommit CP-00: `73d7317dbd7221576b4930c27eec44eb38a50bff`, tatsächlich
+angewendet und normal auf dev gepusht. Result
+`patchharbor-apply_Result_115235_1013_1c84df.zip`, SHA-256
+`4ce49fc2d2f8d793eb9cc6ea1539f007aa72ac867f5eb4f2175ea1bf68233aee`:
+337 Dateien, sauberer Baum, 3052 bestandene parallele Apply-Tests / 8 Skips.
+Development: 3075 passed / 9 skipped einschließlich Übergabeprüfungen.
+Repository-ID `e7a93d72-62dc-4759-97e8-6bf6cdf10e90`, Fingerprint
+`7c9d2a24e397e0e5`, Algorithmus `patchharbor-state-v1`.
+
+Der Nutzer hat danach das erste Implementierungsbundle beauftragt. CP-01 enthält:
+
+- Stdlib-Typvariable statt des erst ab 3.11 importierbaren `typing.Self`.
+- Gemeinsame interne Exception-Notizen mit erhaltenem Primärfehler, Ursache,
+  Fehlerkategorie, Exitstatus und Cleanup-Diagnosen, auch ohne `add_note`.
+- Für Windows vor 3.12: zwei native FILE_BASIC_INFO-Beobachtungen um fstat;
+  CreationTime und ChangeTime bleiben getrennt. Änderungen während der Erfassung
+  und nicht verfügbare Primitiven werden abgewiesen. Keine schwächere
+  Identitäts-, Größen-, Änderungs-, Hash- oder CIFS-Fallback-Prüfung.
+- Reparse-/Junction-Klassifikation aus lstat-Attributen und Reparse-Tag statt
+  eines optionalen neuen pathlib-Aufrufs. Unbekannte Reparse-Dateien bleiben
+  an der regulären Lesegrenze ausgeschlossen.
+- Private Request-/Registrierungsverzeichnisse werden unter Windows mit einer
+  geschützten, vererbbaren DACL bereits beim exklusiven CreateDirectoryW erzeugt.
+  Zugriff für effektiven Benutzer und Administratoren; kein nachträgliches
+  Reparieren fremder ACLs und kein offenes Zwischenfenster. POSIX-Modi bleiben.
+- Versionskompatible native Berechtigungshilfen und Watcher-Fehlerdiagnostik
+  für die vorhandenen Verhaltenstests.
+- Die festen Packaging-/Release-Inventare enthalten explizit die drei neuen
+  Core-Module; die Prüfung bleibt eine geschlossene Allowlist.
+
+Die Untergrenze, Produktversion, alle drei Normdateien, PYZ-Profile, Rezept-/
+Result-/Paketformate, Writer, Bootstrapprogramm und Workflowdatei bleiben in
+CP-01 unverändert. Beide geschlossenen PYZ-Varianten folgen erst in CP-02;
+Metadaten, Build-/Test-TOML-Abhängigkeiten und Writerumschaltung erst in CP-03.
+
+### Konkrete Verhaltenstests dieses Schritts
+
+| Normfall | Neue Prüfung / bestehende Regression | Nachweisgrenze |
+| --- | --- | --- |
+| CT-01 | `test_core_watcher_imports_and_type_hints_do_not_need_typing_self`, `test_runtime_sources_use_python_310_grammar`; bestehende API-/CLI-/Prozess-/Watcher-Suites | Importhindernis und Grammatik geprüft; keine Simulation als echter 3.10-Lauf ausgeben. |
+| CT-02/11 | `test_notes_keep_primary_exception_identity_category_and_cause`, Pack-Publikations-/Interrupt-/Referenz-Cleanup-Fehler in `test_python_compat.py`; bestehende Pack-Fehlerinjektion | Vollständige Kategorien und Ursachen statt Konsolenwortlaut. |
+| CT-03 | stabile native Zeiten, widersprüchliche Daten, fehlende Primitive, echter gleich großer Schreibvorgang mit wiederhergestellter mtime | Simulation auf Linux plus tatsächlicher Handle-Test in `test_python_compat_windows.py`. |
+| CT-04 | Reparse-/Junction-Ablehnung, geschützte vererbte DACL, fehlgeschlagene Token-/SID-/Security-Descriptor-Erfassung und Ressourcenfreigabe | Native DACL-/Junction-Tests müssen auf Windows tatsächlich bestehen. |
+| CT-15 | bestehende vollständige installierte Watcher-, Ereignis- und Prozessbaumtests; portable Fehlernotiz im Event-Testhelfer | Windows und alte Interpreter bleiben separate Zielplattformnachweise. |
+
+Die Quellprüfung erfasst alle 116 Core-/Watcher-Module mit 3.10-Grammatik und
+Standardbibliotheksimporten. Laufzeitabhängigkeiten wurden nicht hinzugefügt.
+Auf diesem Laptop wurde nur CPython 3.14.4 gefunden. Keine neue Systeminstallation
+oder Host-Watcher-Änderung; tatsächliche 3.10-/3.11-Läufe bleiben offen, ebenso
+native Windows-Ergebnisse. CP-01 benötigt vollständige parallele Development-
+und Apply-Gates. CI startet ausschließlich Christian; die neue Matrix kommt CP-04.
+
+Der erste vollständige lokale Lauf fand drei fehlende Inventareinträge in den
+beiden Release-Testdateien (3 failed, 3119 passed, 13 skipped). Diese Listen
+wurden ergänzt; für den dadurch geänderten Stand ist erneut das vollständige
+parallele Gate erforderlich. Dieser erste Lauf gilt nicht als Abnahme.
+
+### Technische Primärquellen
+
+- [CPython 3.10 fileutils](https://github.com/python/cpython/blob/3.10/Python/fileutils.c)
+  und [3.11 fileutils](https://github.com/python/cpython/blob/3.11/Python/fileutils.c):
+  st_ctime wird aus ftCreationTime gebildet, auch bei fstat.
+- [CPython 3.12 fileutils](https://github.com/python/cpython/blob/3.12/Python/fileutils.c):
+  getrennte CreationTime/ChangeTime aus FILE_BASIC_INFO; Grundlage des erhaltenen
+  neueren Descriptor-Vertrags.
+- [Windows FILE_BASIC_INFO](https://learn.microsoft.com/en-us/windows/win32/api/winbase/ns-winbase-file_basic_info)
+  und [CreateDirectoryW](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createdirectoryw):
+  native Zeitinformationen und Sicherheitsattribute bei der Verzeichniserzeugung.
+- [Python 3.10 os.mkdir](https://docs.python.org/3.10/library/os.html#os.mkdir):
+  0700-ACL-Unterstützung wurde erst in 3.10.15 nachgezogen. CP-01 verlässt sich
+  dafür nicht auf eine Minorversionsannahme oder einen stillen chmod-Fallback.

@@ -9,6 +9,10 @@ from pathlib import Path
 import shutil
 import tempfile
 
+from patchharbor.platform.private_directory import (
+    create_private_directory, create_private_temporary_directory,
+)
+
 
 def system_temporary_directory() -> Path:
     """Return the physically resolved system temporary directory."""
@@ -29,9 +33,9 @@ def create_private_request_directory(
         if not name or Path(name).name != name or name in {".", ".."}:
             raise ValueError("temporary request directory name must be simple")
         path = root / name
-        path.mkdir(mode=0o700)
+        create_private_directory(path)
     else:
-        path = Path(tempfile.mkdtemp(prefix=prefix, dir=root))
+        path = create_private_temporary_directory(root, prefix)
 
     return path.resolve(strict=True)
 
