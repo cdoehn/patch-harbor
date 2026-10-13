@@ -47,6 +47,24 @@ if sys.version_info < (3, 12):
 from patchharbor.cli import main
 raise SystemExit(main())
 '''
+MAIN_BYTES_310 = b'''"""PatchHarbor Core ZIP application; no Watcher launcher."""
+import sys
+
+if sys.version_info < (3, 10):
+    sys.stderr.write("PatchHarbor requires Python 3.10 or newer.\\n")
+    raise SystemExit(2)
+
+from patchharbor.cli import main
+raise SystemExit(main())
+'''
+PYTHON_REQUIREMENTS = frozenset({'>=3.12', '>=3.10'})
+
+
+def main_bytes(requires_python: str) -> bytes:
+    """Select one closed variant; MAIN_BYTES retains the original 1.3.0 bytes."""
+    _require(type(requires_python) is str and requires_python in PYTHON_REQUIREMENTS,
+             'unsupported PYZ Python requirement')
+    return MAIN_BYTES if requires_python == '>=3.12' else MAIN_BYTES_310
 
 
 @dataclass(frozen=True, slots=True)
@@ -101,7 +119,7 @@ def parse_recipe(raw: bytes) -> PyzRecipe:
              'unsupported PYZ recipe')
     version, requires, commit = doc['version'], doc['requires_python'], doc['source_commit']
     _require(type(version) is str and _VERSION.fullmatch(version) is not None, 'invalid PYZ version')
-    _require(requires == '>=3.12', 'unsupported PYZ Python requirement')
+    entrypoint = main_bytes(requires)
     _require(commit is None or (type(commit) is str and re.fullmatch(r'(?:[0-9a-f]{40}|[0-9a-f]{64})', commit)),
              'invalid PYZ source provenance')
     _require(type(doc['content_id']) is str and _HEX.fullmatch(doc['content_id']) is not None, 'invalid PYZ content ID')
@@ -130,6 +148,10 @@ def parse_recipe(raw: bytes) -> PyzRecipe:
     _require([e.path for e in entries] == sorted(e.path for e in entries), 'noncanonical PYZ inventory order')
     inventory = {e.path: e for e in entries}
     _require(REQUIRED <= inventory.keys(), 'incomplete PYZ inventory')
+    for name in ('__main__.py', MAIN_PATH):
+        entry = inventory[name]
+        _require((entry.size, entry.sha256) == (len(entrypoint), sha256(entrypoint)),
+                 'PYZ entrypoint differs from its Python requirement')
     for entry in entries:
         source = inventory.get(entry.source)
         _require(source is not None and (source.size, source.sha256) == (entry.size, entry.sha256),
@@ -194,7 +216,8 @@ def materialize(recipe: PyzRecipe, read: Callable[[str, int], bytes]) -> bytes:
                  'PYZ resource size or hash mismatch')
         payloads[entry.path] = raw
     _require(payloads[IDENTITY_PATH] == identity_module(producer_id(recipe)), 'PYZ producer identity mismatch')
-    _require(payloads['__main__.py'] == payloads[MAIN_PATH], 'PYZ entrypoint/resource mismatch')
+    _require(payloads['__main__.py'] == payloads[MAIN_PATH] == main_bytes(recipe.requires_python),
+             'PYZ entrypoint/resource/requirement mismatch')
     for name in (CHAT_PATH, DOC_PATH, LICENSE_PATH):
         raw = payloads[name]
         _require(0 < len(raw) <= 128 * 1024 and not raw.startswith(b'\xef\xbb\xbf'), 'invalid PYZ document resource')

@@ -1,5 +1,4 @@
 """Actual Windows primitives; Linux simulations are not native proof."""
-import json
 import os
 from pathlib import Path
 import subprocess
@@ -10,6 +9,7 @@ from patchharbor.platform import filesystem, private_directory
 from patchharbor.platform.file_handles import open_regular_nofollow
 from patchharbor.platform.file_times import windows_file_times
 from patchharbor import temporary_resources
+from tests.windows_private_support import assert_private_dacl
 
 pytestmark = [pytest.mark.platform, pytest.mark.skipif(os.name != "nt", reason="native Windows primitives")]
 
@@ -63,41 +63,10 @@ def test_native_private_request_dacl_is_protected_and_inherited(tmp_path, monkey
     monkeypatch.setattr(temporary_resources, "system_temporary_directory", lambda: tmp_path)
     path = temporary_resources.create_private_request_directory(
         **({"name": "private-request"} if kind == "named" else {"prefix": "private-request-"}))
-    script = tmp_path / "inspect-dacl.ps1"
-    script.write_text("""
-$ErrorActionPreference = 'Stop'
-$acl = Get-Acl -LiteralPath $args[0]
-$child = Get-Acl -LiteralPath $args[1]
-$type = [System.Security.Principal.SecurityIdentifier]
-[ordered]@{
-  protected = $acl.AreAccessRulesProtected
-  user = [System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value
-  root = @($acl.GetAccessRules($true, $true, $type) | ForEach-Object {
-    [ordered]@{ sid = $_.IdentityReference.Value; access = $_.AccessControlType.ToString();
-                 rights = [int]$_.FileSystemRights; inherited = $_.IsInherited }
-  })
-  child = @($child.GetAccessRules($true, $true, $type) | ForEach-Object {
-    [ordered]@{ sid = $_.IdentityReference.Value; access = $_.AccessControlType.ToString();
-                 rights = [int]$_.FileSystemRights; inherited = $_.IsInherited }
-  })
-} | ConvertTo-Json -Depth 5 -Compress
-""", encoding="utf-8")
     child = path / "child"
     child.write_bytes(b"private")
-    environment = {k: v for k, v in os.environ.items() if k.upper() != "PSMODULEPATH"}
-    engine = environment.get("PATCHHARBOR_WINDOWS_ACCEPTANCE_ENGINE") or "powershell.exe"
     try:
-        result = subprocess.run([engine, "-NoLogo", "-NoProfile", "-NonInteractive",
-            "-ExecutionPolicy", "Bypass", "-File", str(script), str(path), str(child)],
-            env=environment, capture_output=True, text=True, timeout=120)
-        assert result.returncode == 0, result.stderr
-        facts = json.loads(result.stdout)
-        assert facts["protected"] is True
-        for group in ("root", "child"):
-            assert {row["sid"] for row in facts[group]} == {facts["user"], "S-1-5-32-544"}
-            assert all(row["access"] == "Allow" and row["rights"] & 0x1F01FF == 0x1F01FF
-                       for row in facts[group])
-        assert all(row["inherited"] for row in facts["child"])
+        assert_private_dacl(path, child, tmp_path)
         with pytest.raises(FileExistsError):
             private_directory.create_private_directory(path)
         assert child.read_bytes() == b"private"

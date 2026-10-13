@@ -29,20 +29,32 @@ python -I -S -B /trusted/tools/pyz_bootstrap.py /exchange/result.zip --trusted-s
 
 The precheck bounds archive metadata before `ZipFile` allocation, rejects unsafe
 paths, duplicate/special members, and verifies the selected runtime metadata and
-artifact descriptors, size/hash and Python requirement. It never guesses the
+artifact descriptors, size/hash and Python requirement. It also checks the inner
+PYZ inventory, recipe and producer identities, both canonical start files and
+their agreement with the selected requirement before import. It never guesses the
 first `.pyz`, imports archived code, installs a package or extracts the snapshot.
 `scope=runtime_descriptor_precheck` and `full_reference_valid=false` distinguish
 these data checks from the full native reference reader. Legacy and unavailable
 runtimes select an explicit documented fallback. Corrupt data is not success.
 
 Stable input capture compares the same file identity, size and write time across
-path and handle observations. On Windows it compares creation time through
-`st_birthtime_ns` across those views; handle `st_ctime_ns` is checked separately
-before and after reading to detect actual changes. Differing meanings of path
-and handle `ctime` must not reject unchanged files. These checks add no retry,
+path and handle observations. On Windows before 3.12 it obtains creation and
+change time separately from the owned native handle; newer stat fields retain
+their existing semantics. Native observations bracket the older fstat call.
+Reparse inputs and redirected parents are rejected without `Path.is_junction`;
+parent identities are checked again and owned handles are closed on failures.
+Differing meanings of path and handle `ctime` must not reject unchanged files.
+These checks add no retry,
 identity fallback or exception to the trusted digest requirement.
 
-Preparation requires Python >=3.12 and a new private directory. Exactly the
+Preparation uses the selected artifact's exact closed requirement: `>=3.12`
+for original 1.3.0 PYZs, or `>=3.10` for the new compatible variant. Static
+inspection does not relabel an old artifact as executable on an older Python.
+Unknown requirements and rehashed mixed variants are invalid. CP-02 enables
+readers first; the normal distribution and writer still require >=3.12 until CP-03.
+A new private directory is required. On Windows it is created atomically with
+a protected inheritable DACL for the effective user and administrators, including
+on older Python patch versions. Existing paths and ACLs are not repaired. Exactly the
 captured hash-verified PYZ is copied there, with no pip, venv, network or cache.
 Then use the returned absolute path:
 

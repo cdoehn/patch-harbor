@@ -239,7 +239,11 @@ globale Rückabwicklung.
 Das konkrete Resultformat entscheidet: Format 1/2 behält den unten beschriebenen
 Legacyweg; Format 3 mit `embedded` verwendet genau seine PYZ. Der neue Writer
 produziert Format 3. Bereits laufende alte Installationen behalten ihr bisheriges
-Format bis zu einem gesonderten Upgrade. Python 3.12 oder neuer ist nötig.
+Format bis zu einem gesonderten Upgrade. Der Bootstrap prüft die genaue
+Anforderung der ausgewählten PYZ: unveränderte historische Artefakte benötigen
+Python >=3.12; die neue geschlossene Variante verlangt >=3.10. Unbekannte oder
+widersprüchliche Varianten sind Fehler. Der aktuelle Produktionswriter bleibt
+bis zum gesonderten CP-03-Schritt bei >=3.12.
 Die PYZ enthält den vollständigen Core ohne Watcher. Es gibt keinen pip-, venv-,
 Build- oder Downloadschritt und keine Änderung der vorhandenen Installation.
 
@@ -301,6 +305,7 @@ archive does not establish trust. No inspection here executes bundled code.
 from __future__ import annotations
 
 import argparse
+from contextlib import ExitStack
 from dataclasses import dataclass, field
 from hashlib import sha256
 from io import BytesIO
@@ -320,6 +325,17 @@ MAX_TOTAL = 512 * 1024 * 1024
 MAX_ENTRIES = 250_010  # 250,000 snapshot files plus at most ten auxiliary members.
 MAX_PYZ = 16 * 1024 * 1024
 MAX_METADATA = 128 * 1024
+MAX_RECIPE = 1024 * 1024
+MAX_INNER_TOTAL = 32 * 1024 * 1024
+MAX_INNER_ENTRIES = 1000
+RECIPE_PATH = 'patchharbor/_runtime/pyz-recipe.json'
+MAIN_PATH = 'patchharbor/_runtime/pyz-main.py'
+IDENTITY_PATH = 'patchharbor/_pyz_identity.py'
+PYTHON_MINIMA = {'>=3.12': (3, 12), '>=3.10': (3, 10)}
+RESOURCES = {'patchharbor/_runtime/CHAT_INSTRUCTIONS.md',
+             'patchharbor/_runtime/python-api.md', 'patchharbor/_runtime/LICENSE', MAIN_PATH}
+RECIPE_FIELDS = {'marker','format_version','distribution','version','requires_python','profile',
+                 'content_id_algorithm','content_id','source_commit','entries'}
 _WINDOWS = sys.platform == 'win32'
 HEX = re.compile(r'[0-9a-f]{64}')
 METADATA_FIELDS = {'marker','format_version','status','reason','distribution','version',
@@ -353,35 +369,143 @@ def _json(raw):
     return result
 
 
+def _legacy_windows():
+    return _WINDOWS and sys.version_info < (3, 12)
+
+
+def _creation_time(info):
+    birth = getattr(info, 'st_birthtime_ns', None)
+    if birth is not None:
+        return birth
+    _require(_legacy_windows(), 'Windows creation-time metadata is unavailable')
+    return info.st_ctime_ns
+
+
 def _state(info):
-    # Windows path stat exposes creation time as ctime, while fstat exposes
-    # change time. Compare birth time across views and ctime within the handle.
-    timestamp = info.st_birthtime_ns if _WINDOWS else info.st_ctime_ns
+    # Old Windows fstat's ctime is creation time, never a change-time proof.
+    timestamp = _creation_time(info) if _WINDOWS else info.st_ctime_ns
     return info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns, timestamp
+
+
+def _windows_times(descriptor):
+    import ctypes
+    from ctypes import wintypes
+    import msvcrt
+    class BasicInfo(ctypes.Structure):
+        _fields_ = [('creation', ctypes.c_longlong), ('access', ctypes.c_longlong),
+                    ('write', ctypes.c_longlong), ('change', ctypes.c_longlong),
+                    ('attributes', wintypes.DWORD)]
+    kernel = ctypes.WinDLL('kernel32', use_last_error=True)
+    query = kernel.GetFileInformationByHandleEx
+    query.argtypes = [wintypes.HANDLE, ctypes.c_int, ctypes.c_void_p, wintypes.DWORD]
+    query.restype = wintypes.BOOL
+    info = BasicInfo()
+    if not query(msvcrt.get_osfhandle(descriptor), 0, ctypes.byref(info), ctypes.sizeof(info)):
+        raise ctypes.WinError(ctypes.get_last_error())
+    epoch = 11644473600 * 1_000_000_000
+    return info.creation * 100 - epoch, info.write * 100 - epoch, info.change * 100 - epoch, info.attributes
+
+
+@dataclass(frozen=True)
+class _WindowsMetadata:
+    original: object
+    st_birthtime_ns: int
+    st_ctime_ns: int
+
+    def __getattr__(self, name):
+        return getattr(self.original, name)
+
+
+def _descriptor_info(descriptor):
+    if not _legacy_windows():
+        return os.fstat(descriptor)
+    before = _windows_times(descriptor)
+    info = os.fstat(descriptor)
+    after = _windows_times(descriptor)
+    _require(before == after and _creation_time(info) == after[0]
+             and info.st_mtime_ns == after[1] and getattr(info, 'st_file_attributes', 0) == after[3],
+             'Windows handle metadata changed during capture')
+    return _WindowsMetadata(info, after[0], after[2])
+
+
+def _regular(info):
+    return stat.S_ISREG(info.st_mode) and not getattr(info, 'st_file_attributes', 0) & 0x400
+
+
+def _parent_states(path):
+    parents = []
+    for parent in reversed(Path(os.fspath(path)).absolute().parents):
+        info = parent.lstat()
+        _require(stat.S_ISDIR(info.st_mode) and not getattr(info, 'st_file_attributes', 0) & 0x400,
+                 'linked or special parent directory')
+        parents.append((parent, info.st_dev, info.st_ino))
+    return parents
+
+
+def _windows_open(path):
+    import ctypes
+    from ctypes import wintypes
+    import msvcrt
+    class AttributeTag(ctypes.Structure):
+        _fields_ = [('attributes', wintypes.DWORD), ('tag', wintypes.DWORD)]
+    kernel = ctypes.WinDLL('kernel32', use_last_error=True)
+    create = kernel.CreateFileW
+    create.argtypes = [wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD, ctypes.c_void_p,
+                       wintypes.DWORD, wintypes.DWORD, wintypes.HANDLE]
+    create.restype = wintypes.HANDLE
+    query = kernel.GetFileInformationByHandleEx
+    query.argtypes = [wintypes.HANDLE, ctypes.c_int, ctypes.c_void_p, wintypes.DWORD]
+    query.restype = wintypes.BOOL
+    close = kernel.CloseHandle
+    close.argtypes, close.restype = [wintypes.HANDLE], wintypes.BOOL
+    # READ, share READ/WRITE/DELETE, OPEN_EXISTING, OPEN_REPARSE_POINT.
+    handle = create(os.fspath(path), 0x80000000, 7, None, 3, 0x00200000, None)
+    if handle == ctypes.c_void_p(-1).value:
+        raise ctypes.WinError(ctypes.get_last_error())
+    try:
+        attributes = AttributeTag()
+        if not query(handle, 9, ctypes.byref(attributes), ctypes.sizeof(attributes)):
+            raise ctypes.WinError(ctypes.get_last_error())
+        _require(not attributes.attributes & (0x400 | 0x10), 'opened reparse point or directory')
+        descriptor = msvcrt.open_osfhandle(handle, os.O_RDONLY | os.O_BINARY)
+        handle = None  # CRT now owns the handle.
+        return descriptor
+    finally:
+        if handle is not None:
+            close(handle)
 
 
 def _capture(path, maximum):
     """One stable, bounded, no-follow regular-file capture, with no retry."""
+    parents = _parent_states(path)
     initial = path.lstat()
-    _require(stat.S_ISREG(initial.st_mode) and not path.is_symlink()
-             and not getattr(path, 'is_junction', lambda: False)(), 'linked or special input')
-    descriptor = os.open(path, os.O_RDONLY | getattr(os, 'O_BINARY', 0)
-                         | getattr(os, 'O_NOFOLLOW', 0) | getattr(os, 'O_NONBLOCK', 0))
-    with os.fdopen(descriptor, 'rb') as stream:
-        before = os.fstat(stream.fileno())
-        _require(stat.S_ISREG(before.st_mode) and before.st_size <= maximum, 'file type or size limit')
-        _require(not path.is_symlink() and not getattr(path, 'is_junction', lambda: False)(), 'linked input')
-        _require(_state(initial) == _state(before), 'input changed before capture')
-        raw = stream.read(maximum + 1)
-        after = os.fstat(stream.fileno())
-        _require(len(raw) <= maximum and before.st_ctime_ns == after.st_ctime_ns
-                 and _state(initial) == _state(before) == _state(after) == _state(path.lstat()),
-                 'input changed during capture')
+    _require(_regular(initial), 'linked or special input')
+    descriptor = (_windows_open(path) if os.name == 'nt' else
+                  os.open(path, os.O_RDONLY | getattr(os, 'O_NOFOLLOW', 0) | getattr(os, 'O_NONBLOCK', 0)))
+    try:
+        os.set_inheritable(descriptor, False)
+        with os.fdopen(descriptor, 'rb') as stream:
+            descriptor = None
+            before = _descriptor_info(stream.fileno())
+            _require(_regular(before) and before.st_size <= maximum, 'file type or size limit')
+            _require(_state(initial) == _state(before), 'input changed before capture')
+            raw = stream.read(maximum + 1)
+            after = _descriptor_info(stream.fileno())
+            final = path.lstat()
+            _require(_regular(after) and _regular(final) and len(raw) <= maximum
+                     and before.st_ctime_ns == after.st_ctime_ns
+                     and _state(initial) == _state(before) == _state(after) == _state(final),
+                     'input changed during capture')
+        _require(_parent_states(path) == parents, 'input parent changed during capture')
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
     return raw
 
 
-def _directory_budget(raw):
+def _directory_budget(raw, *, maximum=None):
     """Bound ZipFile's metadata allocation before opening the supplied archive."""
+    maximum = MAX_ENTRIES if maximum is None else maximum
     start = max(0, len(raw)-65557)
     position = raw.rfind(b'PK\x05\x06', start)
     _require(position >= 0 and position + 22 <= len(raw), 'missing ZIP boundary')
@@ -405,8 +529,8 @@ def _directory_budget(raw):
                  'inconsistent ZIP64 directory facts')
         count, disk_count, size, offset = z_count, z_disk_count, z_size, z_offset
         directory_end = record_offset
-    _require(disk_count == count and 0 < count <= MAX_ENTRIES,
-             f'ZIP entry limit exceeded: actual={count}, limit={MAX_ENTRIES}')
+    _require(disk_count == count and 0 < count <= maximum,
+             f'ZIP entry limit exceeded: actual={count}, limit={maximum}')
     _require(offset + size == directory_end,
              'ZIP directory boundary mismatch')
     cursor = offset
@@ -468,6 +592,133 @@ def _checked(archive, descriptor, maximum):
     return raw
 
 
+def _minimum(requires):
+    _require(type(requires) is str and requires in PYTHON_MINIMA, 'unsupported PYZ Python requirement')
+    return PYTHON_MINIMA[requires]
+
+
+def _main_bytes(requires):
+    major, minor = _minimum(requires)
+    return ('''"""PatchHarbor Core ZIP application; no Watcher launcher."""
+import sys
+
+if sys.version_info < (%d, %d):
+    sys.stderr.write("PatchHarbor requires Python %d.%d or newer.\\n")
+    raise SystemExit(2)
+
+from patchharbor.cli import main
+raise SystemExit(main())
+''' % (major, minor, major, minor)).encode('ascii')
+
+
+def _canonical(document):
+    return (json.dumps(document, sort_keys=True, ensure_ascii=True,
+                       separators=(',', ':'), allow_nan=False) + '\n').encode('ascii')
+
+
+def _pyz_path(name):
+    _require(type(name) is str and 0 < len(name) <= 512, 'invalid PYZ path')
+    parts = name.split('/')
+    for part in parts:
+        _require(0 < len(part) <= 128 and re.fullmatch(r'[A-Za-z0-9_][A-Za-z0-9_.-]*', part)
+                 and part not in {'.', '..'} and not part.endswith('.'), 'unsafe PYZ path segment')
+        stem = part.split('.')[0].upper()
+        _require(stem not in {'CON','PRN','AUX','NUL'} and not re.fullmatch(r'(COM|LPT)[1-9]', stem),
+                 'device PYZ path')
+    if name == '__main__.py':
+        return name
+    _require(parts[0] == 'patchharbor' and len(parts) > 1, 'foreign PYZ namespace')
+    if name.startswith('patchharbor/_runtime/'):
+        _require(name in RESOURCES, 'unlisted PYZ resource')
+    else:
+        _require(name != 'patchharbor/_runtime_identity.py' and '__pycache__' not in parts
+                 and parts[-1] not in {'sitecustomize.py','usercustomize.py'}, 'unsupported PYZ startup member')
+        _require(name == 'patchharbor/py.typed' or (name.endswith('.py') and all(
+            re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]*', p) for p in [*parts[1:-1], parts[-1][:-3]])),
+            'unsupported PYZ member')
+    return name
+
+
+def _pyz_precheck(raw, expected, remaining=MAX_INNER_TOTAL):
+    """Check the inner inventory and closed start variant without importing it.
+
+    This is still not native validation of the surrounding repository Result.
+    Its separate outer and inner budgets must both hold before code can run.
+    """
+    _require(0 < len(raw) <= MAX_PYZ, 'PYZ artifact byte budget')
+    _directory_budget(raw, maximum=MAX_INNER_ENTRIES)
+    with ZipFile(BytesIO(raw)) as archive:
+        names = _members(archive)
+        infos = archive.infolist()
+        _require(sum(i.file_size for i in infos) <= min(MAX_INNER_TOTAL, remaining), 'shared PYZ byte budget')
+        _require(not archive.comment and [i.filename for i in infos] == sorted(names), 'noncanonical PYZ order')
+        offset = 0
+        for info in infos:
+            _require(info.filename.isascii() and info.compress_type == ZIP_STORED and info.file_size == info.compress_size
+                     and info.create_system == 3 and info.create_version == info.extract_version == 20
+                     and info.date_time == (1980,1,1,0,0,0) and info.external_attr == 0o100644 << 16
+                     and info.internal_attr == info.flag_bits == info.volume == info.reserved == 0
+                     and not info.extra and not info.comment and info.header_offset == offset,
+                     'noncanonical PYZ ZIP member')
+            header = info.FileHeader(zip64=False)
+            _require(raw[offset:offset+len(header)] == header, 'inconsistent PYZ local header')
+            offset += len(header) + info.file_size
+        _require(len(raw) == offset + sum(46 + len(i.filename) for i in infos) + 22,
+                 'noncanonical PYZ directory size')
+        recipe_raw = _read(archive, RECIPE_PATH, MAX_RECIPE)
+        recipe = _json(recipe_raw)
+        _require(set(recipe) == RECIPE_FIELDS and recipe['marker'] == 'patch-harbor-pyz-recipe'
+                 and type(recipe['format_version']) is int and recipe['format_version'] == 1
+                 and recipe['distribution'] == 'patchharbor' and recipe['profile'] == 'patchharbor-core-no-watcher-v1'
+                 and recipe['content_id_algorithm'] == 'patchharbor-pyz-content-v1', 'unsupported PYZ recipe')
+        _require(type(recipe['version']) is str and VERSION.fullmatch(recipe['version']), 'invalid PYZ version')
+        main = _main_bytes(recipe['requires_python'])
+        commit = recipe['source_commit']
+        _require(commit is None or (type(commit) is str and re.fullmatch(r'[0-9a-f]{40}|[0-9a-f]{64}', commit)),
+                 'invalid PYZ source commit')
+        _require(all(recipe[key] == value for key, value in expected.items()), 'runtime/recipe disagreement')
+        _require(type(recipe['content_id']) is str and HEX.fullmatch(recipe['content_id'])
+                 and sha256(_canonical({k:v for k,v in recipe.items() if k != 'content_id'})).hexdigest() == recipe['content_id']
+                 and _canonical(recipe) == recipe_raw, 'PYZ content identity or encoding mismatch')
+        entries = recipe['entries']
+        _require(type(entries) is list and len(entries)+1 == len(infos), 'PYZ inventory count')
+        inventory, folded, directories = {}, set(), {}
+        for entry in entries:
+            _require(type(entry) is dict and set(entry) == {'path','source','size','sha256'}, 'PYZ entry schema')
+            name, source = _pyz_path(entry['path']), _pyz_path(entry['source'])
+            _require(source == (MAIN_PATH if name == '__main__.py' else name), 'PYZ source mapping')
+            _require(name.casefold() not in folded, 'duplicate PYZ path')
+            folded.add(name.casefold())
+            _require(type(entry['size']) is int and entry['size'] >= 0 and type(entry['sha256']) is str
+                     and HEX.fullmatch(entry['sha256']), 'PYZ entry size/hash')
+            data = _read(archive, name, min(entry['size'], MAX_INNER_TOTAL))
+            _require(len(data) == entry['size'] and sha256(data).hexdigest() == entry['sha256'], 'PYZ entry bytes/hash')
+            inventory[name] = entry
+            parts = name.split('/')
+            for index in range(1, len(parts)):
+                parent = '/'.join(parts[:index])
+                _require(directories.setdefault(parent.casefold(), parent) == parent, 'case-ambiguous PYZ directory')
+        _require(list(inventory) == sorted(inventory) and set(inventory) | {RECIPE_PATH} == names,
+                 'PYZ inventory differs from archive')
+        _require(not (folded & set(directories)), 'PYZ file/directory collision')
+        required = RESOURCES | {IDENTITY_PATH,'__main__.py','patchharbor/__init__.py',
+                                'patchharbor/api.py','patchharbor/cli.py','patchharbor/py.typed'}
+        _require(required <= inventory.keys(), 'incomplete PYZ inventory')
+        for name in ('__main__.py', MAIN_PATH):
+            _require(_read(archive, name, len(main)) == main, 'PYZ start bytes disagree with Python requirement')
+        producer = dict(algorithm='patchharbor-pyz-producer-v1', version=recipe['version'],
+                        requires_python=recipe['requires_python'], profile=recipe['profile'],
+                        source_commit=commit, entries=[e for e in entries if e['path'] != IDENTITY_PATH])
+        identity = ('# Generated for the PatchHarbor PYZ profile.\nRESOURCE_ID = "' +
+                    sha256(_canonical(producer)).hexdigest() + '"\n').encode('ascii')
+        _require(_read(archive, IDENTITY_PATH, len(identity)) == identity, 'PYZ producer identity mismatch')
+        for name in RESOURCES - {MAIN_PATH}:
+            data = _read(archive, name, MAX_METADATA)
+            _require(data and not data.startswith(b'\xef\xbb\xbf'), 'invalid PYZ document resource')
+            data.decode('utf-8')
+    return recipe
+
+
 @dataclass(frozen=True)
 class PyzAssessment:
     reference: Path
@@ -475,6 +726,7 @@ class PyzAssessment:
     artifact_name: str
     artifact_sha256: str
     version: str
+    requires_python: str
     pyz_bytes: bytes = field(repr=False)
     source_trusted: bool = False
     # This helper deliberately does not reimplement the full native reader.
@@ -511,6 +763,10 @@ def assess(reference, *, trusted_source_sha256=None):
         _require(metadata.get('status') == runtime['status'] and metadata.get('reason') == runtime['reason']
                  and metadata.get('artifact') == runtime['artifact'], 'runtime descriptor disagreement')
         runtime_names = {name for name in names if name.startswith('runtime/')}
+        version, requires = metadata.get('version'), metadata.get('requires_python')
+        _require(version is None or (type(version) is str and VERSION.fullmatch(version)), 'runtime version profile')
+        if requires is not None:
+            _minimum(requires)
         if runtime['status'] == 'unavailable':
             _require(runtime['artifact'] is None and type(runtime['reason']) is str
                      and runtime['reason'] in {'source_not_prepared','source_changed','artifact_missing',
@@ -524,13 +780,12 @@ def assess(reference, *, trusted_source_sha256=None):
         _require(runtime['status'] == 'embedded' and runtime['reason'] is None, 'runtime status')
         artifact = _descriptor(runtime['artifact'], artifact=True)
         _descriptor(metadata['artifact'], artifact=True)
-        version = metadata.get('version')
         _require(type(version) is str and VERSION.fullmatch(version), 'runtime version profile')
+        _minimum(requires)
         name = 'patchharbor-' + version + '.pyz'
         _require(artifact['path'] == 'runtime/' + name
                  and runtime_names == {'runtime/runtime.json', artifact['path']}, 'runtime member selection')
         _require(metadata.get('profile') == 'patchharbor-core-no-watcher-v1'
-                 and metadata.get('requires_python') == '>=3.12'
                  and metadata.get('content_id_algorithm') == 'patchharbor-pyz-content-v1'
                  and type(metadata.get('content_id')) is str and HEX.fullmatch(metadata['content_id']),
                  'unsupported PYZ profile or Python requirement')
@@ -552,7 +807,10 @@ def assess(reference, *, trusted_source_sha256=None):
         _require(commit is None or (type(commit) is str and re.fullmatch(r'[0-9a-f]{40}|[0-9a-f]{64}',commit)),
                  'invalid runtime source commit')
         artifact_bytes = _checked(archive, artifact, MAX_PYZ)
-    return PyzAssessment(path, digest, name, artifact['sha256'], version, artifact_bytes,
+        _pyz_precheck(artifact_bytes, dict(version=version, requires_python=requires,
+                      content_id=metadata['content_id'], source_commit=commit),
+                      MAX_TOTAL - sum(i.file_size for i in archive.infolist()))
+    return PyzAssessment(path, digest, name, artifact['sha256'], version, requires, artifact_bytes,
                          trusted_source_sha256 is not None)
 
 
@@ -562,18 +820,94 @@ class PreparedPyz:
     path: Path
 
 
+# Same reviewed atomic DACL creation as the Core; bootstrap cannot import it.
+def _windows_create_private_directory(path: Path) -> None:
+    import ctypes
+    from ctypes import wintypes
+
+    class SecurityAttributes(ctypes.Structure):
+        _fields_ = [("length", wintypes.DWORD), ("descriptor", ctypes.c_void_p),
+                    ("inherit", wintypes.BOOL)]
+
+    class SidAndAttributes(ctypes.Structure):
+        _fields_ = [("sid", ctypes.c_void_p), ("attributes", wintypes.DWORD)]
+
+    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+    security = ctypes.WinDLL("advapi32", use_last_error=True)
+
+    def function(library, name, result, args):
+        fn = getattr(library, name)
+        fn.restype, fn.argtypes = result, args
+        return fn
+
+    close = function(kernel, "CloseHandle", wintypes.BOOL, [wintypes.HANDLE])
+    free = function(kernel, "LocalFree", ctypes.c_void_p, [ctypes.c_void_p])
+    thread = function(kernel, "GetCurrentThread", wintypes.HANDLE, [])
+    process = function(kernel, "GetCurrentProcess", wintypes.HANDLE, [])
+    open_thread = function(security, "OpenThreadToken", wintypes.BOOL,
+                           [wintypes.HANDLE, wintypes.DWORD, wintypes.BOOL, ctypes.POINTER(wintypes.HANDLE)])
+    open_process = function(security, "OpenProcessToken", wintypes.BOOL,
+                            [wintypes.HANDLE, wintypes.DWORD, ctypes.POINTER(wintypes.HANDLE)])
+    token_info = function(security, "GetTokenInformation", wintypes.BOOL,
+                          [wintypes.HANDLE, ctypes.c_int, ctypes.c_void_p, wintypes.DWORD,
+                           ctypes.POINTER(wintypes.DWORD)])
+    sid_text = function(security, "ConvertSidToStringSidW", wintypes.BOOL,
+                        [ctypes.c_void_p, ctypes.POINTER(wintypes.LPWSTR)])
+    convert = function(security, "ConvertStringSecurityDescriptorToSecurityDescriptorW", wintypes.BOOL,
+                       [wintypes.LPCWSTR, wintypes.DWORD, ctypes.POINTER(ctypes.c_void_p),
+                        ctypes.POINTER(wintypes.DWORD)])
+    create = function(kernel, "CreateDirectoryW", wintypes.BOOL,
+                      [wintypes.LPCWSTR, ctypes.POINTER(SecurityAttributes)])
+    with ExitStack() as stack:
+        token = wintypes.HANDLE()
+        if not open_thread(thread(), 0x8, True, ctypes.byref(token)):  # TOKEN_QUERY
+            if ctypes.get_last_error() != 1008:  # ERROR_NO_TOKEN only
+                raise ctypes.WinError(ctypes.get_last_error())
+            if not open_process(process(), 0x8, ctypes.byref(token)):
+                raise ctypes.WinError(ctypes.get_last_error())
+        stack.callback(close, token)
+        size = wintypes.DWORD()
+        if token_info(token, 1, None, 0, ctypes.byref(size)) or ctypes.get_last_error() != 122:
+            raise ctypes.WinError(ctypes.get_last_error())  # ERROR_INSUFFICIENT_BUFFER
+        buffer = ctypes.create_string_buffer(size.value)
+        if not token_info(token, 1, buffer, size, ctypes.byref(size)):  # TokenUser
+            raise ctypes.WinError(ctypes.get_last_error())
+        user = SidAndAttributes.from_buffer(buffer)
+        sid = wintypes.LPWSTR()
+        if not sid_text(user.sid, ctypes.byref(sid)):
+            raise ctypes.WinError(ctypes.get_last_error())
+        stack.callback(free, sid)
+        # Protected DACL; only this effective user and administrators, inherited
+        # by files/subdirectories. No permissive-create / later chmod interval.
+        sddl = "D:P(A;OICI;FA;;;" + sid.value + ")(A;OICI;FA;;;BA)"
+        descriptor = ctypes.c_void_p()
+        if not convert(sddl, 1, ctypes.byref(descriptor), None):
+            raise ctypes.WinError(ctypes.get_last_error())
+        stack.callback(free, descriptor)
+        attributes = SecurityAttributes(ctypes.sizeof(SecurityAttributes), descriptor, False)
+        if not create(str(path), ctypes.byref(attributes)):
+            raise ctypes.WinError(ctypes.get_last_error())
+
+
 def prepare(assessment, workspace):
     """Copy exactly one verified artifact into a new private directory; no install."""
     if not assessment.source_trusted:
         raise BootstrapUnavailable('runtime source is not trusted')
-    if sys.version_info < (3, 12):
-        raise BootstrapUnavailable('Python 3.12 or newer is required')
+    minimum = _minimum(assessment.requires_python)
+    if sys.version_info < minimum:
+        raise BootstrapUnavailable('Python %d.%d or newer is required by this artifact' % minimum)
     _require(sha256(assessment.pyz_bytes).hexdigest() == assessment.artifact_sha256
              and 0 < len(assessment.pyz_bytes) <= MAX_PYZ, 'captured PYZ bytes changed')
     _require(assessment.artifact_name == 'patchharbor-' + assessment.version + '.pyz'
              and VERSION.fullmatch(assessment.version), 'artifact name changed')
+    _pyz_precheck(assessment.pyz_bytes, dict(version=assessment.version, requires_python=assessment.requires_python))
     workspace = Path(workspace).absolute()
-    workspace.mkdir(mode=0o700)  # existing destinations and symlinks are refused
+    parents = _parent_states(workspace)
+    if os.name == 'nt':
+        _windows_create_private_directory(workspace)
+    else:
+        workspace.mkdir(mode=0o700)  # existing destinations and symlinks are refused
+    _require(_parent_states(workspace) == parents, 'workspace parent changed during creation')
     output = workspace/assessment.artifact_name
     with output.open('xb') as stream:
         stream.write(assessment.pyz_bytes); stream.flush(); os.fsync(stream.fileno())
@@ -594,13 +928,15 @@ def _check_loaded_origin(path):
 
 def import_api(prepared):
     """Explicit in-process use; retain the checked path for later lazy imports."""
-    if sys.version_info < (3, 12):
-        raise BootstrapUnavailable('Python 3.12 or newer is required')
     assessment, path = prepared.assessment, prepared.path
+    minimum = _minimum(assessment.requires_python)
+    if sys.version_info < minimum:
+        raise BootstrapUnavailable('Python %d.%d or newer is required by this artifact' % minimum)
     if not assessment.source_trusted:
         raise BootstrapUnavailable('runtime source is not trusted')
     _require(sha256(_capture(path, MAX_PYZ)).hexdigest() == assessment.artifact_sha256,
              'prepared PYZ changed before import')
+    _pyz_precheck(assessment.pyz_bytes, dict(version=assessment.version, requires_python=assessment.requires_python))
     _check_loaded_origin(path)
     if not sys.path or sys.path[0] != str(path):
         sys.path.insert(0, str(path))
@@ -631,7 +967,8 @@ def main(argv=None):
     assessment = assess(args.reference, trusted_source_sha256=args.trusted_source_sha256)
     result = dict(scope=assessment.scope, full_reference_valid=False,
                   reference_sha256=assessment.reference_sha256, source_trusted=assessment.source_trusted,
-                  artifact_sha256=assessment.artifact_sha256, version=assessment.version)
+                  artifact_sha256=assessment.artifact_sha256, version=assessment.version,
+                  requires_python=assessment.requires_python)
     if args.prepare_in is not None:
         prepared = prepare(assessment, args.prepare_in)
         result['path'] = str(prepared.path)
@@ -740,9 +1077,10 @@ oder PYZ/PACK-Plan. Der neue Normsatz ändert nur seine ausdrücklich benannten
 Python-Anforderungen. Diese Projektzuordnung gilt nicht pauschal für andere
 Repositorys, denen PatchHarbor dieselbe generische Vorlage mitliefert.
 
-**Aktueller Implementierungsschritt:** CP-00 ist durch tatsächliches Apply
-bestätigt. CP-01 bereitet Sprach-, Fehler- und Dateisystemkompatibilität vor.
-Python-Metadaten und das ausführbare Bootstrapprogramm oben bleiben unverändert.
+**Aktueller Implementierungsschritt:** CP-00 und CP-01 sind durch tatsächliche
+Applies bestätigt. CP-02 erweitert Datenleser und das ausführbare Bootstrapprogramm
+oben auf beide geschlossenen PYZ-Varianten. Der normale Writer, Paketversion und
+Python-Metadaten bleiben bis CP-03 bei der bisherigen 3.12-Anforderung.
 Python 3.10/3.11 sind weiterhin Ziele, noch kein vollständig bestätigter Support.
 Prüfe stets den gelieferten Resultstand: Eine alte globale Installation wird
 durch eine Quelländerung nicht automatisch ersetzt.
@@ -767,9 +1105,9 @@ Development und Apply prüfen jeden Commitstand vollständig parallel, auch am
 Bundle-Ende. Kein serieller Lauf und keine verkürzte Auswahl als Vollabnahme.
 Nur Christian startet den manuellen CI-Workflow; Codex und Entrypoints tun das nie.
 
-Der aktuelle Folgeauftrag umfasst genau das erste Implementierungsbundle CP-01.
+Der aktuelle Folgeauftrag umfasst genau das Reader-/Bootstrap-Bundle CP-02.
 Er startet keine dauerhafte Schleife und autorisiert keine sofortige Umsetzung
-von CP-02 bis CP-05. Eine später ausdrücklich beauftragte Fortsetzung wertet vollständige
+von CP-03 bis CP-05. Eine später ausdrücklich beauftragte Fortsetzung wertet vollständige
 Watcher-Results samt Teilfortschritten aus. Sicherheitsgrenzen und belastbare
 Resultbindung bleiben Voraussetzung; Tokenmeter bleibt gestoppt.
 
@@ -784,7 +1122,7 @@ belegt nicht automatisch den neuen CPython-Auftrag. Dessen Abnahme benötigt
 echte 3.10-/3.11-Interpreter, passende Artefakte, tatsächliche Applies und die
 von Christian gestartete erweiterte native CI. Die Anforderungen und offenen
 Nachweise stehen im neuen Plan. Eine ältere globale Installation wird durch
-diesen Dokumentationspatch nicht aktualisiert.
+diesen Quellpatch nicht aktualisiert.
 
 Bestimme die aktive Zielversion aus dem Repository. Eine laut Plan erst zum
 Release erfolgende Versionsanhebung ist kein Widerspruch; tatsächlich

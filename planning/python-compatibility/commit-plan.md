@@ -1,9 +1,9 @@
 # PatchHarbor – Implementierungsplan CPython 3.10/3.11
 
 **Plan-ID:** `CPYTHON-310-311`
-**Revision:** 2 · 13. Oktober 2026
-**Status:** CP-00 durch tatsächliches Result bestätigt; CP-01 in Bundle 048 vorbereitet. Sechs Planpositionen, noch keine Freigabe der älteren Interpreter.
-**Aktueller Auftrag:** erstes Implementierungsbundle CP-01; danach stoppen und das tatsächliche Apply auswerten.
+**Revision:** 3 · 13. Oktober 2026
+**Status:** CP-00 und CP-01 durch tatsächliche Results bestätigt; CP-02 in Bundle 049 vorbereitet. Sechs Planpositionen, noch keine Freigabe der älteren Interpreter.
+**Aktueller Auftrag:** ein Folgebundle CP-02 samt tatsächlicher Apply-Auswertung; danach stoppen.
 **Zielversion:** gesondert festzulegen; veröffentlichte Basis bleibt 1.3.0.
 **Normen gemeinsam:** [Hauptspec](../../spec/SPECIFICATION.md),
 [PYZ/PACK](../../spec/SPECIFICATION_EXTENSION_PYZ_PACK.md) und
@@ -76,8 +76,8 @@ Sechs Planpositionen sind keine Pflicht zu sechs Bundles: fachlich abgrenzbare
 aufeinanderfolgende Zustände dürfen gemeinsam übergeben werden. Jeder Commit
 braucht sein vollständiges paralleles Gate. Korrekturen erhalten eigene
 FIX-Kennungen und belegte Ausgangszustände; keine künstliche Fehleranzahlgrenze.
-Der ursprüngliche Bootstrap-Auftrag endete nach CP-00. Mit dem neuen ausdrücklichen
-Auftrag wird jetzt ausschließlich CP-01 umgesetzt. CP-02 bis CP-05 folgen in
+Der ursprüngliche Bootstrap-Auftrag endete nach CP-00; Bundle 048 bestätigte CP-01.
+Mit dem neuen ausdrücklichen Auftrag wird jetzt ausschließlich CP-02 umgesetzt. CP-03 bis CP-05 folgen in
 späteren beauftragten Durchläufen; keine automatische Fortsetzung dieses Bundles.
 
 ### CP-00 – Startvertrag übernehmen
@@ -248,8 +248,8 @@ CP-00 startet keine dauerhafte S-Schleife. Tokenmeter bleibt gestoppt.
 - [ ] Produktversion, vollständiger Endcommit und konkrete Artefakthashes festgelegt.
 - [ ] Abschluss gespeichert; keine weiteren Bundles oder automatische Fortsetzung.
 
-CP-00 ist durch das unten gebundene tatsächliche Apply bestätigt. CP-01 benötigt
-seinen eigenen erfolgreichen Apply; der vorbereitete Quellstand genügt nicht. Änderungen nach einer
+CP-00 und CP-01 sind durch die unten gebundenen tatsächlichen Applies bestätigt.
+CP-02 benötigt seinen eigenen erfolgreichen Apply; der vorbereitete Quellstand genügt nicht. Änderungen nach einer
 Abnahme erfordern neue passende Nachweise; die frühere 1.3.0-CI wird nicht als
 Test dieses geänderten Dokumentations- oder zukünftigen Laufzeitstands ausgegeben.
 
@@ -327,3 +327,76 @@ parallele Gate erforderlich. Dieser erste Lauf gilt nicht als Abnahme.
 - [Python 3.10 os.mkdir](https://docs.python.org/3.10/library/os.html#os.mkdir):
   0700-ACL-Unterstützung wurde erst in 3.10.15 nachgezogen. CP-01 verlässt sich
   dafür nicht auf eine Minorversionsannahme oder einen stillen chmod-Fallback.
+
+
+## 8. CP-02 / Bundle 049: zwei geschlossene Datenvarianten vor Writerwechsel
+
+CP-01 ist mit Commit `e60729187b34b4203fc2bd62d41b209022098cfc` tatsächlich
+angewendet und auf dev gepusht. Result
+`patchharbor-apply_Result_123625_1013_c5dc9e.zip`, SHA-256
+`0f596a42c05ef795d9e15a8e38ffdae2bd5e31c08812e4c820b91e601510d7b1`:
+342 Dateien, sauberer Baum, 3099 parallele Apply-Tests / 12 Skips mit zwölf Workern.
+Development: 3122 passed / 13 skipped einschließlich 24 Übergabeprüfungen.
+Repository-ID `e7a93d72-62dc-4759-97e8-6bf6cdf10e90`, Fingerprint
+`7c9d2a24e397e0e5`, Algorithmus `patchharbor-state-v1`.
+
+CP-02 erweitert den gemeinsamen PYZ-Datenleser und Runtime-2-Deskriptorleser auf
+exakt `>=3.12` und `>=3.10`; die statische Lesbarkeit hängt nicht von der
+Ausführbarkeit auf dem prüfenden Interpreter ab. Die historischen `MAIN_BYTES`
+bleiben identisch. Beide Startdateien müssen jetzt nicht nur zueinander, sondern
+auch bytegenau zur deklarierten Variante passen. Unbekannte Anforderungen,
+neu gehashte Mischvarianten, fremde Profile, beschädigte Produzenten-/Inhalts-IDs
+und abweichende Metadaten werden weiterhin abgewiesen.
+
+Der Build-Datenhelfer wählt Startbytes anhand seiner ausdrücklichen Anforderung.
+Die normale Distribution, der Writer einschließlich `unavailable` und alle
+Produktmetadaten bleiben in diesem Schritt bei `>=3.12` / Version 1.3.0.
+3.10-Artefakte in diesen Tests sind ausdrücklich zukünftige synthetische Varianten.
+Gemeinsame Reader/Provider und ihre vorhandenen Ressourcenadapter verarbeiten die
+geprüften Varianten; kein zweiter Core und keine parallele öffentliche API.
+
+Der stdlib-Bootstrap und sein identischer ausführbarer Block in der Root-Anleitung
+prüfen zusätzlich inneres Inventar, Rezept-/Produzenten-IDs, beide Startdateien
+und die Übereinstimmung mit dem Runtime-Deskriptor vor dem Import. Das separate
+innere 1000-Eintrags-/32-MiB-Budget und das gemeinsame äußere Budget bleiben
+verbindlich; 250.010 äußere Einträge und ZIP64 werden nicht zurückgenommen.
+`runtime_descriptor_precheck` bleibt ausdrücklich keine native Vollprüfung der
+Repositoryreferenz. Versionssperren gelten pro ausgewähltem Artefakt, alte
+3.12-Artefakte werden nicht umetikettiert. Importkonflikte bleiben Fehler.
+
+Für Windows übernimmt der installationsfreie Bootstrap die in CP-01 eingeführte
+Trennung von CreationTime und nativer ChangeTime vor 3.12, die atomare private
+DACL-Erzeugung und native No-follow-Handle-Prüfung. Reparse-Dateien sowie
+umgelenkte Eltern werden abgewiesen, Elternidentitäten erneut geprüft und
+owned Handles auch bei fehlschlagender Stream-Erzeugung geschlossen. Die engen
+stdlib-Primitiven stehen dort ohne Core-Import bereit; ihre Fehlerfälle und
+nativen Verhaltensfälle werden für beide Aufrufwege geprüft.
+
+### Eingefrorene Grundlage und Nachweisgrenzen
+
+`tests/fixtures/python_variants/` enthält drei einmal erzeugte synthetische
+Referenzen nach den unveränderten Datenhelfern des bestätigten 1.3.0-Stands
+`30e5de1d67a2d725ff192a0b97e50c2b0336bfcb`. Sie sind keine behaupteten realen Applies.
+Die Format-2-Referenz enthält das vorhandene unveränderte 1.2.1-Wheel; Format 3
+enthält die vollständig archivierte 1.3.0-PYZ aus dem separaten Bundle-046-Build.
+PYZ-SHA-256: `942b2161c46ae3d81e0faf097b649d58d61c9c0d493b934d11cc708a314bfe21`,
+941575 Bytes. `provenance.json` bindet alle Archive, Helfer und Identitäten.
+Das Artefakt ist kein behaupteter Download eines veröffentlichten Release-Assets.
+Bestehende historische Fixtures werden nicht geändert. Für den alten PYZ-Leser
+wird die vollständige historische Runtime ausgeführt, keine Modul-Mischversion.
+
+| Fall | Konkrete neue Prüfungen |
+| --- | --- |
+| CT-05 | Bytegenaue eingefrorene Results 1/2/3, unveränderte originale Startbytes, ganze historische 1.3.0-Runtime liest alte und lehnt neue Variante konservativ ab. |
+| CT-06 | Beide Varianten, unbekannte Anforderungstypen/-ausdrücke, neu gehashte widersprüchliche Startbytes, Metadaten, Profile und Identitäten. |
+| CT-08 | Versionssperre vor Import, statische Lesbarkeit getrennt von Ausführung, keine gefälschte Absenkung über Assessment; frischer stdlib-Prozess packt/prüft mit beiden Varianten. |
+| CT-03/04 | Native und simulierte ChangeTime-, Reparse-/Junction-, DACL- und Handle-Cleanup-Fälle im standalone Bootstrap. |
+| CT-12 | Inneres Eintrags-/Bytebudget, falsche Zähler, CRC-/Hashfehler, äußeres ZIP64 und 250.000-Dateien-Regression; Writer bleibt 3.12. |
+
+Die konkreten neuen Fälle stehen in `test_python_variants.py` und
+`test_bootstrap_python_compat.py`; vorhandene Bootstrap-, PYZ-, Result-,
+Watcher- und Packaging-Suites bleiben Teil des vollständigen parallelen Gates.
+Native Windows-Fälle sind auf Linux Skips. Nur CPython 3.14.4 ist hier verfügbar;
+Versionssimulationen und echte Prozesse auf 3.14 ersetzen keine 3.10-/3.11-Abnahme.
+CI startet ausschließlich Christian. CP-03 (Writer/Installation) und die erweiterte
+CI-Matrix aus CP-04 werden mit diesem Bundle nicht aktiviert.

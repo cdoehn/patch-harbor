@@ -9,7 +9,7 @@ from patchharbor.result_runtime import (
     METADATA_PATH, MAX_METADATA_BYTES, UNAVAILABLE_REASONS, RuntimeFile, _descriptor, _require,
 )
 from patchharbor import runtime_pyz as pyz
-from patchharbor.runtime_wheel import _VERSION, _HEX, _python_requirement
+from patchharbor.runtime_wheel import _VERSION, _HEX
 
 
 _FIELDS = frozenset({
@@ -76,7 +76,8 @@ def read_result_pyz(value: object, files: dict[str, bytes], *, resource_policy: 
     version, requires = doc['version'], doc['requires_python']
     _require(version is None or (type(version) is str and _VERSION.fullmatch(version) is not None),
              'invalid PYZ runtime version')
-    _require(requires is None or _python_requirement(requires), 'invalid PYZ runtime Python requirement')
+    _require(requires is None or (type(requires) is str and requires in pyz.PYTHON_REQUIREMENTS),
+             'invalid PYZ runtime Python requirement')
     if doc['status'] == 'unavailable':
         _require(type(doc['reason']) is str and doc['reason'] in UNAVAILABLE_REASONS,
                  'invalid unavailable PYZ reason')

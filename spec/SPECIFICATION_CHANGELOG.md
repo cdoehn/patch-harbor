@@ -1,5 +1,18 @@
 # PatchHarbor – Spezifikations-Changelog
 
+## 2026-10-13 – CP-01 bestätigt; CP-02 / Bundle 049 vorbereitet
+
+- CP-01 `e60729187b34b4203fc2bd62d41b209022098cfc` tatsächlich angewendet/gepusht;
+  3099 parallele Apply-Tests bestanden, 12 Skips, sauberer Baum.
+- Geschlossene PYZ-Anforderungen >=3.12 und >=3.10 mit jeweils exakt passenden
+  Startbytes; unveränderte Altartefakte und Format-1/2/3-Referenzen weiter lesbar.
+- Bootstrap prüft innere Daten und Variante vor Import, wählt die passende
+  Versionssperre und erhält Windows-No-follow-/Zeit-/DACL-Grenzen auch vor 3.12.
+- Originale 1.3.0-PYZ und synthetische historische Referenzen mit Herkunft/Hashes
+  eingefroren; gemeinsame Reader-/Bootstrap-, Fehler- und Budget-Verhaltenstests.
+- Writer, Python-/Produktmetadaten, drei Normdateien und manuelle CI-Konfiguration
+  bleiben unverändert. Noch keine vollständige Freigabe für 3.10/3.11.
+
 ## 2026-10-13 – CP-00 bestätigt; CP-01 / Bundle 048 vorbereitet
 
 - Startcommit CP-00 `73d7317dbd7221576b4930c27eec44eb38a50bff` tatsächlich

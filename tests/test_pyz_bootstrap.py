@@ -48,6 +48,8 @@ def test_capture_distinguishes_cross_view_times_from_real_file_changes(tmp_path,
     real_fstat = os.fstat
     original = path.stat()
     monkeypatch.setattr(bootstrap, '_WINDOWS', windows)
+    # These synthetic fields model the newer Windows stat/fstat views.
+    monkeypatch.setattr(bootstrap, '_legacy_windows', lambda: False)
     path_reads = handle_reads = 0
 
     def metadata(info, *, opened, changed=False):
