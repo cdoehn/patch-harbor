@@ -1,5 +1,26 @@
 # PatchHarbor – Spezifikations-Changelog
 
+## 2026-10-13 – CPython 3.10/3.11: Norm- und Planstart CP-00 / Bundle 047
+
+- Neuer ausdrücklicher Auftrag: vollständige öffentliche API, Core-PYZ, CLI
+  und separat installierter Watcher unter CPython 3.10 und 3.11.
+- `SPECIFICATION_EXTENSION_CPYTHON_310_311.md` bildet mit Hauptspec und
+  PYZ/PACK-Ergänzung den gemeinsamen Normsatz. Hauptspec und PYZ/PACK-Revision 4
+  verankern die gezielte Ausnahme zur bisherigen Python-Untergrenze.
+- Sechs Schritte CP-00 bis CP-05, 16 Anforderungs-/Verhaltenstestzuordnungen,
+  sichere Leser-vor-Writer-Umstellung und geplante zwölf manuelle CI-Jobs.
+  Alte Result-/PYZ-Bytes und alle Sicherheits-, Fehler- und Paketverträge bleiben
+  erhalten. Echte Interpreter-/Plattformtests sind Voraussetzung der Freigabe.
+- PYZ/PACK ist nach Korrektur 046 auf
+  `30e5de1d67a2d725ff192a0b97e50c2b0336bfcb` tatsächlich abgeschlossen:
+  geprüfter Apply, 3052 parallele Tests / 8 Skips und sechs grüne Jobs der von
+  Christian gestarteten CI 37802304850. Die roten Vorläufe bleiben Historie.
+- CP-00 ändert ausschließlich Normen, Plan und aktive Verweise. Laufzeit,
+  Tests, Workflowdatei und Python-3.12-Metadaten bleiben unverändert.
+  Der neue Plan ist kein Nachweis bereits funktionierender 3.10-/3.11-Unterstützung.
+  Ein echter Startcommit folgt erst nach vollen parallelen Gates im Apply;
+  kein automatischer CI-Start und keine Fortsetzung über CP-00 hinaus.
+
 ## 2026-10-08 – CI 37750308948 ausgewertet; PP-08B-FIX2 / Bundle 046
 
 - Dokumentationsbundle 045 ist auf Commit

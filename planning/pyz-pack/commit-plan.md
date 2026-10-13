@@ -2,18 +2,38 @@
 
 **Plan-ID:** `PYZ-PACK`
 **Planpfad:** `planning/pyz-pack/commit-plan.md`
-**Revision:** 23
-**Stand:** 8. Oktober 2026
-**Status:** Alle 16 Planpositionen, Grenzkorrektur 044 und Dokumentation 045 tatsächlich angewendet/gepusht. Manuelle CI auf 045 bestätigt Windows-/Docker-Fehler; Korrektur 046 / PP-08B-FIX2 in Vorbereitung.
+**Revision:** 24
+**Stand:** 13. Oktober 2026
+**Status:** Abgeschlossen: 16/16 Planpositionen, Korrekturen bis 046 und finale manuelle CI auf `30e5de1d67a2d725ff192a0b97e50c2b0336bfcb` bestätigt.
 **Geplanter Umfang:** 9 Arbeitspakete `PP-00` bis `PP-08`, 16 ursprüngliche Commit-Schritte sowie belegte Korrekturen. Keine feste Anzahl von Patch-Bündeln.
-**Fortschritt:** 16/16 ursprüngliche Planpositionen committed, Korrektur-Apply bestätigt; finale Abnahme benötigt den konkreten manuellen CI-Nachweis. Bundle 045 fügt keine Planposition hinzu.
-**Nächster Schritt:** Belegte Bootstrap-/Fixture-Korrektur vollständig parallel prüfen und als Bundle 046 übergeben. Anschließend tatsächlichen Apply prüfen; erneute native CI startet ausschließlich Christian.
+**Fortschritt:** 16/16 ursprüngliche Planpositionen und Abschlussprüfungen bestätigt. Off-Plan-Dokumentation und Korrekturen fügen keine ursprüngliche Planposition hinzu.
+**Nächster Schritt:** Keiner in diesem Plan. Der separat beauftragte [CPython-Plan](../python-compatibility/commit-plan.md) beginnt mit CP-00; dieser Plan bleibt abgeschlossen.
 **Ziel-Produktversion:** **1.3.0**, ausdrücklich von Christian am 8. Oktober 2026 festgelegt; kein automatischer Tag oder Release.
 
 > **Verbindliche Grundlage ist der gemeinsame Spezifikationssatz:**
 > [Hauptspezifikation](../../spec/SPECIFICATION.md) **und**
-> [Spezifikationserweiterung PYZ/PACK, Revision 3](../../spec/SPECIFICATION_EXTENSION_PYZ_PACK.md).
+> [Spezifikationserweiterung PYZ/PACK](../../spec/SPECIFICATION_EXTENSION_PYZ_PACK.md),
+> Umsetzungsgrundlage bis Revision 3; Revision 4 ordnet den getrennten CPython-Auftrag ein.
 > Dieser Plan konkretisiert ihre Umsetzung. Er ersetzt keine ihrer Regeln und führt keine zusätzlichen Produktfunktionen ein.
+
+## Bestätigter Abschluss und neue Auftragsgrenze
+
+Result `patchharbor-apply_Result_093541_1008_cf92ce.zip`, SHA-256
+`0fa06af4bd8d49b9a2c731fd80585db47a43b912f768c94e723c7e35d279411f`,
+bestätigt den tatsächlichen 046-Apply, Commit und normalen Push auf
+`30e5de1d67a2d725ff192a0b97e50c2b0336bfcb`, einen sauberen Baum und
+3052 bestandene parallele Apply-Tests bei 8 Skips. Development: 3075 passed,
+9 skipped einschließlich der Übergabeprüfungen.
+Die von Christian gestartete [CI 37802304850](https://github.com/cdoehn/patch-harbor/actions/runs/37802304850)
+ist auf genau diesem Commit mit allen sechs Jobs grün; native Linux-/Windows-,
+PowerShell-7- und Docker-Nachweise wurden ausgewertet. Die zuvor roten Läufe
+bleiben unten historische Befunde. Christians erfolgreiche CIFS-Praxisprüfung
+bleibt als Nutzerbestätigung eingeordnet, nicht als neuer CI-Test.
+
+Die historische Schrittfolge und ihre Zwischenstände werden nicht nachträglich
+umgeschrieben. Bei ihrem Status hat dieser bestätigte Abschluss Vorrang.
+Die neue CPython-Ergänzung erweitert die Vertragsbasis für einen eigenständigen
+Auftrag; sie reaktiviert keinen PP-Schritt und ändert keine alten Artefakte.
 
 ## Inhalt
 
@@ -416,10 +436,10 @@ der nächste reguläre CI-Termin bleibt 029 einschließlich Windows nach Apply/P
 Bekannte fehlgeschlagene CI und offene native/CIFS-Nachweise bleiben offen,
 bis neue passende Nachweise vorliegen. Ein Linux-Lauf ersetzt sie nicht.
 
-**Status:** Alle 16 Planpositionen, Grenzkorrektur 044 und Dokumentation 045 tatsächlich angewendet/gepusht. Manuelle CI auf 045 bestätigt Windows-/Docker-Fehler; Korrektur 046 / PP-08B-FIX2 in Vorbereitung.
-ist vorgesehen. Kein PP-02-Schritt, keine neue PYZ, kein `pack`, kein Writerwechsel.
-PP-01-Abnahme erst nach erfolgreichem tatsächlichen Reparatur-Apply und seinen
-vorgeschriebenen lokalen Endgates; keine automatische Planfortsetzung durch 028.
+**Historischer Umfang von 028:** ausschließlich PP-01-Reparatur. Kein
+PP-02-Schritt, keine neue PYZ, kein `pack`, kein Writerwechsel. Die damalige
+PP-01-Abnahme verlangte erfolgreichen tatsächlichen Reparatur-Apply und seine
+lokalen Endgates; 028 autorisierte keine automatische Planfortsetzung.
 
 ### 1.10 PP-01-FIX3 / Bundle 029: erhaltenen Teilzustand fortsetzen
 
@@ -1884,6 +1904,7 @@ Die mechanische Prüfung dieses Markdownplans kontrolliert eindeutige Schrittken
 | 2 | 2026-10-07 | PP-00 / Bundle 024 integriert: aktuelle bytegleiche Referenz vom Pixel, Norm-/Planverweise, offene Alt-Nachweise, vorbereiteter Status; ausdrücklich einmalige CI-only-Ausnahme ohne Tests oder Testinstallation im Apply, ein Commit/Push und automatische parallele CI mit Ergebnisprüfung. |
 | 3 | 2026-10-07 | PP-00-FIX1 / Bundle 025: Abbruch von 024 vor Staging/Commit/CI belegt; dirty Result als Reparaturbasis, SSH-Alias-Auflösung statt URL-Stringliste, unveränderte Konfiguration und Fortsetzung der ersten Pixel-CI-only-Ausnahme. Kein Fortschritt vor Apply-/CI-Nachweis. |
 | 4 | 2026-10-07 | PP-00-Erfolg und CI 37635401106 aus dem damaligen Result bestätigt; PP-01 in 026 vorbereitet. Die damaligen lokalen Endgates und CI-Pause sind durch Revision 5 für die Pixel-Phase ersetzt. |
+| 24 | 2026-10-13 | 046-Apply und finale manuelle CI 37802304850 auf identischem Commit bestätigt; PYZ/PACK abgeschlossen. Neuer ausdrücklich beauftragter CPython-Plan getrennt verlinkt, keine neue PP-Position. |
 | 23 | 2026-10-08 | 045-Apply bestätigt; manuelle CI 37750308948 mit Windows-/Docker-Fehlern ausgewertet. Bootstrap-Zeitvergleich und zwei umgebungsabhängige Fixtures in 046 / PP-08B-FIX2 korrigiert; volle parallele Gates und neuer nativer CI-Nachweis erforderlich. |
 | 22 | 2026-10-08 | Grenzkorrektur 044 durch tatsächlichen Apply bestätigt; zusätzlich beauftragtes Off-Plan-Dokumentationsbundle 045, keine weitere Planposition. README und verlinkte Betriebsanleitungen berichtigt; finale manuelle CI bleibt offen. |
 | 21 | 2026-10-08 | PP-08B tatsächlich bestätigt; beauftragte 250.000-Dateien-Grenze als PP-08B-FIX1 in 044 vorbereitet. Normkorrektur, ZIP64-Bootstrap und konkrete Anzahl-Diagnose; finale manuelle CI bleibt offen. |
@@ -1906,8 +1927,7 @@ Die mechanische Prüfung dieses Markdownplans kontrolliert eindeutige Schrittken
 
 ---
 
-**Alle ursprünglichen Planpositionen, Grenzkorrektur 044 und Dokumentation 045
-sind tatsächlich angewendet. Version 1.3.0; CIFS-Praxis vom Nutzer bestätigt.
-Die manuelle finale CI auf 045 ist rot. Korrektur 046 verlangt volle parallele
-Gates und tatsächlichen Apply; native CI startet nur Christian erneut.
-Keine vorweggenommene Releasefreigabe.**
+**PYZ/PACK ist abgeschlossen. Alle 16 ursprünglichen Positionen und Korrekturen
+bis 046 sind tatsächlich angewendet; finale manuelle CI 37802304850 ist auf dem
+Endcommit grün. Version 1.3.0; CIFS-Praxis als Nutzerbestätigung erfasst.
+Der neue CPython-Auftrag ist ein eigener Plan, kein weiterer PP-Schritt.**

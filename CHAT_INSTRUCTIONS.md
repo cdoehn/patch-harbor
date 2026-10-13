@@ -722,25 +722,29 @@ verdrängen. Ein im Plan ausdrücklich als gemeinsam geltend erklärter
 Spezifikationssatz wird vollständig gelesen; seine Bestandteile sind keine
 konkurrierenden Alternativen. Echte unaufgelöste Konkurrenz bleibt ein STOP.
 
-Für die Entwicklung von **PatchHarbor selbst**, solange der beauftragte
-PYZ/PACK-Auftrag aktiv ist, gilt konkret:
+Für die Entwicklung von **PatchHarbor selbst** gilt für den ausdrücklich
+beauftragten CPython-3.10/3.11-Auftrag konkret:
 
 ```text
-Plan: planning/pyz-pack/commit-plan.md
+Plan: planning/python-compatibility/commit-plan.md
 Normsatz: spec/SPECIFICATION.md
-          spec/SPECIFICATION_EXTENSION_PYZ_PACK.md (Revision 2)
+          spec/SPECIFICATION_EXTENSION_PYZ_PACK.md (Revision 4)
+          spec/SPECIFICATION_EXTENSION_CPYTHON_310_311.md (Revision 1)
 ```
 
-Die gewählte Produktversion ist 1.3.0; das reaktiviert keinen abgeschlossenen
-Versions-, RIV- oder Watcher-Plan. Die gezielten Ausnahmen stehen in der
-Erweiterung, unberührte Basisverträge gelten weiter. Der PYZ/PACK-Plan hält
-Christians erfolgreiche CIFS-Praxisprüfung als Nutzerbestätigung fest. Diese Projektzuordnung gilt nicht pauschal für
-andere Repositorys, denen PatchHarbor dieselbe generische Vorlage mitliefert.
+Der frühere PYZ/PACK-Plan ist mit 16/16 Positionen, Korrektur 046 und grüner
+manueller CI auf `30e5de1d67a2d725ff192a0b97e50c2b0336bfcb` abgeschlossen.
+Die Basisversion bleibt 1.3.0; die neue Releaseversion wird gesondert festgelegt.
+Keine Versionsnummer reaktiviert einen historischen Versions-, RIV-, Watcher-
+oder PYZ/PACK-Plan. Der neue Normsatz ändert nur seine ausdrücklich benannten
+Python-Anforderungen. Diese Projektzuordnung gilt nicht pauschal für andere
+Repositorys, denen PatchHarbor dieselbe generische Vorlage mitliefert.
 
-**Historischer Planstart:** PP-00 integrierte nur Dokumente und Verweise.
-Die folgenden Umsetzungsschritte führten `pack`, den Core-PYZ-Start und den
-Result-3-Writer ein. Prüfe den tatsächlichen Stand des gelieferten Results: Eine
-alte globale Installation wird durch eine Quelländerung nicht automatisch ersetzt.
+**Aktueller Planstart:** CP-00 übernimmt ausschließlich Spezifikation, Plan und
+Verweise. Laufzeit, Python-Metadaten und das ausführbare Bootstrapprogramm oben
+bleiben unverändert. Python 3.10/3.11 sind Ziele, noch kein bestätigter Support.
+Prüfe stets den gelieferten Resultstand: Eine alte globale Installation wird
+durch eine Quelländerung nicht automatisch ersetzt.
 
 **Historie:** Die einmalige CI-only-Ausnahme für PP-00 / Bundles 024/025
 ist mit dessen erfolgreichem Abschluss erfüllt. Result
@@ -762,10 +766,11 @@ Development und Apply prüfen jeden Commitstand vollständig parallel, auch am
 Bundle-Ende. Kein serieller Lauf und keine verkürzte Auswahl als Vollabnahme.
 Nur Christian startet den manuellen CI-Workflow; Codex und Entrypoints tun das nie.
 
-Die aktive Schleife setzt nach vollständig geprüften Watcher-Results den
-PYZ/PACK-Plan fort, ohne feste Zahl erlaubter Korrekturen. Vorhandene Teilfortschritte
-bleiben erhalten. Bei Planabschluss oder Nutzerstopp endet die Schleife.
-Sicherheitsgrenzen und belastbare Resultbindung bleiben Voraussetzung.
+Der aktuelle Auftrag endet mit dem bestätigten Startcommit CP-00. Er startet
+keine dauerhafte Schleife und autorisiert keine sofortige Umsetzung von CP-01
+bis CP-05. Eine später ausdrücklich beauftragte Fortsetzung wertet vollständige
+Watcher-Results samt Teilfortschritten aus. Sicherheitsgrenzen und belastbare
+Resultbindung bleiben Voraussetzung; Tokenmeter bleibt gestoppt.
 
 Development bleibt ausschließlich in `patchharbor-codex`. Nur die fertig und
 vollständig geprüfte kanonische Patch-ZIP gelangt atomar in den Exchange.
@@ -773,13 +778,12 @@ Der bereits laufende Watcher übernimmt allein den Apply. Keine direkten
 Development-Commits, Apply-Mutationen, Hook-Umgehungen oder Watcher-Neustarts.
 Nach erfolgreichen Commit-Gates genau ein normaler Push; kein automatisches Tag.
 
-PP-00 bis PP-08A sind durch tatsächliche Results bestätigt. Christian hat
-Version 1.3.0 gewählt und seine erfolgreiche CIFS-Praxisprüfung bestätigt.
-Bundle 043 bereitet die versionierten Artefakte und vollständigen parallelen
-Gates vor; maßgeblich sind Planabschnitt 1.23 und die aktuelle Testpolicy.
-Die finale Abnahme benötigt den tatsächlichen Apply und die von Christian
-gestartete native CI auf diesem Endcommit. Eine ältere globale Installation
-wird durch diesen Quellpatch nicht automatisch aktualisiert.
+Die frühere 1.3.0-Abnahme einschließlich Christians CIFS-Praxisbestätigung
+belegt nicht automatisch den neuen CPython-Auftrag. Dessen Abnahme benötigt
+echte 3.10-/3.11-Interpreter, passende Artefakte, tatsächliche Applies und die
+von Christian gestartete erweiterte native CI. Die Anforderungen und offenen
+Nachweise stehen im neuen Plan. Eine ältere globale Installation wird durch
+diesen Dokumentationspatch nicht aktualisiert.
 
 Bestimme die aktive Zielversion aus dem Repository. Eine laut Plan erst zum
 Release erfolgende Versionsanhebung ist kein Widerspruch; tatsächlich

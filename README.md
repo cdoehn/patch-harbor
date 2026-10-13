@@ -15,10 +15,17 @@ Apply checks the binding before writing its payloads and running its entrypoint.
 
 This source tree uses version **1.3.0**. The version string, an installed version,
 and a published release are different facts. Implementation and acceptance
-evidence, including outstanding platform gates, are recorded in the
+evidence are recorded in the completed
 [PYZ/PACK plan](planning/pyz-pack/commit-plan.md) and
 [test matrix](planning/pyz-pack/test-matrix.md); a development checkout is not
 itself a release announcement.
+
+The new [CPython 3.10/3.11 plan](planning/python-compatibility/commit-plan.md)
+starts with specification and planning only. Its
+[requirements](spec/SPECIFICATION_EXTENSION_CPYTHON_310_311.md) cover the public
+API, Core-PYZ, CLI and installed watcher while preserving old Results.
+**Python 3.10/3.11 support is not yet implemented or confirmed.** Actual
+interpreter tests and the expanded manual CI matrix are later acceptance gates.
 
 ## Requirements and installation
 
