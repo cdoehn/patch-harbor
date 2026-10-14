@@ -1,6 +1,6 @@
-# PatchHarbor 1.3.0 – Chat-Initialisierung
+# PatchHarbor 1.4.0 – Chat-Initialisierung
 
-**Vertragsversion:** 1.3.0<br>
+**Vertragsversion:** 1.4.0<br>
 **Patch-Paketmarker:** `patch-harbor`<br>
 **Patch-Paketformat:** `1`<br>
 **Result-Bundle-Marker:** `patch-harbor-result-bundle`<br>
@@ -1071,22 +1071,24 @@ Normsatz: spec/SPECIFICATION.md
 
 Der frühere PYZ/PACK-Plan ist mit 16/16 Positionen, Korrektur 046 und grüner
 manueller CI auf `30e5de1d67a2d725ff192a0b97e50c2b0336bfcb` abgeschlossen.
-Die Basisversion bleibt 1.3.0; die neue Releaseversion wird gesondert festgelegt.
+Die historische Basisversion ist 1.3.0; Christian hat die neue Version 1.4.0 festgelegt.
 Keine Versionsnummer reaktiviert einen historischen Versions-, RIV-, Watcher-
 oder PYZ/PACK-Plan. Der neue Normsatz ändert nur seine ausdrücklich benannten
 Python-Anforderungen. Diese Projektzuordnung gilt nicht pauschal für andere
 Repositorys, denen PatchHarbor dieselbe generische Vorlage mitliefert.
 
-**Aktueller Implementierungsschritt:** CP-00 bis CP-04 sind durch tatsächliche
-Apply-Results bestätigt, ebenso CP-04-FIX1 / Bundle 052 und CP-04-FIX2 / Bundle 053.
-Die dritte manuelle CI bestätigt die bisherigen Korrekturen; elf Joblogs sind grün.
-Ein Windows-Packtest belegt nun als einzige Abweichung das zusätzliche
-NTFS-Verzeichnisbit 0x10000000. CP-04-FIX3 / Bundle 054 behandelt ausschließlich
-diesen Darstellungsunterschied bei gewöhnlichen Windows-Verzeichnissen.
-Alle übrigen Attribut-, Identitäts-, Zeit- und Reparse-Prüfungen bleiben erhalten.
-Christian hat 1.4.0 als Zielversion gewählt und zuerst die Fixes beauftragt.
-Der Quellstand bleibt bis zum folgenden Versionsschritt 1.3.0; vollständige native
-CI-/Artefaktabnahme und CP-05 bleiben offen. Logs allein ersetzen diese Abnahme nicht.
+**Aktueller Implementierungsschritt:** CP-00 bis CP-04 und die drei
+Korrekturbundles 052 bis 054 sind tatsächlich angewendet. Alle zwölf Jobs der
+manuellen CI 38596693717 auf `f2e64c241f4e20a1b7e2c4c83faa45ba557f6d0b`
+sind grün; zwölf Artefakte mit 39 vollständigen parallelen Testreports sind geprüft.
+CP-05-VERSION / Bundle 055 stellt die Produktversion auf 1.4.0 um.
+Christian hat das Tag `v1.4.0` ausdrücklich beauftragt: Nur dieser Entrypoint
+darf nach dem vollständigen parallelen Commit-Gate ein neues annotiertes Tag
+auf seinen geprüften Commit setzen und zusammen mit dev atomar normal pushen.
+Vorhandene Tags werden weder ersetzt noch verschoben. Dies ist keine allgemeine
+Erlaubnis für automatisches Tagging und kein CI-Startauftrag.
+Die native CI gehört zum genannten Implementierungscommit vor der Versionsänderung;
+Abnahme des neuen Endstands und erforderliche neue CIFS-Praxis bleiben im Plan offen.
 Alte PYZ-/Resultvarianten und Sicherheitsverträge bleiben unverändert.
 
 **Historie:** Die einmalige CI-only-Ausnahme für PP-00 / Bundles 024/025

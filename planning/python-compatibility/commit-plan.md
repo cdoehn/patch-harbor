@@ -1,10 +1,10 @@
 # PatchHarbor – Implementierungsplan CPython 3.10/3.11
 
 **Plan-ID:** `CPYTHON-310-311`
-**Revision:** 8 · 14. Oktober 2026
-**Status:** CP-00 bis CP-04, CP-04-FIX1 und CP-04-FIX2 tatsächlich angewendet; CI 38585784200 mit einem fehlgeschlagenen Job. CP-04-FIX3 / Bundle 054 vorbereitet, CP-05 offen.
+**Revision:** 9 · 14. Oktober 2026
+**Status:** CP-00 bis CP-04 und FIX1–FIX3 angewendet; alle zwölf manuellen CI-Jobs und 39 Testreports auf dem Implementierungsstand bestätigt. CP-05-VERSION / Bundle 055 vorbereitet; vollständiger Planabschluss bleibt offen.
 **Aktueller Auftrag:** automatische Fortsetzung CP-03 bis CP-05; CI startet weiterhin ausschließlich Christian.
-**Zielversion:** 1.4.0, ausdrücklich von Christian gewählt. Zuerst diese Korrektur; Versionsumschaltung und Freigabe folgen nach dem Fix. Aktueller Quellstand noch 1.3.0.
+**Zielversion:** 1.4.0. Christian beauftragt nach dem grünen Fix ausdrücklich das Tag v1.4.0; Bundle 055 stellt die Version vor dem Tagging konsistent um.
 **Normen gemeinsam:** [Hauptspec](../../spec/SPECIFICATION.md),
 [PYZ/PACK](../../spec/SPECIFICATION_EXTENSION_PYZ_PACK.md) und
 [CPython-Ergänzung Revision 1](../../spec/SPECIFICATION_EXTENSION_CPYTHON_310_311.md).
@@ -647,3 +647,60 @@ verträge zu ändern. Die drei Normdateien, alte Fixtures, Bootstrap-/Startbytes
 Workflow und Produktversion bleiben unverändert. Vollständige parallele lokale
 und Apply-Gates vor genau einem Korrekturcommit; CI startet nur Christian.
 CP-05 einschließlich Version 1.4.0 und finaler Artefaktbindung bleibt offen.
+
+
+## 16. CP-05-VERSION / Bundle 055: Version und ausdrücklich beauftragtes Tag
+
+CP-04-FIX3 ist tatsächlich angewendet und normal auf dev gepusht:
+`f2e64c241f4e20a1b7e2c4c83faa45ba557f6d0b`.
+Result `patchharbor-apply_Result_160614_1014_854693.zip`, SHA-256
+`b669f8f6a8ad8876d6a25381dd2b1c26176d09c11901665eb8d7ccdbe636bff4`,
+bestätigt 354 Dateien, sauberen Baum und 3299 passed / 15 skipped im vollständigen
+parallelen Apply-Gate. Development: 3322 passed / 16 skipped einschließlich
+Übergabeprüfungen. Repository-ID `e7a93d72-62dc-4759-97e8-6bf6cdf10e90`,
+Fingerprint `7c9d2a24e397e0e5`, Algorithmus `patchharbor-state-v1`.
+
+### Bestätigte native Implementierungsabnahme
+
+Christian startete [CI 38596693717](https://github.com/cdoehn/patch-harbor/actions/runs/38596693717)
+manuell auf diesem vollständigen Commit. Alle zwölf Jobs sind grün. Die zwölf
+Artefakte wurden heruntergeladen und ihre 39 vollständigen Testreports mit
+je vier Workern geprüft: Sammlungen, Worker-Enden, Pflichtfälle, Skips,
+Build-/Testbindung sowie Wheel-/sdist-/PYZ-Identitäten und Hashbelege.
+Die Original-ZIP-Digests wurden aus GitHub-Metadaten gegen Uploadlogs geprüft;
+der Download lieferte entpackte Inhalte, keine lokal erneut gehashten Original-ZIPs.
+
+Native Python-Patchstände: Linux 3.10.22 / 3.11.17 / 3.12.15 / 3.14.7;
+Windows und PowerShell 7: 3.10.11 / 3.11.9 / 3.12.10; Docker: 3.12.14.
+Die zusätzlichen Skips älterer Interpreter betreffen historische Laufzeiten,
+deren eigene Python-3.12-Grenze erhalten bleibt. Neue API-/CLI-/Watcher-/PYZ-
+Pflichtdurchstiche einschließlich drei Offline-Generationen bestehen tatsächlich.
+
+### Autorisierter Versions- und Tagschritt
+
+Auf Christians ausdrücklichen Tagauftrag folgt ein echter Versionscommit:
+`chore(release): prepare PatchHarbor 1.4.0 [CP-05-VERSION]`.
+Die Paketversion, aktuellen Installationsbeispiele, Chatvertragsversion und
+bestehenden Release-Prüfwerte wechseln gemeinsam auf 1.4.0. Historische Fixtures,
+Startbytes, Normverträge und Laufzeitverhalten bleiben unverändert.
+
+Development und Apply führen die vollständigen parallelen Gates aus.
+Der gebundene Entrypoint prüft vor dem Commit, dass lokal und auf origin noch
+kein `v1.4.0` existiert. Nach erfolgreichem Gate und geprüftem Commit erzeugt er
+genau dieses annotierte Tag auf dem vollständigen neuen Commit. Ein einziger
+normaler atomarer Push veröffentlicht dev und Tag gemeinsam; keine Force-Option,
+kein Verschieben/Löschen eines bestehenden Tags, keine weiteren Branches.
+Lokales Tagobjekt, Zielcommit und beide Remote-Refs werden danach überprüft
+und als maschinenlesbarer Nachweis im Result protokolliert. Bei Fehlern bleibt
+der tatsächliche Teilfortschritt sichtbar; kein automatisches Aufräumen der Refs.
+
+Diese explizite Einzelausnahme ersetzt nur für Bundle 055 das allgemeine Verbot
+unbeauftragten Taggings. Development führt keine Git-Mutationen aus; der vorhandene
+Watcher übernimmt den autorisierten Entrypoint. Kein CI-Dispatch, GitHub-Release,
+Paketindex-Upload oder Hostupdate ist Bestandteil dieses Auftrags.
+
+Ein Tag ersetzt keine fehlenden Abschlussnachweise. Die native CI ist an den
+obigen Implementierungscommit vor der Versionsumschaltung gebunden. Der neue
+Versionsstand erhält seine eigenen lokalen/Apply-Gates; eine native CI auf seinem
+Endcommit startet weiterhin ausschließlich Christian. Erforderliche neue
+CIFS-Praxis und die endgültige CP-05-Abnahme bleiben ausdrücklich offen.

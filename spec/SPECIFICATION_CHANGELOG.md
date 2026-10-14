@@ -1,5 +1,17 @@
 # PatchHarbor – Spezifikations-Changelog
 
+## 2026-10-14 – CP-05-VERSION / Bundle 055: Version 1.4.0 und Tagauftrag
+
+- FIX3 tatsächlich angewendet; manuelle CI 38596693717 auf vollständigem Commit
+  f2e64c241f4e20a1b7e2c4c83faa45ba557f6d0b mit zwölf grünen Jobs und 39 geprüften Reports.
+- Paketversion, aktuelle Installation/Chatvorlage und bestehende Release-Prüfwerte
+  konsistent auf 1.4.0 umgestellt; Laufzeitverhalten und Altartefakte unverändert.
+- Christian beauftragt v1.4.0 ausdrücklich. Nur der geprüfte Bundle-055-Entrypoint
+  erzeugt nach parallelem Commit-Gate das annotierte Tag auf dem neuen Commit und
+  pusht dev/Tag gemeinsam atomar ohne Force. Bestehende Tags werden nicht ersetzt.
+- Kein CI-Start, GitHub-Release oder Hostupdate. Native Endcommit-Abnahme und
+  erforderliche neue CIFS-Praxis bleiben unabhängig vom Tag offen; siehe CP-05.
+
 ## 2026-10-14 – CP-04-FIX3 / Bundle 054: NTFS-Verzeichnisattribute
 
 - CP-04-FIX2 tatsächlich angewendet; dritte manuelle CI mit elf grünen Joblogs.

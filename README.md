@@ -1,4 +1,4 @@
-# PatchHarbor 1.3.0
+# PatchHarbor 1.4.0
 
 PatchHarbor transfers work between a development environment and a local Git
 repository using verified ZIP packages. A **Result Bundle** describes the actual
@@ -13,27 +13,24 @@ Apply checks the binding before writing its payloads and running its entrypoint.
 - Results normally carry an installation-free **Core-PYZ, without the watcher**.
   CLI and Python callers use the same public API.
 
-This source tree uses version **1.3.0**. The version string, an installed version,
+This source tree uses version **1.4.0**. The version string, an installed version,
 and a published release are different facts. Implementation and acceptance
 evidence are recorded in the completed
 [PYZ/PACK plan](planning/pyz-pack/commit-plan.md) and
 [test matrix](planning/pyz-pack/test-matrix.md); a development checkout is not
 itself a release announcement.
 
-The new [CPython 3.10/3.11 plan](planning/python-compatibility/commit-plan.md)
-has implemented the distribution switch and expanded manual CI matrix. Its
-[requirements](spec/SPECIFICATION_EXTENSION_CPYTHON_310_311.md) cover the public
-API, Core-PYZ, CLI and installed watcher while preserving old Results.
-**This development source targets Python 3.10+; native 3.10/3.11 acceptance is pending.**
-The third expanded manual CI run confirms the Docker report and Windows
-mutation-fixture corrections. Eleven job logs finish successfully; one Windows
-job reports an inconsistent NTFS directory attribute. CP-04-FIX3 normalizes
-only the evidenced extra directory bit while retaining all other checks.
-Complete native CI and final release evidence remain required.
-Christian selected **1.4.0** for the forthcoming release; this correction precedes
-the version switch.
-Original 1.3.0 release artifacts retain their Python 3.12 minimum; use an
-artifact built from this compatibility development, not an old file with the same version label.
+The [CPython 3.10/3.11 plan](planning/python-compatibility/commit-plan.md)
+extends the public API, Core-PYZ, CLI and installed watcher while preserving old
+Results. All twelve jobs of the expanded manual
+[native CI matrix](https://github.com/cdoehn/patch-harbor/actions/runs/38596693717)
+passed on the corrected implementation before this version change, including
+Python 3.10 and 3.11 on Linux and Windows. The plan records the exact commits,
+artifact evidence and remaining release acceptance separately.
+
+**This source requires Python 3.10 or newer.** Original 1.3.0 release artifacts
+retain their Python 3.12 minimum. Version 1.4.0 identifies the compatible release;
+use its reviewed artifacts for the new Python support.
 
 ## Requirements and installation
 
@@ -46,13 +43,13 @@ For the normal CLI **and watcher**, install a reviewed wheel or source checkout.
 For example, with an existing Python 3.10+ and pipx:
 
 ```bash
-pipx install --python python3 /absolute/path/patchharbor-1.3.0-py3-none-any.whl
+pipx install --python python3 /absolute/path/patchharbor-1.4.0-py3-none-any.whl
 patchharbor --version
 patchharbor --help
 ```
 
 The wheel path is an artifact you obtain and verify; this command does not assume
-that version 1.3.0 has been published on a package index. **pipx is optional**:
+that version 1.4.0 has been published on a package index. **pipx is optional**:
 a dedicated virtual environment is another installation route. Wheel and sdist
 remain supported for normal installations; the PYZ replaces the runtime embedded
 in new Results, not the installed watcher. See
