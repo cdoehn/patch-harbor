@@ -1077,13 +1077,14 @@ oder PYZ/PACK-Plan. Der neue Normsatz ändert nur seine ausdrücklich benannten
 Python-Anforderungen. Diese Projektzuordnung gilt nicht pauschal für andere
 Repositorys, denen PatchHarbor dieselbe generische Vorlage mitliefert.
 
-**Aktueller Implementierungsschritt:** CP-00 bis CP-03 sind durch tatsächliche
-Applies bestätigt. Distribution, Writer und Anleitung verwenden >=3.10.
-CP-04 ergänzt jetzt die zwölf manuell gestarteten CI-Lanes samt lesender Auswertung. Beide geschlossenen Varianten bleiben statisch lesbar; originale
-Altartefakte behalten ihre eigene Ausführungsgrenze. Die Releaseversion wird gesondert festgelegt.
-Python 3.10/3.11 sind weiterhin Ziele, noch kein vollständig bestätigter Support.
-Prüfe stets den gelieferten Resultstand: Eine alte globale Installation wird
-durch eine Quelländerung nicht automatisch ersetzt.
+**Aktueller Implementierungsschritt:** CP-00 bis CP-04 sind durch tatsächliche
+Apply-Results bestätigt. Die erste erweiterte manuelle CI ist fehlgeschlagen;
+CP-04-FIX1 / Bundle 052 korrigiert die belegten Fehler und ergänzt die genaue
+Diagnose der noch ungeklärten Windows-Verzeichnisabweichung. Christian hat
+1.4.0 als Zielversion gewählt und zuerst den Fix beauftragt. Der Quellstand
+bleibt bis zum folgenden Versionsschritt 1.3.0. Python 3.10/3.11 sind ohne
+passende vollständige native Abnahme noch kein freigegebener Support.
+Alte PYZ-/Resultvarianten und Sicherheitsverträge bleiben unverändert.
 
 **Historie:** Die einmalige CI-only-Ausnahme für PP-00 / Bundles 024/025
 ist mit dessen erfolgreichem Abschluss erfüllt. Result

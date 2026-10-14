@@ -124,17 +124,22 @@ def test_real_event_loop_drains_multiple_bundles_and_never_retries_failed_identi
     write_package(bad, context, exit_code=23)
     os.utime(good, ns=(1000000000, 1000000000))
     os.utime(bad, ns=(2000000000, 2000000000))
-    reports, scopes = [], []
+    reports, scopes, timings = [], [], []
     drained = Event()
     def delegate(*, exchanges):
         scopes.append(exchanges)
+        started = monotonic()
         result = delegate_to_automatic_apply(exchanges=exchanges, environment=project_environment())
+        timings.append((monotonic() - started, result.progress.status, result.process_exit_code))
         reports.append(result)
         if result.progress.status == 'no_candidate':
             drained.set()
         return result
     with RunningWatcher(delegate=delegate) as watcher:
-        assert drained.wait(35), (reports, watcher.errors)
+        # Three real Core processes, two shell runs and unchanged five-second
+        # quiet periods need more than 35s on parallel Windows CI workers.
+        budget = 120 if sys.platform == 'win32' else 35
+        assert drained.wait(budget), (timings, reports, watcher.errors)
     attempted = [r for r in reports if r.progress.status == 'attempted']
     assert len(attempted) == 2 and sorted(r.process_exit_code for r in attempted) == [0, 23]
     assert reports[-1].progress.status == 'no_candidate'

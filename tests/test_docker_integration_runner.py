@@ -231,8 +231,9 @@ def test_environment_check_covers_every_declared_development_distribution() -> N
         (PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8")
     )
     declared = project["project"]["optional-dependencies"]["dev"]
-    expected_names = tuple(requirement.split(">=", 1)[0] for requirement in declared)
-
+    from packaging.requirements import Requirement
+    expected_names = tuple(r.name for text in declared if
+                           (r := Requirement(text)).marker is None or r.marker.evaluate(environment={"extra": "dev"}))
     assert module.declared_dev_distribution_names() == expected_names
 
 
@@ -305,3 +306,40 @@ def test_docker_integration_image_provides_a_deterministic_release_gate() -> Non
     assert "if: always()" in workflow
     assert "uses: actions/upload-artifact@v7" in workflow
     assert "if-no-files-found: error" in workflow
+
+
+@pytest.mark.parametrize('python_version,expected', [
+    ('3.10', ('build', 'tomli', 'pytest')),
+    ('3.11', ('build', 'pytest')),
+    ('3.12', ('build', 'pytest')),
+    ('3.14', ('build', 'pytest')),
+])
+def test_environment_check_evaluates_conditional_requirements(tmp_path, python_version, expected):
+    module = _environment_check_module()
+    project = tmp_path / 'pyproject.toml'
+    project.write_text("[project.optional-dependencies]\ndev = [\"build>=1.2\", \"tomli>=2.0.1; python_version < '3.11'\", \"pytest>=8.4; extra == 'dev'\", \"not-for-linux; sys_platform == 'win32'\"]\n")
+    assert module.declared_dev_distribution_names(project, environment={
+        'python_version': python_version, 'sys_platform': 'linux'}) == expected
+
+
+def test_docker_preflight_does_not_query_an_inapplicable_distribution(tmp_path, monkeypatch):
+    module = _environment_check_module()
+    project = tmp_path / 'pyproject.toml'
+    project.write_text("[project.optional-dependencies]\ndev = [\"build>=1.2\", \"unavailable; python_version < '1'\"]\n")
+    calls = []
+    def installed(name):
+        calls.append(name)
+        if name != 'build': raise module.PackageNotFoundError(name)
+        from types import SimpleNamespace
+        return SimpleNamespace(version='1.2.0')
+    monkeypatch.setattr(module, 'distribution', installed)
+    module._require_declared_dev_distributions(project)
+    assert calls == ['build']
+
+
+@pytest.mark.parametrize('requirement', ['pytest>=', 'pytest; python_version ??? 3.10'])
+def test_docker_preflight_rejects_invalid_requirement_syntax(tmp_path, requirement):
+    module = _environment_check_module()
+    project = tmp_path / 'pyproject.toml'
+    project.write_text('[project.optional-dependencies]\ndev = [' + json.dumps(requirement) + ']\n')
+    with pytest.raises(SystemExit): module.declared_dev_distribution_names(project)

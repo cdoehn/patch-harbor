@@ -1,5 +1,18 @@
 # PatchHarbor – Spezifikations-Changelog
 
+## 2026-10-14 – CP-04-FIX1 / Bundle 052; Zielversion 1.4.0
+
+- CP-04 tatsächlich angewendet/gepusht; erste manuelle Zwölf-Job-CI rot.
+- Python-3.10-Testparser erhält die UTC-JSON-Prüfung; Docker-Preflight berücksichtigt
+  PEP-508-Marker statt inaktiver bedingter Abhängigkeiten.
+- Native Windows-Testfixture trennt die Zeittakte und belegt die ChangeTime;
+  Drei-Prozess-Watcher-Test erhält ein begrenztes Windows-Budget von 120 Sekunden.
+- Ungeklärte Verzeichnisabweichung bleibt ein Fehler mit vollständigen Feldwerten;
+  Signatur, Sicherheitsentscheidungen und Verbot von Stabilitäts-Retries bleiben.
+- Christian wählt 1.4.0 und beauftragt zunächst den Fix. Kein Versionswechsel,
+  Tag, CI-Start oder vorzeitiger Abschluss; neue native Abnahme bleibt offen.
+
+
 ## 2026-10-13 – CP-01 bestätigt; CP-02 / Bundle 049 vorbereitet
 
 - CP-01 `e60729187b34b4203fc2bd62d41b209022098cfc` tatsächlich angewendet/gepusht;

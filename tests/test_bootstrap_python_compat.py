@@ -7,6 +7,7 @@ import stat
 import subprocess
 import sys
 from types import SimpleNamespace
+from time import sleep
 
 import pytest
 
@@ -145,7 +146,7 @@ def test_bootstrap_refuses_redirected_input_and_workspace_parents(tmp_path):
 @pytest.mark.skipif(os.name != 'nt', reason='native Windows metadata and DACLs')
 def test_native_bootstrap_detects_same_size_restored_mtime_change(tmp_path, monkeypatch):
     path = tmp_path / 'input'; path.write_bytes(b'original')
-    original = path.stat(); fdopen = os.fdopen; descriptors = []
+    original = path.stat(); fdopen = os.fdopen; descriptors = []; observations = []
     monkeypatch.setattr(bootstrap, '_legacy_windows', lambda: True)
     class Observed:
         def __init__(self, stream): self.stream = stream
@@ -154,14 +155,26 @@ def test_native_bootstrap_detects_same_size_restored_mtime_change(tmp_path, monk
         def fileno(self): return self.stream.fileno()
         def read(self, maximum):
             data = self.stream.read(maximum)
-            path.write_bytes(b'modified')
+            before = bootstrap._windows_times(self.fileno())
+            # Keep distinct native clock ticks; no assumption that a same-tick
+            # rewrite must change a timestamp at the filesystem's resolution.
+            sleep(0.05)
+            with path.open('wb') as writer:
+                writer.write(b'modified'); writer.flush(); os.fsync(writer.fileno())
             os.utime(path, ns=(original.st_atime_ns, original.st_mtime_ns))
+            after = bootstrap._windows_times(self.fileno())
+            observations.append((before, after))
+            assert before[2] != after[2], ('native ChangeTime did not advance', observations)
             return data
     def observe(fd, *args, **kwargs):
         descriptors.append(fd)
         return Observed(fdopen(fd, *args, **kwargs))
     monkeypatch.setattr(bootstrap.os, 'fdopen', observe)
     with pytest.raises(ValueError): bootstrap._capture(path, 100)
+    assert len(observations) == 1
+    before, after = observations[0]
+    assert before[:2] == after[:2] and before[2] != after[2]
+    assert path.read_bytes() == b'modified' and path.stat().st_mtime_ns == original.st_mtime_ns
     assert len(descriptors) == 1 and os.path.samestat(original, path.stat())
     with pytest.raises(OSError): os.fstat(descriptors[0])
 

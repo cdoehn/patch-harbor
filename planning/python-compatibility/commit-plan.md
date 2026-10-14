@@ -1,10 +1,10 @@
 # PatchHarbor – Implementierungsplan CPython 3.10/3.11
 
 **Plan-ID:** `CPYTHON-310-311`
-**Revision:** 5 · 14. Oktober 2026
-**Status:** CP-00 bis CP-03 durch tatsächliche Results bestätigt; CP-04 in Bundle 051 vorbereitet. Sechs Planpositionen, noch keine Freigabe der älteren Interpreter.
+**Revision:** 6 · 14. Oktober 2026
+**Status:** CP-00 bis CP-04 tatsächlich angewendet; manuelle CI 38551979998 fehlgeschlagen. CP-04-FIX1 / Bundle 052 vorbereitet, CP-05 offen.
 **Aktueller Auftrag:** automatische Fortsetzung CP-03 bis CP-05; CI startet weiterhin ausschließlich Christian.
-**Zielversion:** gesondert festzulegen; veröffentlichte Basis bleibt 1.3.0.
+**Zielversion:** 1.4.0, ausdrücklich von Christian gewählt. Zuerst diese Korrektur; Versionsumschaltung und Freigabe folgen nach dem Fix. Aktueller Quellstand noch 1.3.0.
 **Normen gemeinsam:** [Hauptspec](../../spec/SPECIFICATION.md),
 [PYZ/PACK](../../spec/SPECIFICATION_EXTENSION_PYZ_PACK.md) und
 [CPython-Ergänzung Revision 1](../../spec/SPECIFICATION_EXTENSION_CPYTHON_310_311.md).
@@ -509,3 +509,39 @@ Fehler in bestehenden Workflow-/Launcher-Erwartungen: die PowerShell-Zeile
 verwendet jetzt YAML-Anführungszeichen und die Windows-Auswahl enthält acht
 zusätzliche Testmodule. Beide Erwartungen wurden dem vorgesehenen Vertrag
 angepasst. Der geänderte Stand erhält erneut das vollständige parallele Gate.
+
+
+## 11. CP-04-FIX1 / Bundle 052: Fehler der ersten erweiterten CI
+
+CP-04 wurde auf `db1167f3471a3f8db462363f611627e7894a6c83` tatsächlich
+angewendet/gepusht. Basisresult `patchharbor-apply_Result_104037_1014_3a2194.zip`,
+SHA-256 `ccce4805326bfe31a5ba6918eef17a3c593337ebc8784bf1e76fc39d01bbeacb`;
+Repository-ID `e7a93d72-62dc-4759-97e8-6bf6cdf10e90`, Fingerprint
+`7c9d2a24e397e0e5` / `patchharbor-state-v1`. 353 Dateien, sauberer Baum.
+Development 3247 passed / 16 skipped, Apply 3224 passed / 15 skipped.
+
+Christians [manueller Lauf 38551979998](https://github.com/cdoehn/patch-harbor/actions/runs/38551979998)
+prüfte denselben vollständigen Commit. Das bereitgestellte Logarchiv hat SHA-256
+`07a65a3c3b3302cfd36ee76870f33b789de9635afd719c4d04f8e84e8651013f`.
+Vier Joblogs enden grün (Ubuntu 3.11/3.12/3.14 und Windows 3.12); acht enthalten
+Fehler. Logs sind Diagnosen, keine vollständige maschinelle Matrixabnahme.
+
+| Befund | Korrektur und Nachweisgrenze |
+| --- | --- |
+| Python 3.10 kann die ausgegebene UTC-Endung Z nicht direkt mit datetime.fromisoformat lesen. | Ausschließlich der Testparser normalisiert Z zu +00:00. UTC, Zeitzone und unverändertes öffentliches JSON bleiben geprüft. |
+| Docker 3.12 installiert das bedingte tomli korrekt nicht; der Preflight verlangte dennoch alle Namen. | PEP-508-Marker mit vorhandenem packaging-Reader im Developmentwerkzeug auswerten. Tests für 3.10/3.11/3.12/3.14, Extras, Plattformen, ungültige Anforderungen und fehlende tatsächlich benötigte Distributionen. Keine Produktabhängigkeit. |
+| Windows-Watcher-Test brach nach 35 Sekunden vor dem Drain ab; ein echtes Apply war bereits zurück. | Nur dieses Windows-Testbudget wird 120 Sekunden. Echte Core-Prozesse, zwei einmalige Versuche, Fehler-Replay-Schutz und fünf Sekunden Quiet-Time bleiben. Laufzeiten/Status pro Versuch dienen der Fehlerdiagnose. |
+| Nativer Bootstrap-Mutationstest beobachtete teilweise keine erkennbare Änderung. | Private Fixture schreibt nach getrennten Zeittakten, flush/fsync und geschlossenem Writer. Native ChangeTime muss nachweislich verschieden sein; echte Ablehnung bleibt Pflicht. Kein Skip und keine Produktprüfung entfällt. Der native Wiederholungslauf bleibt erforderlich. |
+| Ein 10.000-Knoten-Packtest auf Windows 3.12 wurde bei einer Verzeichnis-Metadatenabweichung abgewiesen. | Der Log enthält nicht das abweichende Feld. Unveränderte strenge Signatur wird nun mit allen konkreten Vorher-/Nachher-Abweichungen diagnostiziert; jeder Signaturbestandteil besitzt einen Ablehnungs-/Handle-Cleanup-Test. Die Ursache ist noch nicht nachgewiesen, daher kein Retry, ignoriertes Feld oder behaupteter Verzeichnisfix. |
+
+Der nächste manuelle CI-Lauf muss die Korrekturen nativ bestätigen und, falls
+die Verzeichnisabweichung wieder auftritt, ihre exakten Werte liefern.
+Die Spezifikationen, Paketformate, Altfixtures, PYZ-/Bootstrapbytes, Workflow-
+Auslöser und Sicherheitsentscheidungen bleiben unverändert. Vollständige
+parallele Development-/Apply-Gates vor dem einzigen Korrekturcommit; CI startet
+nur Christian. Der Produktversionswechsel zu 1.4.0 ist danach gesondert vorgesehen.
+
+Primärquellen zur Einordnung:
+[Python datetime](https://docs.python.org/3/library/datetime.html#datetime.datetime.fromisoformat),
+[PEP-508-Marker](https://packaging.pypa.io/en/stable/markers.html),
+[Windows-Dateizeiten](https://learn.microsoft.com/en-us/windows/win32/sysinfo/file-times).

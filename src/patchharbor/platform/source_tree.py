@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass
+import json
 import os
 from pathlib import Path
 import stat
@@ -27,6 +28,20 @@ def metadata_signature(metadata: os.stat_result) -> tuple[int, ...]:
     return (metadata.st_dev, metadata.st_ino, metadata.st_mode, metadata.st_nlink,
             metadata.st_size, metadata.st_mtime_ns, metadata.st_ctime_ns,
             getattr(metadata, 'st_file_attributes', 0))
+
+
+
+def _require_same_directory_metadata(before, after, reason: str) -> None:
+    # Retain the exact signature and fail without a retry. Native mismatches
+    # must expose which fields differed, rather than suggesting weakened checks.
+    if metadata_signature(before) == metadata_signature(after):
+        return
+    fields = ('st_dev', 'st_ino', 'st_mode', 'st_nlink', 'st_size',
+              'st_mtime_ns', 'st_ctime_ns', 'st_file_attributes')
+    differences = {name: {'before': getattr(before, name, 0), 'after': getattr(after, name, 0)}
+                   for name in fields if getattr(before, name, 0) != getattr(after, name, 0)}
+    raise FileChangedDuringRead(reason + ': ' + json.dumps(differences, sort_keys=True),
+                                before=before, after=after)
 
 
 def _name(name: str) -> None:
@@ -67,8 +82,7 @@ class SourceDirectory:
     def revalidate(self) -> None:
         current=self.path.lstat()
         _plain(current, directory=True)
-        if metadata_signature(current) != metadata_signature(self.metadata):
-            raise FileChangedDuringRead('source-directory-changed')
+        _require_same_directory_metadata(self.metadata, current, 'source-directory-changed')
         if self.descriptor is not None and not os.path.samestat(os.fstat(self.descriptor), current):
             raise FileChangedDuringRead('source-directory-replaced')
 
@@ -77,8 +91,7 @@ class SourceDirectory:
         _name(name)
         current=self.child_stat(name)
         _plain(current, directory=True)
-        if metadata_signature(current) != metadata_signature(expected):
-            raise FileChangedDuringRead('source-directory-changed')
+        _require_same_directory_metadata(expected, current, 'source-directory-changed')
         with ExitStack() as stack:
             path=self.path/name
             if self.descriptor is None:
@@ -91,8 +104,7 @@ class SourceDirectory:
                 stack.callback(os.close,descriptor)
                 opened=os.fstat(descriptor)
             _plain(opened,directory=True)
-            if metadata_signature(opened) != metadata_signature(expected):
-                raise FileChangedDuringRead('source-directory-open-changed')
+            _require_same_directory_metadata(expected, opened, 'source-directory-open-changed')
             directory=SourceDirectory(path,opened,descriptor)
             directory.revalidate()
             yield directory
@@ -171,8 +183,7 @@ def open_source_root(root: Path) -> Iterator[SourceDirectory]:
             descriptor=open_directory_nofollow(root)
             stack.callback(os.close,descriptor)
             opened=os.fstat(descriptor)
-        if metadata_signature(opened)!=metadata_signature(initial):
-            raise FileChangedDuringRead('source-root-open-changed')
+        _require_same_directory_metadata(initial, opened, 'source-root-open-changed')
         directory=SourceDirectory(root,opened,descriptor)
         directory.revalidate()
         yield directory

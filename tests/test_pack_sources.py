@@ -1,5 +1,7 @@
 """Bounded input capture, real races and the shared static package contracts."""
 from dataclasses import replace
+import json
+from types import SimpleNamespace
 import os
 from pathlib import Path
 import stat
@@ -344,3 +346,35 @@ def test_output_resolution_and_capture_are_read_only_without_processes(contents,
     result.revalidate()
     assert not target.exists()
     assert sorted(str(p.relative_to(tmp_path)) for p in tmp_path.rglob('*'))==before
+
+
+@pytest.mark.parametrize('field', ['st_dev', 'st_ino', 'st_mode', 'st_nlink', 'st_size',
+                                  'st_mtime_ns', 'st_ctime_ns', 'st_file_attributes'])
+def test_directory_open_mismatch_preserves_safety_and_exact_field_diagnostics(contents, monkeypatch, field):
+    child = contents / 'child'; child.mkdir()
+    observed = child.lstat()
+    fields = ('st_dev', 'st_ino', 'st_mode', 'st_nlink', 'st_size', 'st_mtime_ns', 'st_ctime_ns', 'st_file_attributes')
+    before = SimpleNamespace(**{n: getattr(observed, n, 0) for n in fields})
+    values = vars(before).copy()
+    values[field] += 0o200 if field == 'st_mode' else 1
+    after = SimpleNamespace(**values)
+    directory = tree.SourceDirectory(contents, contents.lstat(), None)
+    monkeypatch.setattr(tree.SourceDirectory, 'child_stat', lambda *a: before)
+    closed = []
+    monkeypatch.setattr(tree, 'pin_windows_directory', lambda path: (17, closed.append))
+    monkeypatch.setattr(Path, 'lstat', lambda self: after if self == child else observed)
+    with pytest.raises(tree.FileChangedDuringRead) as caught:
+        with directory.child('child', before): pytest.fail('changed directory admitted')
+    assert closed == [17]
+    # This JSON is data about the rejected state transition, not display prose.
+    delta = json.loads(str(caught.value).split(': ', 1)[1])
+    assert delta == {field: {'before': getattr(before, field), 'after': getattr(after, field)}}
+    assert caught.value.category == 'unknown'
+    assert caught.value.metadata['before']['st_ino'] == before.st_ino
+
+
+def test_directory_access_time_is_not_a_source_mutation():
+    before = SimpleNamespace(st_dev=1, st_ino=2, st_mode=stat.S_IFDIR | 0o700, st_nlink=1,
+                             st_size=0, st_mtime_ns=3, st_ctime_ns=4, st_file_attributes=16, st_atime_ns=5)
+    after = SimpleNamespace(**{**vars(before), 'st_atime_ns': 6})
+    tree._require_same_directory_metadata(before, after, 'probe')
