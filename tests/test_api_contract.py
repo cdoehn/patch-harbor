@@ -93,7 +93,10 @@ def test_public_result_facts_are_immutable_and_typed(name, required) -> None:
 
 
 def test_release_exposes_typing_metadata_without_runtime_dependencies() -> None:
-    import tomllib
+    try:
+        import tomllib
+    except ModuleNotFoundError:
+        import tomli as tomllib
     project = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     assert project["project"]["dependencies"] == []
     assert project["tool"]["setuptools"]["package-data"]["patchharbor"] == ["py.typed"]

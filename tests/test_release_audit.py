@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import re
-import tomllib
+try:
+    import tomllib
+except ModuleNotFoundError:  # Explicit build/dev dependency on Python 3.10 only.
+    import tomli as tomllib
 from pathlib import Path
 
 from tests.platform_support import PROJECT_ROOT

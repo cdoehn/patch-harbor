@@ -70,7 +70,7 @@ def runtime_payload(artifact: PyzArtifact | None, *, reason: str | None = None) 
     doc = {
         'marker':'patch-harbor-runtime', 'format_version':2,
         'status':'unavailable', 'reason':reason, 'distribution':'patchharbor',
-        'version':__version__, 'requires_python':'>=3.12', 'profile':None,
+        'version':__version__, 'requires_python':'>=3.10', 'profile':None,
         'content_id':None, 'content_id_algorithm':None, 'artifact':None,
         'runtime_dependencies':None, 'provenance':None, 'capabilities':None,
     }

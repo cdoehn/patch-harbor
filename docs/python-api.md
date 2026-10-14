@@ -488,7 +488,7 @@ fallback; configuration repair and root restoration are driven by filtered event
 
 ## Installation and scope of support
 
-Use Python 3.12 or newer. For a normally installed API, install the repository or
+Use Python 3.10 or newer. For a normally installed API, install the repository or
 built wheel into that application's own environment, for example:
 
 ```bash

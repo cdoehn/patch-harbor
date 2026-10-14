@@ -242,8 +242,8 @@ produziert Format 3. Bereits laufende alte Installationen behalten ihr bisherige
 Format bis zu einem gesonderten Upgrade. Der Bootstrap prüft die genaue
 Anforderung der ausgewählten PYZ: unveränderte historische Artefakte benötigen
 Python >=3.12; die neue geschlossene Variante verlangt >=3.10. Unbekannte oder
-widersprüchliche Varianten sind Fehler. Der aktuelle Produktionswriter bleibt
-bis zum gesonderten CP-03-Schritt bei >=3.12.
+widersprüchliche Varianten sind Fehler. Der aktuelle Produktionswriter und die Distribution wechseln in CP-03
+gemeinsam auf >=3.10. Bereits veröffentlichte Altartefakte bleiben unverändert.
 Die PYZ enthält den vollständigen Core ohne Watcher. Es gibt keinen pip-, venv-,
 Build- oder Downloadschritt und keine Änderung der vorhandenen Installation.
 
@@ -1077,10 +1077,10 @@ oder PYZ/PACK-Plan. Der neue Normsatz ändert nur seine ausdrücklich benannten
 Python-Anforderungen. Diese Projektzuordnung gilt nicht pauschal für andere
 Repositorys, denen PatchHarbor dieselbe generische Vorlage mitliefert.
 
-**Aktueller Implementierungsschritt:** CP-00 und CP-01 sind durch tatsächliche
-Applies bestätigt. CP-02 erweitert Datenleser und das ausführbare Bootstrapprogramm
-oben auf beide geschlossenen PYZ-Varianten. Der normale Writer, Paketversion und
-Python-Metadaten bleiben bis CP-03 bei der bisherigen 3.12-Anforderung.
+**Aktueller Implementierungsschritt:** CP-00 bis CP-02 sind durch tatsächliche
+Applies bestätigt. CP-03 schaltet Distribution, Writer und Anleitung gemeinsam
+auf >=3.10 um. Beide geschlossenen Varianten bleiben statisch lesbar; originale
+Altartefakte behalten ihre eigene Ausführungsgrenze. Die Releaseversion wird gesondert festgelegt.
 Python 3.10/3.11 sind weiterhin Ziele, noch kein vollständig bestätigter Support.
 Prüfe stets den gelieferten Resultstand: Eine alte globale Installation wird
 durch eine Quelländerung nicht automatisch ersetzt.
@@ -1105,10 +1105,10 @@ Development und Apply prüfen jeden Commitstand vollständig parallel, auch am
 Bundle-Ende. Kein serieller Lauf und keine verkürzte Auswahl als Vollabnahme.
 Nur Christian startet den manuellen CI-Workflow; Codex und Entrypoints tun das nie.
 
-Der aktuelle Folgeauftrag umfasst genau das Reader-/Bootstrap-Bundle CP-02.
-Er startet keine dauerhafte Schleife und autorisiert keine sofortige Umsetzung
-von CP-03 bis CP-05. Eine später ausdrücklich beauftragte Fortsetzung wertet vollständige
-Watcher-Results samt Teilfortschritten aus. Sicherheitsgrenzen und belastbare
+Die Nutzeranweisung vom 14. Oktober 2026 autorisiert die automatische
+Fortsetzung des bestehenden CPython-Plans ab CP-03. Vollständige Watcher-Results
+samt Teilfortschritten werden jeweils geprüft. Fehlende externe Abschlussnachweise
+werden konkret gemeldet; CI startet ausschließlich Christian. Sicherheitsgrenzen und belastbare
 Resultbindung bleiben Voraussetzung; Tokenmeter bleibt gestoppt.
 
 Development bleibt ausschließlich in `patchharbor-codex`. Nur die fertig und

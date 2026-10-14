@@ -1,9 +1,9 @@
 # PatchHarbor – Implementierungsplan CPython 3.10/3.11
 
 **Plan-ID:** `CPYTHON-310-311`
-**Revision:** 3 · 13. Oktober 2026
-**Status:** CP-00 und CP-01 durch tatsächliche Results bestätigt; CP-02 in Bundle 049 vorbereitet. Sechs Planpositionen, noch keine Freigabe der älteren Interpreter.
-**Aktueller Auftrag:** ein Folgebundle CP-02 samt tatsächlicher Apply-Auswertung; danach stoppen.
+**Revision:** 4 · 14. Oktober 2026
+**Status:** CP-00 bis CP-02 durch tatsächliche Results bestätigt; CP-03 in Bundle 050 vorbereitet. Sechs Planpositionen, noch keine Freigabe der älteren Interpreter.
+**Aktueller Auftrag:** automatische Fortsetzung CP-03 bis CP-05; CI startet weiterhin ausschließlich Christian.
 **Zielversion:** gesondert festzulegen; veröffentlichte Basis bleibt 1.3.0.
 **Normen gemeinsam:** [Hauptspec](../../spec/SPECIFICATION.md),
 [PYZ/PACK](../../spec/SPECIFICATION_EXTENSION_PYZ_PACK.md) und
@@ -77,8 +77,9 @@ aufeinanderfolgende Zustände dürfen gemeinsam übergeben werden. Jeder Commit
 braucht sein vollständiges paralleles Gate. Korrekturen erhalten eigene
 FIX-Kennungen und belegte Ausgangszustände; keine künstliche Fehleranzahlgrenze.
 Der ursprüngliche Bootstrap-Auftrag endete nach CP-00; Bundle 048 bestätigte CP-01.
-Mit dem neuen ausdrücklichen Auftrag wird jetzt ausschließlich CP-02 umgesetzt. CP-03 bis CP-05 folgen in
-späteren beauftragten Durchläufen; keine automatische Fortsetzung dieses Bundles.
+Seit dem ausdrücklichen Auftrag vom 14. Oktober 2026 werden CP-03 bis CP-05
+automatisch fortgesetzt. Fehlende externe Abnahmen werden benannt; kein
+automatischer CI-Start und keine eigenmächtige Release-/Hostaktualisierung.
 
 ### CP-00 – Startvertrag übernehmen
 
@@ -240,7 +241,7 @@ darf sofort ausgewertet werden. Kein zweiter Watcher, keine kurzen Modell-Polls.
 CP-00 startet keine dauerhafte S-Schleife. Tokenmeter bleibt gestoppt.
 
 - [x] CP-00 tatsächlich angewendet; neueste Resultbindung und Planposition erfasst.
-- [ ] CP-01/02 erhalten Fehler- und Dateisicherheit sowie originale Altartefakte.
+- [x] CP-01/02 erhalten Fehler- und Dateisicherheit sowie originale Altartefakte; native Zielplattform-Abnahme bleibt offen.
 - [ ] CP-03 weist erste neue Result-/PYZ-Produktion mit eigener Anleitung nach.
 - [ ] Öffentliche API, CLI, PYZ und Watcher auf echtem 3.10 und 3.11 bestätigt.
 - [ ] Vollständige parallele lokale/Apply-Gates und alle zwölf manuellen CI-Jobs grün.
@@ -248,8 +249,8 @@ CP-00 startet keine dauerhafte S-Schleife. Tokenmeter bleibt gestoppt.
 - [ ] Produktversion, vollständiger Endcommit und konkrete Artefakthashes festgelegt.
 - [ ] Abschluss gespeichert; keine weiteren Bundles oder automatische Fortsetzung.
 
-CP-00 und CP-01 sind durch die unten gebundenen tatsächlichen Applies bestätigt.
-CP-02 benötigt seinen eigenen erfolgreichen Apply; der vorbereitete Quellstand genügt nicht. Änderungen nach einer
+CP-00 bis CP-02 sind durch die unten gebundenen tatsächlichen Applies bestätigt.
+CP-03 benötigt seinen eigenen erfolgreichen Apply; der vorbereitete Quellstand genügt nicht. Änderungen nach einer
 Abnahme erfordern neue passende Nachweise; die frühere 1.3.0-CI wird nicht als
 Test dieses geänderten Dokumentations- oder zukünftigen Laufzeitstands ausgegeben.
 
@@ -400,3 +401,56 @@ Native Windows-Fälle sind auf Linux Skips. Nur CPython 3.14.4 ist hier verfügb
 Versionssimulationen und echte Prozesse auf 3.14 ersetzen keine 3.10-/3.11-Abnahme.
 CI startet ausschließlich Christian. CP-03 (Writer/Installation) und die erweiterte
 CI-Matrix aus CP-04 werden mit diesem Bundle nicht aktiviert.
+
+
+## 9. CP-03 / Bundle 050: kompatible Distribution und Produktion
+
+CP-02 wurde mit Commit `97d69cad66b2d2cee5633fb965a5970fc745eb1f` tatsächlich
+angewendet und normal auf dev gepusht. Maßgebliches Result:
+`patchharbor-apply_Result_155544_1013_44b6c3.zip`, SHA-256
+`79633931146e82de1fdbdd4ccf1265adf836de2de2a9f9de761ca8b4320ece9b`.
+Repository-ID `e7a93d72-62dc-4759-97e8-6bf6cdf10e90`, Fingerprint
+`7c9d2a24e397e0e5`, Algorithmus `patchharbor-state-v1`; 350 Dateien,
+sauberer Baum. Vollständige parallele Gates: Development 3226 passed / 16
+skipped (einschließlich Übergabeprüfungen), Apply 3203 passed / 15 skipped.
+
+CP-03 stellt Requires-Python, normale Writer-/unavailable-Metadaten,
+kanonischen Build-Startcode und eigene Anleitung gemeinsam auf >=3.10 um.
+Der vorhandene Backend wählt bereits anhand derselben Distribution-Metadaten
+beide identischen Startdateien. Alte Startbytes, eingefrorene Fixtures und
+Leserprofile bleiben unverändert; kein zusätzlicher Runtime-Dependency.
+TOML-Hilfen der Release-/Testwerkzeuge verwenden unter 3.10 den ausdrücklich
+bedingten Build-/Dev-Reader tomli; Installation und Tests lösen passende
+Werkzeugversionen anhand deren Python-Metadaten auf. Offline-Installationsfixtures
+stellen ihre deklarierten Buildabhängigkeiten ausdrücklich bereit.
+
+CT-07–14: Die bestehende echte Erstproduktion in `test_pyz_result_e2e.py`
+prüft jetzt neue Runtime-/Rezept-/Startbytes, bootstrapped aus ihrer eigenen
+Result-Anleitung ohne Installation/Netzwerk, packt Full-/Diff-/Mischpayloads
+und führt einen regulären PYZ-Apply aus. `test_runtime_packaging.py` prüft
+Wheel, Source und sdist sowie drei isolierte tatsächliche Resultgenerationen
+und identische PYZ-Bytes. `test_producer_compatibility.py` ergänzt die
+maschinenlesbare Installationsgrenze und beweist fehlende Runtime-Abhängigkeiten.
+Der Writer-Test heißt jetzt `test_writer_uses_python310_requirement_and_start_bytes`;
+seine bisherige Zwischenstand-Annahme wurde durch die neue Produktionsgrenze ersetzt.
+Historische >=3.12-Ausführung bleibt unter zu alten Interpretern ausdrücklich
+ausgenommen, ihre statische Datenprüfung bleibt vollständig erhalten.
+
+Development und Apply führen jeweils die gesamte Suite parallel aus.
+Hier ist CPython 3.14.4 verfügbar; weder Metadaten noch Simulationen beweisen
+native 3.10-/3.11-Unterstützung. CP-04 ergänzt die manuelle Matrix; CP-05
+benötigt Christians CI, konkrete Artefakt-/Interpreterdaten und die berührte
+CIFS-/Plattformpraxis. Produktversion bis zur gesonderten Entscheidung 1.3.0;
+keine bestehenden Artefakte oder Tags werden geändert.
+
+Primärquellen für die Build-/Testentscheidung:
+[Tomli](https://pypi.org/project/tomli/2.0.1/),
+[setuptools 77](https://pypi.org/project/setuptools/77.0.3/),
+[pytest-Kompatibilität](https://pytest.org/en/latest/backwards-compatibility.html).
+
+Der erste CP-03-Volltest fand 168 Setup-Fehler aus einem gemeinsamen
+synthetischen Legacy-Wheel-Fixture (3063 passed / 16 skipped): die neue
+bedingte tomli-Dev-Abhängigkeit passt nicht in dessen geschlossenes Altprofil.
+Nur dieser explizite synthetische Fixture entfernt die neue Dev-Metadatenzeile;
+Original-Wheels, neuer Writer und strikter Legacy-Reader bleiben unverändert.
+Der korrigierte Stand benötigt ein neues vollständiges paralleles Gate.

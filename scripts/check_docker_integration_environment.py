@@ -13,7 +13,10 @@ import re
 import shutil
 import subprocess
 import sys
-import tomllib
+try:
+    import tomllib
+except ModuleNotFoundError:  # Explicit build/dev dependency on Python 3.10 only.
+    import tomli as tomllib
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]

@@ -50,8 +50,8 @@ identity fallback or exception to the trusted digest requirement.
 Preparation uses the selected artifact's exact closed requirement: `>=3.12`
 for original 1.3.0 PYZs, or `>=3.10` for the new compatible variant. Static
 inspection does not relabel an old artifact as executable on an older Python.
-Unknown requirements and rehashed mixed variants are invalid. CP-02 enables
-readers first; the normal distribution and writer still require >=3.12 until CP-03.
+Unknown requirements and rehashed mixed variants are invalid. CP-02 prepared both readers; CP-03 switches the development distribution
+and new writer to >=3.10. Native 3.10/3.11 acceptance remains a separate gate.
 A new private directory is required. On Windows it is created atomically with
 a protected inheritable DACL for the effective user and administrators, including
 on older Python patch versions. Existing paths and ACLs are not repaired. Exactly the

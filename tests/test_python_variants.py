@@ -196,12 +196,12 @@ def test_inner_budgets_and_hashes_precede_bootstrap_import(tmp_path, monkeypatch
 
 
 @pytest.mark.packaging
-def test_writer_still_uses_original_requirement_and_start_bytes(built_result_source):
+def test_writer_uses_python310_requirement_and_start_bytes(built_result_source):
     from patchharbor.result_resources import runtime_payload
     recipe = pyz.parse_recipe((built_result_source / pyz.RECIPE_PATH).read_bytes())
-    assert recipe.requires_python == '>=3.12'
-    assert (built_result_source / pyz.MAIN_PATH).read_bytes() == pyz.MAIN_BYTES
-    assert json.loads(runtime_payload(None, reason='source_not_prepared').metadata)['requires_python'] == '>=3.12'
+    assert recipe.requires_python == '>=3.10'
+    assert (built_result_source / pyz.MAIN_PATH).read_bytes() == pyz.MAIN_BYTES_310
+    assert json.loads(runtime_payload(None, reason='source_not_prepared').metadata)['requires_python'] == '>=3.10'
 
 
 @pytest.mark.packaging
@@ -226,7 +226,9 @@ def test_complete_frozen_130_reader_keeps_or_rejects_variant_without_mixed_modul
 def test_built_reader_variant_bootstraps_and_packs_in_fresh_stdlib_process(built_result_source, tmp_path, requirement):
     recipe = pyz.parse_recipe((built_result_source / pyz.RECIPE_PATH).read_bytes())
     raw = pyz.materialize(recipe, lambda name, size: (built_result_source / name).read_bytes())
-    # Explicit future fixture; production metadata and the writer remain 3.12.
+    # Explicit variant fixture; the normal writer now produces >=3.10.
+    if requirement == '>=3.12' and sys.version_info < (3, 12):
+        pytest.skip('legacy variant execution requires Python 3.12; static reading is tested separately')
     raw = rewrite(raw, recipe_changes={'requires_python': requirement},
                   payload_changes={n: pyz.main_bytes(requirement) for n in ('__main__.py', pyz.MAIN_PATH)})
     reference, _, _ = result_file(tmp_path, raw)

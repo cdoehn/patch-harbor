@@ -5,7 +5,10 @@ import json
 import os
 from pathlib import Path
 import subprocess
-import tomllib
+try:
+    import tomllib
+except ModuleNotFoundError:  # Explicit build/dev dependency on Python 3.10 only.
+    import tomli as tomllib
 
 import pytest
 

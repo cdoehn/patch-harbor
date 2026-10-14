@@ -1309,3 +1309,13 @@ auf und transportiert das bestehende Apply-JSON. Keine Änderungen an Scan,
 Replay, Recovery, Locks, Result-Erzeugung, Signalen oder Serviceinstallation.
 Fachliche Worker-, Konfigurations-, Prozessgrenzen- und Packaging-Prüfungen
 begleiten die Migration; keine neuen Tests der Konsolendarstellung.
+
+
+## 14. Oktober 2026 – CP-03 vorbereitet
+
+CP-02 ist durch Result 049 tatsächlich bestätigt. Bundle 050 setzt den
+bestehenden CPython-Vertrag um: Distribution und neue Result-Produktion >=3.10,
+bedingte Build-/Test-TOML-Abhängigkeit, eigene ausführbare Anleitung und echte
+Build-/Result-/Pack-/Apply-Regressionen. Alte Artefakte behalten ihre ursprünglichen
+Anforderungen und Bytes. Normen, Paketformate und Ressourcenlimits unverändert;
+native 3.10-/3.11-/Windows-Abnahme und manuelle CI bleiben offen.

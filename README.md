@@ -21,21 +21,23 @@ evidence are recorded in the completed
 itself a release announcement.
 
 The new [CPython 3.10/3.11 plan](planning/python-compatibility/commit-plan.md)
-starts with specification and planning only. Its
+has reached the distribution and producer switch. Its
 [requirements](spec/SPECIFICATION_EXTENSION_CPYTHON_310_311.md) cover the public
 API, Core-PYZ, CLI and installed watcher while preserving old Results.
-**Python 3.10/3.11 support is not yet implemented or confirmed.** Actual
-interpreter tests and the expanded manual CI matrix are later acceptance gates.
+**This development source targets Python 3.10+; native 3.10/3.11 acceptance is pending.**
+The expanded manual CI matrix and final release evidence remain required.
+Original 1.3.0 release artifacts retain their Python 3.12 minimum; use an
+artifact built from this compatibility development, not an old file with the same version label.
 
 ## Requirements and installation
 
-Python **3.12 or newer** is required. Repository operations also require Git;
+This development source requires Python **3.10 or newer**. Repository operations also require Git;
 executing a patch requires its declared Bash or PowerShell interpreter.
 Static `pack`, `inspect` and reference-based `validate` need neither Git nor
 the target shell. The Core has no third-party runtime dependencies.
 
 For the normal CLI **and watcher**, install a reviewed wheel or source checkout.
-For example, with an existing Python 3.12+ and pipx:
+For example, with an existing Python 3.10+ and pipx:
 
 ```bash
 pipx install --python python3 /absolute/path/patchharbor-1.3.0-py3-none-any.whl
@@ -145,7 +147,7 @@ Legacy Format-1/2 Results remain readable.
 
 Use the executable bootstrap from the trusted Result's handoff, or a separately
 reviewed copy of `scripts/pyz_bootstrap.py`, to assess and prepare its exact PYZ.
-After source trust and integrity checks, Python 3.12+ can run it directly:
+After source trust and integrity checks, Python 3.10+ can run it directly:
 
 ```bash
 python -I -S -B /private/runtime/patchharbor-VERSION.pyz inspect /work/patch.zip --json

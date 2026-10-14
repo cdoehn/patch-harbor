@@ -10,7 +10,10 @@ import shutil
 import subprocess
 import sys
 import tarfile
-import tomllib
+try:
+    import tomllib
+except ModuleNotFoundError:  # Explicit build/dev dependency on Python 3.10 only.
+    import tomli as tomllib
 import zipfile
 
 import pytest
@@ -326,7 +329,7 @@ def test_release_metadata_is_complete_and_runtime_has_no_dependencies() -> None:
     assert __version__ == RELEASE_VERSION
     assert project["name"] == "patchharbor"
     assert project["dynamic"] == ["version"]
-    assert project["requires-python"] == ">=3.12"
+    assert project["requires-python"] == ">=3.10"
     assert project["license"] == "MIT"
     assert project["license-files"] == ["LICENSE"]
     assert project["dependencies"] == []

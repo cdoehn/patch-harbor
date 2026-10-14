@@ -27,7 +27,10 @@ from tests.test_reference_validation import reference_entries, write_reference, 
 def reference(tmp_path):
     payloads = inputs()
     payloads['patchharbor/api.py'] = b'raise AssertionError("described code must not run during assessment")\n'
+    from tests.pyz_variant_support import rewrite
     recipe, _, raw = prepared(payloads)
+    raw = rewrite(raw, recipe_changes={'requires_python': '>=3.10'},
+                  payload_changes={n: pyz.MAIN_BYTES_310 for n in ('__main__.py', pyz.MAIN_PATH)})
     files, _ = reference_entries(handoff=True)
     files = attach_pyz(files, raw)
     path = tmp_path/'result.zip';write_reference(path,files)
@@ -177,7 +180,7 @@ def test_unavailable_runtime_does_not_erase_or_repair_the_original_result(refere
 
 
 def test_old_python_refuses_execution_without_a_preparation_directory(reference,tmp_path,monkeypatch):
-    assessed=trusted(reference[0]);monkeypatch.setattr(bootstrap.sys,'version_info',(3,11))
+    assessed=trusted(reference[0]);monkeypatch.setattr(bootstrap.sys,'version_info',(3,9))
     with pytest.raises(bootstrap.BootstrapUnavailable):bootstrap.prepare(assessed,tmp_path/'unused')
     assert not (tmp_path/'unused').exists()
 
