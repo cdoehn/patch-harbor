@@ -111,7 +111,7 @@ def test_docker_runner_builds_once_and_runs_every_offline_gate_with_diagnostics(
 
     assert completed.returncode == 0
     calls = [json.loads(line) for line in call_log.read_text().splitlines()]
-    assert len(calls) == 6
+    assert len(calls) == 7
 
     build_call = calls[0]
     assert build_call[0] == "build"
@@ -128,6 +128,8 @@ def test_docker_runner_builds_once_and_runs_every_offline_gate_with_diagnostics(
         "none",
         "--workdir",
         "/workspace",
+        "--mount",
+        f"type=bind,source={diagnostic_directory},target=/evidence",
         "patchharbor-integration:ubuntu-24-04",
     ]
     assert all(call[: len(expected_prefix)] == expected_prefix for call in run_calls)
@@ -137,9 +139,13 @@ def test_docker_runner_builds_once_and_runs_every_offline_gate_with_diagnostics(
         "--require-init",
     ]
 
-    pytest_calls = run_calls[1:]
+    assert "scripts/capture_ci_build.py" in run_calls[1]
+    assert "--commit" in run_calls[1]
+    pytest_calls = run_calls[2:]
     scopes = [call[call.index("--suite") + 1] for call in pytest_calls]
     assert scopes == ["core", "e2e", "platform", "packaging"]
+    assert all(call[call.index("--report") + 1] == f"/evidence/patchharbor-{suite}-tests.json"
+               for call, suite in zip(pytest_calls, scopes))
     assert all("tools/run_tests.py" in call for call in pytest_calls)
     assert all("--durations=20" in call for call in pytest_calls)
     assert not any(value.startswith("--timeout") for call in pytest_calls for value in call)
@@ -147,6 +153,7 @@ def test_docker_runner_builds_once_and_runs_every_offline_gate_with_diagnostics(
     expected_logs = {
         "00-build.log",
         "10-environment-preflight.log",
+        "15-build-evidence.log",
         "20-core-and-architecture.log",
         "30-e2e-and-acceptance.log",
         "40-platform.log",
@@ -177,7 +184,7 @@ def test_docker_runner_preserves_complete_failed_gate_diagnostics(
 
     assert completed.returncode == 17
     calls = [json.loads(line) for line in call_log.read_text().splitlines()]
-    assert len(calls) == 5
+    assert len(calls) == 6
     assert any("platform" in call for call in calls)
     assert not (diagnostic_directory / "50-packaging.log").exists()
     failed_log = (diagnostic_directory / "40-platform.log").read_text(

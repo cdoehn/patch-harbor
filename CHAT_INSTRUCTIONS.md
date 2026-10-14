@@ -1077,9 +1077,9 @@ oder PYZ/PACK-Plan. Der neue Normsatz ändert nur seine ausdrücklich benannten
 Python-Anforderungen. Diese Projektzuordnung gilt nicht pauschal für andere
 Repositorys, denen PatchHarbor dieselbe generische Vorlage mitliefert.
 
-**Aktueller Implementierungsschritt:** CP-00 bis CP-02 sind durch tatsächliche
-Applies bestätigt. CP-03 schaltet Distribution, Writer und Anleitung gemeinsam
-auf >=3.10 um. Beide geschlossenen Varianten bleiben statisch lesbar; originale
+**Aktueller Implementierungsschritt:** CP-00 bis CP-03 sind durch tatsächliche
+Applies bestätigt. Distribution, Writer und Anleitung verwenden >=3.10.
+CP-04 ergänzt jetzt die zwölf manuell gestarteten CI-Lanes samt lesender Auswertung. Beide geschlossenen Varianten bleiben statisch lesbar; originale
 Altartefakte behalten ihre eigene Ausführungsgrenze. Die Releaseversion wird gesondert festgelegt.
 Python 3.10/3.11 sind weiterhin Ziele, noch kein vollständig bestätigter Support.
 Prüfe stets den gelieferten Resultstand: Eine alte globale Installation wird

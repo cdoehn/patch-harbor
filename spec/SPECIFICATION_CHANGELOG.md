@@ -1319,3 +1319,12 @@ bedingte Build-/Test-TOML-Abhängigkeit, eigene ausführbare Anleitung und echte
 Build-/Result-/Pack-/Apply-Regressionen. Alte Artefakte behalten ihre ursprünglichen
 Anforderungen und Bytes. Normen, Paketformate und Ressourcenlimits unverändert;
 native 3.10-/3.11-/Windows-Abnahme und manuelle CI bleiben offen.
+
+
+## 14. Oktober 2026 – CP-04 vorbereitet
+
+CP-03 durch tatsächliches Result 050 bestätigt. Bundle 051 ergänzt die zwölf
+manuellen Python-/Plattform-Lanes, eindeutige Artefakte, tatsächliche Build-/
+Interpreterquittungen und ausschließlich lesende CI-Auswertung. Docker- und
+PowerShell-Nachweise vervollständigt; historische Runtime-Ausführungsgrenzen
+bleiben erhalten. Kein automatischer CI-Start; CP-05 wartet auf native Nachweise.

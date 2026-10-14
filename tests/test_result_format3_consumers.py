@@ -52,6 +52,8 @@ def test_actual_readers_keep_unproven_format3_and_standalone_pyz(
 ):
     from tests.test_exchange_archive_e2e import _world, _bundle, _advance, ARCHIVE
     from tests.registration_support import git
+    if reader == 'frozen_format2' and sys.version_info < (3, 12):
+        pytest.skip('original Format-2 runtime requires Python 3.12; current data readers remain tested')
     env, exchange, repo, _ = _world(tmp_path)
     old = _bundle(repo, env)
     with ZipFile(old) as archive:

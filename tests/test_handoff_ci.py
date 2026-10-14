@@ -1,175 +1,214 @@
-"""Offline GitHub transport fixtures for a single correlated CI request and evidence."""
-from __future__ import annotations
-
+"""Read-only manual CI review: complete native evidence, no dispatch or polling."""
 from copy import deepcopy
 from io import BytesIO
 import json
-from pathlib import Path
 import subprocess
 from types import SimpleNamespace
 from zipfile import BadZipFile, ZipFile
 
 import pytest
-
 from scripts import run_handoff_ci as ci
-from tests.test_test_evidence import example
+from tools.test_results import report_digest
 
-COMMIT = "a" * 40
-HANDOFF = "patchharbor-riv-014-7a3b531f-f7d2-4c62-9e0d-c23e005a1223"
+COMMIT = 'a' * 40
 
 
-def reports(expected):
-    platform, python, engine = expected
+def nodes_for(suite, platform):
+    nodes = [f'tests/test_probe.py::test_{suite}']
+    if suite in ('packaging', 'windows'):
+        nodes += [f'tests/test_pyz_result_e2e.py::test_first_production_result_uses_own_instruction_then_regular_pyz_apply[{kind}]' for kind in ('full', 'diff', 'mixed')]
+        nodes += [f'tests/test_runtime_packaging.py::test_standard_installation_and_three_offline_canonical_generations[{route}]' for route in ('wheel', 'source', 'sdist')]
+        nodes += ['tests/test_packaging_e2e.py::test_release_distributions_run_after_pipx_installation',
+                  'tests/test_python_variants.py::test_built_reader_variant_bootstraps_and_packs_in_fresh_stdlib_process[>=3.10]',
+                  'tests/test_runtime_bootstrap.py::test_uv_installed_runtime_works_outside_checkout']
+    if suite == 'e2e':
+        nodes += [f'tests/test_handoff_commit_sequence.py::test_real_diagnostic_and_commit_sequences_keep_gates_and_single_final_push[{n}]' for n in (0, 1, 3)]
+    if platform == 'Windows' and suite in ('platform', 'windows'):
+        nodes += ['tests/test_python_compat_windows.py::' + name for name in (
+            'test_native_legacy_handle_adapter_detects_real_change_with_restored_mtime',
+            'test_native_junction_is_rejected_without_new_pathlib_api',
+            'test_native_private_request_dacl_is_protected_and_inherited[named]',
+            'test_native_private_request_dacl_is_protected_and_inherited[random]')]
+        nodes += ['tests/test_bootstrap_python_compat.py::' + name for name in (
+            'test_native_bootstrap_detects_same_size_restored_mtime_change',
+            'test_native_bootstrap_rejects_junction_parent_without_pathlib_api',
+            'test_native_bootstrap_prepares_private_inheriting_dacl')]
+    return nodes
+
+
+def document(nodes, binding):
+    result = {'format_version': 1, 'run_id': 'fixture', 'binding': binding, 'mode': 'run',
+              'expected_workers': 2, 'started': ['gw0', 'gw1'], 'finished': {}, 'exitstatus': 0,
+              'collections': {'gw0': nodes, 'gw1': nodes}, 'collection_reports': [], 'errors': [],
+              'reports': [{'nodeid': node, 'when': when, 'outcome': 'passed', 'reason': '',
+                           'xfail': False, 'subtest': None, 'worker': 'gw0'}
+                          for node in nodes for when in ('setup', 'call', 'teardown')]}
+    finish(result)
+    return result
+
+
+def finish(doc):
+    for worker in doc['started']:
+        rows = [row for row in doc['reports'] if row['worker'] == worker]
+        doc['finished'][worker] = {'run_id': doc['run_id'], 'binding': doc['binding'], 'exitstatus': 0,
+                                   'collection': doc['collections'][worker], 'collection_reports': [],
+                                   'report_count': len(rows), 'reports_sha256': report_digest(rows)}
+
+
+def encode(files):
     output = BytesIO()
-    with ZipFile(output, "w") as archive:
-        suites = ["windows"] if engine == "pwsh" else ["core", "e2e", "platform", "packaging"]
-        for suite in suites:
-            document = example()
-            document["binding"].update(platform=platform, python=python + ".1", windows_engine=engine)
-            if suite == "packaging":
-                nodes = ["tests/test_runtime_bootstrap.py::test_actual_offline_install_and_native_reference_check",
-                         "tests/test_runtime_bootstrap.py::test_uv_installed_runtime_works_outside_checkout"]
-            elif suite == "e2e":
-                nodes = [f"tests/test_handoff_commit_sequence.py::test_real_diagnostic_and_commit_sequences_keep_gates_and_single_final_push[{n}]"
-                         for n in (0, 1, 3)]
-            else:
-                nodes = ["tests/test_probe.py::test_good"]
-            document["collections"]["serial"] = nodes
-            sample = document["reports"]
-            document["reports"] = [{**row, "nodeid": node} for row in sample for node in nodes]
-            archive.writestr(f"patchharbor-{suite}-tests.json", json.dumps(document))
+    with ZipFile(output, 'w') as archive:
+        for name, data in files.items(): archive.writestr(name, data)
     return output.getvalue()
+
+
+def reports(name, expected):
+    platform, python, engine = expected
+    binding = dict(platform=platform, python=python + '.1', windows_engine=engine,
+                   source_sha256='b' * 64, pytest='9.1.1', xdist='3.8.0')
+    docker = name.startswith('patchharbor-docker-')
+    build = dict(format_version=1, commit=COMMIT, commit_source='docker-build-context' if docker else 'checkout',
+                 binding=binding, version='1.3.0', requires_python='>=3.10', pyz_content_id='c' * 64,
+                 dependencies={n: '1.0' for n in ('pip', 'setuptools', 'build', 'wheel', 'pipx', 'pytest', 'pytest-xdist', 'pytest-timeout', 'tomli')},
+                 artifacts=[dict(name='patchharbor-1.3.0' + suffix, size=123, sha256='d' * 64)
+                            for suffix in ('-py3-none-any.whl', '.tar.gz', '.pyz')])
+    files = {'patchharbor-build.json': json.dumps(build).encode()}
+    suites = ('windows',) if engine == 'pwsh' else ('core', 'e2e', 'platform', 'packaging')
+    for suite in suites:
+        files[f'patchharbor-{suite}-tests.json'] = json.dumps(document(nodes_for(suite, platform), binding)).encode()
+    if docker:
+        files.update({n: b'complete log' for n in ci.DOCKER_FILES})
+        files['summary.txt'] = f'ubuntu_version={name.rsplit("-", 1)[1]}\nstatus=0\nstage=packaging tests\nlog=packaging.log\n'.encode()
+    return encode(files)
 
 
 @pytest.fixture
 def github(tmp_path, monkeypatch):
-    run = {"id": 100, "head_sha": COMMIT, "head_branch": "dev", "event": "workflow_dispatch",
-           "display_title": "PatchHarbor acceptance - " + HANDOFF, "workflow_id": 77, "run_attempt": 1,
-           "status": "completed", "conclusion": "success", "html_url": "https://github.com/cdoehn/patch-harbor/actions/runs/100"}
-    jobs = [{"id": i+1, "name": name, "status": "completed", "conclusion": "success",
-             "head_sha": COMMIT, "steps": []} for i, name in enumerate(sorted(ci.JOBS))]
-    artifacts = [{"id": i+1, "name": name, "expired": False} for i, name in enumerate(ci.ARTIFACTS)]
-    blobs = {row["id"]: reports(ci.ARTIFACTS[row["name"]]) for row in artifacts}
-    state = SimpleNamespace(run=run, jobs=jobs, artifacts=artifacts, blobs=blobs, dispatched=False,
-                            calls=[], sleeps=[], fault=None, workspace=tmp_path / "ci", clock=0)
+    observed = dict(id=100, head_sha=COMMIT, head_branch='dev', event='workflow_dispatch',
+                    workflow_id=77, run_attempt=1, status='completed', conclusion='success',
+                    html_url='https://github.com/cdoehn/patch-harbor/actions/runs/100')
+    jobs = [dict(id=i+1, name=name, status='completed', conclusion='success', head_sha=COMMIT)
+            for i, name in enumerate(sorted(ci.JOBS))]
+    artifacts = [dict(id=i+1, name=name, expired=False) for i, name in enumerate(ci.ARTIFACTS)]
+    state = SimpleNamespace(run=observed, jobs=jobs, artifacts=artifacts,
+        blobs={row['id']: reports(row['name'], ci.ARTIFACTS[row['name']]) for row in artifacts},
+        calls=[], fault=None, workspace=tmp_path/'review', reads=0)
     def request(route, body=None, *, binary=False):
-        state.calls.append((route, body))
-        if route == "actions/workflows/acceptance-tests.yml":
-            if state.fault == "auth": raise subprocess.CalledProcessError(1, ["gh", "api"])
-            return {"state": "active", "id": 77}
-        if route.endswith("/dispatches"):
-            assert body == {"ref": "dev", "inputs": {"handoff_id": HANDOFF, "expected_commit": COMMIT}}
-            assert not state.dispatched
-            state.dispatched = True
-            if state.fault == "dispatch_uncertain": raise subprocess.TimeoutExpired(["gh", "api"], 120)
-            return None if state.fault == "legacy_response" else {"workflow_run_id": 100}
-        if "/runs?" in route:
-            return {"workflow_runs": [deepcopy(run)] if state.dispatched or state.fault == "duplicate" else []}
-        if route == "actions/runs/100":
-            if state.fault in {"pending_metadata", "binding_never_settles"}:
-                if not state.sleeps or state.fault == "binding_never_settles":
-                    return {**run, "status": "queued", "display_title": "", "run_attempt": 0}
-            if state.fault == "binding_changes_at_completion":
-                return {**run, "head_sha": "b" * 40} if state.sleeps else {**run, "status": "in_progress"}
-            if state.fault == "waiting":
-                if not state.sleeps: return {**run, "status": "queued"}
-            if state.fault == "timeout": return {**run, "status": "queued"}
-            return deepcopy(run)
-        if "/jobs?" in route: return {"jobs": deepcopy(jobs)}
-        if "/artifacts?" in route: return {"artifacts": deepcopy(artifacts)}
-        if route.startswith("actions/artifacts/") and binary: return blobs[int(route.split("/")[2])]
-        pytest.fail("unexpected endpoint: " + route)
-    def sleep(seconds):
-        state.sleeps.append(seconds); state.clock += seconds
-    monkeypatch.setattr(ci, "request", request)
-    monkeypatch.setattr(ci.time, "sleep", sleep)
-    monkeypatch.setattr(ci.time, "monotonic", lambda: state.clock)
-    monkeypatch.setattr(ci.subprocess, "run", lambda *a, **k: subprocess.CompletedProcess(a, 0, b"failure diagnostic", b""))
+        assert body is None and not route.endswith('/dispatches')
+        state.calls.append(route)
+        if state.fault == 'auth': raise subprocess.CalledProcessError(1, ['gh', 'api'])
+        if route == 'actions/workflows/acceptance-tests.yml': return {'id': 77}
+        if route == 'actions/runs/100':
+            state.reads += 1
+            return {**observed, 'head_sha': 'f'*40} if state.fault == 'changed_at_end' and state.reads > 1 else deepcopy(observed)
+        if '/jobs?' in route: return {'jobs': deepcopy(jobs)}
+        if '/artifacts?' in route: return {'artifacts': deepcopy(artifacts)}
+        if route.startswith('actions/artifacts/') and binary: return state.blobs[int(route.split('/')[2])]
+        pytest.fail('unexpected network route: ' + route)
+    monkeypatch.setattr(ci, 'request', request)
     return state
 
 
-@pytest.mark.parametrize("mode", [None, "waiting", "legacy_response", "pending_metadata"])
-def test_one_dispatch_returns_complete_bound_windows_and_second_python_evidence(github, mode):
-    github.fault = mode
-    result = ci.run(COMMIT, HANDOFF, workspace=github.workspace)
-    assert result["status"] == "success" and result["commit"] == COMMIT and result["run_id"] == 100
-    assert len([body for route, body in github.calls if body is not None]) == 1
-    assert {row["name"] for row in result["jobs"]} == ci.JOBS
-    assert len(result["artifacts"]) == 4
-    assert all(row["reports"] for row in result["artifacts"])
-    assert json.loads((github.workspace / "evidence.json").read_text()) == result
-    assert github.sleeps == ([60] if mode in {"waiting", "pending_metadata"} else [])
-    assert result["binding_verified"] is True and result["binding_mismatches"] == {}
-    if mode == "pending_metadata":
-        assert result["binding_observations"][0]["run_attempt"] == 0
+def test_manual_review_covers_twelve_jobs_and_all_python_artifacts_without_dispatch(github):
+    result = ci.run(COMMIT, 100, workspace=github.workspace)
+    assert result['status'] == 'success' and result['dispatch_attempts'] == 0
+    assert len(result['jobs']) == len(result['artifacts']) == 12
+    assert {r['name'] for r in result['artifacts']} == set(ci.ARTIFACTS)
+    assert all(r['build']['commit'] == COMMIT and r['reports'] for r in result['artifacts'])
     before = list(github.calls)
-    with pytest.raises(FileExistsError): ci.run(COMMIT, HANDOFF, workspace=github.workspace)
-    assert github.calls == before  # no second dispatch after restart
+    with pytest.raises(FileExistsError): ci.run(COMMIT, 100, workspace=github.workspace)
+    assert github.calls == before
 
 
-@pytest.mark.parametrize("fault", ["auth", "duplicate", "dispatch_uncertain", "timeout", "wrong_sha",
-                                   "wrong_branch", "wrong_workflow", "rerun", "missing_windows",
-                                   "wrong_job_sha", "failed_job", "missing_report", "expired_report", "corrupt_report",
-                                   "wrong_run_id", "wrong_event", "wrong_title", "binding_never_settles",
-                                   "binding_changes_at_completion"])
-def test_ci_failures_preserve_receipt_and_never_rerun(github, fault):
+@pytest.mark.parametrize('status', ['queued', 'in_progress', 'waiting'])
+def test_running_manual_ci_is_recorded_once_without_poll_or_artifact_acceptance(github, status):
+    github.run['status'] = status
+    result = ci.run(COMMIT, 100, workspace=github.workspace)
+    assert result['status'] == 'pending' and result['artifacts'] == [] and result['dispatch_attempts'] == 0
+    assert len(github.calls) == 2
+
+
+@pytest.mark.parametrize('fault', ['auth', 'wrong_sha', 'wrong_branch', 'wrong_workflow', 'wrong_run_id',
+    'wrong_event', 'wrong_attempt', 'missing_job', 'wrong_job_sha', 'failed_job', 'failed_run',
+    'missing_report', 'expired_report', 'duplicate_report', 'corrupt_report', 'legacy_four_reports', 'changed_at_end'])
+def test_manual_ci_failures_preserve_receipt_without_retry(github, fault):
     github.fault = fault
-    changes = {"wrong_sha": {"head_sha": "b"*40}, "wrong_branch": {"head_branch": "main"},
-               "wrong_workflow": {"workflow_id": 999}, "rerun": {"run_attempt": 2},
-               "wrong_run_id": {"id": 101}, "wrong_event": {"event": "push"},
-               "wrong_title": {"display_title": "another handoff"}}
+    changes = {'wrong_sha': {'head_sha': 'e'*40}, 'wrong_branch': {'head_branch': 'main'},
+               'wrong_workflow': {'workflow_id': 99}, 'wrong_run_id': {'id': 101},
+               'wrong_event': {'event': 'push'}, 'wrong_attempt': {'run_attempt': 2},
+               'failed_run': {'conclusion': 'failure'}}
     github.run.update(changes.get(fault, {}))
-    if fault == "missing_windows": github.jobs[:] = [row for row in github.jobs if "Windows" not in row["name"]]
-    if fault == "wrong_job_sha": github.jobs[0]["head_sha"] = "b"*40
-    if fault == "failed_job": github.jobs[0]["conclusion"] = "failure"
-    if fault == "missing_report": github.artifacts.pop()
-    if fault == "expired_report": github.artifacts[0]["expired"] = True
-    if fault == "corrupt_report": github.blobs[1] = b"not a ZIP"
+    if fault == 'missing_job': github.jobs.pop()
+    if fault == 'wrong_job_sha': github.jobs[0]['head_sha'] = 'e'*40
+    if fault == 'failed_job': github.jobs[0]['conclusion'] = 'failure'
+    if fault == 'missing_report': github.artifacts.pop()
+    if fault == 'expired_report': github.artifacts[0]['expired'] = True
+    if fault == 'duplicate_report': github.artifacts.append(deepcopy(github.artifacts[0]))
+    if fault == 'corrupt_report': github.blobs[1] = b'not a ZIP'
+    if fault == 'legacy_four_reports': github.artifacts[:] = github.artifacts[:4]
     with pytest.raises((ValueError, OSError, BadZipFile, subprocess.SubprocessError)):
-        ci.run(COMMIT, HANDOFF, workspace=github.workspace, timeout=120)
-    result = json.loads((github.workspace / "evidence.json").read_text())
-    assert result["status"] == "failed" and result["dispatch_attempts"] <= 1
-    assert len([body for route, body in github.calls if body is not None]) <= 1
-    if fault == "failed_job":
-        assert result["failure_log"]["bytes"] > 0 and result["jobs"]
-    if fault in changes or fault == "binding_changes_at_completion":
-        assert result["run_id"] == 100 and result["url"] == github.run["html_url"]
-        assert result["binding_mismatches"] and result["binding_verified"] is False
-        assert not any("/jobs?" in route or "/artifacts?" in route for route, _ in github.calls)
-    if fault == "binding_never_settles":
-        assert github.sleeps == [60, 60]
-        assert result["binding_verified"] is False and len(result["binding_observations"]) == 2
+        ci.run(COMMIT, 100, workspace=github.workspace)
+    saved = json.loads((github.workspace/'evidence.json').read_bytes())
+    assert saved['status'] == 'failed' and saved['dispatch_attempts'] == 0
+    if fault in changes and fault != 'failed_run':
+        assert saved['binding_mismatches'] and not saved['binding_verified']
+        assert not any('/jobs?' in r for r in github.calls)
 
 
-@pytest.mark.parametrize("fault", ["wrong_platform", "wrong_python", "missing_test", "changed_sources", "extra_file"])
+@pytest.mark.parametrize('fault', ['wrong_platform', 'wrong_python', 'missing_pyz_test', 'skip_native',
+    'changed_source', 'extra_file', 'serial', 'missing_worker', 'build_commit', 'build_hash', 'build_variant',
+    'missing_tomli', 'missing_sdist', 'docker_summary', 'old_python_artifact_name'])
 def test_artifact_contract_rejects_incomplete_or_mismatched_proofs(github, fault):
-    with ZipFile(BytesIO(github.blobs[1])) as archive:
-        files = {name: archive.read(name) for name in archive.namelist()}
-    name = "patchharbor-packaging-tests.json"
+    target = next(row for row in github.artifacts if row['name'] == 'patchharbor-packaging-windows-2025-py3.10')
+    if fault == 'docker_summary': target = next(row for row in github.artifacts if row['name'].startswith('patchharbor-docker-'))
+    with ZipFile(BytesIO(github.blobs[target['id']])) as archive:
+        files = {n: archive.read(n) for n in archive.namelist()}
+    build = json.loads(files['patchharbor-build.json'])
+    name = 'patchharbor-platform-tests.json' if fault == 'skip_native' else 'patchharbor-packaging-tests.json'
     doc = json.loads(files[name])
-    if fault == "wrong_platform": doc["binding"]["platform"] = "Windows"
-    if fault == "wrong_python": doc["binding"]["python"] = "3.14.1"
-    if fault == "missing_test": doc["reports"].pop()
-    if fault == "changed_sources": doc["binding"]["source_sha256"] = "other"
-    files[name] = json.dumps(doc).encode()
-    if fault == "extra_file": files["../unexpected.json"] = b"{}"
-    output = BytesIO()
-    with ZipFile(output, "w") as archive:
-        for name, raw in files.items(): archive.writestr(name, raw)
-    github.blobs[1] = output.getvalue()
-    with pytest.raises(ValueError): ci.run(COMMIT, HANDOFF, workspace=github.workspace)
-    assert json.loads((github.workspace / "evidence.json").read_text())["status"] == "failed"
+    if fault == 'wrong_platform': doc['binding']['platform'] = 'Linux'
+    if fault == 'wrong_python': doc['binding']['python'] = '3.12.1'
+    if fault == 'changed_source': doc['binding']['source_sha256'] = 'f'*64
+    if fault == 'missing_pyz_test':
+        doc = document([n for n in doc['collections']['gw0'] if 'own_instruction' not in n], doc['binding'])
+    if fault == 'skip_native':
+        row = next(r for r in doc['reports'] if 'native_legacy_handle' in r['nodeid'] and r['when'] == 'call')
+        row.update(outcome='skipped', reason='not supported')
+    if fault == 'serial':
+        doc.update(started=[], finished={}, expected_workers=0, collections={'serial': doc['collections']['gw0']})
+        for row in doc['reports']: row['worker'] = 'serial'
+    finish(doc)
+    if fault == 'missing_worker': doc['finished'].pop('gw1')
+    if fault == 'build_commit': build['commit'] = 'b'*40
+    if fault == 'build_hash': build['artifacts'][0]['sha256'] = ''
+    if fault == 'build_variant': build['requires_python'] = '>=3.12'
+    if fault == 'missing_tomli': build['dependencies'].pop('tomli')
+    if fault == 'missing_sdist': build['artifacts'].pop(1)
+    if fault == 'extra_file': files['foreign.json'] = b'{}'
+    if fault == 'docker_summary': files['summary.txt'] = b'status=17\nstage=platform tests\n'
+    if fault == 'old_python_artifact_name': target['name'] = 'patchharbor-packaging-windows-2025'
+    files['patchharbor-build.json'] = json.dumps(build).encode(); files[name] = json.dumps(doc).encode()
+    github.blobs[target['id']] = encode(files)
+    with pytest.raises((ValueError, KeyError)): ci.run(COMMIT, 100, workspace=github.workspace)
+    assert json.loads((github.workspace/'evidence.json').read_bytes())['status'] == 'failed'
 
 
-def test_transport_uses_structured_stdin_and_never_shell_or_credentials_in_arguments(monkeypatch):
+def test_transport_is_get_only_and_refuses_mutation_before_any_subprocess(monkeypatch):
     calls = []
     def invoke(command, **kwargs):
         calls.append((command, kwargs))
-        return subprocess.CompletedProcess(command, 0, b'{"workflow_run_id":100}', b"")
-    monkeypatch.setattr(ci.subprocess, "run", invoke)
-    body = {"ref": "dev", "inputs": {"handoff_id": HANDOFF, "expected_commit": COMMIT}}
-    assert ci.request("actions/workflows/acceptance-tests.yml/dispatches", body) == {"workflow_run_id": 100}
+        return subprocess.CompletedProcess(command, 0, b'{"id":100}', b'')
+    monkeypatch.setattr(ci.subprocess, 'run', invoke)
+    assert ci.request('actions/runs/100') == {'id': 100}
     command, arguments = calls[0]
-    assert command[:4] == ["gh", "api", "--hostname", "github.com"] and command[-2:] == ["--input", "-"]
-    assert json.loads(arguments["input"]) == body and not arguments.get("shell")
-    assert arguments["check"] and arguments["timeout"] == 120
+    assert command[:4] == ['gh', 'api', '--hostname', 'github.com']
+    assert command[command.index('--method')+1] == 'GET' and '--input' not in command
+    assert arguments['input'] is None and not arguments.get('shell')
+    with pytest.raises(ValueError): ci.request('actions/workflows/acceptance-tests.yml/dispatches', {'ref': 'dev'})
+    assert len(calls) == 1
+
+
+@pytest.mark.parametrize('commit,run_id', [('abc', 100), (COMMIT, True), (COMMIT, 0), (COMMIT, '100')])
+def test_invalid_machine_identifiers_do_not_create_workspace(github, commit, run_id):
+    with pytest.raises(ValueError): ci.run(commit, run_id, workspace=github.workspace)
+    assert not github.workspace.exists() and not github.calls

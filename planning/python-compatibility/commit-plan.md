@@ -1,8 +1,8 @@
 # PatchHarbor – Implementierungsplan CPython 3.10/3.11
 
 **Plan-ID:** `CPYTHON-310-311`
-**Revision:** 4 · 14. Oktober 2026
-**Status:** CP-00 bis CP-02 durch tatsächliche Results bestätigt; CP-03 in Bundle 050 vorbereitet. Sechs Planpositionen, noch keine Freigabe der älteren Interpreter.
+**Revision:** 5 · 14. Oktober 2026
+**Status:** CP-00 bis CP-03 durch tatsächliche Results bestätigt; CP-04 in Bundle 051 vorbereitet. Sechs Planpositionen, noch keine Freigabe der älteren Interpreter.
 **Aktueller Auftrag:** automatische Fortsetzung CP-03 bis CP-05; CI startet weiterhin ausschließlich Christian.
 **Zielversion:** gesondert festzulegen; veröffentlichte Basis bleibt 1.3.0.
 **Normen gemeinsam:** [Hauptspec](../../spec/SPECIFICATION.md),
@@ -165,7 +165,7 @@ Zustand atomar speichern und Entwicklungsschleife beenden.
 
 ## 4. Geplante manuelle CI-Matrix
 
-Die folgende Matrix wird erst in CP-04 umgesetzt. CP-00 verändert keinen Workflow.
+Die folgende Matrix wird in CP-04 / Bundle 051 umgesetzt. CP-00 veränderte keinen Workflow.
 Alle Tests laufen parallel; CI wird ausschließlich von Christian gestartet.
 
 | Lane / bestehender Runner | CPython | Prüfung | Jobs |
@@ -242,15 +242,15 @@ CP-00 startet keine dauerhafte S-Schleife. Tokenmeter bleibt gestoppt.
 
 - [x] CP-00 tatsächlich angewendet; neueste Resultbindung und Planposition erfasst.
 - [x] CP-01/02 erhalten Fehler- und Dateisicherheit sowie originale Altartefakte; native Zielplattform-Abnahme bleibt offen.
-- [ ] CP-03 weist erste neue Result-/PYZ-Produktion mit eigener Anleitung nach.
+- [x] CP-03 weist erste neue Result-/PYZ-Produktion mit eigener Anleitung nach; tatsächlicher Apply 050 bestätigt.
 - [ ] Öffentliche API, CLI, PYZ und Watcher auf echtem 3.10 und 3.11 bestätigt.
 - [ ] Vollständige parallele lokale/Apply-Gates und alle zwölf manuellen CI-Jobs grün.
 - [ ] Erforderliche neue CIFS-/Plattformpraxis und sämtliche Skips ehrlich eingeordnet.
 - [ ] Produktversion, vollständiger Endcommit und konkrete Artefakthashes festgelegt.
 - [ ] Abschluss gespeichert; keine weiteren Bundles oder automatische Fortsetzung.
 
-CP-00 bis CP-02 sind durch die unten gebundenen tatsächlichen Applies bestätigt.
-CP-03 benötigt seinen eigenen erfolgreichen Apply; der vorbereitete Quellstand genügt nicht. Änderungen nach einer
+CP-00 bis CP-03 sind durch die unten gebundenen tatsächlichen Applies bestätigt.
+CP-04 benötigt seinen eigenen erfolgreichen Apply; der vorbereitete Quellstand genügt nicht. Änderungen nach einer
 Abnahme erfordern neue passende Nachweise; die frühere 1.3.0-CI wird nicht als
 Test dieses geänderten Dokumentations- oder zukünftigen Laufzeitstands ausgegeben.
 
@@ -454,3 +454,58 @@ bedingte tomli-Dev-Abhängigkeit passt nicht in dessen geschlossenes Altprofil.
 Nur dieser explizite synthetische Fixture entfernt die neue Dev-Metadatenzeile;
 Original-Wheels, neuer Writer und strikter Legacy-Reader bleiben unverändert.
 Der korrigierte Stand benötigt ein neues vollständiges paralleles Gate.
+
+
+## 10. CP-04 / Bundle 051: manuelle native Matrix und belastbare Nachweise
+
+CP-03 ist mit Commit `ba29e0515af90733d415c73bf999b5ee583baf4f` tatsächlich
+angewendet und normal auf dev gepusht. Basisresult:
+`patchharbor-apply_Result_101142_1014_eff441.zip`, SHA-256
+`8b5d79f020bbd962236c3b4d80f07bf26cd629be946abba814df0e65ec462bae`.
+Repository-ID `e7a93d72-62dc-4759-97e8-6bf6cdf10e90`, Fingerprint
+`7c9d2a24e397e0e5`, Algorithmus `patchharbor-state-v1`; sauberer Baum,
+351 Dateien. Vollständige parallele Gates: Development 3231 passed / 16 skipped,
+Apply 3208 passed / 15 skipped. Der erste lokale Fixture-Fehler wurde vor
+Auslieferung korrigiert; Originalfixtures und strikter Altreader unverändert.
+
+CP-04 aktiviert ausschließlich workflow_dispatch und die zwölf Lanes aus §4.
+Native Artefaktnamen enthalten die Python-Version; PowerShell-7 prüft zusätzlich
+Core-/Bootstrap-Zeiten, DACLs, Junctions, beide Varianten und den tatsächlich
+installierten Watcher. Die bisherigen 3.12-/3.14- und Docker-Gates bleiben.
+Docker exportiert nun ebenfalls vollständige JSON-Reports aller vier parallelen
+Gruppen; seine temporären Container bleiben ohne Netzwerk. Der Berichtspfad
+wird ausdrücklich in den Container eingebunden, nicht das Arbeitsrepository.
+
+`scripts/capture_ci_build.py` erstellt Wheel/sdist/PYZ mit bestehenden
+Releaseaudits und erfasst Hashes, Interpreter-Patchstand, aufgelöste Build-/
+Testwerkzeuge, genaue Quellbindung und Commit. Normale CI-Reports liegen neben
+dieser Bauquittung. Docker dokumentiert den vom Host belegten Buildkontext-Commit.
+`scripts/run_handoff_ci.py` ist nun ausschließlich ein lesender Reviewer für
+eine ausdrücklich angegebene Run-ID und volle Commit-SHA. Er besitzt keinen
+Dispatch-/Retry-/Pollingpfad mehr; die historische CI-Kennung ist nicht nötig.
+Alle zwölf Jobs und Reportartefakte müssen vollständig zum angefragten Stand
+passen. Serielle Reports, fehlende Worker, übersprungene native Sicherheitsfälle,
+alte Vier-Artefaktlisten und unvollständige Installations-/PYZ-/Watcher-Nachweise
+können keine erfolgreiche Abnahme erzeugen. Ein laufender Run wird einmal als
+pending gespeichert; er wird weder gestartet noch erneut gestartet.
+
+Die Tests der historischen Wheel-Bootstrap-Installation prüfen unter 3.10/3.11
+den tatsächlichen konservativen Fallback vor Installation. Historische komplette
+Format-2-Runtime-Ausführung bleibt wegen deren eigener >=3.12-Anforderung
+übersprungen; neue Datenleser prüfen dieselben Altresults weiterhin. Kein
+unverändertes Altartefakt wird umetikettiert, keine neue Funktion wird dafür geskippt.
+Die früheren Dispatch-Simulationen in `test_handoff_ci.py` wurden durch die
+entsprechenden lesenden Bindungs-/Fehler-/Vollständigkeitsfälle ersetzt; kein
+Dispatch ist mehr zulässiges Verhalten dieses Projektwerkzeugs.
+
+CT-15/16: Tests in `test_handoff_ci.py`, `test_ci_build_evidence.py`, den
+bestehenden Workflow-/Docker-Vertragstests sowie die vollständigen Native- und
+Packaging-Suites belegen die neuen Nachweisgrenzen. Echter 3.10-/3.11-/Windows-
+und Docker-Lauf bleibt Christians manuelle CI; lokale Simulationen zählen nicht
+als deren Erfolg. CP-05 bleibt bis zu passenden externen Nachweisen offen.
+
+Der erste vollständige CP-04-Lauf ergab 3245 passed / 16 skipped und zwei
+Fehler in bestehenden Workflow-/Launcher-Erwartungen: die PowerShell-Zeile
+verwendet jetzt YAML-Anführungszeichen und die Windows-Auswahl enthält acht
+zusätzliche Testmodule. Beide Erwartungen wurden dem vorgesehenen Vertrag
+angepasst. Der geänderte Stand erhält erneut das vollständige parallele Gate.

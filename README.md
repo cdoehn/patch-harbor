@@ -21,11 +21,12 @@ evidence are recorded in the completed
 itself a release announcement.
 
 The new [CPython 3.10/3.11 plan](planning/python-compatibility/commit-plan.md)
-has reached the distribution and producer switch. Its
+has implemented the distribution switch and expanded manual CI matrix. Its
 [requirements](spec/SPECIFICATION_EXTENSION_CPYTHON_310_311.md) cover the public
 API, Core-PYZ, CLI and installed watcher while preserving old Results.
 **This development source targets Python 3.10+; native 3.10/3.11 acceptance is pending.**
-The expanded manual CI matrix and final release evidence remain required.
+The expanded manual CI matrix is ready for Christian to start; its successful
+results and final release evidence remain required.
 Original 1.3.0 release artifacts retain their Python 3.12 minimum; use an
 artifact built from this compatibility development, not an old file with the same version label.
 
