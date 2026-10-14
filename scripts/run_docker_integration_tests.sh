@@ -21,7 +21,7 @@ case "$ubuntu_version" in
         ;;
 esac
 
-for command_name in docker tee timeout; do
+for command_name in docker tee timeout id; do
     command -v "$command_name" >/dev/null 2>&1 || {
         printf 'patchharbor: required command not found: %s\n' "$command_name" >&2
         exit 1
@@ -43,6 +43,8 @@ default_log_root="${RUNNER_TEMP:-${TMPDIR:-/tmp}}/patchharbor-docker-integration
 log_directory="${PATCHHARBOR_DOCKER_LOG_DIR:-$default_log_root/ubuntu-${ubuntu_version//./-}}"
 mkdir -p -- "$log_directory"
 log_directory="$(cd -- "$log_directory" && pwd -P)"
+report_uid="$(id -u)"
+report_gid="$(id -g)"
 
 current_stage="initialization"
 current_log=""
@@ -123,6 +125,9 @@ run_pytest_gate() {
     local log_name="$2"
     local suite="$3"
     run_container "$label" "" "$log_name" \
+        python scripts/run_docker_report.py \
+        --report "/evidence/patchharbor-$suite-tests.json" \
+        --uid "$report_uid" --gid "$report_gid" -- \
         python tools/run_tests.py --suite "$suite" --durations="$test_durations" \
         --report "/evidence/patchharbor-$suite-tests.json"
 }
@@ -139,6 +144,8 @@ run_container "environment preflight" "$preflight_timeout_seconds" \
     "10-environment-preflight.log" \
     python scripts/check_docker_integration_environment.py --require-init
 run_container "audited build evidence" "" "15-build-evidence.log" \
+    python scripts/run_docker_report.py --report /evidence/patchharbor-build.json \
+    --uid "$report_uid" --gid "$report_gid" -- \
     python scripts/capture_ci_build.py --report /evidence/patchharbor-build.json \
     --commit "$(git -C "$repository_root" rev-parse HEAD)"
 run_pytest_gate \

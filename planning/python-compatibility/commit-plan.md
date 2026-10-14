@@ -1,8 +1,8 @@
 # PatchHarbor – Implementierungsplan CPython 3.10/3.11
 
 **Plan-ID:** `CPYTHON-310-311`
-**Revision:** 6 · 14. Oktober 2026
-**Status:** CP-00 bis CP-04 tatsächlich angewendet; manuelle CI 38551979998 fehlgeschlagen. CP-04-FIX1 / Bundle 052 vorbereitet, CP-05 offen.
+**Revision:** 7 · 14. Oktober 2026
+**Status:** CP-00 bis CP-04 und CP-04-FIX1 tatsächlich angewendet; manuelle CI 38559897782 mit drei fehlgeschlagenen Jobs. CP-04-FIX2 / Bundle 053 vorbereitet, CP-05 offen.
 **Aktueller Auftrag:** automatische Fortsetzung CP-03 bis CP-05; CI startet weiterhin ausschließlich Christian.
 **Zielversion:** 1.4.0, ausdrücklich von Christian gewählt. Zuerst diese Korrektur; Versionsumschaltung und Freigabe folgen nach dem Fix. Aktueller Quellstand noch 1.3.0.
 **Normen gemeinsam:** [Hauptspec](../../spec/SPECIFICATION.md),
@@ -545,3 +545,52 @@ Primärquellen zur Einordnung:
 [Python datetime](https://docs.python.org/3/library/datetime.html#datetime.datetime.fromisoformat),
 [PEP-508-Marker](https://packaging.pypa.io/en/stable/markers.html),
 [Windows-Dateizeiten](https://learn.microsoft.com/en-us/windows/win32/sysinfo/file-times).
+
+
+## 12. CP-04-FIX2 / Bundle 053: Docker-Berichte und verbleibendes Windows-Fixture
+
+CP-04-FIX1 ist mit `6b177eb46c735fe1c7ce673e716f6f95f5dcd4ab` tatsächlich
+angewendet/gepusht. Basisresult `patchharbor-apply_Result_114551_1014_6f6831.zip`,
+SHA-256 `be9afce4c8a88833a62a0414b7d8b70745536b098d73b730494755e161f2dfb0`;
+Repository-ID `e7a93d72-62dc-4759-97e8-6bf6cdf10e90`, Fingerprint
+`7c9d2a24e397e0e5` / `patchharbor-state-v1`; 353 Dateien, sauberer Baum.
+Development 3263 passed / 16 skipped, Apply 3240 passed / 15 skipped.
+
+Christians [manueller Lauf 38559897782](https://github.com/cdoehn/patch-harbor/actions/runs/38559897782)
+prüfte diesen vollständigen Commit. Das bereitgestellte Logarchiv hat SHA-256
+`9bee9f2a67a5899cdb499e6306dda6fd6a5e390dc20488ed60e0554ebcf7cf43`.
+Neun Joblogs enden erfolgreich. Beide Docker-Jobs bestehen alle vier parallelen
+Testgruppen, scheitern danach beim Upload an `EACCES` für den Core-JSON-Bericht.
+Windows 3.12 besteht Core/E2E, scheitert an einem anderen nativen Mutationsfixture
+im Plattform-Gate und führt Packaging daher nicht aus. Die vorherigen Fehler
+kehren in diesem Lauf nicht wieder; für die frühere Verzeichnisabweichung gibt
+es damit weiterhin keinen konkreten Metadatenbefund und keinen behaupteten Fix.
+
+### Korrekturen
+
+- Der atomare Testreport wird absichtlich mit 0600 erstellt. Im Docker-Container
+  gehört er root; der Upload läuft als Host-Runner und kann ihn nicht öffnen.
+  Ein enger Development-Wrapper übergibt nach genau einem Gate den ausdrücklich
+  benannten fertigen Bericht an die Host-UID/GID, weiterhin mit 0600. Das gilt
+  auch für fehlgeschlagene Gates und die Buildquittung. Keine rekursive Änderung,
+  keine Freigabe für alle Benutzer, kein geänderter Produkt-/Report-Writer.
+  Symlink, Hardlink, Verzeichnis und FIFO sind ausgeschlossen; Exportfehler
+  machen einen erfolgreichen Gate-Aufruf erfolglos und erhalten einen bereits
+  fehlgeschlagenen Exitcode. Native POSIX- und Prozess-Verhaltenstests prüfen
+  Bytes, Rechte, einmaligen Aufruf, Fehler und Descriptor-Cleanup. Docker-Upload
+  selbst bleibt durch die nächste manuelle CI nachzuweisen.
+- `test_native_legacy_handle_adapter_detects_real_change_with_restored_mtime`
+  belegte exakt gleiche native ChangeTime vor/nach der sofortigen Mutation.
+  Das Fixture trennt wie der bereits grüne Bootstrap-Test die Zeittakte durch
+  50 ms, schreibt mit flush/fsync, schließt den Writer und stellt mtime zurück.
+  Native ChangeTime muss ausdrücklich verschieden sein; gleiche Größe, Identität,
+  BirthTime und mtime sowie die echte Ablehnung bleiben verpflichtend. Kein Skip,
+  kein Retry und keine tolerantere Produktprüfung. Neuer nativer Windows-Lauf nötig.
+
+Alle Runtime-/Bootstrap-/Altfixture-Bytes, drei Normdateien, Paketverträge,
+Workflow-Auslöser und Produktversion bleiben unverändert. Volle parallele
+Development-/Apply-Gates vor genau einem Korrekturcommit. CI startet nur Christian;
+CP-05 und die Version 1.4.0 folgen erst mit passenden Abnahmen.
+
+Primärquellen: [Windows-Dateizeiten](https://learn.microsoft.com/en-us/windows/win32/sysinfo/file-times),
+[Python-Dateieigentümer](https://docs.python.org/3/library/os.html#os.fchown).

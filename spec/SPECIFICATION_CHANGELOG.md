@@ -1,5 +1,19 @@
 # PatchHarbor – Spezifikations-Changelog
 
+## 2026-10-14 – CP-04-FIX2 / Bundle 053: CI-Berichte und Windows-Test
+
+- CP-04-FIX1 tatsächlich angewendet; zweiter manueller Lauf mit neun grünen und
+  drei roten Joblogs. Alte Fehler treten dort nicht mehr auf.
+- Docker-Gates bestehen, Upload scheitert an root-eigenen 0600-Reports. Nur die
+  ausdrücklich benannten fertigen Berichte erhalten Host-UID/GID und bleiben 0600;
+  Fehlercodes, private Reportproduktion und Offline-Container bleiben erhalten.
+- Weiteres Windows-Fixture belegt unveränderte native ChangeTime trotz sofortigem
+  Schreiben. Zeittakte trennen, Writer flushen/schließen und tatsächliche Änderung
+  ausdrücklich prüfen; keine Abschwächung der Core-Sicherheitsentscheidung.
+- Normen, Produktversion 1.3.0, historische Bytes und manuelle CI-Auslöser unverändert.
+  Ziel 1.4.0 bleibt; kein CI-Start und keine behauptete native Abschlussabnahme.
+
+
 ## 2026-10-14 – CP-04-FIX1 / Bundle 052; Zielversion 1.4.0
 
 - CP-04 tatsächlich angewendet/gepusht; erste manuelle Zwölf-Job-CI rot.

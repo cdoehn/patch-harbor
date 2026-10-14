@@ -5,6 +5,8 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import stat
+import sys
 try:
     import tomllib
 except ModuleNotFoundError:  # Explicit build/dev dependency on Python 3.10 only.
@@ -141,6 +143,15 @@ def test_docker_runner_builds_once_and_runs_every_offline_gate_with_diagnostics(
 
     assert "scripts/capture_ci_build.py" in run_calls[1]
     assert "--commit" in run_calls[1]
+    for call in run_calls[1:]:
+        assert call[len(expected_prefix):len(expected_prefix) + 2] == [
+            "python", "scripts/run_docker_report.py"]
+        assert call[call.index("--uid") + 1] == str(os.getuid())
+        assert call[call.index("--gid") + 1] == str(os.getgid())
+        boundary = call.index("--")
+        report = call[call.index("--report") + 1]
+        assert call[boundary + 1] == "python"
+        assert call[call.index("--report", boundary) + 1] == report
     pytest_calls = run_calls[2:]
     scopes = [call[call.index("--suite") + 1] for call in pytest_calls]
     assert scopes == ["core", "e2e", "platform", "packaging"]
@@ -343,3 +354,86 @@ def test_docker_preflight_rejects_invalid_requirement_syntax(tmp_path, requireme
     project = tmp_path / 'pyproject.toml'
     project.write_text('[project.optional-dependencies]\ndev = [' + json.dumps(requirement) + ']\n')
     with pytest.raises(SystemExit): module.declared_dev_distribution_names(project)
+
+
+def _report_export_module():
+    spec = importlib.util.spec_from_file_location(
+        "patchharbor_docker_report", PROJECT_ROOT / "scripts/run_docker_report.py")
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+_POSIX_REPORTS = pytest.mark.skipif(os.name != "posix", reason="Docker report export uses POSIX ownership")
+
+
+@_POSIX_REPORTS
+@pytest.mark.parametrize("status", [0, 17])
+def test_docker_report_export_preserves_private_bytes_and_failed_gate_status(tmp_path, status):
+    report = tmp_path / "report.json"
+    counter = tmp_path / "executions"
+    unrelated = tmp_path / "untouched.json"
+    unrelated.write_bytes(b"private unrelated evidence")
+    unrelated.chmod(0o640)
+    before = unrelated.stat()
+    # Exercise the actual CLI and a real atomic 0600 producer, including failure.
+    program = """import os, pathlib, sys, tempfile
+report, counter = map(pathlib.Path, sys.argv[1:3])
+with counter.open('a') as stream: stream.write('once\\n')
+with tempfile.NamedTemporaryFile(dir=report.parent, delete=False) as stream:
+    stream.write(b'{"status": "evidence"}\\n'); temporary = stream.name
+os.replace(temporary, report)
+raise SystemExit(int(sys.argv[3]))
+"""
+    completed = subprocess.run([
+        sys.executable, str(PROJECT_ROOT / "scripts/run_docker_report.py"),
+        "--report", str(report), "--uid", str(os.getuid()), "--gid", str(os.getgid()), "--",
+        sys.executable, "-c", program, str(report), str(counter), str(status),
+    ], capture_output=True, timeout=10)
+    assert completed.returncode == status, completed.stderr
+    assert report.read_bytes() == b'{"status": "evidence"}\n'
+    metadata = report.stat()
+    assert (metadata.st_uid, metadata.st_gid, stat.S_IMODE(metadata.st_mode)) == (os.getuid(), os.getgid(), 0o600)
+    assert counter.read_text().splitlines() == ["once"]
+    assert unrelated.stat() == before
+    assert unrelated.read_bytes() == b"private unrelated evidence"
+
+
+@_POSIX_REPORTS
+@pytest.mark.parametrize("kind", ["symlink", "hardlink", "directory", "fifo", "missing"])
+def test_docker_report_export_rejects_links_and_nonregular_files(tmp_path, kind):
+    module = _report_export_module()
+    outside = tmp_path / "outside.json"
+    outside.write_bytes(b"unchanged")
+    outside.chmod(0o640)
+    report = tmp_path / "report.json"
+    if kind == "symlink": report.symlink_to(outside)
+    elif kind == "hardlink": os.link(outside, report)
+    elif kind == "directory": report.mkdir()
+    elif kind == "fifo": os.mkfifo(report)
+    before = outside.stat()
+    with pytest.raises((OSError, ValueError)):
+        module.export_report(report, os.getuid(), os.getgid())
+    assert outside.stat() == before
+    assert outside.read_bytes() == b"unchanged"
+
+
+@_POSIX_REPORTS
+@pytest.mark.parametrize("failure", ["missing", "chown", "owner_mismatch"])
+@pytest.mark.parametrize("status", [0, 17])
+def test_docker_export_failure_cannot_hide_test_failure_or_report_success(tmp_path, monkeypatch, status, failure):
+    module = _report_export_module()
+    report = tmp_path / "report.json"
+    child = [sys.executable, "-c", "import sys; raise SystemExit(int(sys.argv[1]))", str(status)]
+    descriptors = []
+    if failure != "missing":
+        report.write_bytes(b"evidence")
+        def chown(descriptor, uid, gid):
+            descriptors.append(descriptor)
+            if failure == "chown": raise PermissionError("simulated chown denial")
+        monkeypatch.setattr(module.os, "fchown", chown)
+    uid = os.getuid() + 1 if failure == "owner_mismatch" else os.getuid()
+    assert module.run_gate(child, report, uid, os.getgid()) == (status or 1)
+    for descriptor in descriptors:
+        with pytest.raises(OSError): os.fstat(descriptor)

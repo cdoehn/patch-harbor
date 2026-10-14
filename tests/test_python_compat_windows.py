@@ -2,6 +2,7 @@
 import os
 from pathlib import Path
 import subprocess
+from time import sleep
 
 import pytest
 
@@ -23,9 +24,21 @@ def test_native_legacy_handle_adapter_detects_real_change_with_restored_mtime(tm
     descriptor = open_regular_nofollow(path)
     try:
         before = filesystem.capture_descriptor_metadata(descriptor)
-        path.write_bytes(b"modified")
+        native_before = windows_file_times(descriptor)
+        # Separate native clock ticks, as in the bootstrap mutation fixture.
+        # File time updates must be observed after the writing handle closes.
+        sleep(0.05)
+        with path.open("wb") as writer:
+            writer.write(b"modified")
+            writer.flush()
+            os.fsync(writer.fileno())
         os.utime(path, ns=(identity.st_atime_ns, identity.st_mtime_ns))
+        native_after = windows_file_times(descriptor)
+        assert native_after.change_ns != native_before.change_ns, (native_before, native_after)
         after = filesystem.capture_descriptor_metadata(descriptor)
+        assert before.st_ctime_ns == native_before.change_ns
+        assert after.st_ctime_ns == native_after.change_ns
+        assert path.read_bytes() == b"modified"
         assert before.st_size == after.st_size and before.st_mtime_ns == after.st_mtime_ns
         assert os.path.samestat(before, after) and before.st_birthtime_ns == after.st_birthtime_ns
         assert windows_file_times(descriptor).change_ns == after.st_ctime_ns

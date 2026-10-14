@@ -25,9 +25,11 @@ has implemented the distribution switch and expanded manual CI matrix. Its
 [requirements](spec/SPECIFICATION_EXTENSION_CPYTHON_310_311.md) cover the public
 API, Core-PYZ, CLI and installed watcher while preserving old Results.
 **This development source targets Python 3.10+; native 3.10/3.11 acceptance is pending.**
-The first expanded manual CI run found compatibility and native test failures.
-The CP-04-FIX1 correction and its remaining Windows diagnostic are recorded in
-the plan; successful native results and final release evidence remain required.
+The second expanded manual CI run confirms the CP-04-FIX1 changes. Nine job
+logs finish successfully; two Docker jobs pass their tests but cannot upload
+private reports, and one Windows job fails a separate native mutation fixture.
+CP-04-FIX2 addresses report ownership and that fixture; complete native CI
+and final release evidence remain required.
 Christian selected **1.4.0** for the forthcoming release; this correction precedes
 the version switch.
 Original 1.3.0 release artifacts retain their Python 3.12 minimum; use an

@@ -1078,12 +1078,14 @@ Python-Anforderungen. Diese Projektzuordnung gilt nicht pauschal für andere
 Repositorys, denen PatchHarbor dieselbe generische Vorlage mitliefert.
 
 **Aktueller Implementierungsschritt:** CP-00 bis CP-04 sind durch tatsächliche
-Apply-Results bestätigt. Die erste erweiterte manuelle CI ist fehlgeschlagen;
-CP-04-FIX1 / Bundle 052 korrigiert die belegten Fehler und ergänzt die genaue
-Diagnose der noch ungeklärten Windows-Verzeichnisabweichung. Christian hat
-1.4.0 als Zielversion gewählt und zuerst den Fix beauftragt. Der Quellstand
-bleibt bis zum folgenden Versionsschritt 1.3.0. Python 3.10/3.11 sind ohne
-passende vollständige native Abnahme noch kein freigegebener Support.
+Apply-Results bestätigt, ebenso die Korrektur CP-04-FIX1 / Bundle 052.
+Die zweite manuelle CI bestätigt deren Änderungen; der Verzeichnisfehler trat
+nicht erneut auf. CP-04-FIX2 / Bundle 053 korrigiert die Docker-Berichtsübergabe
+und ein weiteres Windows-Mutationsfixture. Neun Joblogs sind grün, drei rot;
+Logs allein ersetzen keine vollständige Artefaktabnahme. Christian hat 1.4.0
+als Zielversion gewählt und zuerst den Fix beauftragt. Der Quellstand bleibt
+bis zum folgenden Versionsschritt 1.3.0. Python 3.10/3.11 sind ohne passende
+vollständige native Abnahme noch kein freigegebener Support.
 Alte PYZ-/Resultvarianten und Sicherheitsverträge bleiben unverändert.
 
 **Historie:** Die einmalige CI-only-Ausnahme für PP-00 / Bundles 024/025
