@@ -1,8 +1,8 @@
 # PatchHarbor – Implementierungsplan CPython 3.10/3.11
 
 **Plan-ID:** `CPYTHON-310-311`
-**Revision:** 7 · 14. Oktober 2026
-**Status:** CP-00 bis CP-04 und CP-04-FIX1 tatsächlich angewendet; manuelle CI 38559897782 mit drei fehlgeschlagenen Jobs. CP-04-FIX2 / Bundle 053 vorbereitet, CP-05 offen.
+**Revision:** 8 · 14. Oktober 2026
+**Status:** CP-00 bis CP-04, CP-04-FIX1 und CP-04-FIX2 tatsächlich angewendet; CI 38585784200 mit einem fehlgeschlagenen Job. CP-04-FIX3 / Bundle 054 vorbereitet, CP-05 offen.
 **Aktueller Auftrag:** automatische Fortsetzung CP-03 bis CP-05; CI startet weiterhin ausschließlich Christian.
 **Zielversion:** 1.4.0, ausdrücklich von Christian gewählt. Zuerst diese Korrektur; Versionsumschaltung und Freigabe folgen nach dem Fix. Aktueller Quellstand noch 1.3.0.
 **Normen gemeinsam:** [Hauptspec](../../spec/SPECIFICATION.md),
@@ -594,3 +594,56 @@ CP-05 und die Version 1.4.0 folgen erst mit passenden Abnahmen.
 
 Primärquellen: [Windows-Dateizeiten](https://learn.microsoft.com/en-us/windows/win32/sysinfo/file-times),
 [Python-Dateieigentümer](https://docs.python.org/3/library/os.html#os.fchown).
+
+
+## 13. CP-04-FIX3 / Bundle 054: belegter NTFS-Verzeichnisunterschied
+
+CP-04-FIX2 wurde auf `77b38265d08b64b02d9b4e92a5c39eeb32083220` tatsächlich
+angewendet/gepusht. Basisresult `patchharbor-apply_Result_131454_1014_6a9679.zip`,
+SHA-256 `e092e99a3817246ae30da159a42c3504d04736c46ba22c6b512efbb571d6c138`;
+Repository-ID `e7a93d72-62dc-4759-97e8-6bf6cdf10e90`, Fingerprint
+`7c9d2a24e397e0e5` / `patchharbor-state-v1`; 354 Dateien, sauberer Baum.
+Development 3276 passed / 16 skipped, Apply 3253 passed / 15 skipped.
+
+Christians [manueller Lauf 38585784200](https://github.com/cdoehn/patch-harbor/actions/runs/38585784200)
+prüfte denselben Commit. SHA-256 des bereitgestellten Logarchivs:
+`5a4bc88269836bd2e2cb2545d6701998f8c67fff57f7cd0f1cc404aedde47bac`.
+Elf Joblogs enden erfolgreich, einschließlich beider Docker-Uploads und aller
+nativen Mutationsfixtures. Windows/PowerShell 7 mit Python 3.12.10 scheitert
+allein am unveränderten Test mit 10.000 Dateisystemknoten.
+
+Die neue genaue Diagnose zeigt `st_file_attributes` vor dem Öffnen 268435472
+(0x10000010), danach 16 (0x10). Alle sieben übrigen Signaturfelder sind gleich.
+Das entspricht dem in [CPython #126253](https://github.com/python/cpython/issues/126253)
+belegten Unterschied: NTFS kann zusätzlich sein internes Verzeichnisbit liefern.
+Dieses Bit ist kein öffentliches
+[Windows-Dateiattribut](https://learn.microsoft.com/en-us/windows/win32/fileio/file-attribute-constants).
+Der zuvor ungeklärte Fehler hat jetzt eine konkrete belegte Ursache; kein
+allgemeiner Stabilitäts-Retry oder pauschales Weglassen der Attribute ist nötig.
+
+### Enger Kompatibilitätsadapter und Nachweise
+
+`source_tree.metadata_signature` normalisiert ausschließlich 0x10000000,
+und ausschließlich auf Windows, bei Verzeichnistyp, gesetztem öffentlichem
+DIRECTORY-Bit 0x10 und ohne REPARSE_POINT-Bit 0x400. Reguläre Dateien,
+POSIX-Beobachtungen, Reparse-Punkte und inkonsistente Typangaben erhalten
+keine Ausnahme. Alle anderen 31 Attributbits, auch sonstige unbekannte Bits,
+werden unverändert verglichen. Identität, Modus, Linkzahl, Größe und beide
+Zeitfelder bleiben vollständig erhalten. Rohbeobachtungen werden nicht verändert;
+Fehlerdiagnosen behalten ihre konkreten Vorher-/Nachher-Werte. Derselbe Vergleich
+gilt für Root, Kindöffnung, erneute Beobachtung und finale Inventarprüfung.
+
+46 zusätzliche Verhaltensfälle prüfen beide Übergangsrichtungen mit vollständiger
+Erfassung und Revalidierung eines realen Baums, sämtliche anderen Attributbits,
+begrenzten Plattform-/Dateitypbereich sowie echte Metadatenabweichungen und
+Handle-Cleanup trotz gleichzeitig wechselndem NTFS-Bit. Reparse-Punkte bleiben
+abgewiesen. Die Windows-Stat-Beobachtungen sind dabei gezielt simuliert;
+der vorhandene native 10.000-Knoten-Test bleibt unverändert und muss den Fix
+im nächsten manuellen CI-Lauf bestätigen. Keine neuen Skips oder Retries für
+bestehende Tests und keine reduzierte native Testauswahl.
+
+Dies setzt CPY-07/08 und CT-03/11/16 um, ohne Paket-, Fehler- oder Ressourcen-
+verträge zu ändern. Die drei Normdateien, alte Fixtures, Bootstrap-/Startbytes,
+Workflow und Produktversion bleiben unverändert. Vollständige parallele lokale
+und Apply-Gates vor genau einem Korrekturcommit; CI startet nur Christian.
+CP-05 einschließlich Version 1.4.0 und finaler Artefaktbindung bleibt offen.

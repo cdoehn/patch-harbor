@@ -378,3 +378,105 @@ def test_directory_access_time_is_not_a_source_mutation():
                              st_size=0, st_mtime_ns=3, st_ctime_ns=4, st_file_attributes=16, st_atime_ns=5)
     after = SimpleNamespace(**{**vars(before), 'st_atime_ns': 6})
     tree._require_same_directory_metadata(before, after, 'probe')
+
+
+def _observed_directory(metadata, **changes):
+    fields = ('st_dev', 'st_ino', 'st_mode', 'st_nlink', 'st_size',
+              'st_mtime_ns', 'st_ctime_ns', 'st_file_attributes')
+    return SimpleNamespace(**{**{n: getattr(metadata, n, 0) for n in fields}, **changes})
+
+
+@pytest.mark.parametrize('first_attributes', [0x10, 0x10000010])
+def test_pack_capture_accepts_windows_directory_attribute_representation_changes(contents, monkeypatch, first_attributes):
+    nested = contents / 'nested'; nested.mkdir()
+    (nested / 'empty').mkdir()
+    (nested / 'data.bin').write_bytes(b'\x00\xffunchanged')
+    original = Path.lstat
+    observations = {}
+    opened, closed = [], []
+
+    def observe(path):
+        metadata = original(path)
+        if not stat.S_ISDIR(metadata.st_mode): return metadata
+        count = observations.get(path, 0)
+        observations[path] = count + 1
+        attributes = first_attributes ^ (0x10000000 if count % 2 else 0)
+        return _observed_directory(metadata, st_file_attributes=attributes)
+
+    def pin(path):
+        handle = len(opened)
+        opened.append((handle, path))
+        return handle, closed.append
+
+    # Exercise both complete captures and the final inventory revalidation on
+    # a real tree. Only Windows observation/pinning is simulated on Linux.
+    monkeypatch.setattr(tree, 'is_windows', lambda: True)
+    monkeypatch.setattr(tree, 'pin_windows_directory', pin)
+    monkeypatch.setattr(Path, 'lstat', observe)
+    captured = capture_sources(contents, 'run.sh')
+    captured.revalidate()
+    assert {p.relative_path: p.content for p in captured.files} == {
+        'run.sh': SCRIPT, 'nested/data.bin': b'\x00\xffunchanged'}
+    assert captured.empty_directories == 1
+    assert all(observations[path] > 3 for path in (contents, nested, nested / 'empty'))
+    assert sorted(closed) == [handle for handle, _ in opened]
+
+
+@pytest.mark.parametrize('bit', [1 << n for n in range(32) if n != 28])
+def test_windows_directory_attribute_normalization_preserves_every_other_bit(contents, monkeypatch, bit):
+    monkeypatch.setattr(tree, 'is_windows', lambda: True)
+    before = _observed_directory(contents.lstat(), st_file_attributes=0x10000010)
+    after = _observed_directory(before, st_file_attributes=0x10 ^ bit)
+    with pytest.raises(tree.FileChangedDuringRead) as caught:
+        tree._require_same_directory_metadata(before, after, 'probe')
+    delta = json.loads(str(caught.value).split(': ', 1)[1])
+    assert delta['st_file_attributes'] == {'before': before.st_file_attributes, 'after': after.st_file_attributes}
+
+
+@pytest.mark.parametrize('windows,mode,attributes', [
+    (False, stat.S_IFDIR | 0o700, 0x10),
+    (True, stat.S_IFREG | 0o600, 0x20),
+    (True, stat.S_IFREG | 0o600, 0x10),
+    (True, stat.S_IFDIR | 0o700, 0),
+    (True, stat.S_IFDIR | 0o700, 0x410),
+])
+def test_ntfs_directory_exception_does_not_extend_to_other_file_kinds(contents, monkeypatch, windows, mode, attributes):
+    monkeypatch.setattr(tree, 'is_windows', lambda: windows)
+    before = _observed_directory(contents.lstat(), st_mode=mode, st_file_attributes=attributes)
+    after = _observed_directory(before, st_file_attributes=attributes | 0x10000000)
+    with pytest.raises(tree.FileChangedDuringRead):
+        tree._require_same_directory_metadata(before, after, 'probe')
+
+
+@pytest.mark.parametrize('field', ['st_dev', 'st_ino', 'st_mode', 'st_nlink', 'st_size', 'st_mtime_ns', 'st_ctime_ns'])
+def test_windows_directory_bit_cannot_hide_a_real_change_or_leak_handle(contents, monkeypatch, field):
+    child = contents / 'child'; child.mkdir()
+    before = _observed_directory(child.lstat(), st_file_attributes=0x10000010)
+    after = _observed_directory(before, st_file_attributes=0x10,
+                                **{field: getattr(before, field) + (0o200 if field == 'st_mode' else 1)})
+    parent = tree.SourceDirectory(contents, contents.lstat(), None)
+    closed = []
+    monkeypatch.setattr(tree, 'is_windows', lambda: True)
+    monkeypatch.setattr(tree.SourceDirectory, 'child_stat', lambda *a: before)
+    monkeypatch.setattr(tree, 'pin_windows_directory', lambda path: (17, closed.append))
+    monkeypatch.setattr(Path, 'lstat', lambda path: after)
+    with pytest.raises(tree.FileChangedDuringRead) as caught:
+        with parent.child('child', before): pytest.fail('changed directory admitted')
+    assert closed == [17]
+    delta = json.loads(str(caught.value).split(': ', 1)[1])
+    assert delta[field] == {'before': getattr(before, field), 'after': getattr(after, field)}
+
+
+def test_windows_directory_bit_does_not_admit_reparse_point(contents, monkeypatch):
+    child = contents / 'child'; child.mkdir()
+    before = _observed_directory(child.lstat(), st_file_attributes=0x10000010)
+    after = _observed_directory(before, st_file_attributes=0x10000410)
+    parent = tree.SourceDirectory(contents, contents.lstat(), None)
+    closed = []
+    monkeypatch.setattr(tree, 'is_windows', lambda: True)
+    monkeypatch.setattr(tree.SourceDirectory, 'child_stat', lambda *a: before)
+    monkeypatch.setattr(tree, 'pin_windows_directory', lambda path: (17, closed.append))
+    monkeypatch.setattr(Path, 'lstat', lambda path: after)
+    with pytest.raises(tree.UnsupportedFileTypeError):
+        with parent.child('child', before): pytest.fail('reparse point admitted')
+    assert closed == [17]

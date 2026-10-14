@@ -1,5 +1,19 @@
 # PatchHarbor – Spezifikations-Changelog
 
+## 2026-10-14 – CP-04-FIX3 / Bundle 054: NTFS-Verzeichnisattribute
+
+- CP-04-FIX2 tatsächlich angewendet; dritte manuelle CI mit elf grünen Joblogs.
+  Docker-Upload und native Mutationsfixtures bestätigen die vorigen Korrekturen.
+- Ein Windows-3.12/PowerShell-7-Packtest belegt ausschließlich den Wechsel
+  0x10000010 zu 0x10; identischer Unterschied ist in CPython #126253 dokumentiert.
+- Enger Vergleichsadapter für das zusätzliche interne NTFS-Verzeichnisbit auf
+  gewöhnlichen Windows-Verzeichnissen. Alle anderen Attribute und Metadaten,
+  Reparse-Abweisung, Fehlerdaten und Ressourcenbudgets bleiben erhalten.
+- 46 zusätzliche Verhaltensfälle; ursprünglicher nativer Grenztest unverändert.
+  Normsatz, Altfixtures, Startbytes, manuelle CI-Auslöser und Version unverändert.
+  Ziel 1.4.0 und CP-05 bleiben offen; neue native Bestätigung erforderlich.
+
+
 ## 2026-10-14 – CP-04-FIX2 / Bundle 053: CI-Berichte und Windows-Test
 
 - CP-04-FIX1 tatsächlich angewendet; zweiter manueller Lauf mit neun grünen und

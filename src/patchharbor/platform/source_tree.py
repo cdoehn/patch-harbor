@@ -25,15 +25,23 @@ from patchharbor.platform.runtime import is_windows
 
 def metadata_signature(metadata: os.stat_result) -> tuple[int, ...]:
     """Compare observations of the same kind; access times are not mutations."""
+    attributes = getattr(metadata, 'st_file_attributes', 0)
+    if (is_windows() and stat.S_ISDIR(metadata.st_mode)
+            and attributes & 0x10 and not attributes & 0x400):
+        # Windows/NTFS can expose its internal directory bit through one stat
+        # path and omit it through another (CPython issue 126253). Normalize
+        # only that redundant bit on plain directories. All other attributes,
+        # including unknown bits, and all identity/time fields remain compared.
+        attributes &= ~0x10000000
     return (metadata.st_dev, metadata.st_ino, metadata.st_mode, metadata.st_nlink,
             metadata.st_size, metadata.st_mtime_ns, metadata.st_ctime_ns,
-            getattr(metadata, 'st_file_attributes', 0))
+            attributes)
 
 
 
 def _require_same_directory_metadata(before, after, reason: str) -> None:
-    # Retain the exact signature and fail without a retry. Native mismatches
-    # must expose which fields differed, rather than suggesting weakened checks.
+    # Retain strict semantic comparison without a retry. Diagnostics preserve
+    # the raw observations, including any extra NTFS directory bit.
     if metadata_signature(before) == metadata_signature(after):
         return
     fields = ('st_dev', 'st_ino', 'st_mode', 'st_nlink', 'st_size',
