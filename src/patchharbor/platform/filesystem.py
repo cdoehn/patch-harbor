@@ -14,6 +14,9 @@ import tempfile
 
 from patchharbor.platform.runtime import is_windows
 from patchharbor.platform.file_handles import open_regular_nofollow
+from patchharbor.platform.file_times import (
+    WindowsDescriptorMetadata, legacy_windows_stat, windows_creation_time, windows_file_times,
+)
 
 
 class PathKind(Enum):
@@ -92,21 +95,20 @@ class FileSystemOperationError(OSError):
 def path_kind(path: Path) -> PathKind:
     """Inspect one path without following symbolic links."""
     try:
-        mode = path.lstat().st_mode
+        metadata = path.lstat()
+        mode = metadata.st_mode
     except FileNotFoundError:
         return PathKind.MISSING
     except OSError as exc:
         raise FileSystemOperationError("cannot inspect target", exc) from exc
 
-    junction_check = getattr(path, "is_junction", None)
-    try:
-        if callable(junction_check) and junction_check():
-            return PathKind.JUNCTION
-    except OSError as exc:
-        raise FileSystemOperationError("cannot inspect target", exc) from exc
-
     if stat.S_ISLNK(mode):
         return PathKind.SYMBOLIC_LINK
+    if getattr(metadata, "st_file_attributes", 0) & 0x400:
+        # lstat exposes these since Python 3.8; no Path.is_junction dependency.
+        if getattr(metadata, "st_reparse_tag", 0) == 0xA0000003:
+            return PathKind.JUNCTION
+        return PathKind.OTHER
     if stat.S_ISREG(mode):
         return PathKind.REGULAR_FILE
     if stat.S_ISDIR(mode):
@@ -141,7 +143,7 @@ def regular_file_state(path: Path) -> RegularFileState | None:
         return None
     except OSError as exc:
         raise FileSystemOperationError("cannot inspect target mode", exc) from exc
-    if not stat.S_ISREG(metadata.st_mode):
+    if not stat.S_ISREG(metadata.st_mode) or getattr(metadata, "st_file_attributes", 0) & 0x400:
         raise FileSystemOperationError(
             "target is not a regular file", OSError(errno.EINVAL, "unsupported target")
         )
@@ -210,17 +212,34 @@ def _path_and_descriptor_signature(metadata: os.stat_result) -> tuple[int, ...]:
     if is_windows():
         # Windows path stat and descriptor fstat expose different ctime
         # semantics; birth time is stable across both views of one file.
-        return (*common, metadata.st_birthtime_ns)
+        return (*common, windows_creation_time(metadata))
     return (*common, stat.S_IMODE(metadata.st_mode), metadata.st_ctime_ns)
 
 
 def _descriptor_signature(metadata: os.stat_result) -> tuple[int, ...]:
     common = _path_and_descriptor_signature(metadata)
     if is_windows():
+        if legacy_windows_stat() and not isinstance(metadata, WindowsDescriptorMetadata):
+            raise OSError("native Windows descriptor change time is required")
         # Descriptor ctime is the Windows change time and catches mutation
         # while the file remains open.
         return (*common, metadata.st_ctime_ns)
     return common
+
+
+def capture_descriptor_metadata(descriptor: int) -> os.stat_result | WindowsDescriptorMetadata:
+    """Preserve change-time checks when legacy fstat only exposes creation time."""
+    if not legacy_windows_stat():
+        return os.fstat(descriptor)
+    before = windows_file_times(descriptor)
+    metadata = os.fstat(descriptor)
+    after = windows_file_times(descriptor)
+    if (before != after or windows_creation_time(metadata) != after.creation_ns
+            or metadata.st_mtime_ns != after.write_ns
+            or getattr(metadata, "st_file_attributes", 0) != after.attributes):
+        raise FileChangedDuringRead("Windows handle metadata changed during capture",
+                                    category="descriptor-state-changed")
+    return WindowsDescriptorMetadata(metadata, after.creation_ns, after.change_ns)
 
 
 def _portable_content_signature(metadata: os.stat_result) -> tuple[int, ...]:
@@ -268,7 +287,7 @@ def _inspect_path_without_following(path: Path) -> os.stat_result | None:
 
 
 def _require_regular_file(metadata: os.stat_result) -> None:
-    if not stat.S_ISREG(metadata.st_mode):
+    if not stat.S_ISREG(metadata.st_mode) or getattr(metadata, "st_file_attributes", 0) & 0x400:
         raise UnsupportedFileTypeError
 
 
@@ -312,7 +331,7 @@ def _read_stable_regular_file(
     try:
         descriptor = (os.open(path, flags) if expected_identity is None
                       else open_regular_nofollow(path))
-        opened_metadata = os.fstat(descriptor)
+        opened_metadata = capture_descriptor_metadata(descriptor)
         _require_regular_file(opened_metadata)
         if expected_identity is not None:
             require_file_identity(opened_metadata, expected_identity)
@@ -355,7 +374,7 @@ def _read_stable_regular_file(
                         retained.extend(chunk)
                     else:
                         retained = None
-            finished_metadata = os.fstat(handle.fileno())
+            finished_metadata = capture_descriptor_metadata(handle.fileno())
     except (FileChangedDuringRead, UnsupportedFileTypeError):
         raise
     except OSError as exc:

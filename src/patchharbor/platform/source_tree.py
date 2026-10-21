@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass
+import json
 import os
 from pathlib import Path
 import stat
@@ -17,16 +18,38 @@ from patchharbor.platform.directories import open_directory_nofollow, pin_window
 from patchharbor.platform.file_handles import open_regular_nofollow
 from patchharbor.platform.filesystem import (
     FileChangedDuringRead, FileReadLimitExceeded, UnsupportedFileTypeError,
-    _same_open_file_state, _same_path_and_open_file_state,
+    _same_open_file_state, _same_path_and_open_file_state, capture_descriptor_metadata,
 )
 from patchharbor.platform.runtime import is_windows
 
 
 def metadata_signature(metadata: os.stat_result) -> tuple[int, ...]:
     """Compare observations of the same kind; access times are not mutations."""
+    attributes = getattr(metadata, 'st_file_attributes', 0)
+    if (is_windows() and stat.S_ISDIR(metadata.st_mode)
+            and attributes & 0x10 and not attributes & 0x400):
+        # Windows/NTFS can expose its internal directory bit through one stat
+        # path and omit it through another (CPython issue 126253). Normalize
+        # only that redundant bit on plain directories. All other attributes,
+        # including unknown bits, and all identity/time fields remain compared.
+        attributes &= ~0x10000000
     return (metadata.st_dev, metadata.st_ino, metadata.st_mode, metadata.st_nlink,
             metadata.st_size, metadata.st_mtime_ns, metadata.st_ctime_ns,
-            getattr(metadata, 'st_file_attributes', 0))
+            attributes)
+
+
+
+def _require_same_directory_metadata(before, after, reason: str) -> None:
+    # Retain strict semantic comparison without a retry. Diagnostics preserve
+    # the raw observations, including any extra NTFS directory bit.
+    if metadata_signature(before) == metadata_signature(after):
+        return
+    fields = ('st_dev', 'st_ino', 'st_mode', 'st_nlink', 'st_size',
+              'st_mtime_ns', 'st_ctime_ns', 'st_file_attributes')
+    differences = {name: {'before': getattr(before, name, 0), 'after': getattr(after, name, 0)}
+                   for name in fields if getattr(before, name, 0) != getattr(after, name, 0)}
+    raise FileChangedDuringRead(reason + ': ' + json.dumps(differences, sort_keys=True),
+                                before=before, after=after)
 
 
 def _name(name: str) -> None:
@@ -67,8 +90,7 @@ class SourceDirectory:
     def revalidate(self) -> None:
         current=self.path.lstat()
         _plain(current, directory=True)
-        if metadata_signature(current) != metadata_signature(self.metadata):
-            raise FileChangedDuringRead('source-directory-changed')
+        _require_same_directory_metadata(self.metadata, current, 'source-directory-changed')
         if self.descriptor is not None and not os.path.samestat(os.fstat(self.descriptor), current):
             raise FileChangedDuringRead('source-directory-replaced')
 
@@ -77,8 +99,7 @@ class SourceDirectory:
         _name(name)
         current=self.child_stat(name)
         _plain(current, directory=True)
-        if metadata_signature(current) != metadata_signature(expected):
-            raise FileChangedDuringRead('source-directory-changed')
+        _require_same_directory_metadata(expected, current, 'source-directory-changed')
         with ExitStack() as stack:
             path=self.path/name
             if self.descriptor is None:
@@ -91,8 +112,7 @@ class SourceDirectory:
                 stack.callback(os.close,descriptor)
                 opened=os.fstat(descriptor)
             _plain(opened,directory=True)
-            if metadata_signature(opened) != metadata_signature(expected):
-                raise FileChangedDuringRead('source-directory-open-changed')
+            _require_same_directory_metadata(expected, opened, 'source-directory-open-changed')
             directory=SourceDirectory(path,opened,descriptor)
             directory.revalidate()
             yield directory
@@ -108,7 +128,7 @@ class SourceDirectory:
         path=self.path/name if self.descriptor is None else Path(name)
         descriptor=open_regular_nofollow(path,parent_fd=self.descriptor)
         try:
-            opened=os.fstat(descriptor)
+            opened=capture_descriptor_metadata(descriptor)
             _plain(opened,directory=False)
             if not _same_path_and_open_file_state(initial,opened,allow_path_identity_fallback=False):
                 raise FileChangedDuringRead('source-file-open-changed')
@@ -117,7 +137,7 @@ class SourceDirectory:
             if metadata_signature(current)!=metadata_signature(initial):
                 raise FileChangedDuringRead('source-file-path-changed')
             yield descriptor, opened
-            finished=os.fstat(descriptor)
+            finished=capture_descriptor_metadata(descriptor)
             _plain(finished,directory=False)
             if not _same_open_file_state(opened,finished):
                 raise FileChangedDuringRead('source-file-changed-during-read')
@@ -171,8 +191,7 @@ def open_source_root(root: Path) -> Iterator[SourceDirectory]:
             descriptor=open_directory_nofollow(root)
             stack.callback(os.close,descriptor)
             opened=os.fstat(descriptor)
-        if metadata_signature(opened)!=metadata_signature(initial):
-            raise FileChangedDuringRead('source-root-open-changed')
+        _require_same_directory_metadata(initial, opened, 'source-root-open-changed')
         directory=SourceDirectory(root,opened,descriptor)
         directory.revalidate()
         yield directory

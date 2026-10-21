@@ -1,5 +1,106 @@
 # PatchHarbor – Spezifikations-Changelog
 
+## 2026-10-14 – CP-05-VERSION / Bundle 055: Version 1.4.0 und Tagauftrag
+
+- FIX3 tatsächlich angewendet; manuelle CI 38596693717 auf vollständigem Commit
+  f2e64c241f4e20a1b7e2c4c83faa45ba557f6d0b mit zwölf grünen Jobs und 39 geprüften Reports.
+- Paketversion, aktuelle Installation/Chatvorlage und bestehende Release-Prüfwerte
+  konsistent auf 1.4.0 umgestellt; Laufzeitverhalten und Altartefakte unverändert.
+- Christian beauftragt v1.4.0 ausdrücklich. Nur der geprüfte Bundle-055-Entrypoint
+  erzeugt nach parallelem Commit-Gate das annotierte Tag auf dem neuen Commit und
+  pusht dev/Tag gemeinsam atomar ohne Force. Bestehende Tags werden nicht ersetzt.
+- Kein CI-Start, GitHub-Release oder Hostupdate. Native Endcommit-Abnahme und
+  erforderliche neue CIFS-Praxis bleiben unabhängig vom Tag offen; siehe CP-05.
+
+## 2026-10-14 – CP-04-FIX3 / Bundle 054: NTFS-Verzeichnisattribute
+
+- CP-04-FIX2 tatsächlich angewendet; dritte manuelle CI mit elf grünen Joblogs.
+  Docker-Upload und native Mutationsfixtures bestätigen die vorigen Korrekturen.
+- Ein Windows-3.12/PowerShell-7-Packtest belegt ausschließlich den Wechsel
+  0x10000010 zu 0x10; identischer Unterschied ist in CPython #126253 dokumentiert.
+- Enger Vergleichsadapter für das zusätzliche interne NTFS-Verzeichnisbit auf
+  gewöhnlichen Windows-Verzeichnissen. Alle anderen Attribute und Metadaten,
+  Reparse-Abweisung, Fehlerdaten und Ressourcenbudgets bleiben erhalten.
+- 46 zusätzliche Verhaltensfälle; ursprünglicher nativer Grenztest unverändert.
+  Normsatz, Altfixtures, Startbytes, manuelle CI-Auslöser und Version unverändert.
+  Ziel 1.4.0 und CP-05 bleiben offen; neue native Bestätigung erforderlich.
+
+
+## 2026-10-14 – CP-04-FIX2 / Bundle 053: CI-Berichte und Windows-Test
+
+- CP-04-FIX1 tatsächlich angewendet; zweiter manueller Lauf mit neun grünen und
+  drei roten Joblogs. Alte Fehler treten dort nicht mehr auf.
+- Docker-Gates bestehen, Upload scheitert an root-eigenen 0600-Reports. Nur die
+  ausdrücklich benannten fertigen Berichte erhalten Host-UID/GID und bleiben 0600;
+  Fehlercodes, private Reportproduktion und Offline-Container bleiben erhalten.
+- Weiteres Windows-Fixture belegt unveränderte native ChangeTime trotz sofortigem
+  Schreiben. Zeittakte trennen, Writer flushen/schließen und tatsächliche Änderung
+  ausdrücklich prüfen; keine Abschwächung der Core-Sicherheitsentscheidung.
+- Normen, Produktversion 1.3.0, historische Bytes und manuelle CI-Auslöser unverändert.
+  Ziel 1.4.0 bleibt; kein CI-Start und keine behauptete native Abschlussabnahme.
+
+
+## 2026-10-14 – CP-04-FIX1 / Bundle 052; Zielversion 1.4.0
+
+- CP-04 tatsächlich angewendet/gepusht; erste manuelle Zwölf-Job-CI rot.
+- Python-3.10-Testparser erhält die UTC-JSON-Prüfung; Docker-Preflight berücksichtigt
+  PEP-508-Marker statt inaktiver bedingter Abhängigkeiten.
+- Native Windows-Testfixture trennt die Zeittakte und belegt die ChangeTime;
+  Drei-Prozess-Watcher-Test erhält ein begrenztes Windows-Budget von 120 Sekunden.
+- Ungeklärte Verzeichnisabweichung bleibt ein Fehler mit vollständigen Feldwerten;
+  Signatur, Sicherheitsentscheidungen und Verbot von Stabilitäts-Retries bleiben.
+- Christian wählt 1.4.0 und beauftragt zunächst den Fix. Kein Versionswechsel,
+  Tag, CI-Start oder vorzeitiger Abschluss; neue native Abnahme bleibt offen.
+
+
+## 2026-10-13 – CP-01 bestätigt; CP-02 / Bundle 049 vorbereitet
+
+- CP-01 `e60729187b34b4203fc2bd62d41b209022098cfc` tatsächlich angewendet/gepusht;
+  3099 parallele Apply-Tests bestanden, 12 Skips, sauberer Baum.
+- Geschlossene PYZ-Anforderungen >=3.12 und >=3.10 mit jeweils exakt passenden
+  Startbytes; unveränderte Altartefakte und Format-1/2/3-Referenzen weiter lesbar.
+- Bootstrap prüft innere Daten und Variante vor Import, wählt die passende
+  Versionssperre und erhält Windows-No-follow-/Zeit-/DACL-Grenzen auch vor 3.12.
+- Originale 1.3.0-PYZ und synthetische historische Referenzen mit Herkunft/Hashes
+  eingefroren; gemeinsame Reader-/Bootstrap-, Fehler- und Budget-Verhaltenstests.
+- Writer, Python-/Produktmetadaten, drei Normdateien und manuelle CI-Konfiguration
+  bleiben unverändert. Noch keine vollständige Freigabe für 3.10/3.11.
+
+## 2026-10-13 – CP-00 bestätigt; CP-01 / Bundle 048 vorbereitet
+
+- Startcommit CP-00 `73d7317dbd7221576b4930c27eec44eb38a50bff` tatsächlich
+  angewendet/gepusht; vollständiges paralleles Apply-Gate grün, Baum sauber.
+- Erstes Implementierungsbundle nach neuem Nutzerauftrag: portable Typannotation
+  und Exception-Notizen, native Windows-Änderungszeit für ältere Interpreter,
+  Reparse-Erkennung und private Verzeichnisse mit DACL ab ihrer Erzeugung.
+- Verhaltenstests erhalten Fehlerkategorien, Ursachen, Sicherheitsgrenzen und
+  Cleanup-Nachweise; native Windows-Tests ergänzen die vorhandenen Gates.
+- Keine Änderung der drei Normdateien oder Produkt-/Python-Metadaten. CP-01
+  ist noch keine Freigabe der älteren Interpreter; echte 3.10-/3.11- und
+  Windows-Nachweise bleiben offen. Volle parallele lokale/Apply-Gates sind Pflicht;
+  CI weiterhin ausschließlich von Christian manuell gestartet.
+
+## 2026-10-13 – CPython 3.10/3.11: Norm- und Planstart CP-00 / Bundle 047
+
+- Neuer ausdrücklicher Auftrag: vollständige öffentliche API, Core-PYZ, CLI
+  und separat installierter Watcher unter CPython 3.10 und 3.11.
+- `SPECIFICATION_EXTENSION_CPYTHON_310_311.md` bildet mit Hauptspec und
+  PYZ/PACK-Ergänzung den gemeinsamen Normsatz. Hauptspec und PYZ/PACK-Revision 4
+  verankern die gezielte Ausnahme zur bisherigen Python-Untergrenze.
+- Sechs Schritte CP-00 bis CP-05, 16 Anforderungs-/Verhaltenstestzuordnungen,
+  sichere Leser-vor-Writer-Umstellung und geplante zwölf manuelle CI-Jobs.
+  Alte Result-/PYZ-Bytes und alle Sicherheits-, Fehler- und Paketverträge bleiben
+  erhalten. Echte Interpreter-/Plattformtests sind Voraussetzung der Freigabe.
+- PYZ/PACK ist nach Korrektur 046 auf
+  `30e5de1d67a2d725ff192a0b97e50c2b0336bfcb` tatsächlich abgeschlossen:
+  geprüfter Apply, 3052 parallele Tests / 8 Skips und sechs grüne Jobs der von
+  Christian gestarteten CI 37802304850. Die roten Vorläufe bleiben Historie.
+- CP-00 ändert ausschließlich Normen, Plan und aktive Verweise. Laufzeit,
+  Tests, Workflowdatei und Python-3.12-Metadaten bleiben unverändert.
+  Der neue Plan ist kein Nachweis bereits funktionierender 3.10-/3.11-Unterstützung.
+  Ein echter Startcommit folgt erst nach vollen parallelen Gates im Apply;
+  kein automatischer CI-Start und keine Fortsetzung über CP-00 hinaus.
+
 ## 2026-10-08 – CI 37750308948 ausgewertet; PP-08B-FIX2 / Bundle 046
 
 - Dokumentationsbundle 045 ist auf Commit
@@ -1261,3 +1362,22 @@ auf und transportiert das bestehende Apply-JSON. Keine Änderungen an Scan,
 Replay, Recovery, Locks, Result-Erzeugung, Signalen oder Serviceinstallation.
 Fachliche Worker-, Konfigurations-, Prozessgrenzen- und Packaging-Prüfungen
 begleiten die Migration; keine neuen Tests der Konsolendarstellung.
+
+
+## 14. Oktober 2026 – CP-03 vorbereitet
+
+CP-02 ist durch Result 049 tatsächlich bestätigt. Bundle 050 setzt den
+bestehenden CPython-Vertrag um: Distribution und neue Result-Produktion >=3.10,
+bedingte Build-/Test-TOML-Abhängigkeit, eigene ausführbare Anleitung und echte
+Build-/Result-/Pack-/Apply-Regressionen. Alte Artefakte behalten ihre ursprünglichen
+Anforderungen und Bytes. Normen, Paketformate und Ressourcenlimits unverändert;
+native 3.10-/3.11-/Windows-Abnahme und manuelle CI bleiben offen.
+
+
+## 14. Oktober 2026 – CP-04 vorbereitet
+
+CP-03 durch tatsächliches Result 050 bestätigt. Bundle 051 ergänzt die zwölf
+manuellen Python-/Plattform-Lanes, eindeutige Artefakte, tatsächliche Build-/
+Interpreterquittungen und ausschließlich lesende CI-Auswertung. Docker- und
+PowerShell-Nachweise vervollständigt; historische Runtime-Ausführungsgrenzen
+bleiben erhalten. Kein automatischer CI-Start; CP-05 wartet auf native Nachweise.

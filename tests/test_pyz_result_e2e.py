@@ -59,8 +59,12 @@ print(json.dumps({'path':str(result.path)}))
         raw=archive.read(facts.runtime.artifact.path)
         assert {n for n in archive.namelist() if n.startswith('runtime/')}=={
             'runtime/runtime.json',facts.runtime.artifact.path}
+    assert facts.runtime.requires_python == '>=3.10'
     with ZipFile(BytesIO(raw)) as archive:
-        assert not any(n.startswith('patchharbor_watcher/') for n in archive.namelist())
+        recipe = pyz.parse_recipe(archive.read(pyz.RECIPE_PATH))
+        assert recipe.requires_python == '>=3.10'
+        assert archive.read('__main__.py') == archive.read(pyz.MAIN_PATH) == pyz.MAIN_BYTES_310
+        assert not any(n.startswith(('patchharbor_watcher/', 'tomli/', 'tomllib/')) for n in archive.namelist())
     # E-10: executable bootstrap taken only from THIS Result's root handoff.
     helper=tmp_path/'reviewed-instruction.py';helper.write_text(bootstrap_program(template))
     outside=tmp_path/'outside';outside.mkdir()
@@ -87,7 +91,7 @@ assert not any(n=='patchharbor' or n.startswith('patchharbor.') for n in sys.mod
 def forbidden(*a,**k):raise AssertionError('Python-only consumer used process/network')
 subprocess.run=subprocess.Popen=socket.socket=forbidden;os.environ['PATH']=''
 assessment=bootstrap.assess(reference,trusted_source_sha256=hashlib.sha256(reference.read_bytes()).hexdigest())
-assert not assessment.full_reference_valid
+assert not assessment.full_reference_valid and assessment.requires_python == '>=3.10'
 prepared=bootstrap.prepare(assessment,workspace);api=bootstrap.import_api(prepared)
 packed=api.pack_patch(contents,reference_bundle=reference,entrypoint=entrypoint,output_directory=output)
 checked=api.validate_patch(packed.path,reference_bundle=reference)

@@ -61,7 +61,7 @@ def test_acceptance_workflow_uses_current_python_actions_and_grouped_suites() ->
 
     assert "uses: actions/checkout@v7" in text
     assert "uses: actions/setup-python@v7" in text
-    assert 'python-version: "3.12"' in text
+    assert 'python-version: ${{ matrix.python }}' in text
     assert 'python -m pip install --disable-pip-version-check -e ".[dev]"' in text
     from tools.test_policy import SUITES
     for scope in ("core", "e2e", "platform", "packaging", "windows"):
@@ -78,7 +78,7 @@ def test_acceptance_workflow_requires_both_windows_powershell_variants() -> None
     assert "Get-Command pwsh -ErrorAction Stop" in text
     assert "powershell.exe -NoLogo -NoProfile -NonInteractive" in text
     assert "pwsh -NoLogo -NoProfile -NonInteractive" in text
-    assert "windows_engine: powershell.exe" in text
+    assert 'windows_engine: "powershell.exe"' in text
     assert "PATCHHARBOR_WINDOWS_ACCEPTANCE_ENGINE: ${{ matrix.windows_engine }}" in text
     assert "windows-powershell7-acceptance:" in text
     assert "name: Release gate - Windows 2025 - PowerShell 7" in text
@@ -154,3 +154,26 @@ def test_ci_uses_parallel_policy_without_a_serial_reference():
     assert "--serial" not in text
     assert "--workers" not in text
     assert "verify_test_modes.py" not in text
+
+
+def test_native_python_matrix_and_artifact_names_are_unambiguous():
+    text = _workflow_text()
+    matrix = text.split("        include:\n", 1)[1].split("    steps:", 1)[0]
+    assert len(re.findall(r"^          - name:", matrix, flags=re.MULTILINE)) == 7
+    for version in ("3.10", "3.11", "3.12"):
+        assert f"Release gate - Ubuntu 24.04 - Python {version}" in matrix
+        assert f"Release gate - Windows 2025 - Python {version}" in matrix
+    assert 'python: ["3.10", "3.11", "3.12"]' in text
+    assert 'patchharbor-packaging-${{ matrix.runner }}-py${{ matrix.python }}' in text
+    assert 'patchharbor-windows-powershell7-py${{ matrix.python }}' in text
+    assert text.count('scripts/capture_ci_build.py') == 2
+    from scripts.run_handoff_ci import JOBS, ARTIFACTS
+    assert len(JOBS) == len(ARTIFACTS) == 12
+
+
+def test_windows_selection_includes_new_native_compatibility_and_installed_watcher_proofs():
+    from tools.test_policy import SUITES
+    assert set(('tests/test_python_compat_windows.py', 'tests/test_bootstrap_python_compat.py',
+                'tests/test_python_variants.py', 'tests/test_watcher_events_native.py',
+                'tests/test_watcher_event_loop_e2e.py', 'tests/test_packaging_e2e.py')) <= set(SUITES['windows'])
+    assert len(SUITES['windows']) == len(set(SUITES['windows']))

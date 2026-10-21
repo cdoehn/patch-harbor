@@ -203,7 +203,8 @@ def test_json_cli_uses_public_api_and_complete_typed_facts(tmp_path, monkeypatch
     if command == "validate":
         assert result["scope"] == "package" and result["binding_matches"] is None
         assert result["context"] is None and result["reference_sha256"] is None
-        assert datetime.fromisoformat(result["checked_at"]).tzinfo is not None
+        assert result["checked_at"].endswith("Z")
+        assert datetime.fromisoformat(result["checked_at"][:-1] + "+00:00").tzinfo is timezone.utc
         result = result["inspection"]
     assert result["manifest"] == MANIFEST
     assert result["package_sha256"] == hashlib.sha256(path.read_bytes()).hexdigest()

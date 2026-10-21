@@ -1,0 +1,41 @@
+{
+  "purpose": "Frozen synthetic Results built once from the unchanged 1.3.0 test data helpers; no actual Apply is claimed.",
+  "frozen_at": "2026-10-13",
+  "source_commit": "30e5de1d67a2d725ff192a0b97e50c2b0336bfcb",
+  "pyz_origin": "Bundle 046 separately retained development build, identical source bound to its completed full suite; not claimed to be a downloaded release asset.",
+  "pyz_sha256": "942b2161c46ae3d81e0faf097b649d58d61c9c0d493b934d11cc708a314bfe21",
+  "pyz_bytes": 941575,
+  "pyz_content_id": "386b2188e43d4a109381d74b466f42ed8e22f0a4eebec3133d21e7933906fb79",
+  "pyz_producer_id": "804fc12c24f4334554663ba3acb0d1a6f90119d3cc92a04a659f83fcd704ae4c",
+  "requires_python": ">=3.12",
+  "legacy_main_sha256": "ab2f78463c00b883f980d358daa31296753816c509389d95fa56162dd2d91cd5",
+  "binding": {
+    "repo_id": "01234567-89ab-4cde-8fab-0123456789ab",
+    "base_commit": "1212121212121212121212121212121212121212",
+    "state_fingerprint": "7c9d2a24e397e0e5",
+    "fingerprint_algorithm": "patchharbor-state-v1"
+  },
+  "files": {
+    "result-format1.zip": {
+      "sha256": "f3b4cc3731d38f121208aeaf84ea19e1526ce950827688353798291485f1e207",
+      "bytes": 2101,
+      "format_version": 1
+    },
+    "result-format2.zip": {
+      "sha256": "7b89a2a46f5fc75cf6a7f654f99068f6363b2b1a8211160ea2564307f767f9c2",
+      "bytes": 251461,
+      "format_version": 2
+    },
+    "result-format3.zip": {
+      "sha256": "701d22eab0ef5c75ac4ec1b2a9f2067f64b6aea4e4e3c6535bdcb263f1ff89a0",
+      "bytes": 225619,
+      "format_version": 3
+    }
+  },
+  "helper_sha256": {
+    "tests/test_reference_validation.py": "f5f866996be7a1dd00f27b4b1cdc41017f5f7bdb0c2bd814c8cb198e27a51bfb",
+    "tests/result_runtime_support.py": "ae87c6cfbfd57e79a348de124b606d35f5e374d5eae1942d03eca2a2fe8b79b1",
+    "tests/result_pyz_support.py": "ab1589083e7cfb9a568656ba4b95282eb754495d4b0b6122a334d0fb14860de4"
+  },
+  "wheel_sha256": "e9a587c49819419cda30adb8a9746bade5de4cc31d13619ed88157dabff79fe1"
+}

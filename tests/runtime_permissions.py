@@ -5,20 +5,26 @@ from contextlib import contextmanager
 import os
 from pathlib import Path
 import shutil
+import stat
 import subprocess
 import tempfile
 
 from tests.runtime_acl import verify_restored_dacls
 
 
+def _linked(path: Path) -> bool:
+    info = path.lstat()
+    return stat.S_ISLNK(info.st_mode) or bool(getattr(info, "st_file_attributes", 0) & 0x400)
+
+
 def _owned_paths(root: Path, owner: Path) -> list[Path]:
-    if not root.is_absolute() or root.is_symlink() or root.is_junction():
+    if not root.is_absolute() or _linked(root):
         raise ValueError("permission fixture requires an absolute unlinked root")
     resolved, owned = root.resolve(strict=True), owner.resolve(strict=True)
     if resolved == owned or not resolved.is_relative_to(owned) or not root.is_dir():
         raise ValueError("permission fixture must be below its owned temporary root")
     paths = [root, *sorted(root.rglob("*"))]
-    if any(p.is_symlink() or p.is_junction() or not (p.is_file() or p.is_dir()) for p in paths):
+    if any(_linked(p) or not (p.is_file() or p.is_dir()) for p in paths):
         raise ValueError("permission fixture contains a link or special file")
     return paths
 

@@ -4,7 +4,7 @@ Der Vertrag steht gemeinsam in [Hauptspezifikation](../spec/SPECIFICATION.md)
 und [PYZ/PACK-Ergänzung, Revision 3](../spec/SPECIFICATION_EXTENSION_PYZ_PACK.md).
 Der [aktive Plan](../planning/pyz-pack/commit-plan.md) führt den Fortschritt.
 Installierte CLI, Core-PYZ und öffentliche Python-API verwenden denselben
-Pack-Core. Python ab 3.12 ist nötig. Die PYZ enthält den Core ohne Watcher und
+Pack-Core. Python ab 3.10 ist nötig. Die PYZ enthält den Core ohne Watcher und
 braucht keine Installation; ihr Start aus einem Result folgt dem
 [geprüften Bootstrap](runtime-bootstrap.md).
 

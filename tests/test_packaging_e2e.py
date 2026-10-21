@@ -10,7 +10,10 @@ import shutil
 import subprocess
 import sys
 import tarfile
-import tomllib
+try:
+    import tomllib
+except ModuleNotFoundError:  # Explicit build/dev dependency on Python 3.10 only.
+    import tomli as tomllib
 import zipfile
 
 import pytest
@@ -23,7 +26,7 @@ from tests.registration_support import isolated_user_environment
 pytestmark = pytest.mark.packaging
 
 MAX_WHEEL_BYTES = 384 * 1024
-RELEASE_VERSION = "1.3.0"
+RELEASE_VERSION = "1.4.0"
 EXPECTED_RUNTIME_FILES = {
     "patchharbor/py.typed",
     "patchharbor/__init__.py",
@@ -55,6 +58,7 @@ EXPECTED_RUNTIME_FILES = {
     "patchharbor/platform/environment.py",
     "patchharbor/bundles.py",
     "patchharbor/cli.py",
+    "patchharbor/compat.py",
     "patchharbor/configuration.py",
     "patchharbor/configuration_context.py",
     "patchharbor/context_output.py",
@@ -132,6 +136,8 @@ EXPECTED_RUNTIME_FILES = {
     "patchharbor/platform/errors.py",
     "patchharbor/platform/filesystem.py",
     "patchharbor/platform/file_handles.py",
+    "patchharbor/platform/file_times.py",
+    "patchharbor/platform/private_directory.py",
     "patchharbor/platform/cifs.py",
     "patchharbor/platform/lifecycle.py",
     "patchharbor/platform/locking.py",
@@ -323,7 +329,7 @@ def test_release_metadata_is_complete_and_runtime_has_no_dependencies() -> None:
     assert __version__ == RELEASE_VERSION
     assert project["name"] == "patchharbor"
     assert project["dynamic"] == ["version"]
-    assert project["requires-python"] == ">=3.12"
+    assert project["requires-python"] == ">=3.10"
     assert project["license"] == "MIT"
     assert project["license-files"] == ["LICENSE"]
     assert project["dependencies"] == []

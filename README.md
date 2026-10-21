@@ -1,4 +1,4 @@
-# PatchHarbor 1.3.0
+# PatchHarbor 1.4.0
 
 PatchHarbor transfers work between a development environment and a local Git
 repository using verified ZIP packages. A **Result Bundle** describes the actual
@@ -13,31 +13,43 @@ Apply checks the binding before writing its payloads and running its entrypoint.
 - Results normally carry an installation-free **Core-PYZ, without the watcher**.
   CLI and Python callers use the same public API.
 
-This source tree uses version **1.3.0**. The version string, an installed version,
+This source tree uses version **1.4.0**. The version string, an installed version,
 and a published release are different facts. Implementation and acceptance
-evidence, including outstanding platform gates, are recorded in the
+evidence are recorded in the completed
 [PYZ/PACK plan](planning/pyz-pack/commit-plan.md) and
 [test matrix](planning/pyz-pack/test-matrix.md); a development checkout is not
 itself a release announcement.
 
+The [CPython 3.10/3.11 plan](planning/python-compatibility/commit-plan.md)
+extends the public API, Core-PYZ, CLI and installed watcher while preserving old
+Results. All twelve jobs of the expanded manual
+[native CI matrix](https://github.com/cdoehn/patch-harbor/actions/runs/38596693717)
+passed on the corrected implementation before this version change, including
+Python 3.10 and 3.11 on Linux and Windows. The plan records the exact commits,
+artifact evidence and remaining release acceptance separately.
+
+**This source requires Python 3.10 or newer.** Original 1.3.0 release artifacts
+retain their Python 3.12 minimum. Version 1.4.0 identifies the compatible release;
+use its reviewed artifacts for the new Python support.
+
 ## Requirements and installation
 
-Python **3.12 or newer** is required. Repository operations also require Git;
+This development source requires Python **3.10 or newer**. Repository operations also require Git;
 executing a patch requires its declared Bash or PowerShell interpreter.
 Static `pack`, `inspect` and reference-based `validate` need neither Git nor
 the target shell. The Core has no third-party runtime dependencies.
 
 For the normal CLI **and watcher**, install a reviewed wheel or source checkout.
-For example, with an existing Python 3.12+ and pipx:
+For example, with an existing Python 3.10+ and pipx:
 
 ```bash
-pipx install --python python3 /absolute/path/patchharbor-1.3.0-py3-none-any.whl
+pipx install --python python3 /absolute/path/patchharbor-1.4.0-py3-none-any.whl
 patchharbor --version
 patchharbor --help
 ```
 
 The wheel path is an artifact you obtain and verify; this command does not assume
-that version 1.3.0 has been published on a package index. **pipx is optional**:
+that version 1.4.0 has been published on a package index. **pipx is optional**:
 a dedicated virtual environment is another installation route. Wheel and sdist
 remain supported for normal installations; the PYZ replaces the runtime embedded
 in new Results, not the installed watcher. See
@@ -138,7 +150,7 @@ Legacy Format-1/2 Results remain readable.
 
 Use the executable bootstrap from the trusted Result's handoff, or a separately
 reviewed copy of `scripts/pyz_bootstrap.py`, to assess and prepare its exact PYZ.
-After source trust and integrity checks, Python 3.12+ can run it directly:
+After source trust and integrity checks, Python 3.10+ can run it directly:
 
 ```bash
 python -I -S -B /private/runtime/patchharbor-VERSION.pyz inspect /work/patch.zip --json

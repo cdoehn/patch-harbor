@@ -35,6 +35,17 @@ def prepared(tmp_path_factory):
         payloads = {name: wheel.read(name) for name in wheel.namelist()}
     # Explicit legacy data-profile fixture. New normal builds prepare only PYZ;
     # these tests continue checking the old reader/profile without a dual writer.
+    metadata = f"patchharbor-{__version__}.dist-info/METADATA"
+    assert b"Requires-Python: >=3.10" in payloads[metadata]
+    payloads[metadata] = payloads[metadata].replace(b"Requires-Python: >=3.10", b"Requires-Python: >=3.12")
+    # The legacy profile admits simple dev extras, not newer conditional build
+    # requirements. Keep this synthetic data fixture in that historical profile;
+    # the real new distribution and all frozen artifacts remain untouched.
+    lines = payloads[metadata].splitlines(keepends=True)
+    conditional = [line for line in lines if line.startswith(b"Requires-Dist: tomli")]
+    assert len(conditional) == 1 and conditional[0].strip() == (
+        b'Requires-Dist: tomli>=2.0.1; python_version < "3.11" and extra == "dev"')
+    payloads[metadata] = b"".join(line for line in lines if line not in conditional)
     return _prepare_transport(runtime,payloads,version=__version__,requires_python='>=3.12',
                               chat=payloads[runtime.CHAT_PATH],documentation=payloads[runtime.DOC_PATH])
 

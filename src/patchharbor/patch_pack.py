@@ -8,6 +8,8 @@ import os
 from pathlib import Path
 from uuid import uuid4
 
+from patchharbor.compat import add_exception_note
+
 from patchharbor.pyz_artifact import PyzProvider, own_pyz_profile_present
 from patchharbor.bundle_handoff import CHAT_INSTRUCTIONS_NAME, MAX_HANDOFF_ENTRY_BYTES
 from patchharbor.errors import FailureReason, PatchHarborError
@@ -19,6 +21,7 @@ from patchharbor.platform.file_handles import open_regular_nofollow
 from patchharbor.platform.filesystem import (
     FileChangedDuringRead, FileReadLimitExceeded, UnsupportedFileTypeError,
     read_stable_regular_file_bounded, _same_open_file_state, _same_path_and_open_file_state,
+    capture_descriptor_metadata,
 )
 from patchharbor.platform.pack_output import open_output_directory
 from patchharbor.progress import activity
@@ -74,9 +77,9 @@ def pack_patch(content_directory: Path, *, reference_bundle: Path, entrypoint: s
         try:
             reference_path = reference_bundle.resolve(strict=True)
             reference_descriptor = open_regular_nofollow(reference_path)
-            reference_metadata = os.fstat(reference_descriptor)
+            reference_metadata = capture_descriptor_metadata(reference_descriptor)
             reference = capture_result_reference(reference_path, expected_identity=reference_metadata)
-            if not _same_open_file_state(reference_metadata, os.fstat(reference_descriptor)):
+            if not _same_open_file_state(reference_metadata, capture_descriptor_metadata(reference_descriptor)):
                 raise FileChangedDuringRead('reference changed during capture')
         except (OSError, ValueError, FileChangedDuringRead, UnsupportedFileTypeError) as exc:
             raise _error('cannot capture pack reference', FailureReason.SOURCE_ERROR, exc) from exc
@@ -125,7 +128,7 @@ def pack_patch(content_directory: Path, *, reference_bundle: Path, entrypoint: s
                     try:
                         if (not _same_path_and_open_file_state(reference_path.lstat(), reference_metadata,
                                                               allow_path_identity_fallback=False)
-                                or not _same_open_file_state(reference_metadata, os.fstat(reference_descriptor))):
+                                or not _same_open_file_state(reference_metadata, capture_descriptor_metadata(reference_descriptor))):
                             raise FileChangedDuringRead('reference changed before pack finalization')
                         owned.verify_hash(validation.inspection.package_sha256,
                                           DEFAULT_RESOURCE_POLICY.max_input_artifact_bytes)
@@ -150,7 +153,7 @@ def pack_patch(content_directory: Path, *, reference_bundle: Path, entrypoint: s
                                          'optional cleanup interrupted after pack publication'))
                     else:
                         for warning in cleanup:
-                            exc.add_note(warning)
+                            add_exception_note(exc, warning)
                         raise
                 else:
                     result = replace(result, warnings=(*result.warnings, *owned.cleanup()))
@@ -162,11 +165,11 @@ def pack_patch(content_directory: Path, *, reference_bundle: Path, entrypoint: s
             try:
                 os.close(reference_descriptor)
             except (OSError, KeyboardInterrupt) as cleanup:
-                exc.add_note('cannot close pack reference handle: ' + str(cleanup))
+                add_exception_note(exc, 'cannot close pack reference handle: ' + str(cleanup))
         if isinstance(exc, KeyboardInterrupt):
             error = _error('pack interrupted without confirmed publication; inspect the chosen output before retrying',
                            FailureReason.INTERRUPTED, exc)
             for note in getattr(exc, '__notes__', ()):
-                error.add_note(note)
+                add_exception_note(error, note)
             raise error from exc
         raise

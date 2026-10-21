@@ -81,6 +81,11 @@ def test_actual_offline_install_and_native_reference_check(handoff, tmp_path, mo
     assessment = trusted_assessment(reference)
     assert assessment.reason is None
     result = bootstrap.install(assessment, tmp_path / "isolated-runtime")
+    if sys.version_info < (3, 12):
+        assert result.status == "fallback" and result.reason == "installer_or_python_incompatible"
+        assert not list(result.workspace.rglob("patchharbor/__init__.py"))
+        assert bootstrap.check_patch(patch, result)["native_validation"] is False
+        return
     assert result.status == "ready", result
     checked = bootstrap.check_patch(patch, result)
     assert checked["method"] == "native_reference" and checked["native_validation"] is True
@@ -216,6 +221,9 @@ def test_failed_bootstrap_has_one_attempt_and_uses_previous_handoff(handoff, tmp
     outcome = bootstrap.install(assessment, tmp_path / "failed-runtime")
     expected = {"missing_venv": "venv_unavailable", "install": "installation_failed",
                 "import": "runtime_import_failed", "wheel_changed": "installer_or_python_incompatible"}
+    if sys.version_info < (3, 12) and fault != "missing_venv":
+        expected[fault] = "installer_or_python_incompatible"
+        assert not any("-c" in command for command in calls)
     assert outcome.status == "fallback" and outcome.reason == expected[fault]
     assert len(calls) == len({tuple(command) for command in calls})
     assert bootstrap.check_patch(patch, outcome)["method"] == "previous_handoff"
@@ -234,6 +242,10 @@ def test_runtime_cannot_import_project_shadow_modules(handoff, tmp_path, monkeyp
     monkeypatch.setattr(bootstrap, "_run", run)
     assessment = trusted_assessment(reference)
     outcome = bootstrap.install(assessment, tmp_path / "isolated")
+    if sys.version_info < (3, 12):
+        assert outcome.status == "fallback" and outcome.reason == "installer_or_python_incompatible"
+        assert bootstrap.check_patch(patch, outcome)["native_validation"] is False
+        return
     assert outcome.status == "ready"
     assert bootstrap.check_patch(patch, outcome)["native_validation"] is True
 
@@ -278,6 +290,8 @@ def test_invalid_or_changed_validation_inputs_never_receive_success(handoff, tmp
 
 
 def test_uv_installed_runtime_works_outside_checkout(handoff, tmp_path, network_guard):
+    if sys.version_info < (3, 12):
+        pytest.skip("historical wheel execution requires Python 3.12; new PYZ install routes are tested separately")
     uv = shutil.which("uv")
     if uv is None:
         pytest.skip("uv route runs on the designated Ubuntu 26.04 CI lane")

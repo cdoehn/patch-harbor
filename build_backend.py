@@ -70,8 +70,8 @@ def _prepare_pyz_transport(transport: dict[str, bytes], *, version: str,
                  if name.startswith('patchharbor/') and not name.startswith(pyz.RESOURCE_ROOT)
                  and name not in {pyz.IDENTITY_PATH, 'patchharbor/_runtime_identity.py'}}
     canonical.update({pyz.CHAT_PATH: chat, pyz.DOC_PATH: documentation,
-                      pyz.LICENSE_PATH: license, pyz.MAIN_PATH: pyz.MAIN_BYTES,
-                      '__main__.py': pyz.MAIN_BYTES})
+                      pyz.LICENSE_PATH: license, pyz.MAIN_PATH: pyz.main_bytes(requires_python),
+                      '__main__.py': pyz.main_bytes(requires_python)})
     recipe, identity = pyz.create_recipe(canonical, version=version, requires_python=requires_python)
     canonical[pyz.IDENTITY_PATH] = identity
     candidate = pyz.materialize(recipe, lambda name, size: canonical[name])

@@ -31,15 +31,31 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: Release gate - Ubuntu 24.04
+          - name: Release gate - Ubuntu 24.04 - Python 3.10
+            runner: ubuntu-24.04
+            windows_engine: ""
+            python: "3.10"
+          - name: Release gate - Ubuntu 24.04 - Python 3.11
+            runner: ubuntu-24.04
+            windows_engine: ""
+            python: "3.11"
+          - name: Release gate - Ubuntu 24.04 - Python 3.12
             runner: ubuntu-24.04
             windows_engine: ""
             python: "3.12"
-          - name: Release gate - Windows 2025
+          - name: Release gate - Windows 2025 - Python 3.10
             runner: windows-2025
-            windows_engine: powershell.exe
+            windows_engine: "powershell.exe"
+            python: "3.10"
+          - name: Release gate - Windows 2025 - Python 3.11
+            runner: windows-2025
+            windows_engine: "powershell.exe"
+            python: "3.11"
+          - name: Release gate - Windows 2025 - Python 3.12
+            runner: windows-2025
+            windows_engine: "powershell.exe"
             python: "3.12"
-          - name: Release gate - Ubuntu 26.04
+          - name: Release gate - Ubuntu 26.04 - Python 3.14
             runner: ubuntu-26.04
             windows_engine: ""
             python: "3.14"
@@ -72,6 +88,9 @@ jobs:
           powershell.exe -NoLogo -NoProfile -NonInteractive -Command '$PSVersionTable.PSVersion'
           pwsh -NoLogo -NoProfile -NonInteractive -Command '$PSVersionTable.PSVersion'
 
+      - name: Capture audited build and interpreter evidence
+        run: python scripts/capture_ci_build.py --report "${{ runner.temp }}/patchharbor-build.json"
+
       - name: Run core and architecture tests
         run: >-
           python tools/run_tests.py --suite core --durations=10
@@ -96,8 +115,9 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: patchharbor-packaging-${{ matrix.runner }}
+          name: patchharbor-packaging-${{ matrix.runner }}-py${{ matrix.python }}
           path: |
+            ${{ runner.temp }}/patchharbor-build.json
             ${{ runner.temp }}/patchharbor-core-tests.json
             ${{ runner.temp }}/patchharbor-e2e-tests.json
             ${{ runner.temp }}/patchharbor-platform-tests.json
@@ -106,20 +126,25 @@ jobs:
           retention-days: 14
 
   windows-powershell7-acceptance:
-    name: Release gate - Windows 2025 - PowerShell 7
+    name: Release gate - Windows 2025 - PowerShell 7 - Python ${{ matrix.python }}
     runs-on: windows-2025
     timeout-minutes: 30
     env:
       PATCHHARBOR_WINDOWS_ACCEPTANCE_ENGINE: pwsh
 
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.10", "3.11", "3.12"]
+
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
 
-      - name: Set up Python 3.12
+      - name: Set up Python
         uses: actions/setup-python@v7
         with:
-          python-version: "3.12"
+          python-version: ${{ matrix.python }}
 
       - name: Install development dependencies
         run: python -m pip install --disable-pip-version-check -e ".[dev]"
@@ -131,6 +156,9 @@ jobs:
         shell: pwsh
         run: Get-Command pwsh -ErrorAction Stop
 
+      - name: Capture audited build and interpreter evidence
+        run: python scripts/capture_ci_build.py --report "${{ runner.temp }}/patchharbor-build.json"
+
       - name: Run native Windows PowerShell 7 acceptance
         shell: pwsh
         run: >-
@@ -141,8 +169,10 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: patchharbor-windows-powershell7
-          path: ${{ runner.temp }}/patchharbor-windows-tests.json
+          name: patchharbor-windows-powershell7-py${{ matrix.python }}
+          path: |
+            ${{ runner.temp }}/patchharbor-build.json
+            ${{ runner.temp }}/patchharbor-windows-tests.json
           if-no-files-found: error
           retention-days: 14
 
@@ -176,6 +206,8 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: patchharbor-docker-ubuntu-${{ matrix.ubuntu }}
-          path: ${{ runner.temp }}/patchharbor-docker-integration/ubuntu-${{ matrix.ubuntu }}
+          path: |
+            ${{ runner.temp }}/patchharbor-docker-integration/ubuntu-${{ matrix.ubuntu }}
+            !${{ runner.temp }}/patchharbor-docker-integration/ubuntu-${{ matrix.ubuntu }}/patchharbor-build-artifacts/**
           if-no-files-found: error
           retention-days: 14

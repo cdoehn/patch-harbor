@@ -16,7 +16,10 @@ import subprocess
 import sys
 import tarfile
 import tempfile
-import tomllib
+try:
+    import tomllib
+except ModuleNotFoundError:  # Explicit build/dev dependency on Python 3.10 only.
+    import tomli as tomllib
 import zipfile
 from typing import NamedTuple
 

@@ -13,6 +13,7 @@ from patchharbor.models import (
     RepositoryPath,
 )
 from patchharbor.platform.paths import physically_canonicalize
+from patchharbor.platform.private_directory import create_private_directory
 from patchharbor.platform.filesystem import (
     FileSystemOperationError,
     PathKind,
@@ -293,7 +294,7 @@ def apply_local_registration(
 
     if not state.internal_directory_existed:
         try:
-            state.internal_directory.mkdir(mode=0o700)
+            create_private_directory(state.internal_directory)
         except OSError as exc:
             raise _error(f"cannot create {state.internal_directory}: {exc}") from exc
     _require_internal_directory_state(state.internal_directory)

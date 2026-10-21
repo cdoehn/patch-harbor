@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import re
-import tomllib
+try:
+    import tomllib
+except ModuleNotFoundError:  # Explicit build/dev dependency on Python 3.10 only.
+    import tomli as tomllib
 from pathlib import Path
 
 from tests.platform_support import PROJECT_ROOT
@@ -39,6 +42,7 @@ EXPECTED_CORE_RUNTIME_FILES = {
     "platform/environment.py",
     "bundles.py",
     "cli.py",
+    "compat.py",
     "configuration.py",
     "configuration_context.py",
     "context_output.py",
@@ -102,6 +106,8 @@ EXPECTED_CORE_RUNTIME_FILES = {
     "platform/errors.py",
     "platform/filesystem.py",
     "platform/file_handles.py",
+    "platform/file_times.py",
+    "platform/private_directory.py",
     "platform/cifs.py",
     "platform/lifecycle.py",
     "platform/locking.py",
@@ -393,12 +399,12 @@ def test_v121_release_retains_completed_v111_history() -> None:
     chat = (PROJECT_ROOT / "CHAT_INSTRUCTIONS.md").read_text(encoding="utf-8")
     readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
 
-    assert __version__ == "1.3.0"
-    assert 'RELEASE_VERSION = "1.3.0"' in packaging
+    assert __version__ == "1.4.0"
+    assert 'RELEASE_VERSION = "1.4.0"' in packaging
     # The joint specification retains the bound 1.2.1 base contract.
     assert "**Produktversion:** `1.2.1`<br>" in specification
-    assert "**Vertragsversion:** 1.3.0<br>" in chat
-    assert "PatchHarbor 1.3.0" in readme
+    assert "**Vertragsversion:** 1.4.0<br>" in chat
+    assert "PatchHarbor 1.4.0" in readme
     assert (
         "**Planstatus:** 12 / 12 Plan-Commits umgesetzt; "
         "Plan abgeschlossen; 0 Plan-Commits offen.<br>"

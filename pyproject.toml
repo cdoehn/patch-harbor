@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=77"]
+requires = ["setuptools>=77", "tomli>=2.0.1; python_version < '3.11'"]
 build-backend = "build_backend"
 backend-path = ["."]
 
@@ -9,7 +9,7 @@ dynamic = ["version"]
 description = "Controlled cross-platform runner for generated Bash and PowerShell scripts and ZIP PatchBundles."
 keywords = ["bash", "cli", "patch-bundle", "powershell", "script-runner", "zip"]
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.10"
 license = "MIT"
 license-files = ["LICENSE"]
 authors = [
@@ -22,6 +22,8 @@ classifiers = [
   "Operating System :: Microsoft :: Windows",
   "Operating System :: POSIX :: Linux",
   "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Topic :: System :: Shells",
 ]
@@ -40,7 +42,8 @@ dev = [
   "pytest-xdist>=3.8",
   "pytest-timeout>=2.4",
   "setuptools>=77",
-  "wheel>=0.43"
+  "wheel>=0.43",
+  "tomli>=2.0.1; python_version < '3.11'"
 ]
 
 [tool.pytest.ini_options]

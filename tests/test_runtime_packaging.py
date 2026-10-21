@@ -41,6 +41,11 @@ def _install_builder(python, outside, environment):
     shutil.copytree(distribution.locate_file("_distutils_hack"), site / "_distutils_hack")
     info = next(path for path in distribution.files if str(path).endswith(".dist-info/METADATA"))
     shutil.copytree(distribution.locate_file(info).parent, site / info.parent.name)
+    if sys.version_info < (3, 11):
+        parser = metadata.distribution("tomli")
+        shutil.copytree(parser.locate_file("tomli"), site / "tomli")
+        info = next(path for path in parser.files if str(path).endswith(".dist-info/METADATA"))
+        shutil.copytree(parser.locate_file(info).parent, site / info.parent.name)
 
 
 @contextmanager
@@ -151,7 +156,7 @@ print(json.dumps(measurement))
             assert 0<produced['peak_python_bytes']<128*1024*1024
         assert cli['result']['scope']=='package'
         assert not (outside/'SHOULD_NOT_EXIST').exists()
-        assert proof['requires_python']=='>=3.12'
+        assert proof['requires_python']=='>=3.10'
         fingerprints.append(proof)
         raw=target.read_bytes()
         if previous is not None:assert raw==previous

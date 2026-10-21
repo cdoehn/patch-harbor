@@ -4,20 +4,25 @@
 from __future__ import annotations
 
 import argparse
+from collections.abc import Mapping
 from importlib.metadata import PackageNotFoundError, distribution
 from importlib.util import find_spec
 import locale
 import os
 from pathlib import Path
-import re
 import shutil
 import subprocess
 import sys
-import tomllib
+try:
+    import tomllib
+except ModuleNotFoundError:  # Explicit build/dev dependency on Python 3.10 only.
+    import tomli as tomllib
+
+
+from packaging.requirements import InvalidRequirement, Requirement
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-_REQUIREMENT_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*")
 _DETERMINISTIC_ENVIRONMENT = {
     "LANG": "C.UTF-8",
     "LC_ALL": "C.UTF-8",
@@ -51,15 +56,21 @@ def _command_version(command: str) -> None:
 
 def declared_dev_distribution_names(
     pyproject_path: Path = PROJECT_ROOT / "pyproject.toml",
+    *, environment: Mapping[str, str] | None = None,
 ) -> tuple[str, ...]:
     project = tomllib.loads(pyproject_path.read_text(encoding="utf-8"))
     requirements = project["project"]["optional-dependencies"]["dev"]
     names: list[str] = []
     for requirement in requirements:
         _require(isinstance(requirement, str), "development requirement is not text")
-        match = _REQUIREMENT_NAME.match(requirement)
-        _require(match is not None, f"invalid development requirement: {requirement!r}")
-        names.append(match.group(0))
+        try:
+            parsed = Requirement(requirement)
+        except InvalidRequirement:
+            raise SystemExit(f"invalid development requirement: {requirement!r}") from None
+        # pip installs only requirements whose PEP 508 marker holds here.
+        # packaging is already required by the declared build toolchain.
+        if parsed.marker is None or parsed.marker.evaluate(environment={"extra": "dev", **(environment or {})}):
+            names.append(parsed.name)
     return tuple(names)
 
 

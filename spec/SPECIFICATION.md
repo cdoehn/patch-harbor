@@ -1,37 +1,47 @@
 # PatchHarbor – Spezifikation
 
 **Dateiname:** `SPECIFICATION.md`<br>
+**Historischer Basisvertrag – Versionsangabe nur für dessen ursprünglichen Stand:**<br>
 **Produktversion:** `1.2.1`<br>
-**Spezifikationsstand:** 2026-10-05 · Native Watcher-Adapter WE-2 vorbereitet<br>
-**Status:** Verbindliche, freigegebene Produktspezifikation für den Bestandsvertrag 1.2.1; keine Release-Freigabe des konkreten Commits ohne grüne Gates.<br>
+**Aktuelle Produktbasis:** `1.3.0`, gemeinsam mit der PYZ/PACK-Ergänzung.<br>
+**Spezifikationsstand:** 2026-10-13 · CPython-3.10/3.11-Planstart CP-00<br>
+**Status:** Verbindliche, freigegebene Produktspezifikation des Bestands mit den unten erklärten Ergänzungen. CP-00 erweitert den Zielvertrag, nicht die bereits nachgewiesene Interpreterunterstützung.<br>
 **RIV-Status:** 18/18 Umsetzungsschritte samt Abschlusskorrektur durch Bundle 015 und CI-Run 37306630290 auf `a02391dc045d42e317b3e766f0b1e9fa8dfadec1` bestätigt; Plan abgeschlossen.<br>
-**Watcher-Ereignisse:** WE-0/WE-1 durch Bundles 016/017 bestätigt; native Adapter WE-2 vorbereitet, noch keine Änderung des Polling-Betriebs.<br>
+**Watcher-Ereignisse:** Ereignisgesteuerter Watcher Bestandteil der bestätigten Basis; historische WE-Zwischenstände aktivieren keinen neuen Watcher-Plan.<br>
 **Projektname:** `PatchHarbor`<br>
 **Kommando:** `patchharbor`<br>
 **Skriptmarker:** `# PATCHHARBOR`<br>
 **Patch-Paketmarker:** `patch-harbor`
 
-Der aktive Entwicklungsplan liegt unter `planning/watcher-events/commit-plan.md`;
-das normative Entwicklungsziel unter `planning/watcher-events/specification.md`.
-WE-0/WE-1 sind angewendet. WE-2 bereitet native Linux-/Windows-Ereignisadapter vor.
-Sein Apply-Nachweis, native Windows-Prüfung und die Aktivierung des neuen
-Watcher-Verhaltens stehen aus. Die Zielversion wird gesondert
-festgelegt; die vorhandene Paketversion bleibt 1.2.1.
-Der RIV-Plan unter `planning/runtime-inspect-validate/commit-plan.md` ist abgeschlossen.
-Die abgeschlossenen Pläne unter `planning/1.2.1/`,
-`planning/1.2.0/`, `planning/1.1.1/`, `planning/1.1.0/` und `planning/1.0.0/`
-bleiben historische Grundlagen. Die Dokumentübernahme `RIV-DOCS-1` liegt außerhalb
-der 18 RIV-Umsetzungsschritte. Änderungen am Produktziel stehen in
-`spec/SPECIFICATION_CHANGELOG.md`.
+Der ausdrücklich beauftragte Entwicklungsplan liegt unter
+[`planning/python-compatibility/commit-plan.md`](../planning/python-compatibility/commit-plan.md).
+Für diesen Auftrag gelten gemeinsam diese drei Normdateien:
+
+- dieses Basisdokument,
+- [PYZ/PACK-Ergänzung](SPECIFICATION_EXTENSION_PYZ_PACK.md),
+- [CPython-3.10/3.11-Ergänzung](SPECIFICATION_EXTENSION_CPYTHON_310_311.md).
+
+Die neue Ergänzung ersetzt nur ihre ausdrücklich benannten Python-Untergrenzen
+und ergänzt deren Nachweise. Unberührte Sicherheits-, Fehler- und Paketregeln
+gelten weiter. Dies ist die gezielte Ausnahme zur Einzeldokumentauswahl in
+§26.3/35, keine Mehrdeutigkeit zwischen konkurrierenden Spezifikationen.
+Der PYZ/PACK-Plan ist mit 16/16 Positionen, Korrektur 046 und der manuellen CI
+auf `30e5de1d67a2d725ff192a0b97e50c2b0336bfcb` abgeschlossen. Er sowie die
+Versions-, RIV- und Watcher-Pläne bleiben historische Grundlagen. Die neue
+Releaseversion wird gesondert festgelegt; CP-00 belässt Produkt und Runtime
+auf ihrem bestehenden Stand. Änderungen stehen im
+[`SPECIFICATION_CHANGELOG.md`](SPECIFICATION_CHANGELOG.md).
 
 ---
 
 ## 1. Zweck, Gültigkeit und Verhältnis zu 1.1.1
 
-Dieses Dokument beschreibt den Bestandsvertrag von PatchHarbor 1.2.1 und das
-Produktziel der RIV-Erweiterung in Abschnitten 35–41 sowie das noch nicht
-vollständig implementierte Watcher-Ziel nach Abschnitt 3.2.1. Dokumentationsübernahmen
-aktivieren für sich allein keine neue Laufzeitfunktion.
+Dieses Dokument bewahrt den Bestandsvertrag aus PatchHarbor 1.2.1 einschließlich
+der RIV-Erweiterung in Abschnitten 35–41 und des Watcher-Vertrags nach §3.2.1.
+Die oben erklärten Ergänzungen ordnen den bestätigten 1.3.0-Stand und das neue
+CPython-Ziel ein. Historische Zukunftsformulierungen sind keine erneute
+Planaktivierung. Dokumentationsübernahmen aktivieren für sich allein keine
+neue Laufzeitfunktion.
 Ihre Querverweise ergänzen die jeweils betroffenen Basisabschnitte; unbetroffene
 Bestandsverträge einschließlich repositorylokaler Konfiguration bleiben erhalten.
 
@@ -295,7 +305,11 @@ patchharbor
 
 ### 4.2 Python und Zielplattformen
 
-PatchHarbor 1.1.1 verwendet die vollständig implementierte 1.1.0-Basis und benötigt Python 3.12 oder neuer.
+Der bestätigte PatchHarbor-1.3.0-Stand benötigt Python 3.12 oder neuer.
+Die beauftragte Erweiterung auf CPython 3.10/3.11 ist in
+[CPY-02–04](SPECIFICATION_EXTENSION_CPYTHON_310_311.md) festgelegt. Erst ihre
+Implementierung und tatsächlichen Gates belegen die neue Untergrenze;
+der Planstart allein verändert keine Paketmetadaten.
 
 Verbindliche Zielplattformen:
 
@@ -3768,7 +3782,9 @@ Legacy-Daten unter `share/patchharbor` dürfen beim Übergang lesbar bleiben. Di
 
 ### 38.2 Python und Systemvoraussetzungen
 
-Die bestehende Mindestanforderung bleibt zunächst **Python 3.12**. Runtime-Metadaten übernehmen das tatsächlich gebaute `Requires-Python`, nicht einen unabhängig gepflegten Wunschwert. Eine Unterstützung älterer Interpreter gehört nicht zu diesem Auftrag. [Q3]
+Die bestehende Mindestanforderung bleibt zunächst **Python 3.12**. Runtime-Metadaten übernehmen das tatsächlich gebaute `Requires-Python`, nicht einen unabhängig gepflegten Wunschwert. Diese historische RIV-Abgrenzung wird für den neuen Auftrag gezielt durch
+[CPY-01/10–13](SPECIFICATION_EXTENSION_CPYTHON_310_311.md) erweitert. Alte
+Runtime-Artefakte behalten ihre ursprünglichen Anforderungen. [Q3]
 
 Paketinspektion und reine Paketvalidierung dürfen kein Git, Bash oder PowerShell benötigen. Repositoryvalidierung und `bundle` benötigen zusätzlich die vorhandenen Git-/Repositoryvoraussetzungen. Eine erfolgreiche Runtime-Installation ersetzt diese nicht.
 
@@ -4039,6 +4055,12 @@ Runtime-Bereitstellung, Paketprüfung, lokale Projekttests, Apply auf dem Zielre
 ## 41. Abnahmekriterien und WRC-Umsetzung
 
 ### 41.1 Funktionale Abnahme
+
+Für den CPython-Auftrag ergänzen CPY-14–16 und CT-01–16 der
+[neuen Norm](SPECIFICATION_EXTENSION_CPYTHON_310_311.md) diese historische
+Abnahme. Die neue 3.10-/3.11-Matrix kommt zu den bestehenden 3.12-/3.14-Gates;
+alle Tests laufen parallel, CI startet ausschließlich Christian manuell.
+Result-/PYZ-Nachweise folgen außerdem der weiterhin geltenden PYZ/PACK-Norm.
 
 API und CLI müssen denselben fachlichen Code verwenden; die neuen Operationen müssen auf dem tatsächlich installierten Wheel außerhalb des Checkouts funktionieren. Alle bestehenden funktionalen Sicherheits- und Plattformverträge bleiben blockierend. Ein erfolgreicher Dateihash-Test ist kein Ersatz für einen installierten Durchstich.
 

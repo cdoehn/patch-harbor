@@ -12,7 +12,8 @@ Das sortierte finite Inventar enthält Root-`__main__.py`, Core-Code, Typingmark
 Chatvorlage, API-Dokumentation, Lizenz und das generierte `_pyz_identity.py`.
 `__main__.py` stammt ausschließlich aus der inventarisierten Ressource
 `patchharbor/_runtime/pyz-main.py` mit gleichen Bytes. Der Einstieg prüft
-Python >=3.12 vor dem ersten Core-Import. Watcher, dist-info, alte generierte
+Python >=3.10 vor dem ersten Core-Import. Originale 1.3.0-Artefakte
+behalten ihren unveränderten >=3.12-Startcode und ihre ursprünglichen Hashes. Watcher, dist-info, alte generierte
 Wheel-Identitäten/-Rezepte, fremde Pakete, Bytecode, Hooks und Runtime-Artefakte
 sind ausgeschlossen. Legacy-Wheel-Lesecode bleibt im Core.
 

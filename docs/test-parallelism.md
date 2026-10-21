@@ -8,7 +8,8 @@ Gates. Nur Christian selbst startet den weiterhin manuellen CI-Workflow.
 Codex und Entrypoints starten keine CI; der frühere Fünfertakt entfällt.
 Die aktive Schleife arbeitet den bestehenden Plan ohne feste Korrekturgrenze ab.
 Der vorhandene Watcher übernimmt ausschließlich fertig veröffentlichte Pakete.
-Details und aktuelle Resultbindung: aktiver PYZ/PACK-Plan, Abschnitt 1.10.
+Details und aktuelle Resultbindung: aktiver
+`planning/python-compatibility/commit-plan.md`.
 
 ## Historische Pixel-Phase: durch den Laptop-Wechsel beendet
 
@@ -40,8 +41,9 @@ Core-/Bindungs-/Datei-/Git-Scopeprüfungen (keine Produkttests)
 
 Die Tests laufen ausschließlich in der GitHub-CI, parallel mit dem vorhandenen
 xdist-`auto`-Vertrag. Keine zusätzliche serielle Suite, kein Modusvergleich und
-keine neue Triggerinfrastruktur. `scripts/run_handoff_ci.py` wartet auf den
-korrelierten Workflow inklusive Windows/Docker; Ergebnis-/Berichtsprüfung auf
+keine neue Triggerinfrastruktur. Die damalige Fassung von
+`scripts/run_handoff_ci.py` wartete auf den korrelierten Workflow inklusive
+Windows/Docker; Ergebnis-/Berichtsprüfung auf
 dem Pixel ist kein lokaler Testlauf. Der native Bericht muss tatsächlich Worker
 belegen. Plattform-Skips bleiben Skips, keine erfundenen Zielplattformnachweise.
 
@@ -202,15 +204,40 @@ native Plattformabnahmen und Releasefreigabe bleiben bis zum passenden Nachweis
 offen. Bekannte CI-Fehler werden weiterhin anhand tatsächlicher Ergebnisse
 ausgewertet. Ein paralleler Linux-Lauf ersetzt keinen nativen Windows-Beleg.
 
-Die native Packaging-Lane speichert seit `1.c.R-FIX1` ihren Controller-Bericht
-unter `${{ runner.temp }}/patchharbor-packaging-tests.json` und lädt ihn auch bei
-Fehlern als `patchharbor-packaging-<runner>` hoch (14 Tage Aufbewahrung).
-Fehlende Dateien sind Fehler. Der JSON-Bericht enthält Sammlung, Phasen,
-Workerabschlüsse, Plattform/Interpreter und Quellbindung; ein Upload allein
-ist kein bestandenes Gate. Die erforderlichen Runtime-/Windows-Rechtefälle
-und Zuordnung zum tatsächlichen Run-HEAD stehen in `docs/runtime-artifact.md`.
-Die DACL-Tests ändern ausschließlich Rechte ihrer privaten temporären Fixtures;
-Linux-Ausführung und Windows-Skips ersetzen keinen nativen Windows-Beleg.
+Die manuelle CP-04-Matrix enthält zwölf Jobs: vollständige Gruppen auf Linux und
+Windows mit CPython 3.10, 3.11 und 3.12, zusätzlich Linux mit 3.14, drei
+PowerShell-7-Lanes (3.10/3.11/3.12) und die beiden bisherigen Docker-Lanes.
+Jeder Job zeichnet die exakte Interpreterversion, aufgelöste Build-/Testwerkzeuge,
+Quellbindung und SHA-256 der tatsächlich gebauten Wheel-, sdist- und PYZ-Dateien
+auf. Native Hauptlanes laden alle vier Controller-Berichte hoch;
+PowerShell 7 seinen erweiterten Windows-Bericht; Docker zusätzlich seine Logs.
+Artefaktnamen enthalten Interpreter und Plattform, zum Beispiel
+`patchharbor-packaging-windows-2025-py3.10`. Aufbewahrung: 14 Tage.
+
+Nach Christians manuellem Start kann ein vorhandener Lauf einmal lesend geprüft
+werden (Platzhalter durch Run-ID und vollständigen Commit ersetzen):
+
+```sh
+python scripts/run_handoff_ci.py --run-id RUN_ID --commit FULL_COMMIT_SHA
+```
+
+Der Helfer startet und wiederholt keinen Workflow und wartet nicht auf laufende
+Jobs. Er bindet den vorhandenen Run und seinen Attempt an `dev` und den genannten
+Commit, prüft alle zwölf Jobs sowie deren Build- und parallele Testnachweise und
+speichert `build/manual-ci-review/RUN_ID-1/evidence.json`. Ein laufender Run wird
+als `pending` mit Exitcode 2 erfasst. Eine spätere Auswertung benötigt ein neues
+`--workspace`-Verzeichnis; ein vorhandener Nachweis wird nicht überschrieben.
+Für einen von Christian gestarteten weiteren Attempt dient `--attempt NUMMER`.
+Eine zusätzliche Handoff-ID ist für diese Auswertung nicht erforderlich.
+
+Pflichtfälle für eigene Result-Anleitung, Core-PYZ, drei Installationsgenerationen,
+CLI/API/Watcher und native Windows-Sicherheitsadapter müssen bestanden sein.
+Skips und Collection-Skips werden separat erhalten. Historische eingefrorene
+Laufzeiten mit eigener Mindestversion 3.12 werden auf älteren Interpretern nicht
+als ausführbar behauptet; die Datenlesbarkeit alter Results und die neue
+3.10-Produktion bleiben eigene Pflichtprüfungen. Native DACL-Fälle ändern nur
+private temporäre Fixtures. CI ersetzt keine zusätzliche geforderte CIFS-Praxis
+oder die abschließende Releaseentscheidung.
 
 Im Development und im Apply läuft vor jedem Commitstand dieselbe vollständige
 parallele Suite. Dies gilt auch am Bundle-Ende; kein serieller Vorlauf und kein

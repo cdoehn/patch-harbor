@@ -1,6 +1,6 @@
 # Installation and safe updates
 
-PatchHarbor requires Python 3.12 or newer. The normal wheel/sdist installation
+PatchHarbor requires Python 3.10 or newer. The normal wheel/sdist installation
 provides both `patchharbor` and `patchharbor-watcher`; the Core-PYZ deliberately
 does not include the watcher. Git and the declared Bash/PowerShell interpreter
 are needed for repository execution, not for static pack/reference checks.
@@ -14,19 +14,19 @@ in the source tree is not evidence that an index release or Git tag exists.
 The [acceptance plan](../planning/pyz-pack/commit-plan.md) records release gates;
 `patchharbor --version` reports the executable you are actually invoking.
 
-With an existing pipx and Python 3.12+ on POSIX:
+With an existing pipx and Python 3.10+ on POSIX:
 
 ```bash
 python3 --version
-pipx install --python python3 /absolute/path/patchharbor-1.3.0-py3-none-any.whl
+pipx install --python python3 /absolute/path/patchharbor-1.4.0-py3-none-any.whl
 patchharbor --version
 patchharbor-watcher --help
 ```
 
 Ensure pipx's application directory is on PATH. `pipx list` shows the environment
 it manages; `command -v patchharbor` locates the selected POSIX executable.
-Use an explicit interpreter path if `python3` is older than 3.12. On Windows,
-use the same pipx commands with Windows paths and an available Python 3.12+
+Use an explicit interpreter path if `python3` is older than 3.10. On Windows,
+use the same pipx commands with Windows paths and an available Python 3.10+
 executable; `Get-Command patchharbor` shows which executable PowerShell selects.
 
 For a reviewed local source checkout, `pipx install /absolute/path/to/checkout`
@@ -38,7 +38,7 @@ Normal installation is distinct from the stdlib-only PYZ bootstrap.
 
 ## Dedicated venv instead of pipx
 
-pipx is optional. For example on POSIX, after confirming `python3` is 3.12+:
+pipx is optional. For example on POSIX, after confirming `python3` is 3.10+:
 
 ```bash
 python3 -m venv /absolute/path/to/patchharbor-env
@@ -74,7 +74,7 @@ Do not use `python -m patchharbor`: the installed module entrypoint is
    new wheel. For pipx, a newer local wheel can replace the managed package:
 
    ```bash
-   pipx install --force /absolute/path/patchharbor-1.3.0-py3-none-any.whl
+   pipx install --force /absolute/path/patchharbor-1.4.0-py3-none-any.whl
    patchharbor --version
    ```
 

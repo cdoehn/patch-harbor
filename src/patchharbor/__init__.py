@@ -1,6 +1,6 @@
 """PatchHarbor package."""
 
-__version__ = "1.3.0"
+__version__ = "1.4.0"
 
 # A wheel-only literal captures the installed producer when this process first
 # imports the package. Source/editable use has no prepared producer identity.

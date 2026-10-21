@@ -1,12 +1,12 @@
 # PatchHarbor – Spezifikationserweiterung: Result-PYZ und `pack`
 
 **Dokument-ID:** `PYZ-PACK`  
-**Revision:** 3
-**Stand:** 7. Oktober 2026  
+**Revision:** 4
+**Stand:** 13. Oktober 2026
 **Vorgesehener Ablageort:** `spec/SPECIFICATION_EXTENSION_PYZ_PACK.md`  
 **Basisdokument:** danebenliegende [`SPECIFICATION.md`](SPECIFICATION.md), gebundener Bestandsvertrag 1.2.1 einschließlich RIV und der bereits enthaltenen Result-/CIFS-Publikationsregeln  
-**Status:** Zielvertrag mit autorisierter Grenzkorrektur vom 8. Oktober 2026; ersetzt Revision 2 dieser Ergänzung, nicht die Hauptspezifikation; Ausführungsnachweise stehen im Plan
-**Ziel-Produktversion:** vor der Release-Umsetzung gesondert festzulegen; dieses Dokument behauptet keine neue veröffentlichte Version
+**Status:** Fortgeltender PYZ/PACK-Vertrag der bestätigten 1.3.0-Basis; Revision 4 ordnet die neu beauftragte Python-Erweiterung ein. Ausführungsnachweise stehen im abgeschlossenen PYZ/PACK-Plan.
+**Produktbasis:** 1.3.0; die Folgeversion des CPython-Auftrags wird gesondert festgelegt.
 
 > **Ziel:** Neue Result-Bundles liefern PatchHarbor als direkt mit Python aufrufbare PYZ statt als zu installierendes Runtime-Wheel. Die PYZ enthält den PatchHarbor-Core mit dessen CLI und öffentlicher Python-API, **aber keinen Watcher**. Zusätzlich erhält PatchHarbor das reguläre Unterkommando `pack` und die öffentliche Funktion `api.pack_patch(...)`, um vorbereitete Inhalte als referenzgebundenes, abschließend validiertes Patch-Paket zu erzeugen.
 
@@ -68,6 +68,19 @@ Die beiden so eingeordneten Dateien sind keine konkurrierenden Kandidaten und l�
 Der neue Plan wird aufgrund des ausdrücklich beauftragten Features und seines eindeutigen aktiven Planverweises gewählt. Eine noch unveränderte Paketversionsnummer aktiviert weder einen abgeschlossenen Versions-/RIV-/Watcher-Plan noch verdrängt sie `PYZ-PACK`. Die bisherige Behandlung echter Planmehrdeutigkeit und unbekannter Planpositionen bleibt bestehen. Solange der neue Plan noch nicht angelegt ist, darf er nicht als bereits vorhandene Datei ausgegeben werden; dieses Dokument beschreibt bis dahin den vorgesehenen Arbeitsplan.
 
 Plan- und Spezifikationsnachweise müssen beide verwendeten Spezifikationspfade erkennen lassen. Dafür werden die vorhandenen Anweisungen und Dokumentverweise angepasst, **kein Core-Spezifikationsscanner, keine Registry und kein neuer Dienst** eingeführt. Die konkrete optische Darstellung wird nicht zum UI-Testvertrag.
+
+### 1.1.1 Nachfolgender CPython-Auftrag
+
+Der PYZ/PACK-Plan ist abgeschlossen. Für den ausdrücklich beauftragten
+Nachfolgeplan [CPython 3.10/3.11](../planning/python-compatibility/commit-plan.md)
+gehört zusätzlich [SPECIFICATION_EXTENSION_CPYTHON_310_311.md](SPECIFICATION_EXTENSION_CPYTHON_310_311.md)
+zum gemeinsam normativen Satz. Das erweitert GOV-01/03 gezielt auf drei Dateien;
+die historische Zweierauswahl oben gilt für den ursprünglichen PYZ/PACK-Auftrag.
+CPY-01 ersetzt ausschließlich die ältere-Python-Abgrenzung in §2.2 und die
+Untergrenze/Matrix in PYZ-02 und TEST-04. CPY-10–13 erhalten originale
+3.12-Artefakte und definieren den sicheren Übergang zur neuen geschlossenen
+3.10-Variante. Alle übrigen Profile, Sicherheitsgrenzen und Fehler-/Paketverträge
+bleiben erhalten. CP-00 implementiert diese Erweiterung noch nicht.
 
 ### 1.2 Konkrete Ausgangsbasis
 
@@ -139,7 +152,7 @@ Diese Erweiterung enthält keinen automatischen Dateivergleich zwischen bearbeit
 
 `pack` installiert nichts, führt kein Skript aus, startet keine Tests, committet oder pusht nicht und wendet kein Paket an. Es beobachtet keine Ordner. Es erhält weder `--apply` noch einen impliziten anschließenden Apply.
 
-Es werden kein neuer Python-Interpreter, keine virtuelle Umgebung, keine externen Runtime-Dependencies, kein allgemeiner Plugin-Loader, kein Netzwerkdienst und keine neue Sicherheits-Sandbox ausgeliefert. Unterstützung älterer Python-Versionen, native EXE-Launcher, Signaturen, eine Multi-Wheel-Abhängigkeitssammlung und ein universeller Runtime-Updater sind ebenfalls nicht Gegenstand dieses Auftrags.
+Es werden kein neuer Python-Interpreter, keine virtuelle Umgebung, keine externen Runtime-Dependencies, kein allgemeiner Plugin-Loader, kein Netzwerkdienst und keine neue Sicherheits-Sandbox ausgeliefert. Native EXE-Launcher, Signaturen, eine Multi-Wheel-Abhängigkeitssammlung und ein universeller Runtime-Updater sind ebenfalls nicht Gegenstand dieses Auftrags. Ältere Python-Versionen waren im ursprünglichen PYZ/PACK-Auftrag ausgeschlossen; der neue CPython-Auftrag hebt ausschließlich diesen Ausschluss gemäß §1.1.1 auf.
 
 ## 3. Begriffe und unveränderte Einspielsemantik
 
@@ -234,7 +247,7 @@ python /pfad/patchharbor.pyz bundle /pfad/zum/registrierten-repository
 
 Python ZIP-Anwendungen benötigen einen Root-Einstieg `__main__.py`; der Python-Interpreter kann weitere Module aus dem Archiv laden. Die PYZ bringt den Interpreter nicht selbst mit. [Q1, Q2]
 
-**PYZ-02.** Die Mindestanforderung bleibt für diese Erweiterung **Python 3.12**. `requires_python` muss aus den tatsächlichen Produkt-/Builddaten stammen. Der Einstieg erkennt einen zu alten Python-3-Interpreter vor dem Import inkompatibler Produktmodule und endet mit einem verständlichen Fehler. Eine Zusage für alle künftigen Python-Versionen wird nicht gegeben.
+**PYZ-02.** Die ursprüngliche PYZ/PACK-Untergrenze ist **Python 3.12**. Die neue Untergrenze 3.10 samt zwei geschlossenen, unvermischt zu prüfenden Artefaktvarianten ist für den Nachfolgeauftrag in CPY-02/10–13 festgelegt. `requires_python` muss aus den tatsächlichen Produkt-/Builddaten stammen. Der Einstieg erkennt einen zu alten Python-3-Interpreter vor dem Import inkompatibler Produktmodule und endet mit einem verständlichen Fehler. Eine Zusage für alle künftigen Python-Versionen wird nicht gegeben.
 
 ### 5.2 Sicherer empfohlener Start im Chat
 
@@ -1222,7 +1235,7 @@ Die normale Installation muss den Watcher weiterhin korrekt dokumentieren. In de
 
 ### 17.7 Plattformen, vorhandene CI und Messungen
 
-**TEST-04.** Verpflichtend sind die Python-Untergrenze 3.12 und mindestens ein zusätzlich im Plan festgelegter unterstützter Interpreter. Auf der gelieferten Grundlage sind die vorhandenen nativen Lanes mit CPython 3.12 und 3.14, Linux und Windows sowie deren Bash-/PowerShell-Prüfungen weiterzuverwenden. Ein Linux-Lauf belegt keine native Windows-Funktion.
+**TEST-04.** Für die ursprüngliche Abnahme sind die Python-Untergrenze 3.12 und mindestens ein zusätzlich im Plan festgelegter unterstützter Interpreter verpflichtend. Der Nachfolgeauftrag ergänzt gemäß CPY-14–16 tatsächliche 3.10-/3.11-Nachweise, ohne diese bisherigen Gates zu entfernen. Auf der gelieferten Grundlage sind die vorhandenen nativen Lanes mit CPython 3.12 und 3.14, Linux und Windows sowie deren Bash-/PowerShell-Prüfungen weiterzuverwenden. Ein Linux-Lauf belegt keine native Windows-Funktion.
 
 Die regulären Wheel-/sdist-/pip-/pipx-/uv-Bereitstellungsnachweise werden nach der bestehenden Packaging-Policy abgedeckt; nicht jede Kombination muss zu einem neuen vollständigen Kreuzprodukt ausgebaut werden. Ein optionaler ARM64-/Ubuntu-in-Termux-Nachweis wird gesondert bezeichnet und nicht als allgemeine Android-Unterstützung ausgegeben.
 
@@ -1350,6 +1363,7 @@ Die technischen Primärquellen aus Revision 1 werden für Revision 2 unveränder
 | 1 | 2026-10-07 | Erste vollständige separate Spezifikationserweiterung für Result-PYZ ohne Watcher und reguläres `pack`, einschließlich Formatübergang, CLI/API, Fehler-/Sicherheitsvertrag, Dokumentation, Testmatrix und Umsetzungsplan. |
 | 2 | 2026-10-07 | Integrationsreview umgesetzt: gemeinsamer Spezifikationssatz und eng begrenzte Bestandsausnahmen; unveränderte Prüferkategorien; Bootstrap als Writer-Gate; Result-/CIFS-Bestandsschutz und ausdrücklich getrennte Pack-Publikationspolitik; vollständiger Erfolg trotz Cleanup-Warnung und getrennte CLI-Ausgabefehler; Paket-ID/Zeit für beide Ausgabearten und Abgrenzung zum Chat-Zähler. Testmatrix, Dokumentationspflichten, Plan und Abnahme entsprechend nachgeführt. Keine Implementierung oder Produktabnahme. |
 | 3 | 2026-10-08 | Nutzerkorrektur: 250.000 Snapshot-Dateien und 250.010 äußere ZIP-Einträge, durchgängiges Lesen/Schreiben einschließlich ZIP64-Bootstrap und konkrete Grenzdiagnosen. Bytebudgets, 1.000 innere Runtime-Einträge und Pack-Scan-Schutz bleiben erhalten. |
+| 4 | 2026-10-13 | Abgeschlossene 1.3.0-Basis und ausdrücklich beauftragte CPython-Ergänzung eingeordnet; gezielte Erweiterung des Normsatzes, Python-Nichtziels, PYZ-02 und TEST-04. Keine Produkt-/Writeränderung in CP-00. |
 
 ### 20.4 Nachverfolgung der Korrekturen aus dem Integrationsreview
 
