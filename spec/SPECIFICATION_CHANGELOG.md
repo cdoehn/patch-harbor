@@ -1,5 +1,21 @@
 # PatchHarbor – Spezifikations-Changelog
 
+## 2026-10-29 – RF-02 / Bundle 058: Originale 1.4.0-Verträge sichern
+
+- RF-01 tatsächlich angewendet und gepusht auf
+  `37e2c88c5afd41be2abb83a394b22748a5256ef9`; 2 von 14 Planpositionen bestätigt.
+- Acht unveränderte Original-Results und fünf Original-Patches aus kleinen
+  isolierten Testrepositories sichern die in RF-01 festgelegte 1.4.0-Basis.
+  Provenienz, vollständige Hashes, Modi und echte Ausführungsergebnisse sind
+  festgehalten; bestehende Runtime-Capabilities werden nicht umgeschrieben.
+- Verhaltenstests prüfen Reader/Pack/Inspect/Validate, konservative Exchange-
+  und Recovery-Nachweise, unbekannte/manipulierte Daten, Dirty-Zustände,
+  Dry-Runs, 0/1/mehrere Commits und Fehler mit erhaltenem Teilfortschritt.
+- Gepinnte Original-PYZ nur isoliert ausführen; statische Leser importieren sie
+  nicht. `unavailable` kommt aus echten unvorbereiteten 1.4.0-Quellen.
+- Kein Normvertrag, Produktcode, Format oder Versionswert geändert. Vollständige
+  parallele lokale Gates; eigener Apply noch offen, kein CI-Start oder Tag.
+
 ## 2026-10-29 – RF-01 / Bundle 057: Kompatibilitätsbasis ab 1.4.0
 
 - RF-00 tatsächlich angewendet und gepusht auf

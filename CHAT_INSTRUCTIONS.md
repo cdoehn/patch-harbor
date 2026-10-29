@@ -1093,10 +1093,12 @@ Development und Apply prüfen jeden Commitstand vollständig parallel, auch am
 Bundle-Ende. Kein serieller Lauf und keine verkürzte Auswahl als Vollabnahme.
 Nur Christian startet den manuellen CI-Workflow; Codex und Entrypoints tun das nie.
 
-RF-00 / Bundle 056 ist durch tatsächliches Apply und Push auf
-`05cceef59891a68a3e0fdd2115fa79e718db1347` bestätigt. Der Folgeauftrag umfasst
-RF-01 / Bundle 057; dessen Apply steht bei Vorbereitung noch aus. Eine weitere
-Implementierung oder automatische Schleife ist damit nicht vorweggenommen. Vollständige Watcher-Results samt Teilfortschritten werden
+RF-00/RF-01 sind durch tatsächliche Applies und Push bestätigt, zuletzt
+RF-01 / Bundle 057 auf `37e2c88c5afd41be2abb83a394b22748a5256ef9`.
+Der Folgeauftrag umfasst RF-02 / Bundle 058 mit unveränderten 1.4.0-Fixtures und
+Kompatibilitäts-Verhaltenstests; dessen Apply steht bei Vorbereitung noch aus.
+Weitere Implementierung oder eine automatische Schleife ist nicht vorweggenommen.
+Vollständige Watcher-Results samt Teilfortschritten werden
 geprüft; fehlende externe Nachweise werden konkret gemeldet. CI startet
 ausschließlich Christian. Sicherheitsgrenzen und belastbare Resultbindung
 bleiben Voraussetzung; Tokenmeter bleibt gestoppt.

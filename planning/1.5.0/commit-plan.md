@@ -1,11 +1,11 @@
 # PatchHarbor 1.5.0 – Refactoring- und Commitplan
 
 **Plan-ID:** `REFACTOR-1.5.0`
-**Revision:** 2 · 29. Oktober 2026
+**Revision:** 3 · 29. Oktober 2026
 **Zielversion:** 1.5.0; die Produktversion bleibt bis RF-13 bei 1.4.0.
-**Status:** RF-00 durch Bundle 056 bestätigt; RF-01 als Bundle 057 vorbereitet, Apply offen.
-**Fortschritt:** 1 / 14 Plancommits bestätigt; RF-01 ist der nächste zu bestätigende Schritt.
-**Aktueller Auftrag:** genau das nächste Arbeitspaket RF-01 erstellen; keine übernommene Automatik aus älteren Plänen.
+**Status:** RF-00/RF-01 durch Bundles 056/057 bestätigt; RF-02 als Bundle 058 vorbereitet, Apply offen.
+**Fortschritt:** 2 / 14 Plancommits bestätigt; RF-02 ist der nächste zu bestätigende Schritt.
+**Aktueller Auftrag:** genau das nächste Arbeitspaket RF-02 erstellen; keine übernommene Automatik aus älteren Plänen.
 **Gemeinsame normative Grundlage:** [Hauptspezifikation](../../spec/SPECIFICATION.md),
 [PYZ/PACK-Erweiterung](../../spec/SPECIFICATION_EXTENSION_PYZ_PACK.md) und
 [CPython-3.10/3.11-Erweiterung](../../spec/SPECIFICATION_EXTENSION_CPYTHON_310_311.md),
@@ -145,8 +145,8 @@ falls weitere Aufteilung nötig wird, wird der Plan vorher nachvollziehbar angep
 | Position | ID | Aktueller Status | Vorgesehener Commit |
 | --- | --- | --- | --- |
 | 1 / 14 | RF-00 | CONFIRMED – Bundle 056 | `docs(plan): define 1.5.0 refactoring sequence [RF-00]` |
-| 2 / 14 | RF-01 | NEXT – Bundle 057 vorbereitet, Apply offen | `docs(spec): establish compatibility baseline from 1.4.0 [RF-01]` |
-| 3 / 14 | RF-02 | OPEN | `test(compat): freeze supported 1.4.0 artifact contracts [RF-02]` |
+| 2 / 14 | RF-01 | CONFIRMED – Bundle 057 | `docs(spec): establish compatibility baseline from 1.4.0 [RF-01]` |
+| 3 / 14 | RF-02 | NEXT – Bundle 058 vorbereitet, Apply offen | `test(compat): freeze supported 1.4.0 artifact contracts [RF-02]` |
 | 4 / 14 | RF-03 | OPEN | `refactor(tests): isolate shared fixtures from test modules [RF-03]` |
 | 5 / 14 | RF-04 | OPEN | `test(architecture): assert behavior and dependency boundaries [RF-04]` |
 | 6 / 14 | RF-05 | OPEN | `refactor(runtime): separate shared profile primitives from wheel support [RF-05]` |
@@ -208,6 +208,22 @@ RF-13 ist erst mit den Abschlussnachweisen aus Abschnitt 6 vollständig abgenomm
 - **Abnahme:** zukünftiger Leser/Pack/Validate und Exchange-Entscheidungen werden
   gegen unveränderte 1.4.0-Daten geprüft; aktuelle Produzenten werden ebenfalls
   durch Ende-zu-Ende-Tests geprüft. Nicht unterstützte/future Daten liefern keine Erfolgsbeweise.
+
+**Vorbereitet in Bundle 058:** Acht echte Result-3- und fünf Patch-1-Archive
+mit vollständig gepinnter Provenienz. Originale Core-PYZ 1.4.0 aus dem geprüften
+Result 057; alle 102 enthaltenen Core-Module gegen den Release-Tag-Commit
+`282db1ef5c0af8e2a3ecf41f431f80006487dde4` verglichen. Das unveränderte
+`source_commit: null` im Artefakt bleibt ehrlich erhalten. `unavailable` stammt
+aus einem echten, unvorbereiteten Original-Quellbaum desselben Commits.
+
+Neue gemeinsame Testhilfe und Verhaltenstests prüfen unveränderte Referenzen,
+statische APIs ohne Prozess-/Netzzugriff, alle vier Bindungswerte, Modi,
+0/1/2 Commits, Fehler-Teilfortschritte, unbekannte/manipulierte Daten und
+konservative Exchange-Entscheidungen. Die Original-PYZ läuft ausschließlich
+gepinnt in frischen isolierten Prozessen. Bestehende Produzenten-/Ende-zu-Ende-
+Tests bleiben erhalten. Der einmalige Capture-Code und seine Grenzen sind
+[bei den Fixtures](../../tests/fixtures/compatibility_140/README.md) dokumentiert.
+Kein Produktcode oder Artefaktformat wird in RF-02 geändert; eigener Apply offen.
 
 ### RF-03 – Gemeinsame Testdaten aus Testmodulen herauslösen
 
@@ -429,6 +445,18 @@ erreichte Teilfortschritte werden im tatsächlichen Result ausgewertet.
 - Vollständiges paralleles Apply-Gate: 3299 passed, 15 skipped, 12 Worker.
 - Keine CI ausgelöst. RF-01 verwendet dieses Result als neue Bindungsbasis;
   der eigene künftige Apply-/Commit-Erfolg wird hier nicht vorweggenommen.
+
+### Bestätigter Fortschritt: RF-01 / Bundle 057
+
+- Tatsächlicher Apply, Entrypoint- und Prozess-Exitcode 0; kein Dry-Run.
+- Commit `37e2c88c5afd41be2abb83a394b22748a5256ef9`, normaler Push auf `dev`;
+  sauberer Snapshot mit 355 Dateien und den geplanten 16 Änderungen.
+- Result `patchharbor-apply_Result_121920_1029_43a1e8.zip`, SHA-256
+  `09301a80390bd41410d37a6485d5377071af1d5e96b7946f0b05b7c108d91de1`.
+- Vollständiges paralleles Apply-Gate: 3299 passed, 15 skipped, 12 Worker.
+- Report-SHA-256: `90290174a372825cb77bb6425ad7bfb4551df4751a513412910c358f3f703c2a`.
+- Keine CI ausgelöst. RF-02 bindet sich an dieses Result; sein eigener
+  zukünftiger Apply-/Commit-Erfolg wird nicht vorweggenommen.
 
 ## 5. Pflichtnachweise über die Schritte hinweg
 
