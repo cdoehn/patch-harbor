@@ -287,6 +287,9 @@ does not replace repository-bound Apply.
 
 ## Documentation and development
 
+- [Active 1.5.0 refactoring plan](planning/1.5.0/commit-plan.md): planning bootstrap;
+  the running product remains 1.4.0 until the release step. The plan establishes
+  compatibility from 1.4.0 onward and keeps the existing specification split.
 - [Installation and updates](docs/install-and-update.md)
 - [Repository configuration, archives, retries and permissions](docs/repository-workflow.md)
 - [Troubleshooting](docs/troubleshooting.md)

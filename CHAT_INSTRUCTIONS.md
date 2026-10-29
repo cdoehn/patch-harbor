@@ -1059,37 +1059,43 @@ verdrängen. Ein im Plan ausdrücklich als gemeinsam geltend erklärter
 Spezifikationssatz wird vollständig gelesen; seine Bestandteile sind keine
 konkurrierenden Alternativen. Echte unaufgelöste Konkurrenz bleibt ein STOP.
 
-Für die Entwicklung von **PatchHarbor selbst** gilt für den ausdrücklich
-beauftragten CPython-3.10/3.11-Auftrag konkret:
+Für die Entwicklung von **PatchHarbor selbst** gilt seit dem ausdrücklichen
+Nutzerauftrag vom 29. Oktober 2026 der Refactoring-Plan für 1.5.0:
 
 ```text
-Plan: planning/python-compatibility/commit-plan.md
+Plan: planning/1.5.0/commit-plan.md
 Normsatz: spec/SPECIFICATION.md
           spec/SPECIFICATION_EXTENSION_PYZ_PACK.md (Revision 4)
           spec/SPECIFICATION_EXTENSION_CPYTHON_310_311.md (Revision 1)
 ```
 
+Die drei Normdateien bleiben getrennt. Nur konkrete grobe Fehler und aktuelle
+Widersprüche werden gezielt korrigiert, insbesondere die bisherige Pflicht zur
+Unterstützung von Artefakten vor 1.4.0. Gültige 1.4.0-Artefakte bleiben die Basis
+zukünftiger Abwärtskompatibilität; Patchformat 1 bleibt erhalten. RF-01 trägt
+diese ausdrückliche Nutzerentscheidung in die betroffenen Normstellen ein.
+RF-00 ist ausschließlich der Planungsbootstrap; Produktversion, ausführbarer
+Bootstrap, Tests und Laufzeitverhalten bleiben dabei unverändert.
+
 Der frühere PYZ/PACK-Plan ist mit 16/16 Positionen, Korrektur 046 und grüner
 manueller CI auf `30e5de1d67a2d725ff192a0b97e50c2b0336bfcb` abgeschlossen.
 Die historische Basisversion ist 1.3.0; Christian hat die neue Version 1.4.0 festgelegt.
 Keine Versionsnummer reaktiviert einen historischen Versions-, RIV-, Watcher-
-oder PYZ/PACK-Plan. Der neue Normsatz ändert nur seine ausdrücklich benannten
-Python-Anforderungen. Diese Projektzuordnung gilt nicht pauschal für andere
+oder PYZ/PACK-Plan. Der CPython-Plan bleibt als bisheriger Implementierungs- und
+Abnahmenachweis erhalten; offene Abnahmen werden nicht durch diesen Planwechsel
+als erledigt erklärt. Diese Projektzuordnung gilt nicht pauschal für andere
 Repositorys, denen PatchHarbor dieselbe generische Vorlage mitliefert.
 
-**Aktueller Implementierungsschritt:** CP-00 bis CP-04 und die drei
+**Historischer Implementierungsstand:** CP-00 bis CP-04 und die drei
 Korrekturbundles 052 bis 054 sind tatsächlich angewendet. Alle zwölf Jobs der
 manuellen CI 38596693717 auf `f2e64c241f4e20a1b7e2c4c83faa45ba557f6d0b`
 sind grün; zwölf Artefakte mit 39 vollständigen parallelen Testreports sind geprüft.
-CP-05-VERSION / Bundle 055 stellt die Produktversion auf 1.4.0 um.
-Christian hat das Tag `v1.4.0` ausdrücklich beauftragt: Nur dieser Entrypoint
-darf nach dem vollständigen parallelen Commit-Gate ein neues annotiertes Tag
-auf seinen geprüften Commit setzen und zusammen mit dev atomar normal pushen.
-Vorhandene Tags werden weder ersetzt noch verschoben. Dies ist keine allgemeine
-Erlaubnis für automatisches Tagging und kein CI-Startauftrag.
+CP-05-VERSION / Bundle 055 stellte die Produktversion auf 1.4.0 um.
+Der damalige einmalige Auftrag zum Tag `v1.4.0` ist kein Tagging-Auftrag für 1.5.0.
+Vorhandene Tags werden weder ersetzt noch verschoben; kein automatisches Tagging.
 Die native CI gehört zum genannten Implementierungscommit vor der Versionsänderung;
 Abnahme des neuen Endstands und erforderliche neue CIFS-Praxis bleiben im Plan offen.
-Alte PYZ-/Resultvarianten und Sicherheitsverträge bleiben unverändert.
+Die neue Kompatibilitätsbasis steht im 1.5.0-Plan; Sicherheitsverträge bleiben erhalten.
 
 **Historie:** Die einmalige CI-only-Ausnahme für PP-00 / Bundles 024/025
 ist mit dessen erfolgreichem Abschluss erfüllt. Result
@@ -1111,11 +1117,12 @@ Development und Apply prüfen jeden Commitstand vollständig parallel, auch am
 Bundle-Ende. Kein serieller Lauf und keine verkürzte Auswahl als Vollabnahme.
 Nur Christian startet den manuellen CI-Workflow; Codex und Entrypoints tun das nie.
 
-Die Nutzeranweisung vom 14. Oktober 2026 autorisiert die automatische
-Fortsetzung des bestehenden CPython-Plans ab CP-03. Vollständige Watcher-Results
-samt Teilfortschritten werden jeweils geprüft. Fehlende externe Abschlussnachweise
-werden konkret gemeldet; CI startet ausschließlich Christian. Sicherheitsgrenzen und belastbare
-Resultbindung bleiben Voraussetzung; Tokenmeter bleibt gestoppt.
+Der Auftrag vom 29. Oktober 2026 umfasst zunächst nur RF-00 / Bundle 056.
+Weitere Implementierung und eine automatische Schleife benötigen einen neuen
+Fortsetzungsauftrag. Vollständige Watcher-Results samt Teilfortschritten werden
+geprüft; fehlende externe Nachweise werden konkret gemeldet. CI startet
+ausschließlich Christian. Sicherheitsgrenzen und belastbare Resultbindung
+bleiben Voraussetzung; Tokenmeter bleibt gestoppt.
 
 Development bleibt ausschließlich in `patchharbor-codex`. Nur die fertig und
 vollständig geprüfte kanonische Patch-ZIP gelangt atomar in den Exchange.
@@ -1127,7 +1134,8 @@ Die frühere 1.3.0-Abnahme einschließlich Christians CIFS-Praxisbestätigung
 belegt nicht automatisch den neuen CPython-Auftrag. Dessen Abnahme benötigt
 echte 3.10-/3.11-Interpreter, passende Artefakte, tatsächliche Applies und die
 von Christian gestartete erweiterte native CI. Die Anforderungen und offenen
-Nachweise stehen im neuen Plan. Eine ältere globale Installation wird durch
+Nachweise stehen im bisherigen CPython-Plan. Die 1.5.0-Abnahme ist im neuen
+Refactoring-Plan beschrieben. Eine ältere globale Installation wird durch
 diesen Quellpatch nicht aktualisiert.
 
 Bestimme die aktive Zielversion aus dem Repository. Eine laut Plan erst zum
