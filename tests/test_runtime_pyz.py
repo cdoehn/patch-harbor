@@ -9,24 +9,7 @@ import pytest
 
 from patchharbor import __version__, runtime_pyz as pyz
 from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY
-
-
-def inputs():
-    payloads = {name: b'# fixture module\n' for name in pyz.REQUIRED - {pyz.IDENTITY_PATH}}
-    payloads['patchharbor/py.typed'] = b''
-    payloads[pyz.CHAT_PATH] = b'controlled template\n'
-    payloads[pyz.DOC_PATH] = b'controlled API documentation\n'
-    payloads[pyz.LICENSE_PATH] = b'controlled license\n'
-    payloads[pyz.MAIN_PATH] = payloads['__main__.py'] = pyz.MAIN_BYTES
-    return payloads
-
-
-def prepared(payloads=None, *, version=__version__, **kwargs):
-    payloads = inputs() if payloads is None else payloads
-    recipe, identity = pyz.create_recipe(payloads, version=version, requires_python='>=3.12', **kwargs)
-    payloads = {**payloads, pyz.IDENTITY_PATH: identity}
-    artifact = pyz.materialize(recipe, lambda name, size: payloads[name])
-    return recipe, payloads, artifact
+from tests.runtime_pyz_support import inputs, prepared
 
 
 def read(raw, **kwargs):

@@ -15,9 +15,7 @@ import patchharbor.pack_sources as sources
 import patchharbor.platform.source_tree as tree
 from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY
 from tests.platform_support import create_symlink_or_skip
-
-
-SCRIPT=b'#!/usr/bin/env bash\n# PATCHHARBOR\nexit 0\n'
+from tests.pack_support import SCRIPT
 
 
 @pytest.fixture

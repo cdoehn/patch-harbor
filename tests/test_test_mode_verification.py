@@ -10,7 +10,7 @@ import pytest
 
 from tools import verify_test_modes as modes
 from tools import test_runner
-from tests.test_test_evidence import example, make_suite, invoke
+from tests.runner_support import example, make_suite, invoke
 
 
 def test_matrix_retains_serial_two_four_auto_and_multiple_hash_seeds():

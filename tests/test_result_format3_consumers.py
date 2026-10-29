@@ -16,9 +16,9 @@ from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY
 from scripts import runtime_bootstrap
 from tests.platform_support import project_environment, run_cli
 from tests.result_pyz_support import attach_pyz
-from tests.test_reference_validation import edit_document, write_reference
-from tests.test_result_format3 import canonical, format3
-from tests.test_result_robustness import legacy_source
+from tests.reference_support import edit_document, write_reference
+from tests.result_pyz_support import canonical, format3
+from tests.legacy_runtime_support import legacy_source
 
 
 @pytest.fixture(scope='module')
@@ -50,7 +50,7 @@ def format2_source(tmp_path_factory):
 def test_actual_readers_keep_unproven_format3_and_standalone_pyz(
     canonical, legacy_source, format2_source, tmp_path, reader, state,
 ):
-    from tests.test_exchange_archive_e2e import _world, _bundle, _advance, ARCHIVE
+    from tests.archive_support import _world, _bundle, _advance, ARCHIVE
     from tests.registration_support import git
     if reader == 'frozen_format2' and sys.version_info < (3, 12):
         pytest.skip('original Format-2 runtime requires Python 3.12; current data readers remain tested')
@@ -103,9 +103,9 @@ print(json.dumps(files))
 @pytest.mark.e2e
 @pytest.mark.parametrize('state',['embedded','unavailable','corrupt','future'])
 def test_real_recovery_requires_full_format3_success(canonical,tmp_path,state):
-    from tests.test_exchange_recovery_e2e import _pending, _result, _edit_record
-    from tests.test_exchange_archive_e2e import _scan, ARCHIVE
-    from tests.test_exchange_e2e import _identity_record
+    from tests.recovery_support import _pending, _result, _edit_record
+    from tests.archive_support import _scan, ARCHIVE
+    from tests.exchange_support import _identity_record
     from tests.registration_support import git
     env,exchange,repo,_,patch,record = _pending(tmp_path)
     result = _result(exchange,record)

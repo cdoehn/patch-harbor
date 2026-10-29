@@ -6,8 +6,9 @@ from zipfile import ZipFile, ZipInfo
 from patchharbor import runtime_pyz as pyz
 from tests.result_pyz_support import attach_pyz
 from tests.result_runtime_support import descriptor, edit_metadata
-from tests.test_reference_validation import edit_document
-from tests.test_runtime_pyz import inputs
+from tests.reference_support import edit_document
+from tests.runtime_pyz_support import inputs
+from tests.reference_support import reference_entries, write_reference
 
 
 def variant(requirement):
@@ -72,3 +73,11 @@ def attach_unchecked(files, raw):
     edit_metadata(files, update)
     edit_document(files, 'manifest.json', lambda doc: doc['runtime'].update(artifact=artifact))
     return files
+
+
+def result_file(tmp_path, raw):
+    files, binding = reference_entries(handoff=True)
+    files = attach_unchecked(files, raw)
+    path = tmp_path / 'reference.zip'
+    write_reference(path, files)
+    return path, files, binding

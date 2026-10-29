@@ -7,42 +7,13 @@ import pytest
 
 from patchharbor.errors import FailureReason
 from patchharbor.errors import PatchHarborError
-from patchharbor.exchange_state import (
-    ExchangeApplyStatus,
-    ExchangeFileIdentity,
-    ExchangePatchSelection,
-    ExchangeStateRecord,
-    load_exchange_state,
-    mark_exchange_apply_finished,
-    mark_exchange_apply_started,
-    merge_exchange_classifications,
-)
-from patchharbor.models import GitObjectFormat, GitObjectId, RepositoryId
+from patchharbor.exchange_state import ExchangeApplyStatus, load_exchange_state, mark_exchange_apply_finished, mark_exchange_apply_started, merge_exchange_classifications
+from patchharbor.models import GitObjectFormat, GitObjectId
 from patchharbor.platform.filesystem import FileSystemOperationError
 from patchharbor.state_fingerprint import FINGERPRINT_ALGORITHM
 from patchharbor.user_paths import registration_user_paths
 from tests.registration_support import set_isolated_user_environment
-
-
-def _identity(path: Path, character: str = "a") -> ExchangeFileIdentity:
-    return ExchangeFileIdentity(path=path.resolve(), sha256=character * 64)
-
-
-def _selection() -> ExchangePatchSelection:
-    return ExchangePatchSelection(
-        repo_id=RepositoryId("a3f9c2e1-7b4d-4a91-9d2e-5c6f8a1b2c3d"),
-        base_commit=GitObjectId("b" * 40, GitObjectFormat.SHA1),
-        state_fingerprint="c" * 16,
-        fingerprint_algorithm=FINGERPRINT_ALGORITHM,
-    )
-
-
-def _record(path: Path, character: str = "a") -> ExchangeStateRecord:
-    return ExchangeStateRecord(
-        identity=_identity(path, character),
-        kind="patch_package",
-        manifest=_selection(),
-    )
+from tests.exchange_support import _identity, _selection, _record
 
 
 def test_classification_and_apply_lifecycle_are_persisted_in_closed_v4_state(

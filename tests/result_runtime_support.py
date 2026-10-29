@@ -8,7 +8,7 @@ from pathlib import Path
 from zipfile import ZIP_STORED, ZipFile
 
 from patchharbor import runtime_wheel as wheel
-from tests.test_reference_validation import edit_document, reference_entries
+from tests.reference_support import edit_document, reference_entries
 
 
 def descriptor(path: str, content: bytes) -> dict:

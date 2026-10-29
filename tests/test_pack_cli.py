@@ -11,7 +11,7 @@ import pytest
 from patchharbor import api, cli
 from patchharbor.exit_status import exit_code_for_reason
 from patchharbor.inspection_output import pack_json_result, validation_json_result
-from tests.test_pack_api import request_files
+from tests.pack_support import request_files
 
 
 def arguments(files, *more):

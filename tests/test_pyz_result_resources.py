@@ -11,9 +11,9 @@ from patchharbor import api, application, result_bundle, result_resources as res
 from patchharbor import pyz_artifact, runtime_pyz as pyz
 from patchharbor.result_reader import read_result_reference
 from patchharbor.resource_policy import ResourcePolicy
-from tests.test_pyz_resources import provider_for
-from tests.test_reference_validation import reference_entries, write_reference, edit_document
-from tests.test_result_runtime_writer import repository, package
+from tests.runtime_pyz_support import provider_for
+from tests.reference_support import reference_entries, write_reference, edit_document
+from tests.apply_support import repository, package
 
 
 @pytest.mark.parametrize('kind',['directory','zip'])

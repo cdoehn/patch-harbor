@@ -29,13 +29,9 @@ from patchharbor.run_report import PrimaryResult
 from tests.result_runtime_support import (
     attach_runtime, descriptor, edit_metadata, format2_entries, replace_wheel, rewrite_wheel,
 )
-from tests.test_reference_validation import bound_package, edit_document, reference_entries, write_reference
-from tests.test_runtime_artifact import prepared, _capture
-
-
-@pytest.fixture(scope="module")
-def canonical(prepared):
-    return _capture(prepared)
+from tests.reference_support import bound_package, edit_document, reference_entries, write_reference
+from tests.legacy_runtime_support import prepared
+from tests.legacy_runtime_support import canonical
 
 
 @pytest.mark.parametrize("version", [1, 2])
@@ -324,9 +320,9 @@ def test_cli_reference_validation_accepts_format2(canonical, tmp_path):
 @pytest.mark.e2e
 @pytest.mark.parametrize("state", ["embedded", "unavailable", "corrupt", "future"])
 def test_real_recovery_consumes_only_complete_successful_format2_evidence(canonical, tmp_path, state):
-    from tests.test_exchange_recovery_e2e import _pending, _result, _edit_record
-    from tests.test_exchange_archive_e2e import _rewrite, _scan, ARCHIVE
-    from tests.test_exchange_e2e import _identity_record
+    from tests.recovery_support import _pending, _result, _edit_record
+    from tests.archive_support import _rewrite, _scan, ARCHIVE
+    from tests.exchange_support import _identity_record
     from tests.registration_support import git
     env, exchange, repo, _, patch, record = _pending(tmp_path)
     result = _result(exchange, record)

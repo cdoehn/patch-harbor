@@ -10,8 +10,8 @@ import pytest
 from patchharbor import runtime_pyz as pyz
 from tests.embedded_pyz_support import bootstrap_program
 from tests.result_pyz_support import attach_pyz
-from tests.test_pack_api import request_files
-from tests.test_reference_validation import reference_entries, write_reference
+from tests.pack_support import request_files
+from tests.reference_support import reference_entries, write_reference
 
 
 @pytest.mark.packaging

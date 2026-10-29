@@ -15,22 +15,11 @@ except ModuleNotFoundError:  # Explicit build/dev dependency on Python 3.10 only
 import pytest
 
 from tests.platform_support import PROJECT_ROOT, REQUIRES_BASH_DOCKER_RUNNER
+from tests.runner_support import ENVIRONMENT_CHECK, _environment_check_module
 
 RUNNER = PROJECT_ROOT / "scripts" / "run_docker_integration_tests.sh"
-ENVIRONMENT_CHECK = PROJECT_ROOT / "scripts" / "check_docker_integration_environment.py"
 DOCKERFILE = PROJECT_ROOT / "docker" / "Dockerfile.integration"
 ACCEPTANCE_WORKFLOW = PROJECT_ROOT / ".github" / "workflows" / "acceptance-tests.yml"
-
-
-def _environment_check_module():
-    spec = importlib.util.spec_from_file_location(
-        "patchharbor_docker_environment_check",
-        ENVIRONMENT_CHECK,
-    )
-    assert spec is not None and spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
 
 
 def _write_fake_docker(fake_bin: Path) -> Path:

@@ -14,7 +14,7 @@ from build_backend import _prepare_recipe
 from patchharbor import runtime_artifact as provider_module
 from patchharbor import runtime_wheel as runtime
 from patchharbor.runtime_artifact import RuntimeProvider
-from tests.test_runtime_artifact import prepared, _capture, _provider_tree, _recipe, _rewrite_recipe
+from tests.legacy_runtime_support import prepared, _capture, _provider_tree, _recipe, _rewrite_recipe
 
 
 def test_loaded_producer_rejects_coherent_same_version_replacement(prepared, tmp_path):

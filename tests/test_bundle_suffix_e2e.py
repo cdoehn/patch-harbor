@@ -17,7 +17,7 @@ from patchharbor_watcher.apply_boundary import delegate_to_automatic_apply
 from patchharbor_watcher.loop import SharedWatcherEventState, poll_repositories_once, WatcherPollOutcome
 from tests.platform_support import native_script, native_value, project_environment, run_cli
 from tests.registration_support import create_repository, user_configuration_path
-from tests.test_exchange_e2e import _configure_user, _register_context, _manifest, _write_package
+from tests.exchange_support import _configure_user, _register_context, _manifest, _write_package
 
 pytestmark = pytest.mark.e2e
 

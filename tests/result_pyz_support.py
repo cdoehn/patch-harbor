@@ -5,7 +5,11 @@ from zipfile import ZipFile
 
 from patchharbor import __version__, runtime_pyz as pyz
 from tests.result_runtime_support import descriptor
-from tests.test_reference_validation import edit_document
+from tests.reference_support import edit_document
+import pytest
+from tests.reference_support import reference_entries
+from tests.runtime_pyz_support import inputs, prepared
+from patchharbor.pyz_artifact import PyzArtifact
 
 
 def attach_pyz(files, raw, *, reason='source_not_prepared'):
@@ -31,3 +35,25 @@ def attach_pyz(files, raw, *, reason='source_not_prepared'):
     files['manifest.json'] = json.dumps(manifest).encode()
     edit_document(files,'logs/run.json',lambda run:run.update(warnings=[] if raw is not None else ['runtime unavailable']))
     return files
+
+
+@pytest.fixture(scope='module')
+def canonical():
+    payloads = inputs()
+    payloads['patchharbor/api.py'] = b'raise AssertionError("Result reader executed described API")\n'
+    return prepared(payloads)[2]
+
+
+def format3(raw, **options):
+    files,binding = reference_entries(handoff=True,**options)
+    return attach_pyz(files,raw), binding
+
+
+@pytest.fixture(scope="module")
+def artifact():
+    fixture_inputs = inputs()
+    # Keep the runtime above the explicit 128-KiB publication-test budget.
+    fixture_inputs["patchharbor/budget_fixture.py"] = b"# Runtime budget fixture\n" * 10000
+    recipe,payloads,raw=prepared(fixture_inputs)
+    return PyzArtifact(recipe,raw,pyz.sha256(raw),payloads[pyz.CHAT_PATH],
+                       payloads[pyz.DOC_PATH],payloads[pyz.LICENSE_PATH])

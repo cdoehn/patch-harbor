@@ -20,7 +20,7 @@ from tests.registration_support import (
     create_repository, set_isolated_user_environment,
     start_repository_lock_holder, release_repository_lock_holder, stop_repository_lock_holder,
 )
-from tests.test_api_e2e import write_package
+from tests.apply_support import write_package
 
 pytestmark = pytest.mark.e2e
 

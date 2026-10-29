@@ -11,7 +11,7 @@ import time
 import pytest
 
 from patchharbor import runtime_pyz as pyz
-from tests.test_pack_api import request_files
+from tests.pack_support import request_files
 
 
 @pytest.mark.packaging

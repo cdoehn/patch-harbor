@@ -13,7 +13,7 @@ from patchharbor.user_paths import registration_user_paths
 from patchharbor_watcher.apply_boundary import delegate_to_automatic_apply
 from tests.platform_support import native_script, native_value, project_environment
 from tests.registration_support import create_repository, git, set_isolated_user_environment
-from tests.test_api_e2e import write_package
+from tests.apply_support import write_package
 
 pytestmark = [pytest.mark.e2e, pytest.mark.acceptance]
 

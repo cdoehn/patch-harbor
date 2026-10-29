@@ -1,5 +1,18 @@
 # PatchHarbor – Spezifikations-Changelog
 
+## 2026-10-29 – RF-03 / Bundle 059: Gemeinsame Testhilfen entkoppeln
+
+- RF-02 tatsächlich angewendet und gepusht auf
+  `f959ea054c37977650be43db690909c2d510f29d`; 3 von 14 Planpositionen bestätigt.
+- 88 direkte Testmodul-Importstellen und ein Modulalias in fachliche
+  Supportmodule umgestellt; vollständige Zuordnung im aktiven Planverzeichnis.
+- Testfälle, Parametrisierungen, Marker und Fixture-Scopes bleiben erhalten.
+  Windows-ACL-Fehlerfälle nutzen dieselbe Prüflogik mit explizitem Adapter;
+  Bootstrap-Tests verändern keine globalen Referenzen anderer Testmodule mehr.
+- Kein Produktcode, Normvertrag, Artefaktformat, Versionswert, CI-Workflow
+  oder eingefrorenes Fixture geändert. Vollständige parallele lokale Gates;
+  eigener Apply noch offen, kein CI-Start oder Tag.
+
 ## 2026-10-29 – RF-02 / Bundle 058: Originale 1.4.0-Verträge sichern
 
 - RF-01 tatsächlich angewendet und gepusht auf

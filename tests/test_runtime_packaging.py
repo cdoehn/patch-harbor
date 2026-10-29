@@ -16,21 +16,11 @@ import pytest
 
 from scripts.build_release import _copy_release_inputs
 from tests.runtime_permissions import readonly_tree
-from tests.test_patch_inspection import write_package
+from tests.patch_inspection_support import write_package
 from tests.registration_support import create_repository
+from tests.runtime_installation_support import _run, _venv
 
 pytestmark = pytest.mark.packaging
-
-
-def _run(command, cwd, environment):
-    result = subprocess.run(command, cwd=cwd, env=environment, capture_output=True, text=True, timeout=300)
-    assert result.returncode == 0, result.stdout + result.stderr
-    return result.stdout
-
-
-def _venv(root, cwd, environment):
-    _run([sys.executable, "-m", "venv", "--without-pip", str(root)], cwd, environment)
-    return root / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
 
 
 def _install_builder(python, outside, environment):

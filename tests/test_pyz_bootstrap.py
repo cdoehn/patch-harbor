@@ -18,9 +18,9 @@ from scripts import pyz_bootstrap as bootstrap
 from patchharbor import api, runtime_pyz as pyz
 from tests.result_pyz_support import attach_pyz
 from tests.result_runtime_support import edit_metadata
-from tests.test_pack_api import request_files
-from tests.test_runtime_pyz import inputs, prepared
-from tests.test_reference_validation import reference_entries, write_reference, edit_document
+from tests.pack_support import request_files
+from tests.runtime_pyz_support import inputs, prepared
+from tests.reference_support import reference_entries, write_reference, edit_document
 
 
 @pytest.fixture

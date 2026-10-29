@@ -17,12 +17,7 @@ from patchharbor_watcher.events import (
     DirectoryEvent, EventBackendError, EventBatch, EventErrorKind, EventKind, WatchPlan,
 )
 from patchharbor_watcher.platform import linux, windows
-
-
-def inotify_record(wd=1, mask=linux.IN_CREATE, name=b"file"):
-    raw = b"" if name is None else name + b"\0"
-    raw += b"\0" * (-len(raw) % 4)
-    return struct.pack("=iIII", wd, mask, 0, len(raw)) + raw
+from tests.watcher_support import inotify_record
 
 
 def windows_records(*records):

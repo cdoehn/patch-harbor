@@ -19,7 +19,7 @@ from build_backend import _prepare_recipe
 from scripts import runtime_bootstrap as bootstrap
 from tests.result_runtime_support import attach_runtime, replace_wheel, rewrite_wheel
 from tests.registration_support import create_repository
-from tests.test_result_runtime_writer import package
+from tests.apply_support import package
 
 pytestmark = pytest.mark.packaging
 

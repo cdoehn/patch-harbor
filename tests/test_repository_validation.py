@@ -13,7 +13,7 @@ from patchharbor.locks import repository_lock, registry_lock
 from patchharbor.user_paths import registration_user_paths
 import patchharbor.repository_state as state
 from tests.registration_support import create_repository, set_isolated_user_environment, git
-from tests.test_reference_validation import bound_package
+from tests.reference_support import bound_package
 
 pytestmark = pytest.mark.e2e
 
@@ -151,7 +151,7 @@ def test_missing_registration_creates_no_configuration_directory(tmp_path,monkey
     env=isolated_user_environment(tmp_path/'user')
     for name,value in env.items():monkeypatch.setenv(name,value)
     repo=create_repository(tmp_path/'repo')
-    from tests.test_reference_validation import reference_entries
+    from tests.reference_support import reference_entries
     _,binding=reference_entries();patch=tmp_path/'patch.zip';bound_package(patch,binding)
     configuration=Path(env['APPDATA'])/'PatchHarbor' if os.name=='nt' else Path(env['XDG_CONFIG_HOME'])/'patchharbor'
     assert not configuration.exists()

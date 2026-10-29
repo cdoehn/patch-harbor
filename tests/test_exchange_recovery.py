@@ -16,10 +16,10 @@ import patchharbor.exchange_state as ledger
 from patchharbor.errors import PatchHarborError, patch_package_error
 from patchharbor.models import GitObjectId, GitObjectFormat, RepositoryId
 from tests.registration_support import git, set_isolated_user_environment, user_configuration_path
-from tests.test_archive_maintenance import _inputs
-from tests.test_exchange_recovery_e2e import _pending, _result, _edit_record
-from tests.test_exchange_e2e import _identity_record
-from tests.test_exchange_state import _record, _selection
+from tests.archive_support import _inputs
+from tests.recovery_support import _pending, _result, _edit_record
+from tests.exchange_support import _identity_record
+from tests.exchange_support import _record, _selection
 
 
 def _identified_attempt(tmp_path, monkeypatch):

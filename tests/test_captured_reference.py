@@ -19,27 +19,8 @@ from patchharbor.exit_status import exit_code_for_error
 from patchharbor.json_document import parse_json_document
 from patchharbor.platform.filesystem import FileChangedDuringRead
 from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY
-from tests.result_runtime_support import attach_runtime
-from tests.test_reference_validation import (
-    bound_package, edit_document, reference_entries, write_reference,
-)
-
-
-def _reference(tmp_path, *, kind="bundle", dirty=False, handoff=True, version=1, suffix=".txt"):
-    files, binding = reference_entries(kind=kind, dirty=dirty, handoff=handoff)
-    edit_document(files, "context.json", lambda doc: doc.update(bundle_suffix=suffix))
-    if handoff:
-        edit_document(files, "environment.json", lambda doc: doc.update(
-            bundle_suffix=suffix, repository_path="/foreign/missing/repository",
-            captured_at="2026-10-03T12:00:00Z", repository_name="recorded-repo",
-            exchange_directory="/foreign/exchange", output_directory=None,
-            runtime={"system": "ForeignOS", "python_version": "3.12.0", "unknown": None,
-                     "extra": {"items": [1, {"nested": True}]}}))
-    if version == 2:
-        files = attach_runtime(files, None)
-    path = tmp_path / "reference.zip"
-    write_reference(path, files)
-    return path, files, binding
+from tests.reference_support import bound_package, edit_document, write_reference
+from tests.pack_support import _reference
 
 
 @pytest.mark.parametrize("kind", ["bundle", "success", "dry_run", "failure", "mismatch", "timeout", "interrupted"])
@@ -220,7 +201,7 @@ def test_internal_validation_does_not_skip_any_binding_comparison(tmp_path, fiel
 
 
 def test_internal_validation_uses_actual_package_bytes_and_original_error_categories(tmp_path):
-    from tests.test_patch_inspection import MANIFEST, write_package
+    from tests.patch_inspection_support import MANIFEST, write_package
     path, _, binding = _reference(tmp_path)
     captured = reader.capture_result_reference(path)
     patch = tmp_path / "patch.zip"

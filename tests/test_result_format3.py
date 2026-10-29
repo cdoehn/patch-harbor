@@ -15,22 +15,9 @@ from patchharbor.result_reader import (
     _parse_repository_payloads, result_member_path,
 )
 from patchharbor.zip_payloads import read_zip_payload_bytes
-from tests.result_pyz_support import attach_pyz
 from tests.result_runtime_support import descriptor, edit_metadata
-from tests.test_reference_validation import bound_package, reference_entries, write_reference, edit_document
-from tests.test_runtime_pyz import inputs, prepared
-
-
-@pytest.fixture(scope='module')
-def canonical():
-    payloads = inputs()
-    payloads['patchharbor/api.py'] = b'raise AssertionError("Result reader executed described API")\n'
-    return prepared(payloads)[2]
-
-
-def format3(raw, **options):
-    files,binding = reference_entries(handoff=True,**options)
-    return attach_pyz(files,raw), binding
+from tests.reference_support import bound_package, write_reference, edit_document
+from tests.result_pyz_support import canonical, format3
 
 
 @pytest.mark.parametrize('status',['embedded','unavailable'])

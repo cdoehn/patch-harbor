@@ -17,8 +17,8 @@ from patchharbor.pack_candidate import prepare_metadata, write_candidate
 from patchharbor.pack_sources import capture_sources
 from patchharbor.result_reader import capture_result_reference
 from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY
-from tests.test_captured_reference import _reference
-from tests.test_reference_validation import edit_document, write_reference
+from tests.pack_support import _reference
+from tests.reference_support import edit_document, write_reference
 
 
 PACKAGE_ID=UUID('be14e6e2-5f1c-4693-8c94-30f2381499df')

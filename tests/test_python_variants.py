@@ -17,24 +17,17 @@ from patchharbor.exit_status import exit_code_for_error
 from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY
 from patchharbor.result_reader import read_result_reference
 from scripts import pyz_bootstrap as bootstrap
-from tests.pyz_variant_support import variant, rewrite, attach_unchecked
+from tests.pyz_variant_support import variant, rewrite
 from tests.result_pyz_support import attach_pyz
 from tests.result_runtime_support import edit_metadata
-from tests.test_reference_validation import reference_entries, write_reference, bound_package, edit_document
+from tests.reference_support import reference_entries, write_reference, bound_package, edit_document
+from tests.pyz_variant_support import result_file
 
 FIXTURES = Path(__file__).parent / 'fixtures/python_variants'
 
 
 def read(raw):
     return pyz.read_pyz(raw, policy=DEFAULT_RESOURCE_POLICY, remaining_bytes=pyz.MAX_CONTENT_BYTES)
-
-
-def result_file(tmp_path, raw):
-    files, binding = reference_entries(handoff=True)
-    files = attach_unchecked(files, raw)
-    path = tmp_path / 'reference.zip'
-    write_reference(path, files)
-    return path, files, binding
 
 
 @pytest.mark.parametrize('requirement', ['>=3.12', '>=3.10'])

@@ -1,11 +1,9 @@
 """Bounded malformed inputs and real mixed-version/legacy Exchange behavior."""
 from __future__ import annotations
 
-import hashlib
 from io import BytesIO
 import json
 from pathlib import Path
-import shutil
 import struct
 import subprocess
 import sys
@@ -18,11 +16,12 @@ from patchharbor.archive_evidence import parse_archive_evidence
 from patchharbor.exchange import ExchangeArtifactKind, _classify_content
 from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY
 from patchharbor.result_reader import read_result_reference
-from tests.platform_support import PROJECT_ROOT, project_environment, run_cli
+from tests.platform_support import project_environment, run_cli
 from tests.result_runtime_support import attach_runtime, format2_entries, replace_wheel
-from tests.test_reference_validation import edit_document, write_reference
-from tests.test_result_format2 import canonical
-from tests.test_runtime_artifact import prepared
+from tests.reference_support import edit_document, write_reference
+from tests.legacy_runtime_support import canonical
+from tests.legacy_runtime_support import prepared
+from tests.legacy_runtime_support import legacy_source
 
 
 @pytest.mark.parametrize("fault", ["entries", "forged_count", "count_mismatch", "disk",
@@ -88,7 +87,7 @@ def test_deep_json_cannot_abort_exchange_classification(tmp_path, monkeypatch, u
 
 @pytest.mark.parametrize("fault", ["duplicate", "case_file", "case_directory", "extra_wheel", "nested_archive", "traversal", "both_markers"])
 def test_outer_runtime_inventory_failures_never_become_patch_candidates(canonical, tmp_path, fault):
-    from tests.test_patch_inspection import MANIFEST
+    from tests.patch_inspection_support import MANIFEST
     files, _ = format2_entries(canonical)
     if fault == "case_file": files["runtime/Runtime.json"] = files["runtime/runtime.json"]
     elif fault == "case_directory": files["Runtime/other.txt"] = b"ambiguous directory"
@@ -111,28 +110,11 @@ def test_outer_runtime_inventory_failures_never_become_patch_candidates(canonica
         parse_archive_evidence(path.read_bytes(), path)
 
 
-@pytest.fixture(scope="module")
-def legacy_source(tmp_path_factory):
-    root = tmp_path_factory.mktemp("frozen-result-reader")
-    shutil.copytree(PROJECT_ROOT / "src", root / "src", ignore=shutil.ignore_patterns("__pycache__", "*.pyc", "*.egg-info"))
-    fixtures = Path(__file__).parent / "fixtures/result_format1"
-    provenance = json.loads((fixtures / "provenance.json").read_bytes())
-    # Freeze the inspection consumer with its reader: current inspection may
-    # require reference APIs that did not exist in this historical boundary.
-    for name, record in provenance["files"].items():
-        # Git may use CRLF in a Windows worktree. Restore the historical LF
-        # bytes before their digest check and before loading the frozen module.
-        raw = (fixtures / name).read_bytes().replace(b"\r\n", b"\n")
-        assert hashlib.sha256(raw).hexdigest() == record["sha256"]
-        (root / record["source_path"]).write_bytes(raw)
-    return root / "src", provenance
-
-
 @pytest.mark.e2e
 @pytest.mark.parametrize("reader", ["current", "frozen_format1"])
 @pytest.mark.parametrize("state", ["embedded", "unavailable", "corrupt", "future"])
 def test_mixed_exchange_uses_actual_current_and_frozen_reader_decisions(canonical, legacy_source, tmp_path, reader, state):
-    from tests.test_exchange_archive_e2e import _world, _bundle, _advance, ARCHIVE
+    from tests.archive_support import _world, _bundle, _advance, ARCHIVE
     from tests.registration_support import git
     env, exchange, repo, _ = _world(tmp_path)
     old = _bundle(repo, env)
@@ -183,8 +165,8 @@ print(json.dumps({Path(m.__file__).name: hashlib.sha256(Path(m.__file__).read_by
 
 @pytest.mark.e2e
 def test_mixed_exchange_selects_only_real_patch_and_writer_produces_current_format(canonical, tmp_path):
-    from tests.test_exchange_archive_e2e import _world
-    from tests.test_exchange_e2e import _write_custom_package
+    from tests.archive_support import _world
+    from tests.exchange_support import _write_custom_package
     env, exchange, repo, context = _world(tmp_path)
     for name, data in (("embedded.zip", canonical), ("unavailable.zip", None)):
         files, _ = format2_entries(data)

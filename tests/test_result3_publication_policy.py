@@ -7,8 +7,10 @@ import pytest
 from patchharbor import result_bundle_writer as writer, result_reader as reader
 from patchharbor import result_resources as resources, result_verification as verification
 from patchharbor.platform.filesystem import FileChangedDuringRead
-from tests.test_result_bundle_publication import _publish, prepare_result_bundle_publication, UUID
-from tests.test_result_runtime_writer import artifact
+from tests.result_publication_support import _publish
+from patchharbor.result_bundle_publication import prepare_result_bundle_publication
+from uuid import UUID
+from tests.result_pyz_support import artifact
 
 
 @pytest.mark.parametrize('state',['embedded','unavailable'])

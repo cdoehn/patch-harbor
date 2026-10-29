@@ -4,7 +4,6 @@ from io import BytesIO
 import json
 import os
 from pathlib import Path
-import shutil
 import subprocess
 import sys
 from zipfile import ZipFile
@@ -13,28 +12,12 @@ import pytest
 
 from patchharbor.result_reader import read_result_reference
 from patchharbor import runtime_pyz as pyz
-from scripts.build_release import _copy_release_inputs
 from tests.embedded_pyz_support import bootstrap_program
 from tests.platform_support import native_python_script, native_value
 from tests.registration_support import create_repository
 from tests.runtime_permissions import readonly_tree
-from tests.test_runtime_packaging import _run, _venv
-
-
-@pytest.fixture(scope='module')
-def installed_producer(tmp_path_factory):
-    root=tmp_path_factory.mktemp('pyz-writer-installation')
-    source=root/'source';source.mkdir();outside=root/'outside';outside.mkdir()
-    _copy_release_inputs(source)
-    environment={k:v for k,v in os.environ.items() if k not in ('PYTHONPATH','PYTHONHOME')}
-    environment.update(PIP_NO_INDEX='1',PIP_DISABLE_PIP_VERSION_CHECK='1',PIP_CONFIG_FILE=os.devnull)
-    output=root/'dist'
-    _run([sys.executable,'-m','build','--wheel','--no-isolation','--outdir',str(output)],source,environment)
-    python=_venv(root/'venv',outside,environment)
-    _run([sys.executable,'-m','pip','--python',str(python),'install','--no-index','--no-deps',
-          '--no-cache-dir','--no-compile',str(next(output.glob('*.whl')))],outside,environment)
-    shutil.rmtree(source);shutil.rmtree(output)
-    return python
+from tests.runtime_installation_support import _run
+from tests.runtime_installation_support import installed_producer
 
 
 @pytest.mark.packaging

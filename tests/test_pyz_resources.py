@@ -16,24 +16,9 @@ import pytest
 
 from patchharbor import pyz_artifact as provider_module, runtime_pyz as pyz
 from patchharbor.pyz_artifact import PyzProvider
-from patchharbor.runtime_sources import DirectoryResources, ZipResources
-from tests.test_pack_api import request_files
-from tests.test_runtime_pyz import inputs, prepared
-
-
-def provider_for(monkeypatch, tmp_path, *, kind='directory', payloads=None):
-    recipe, payloads, archive = prepared(payloads)
-    if kind == 'directory':
-        root = tmp_path/'installation'; root.mkdir()
-        for name, raw in {**payloads, pyz.RECIPE_PATH: recipe.data}.items():
-            if name == '__main__.py': continue
-            target = root/name; target.parent.mkdir(parents=True, exist_ok=True); target.write_bytes(raw)
-        source = DirectoryResources(root)
-    else:
-        path = tmp_path/'own.pyz'; path.write_bytes(archive); source = ZipResources(path)
-    monkeypatch.setattr(provider_module, 'own_resources', lambda: source)
-    monkeypatch.setattr(provider_module, '_pyz_resource_id', pyz.producer_id(recipe))
-    return PyzProvider(), source, recipe, archive
+from tests.pack_support import request_files
+from tests.runtime_pyz_support import inputs, prepared
+from tests.runtime_pyz_support import provider_for
 
 
 @pytest.mark.parametrize('kind', ['directory', 'zip'])
