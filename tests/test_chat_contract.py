@@ -1,518 +1,86 @@
+"""Executable handoff examples and public parser behavior, independent of prose."""
 from __future__ import annotations
 
 import json
-from pathlib import Path
 import re
+import socket
+import subprocess
+from zipfile import ZipFile
 
 import pytest
 
-from patchharbor.cli import _build_parser as build_core_parser
+from patchharbor import api
 from patchharbor.bundle_handoff import MAX_HANDOFF_ENTRY_BYTES
-from patchharbor.parser import REQUIRED_MARKER
-from patchharbor.patch_manifest import (
-    PATCH_FORMAT_VERSION,
-    PATCH_MANIFEST_NAME,
-    PATCH_MARKER,
-)
-from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY
-from patchharbor.state_fingerprint import FINGERPRINT_ALGORITHM
+from patchharbor.chat_instructions import load_chat_template, render_chat_handoff
+from patchharbor.cli import _build_parser as build_core_parser
 from patchharbor_watcher.cli import _build_parser as build_watcher_parser
+from tests.compatibility_140_support import artifact
 from tests.platform_support import PROJECT_ROOT
 
 
-CHAT_PATH = PROJECT_ROOT / "CHAT_INSTRUCTIONS.md"
-SPEC_PATH = PROJECT_ROOT / "spec" / "SPECIFICATION.md"
-README_PATH = PROJECT_ROOT / "README.md"
-PLAN_PATH = PROJECT_ROOT / "planning" / "1.1.1" / "commit-plan.md"
-PATCH_READY = "🟩🟩 PATCH BEREIT 🟩🟩"
-BUNDLE_NUMBER = "PATCHHARBOR-BUNDLE-NR: 003"
-PATCH_LINK = "[Patch herunterladen](sandbox:/pfad/zum/patch.zip)"
-WARNING_HEADER = "🟨🟨 PATCHHARBOR WARNUNG 🟨🟨\nCODE: <WARNING_CODE>"
-STOP_HEADER = "🟥🟥 PATCHHARBOR STOP 🟥🟥\nCODE: <STOP_CODE>"
-EXPECTED_WARNING_CODES = {
-    "NON_BLOCKING_ASSUMPTION",
-    "PLAN_SPEC_MINOR_DEVIATION",
-    "REDUCED_TEST_SCOPE",
-}
-EXPECTED_STOP_CODES = {
-    "PATCH_CREATION_FAILED",
-    "PLAN_AMBIGUOUS",
-    "PLAN_NOT_FOUND",
-    "PLAN_POSITION_UNKNOWN",
-    "PLAN_SPEC_CONFLICT",
-    "REPOSITORY_STATE_INCOMPLETE",
-    "REQUIREMENT_AMBIGUOUS",
-    "SPEC_AMBIGUOUS",
-    "UNSAFE_OR_IMPOSSIBLE",
-}
-EXPECTED_HEADINGS = [
-    "## 1. Deine Aufgabe und die Sicherheitsgrenze",
-    "## 2. Erforderliche Eingaben",
-    "## 3. Result Bundle vollständig auswerten",
-    "## 4. Zielversion, Commit-Plan und Spezifikation finden",
-    "## 5. Spezifikation, Plan, Projektregeln und Auftrag abgleichen",
-    "## 6. Commit-Arten und Zähler",
-    "## 7. Genau ein sicheres Patch-Paket erzeugen",
-    "## 8. Projektprüfungen, Commitfolge und lokale Ausführung",
-    "## 9. Result Bundle nach Apply auswerten",
-    "## 10. Standardisierte Warning- und STOP-Ausgaben",
-    "## 11. Verbindliche schmale Patch-Bereit-UI",
-    "## 12. Verantwortungsgrenzen im Gesamtsystem",
-]
-EXPECTED_COMMAND_BLOCK = "\n".join(
-    (
-        "patchharbor configure exchange-directory VERZEICHNIS",
-        "patchharbor configure bundle-suffix .txt",
-        "patchharbor configure bundle-suffix --clear",
-        "patchharbor configure archive-dir PatchHarbor-Archive",
-        "patchharbor configure archive-dir --clear",
-        "patchharbor configure show",
-        "patchharbor register [REPOSITORY]",
-        "patchharbor registry list",
-        "patchharbor unregister REPOSITORY_OR_REPO_ID",
-        "patchharbor context [REPOSITORY]",
-        "patchharbor bundle [REPOSITORY]",
-        "patchharbor apply [PATCH_ZIP]",
-        "patchharbor apply --dry-run [PATCH_ZIP]",
-        "patchharbor fs run QUELLE",
-        "patchharbor-watcher",
-    )
-)
+def test_canonical_contract_can_be_loaded_and_rendered_without_execution(monkeypatch) -> None:
+    def forbidden(*args, **kwargs):
+        pytest.fail("passive handoff attempted process or network activity")
+    monkeypatch.setattr(subprocess, "Popen", forbidden)
+    monkeypatch.setattr(socket, "socket", forbidden)
+    raw = (PROJECT_ROOT / "CHAT_INSTRUCTIONS.md").read_bytes()
+    template = load_chat_template()
+    assert template == raw.decode("utf-8").replace("\r\n", "\n").replace("\r", "\n")
+    document = {"repository_path": "/example/repo", "runtime": {"system": "Linux"}}
+    handoff = render_chat_handoff(document)
+    assert handoff.instructions.endswith(template.encode("utf-8"))
+    assert 0 < len(handoff.instructions) <= MAX_HANDOFF_ENTRY_BYTES
+    assert json.loads(handoff.environment) == document
 
 
-def _text(path: Path) -> str:
-    return path.read_text(encoding="utf-8")
+def test_documented_patch_manifest_validates_against_a_real_reference(tmp_path, monkeypatch) -> None:
+    reference, expected = artifact("result", "clean")
+    document = load_chat_template()
+    examples = [json.loads(block) for block in re.findall(
+        r"^```json\s*\n(.*?)\n```$", document, flags=re.MULTILINE | re.DOTALL)]
+    manifests = [example for example in examples if isinstance(example, dict) and "entrypoint" in example]
+    assert len(manifests) == 1
+    manifest = manifests[0]
+    # Resolve only the three target-specific placeholders. All remaining example
+    # fields are validated unchanged by the actual public package reader.
+    for field in ("repo_id", "base_commit", "state_fingerprint"):
+        manifest[field] = expected["binding"][field]
+    package = tmp_path / "documented.zip"
+    with ZipFile(package, "w") as archive:
+        archive.writestr("patch.json", json.dumps(manifest))
+        archive.writestr("run.sh", "#!/usr/bin/env bash\n# PATCHHARBOR\nexit 23\n")
+    def forbidden(*args, **kwargs):
+        pytest.fail("example validation attempted execution or network activity")
+    monkeypatch.setattr(subprocess, "Popen", forbidden)
+    monkeypatch.setattr(socket, "socket", forbidden)
+    checked = api.validate_patch(package, reference_bundle=reference)
+    assert checked.binding_matches is True
+    assert checked.scope is api.PatchValidationScope.REFERENCE
+    assert checked.reference_sha256 == expected["sha256"]
+    assert "execution" in checked.not_checked
 
 
-def _fenced_blocks(document: str, language: str) -> tuple[str, ...]:
-    return tuple(
-        re.findall(
-            rf"^```{re.escape(language)}\n(.*?)\n```$",
-            document,
-            flags=re.MULTILINE | re.DOTALL,
-        )
-    )
-
-
-def _section(document: str, heading: str, next_heading: str | None) -> str:
-    start = document.index(heading)
-    end = len(document) if next_heading is None else document.index(
-        next_heading,
-        start + len(heading),
-    )
-    return document[start:end]
-
-
-def _normalise_space(value: str) -> str:
-    return " ".join(value.split())
-
-
-def test_chat_contract_is_canonical_versioned_and_compact() -> None:
-    raw = CHAT_PATH.read_bytes()
-    document = raw.decode("utf-8")
-
-    assert not raw.startswith(b"\xef\xbb\xbf")
-    assert b"\r" not in raw
-    assert raw.endswith(b"\n")
-    assert len(raw) <= MAX_HANDOFF_ENTRY_BYTES
-    assert all(line.rstrip() == line for line in document.splitlines())
-    assert (PROJECT_ROOT / ".gitattributes").read_text(encoding="utf-8") == (
-        "/CHAT_INSTRUCTIONS.md text eol=lf\n"
-        "/README.md text eol=lf\n"
-    )
-    assert document.startswith(
-        "# PatchHarbor 1.4.0 – Chat-Initialisierung\n\n"
-        "**Vertragsversion:** 1.4.0<br>\n"
-        f"**Patch-Paketmarker:** `{PATCH_MARKER}`<br>\n"
-        f"**Patch-Paketformat:** `{PATCH_FORMAT_VERSION}`<br>\n"
-        "**Result-Bundle-Marker:** `patch-harbor-result-bundle`<br>\n"
-        f"**Fingerprint-Algorithmus:** `{FINGERPRINT_ALGORITHM}`<br>\n"
-        f"**Entrypoint-Pflichtmarker:** `{REQUIRED_MARKER}`\n"
-    )
-    assert re.findall(r"^## .+$", document, flags=re.MULTILINE) == (
-        EXPECTED_HEADINGS
-    )
-    assert "1.1.0" not in document
-    assert _text(PLAN_PATH).count("`CHAT_INSTRUCTIONS.md`") >= 1
-
-
-def test_chat_manifest_and_resource_contract_match_runtime_constants() -> None:
-    document = _text(CHAT_PATH)
-    json_blocks = _fenced_blocks(document, "json")
-    assert len(json_blocks) == 1
-    manifest = json.loads(json_blocks[0])
-
-    assert list(manifest) == [
-        "marker",
-        "format_version",
-        "repo_id",
-        "base_commit",
-        "state_fingerprint",
-        "fingerprint_algorithm",
-        "entrypoint",
-    ]
-    assert manifest["marker"] == PATCH_MARKER
-    assert manifest["format_version"] == PATCH_FORMAT_VERSION
-    assert manifest["fingerprint_algorithm"] == FINGERPRINT_ALGORITHM
-    assert manifest["entrypoint"] == "run.sh"
-    assert manifest["entrypoint"] != PATCH_MANIFEST_NAME
-    assert f"exakt diese sieben Felder" in document
-    assert f"Skriptmarker `{REQUIRED_MARKER}`" in document
-
-    policy = DEFAULT_RESOURCE_POLICY
-    mib = 1024 * 1024
-    formatted_entries = f"{policy.max_zip_entries:,}".replace(",", ".")
-    expected_limits = (
-        f"Warning ab {policy.warning_bytes // mib} MiB pro Inhalt, höchstens "
-        f"{policy.max_input_artifact_bytes // mib} MiB pro Eingabeartefakt "
-        f"oder ZIP-Eintrag, höchstens {policy.max_zip_total_bytes // mib} MiB "
-        f"unkomprimierte ZIP-Gesamtdaten und höchstens "
-        f"{formatted_entries} ZIP-Einträge"
-    )
-    assert expected_limits in _normalise_space(document)
-
-    result_marker = "patch-harbor-result-bundle"
-    from patchharbor.models import BundlePayload
-    from patchharbor.result_bundle import _RESULT_MARKER
-    from patchharbor.result_reader import has_result_marker
-    assert _RESULT_MARKER == result_marker
-    assert has_result_marker((BundlePayload(
-        relative_path="manifest.json", content=json.dumps({"marker": result_marker}).encode(),
-    ),))
-
-
-def test_chat_public_commands_are_real_and_use_correct_optionality() -> None:
-    document = _text(CHAT_PATH)
-    text_blocks = _fenced_blocks(document, "text")
-    assert text_blocks[0] == EXPECTED_COMMAND_BLOCK
-
+def test_public_commands_accept_documented_arguments_and_reject_missing_or_unknown_ones() -> None:
     parser = build_core_parser()
-    valid_arguments = (
+    for arguments in (
         ["configure", "exchange-directory", "exchange"],
         ["configure", "show"],
+        ["configure", "bundle-suffix", ".txt"],
+        ["configure", "bundle-suffix", "--clear"],
         ["configure", "archive-dir", "PatchHarbor-Archive"],
         ["configure", "archive-dir", "--clear"],
-        ["register"],
-        ["registry", "list"],
+        ["register"], ["register", "repository"], ["registry", "list"],
         ["unregister", "repository-or-id"],
-        ["context"],
-        ["bundle"],
-        ["apply"],
-        ["apply", "--dry-run"],
+        ["context"], ["context", "repository"],
+        ["bundle"], ["bundle", "repository"],
+        ["apply"], ["apply", "package.zip"],
+        ["apply", "--dry-run"], ["apply", "--dry-run", "package.zip"],
         ["fs", "run", "source"],
-    )
-    for arguments in valid_arguments:
+    ):
         parser.parse_args(arguments)
     build_watcher_parser().parse_args([])
-
-    with pytest.raises(SystemExit):
-        parser.parse_args(["unregister"])
-
-    for invented in (
-        "patchharbor chat",
-        "patchharbor commit",
-        "patchharbor plan",
-        "patchharbor rollback",
-        "patchharbor test",
-    ):
-        assert invented not in text_blocks[0]
-
-
-def test_chat_contract_distinguishes_manual_explicit_and_watcher_selection() -> None:
-    document = _normalise_space(_text(CHAT_PATH))
-
-    assert (
-        "Ein manueller parameterloser `apply` löst zuerst das aktuelle "
-        "Arbeitsverzeichnis einschließlich Repository-Unterverzeichnissen auf"
-        in document
-    )
-    assert "ausschließlich Pakete für genau diese registrierte Repository-Instanz" in (
-        document
-    )
-    assert "Unicode-NFC-normalisierte Dateiname deterministisch" in document
-    assert "Der Watcher bleibt dagegen global für alle registrierten Repositorys" in (
-        document
-    )
-    assert "Ein expliziter `PATCH_ZIP` darf weiterhin über seine `repo_id`" in document
-
-
-def test_chat_and_spec_share_commit_warning_stop_and_ui_contracts() -> None:
-    chat = _text(CHAT_PATH)
-    specification = _text(SPEC_PATH)
-    warning_section = _section(
-        chat,
-        EXPECTED_HEADINGS[9],
-        EXPECTED_HEADINGS[10],
-    )
-    spec_warning_section = _section(
-        specification,
-        "### 26.7 Standardisierte Warning- und Stop-Ausgaben",
-        "### 26.8 Verbindliche schmale Patch-Bereit-UI",
-    )
-
-    chat_text_blocks = _fenced_blocks(warning_section, "text")
-    spec_text_blocks = _fenced_blocks(spec_warning_section, "text")
-    assert chat_text_blocks == (WARNING_HEADER, STOP_HEADER)
-    assert spec_text_blocks == chat_text_blocks
-
-    warning_part, stop_part = warning_section.split(
-        "Eine blockierende Situation beginnt exakt mit:",
-        maxsplit=1,
-    )
-    warning_codes = set(re.findall(r"`([A-Z][A-Z0-9_]+)`", warning_part))
-    stop_codes = set(re.findall(r"`([A-Z][A-Z0-9_]+)`", stop_part))
-    assert warning_codes == EXPECTED_WARNING_CODES
-    assert stop_codes == EXPECTED_STOP_CODES
-    for code in warning_codes | stop_codes:
-        assert f"`{code}`" in spec_warning_section
-
-    commit_section = _section(chat, EXPECTED_HEADINGS[5], EXPECTED_HEADINGS[6])
-    assert re.findall(r"^### `([^`]+)`$", commit_section, flags=re.MULTILINE) == [
-        "PLAN",
-        "FIX",
-        "OFF-PLAN",
-    ]
-    for fragment in ("<PLAN-ID>-FIX<n>", "-- / <Gesamtzahl>", "-- / --"):
-        assert fragment in commit_section
-        assert fragment in specification
-    assert "Erhöht weder Gesamtzahl noch erreichte Planposition" in commit_section
-    assert "erhöht den Planfortschritt nicht" in specification
-    assert "Plan-Zähler unverändert" in commit_section
-
-    # The product spec and the chat contract must agree on semantics, not on a
-    # human-facing Markdown example or console layout.
-    chat_ui = _normalise_space(
-        _section(chat, EXPECTED_HEADINGS[10], EXPECTED_HEADINGS[11])
-    )
-    spec_ui = _normalise_space(
-        _section(
-            specification,
-            "### 26.8 Verbindliche schmale Patch-Bereit-UI",
-            "### 26.9 Auswertung nach lokalem Apply",
-        )
-    )
-    for fragment in (
-        "eine kanonische ZIP",
-        "PATCHHARBOR-BUNDLE-NR",
-        "zählt Bundles, nicht Commits",
-        "Patch-Link ist die allerletzte Zeile",
-    ):
-        assert fragment in chat_ui
-        assert fragment in spec_ui
-
-
-def test_patch_delivery_contract_is_single_artifact_and_backup_safe() -> None:
-    # Check the handoff contract, not console text, colors, layout or timing.
-    document = _text(CHAT_PATH)
-    delivery = _section(document, EXPECTED_HEADINGS[10], EXPECTED_HEADINGS[11])
-    compact = _normalise_space(delivery)
-    (example,) = _fenced_blocks(delivery, "text")
-
-    assert example.count(PATCH_READY) == 2
-    assert "genau eine finale Auslieferung" in compact
-    assert "eine kanonische ZIP" in compact
-    assert "keine zweite Bereitschaftszeile am Ende" not in compact
-    assert BUNDLE_NUMBER in example
-    assert example.splitlines()[-3:] == [PATCH_READY, BUNDLE_NUMBER, PATCH_LINK]
-    assert "Vor der finalen Antwort:" in delivery
-    assert "blind doppelt" in compact
-    assert "nicht neu packen" in compact
-    for field in ("Chat-Link", "Drive-Backup", "E-Mail", "SHA-256"):
-        assert field in example
-    for safeguard in (
-        "PatchHarbor-Backups/Patches",
-        "byteidentische",
-        "Keine öffentliche Freigabe",
-        "Anbieter-Prüfsumme",
-        "Gmail-Adresse aus dem verbundenen Konto",
-        "Anhangsgrenzen",
-        "Schutzgrenzen nicht umgehen",
-        "Statusmail allein ist kein Backup",
-        "Best Effort",
-        "Tool-Bestätigung",
-        "nicht im Core, Watcher oder Entrypoint",
-        "Release-Tag",
-    ):
-        assert safeguard in compact
-    # Missing integrations are explicit; the example promises no imaginary backup.
-    assert "Drive-Backup: nicht verfügbar" in example
-    assert "E-Mail: nicht verfügbar" in example
-    assert "allerletzte Zeile der gesamten Antwort" in compact
-    assert "Sicherung erfolgt im externen Chat" in compact
-
-
-def test_delivery_contract_has_no_superseded_single_footer_rule() -> None:
-    chat = _text(CHAT_PATH)
-    spec = _text(SPEC_PATH)
-    for document in (chat, spec):
-        assert "keine zweite Bereitschaftszeile am Ende" not in document
-        assert "es gibt keine zweite Bereitschaftszeile" not in document
-    delivery = _section(chat, EXPECTED_HEADINGS[10], EXPECTED_HEADINGS[11])
-    assert delivery.count("PATCHHARBOR-BUNDLE-NR") >= 2
-    assert "allerletzte Zeile der gesamten Antwort" in delivery
-
-
-def test_warning_and_stop_finish_without_creating_second_artifacts() -> None:
-    chat = _text(CHAT_PATH)
-    warnings = _section(chat, EXPECTED_HEADINGS[9], EXPECTED_HEADINGS[10])
-    compact = _normalise_space(warnings)
-    assert "wiederhole denselben gelben Block" in compact
-    assert "unmittelbar vor dem grünen Erfolgsblock" in compact
-    assert "keine neue Bundle-Nummer" in compact
-    assert "kein Patch-Link" in compact
-    assert "kein `PATCH BEREIT`" in compact
-    assert "rote Block bildet zusätzlich den Abschluss" in compact
-
-
-def test_bundle_number_is_shared_with_successful_entrypoint_only() -> None:
-    chat = _text(CHAT_PATH)
-    execution = _section(chat, EXPECTED_HEADINGS[7], EXPECTED_HEADINGS[8])
-    delivery = _section(chat, EXPECTED_HEADINGS[10], EXPECTED_HEADINGS[11])
-    assert "PATCHHARBOR-BUNDLE-NR: <NNN> | APPLIED SUCCESSFULLY" in execution
-    assert "Bei einem Fehler darf diese Zeile niemals erscheinen" in execution
-    compact = _normalise_space(delivery)
-    for phrase in (
-        "dreistellige",
-        "zählt Bundles, nicht Commits",
-        "bei `001`",
-        "behält dieselbe Nummer",
-        "STOP ohne Bundle erhöht nichts",
-        "keinen zentralen oder transaktionalen Nummerngeber",
-        "kein STOP-Grund",
-    ):
-        assert phrase in compact
-
-
-def test_generic_chat_contract_delegates_test_policy_and_allows_commit_sequences() -> None:
-    chat = _text(CHAT_PATH)
-    compact = _normalise_space(chat)
-    execution = _normalise_space(
-        _section(chat, EXPECTED_HEADINGS[7], EXPECTED_HEADINGS[8])
-    )
-    commit_rules = _normalise_space(
-        _section(chat, EXPECTED_HEADINGS[4], EXPECTED_HEADINGS[6])
-    )
-
-    for required in (
-        "Explizite Nutzeranweisungen haben Vorrang",
-        "`AGENTS.md`",
-        "Ein Bundle darf standardmäßig einen oder mehrere fachlich abgegrenzte Commits enthalten",
-        "Mehrere Commits brauchen allein wegen ihrer Anzahl keine Genehmigung",
-        "Mehrere Commits erweitern weder Scope noch Testpolicy",
-        "PatchHarbor Core legt keine fachliche Teststrategie",
-        "Vor jedem Commit müssen alle für genau diesen Zwischenstand vorgeschriebenen",
-        "Installiere nicht zuerst den Endzustand",
-        "Teilerfolg",
-    ):
-        assert required in compact
-
-    for project_specific_default in (
-        "Pixel-/Termux-Workflow",
-        "uv run --frozen",
-        ".[dev]",
-        "xdist `auto`",
-        "Lokal/Bundles: Vollsuite nur parallel",
-        "--serial`-Vollreferenz nur in CI",
-        "planning/test-parallel/",
-        "docs/test-parallelism.md",
-        "seriell/2/4/auto mit Hash-Seeds",
-    ):
-        assert project_specific_default not in execution
-
-    assert "genau einen Git-Commit" not in commit_rules
-    assert "Eine Ausnahme ist" not in commit_rules
-
-
-def test_canonical_template_path_and_renderer_remain_the_handoff_source() -> None:
-    source = _text(PROJECT_ROOT / "src" / "patchharbor" / "chat_instructions.py")
-    packaging = _text(PROJECT_ROOT / "pyproject.toml")
-    assert "source_template = module.parents[2] / CHAT_INSTRUCTIONS_NAME" in source
-    assert '"share/patchharbor" = ["CHAT_INSTRUCTIONS.md", "docs/python-api.md"]' in packaging
-    assert "load_chat_template()" in source
-    assert "render_chat_handoff" in source
-
-
-def test_chat_contract_carries_retry_filename_and_identifier_presentation() -> None:
-    chat = _text(CHAT_PATH)
-    specification = _text(SPEC_PATH)
-    readme = _text(README_PATH)
-    compact_chat = _normalise_space(chat)
-
-    for document in (chat, specification, readme):
-        assert "<Repository>_Patch_<HHMMSS>_<MMDD>_<ID6>.zip" in document
-        assert "<Repository>_Result_<HHMMSS>_<MMDD>_<ID6>.zip" in document
-    assert "höchsten `mtime_ns`" in compact_chat
-    assert "fehlgeschlagenen Patch darf der manuelle Aufruf bewusst" in compact_chat
-    assert "fehlgeschlagene Pakete nicht erneut pollt" in compact_chat
-    assert "sechs Zeichen plus `…`" in specification
-    assert "vollständigen JSON-Werte" in chat
-    assert "`register`-, `context`- oder `registry list`-Kurzansicht" in chat
-    assert "patchharbor context --json" in chat
-    assert "Rekonstruiere niemals vollständige" in chat
-    assert "keine kopierbare Maschinenrepräsentation" in specification
-    assert "Kontextblock zum Kopieren in den Chat" not in specification
-    assert "--retry-failed" not in build_core_parser().format_help()
-
-
-def test_result_bundle_and_responsibility_boundaries_match_spec_and_readme() -> None:
-    chat = _text(CHAT_PATH)
-    specification = _text(SPEC_PATH)
-    readme = _text(README_PATH)
-
-    bundle_section = _section(chat, EXPECTED_HEADINGS[2], EXPECTED_HEADINGS[3])
-    for required in (
-        "`manifest.json`",
-        "`context.json`",
-        "`base/`",
-        "`changes/staged.patch`",
-        "`changes/unstaged.patch`",
-        "`untracked/`",
-        "`logs/run.json`",
-        "`logs/execution.log`",
-    ):
-        assert required in bundle_section
-        assert required in specification
-
-    for shared_boundary in (
-        "PatchHarbor ist keine Sandbox",
-        "keine globale automatische Rückabwicklung",
-        "keine Git-Historie",
-    ):
-        assert shared_boundary in chat
-
-    assert "PatchHarbor is not a sandbox" in readme
-    assert "not automatically rolled back" in readme
-    assert "without Git history" in readme
-    assert "PatchHarbor does not run target-project tests or create Git commits" in (
-        readme
-    )
-    assert "Es verwaltet außerdem keine fachlichen Tests, Git-Commits" in chat
-    assert "Lokale Repository- und Exchange-Pfade" in chat
-    assert "Pfad und Exchange-Pfad dienen nur Kommandozeilenbeispielen" in specification
-
-
-def test_chat_contract_remains_documentation_not_runtime_orchestration() -> None:
-    forbidden_runtime_terms = (
-        "CHAT_INSTRUCTIONS.md",
-        "PATCHHARBOR WARNUNG",
-        "PATCHHARBOR STOP",
-        PATCH_READY,
-        "PLAN_SPEC_MINOR_DEVIATION",
-    )
-    for package_root in (
-        PROJECT_ROOT / "src" / "patchharbor",
-        PROJECT_ROOT / "src" / "patchharbor_watcher",
-    ):
-        for path in package_root.rglob("*.py"):
-            source = path.read_text(encoding="utf-8")
-            for term in forbidden_runtime_terms:
-                if term == "CHAT_INSTRUCTIONS.md" and path.name in {"bundle_handoff.py", "runtime_wheel.py"}:
-                    continue  # Passive output file roles, not workflow execution.
-                assert term not in source, f"{term!r} leaked into {path}"
-
-
-def test_archive_contract_has_no_blanket_prohibition_conflicting_with_maintenance() -> None:
-    document = _text(CHAT_PATH)
-    assert "PatchHarbor selbst verschiebt, löscht, archiviert, sortiert oder benennt keine" not in document
-    assert "Es löscht keine\nBundles" in document
-    assert "State-/Git-Prüfung vor jedem Verschieben" in document
+    for arguments in (["unregister"], ["apply", "--retry-failed"],
+                      ["chat"], ["commit"], ["plan"], ["rollback"], ["test"]):
+        with pytest.raises(SystemExit) as error:
+            parser.parse_args(arguments)
+        assert error.value.code == 2

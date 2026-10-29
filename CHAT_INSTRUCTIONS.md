@@ -1093,10 +1093,10 @@ Development und Apply prüfen jeden Commitstand vollständig parallel, auch am
 Bundle-Ende. Kein serieller Lauf und keine verkürzte Auswahl als Vollabnahme.
 Nur Christian startet den manuellen CI-Workflow; Codex und Entrypoints tun das nie.
 
-RF-00 bis RF-02 sind durch tatsächliche Applies und Push bestätigt, zuletzt
-RF-02 / Bundle 058 auf `f959ea054c37977650be43db690909c2d510f29d`.
-Der Folgeauftrag umfasst RF-03 / Bundle 059: gemeinsame Testhilfen aus
-Testmodulen herauslösen; dessen Apply steht bei Vorbereitung noch aus.
+RF-00 bis RF-03 sind durch tatsächliche Applies und Push bestätigt, zuletzt
+RF-03 / Bundle 059 auf `ab1d6d5dae0d6f013c91775e9308dfe86ef6d848`.
+Der Folgeauftrag umfasst RF-04 / Bundle 060: Verhalten und Architekturgrenzen
+statt Quelltextlayout prüfen; dessen Apply steht bei Vorbereitung noch aus.
 Weitere Implementierung oder eine automatische Schleife ist nicht vorweggenommen.
 Vollständige Watcher-Results samt Teilfortschritten werden
 geprüft; fehlende externe Nachweise werden konkret gemeldet. CI startet

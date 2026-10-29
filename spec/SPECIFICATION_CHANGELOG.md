@@ -1,5 +1,18 @@
 # PatchHarbor – Spezifikations-Changelog
 
+## 2026-10-29 – RF-04 / Bundle 060: Verhalten und Schichtgrenzen prüfen
+
+- RF-03 tatsächlich angewendet und gepusht auf
+  `ab1d6d5dae0d6f013c91775e9308dfe86ef6d848`; 4 von 14 Planpositionen bestätigt.
+- Tests auf historische Planprosa, Überschriften und konkrete Quelltextformen
+  durch zugeordnete Verhaltenstests ersetzen; Manifest-Beispiel tatsächlich
+  gegen eine unveränderte 1.4.0-Referenz validieren, ohne Ausführung.
+- AST-Abhängigkeiten einschließlich relativer Importe und Aliase prüfen;
+  aufgeteilte Workflows erlauben, Rückabhängigkeiten, Zyklen und Grenzverletzungen
+  weiter ablehnen. 22 kleine adversarielle Architekturfälle ergänzen die Suite.
+- Keine Normdatei, Produktquelle, Paketversion, CI-Konfiguration oder eingefrorene
+  Fixture geändert. Vollständige parallele lokale Gates; eigener Apply noch offen.
+
 ## 2026-10-29 – RF-03 / Bundle 059: Gemeinsame Testhilfen entkoppeln
 
 - RF-02 tatsächlich angewendet und gepusht auf

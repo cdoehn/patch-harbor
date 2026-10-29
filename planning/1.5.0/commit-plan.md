@@ -1,11 +1,11 @@
 # PatchHarbor 1.5.0 – Refactoring- und Commitplan
 
 **Plan-ID:** `REFACTOR-1.5.0`
-**Revision:** 4 · 29. Oktober 2026
+**Revision:** 5 · 29. Oktober 2026
 **Zielversion:** 1.5.0; die Produktversion bleibt bis RF-13 bei 1.4.0.
-**Status:** RF-00 bis RF-02 durch Bundles 056 bis 058 bestätigt; RF-03 als Bundle 059 vorbereitet, Apply offen.
-**Fortschritt:** 3 / 14 Plancommits bestätigt; RF-03 ist der nächste zu bestätigende Schritt.
-**Aktueller Auftrag:** genau das nächste Arbeitspaket RF-03 erstellen; keine übernommene Automatik aus älteren Plänen.
+**Status:** RF-00 bis RF-03 durch Bundles 056 bis 059 bestätigt; RF-04 als Bundle 060 vorbereitet, Apply offen.
+**Fortschritt:** 4 / 14 Plancommits bestätigt; RF-04 ist der nächste zu bestätigende Schritt.
+**Aktueller Auftrag:** genau das nächste Arbeitspaket RF-04 erstellen; keine übernommene Automatik aus älteren Plänen.
 **Gemeinsame normative Grundlage:** [Hauptspezifikation](../../spec/SPECIFICATION.md),
 [PYZ/PACK-Erweiterung](../../spec/SPECIFICATION_EXTENSION_PYZ_PACK.md) und
 [CPython-3.10/3.11-Erweiterung](../../spec/SPECIFICATION_EXTENSION_CPYTHON_310_311.md),
@@ -147,8 +147,8 @@ falls weitere Aufteilung nötig wird, wird der Plan vorher nachvollziehbar angep
 | 1 / 14 | RF-00 | CONFIRMED – Bundle 056 | `docs(plan): define 1.5.0 refactoring sequence [RF-00]` |
 | 2 / 14 | RF-01 | CONFIRMED – Bundle 057 | `docs(spec): establish compatibility baseline from 1.4.0 [RF-01]` |
 | 3 / 14 | RF-02 | CONFIRMED – Bundle 058 | `test(compat): freeze supported 1.4.0 artifact contracts [RF-02]` |
-| 4 / 14 | RF-03 | NEXT – Bundle 059 vorbereitet, Apply offen | `refactor(tests): isolate shared fixtures from test modules [RF-03]` |
-| 5 / 14 | RF-04 | OPEN | `test(architecture): assert behavior and dependency boundaries [RF-04]` |
+| 4 / 14 | RF-03 | CONFIRMED – Bundle 059 | `refactor(tests): isolate shared fixtures from test modules [RF-03]` |
+| 5 / 14 | RF-04 | NEXT – Bundle 060 vorbereitet, Apply offen | `test(architecture): assert behavior and dependency boundaries [RF-04]` |
 | 6 / 14 | RF-05 | OPEN | `refactor(runtime): separate shared profile primitives from wheel support [RF-05]` |
 | 7 / 14 | RF-06 | OPEN | `refactor(compat): remove pre-1.4 result and runtime paths [RF-06]` |
 | 8 / 14 | RF-07 | OPEN | `refactor(bootstrap): generate embedded program from one source [RF-07]` |
@@ -238,7 +238,7 @@ Kein Produktcode oder Artefaktformat wurde in RF-02 geändert; Apply bestätigt 
   Hilfen. Unveränderte Fallauswahl und Verhaltensergebnisse nachweisen; Änderungen
   an Node-IDs nur mit vollständiger Zuordnung, nicht als stiller Testverlust.
 
-**Vorbereitet in Bundle 059:** 88 direkte Hilfsimporte und ein Modulalias
+**Bestätigt durch Bundle 059:** 88 direkte Hilfsimporte und ein Modulalias
 werden vollständig auf fachliche Supportmodule umgestellt. 66 Definitionen
 ziehen in 14 neue und zwei bestehende Module; Testnamen, Parameter, Marker und
 Fixture-Scopes bleiben erhalten. Die gemeinsame Windows-ACL-Prüflogik erhält
@@ -247,7 +247,7 @@ Alle übrigen Testfunktionskörper bleiben strukturell gleich, abgesehen von den
 Importzielen. Die [vollständige Zuordnung](rf03-test-support.md) hält jede
 ursprüngliche Importstelle und ihre neue Zuständigkeit fest. Keine neuen
 Test-zu-Test-Abhängigkeiten oder Importzyklen, keine Änderung an Produktcode,
-CI oder eingefrorenen Fixtures. Eigener Apply-/Commit-Nachweis noch offen.
+CI oder eingefrorenen Fixtures. Apply-/Commit-Nachweis siehe Abschnitt 4.
 
 ### RF-04 – Verhalten und Architekturgrenzen statt Quelltextlayout prüfen
 
@@ -264,6 +264,15 @@ CI oder eingefrorenen Fixtures. Eigener Apply-/Commit-Nachweis noch offen.
   Skip/Xfail, kein bloßes Löschen roter Sicherheitsprüfungen.
 - **Abnahme:** gleiches Verhalten kann intern umorganisiert werden, tatsächliche
   Grenzverletzungen werden weiter erkannt; keine neuen Layout-/Prosa-Tests.
+
+**Vorbereitet in Bundle 060:** Prosa- und Quelltextformprüfungen in Chat-/Release-
+Tests entfallen zugunsten vorhandener Verhaltenstests und eines tatsächlich
+validierten Manifest-Beispiels. Der AST-Importgraph erkennt Aliase und relative
+Importe und erlaubt eine aufgeteilte Application-/CLI-Schicht ohne Rückabhängigkeiten.
+22 adversarielle Architekturfälle sichern erlaubte und verbotene Abhängigkeiten.
+Die [vollständige Check- und Collection-Zuordnung](rf04-test-mapping.md) erklärt
+jede Entfernung; Produktcode, Normverträge, CI und Originalfixtures bleiben gleich.
+Vollständiges paralleles Gate vorgeschrieben; eigener Apply-/Commit-Nachweis offen.
 
 ### RF-05 – Gemeinsame Runtime-Primitiven von Wheel-Code trennen
 
@@ -480,6 +489,19 @@ erreichte Teilfortschritte werden im tatsächlichen Result ausgewertet.
   alle 43 neuen Kompatibilitätsfälle bestanden.
 - Report-SHA-256: `e7c505fb6a4eeb7857ced5d0e9dfa974821b11b30067ad48c5989770fa2080fd`.
 - Keine CI ausgelöst. RF-03 verwendet dieses Result als neue Bindungsbasis.
+
+### Bestätigter Fortschritt: RF-03 / Bundle 059
+
+- Tatsächlicher Apply, Entrypoint- und Prozess-Exitcode 0; kein Dry-Run.
+- Commit `ab1d6d5dae0d6f013c91775e9308dfe86ef6d848`, normaler Push auf `dev`;
+  sauberer Snapshot mit 388 Dateien und genau den 78 geplanten Änderungen.
+- Result `patchharbor-apply_Result_173904_1029_2cadb0.zip`, SHA-256
+  `10fae621c678ad78ac0dca9b28977c2bfcf872fe7eea719ef90a9a12bd28db6d`.
+- Vollständiges paralleles Apply-Gate: 3342 passed, 15 skipped, 12 Worker;
+  unveränderte Collection gegenüber RF-02.
+- Report-SHA-256: `2b9363578408ba6b3d75375df059f31aaa7b4190c1de28fb780fc6b5dacb1d11`.
+- Keine CI ausgelöst. RF-04 bindet sich an dieses Result; sein eigener
+  zukünftiger Apply-/Commit-Erfolg wird nicht vorweggenommen.
 
 ## 5. Pflichtnachweise über die Schritte hinweg
 
