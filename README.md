@@ -1,17 +1,28 @@
 # PatchHarbor 1.4.0
 
-PatchHarbor transfers work between a development environment and a local Git
-repository using verified ZIP packages. A **Result Bundle** describes the actual
-repository state. A **Patch package** is bound to that repository and exact state;
-Apply checks the binding before writing its payloads and running its entrypoint.
+**A bridge between AI coding assistants and local Git repositories.**
 
-- `bundle` captures a repository; `apply` applies an explicitly prepared package.
-- `pack` builds a patch from chosen contents and a Result reference.
-- `inspect` and `validate` check packages without executing their code.
-- The optional watcher runs Apply after filesystem changes in Exchange have
-  settled for five seconds.
-- Results normally carry an installation-free **Core-PYZ, without the watcher**.
-  CLI and Python callers use the same public API.
+PatchHarbor enables AI-assisted software development with tools such as **ChatGPT, Claude, GitHub Copilot, and other AI coding assistants** — even when the AI operates in an isolated, cloud-hosted Linux environment while the actual Git repository resides on a local Linux or Windows machine.
+
+It bridges these separate environments using verified ZIP packages, allowing AI assistants to inspect real repository states, prepare code changes, and deliver patches that can be safely applied to the local project.
+
+### How it works
+
+1. **Export:** PatchHarbor captures the current Git repository state in a *Result Bundle*.
+2. **AI development:** The bundle is provided to an AI assistant, which analyzes the project and prepares changes.
+3. **Patch delivery:** The AI produces a *Patch package* bound to the exact repository state.
+4. **Local application:** PatchHarbor verifies the package before applying its changes to the local repository.
+5. **Feedback:** A new Result Bundle captures the updated repository and execution results, enabling the next development iteration.
+
+### Key features
+
+- `bundle` captures the repository state for AI-assisted development.
+- `pack` creates verified patch packages from selected files and a Result reference.
+- `apply` validates and executes explicitly prepared patches.
+- `inspect` and `validate` examine packages without executing their code.
+- An optional watcher automatically applies incoming patches after filesystem activity in the Exchange directory has settled for five seconds.
+- Result Bundles normally include an installation-free **Core-PYZ (without the watcher)**, allowing compatible AI Linux environments to work with PatchHarbor without installing it separately.
+- CLI and Python integrations share the same public API.
 
 This source tree uses version **1.4.0**. The version string, an installed version,
 and a published release are different facts. Implementation and acceptance
