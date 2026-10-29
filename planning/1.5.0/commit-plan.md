@@ -1,11 +1,11 @@
 # PatchHarbor 1.5.0 – Refactoring- und Commitplan
 
 **Plan-ID:** `REFACTOR-1.5.0`
-**Revision:** 1 · 29. Oktober 2026
+**Revision:** 2 · 29. Oktober 2026
 **Zielversion:** 1.5.0; die Produktversion bleibt bis RF-13 bei 1.4.0.
-**Status:** RF-00 als Startbundle 056 vorbereitet; noch kein tatsächlicher Apply dieses Plans bestätigt.
-**Fortschritt:** 0 / 14 Plancommits bestätigt; RF-00 ist der nächste zu bestätigende Schritt.
-**Aktueller Auftrag:** genau das Planungsbundle RF-00 erstellen. Die Folgeimplementierung beginnt erst auf weiteren Nutzerauftrag; keine übernommene Automatik aus älteren Plänen.
+**Status:** RF-00 durch Bundle 056 bestätigt; RF-01 als Bundle 057 vorbereitet, Apply offen.
+**Fortschritt:** 1 / 14 Plancommits bestätigt; RF-01 ist der nächste zu bestätigende Schritt.
+**Aktueller Auftrag:** genau das nächste Arbeitspaket RF-01 erstellen; keine übernommene Automatik aus älteren Plänen.
 **Gemeinsame normative Grundlage:** [Hauptspezifikation](../../spec/SPECIFICATION.md),
 [PYZ/PACK-Erweiterung](../../spec/SPECIFICATION_EXTENSION_PYZ_PACK.md) und
 [CPython-3.10/3.11-Erweiterung](../../spec/SPECIFICATION_EXTENSION_CPYTHON_310_311.md),
@@ -142,10 +142,10 @@ wenn jeder als echter Dateizustand mit eigenem vollständigen parallelen Gate
 und anschließendem Commit entsteht. Es gibt keine künstliche W/R/C-Dreiteilung;
 falls weitere Aufteilung nötig wird, wird der Plan vorher nachvollziehbar angepasst.
 
-| Position | ID | Status beim Bootstrap | Vorgesehener Commit |
+| Position | ID | Aktueller Status | Vorgesehener Commit |
 | --- | --- | --- | --- |
-| 1 / 14 | RF-00 | NEXT – vorbereitet, Apply offen | `docs(plan): define 1.5.0 refactoring sequence [RF-00]` |
-| 2 / 14 | RF-01 | OPEN | `docs(spec): establish compatibility baseline from 1.4.0 [RF-01]` |
+| 1 / 14 | RF-00 | CONFIRMED – Bundle 056 | `docs(plan): define 1.5.0 refactoring sequence [RF-00]` |
+| 2 / 14 | RF-01 | NEXT – Bundle 057 vorbereitet, Apply offen | `docs(spec): establish compatibility baseline from 1.4.0 [RF-01]` |
 | 3 / 14 | RF-02 | OPEN | `test(compat): freeze supported 1.4.0 artifact contracts [RF-02]` |
 | 4 / 14 | RF-03 | OPEN | `refactor(tests): isolate shared fixtures from test modules [RF-03]` |
 | 5 / 14 | RF-04 | OPEN | `test(architecture): assert behavior and dependency boundaries [RF-04]` |
@@ -418,6 +418,17 @@ führt die lokalen Gates aus und erzeugt tatsächliche Commits ausschließlich i
 Apply-Repository. Nach allen erfolgreichen Commits genau ein normaler Push.
 Bei Fehlern keine Erfolgsmeldung und keinen nachgelagerten Push; bereits
 erreichte Teilfortschritte werden im tatsächlichen Result ausgewertet.
+
+### Bestätigter Fortschritt: RF-00 / Bundle 056
+
+- Tatsächlicher Apply, Entrypoint- und Prozess-Exitcode 0; kein Dry-Run.
+- Commit `05cceef59891a68a3e0fdd2115fa79e718db1347`, normaler Push auf `dev`,
+  sauberer Snapshot mit 355 Dateien; genau die drei geplanten Dokumentänderungen.
+- Result `patchharbor-apply_Result_111022_1029_d93260.zip`, SHA-256
+  `126547f6af58edf66323ac1b98711c32c882978f7a08cd3965833dbb590ffd23`.
+- Vollständiges paralleles Apply-Gate: 3299 passed, 15 skipped, 12 Worker.
+- Keine CI ausgelöst. RF-01 verwendet dieses Result als neue Bindungsbasis;
+  der eigene künftige Apply-/Commit-Erfolg wird hier nicht vorweggenommen.
 
 ## 5. Pflichtnachweise über die Schritte hinweg
 

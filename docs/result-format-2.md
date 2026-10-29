@@ -1,8 +1,12 @@
-# Result-Format 2: festgelegter Leservertrag
+# Result-Format 2: historischer Leservertrag
 
 Historischer Stand `1.e.W`: damals erzeugten die regulären Result-Wege Format 2.
 Ab PP-06B schreibt der aktuelle Core [Result 3](result-format-3.md). Der hier
-beschriebene geschlossene Leservertrag für vorhandene Result-2-Dateien bleibt gültig.
+beschriebene geschlossene Leservertrag dokumentiert nur den Altstand.
+Ab der Kompatibilitätsbasis 1.4.0 (RF-01) besteht keine Pflicht mehr, Result 1/2
+oder deren Runtime-Wheels zu verarbeiten. Die folgenden Felder und Beispiele
+werden nicht umgedeutet; sie sind historische Dokumentation, keine aktuelle
+Freigabeforderung. RF-01 ändert den bestehenden Leser noch nicht.
 Vorbereitete Standardinstallationen betten ihre Runtime ein; unvorbereiteter
 Quellbetrieb liefert `unavailable/source_not_prepared` mit Warnung. Allgemeine Referenzgültigkeit und Archiv-/Recovery-Erfolg bleiben
 getrennt. Der Leser importiert, installiert oder startet keinen Wheel-Code.

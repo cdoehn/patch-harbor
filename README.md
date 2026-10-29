@@ -157,7 +157,10 @@ provides `import_api(prepared)` for API use without installing PatchHarbor.
 New Results use **Format 3**. When runtime embedding succeeds, they contain
 exactly one `runtime/patchharbor-<version>.pyz`. A valid `unavailable` status
 instead contains runtime metadata and a warning, with no executable artifact.
-Legacy Format-1/2 Results remain readable.
+Version 1.4.0 still reads older Results. The 1.5.0 refactoring contract preserves
+valid artifacts from **1.4.0 onward**; support for earlier Result formats and
+embedded runtime wheels is no longer required. RF-01 documents this boundary;
+the implementation changes follow the [refactoring plan](planning/1.5.0/commit-plan.md).
 
 Use the executable bootstrap from the trusted Result's handoff, or a separately
 reviewed copy of `scripts/pyz_bootstrap.py`, to assess and prepare its exact PYZ.
@@ -181,7 +184,8 @@ If the runtime is absent or technically unusable, use the
 with trusted compatible tools and record the reason. A semantic validation
 failure or invalid binding remains an error; fallback is not a bypass.
 The [bootstrap guide](docs/runtime-bootstrap.md) covers trust, extraction,
-Python-only API use and legacy wheels.
+Python-only API use and the safe runtime-unavailable fallback. Its old wheel
+procedure is retained as historical documentation.
 
 ## Manual operation and watcher
 

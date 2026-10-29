@@ -236,16 +236,20 @@ globale Rückabwicklung.
 
 ### Installationsfreier Start aus dem vorliegenden Format-3-Result
 
-Das konkrete Resultformat entscheidet: Format 1/2 behält den unten beschriebenen
-Legacyweg; Format 3 mit `embedded` verwendet genau seine PYZ. Der neue Writer
-produziert Format 3. Bereits laufende alte Installationen behalten ihr bisheriges
-Format bis zu einem gesonderten Upgrade. Der Bootstrap prüft die genaue
-Anforderung der ausgewählten PYZ: unveränderte historische Artefakte benötigen
-Python >=3.12; die neue geschlossene Variante verlangt >=3.10. Unbekannte oder
-widersprüchliche Varianten sind Fehler. Der aktuelle Produktionswriter und die Distribution wechseln in CP-03
-gemeinsam auf >=3.10. Bereits veröffentlichte Altartefakte bleiben unverändert.
-Die PYZ enthält den vollständigen Core ohne Watcher. Es gibt keinen pip-, venv-,
-Build- oder Downloadschritt und keine Änderung der vorhandenen Installation.
+Die Kompatibilitätsbasis für die Entwicklung ab 1.5.0 sind unveränderte gültige
+1.4.0-Results mit Format 3. Bei `embedded` verwende genau deren Core-PYZ mit
+Python >=3.10; `unavailable` bleibt eine gültige Referenz ohne Werkzeugzugabe.
+Result 1/2 und ursprüngliche 1.3.0-PYZs sind keine Supportpflicht mehr.
+Nicht unterstützte Formate sind kein Anlass, alte Wheel-Laufzeiten zu installieren.
+Bestehende 1.4.0-Capabilities `[1, 2, 3]` bleiben gültig; neue bereinigte
+Produzenten deklarieren `[3]`. Angaben beschreiben den jeweiligen Produzenten,
+nicht die Lesepflicht des aktuellen Werkzeugs. Originalbytes bleiben unverändert.
+
+RF-01 aktualisiert nur den Vertrag. Der folgende ausführbare Bootstrap ist noch
+unverändert aus 1.4.0 und kann zusätzliche historische Varianten erkennen; daraus
+folgt keine fortgesetzte Altformatzusage. Seine Bereinigung folgt RF-06/RF-07.
+Die PYZ enthält den vollständigen Core ohne Watcher. Kein pip-, venv-, Build-
+oder Downloadschritt und keine Änderung der vorhandenen Installation.
 
 Prüfe Herkunft und Code dieser Anleitung zuerst. Ein SHA aus demselben unbekannten
 ZIP ist kein Herkunftsnachweis. Speichere den folgenden Python-Code aus genau dieser
@@ -988,46 +992,18 @@ if __name__ == '__main__':
         raise SystemExit(2)
 ```
 
-### Legacy-Result 2: geprüftes Wheel und bisheriger Übergabeweg
+### Runtime-Ausfall und bisheriger sicherer Übergabeweg
 
-Result-Format 2 ergänzt `runtime/runtime.json` und gegebenenfalls ein kanonisches
-Wheel. Format 1 sowie `unavailable` bleiben gültige Referenzen. `runtime/` ist
-Werkzeugmaterial außerhalb des Repository-Snapshots; `base/runtime/` ist etwas
-anderes. Das Finden eines Wheels erlaubt weder Installation noch Import.
+Dieser Fallback gilt für eine fehlende oder technisch unbenutzbare Werkzeugzugabe
+einer unterstützten Repositoryreferenz. Result 1/2 und alte Runtime-Wheels sind
+historische Daten, kein automatischer Ersatzweg. Unbekannte Formate und ungültige
+Pflichtdaten werden nicht durch Runtime-Installation oder Umdeklaration geheilt.
+Das frühere Wheel-Beispiel in `docs/runtime-bootstrap.md` ist ausdrücklich Historie.
+Eine fehlende PYZ allein verhindert die Arbeit am sicher geprüften Snapshot nicht.
 
-Prüfe zuerst Herkunft und Berechtigung mit bereits vertrauenswürdigen Werkzeugen.
-Ein Hash aus derselben unbekannten Quelle authentifiziert keinen Absender.
-Prüfe äußere ZIP-Sicherheit, vollständiges Inventar, Größen, Hashes und das enge
-Wheel-Profil einschließlich RECORD, Python-Anforderung, dependency-freier
-Metadaten und Ausschluss von `.pth`, Fremdmodulen und Launchern **vor** Codeausführung.
-Unbekannte Herkunft oder fehlender verlässlicher Prüfer führt zum bisherigen Weg.
-Ein Skript aus dem ungeprüften Wheel darf nicht seine eigene Vertrauensbasis sein.
-
-Erst danach explizit eine frische Umgebung außerhalb des Ziel-Snapshots anlegen.
-Nur das geprüfte lokale Wheel offline installieren: kein Index, Nachladen,
-Buildfallback, Interpreterdownload oder `--ignore-requires-python`. Ein vorhandener
-Installer muss die vollständige `Requires-Python`-Bedingung vor Installation am
-Zielinterpreter prüfen, etwa durch einen lokalen pip-Dry-Run. Eine venv ist keine
-Sicherheits-Sandbox. Keine Session-Secrets weitergeben; `PYTHONPATH`/`PYTHONHOME`
-bereinigen und einen fremden Arbeitsordner sowie den isolierten Interpreter nutzen.
-
-Das separat reviewed Repository-Beispiel `scripts/runtime_bootstrap.py` und
-`docs/runtime-bootstrap.md` konkretisieren den Ablauf. Der Helfer setzt eine
-bereits vertrauenswürdige passende Core-Installation voraus; er ist keine neue
-öffentliche API und wird nicht aus einer fremden Result-Runtime gestartet.
-Fehlt er, bleibt die folgende bisherige Prüfung verbindlich.
-
-Mit dem konkret geprüften venv-Interpreter (Windows: `Scripts/python.exe`,
-POSIX: `bin/python`) prüfen:
-
-```text
-<venv-python> -I -m patchharbor.cli inspect /absolut/patch.zip --json
-<venv-python> -I -m patchharbor.cli validate /absolut/patch.zip --reference-bundle /absolut/result.zip --json
-```
-
-**Fehlt oder versagt das Wheel, muss der bisherige Übergabeweg verwendet werden.**
+**Fehlt oder versagt die PYZ, muss der bisherige sichere Übergabeweg verwendet werden.**
 Das gilt für fehlende/defekte Bytes, ungeklärte Herkunft, inkompatibles Python,
-fehlenden Installer und technische Import-/Nutzungsfehler. Ein Versuch genügt;
+technische Vorbereitungs-, Import- oder Nutzungsfehler. Ein Versuch genügt;
 keine Reparatur- oder Netzwerkschleife. Entwickle am geprüften tatsächlichen
 Snapshot; verwende vorhandene vertrauenswürdige Paketprüfer oder die etablierten
 ZIP-, Payload-, Hash- und Bindungsprüfungen. Alle vier vollständigen Werte aus
@@ -1038,7 +1014,7 @@ Bei ausschließlich defektem Runtime-Zusatz separat äußere ZIP-Sicherheit,
 Pflichtdateien, Snapshot-Inventar/Blob-IDs/Hashes, Kontext und Run-Konsistenz
 prüfen. Originalbytes und vollständige Result-SHA behalten; weder reparieren
 noch als Format 1 umdeklarieren. Dieser Nachweis ist keine erfolgreiche native
-Vollvalidierung des defekten Format-2-Results. Ungültige Repositorydaten,
+Vollvalidierung des defekten Results. Ungültige Repositorydaten,
 unsichere Paketpfade und Bindungsabweichungen bleiben blockierend.
 
 Ausfallgrund, Werkzeuge, tatsächliche Prüfungen und fehlende Nachweise benennen.
@@ -1065,17 +1041,17 @@ Nutzerauftrag vom 29. Oktober 2026 der Refactoring-Plan für 1.5.0:
 ```text
 Plan: planning/1.5.0/commit-plan.md
 Normsatz: spec/SPECIFICATION.md
-          spec/SPECIFICATION_EXTENSION_PYZ_PACK.md (Revision 4)
-          spec/SPECIFICATION_EXTENSION_CPYTHON_310_311.md (Revision 1)
+          spec/SPECIFICATION_EXTENSION_PYZ_PACK.md (Revision 5)
+          spec/SPECIFICATION_EXTENSION_CPYTHON_310_311.md (Revision 2)
 ```
 
 Die drei Normdateien bleiben getrennt. Nur konkrete grobe Fehler und aktuelle
 Widersprüche werden gezielt korrigiert, insbesondere die bisherige Pflicht zur
 Unterstützung von Artefakten vor 1.4.0. Gültige 1.4.0-Artefakte bleiben die Basis
-zukünftiger Abwärtskompatibilität; Patchformat 1 bleibt erhalten. RF-01 trägt
-diese ausdrückliche Nutzerentscheidung in die betroffenen Normstellen ein.
-RF-00 ist ausschließlich der Planungsbootstrap; Produktversion, ausführbarer
-Bootstrap, Tests und Laufzeitverhalten bleiben dabei unverändert.
+zukünftiger Abwärtskompatibilität; Patchformat 1 bleibt erhalten. RF-01 korrigiert
+die betroffenen Normstellen. Produktversion, ausführbarer Bootstrap und
+Laufzeitverhalten bleiben unverändert. Nur ein blockierender Status-Wortlautcheck
+entfällt; die bestehenden Verhaltenstests und vollständigen Gates bleiben erhalten.
 
 Der frühere PYZ/PACK-Plan ist mit 16/16 Positionen, Korrektur 046 und grüner
 manueller CI auf `30e5de1d67a2d725ff192a0b97e50c2b0336bfcb` abgeschlossen.
@@ -1117,9 +1093,10 @@ Development und Apply prüfen jeden Commitstand vollständig parallel, auch am
 Bundle-Ende. Kein serieller Lauf und keine verkürzte Auswahl als Vollabnahme.
 Nur Christian startet den manuellen CI-Workflow; Codex und Entrypoints tun das nie.
 
-Der Auftrag vom 29. Oktober 2026 umfasst zunächst nur RF-00 / Bundle 056.
-Weitere Implementierung und eine automatische Schleife benötigen einen neuen
-Fortsetzungsauftrag. Vollständige Watcher-Results samt Teilfortschritten werden
+RF-00 / Bundle 056 ist durch tatsächliches Apply und Push auf
+`05cceef59891a68a3e0fdd2115fa79e718db1347` bestätigt. Der Folgeauftrag umfasst
+RF-01 / Bundle 057; dessen Apply steht bei Vorbereitung noch aus. Eine weitere
+Implementierung oder automatische Schleife ist damit nicht vorweggenommen. Vollständige Watcher-Results samt Teilfortschritten werden
 geprüft; fehlende externe Nachweise werden konkret gemeldet. CI startet
 ausschließlich Christian. Sicherheitsgrenzen und belastbare Resultbindung
 bleiben Voraussetzung; Tokenmeter bleibt gestoppt.

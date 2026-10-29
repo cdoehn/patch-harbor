@@ -1,11 +1,12 @@
 # PatchHarbor – CPython 3.10 und 3.11
 
 **Dokument-ID:** `CPYTHON-310-311`
-**Revision:** 1
-**Stand:** 13. Oktober 2026
-**Status:** Autorisierter Zielvertrag; CP-00 übernimmt ausschließlich Spezifikation und Plan. Noch kein Nachweis zusätzlicher Interpreterunterstützung.
-**Produktbasis:** freigegebener 1.3.0-Stand; die nächste Releaseversion wird gesondert festgelegt.
-**Umsetzungsplan:** [CP-00 bis CP-05](../planning/python-compatibility/commit-plan.md)
+**Revision:** 2
+**Stand:** 29. Oktober 2026
+**Status:** Fortgeltender CPython-Vertrag; RF-01 begrenzt die Artefakt-Kompatibilität auf die Basis ab 1.4.0. Implementierungs- und offene Abnahmenachweise bleiben im CPython-Plan erhalten.
+**Produktbasis:** 1.4.0; Refactoring-Ziel 1.5.0. CPython-Untergrenze unverändert 3.10.
+**Historischer Umsetzungsplan:** [CP-00 bis CP-05](../planning/python-compatibility/commit-plan.md)
+**Aktiver Plan:** [REFACTOR-1.5.0](../planning/1.5.0/commit-plan.md)
 
 ## 1. Geltung und gezielte Vertragsänderung
 
@@ -26,8 +27,9 @@ oder ein Implementierungsdetail darf die Sicherheitsverträge nicht absenken.
 Gezielt ersetzt werden die Python-Untergrenze und der Ausschluss älterer
 Interpreter in Hauptspec §4.2/38.2/41 sowie PYZ/PACK §2.2, PYZ-02 und TEST-04.
 Die in 1.3.0 veröffentlichten Artefakte, Metadaten, IDs und Hashes bleiben
-unverändert historische Tatsachen. CP-00 setzt weder `Requires-Python` noch
-den produktiven Bootstrap vorzeitig herab.
+unverändert historische Tatsachen, ohne fortgesetzte Supportpflicht für diese
+Altartefakte. Die ursprüngliche CP-00-Planübernahme änderte noch keine Laufzeit.
+RF-01 präzisiert CPY-10–12 nach Hauptspec §1.1; Sicherheitsregeln bleiben erhalten.
 
 ## 2. Unterstützter Funktionsumfang
 
@@ -102,39 +104,37 @@ und das separate innere Runtime-Limit erhalten. Keine automatische
 Konfigurationsmigration, kein Cache als Vertrauensquelle und kein Retry um
 semantisch ungültige Referenzen herum.
 
-## 4. Alte Results und zwei geschlossene PYZ-Varianten
+## 4. Kompatibilitätsbasis ab 1.4.0 und geschlossene PYZ-Verträge
 
-**CPY-10.** Neue Leser verarbeiten weiterhin Resultformate 1, 2 und 3,
-Legacy-Wheel-Metadaten und die originalen 1.3.0-PYZ-Artefakte. Das Lesen und
-statische Prüfen eines Results wird von der Ausführbarkeit seiner enthaltenen
-Runtime getrennt. Ein altes korrektes `>=3.12`-Artefakt wird nicht zur
-Ausführung unter 3.10/3.11 umetikettiert oder beim Lesen verändert.
+**CPY-10.** Neue Leser verarbeiten unveränderte gültige 1.4.0-Results und
+später unterstützte Vertragsstände. Result 1/2, Legacy-Wheel-Metadaten und die
+originale 1.3.0-PYZ sind keine Supportpflicht mehr. Statische Resultprüfung
+bleibt von der Ausführbarkeit der eingebetteten Runtime getrennt; unbekannte
+oder nicht unterstützte Daten sind keine Erfolgs-/Archiv-/Recovery-Belege und
+lösen keine Ersatz-Ausführung aus. Historische Bytes werden nicht verändert.
 
 **CPY-11.** Patchformat 1, Resultformat 3, Runtime-Metadatenformat 2,
-PYZ-Rezeptformat 1, Profil `patchharbor-core-no-watcher-v1` sowie die bestehenden
-Inhalts-/Produzenten-ID-Algorithmen bleiben erhalten. Die geschlossene
-Python-Anforderung kennt nach der Erweiterung genau zwei Varianten:
+PYZ-Rezeptformat 1, Profil `patchharbor-core-no-watcher-v1` sowie bestehende
+Inhalts-/Produzenten-ID-Algorithmen bleiben erhalten. Die unterstützte Basis
+verwendet `requires_python: ">=3.10"` und die dazu festgelegten Startbytes.
+Die ursprüngliche 1.3.0-Variante `>=3.12` bleibt historische Dokumentation,
+keine Pflicht für neue Leser. Keine beliebigen Versionsausdrücke.
 
-| Variante | `requires_python` | Kanonischer Programmeinstieg |
-| --- | --- | --- |
-| Bisherige 1.3.0-PYZ | `>=3.12` | unveränderte historische Startbytes mit 3.12-Grenze |
-| Neue kompatible PYZ | `>=3.10` | festgelegte neue Startbytes mit 3.10-Grenze |
+Rezept, Deskriptor, Build-Metadaten, Identitätsbytes und beide Startdateien
+müssen denselben Vertrag beschreiben. Unbekannte Profile/Felder, gemischte
+Startbytes und neu gehashte Widersprüche bleiben ungültig. FMT-03 erlaubt
+genau die Capability-Varianten `[1, 2, 3]` (unveränderte Basis) und `[3]`
+(bereinigter Produzent). Dies sind Result-Lesefähigkeiten des Produzenten,
+keine unterschiedlichen Python-Mindestversionen oder neue Profilidentitäten.
 
-Rezept, Runtime-Deskriptor, Build-Metadaten, Identitätsbytes und ausgewählter
-Startcode müssen dieselbe Variante beschreiben. Beide Startdateien der PYZ
-müssen zur jeweiligen Variante passen. Kein beliebiger Versionsausdruck,
-kein lexikalischer Vergleich, keine Akzeptanz unbekannter Profile/Felder.
-Ein gemischtes Artefakt ist ungültig, auch wenn jemand seine Hashes neu berechnet.
-Aktuelle Hash-/Inventarprüfung bleibt vollständig; alte kanonische Bytes werden
-mit ihrer ursprünglichen Variante und ihren ursprünglichen Hashes geprüft.
-
-**CPY-12.** Zuerst werden Leser, Datenvalidatoren und Bootstrap für beide
-Varianten vorbereitet, während der Writer noch `>=3.12` erzeugt. Erst danach
-dürfen Distribution, Writer, `unavailable`-Metadaten, Programmeinstieg und
-eingebettete ausführbare Chat-Anleitung gemeinsam auf `>=3.10` wechseln.
-Neue Results enthalten genau eine passende PYZ oder begründetes `unavailable`.
-Ältere eingefrorene Leser dürfen neue Varianten weiterhin konservativ ablehnen;
-dieser Auftrag verspricht nicht, bereits veröffentlichte Leser nachzurüsten.
+**CPY-12.** Die damalige Umstellung auf `>=3.10` bereitete Leser und Bootstrap
+vor dem Writerwechsel vor. Dieser historische Übergang muss nicht wiederholt
+werden. Vor der Altpfadbereinigung werden unveränderte 1.4.0-Fixtures gesichert;
+neue Leser und Bootstrap erhalten deren geschlossenen Vertrag. Writer,
+`unavailable`-Metadaten, Programmeinstieg und eingebettete Anleitung bleiben
+konsistent. Neue Results enthalten genau eine passende PYZ oder begründetes
+`unavailable`. Bereits veröffentlichte 1.4.0-Leser dürfen unbekannte zukünftige
+Verträge konservativ ablehnen; Abwärts- ist keine Vorwärtskompatibilität.
 
 **CPY-13.** Bootstrap und In-Process-API funktionieren offline mit der
 Standardbibliothek unter beiden neuen Interpretern. Sie prüfen vor Import
@@ -179,8 +179,8 @@ für die geänderte Kombination. Tags, Releases und Hostupdates sind eigene Auft
 | CT-02 | Hauptfehler plus fehlschlagendes Cleanup erhalten Kategorie, Exitstatus, Verkettung und Diagnosen ohne `add_note`-Attributfehler. |
 | CT-03 | Native Windows-Identität, Pfad-/Handle-Zeiten, Inhaltsänderung bei gleicher Größe/mtime und Dateiaustausch bleiben sicher erkannt. |
 | CT-04 | Symlink, Junction, Reparse-Punkt, umgelenkte Eltern, Dateirechte und private Arbeitsverzeichnisse/DACLs werden unter alten und neuen Interpretern geprüft. |
-| CT-05 | Neue Leser validieren unveränderte eingefrorene Results 1/2/3 und originale 1.3.0-PYZ; statische Lesbarkeit hängt nicht von ihrer Ausführbarkeit ab. |
-| CT-06 | Beide erlaubten PYZ-Varianten bestehen; unbekannte Anforderungen, gemischte Deskriptoren/Startbytes und neu gehashte Widersprüche scheitern. |
+| CT-05 | Neue Leser validieren unveränderte eingefrorene 1.4.0-Results und deren PYZ; statische Lesbarkeit hängt nicht von ihrer Ausführbarkeit ab. |
+| CT-06 | Unterstützte PYZ mit >=3.10 und beide Capability-Varianten bestehen; unbekannte Anforderungen, gemischte Deskriptoren/Startbytes und neu gehashte Widersprüche scheitern. |
 | CT-07 | Frischer stdlib-Prozess startet die neue PYZ unter 3.10/3.11 offline; kein fremdes Paket, Installer oder Checkout wird verwendet. |
 | CT-08 | Eigene Result-Anleitung bootstrapped ihre tatsächliche PYZ; In-Process-API, Herkunft, Importkonflikt und zu alter Interpreter werden korrekt behandelt. |
 | CT-09 | Vollständige Core-API/CLI-Parität: Konfiguration, Registrierung, bundle, tatsächliches Apply, Dry-Run, fehlgeschlagenes Apply und fs-run mit denselben Verträgen. |
@@ -210,4 +210,5 @@ Sicherheitsentscheidungen sind PatchHarbor-Verträge, keine Garantie der Quellen
 
 | Revision | Datum | Änderung |
 | --- | --- | --- |
+| 2 | 2026-10-29 | RF-01: Supportbasis ab 1.4.0 statt Pflicht für Results 1/2 und originale 1.3.0-PYZ; historische Bytes bleiben unverändert, Untergrenze und Sicherheitsverträge erhalten. |
 | 1 | 2026-10-13 | Beauftragtes Ziel CPython 3.10/3.11, Vertragsabgrenzung, geschlossene Legacy-/Ziel-PYZ-Varianten und Abnahmematrix; noch keine Runtime-Änderung. |

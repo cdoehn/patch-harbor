@@ -4,12 +4,17 @@ Normal production uses Result 3. PP-05A/B established the full reader and
 consumer compatibility before PP-06B activated that writer. Standard installations
 prepare the Core-PYZ
 without building or installing anything while handling a request. The productive
-writer uses one runtime shape; old 1/2 data contracts remain read-only compatibility.
+writer uses one runtime shape. For 1.5.0 the supported compatibility baseline
+is unchanged valid **1.4.0 artifacts onward**. Result 1/2 and old embedded wheels
+are no longer required. RF-01 specifies this boundary; the running 1.4.0 code
+is unchanged until the later implementation steps.
 
 The normative contract is the joint main specification and
 [PYZ/PACK extension](../spec/SPECIFICATION_EXTENSION_PYZ_PACK.md), especially
 FMT-01–05 and MIG-01–06. Patch format 1, Environment/Handoff format 1, and public
-inspection/validation output versions are unchanged.
+inspection/validation output versions are unchanged. The
+[CPython extension](../spec/SPECIFICATION_EXTENSION_CPYTHON_310_311.md) jointly
+defines the unchanged >=3.10 interpreter contract.
 
 A Result-3 manifest has the same repository, run, snapshot and change fields as
 Result 2. Its runtime object has exactly `status`, `reason`, `metadata`, `artifact`.
@@ -29,8 +34,11 @@ distribution `patchharbor`. Its closed fields additionally describe `status`,
 - Provenance `canonical_resources`, full source commit or null matching the recipe,
   recipe version 1 (an integer, not a boolean).
 - Chat-tool operations `inspect_patch`, `validate_patch`, `pack_patch`, patch
-  formats `[1]`, result formats `[1, 2, 3]`. These capabilities do not restrict
-  the other normal Core operations; the PYZ deliberately excludes the Watcher.
+  formats `[1]`, result formats `[1, 2, 3]` for unchanged 1.4.0 producers or `[3]`
+  for the later cleaned producer. The new reader accepts exactly those two lists.
+  Capabilities describe the embedded producer, not the current reader's support
+  obligations; they do not restrict other Core operations. No Watcher in the PYZ.
+  Existing bytes, identities and hashes are never rewritten.
 
 The reader verifies the entire canonical PYZ profile as data: recipe and producer
 identity, inventory, every file size/hash, version/provenance agreement, and exact
@@ -46,15 +54,16 @@ are retained: `source_not_prepared`, `source_changed`, `artifact_missing`,
 `read_error`. Known version/Python facts may be present, otherwise null. The run
 must contain a warning. This never permits deleting mandatory snapshot or log data.
 
-The new immutable internal Result-PYZ facts have `artifact`, while legacy facts
-keep `wheel`. Public `validate_patch` signatures, scopes and categories are
+Result-PYZ facts have `artifact`; the historical Result-2 `wheel` field is not
+repurposed and does not require keeping its old reader. Public `validate_patch` signatures, scopes and categories are
 unchanged. Corrupt full references still fail with source error 4. The deliberately
 private repository-only diagnostic reader can exclude only the reserved runtime
 namespace; it retains all other integrity checks and is never used by `pack` or
 full native reference validation. No downgrade or repaired reference is invented.
 
-PP-05B verifies Format-3 Exchange/archive/recovery integration using real consumer
-processes, including frozen Format-1 and complete Format-2 runtimes. A standalone
+Historically PP-05B checked Format-3 integration with frozen Format-1/2
+consumers. Future compatibility checks use unchanged 1.4.0 artifacts and
+current consumers; pre-1.4.0 positive fixtures are no longer release gates. A standalone
 PYZ remains a non-patch artifact. Unavailable, corrupt and future Results cannot
 become archival/recovery success proofs. The canonical handoff includes the
 reviewed executable bootstrap used by the active Format-3 writer. Existing

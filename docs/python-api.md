@@ -127,7 +127,7 @@ computed observations, not new declared hashes in format-1 `patch.json`.
 frozen `ReferenceContext`. Its fields are `repo_id`, `base_commit` (the existing
 typed IDs), `state_fingerprint`, `fingerprint_algorithm`, `dirty` and
 `repository_path` (recorded text, including foreign Windows paths; never resolved
-on this machine). This reader checks the complete format-1/2/3 inventory, blob IDs,
+on this machine). The supported Result-3 reader checks the complete inventory, blob IDs,
 untracked SHA-256 and metadata consistency, accepting consistent dirty, failure
 and dry-run Results. It uses actual context, never the previous expected binding.
 Repository snapshot paths retain the existing portable UTF-8 repository rules;
@@ -139,7 +139,10 @@ successful Apply: those consumers still require a clean, completed success,
 no warnings or dry run, the appropriate expected binding and, for recovery,
 the existing receipt, local digest and Git evidence. Their conservative ZIP
 path policy is unchanged. Current writers emit format 3 with one verified Core-PYZ
-or a declared runtime-only restriction; readers also accept formats 1 and 2.
+or a declared runtime-only restriction. The existing 1.4.0 implementation also
+reads formats 1/2. For 1.5.0, compatibility is required from 1.4.0 artifacts
+onward; RF-01 changes this contract, with code cleanup scheduled for RF-06.
+No public signature, result field, validation scope or error code changes in RF-01.
 Full reference validation rejects a corrupt declared runtime. The separately
 reviewed [bootstrap and previous handoff procedure](runtime-bootstrap.md) can
 check repository evidence independently when only that optional addition fails.
@@ -566,12 +569,13 @@ from bootstrap checks; no installation or subprocess is needed for these calls.
 Result-3 production uses the same shared Core and request-local resource capture.
 
 
-## Reader-first Result 3 (PP-05A)
+## Historical reader-first introduction of Result 3 (PP-05A)
 
-`validate_patch(..., reference_bundle=...)` and `pack_patch` now use the same
+At PP-05A, `validate_patch(..., reference_bundle=...)` and `pack_patch` began using the same
 full reader for Result formats 1, 2 and 3. The new format verifies its PYZ as
 strict data, without importing it. Public signatures/scopes are unchanged;
 corrupt references retain source-error category 4. A private repository-only
 diagnostic fallback is never a successful full reference or a `pack` input.
 See [Result format 3](result-format-3.md). Production uses this format from PP-06B;
-legacy reader schemas and public validation scopes remain unchanged.
+the earlier legacy-reader support promise is now replaced by the 1.4.0
+compatibility baseline. Public validation scopes remain unchanged.

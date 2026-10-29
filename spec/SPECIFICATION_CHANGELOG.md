@@ -1,5 +1,31 @@
 # PatchHarbor – Spezifikations-Changelog
 
+## 2026-10-29 – RF-01 / Bundle 057: Kompatibilitätsbasis ab 1.4.0
+
+- RF-00 tatsächlich angewendet und gepusht auf
+  `05cceef59891a68a3e0fdd2115fa79e718db1347`; 1 von 14 Planpositionen bestätigt.
+- Drei bestehende Normdateien bleiben getrennt. Veraltete Muss-Regeln für
+  Result 1/2, alte Result-Runtime-Wheels und originale 1.3.0-PYZs gezielt ersetzt;
+  historische Einführungsabläufe ausdrücklich als Historie eingeordnet.
+- Abwärtskompatibilität ab 1.4.0 bleibt verpflichtend: Patchformat 1 und seine
+  sieben Felder, Result 3, Runtime-Metadaten 2, Rezept 1 und Core-PYZ-Profil bleiben.
+  Bestehende `[1, 2, 3]`-Capabilities bleiben gültig; bereinigte Produzenten
+  deklarieren `[3]`. Kein Versionsraten, Umetikettieren oder Hashumschreiben.
+- CPython >=3.10, sichere Runtime-unavailable-/Fallback-Fälle, normale
+  Installations-Wheels/sdist und Watcher bleiben erhalten. Nicht unterstützte
+  Daten lösen keine Ersatz-Ausführung aus und sind keine Erfolgsbelege.
+- Überholte serielle Gates und automatischer CI-Fünfertakt in der Hauptspec an
+  die bestehende Nutzerentscheidung angeglichen: nur volle parallele Gates,
+  manuelle CI ausschließlich durch Christian. Keine Workflowänderung.
+- Korrespondierende Chat-/Runtime-Hinweise angeglichen. Der volle parallele
+  Erstlauf belegt genau einen veralteten Spec-Status-Wortlautcheck; nur dieser
+  redaktionelle Assert entfällt. Keine fachliche Prüfung oder Testfunktion
+  entfernt, keine neuen Prosatests. Installierte Artefakte bleiben durch die
+  vorhandenen Packaging-/Runtime-Verhaltenstests und vollständigen Gates geprüft.
+- Kein Produktcode, ausführbarer Bootstrap, Artefaktformat oder Versionswert
+  geändert; Altpfade werden erst nach RF-02-Fixtures in RF-06 bereinigt.
+  Kein Tag oder CI-Start.
+
 ## 2026-10-14 – CP-05-VERSION / Bundle 055: Version 1.4.0 und Tagauftrag
 
 - FIX3 tatsächlich angewendet; manuelle CI 38596693717 auf vollständigem Commit

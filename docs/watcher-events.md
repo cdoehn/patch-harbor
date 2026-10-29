@@ -75,7 +75,8 @@ Wurzel nicht; ihre Ereigniserkennung bleibt aktiv.
 Git-Änderungen außerhalb des Exchanges lösen keine Prüfung aus. Für ein dadurch
 passend gewordenes Bundle sind ein neues Exchange-Ereignis, Watcher-Neustart
 oder bewusster manueller Apply möglich. Manuelle Verarbeitung und der vorhandene
-PYZ-/Legacy-Wheel-Fallback bleiben erhalten. Netzwerk-/virtuelle
+sichere Übergabeweg bei technisch unbenutzbarer PYZ bleiben erhalten; alte
+Runtime-Wheels sind ab der 1.4.0-Kompatibilitätsbasis keine Supportpflicht mehr. Netzwerk-/virtuelle
 Dateisysteme erhalten keine weitergehende Garantie als ihre nativen Ereignisse.
 
 ## Nachweise

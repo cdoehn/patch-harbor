@@ -1,4 +1,4 @@
-# Installation-free PYZ bootstrap and legacy handoff
+# Installation-free PYZ bootstrap and safe handoff fallback
 
 
 ## Stdlib-only PYZ bootstrap and embedded executable
@@ -9,8 +9,10 @@ Use a trusted copy of the helper and an explicitly trusted Result. A digest
 copied from an unknown archive does not authenticate its sender. The current
 production writer emits Format 3 with exactly one Core-PYZ when runtime
 embedding succeeds. A valid `unavailable` result instead contains runtime
-metadata and a warning, with no executable artifact. Legacy 1/2 references
-retain their versioned previous path. Upgrading repository files does not restart
+metadata and a warning, with no executable artifact. The 1.5.0 contract retains
+valid 1.4.0 artifacts; Result 1/2 and earlier runtime wheels no longer require
+support. RF-01 only changes documentation; the executable 1.4.0 helper is
+unchanged until RF-06/RF-07. Upgrading repository files does not restart
 or replace an already running older global installation.
 
 Result snapshots support up to 250,000 stored repository files, with ten further
@@ -34,8 +36,10 @@ PYZ inventory, recipe and producer identities, both canonical start files and
 their agreement with the selected requirement before import. It never guesses the
 first `.pyz`, imports archived code, installs a package or extracts the snapshot.
 `scope=runtime_descriptor_precheck` and `full_reference_valid=false` distinguish
-these data checks from the full native reference reader. Legacy and unavailable
-runtimes select an explicit documented fallback. Corrupt data is not success.
+these data checks from the full native reference reader. An unavailable or
+technically unusable runtime has a documented fallback for otherwise supported
+repository evidence. An unsupported Result format is not a runtime-only failure
+and never triggers execution of a legacy wheel. Corrupt data is not success.
 
 Stable input capture compares the same file identity, size and write time across
 path and handle observations. On Windows before 3.12 it obtains creation and
@@ -47,11 +51,11 @@ Differing meanings of path and handle `ctime` must not reject unchanged files.
 These checks add no retry,
 identity fallback or exception to the trusted digest requirement.
 
-Preparation uses the selected artifact's exact closed requirement: `>=3.12`
-for original 1.3.0 PYZs, or `>=3.10` for the new compatible variant. Static
-inspection does not relabel an old artifact as executable on an older Python.
-Unknown requirements and rehashed mixed variants are invalid. CP-02 prepared both readers; CP-03 switches the development distribution
-and new writer to >=3.10. Native 3.10/3.11 acceptance remains a separate gate.
+The supported 1.4.0 baseline uses the exact closed requirement `>=3.10`.
+The unchanged 1.4.0 helper can also recognize historical `>=3.12` artifacts;
+that extra path is no longer a future compatibility requirement. No original
+artifact is relabeled. Unknown requirements and rehashed mixed variants remain
+invalid. Native 3.10/3.11 acceptance remains a separate gate.
 A new private directory is required. On Windows it is created atomically with
 a protected inheritable DACL for the effective user and administrators, including
 on older Python patch versions. Existing paths and ACLs are not repaired. Exactly the
@@ -87,14 +91,19 @@ the built handoff resource in a fresh stdlib-only process, and proves that a
 successful descriptor precheck cannot bypass a corrupt repository snapshot.
 
 Metadata fields, capabilities, artifact descriptors and provenance are closed;
-unknown future Results are rejected, while legacy Formats 1/2 select their own
-path. The old wheel helper reports `result_format_requires_pyz_bootstrap` for
-valid Format 3 without accessing wheel fields or installing anything. Production
+unknown future Results are rejected. Valid original 1.4.0 capability lists
+`[1, 2, 3]` remain accepted; the future cleaned producer declares `[3]`, with
+no arbitrary lists. Old wheel-helper behavior described below is historical. Production
 emits Format 3 from PP-06B. Its E-10 test obtains the executable helper from the
 first actual Result produced by a real installation, then performs pack, full
 reference validation and regular Apply through the selected PYZ.
 
-## Legacy wheel bootstrap
+## Historical legacy wheel bootstrap
+
+The following wheel procedure and prerequisites document the former RIV
+workflow. They do not require supporting pre-1.4.0 Results, installing wheels
+as a fallback, or retaining the old helper. The current PYZ procedure above
+and the safe handoff procedure below remain the supported paths.
 
 The bootstrap is an explicit consumer action, separate from read-only inspection.
 Finding a wheel in a Result never installs or imports it. A digest proves byte
@@ -102,7 +111,7 @@ identity; obtain source trust through an already trusted channel, not a digest
 copied from the same unknown archive. A venv separates installations, not hostile
 code from the host. User permissions and project rules remain authoritative.
 
-## Prerequisites and executable example
+### Historical prerequisites and executable example
 
 Use an independently reviewed copy of `scripts/runtime_bootstrap.py` with a
 matching, already trusted Core installation. This repository tool reuses the
@@ -162,7 +171,8 @@ tests, CI, sender trust, replay permission or a future Apply.
 ## Mandatory previous procedure
 
 Missing, unavailable, damaged, incompatible, untrusted or technically unusable
-runtime means use the existing development and handoff process. Document the
+runtime means use the existing development and handoff process for a supported
+reference. An unsupported Result format does not qualify for this fallback. Document the
 reason and actual tools/checks, without inventing native success. First validate
 the original Result's safe outer ZIP and mandatory files, snapshot inventory,
 Git blob IDs/untracked SHA, context/run consistency and complete binding. Read
@@ -172,8 +182,8 @@ that state and build one safe format-1 patch with one entrypoint, full `repo_id`
 
 Use an already trusted compatible Core parser, or the established ZIP, payload,
 hash and binding checks when the new native operations are unavailable. The
-example helper uses those existing parsers and returns `method=previous_handoff`
-and `native_validation=false`. A semantic rejection is not a technical failure
+historical wheel helper returned `method=previous_handoff` and
+`native_validation=false`; these labels do not make unsupported data valid. A semantic rejection is not a technical failure
 and does not permit fallback around invalid paths, corrupt mandatory data or a
 binding mismatch. A missing trustworthy repository proof still blocks a patch.
 
@@ -181,7 +191,7 @@ For a defect isolated to the reserved runtime namespace, the repository-only
 reader retains every non-runtime requirement. It does not weaken the public
 native reader, archive/recovery policy or safe outer ZIP checks. Original bytes
 and their complete SHA are retained; `full_reference_valid=false` distinguishes
-this limited receipt from valid full format-2 evidence. Never silently repair,
+this limited receipt from valid full Result evidence. Never silently repair,
 downgrade or repackage the reference to obtain apparent native success.
 
 Open and check the final patch, payload hashes, size and SHA after all edits.

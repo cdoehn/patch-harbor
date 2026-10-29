@@ -1,12 +1,12 @@
 # PatchHarbor – Spezifikationserweiterung: Result-PYZ und `pack`
 
 **Dokument-ID:** `PYZ-PACK`  
-**Revision:** 4
-**Stand:** 13. Oktober 2026
+**Revision:** 5
+**Stand:** 29. Oktober 2026
 **Vorgesehener Ablageort:** `spec/SPECIFICATION_EXTENSION_PYZ_PACK.md`  
 **Basisdokument:** danebenliegende [`SPECIFICATION.md`](SPECIFICATION.md), gebundener Bestandsvertrag 1.2.1 einschließlich RIV und der bereits enthaltenen Result-/CIFS-Publikationsregeln  
-**Status:** Fortgeltender PYZ/PACK-Vertrag der bestätigten 1.3.0-Basis; Revision 4 ordnet die neu beauftragte Python-Erweiterung ein. Ausführungsnachweise stehen im abgeschlossenen PYZ/PACK-Plan.
-**Produktbasis:** 1.3.0; die Folgeversion des CPython-Auftrags wird gesondert festgelegt.
+**Status:** Fortgeltender PYZ/PACK-Vertrag; Revision 5 korrigiert die Kompatibilitätsbasis für 1.5.0. Historische Ausführungsnachweise bleiben in ihren bisherigen Plänen.
+**Produktbasis:** 1.4.0; Refactoring-Ziel 1.5.0. RF-01 ändert keine Laufzeit.
 
 > **Ziel:** Neue Result-Bundles liefern PatchHarbor als direkt mit Python aufrufbare PYZ statt als zu installierendes Runtime-Wheel. Die PYZ enthält den PatchHarbor-Core mit dessen CLI und öffentlicher Python-API, **aber keinen Watcher**. Zusätzlich erhält PatchHarbor das reguläre Unterkommando `pack` und die öffentliche Funktion `api.pack_patch(...)`, um vorbereitete Inhalte als referenzgebundenes, abschließend validiertes Patch-Paket zu erzeugen.
 
@@ -76,11 +76,13 @@ Nachfolgeplan [CPython 3.10/3.11](../planning/python-compatibility/commit-plan.m
 gehört zusätzlich [SPECIFICATION_EXTENSION_CPYTHON_310_311.md](SPECIFICATION_EXTENSION_CPYTHON_310_311.md)
 zum gemeinsam normativen Satz. Das erweitert GOV-01/03 gezielt auf drei Dateien;
 die historische Zweierauswahl oben gilt für den ursprünglichen PYZ/PACK-Auftrag.
-CPY-01 ersetzt ausschließlich die ältere-Python-Abgrenzung in §2.2 und die
-Untergrenze/Matrix in PYZ-02 und TEST-04. CPY-10–13 erhalten originale
-3.12-Artefakte und definieren den sicheren Übergang zur neuen geschlossenen
-3.10-Variante. Alle übrigen Profile, Sicherheitsgrenzen und Fehler-/Paketverträge
-bleiben erhalten. CP-00 implementiert diese Erweiterung noch nicht.
+CPY-01 bestimmt die Python-Abgrenzung in §2.2 sowie Untergrenze/Matrix in
+PYZ-02 und TEST-04. Seit RF-01 gilt gemeinsam Hauptspec §1.1: Kompatibilität
+ab 1.4.0, keine Pflicht für ältere Results oder ursprüngliche 1.3.0-PYZs.
+CPY-10–13 und MIG-01 konkretisieren dies ohne Änderung der Python-Untergrenze.
+Aktiv ist [REFACTOR-1.5.0](../planning/1.5.0/commit-plan.md); die drei Normdateien
+bleiben getrennt. Codebereinigung folgt erst nach Sicherung der 1.4.0-Fixtures.
+Unberührte Profile, Sicherheits-, Fehler- und Paketverträge bleiben erhalten.
 
 ### 1.2 Konkrete Ausgangsbasis
 
@@ -118,10 +120,10 @@ PP-00 muss diese Angaben mit den dann tatsächlich verfügbaren Result-, Commit-
 | §§ 2.2 und 23: keine rekursive Ordnersuche | Begrenzte Ausnahme für die vollständige Inventarisierung des ausdrücklich gewählten Pack-Inhaltsordners. Exchange-/Runner-Suche und die Auswahl angrenzender Projektdateien bleiben unverändert. |
 | §§ 19.6a und 21: Chat-Handoff und externe Paketnamen | Technische Erzeugung des Pflichtpaars und des kanonischen Namens darf an `pack` delegiert werden. Der Ersteller verantwortet weiterhin Inhalt und Auslieferung. Die manuelle Namenswahl gemäß `PACK-15` ist eine ausdrückliche Ausnahme nur außerhalb der kanonischen Chat-Auslieferung. |
 | § 18.5: Result-Veröffentlichung | Bestehender Sync-/Retry-/Hash-/Diagnosevertrag einschließlich Result-`os.replace()` bleibt für Format 3 erhalten (`MIG-06`). Pack-No-replace und dessen ausdrücklich getrennte Dateisystempolitik gelten nur für `pack` (`PACK-19/23`). |
-| §§ 19 und 39: Result | Neuer Writer für Result-Format 3 mit PYZ; Leser für 1/2 bleiben erhalten. |
+| §§ 19 und 39: Result | Resultformat 3 mit PYZ; neue Leser erhalten die Basis ab 1.4.0, keine Pflicht für Result 1/2. |
 | § 26.3: Auswahl eines Spezifikationsdokuments | Für `PYZ-PACK` gilt der gemeinsam erklärte Satz nach `GOV-03`, nicht eine Wahl zwischen Hauptdatei und Ergänzung. Echte nicht aufgelöste Konkurrenz bleibt mehrdeutig. |
 | § 35: keine zusätzliche normative Spezifikationsdatei | Eng begrenzte Ausnahme für diese beauftragte nebenliegende Ergänzung; keine beliebigen Parallelfassungen. |
-| § 38: Runtime-Wheel | Für **neu erzeugte** Results ersetzt durch das PYZ-Profil dieses Dokuments; Legacy-Lesen und normale Installationsartefakte bleiben erhalten. |
+| § 38: Runtime-Wheel | Für **neu erzeugte** Results ersetzt durch das PYZ-Profil dieses Dokuments; normale Installationsartefakte bleiben erhalten; alte Result-Runtime-Wheels sind keine Pflicht mehr. |
 | § 40: Bootstrap | Installationsfreier PYZ-Start ersetzt den regulären Wheel-Installationsschritt; der neue Startweg ist Voraussetzung der Writerfreigabe. |
 | §§ 22, 33 und 41: Tests/Freigabe | Zusätzliche Funktionsnachweise; keine Aufweichung bestehender Gates oder noch offener Plattformabnahmen. |
 | Watcher-Produktvertrag | Kein neues Watcher-Feature; Watcher bleibt Bestandteil der normalen Installation, nicht der PYZ. |
@@ -274,7 +276,7 @@ Nicht enthalten sind `patchharbor_watcher/`, Watcher-Launcher, systemd-Units als
 
 Im PYZ-Profil gibt es keine `.pth`-Dateien, `sitecustomize.py`, `usercustomize.py`, fremden importierbaren Top-Level-Pakete, nativen Erweiterungen, lokalen Launcher-Kopien, `.pyc` oder `__pycache__`. Das normale Installations-Wheel darf weiterhin seine erforderlichen Installationsmetadaten und den Watcher enthalten. Diese werden nicht ungeprüft in die PYZ kopiert.
 
-Zu den expliziten Pflichtdateien gehören neben dem Root-Einstieg mindestens `patchharbor/__init__.py`, `patchharbor/api.py`, `patchharbor/cli.py`, `patchharbor/py.typed`, `patchharbor/_pyz_identity.py`, `patchharbor/_runtime/pyz-main.py`, `patchharbor/_runtime/pyz-recipe.json`, `patchharbor/_runtime/CHAT_INSTRUCTIONS.md`, `patchharbor/_runtime/python-api.md` und `patchharbor/_runtime/LICENSE`. Sämtliche weiteren tatsächlich benötigten Core-Module werden ebenfalls inventarisiert; die Liste erlaubt keinen unvollständigen Importgraphen. Alte generierte Wheel-Identitäts-/Reproduktionsressourcen sind nicht Teil des neuen PYZ-Inventars. Der Legacy-Wheel-**Lesecode** bleibt dagegen im Core verfügbar.
+Zu den expliziten Pflichtdateien gehören neben dem Root-Einstieg mindestens `patchharbor/__init__.py`, `patchharbor/api.py`, `patchharbor/cli.py`, `patchharbor/py.typed`, `patchharbor/_pyz_identity.py`, `patchharbor/_runtime/pyz-main.py`, `patchharbor/_runtime/pyz-recipe.json`, `patchharbor/_runtime/CHAT_INSTRUCTIONS.md`, `patchharbor/_runtime/python-api.md` und `patchharbor/_runtime/LICENSE`. Sämtliche weiteren tatsächlich benötigten Core-Module werden ebenfalls inventarisiert; die Liste erlaubt keinen unvollständigen Importgraphen. Alte generierte Wheel-Identitäts-/Reproduktionsressourcen sind nicht Teil des neuen PYZ-Inventars. Legacy-Wheel-Lesecode ist ab der Kompatibilitätsbasis 1.4.0 keine Pflicht mehr; seine Entfernung folgt RF-06.
 
 Eine `.dist-info`-Struktur ist **kein Pflichtbestandteil der PYZ und wird im ersten Profil nicht eingebettet**. Der PYZ-Code darf seine eigene Version und seine eigenen Ressourcen nicht aus einer zufällig installierten Distribution gleichen Namens beziehen.
 
@@ -365,7 +367,7 @@ Die Ableitung erfolgt in dieser Reihenfolge:
 
 Das Rezept inventarisiert sich nicht selbst. Die vollständigen Rezeptbytes werden durch den äußeren Artefakthash und den strikten Archivvertrag erfasst. Der Artefakthash wird nicht in das Archiv hineingeschrieben. Es gibt keine Selbsthash-Schleife und kein Wheel-`RECORD` im PYZ-Profil.
 
-Die neue Datei `patchharbor/_pyz_identity.py` ist vom bisherigen Wheel-Identitätsmodul getrennt. Legacy-Wheel-Rezepte und deren Identitätsprüfung bleiben als Datenvertrag unverändert. Das bei normalem Paketimport geladene PYZ-Identitätsliteral muss zum vom Provider geprüften PYZ-Ressourcensatz passen. Ein fremder oder während des Prozesses unpassend geänderter Satz wird nicht als eigene Runtime ausgegeben.
+Die neue Datei `patchharbor/_pyz_identity.py` ist vom bisherigen Wheel-Identitätsmodul getrennt. Historische Wheel-Rezepte werden nicht umgeschrieben; ihre fortgesetzte Verarbeitung ist nicht mehr verpflichtend. Das bei normalem Paketimport geladene PYZ-Identitätsliteral muss zum vom Provider geprüften PYZ-Ressourcensatz passen. Ein fremder oder während des Prozesses unpassend geänderter Satz wird nicht als eigene Runtime ausgegeben.
 
 ### 6.4 Kanonische ZIP-Regeln
 
@@ -475,7 +477,7 @@ Die Zahlen und Winkelklammerwerte in diesem Schema-Beispiel sind Platzhalter, ke
 
 `provenance.mode` lautet `canonical_resources`, `source_commit` entspricht dem Rezept, `recipe_format_version` ist `1` für das neue ausdrücklich durch seinen Marker identifizierte PYZ-Rezept.
 
-Für das erste vollständig freigegebene Profil lautet `capabilities`:
+Für unveränderte 1.4.0-Artefakte lautet `capabilities` weiterhin:
 
 ```json
 {
@@ -484,6 +486,15 @@ Für das erste vollständig freigegebene Profil lautet `capabilities`:
   "result_formats": [1, 2, 3]
 }
 ```
+
+Der bereinigte Produzent verwendet bei sonst identischem Capability-Schema
+`result_formats: [3]`. Neue Leser akzeptieren genau die geschlossenen Varianten
+`[1, 2, 3]` und `[3]`; alle anderen Listen bleiben ungültig. Die alte Liste
+beschreibt den eingebetteten 1.4.0-Produzenten und verpflichtet den neuen Leser
+nicht zur Unterstützung von Result 1/2. Neue Produzenten deklarieren ihre
+tatsächlichen Fähigkeiten. Originalmetadaten, IDs und Hashes werden nicht
+umgeschrieben; neue Vertragsformen benötigen eine ausdrückliche Versionierung.
+RF-01 legt diesen Zielvertrag fest, die Implementierung folgt in RF-06.
 
 `operations` benennt wie der bisherige Runtime-Vertrag die vorgesehenen **Chat-Werkzeugoperationen**. Es ist **keine Sperrliste für die übrige Core-CLI oder API**. Deren Funktionsumfang wird durch das Profil und `ARCH-02` festgelegt. Ein Hersteller darf damit insbesondere nicht das funktionierende `bundle` aus der PYZ herauslassen.
 
@@ -512,25 +523,28 @@ Beim Prüfen wird die beschriebene Runtime **nicht importiert oder ausgeführt**
 
 ### 8.1 Lesematrix
 
-**MIG-01.** Neue Reader unterstützen die bisherigen Results 1 und 2 sowie das neue Format 3 entsprechend deren jeweiligem Vertrag:
+**MIG-01.** Neue Leser unterstützen gültige Artefakte aus 1.4.0 und später
+unterstützten Vertragsständen. Die frühere Pflicht für Result 1/2 und das alte
+Runtime-Wheel entfällt; Produkt- und Formatnummer bleiben getrennt (§1.1 Hauptspec).
 
 | Eingang | Verhalten des neuen Readers |
 |---|---|
-| Gültiges Format 1 ohne Runtime | Weiterhin als Referenz lesbar. |
-| Gültiges Format 2 mit Wheel | Nach dem **alten Wheel-Vertrag** vollständig prüfen; nicht als PYZ interpretieren. |
-| Gültiges Format 2 mit `unavailable` | Weiterhin als Referenz lesbar. |
-| Gültiges Format 3 mit PYZ | Nach dem neuen Vertrag vollständig prüfen. |
-| Gültiges Format 3 mit `unavailable` | Als Referenz lesbar; keine Runtime-Verfügbarkeit behaupten. |
+| Unverändertes 1.4.0-Result 3 mit PYZ | Vollständig prüfen; ursprüngliche Capabilities `[1, 2, 3]` akzeptieren. |
+| Neues Result 3 mit bereinigtem Produzenten | Vollständig prüfen; Capabilities `[3]` akzeptieren. |
+| Gültiges Result 3 mit `unavailable` | Als Referenz lesbar; keine Runtime-Verfügbarkeit behaupten. |
+| Result 1/2, altes Runtime-Wheel oder ausschließlich frühere PYZ-Variante | Keine Supportpflicht; nicht unterstützte Eingaben konservativ behandeln, keine Ersatz-Ausführung. |
 | Deklarierte, aber defekte Runtime | Vollständige native Referenzprüfung schlägt fehl. |
-| Unbekanntes Result- oder Runtimeformat | Konservativ als nicht unterstützt behandeln; nicht als Patch ausführen. |
+| Unbekanntes Result- oder Runtimeformat | Nicht unterstützt; nicht als Patch oder Archiv-/Recovery-/Erfolgsnachweis verwenden. |
 
-Der Legacy-Wheel-Reader bleibt ein Datenleser. Er installiert das alte Wheel nicht. Neue Produktions-Results enthalten nur die neue Runtimeform.
+Neue Produktions-Results enthalten nur die PYZ-Runtimeform. Normale
+Installations-Wheels bleiben unterstützt. Unveränderte 1.4.0-Artefakte werden
+vor dem Entfernen von Altpfaden gesichert und gegen die neuen Leser geprüft.
 
 ### 8.2 Reader vor Writer
 
-**MIG-02.** Die Lesefähigkeit für Format 3 muss mit künstlichen Testfixtures vollständig integriert sein, **bevor** der produktive Writer auf Format 3 umgeschaltet wird. Das schließt Referenzvalidierung, Result-Verifikation, Exchange-Klassifikation, Archivierungsnachweise und Recovery-Leser ein.
+**MIG-02. Historische Writerumstellung und fortgeltende Reihenfolge.** Bei der ursprünglichen Umstellung musste die Lesefähigkeit für Format 3 mit künstlichen Testfixtures vollständig integriert sein, **bevor** der produktive Writer auf Format 3 umgeschaltet wurde. Das schließt Referenzvalidierung, Result-Verifikation, Exchange-Klassifikation, Archivierungsnachweise und Recovery-Leser ein.
 
-Ein Zwischenstand, der 1/2/3 lesen kann und weiterhin Format 2 schreibt, ist zulässig. Ein Writer, dessen eigener Scanner oder Nachweisleser die erzeugten Results nicht sicher versteht, ist unzulässig.
+Historisch war ein Zwischenstand mit Leser 1/2/3 und Writer 2 zulässig. Das ist heute keine Pflicht zur Reaktivierung alter Writer oder Leser. Ein Writer, dessen eigener Scanner oder Nachweisleser die erzeugten Results nicht sicher versteht, ist unzulässig.
 
 **Reader-first schließt einen funktionsfähigen Bootstrap als Writer-Gate ein.** Vor einer auslieferbaren Writerumschaltung müssen auch Runtime-Provider, der installationsfreie Bootstrap und die **tatsächlich in neuen Results eingebettete kanonische Anleitung** dieselbe neue Format-/Artefaktkombination unterstützen. Diese minimale Bootstrap-Integration erfolgt vor PP-06 oder atomar mit PP-06, niemals erst in PP-07.
 
@@ -540,9 +554,14 @@ Die Aktivierung des Format-3-Writers erfolgt an der gemeinsamen Result-Erzeugung
 
 ### 8.3 Altprogramme und vorhandene Paketformate
 
-**MIG-03.** Altprogramme müssen neue Format-3-Results zumindest konservativ behalten oder ablehnen. Mit eingefrorenen Altleser-Fixtures ist nachzuweisen, dass sie diese weder ausführen noch aufgrund eines unbewiesenen Erfolgshinweises löschen/archivieren.
+**MIG-03.** Abwärtskompatibilität wird mit unveränderten 1.4.0-Artefakten und
+aktuellen Lesern geprüft. Vor-1.4.0-Altleser-Fixtures sind keine positive
+Freigabepflicht mehr. Nicht unterstützte oder unbekannte Results werden
+konservativ behalten/abgelehnt, niemals ausgeführt oder als Erfolgsbeleg
+archiviert/gelöscht. Bestehende 1.4.0-Leser müssen keine zukünftigen Formate
+verstehen; das ist keine Zusage von Vorwärtskompatibilität.
 
-Die neuen Patch-Pakete bleiben Format 1. Ihre Kompatibilität mit älteren Apply-Engines wird anhand des bereits vorhandenen Handoff- und Modivertrags beschrieben und getestet, nicht allein aus der Formatnummer abgeleitet. Eine neue generelle Bootstrap- oder Migrationsautomatik für sehr alte Runner wird nicht eingeführt.
+Die neuen Patch-Pakete bleiben Format 1. Ihre Kompatibilität mit unterstützten Apply-Engines ab 1.4.0 wird anhand des bereits vorhandenen Handoff- und Modivertrags beschrieben und getestet, nicht allein aus der Formatnummer abgeleitet. Eine neue generelle Bootstrap- oder Migrationsautomatik für sehr alte Runner wird nicht eingeführt.
 
 ### 8.4 Diagnose hat Vorrang vor Runtime-Komfort
 
@@ -850,7 +869,7 @@ Nur bei `--output-dir` dienen diese Werte zusätzlich zur automatischen Namensbi
 <Repository>_Patch_<HHMMSS>_<MMDD>_<ID6>.zip<bundle_suffix>
 ```
 
-`ID6` sind die ersten sechs Zeichen der vollständigen Paket-UUID, ohne Auslassungszeichen. Der Bezug ist die Paket-ID, nicht die Run-ID des Referenz-Results. `bundle_suffix` stammt aus dem geprüften `context.json`; fehlend in einem zulässigen Legacy-Result oder leer bedeutet kein Suffix. Die existierende Suffixvalidierung wird wiederverwendet.
+`ID6` sind die ersten sechs Zeichen der vollständigen Paket-UUID, ohne Auslassungszeichen. Der Bezug ist die Paket-ID, nicht die Run-ID des Referenz-Results. `bundle_suffix` stammt aus dem geprüften `context.json`; leer bedeutet kein Suffix. Die frühere Ausnahme für fehlende Angaben in Result 1 gehört nicht zur aktuellen Supportpflicht. Die existierende Suffixvalidierung wird wiederverwendet.
 
 Der Repository-Anzeigename stammt vorrangig aus dem geprüften Environmentfeld `repository_name`. Fehlt es, darf der letzte Pfadbestandteil des als **Text** aufgezeichneten Repositorypfads nach dessen POSIX-/Windows-Syntax verwendet werden. Der fremde Pfad wird dabei niemals lokal aufgelöst. Gibt es keinen brauchbaren Namen, wird `repository` mit einem fachlichen Hinweis verwendet.
 
@@ -889,7 +908,10 @@ Die dynamischen Zielangaben stammen dagegen aus der **geprüften Referenz**, nic
 
 Zusätzliche zulässige passive Referenzangaben dürfen übernommen werden, sofern sie strikt als endliche JSON-Daten behandelt werden, nicht mit den verbindlichen Feldern kollidieren und die Größen-/Renderregeln einhalten. Es gibt keine beliebige Auswertung solcher Daten als Code oder lokale Pfade.
 
-Bei einem gültigen Legacy-Result ohne Environmentpaar werden sicher bekannte Angaben aus dessen geprüften Kontext-/Run-Fakten übernommen. Unbekannte Betriebssystem-, Tool-, Shell- und Zielpfadangaben bleiben `null`; keine Erforschung des Pack-Rechners als vermeintlicher Ersatz. Das Fehlen solcher optionalen Altdaten wird als Hinweis ausgegeben, verhindert aber nicht automatisch die Erstellung.
+Bei unterstützten Result-3-Referenzen ist das Environmentpaar Pflicht; fehlende
+Pflichtdaten bleiben Fehler. Zulässige unbekannte Betriebssystem-, Tool-, Shell-
+und Zielpfadangaben bleiben `null`, ohne Erforschung des Pack-Rechners als Ersatz.
+Die frühere Legacy-Ausnahme ohne Environmentpaar entfällt aus der Supportpflicht.
 
 Der aktuelle Pack-Zeitpunkt steht getrennt im API-Ergebnis. Er wird nicht als neue Messung des Zielrechners ausgegeben. Scheitert die Erzeugung des Pflichtpaars oder fehlt die eigene kanonische Vorlage, scheitert `pack`; es gibt kein stilles Paket ohne Begleitdateien.
 
@@ -1109,7 +1131,7 @@ Ein noch unveränderter Versionsstring darf keinen abgeschlossenen Plan reaktivi
 | CLI-Hilfe | Eingaben, Ausgabealternativen, Suffix, Modusoptionen und fehlende Ausführung durch `pack` erklären. |
 | `docs/python-api.md` | `pack_patch`, `PatchPackResult`, phasenunabhängige Bestandsfehler, Erfolg trotz Cleanup-Warnung, stille Standardaufrufe und In-Process-Verwendung. |
 | `docs/runtime-artifact.md` | PYZ-Profil, neues Rezept, Hashverfahren, Normalinstallation versus portable Runtime, Watcher-Ausschluss. |
-| `docs/runtime-bootstrap.md` und `scripts/runtime_bootstrap.py` | Installationsfreien Bootstrap und Legacy-Behandlung vor oder atomar mit der Writerfreigabe nutzbar machen; die tatsächlich mitgelieferte Vorlage einbeziehen, keine blind ausgeführte Runtime. |
+| `docs/runtime-bootstrap.md` und `scripts/pyz_bootstrap.py` | Installationsfreien Bootstrap und sicheren Runtime-Ausfall-Fallback für die unterstützte Basis nutzbar halten; die tatsächlich mitgelieferte Vorlage einbeziehen, keine blind ausgeführte Runtime. |
 | `docs/result-format-2.md` | Historischen Format-2-Vertrag erhalten und auf den Nachfolger verweisen; nicht nachträglich zu Format 3 umdeuten. |
 | Neues `docs/result-format-3.md` | Geschlossene äußere/innere Schemata, Inventar, `unavailable`, Kompatibilität und Prüfumfang. |
 | `docs/result-runtime-production.md` | Automatische Erzeugung, request-lokale Bindung, Selbstupdate, dreifacher Roundtrip, Diagnosepriorität. |
@@ -1157,18 +1179,18 @@ Die normale Installation muss den Watcher weiterhin korrekt dokumentieren. In de
 
 | Test-ID | Verbindlicher Nachweis | Anforderungen |
 |---|---|---|
-| F-01 | Neue Reader lesen gültige Results 1, 2 und 3; formatbezogene Inventare bleiben getrennt. | FMT-01, MIG-01 |
-| F-02 | Alte Wheels werden nur lesend nach altem Profil geprüft; kein Import/Installieren und keine Umdeutung zu PYZ. | MIG-01 |
+| F-01 | Neue Reader lesen unveränderte 1.4.0-Results sowie aktuelle Result-3-Daten; geschlossene Inventare und Capability-Varianten bleiben konsistent. | FMT-01, MIG-01 |
+| F-02 | Nicht unterstützte alte Results/Runtime-Wheels liefern keine Erfolgsnachweise und lösen weder Import noch Installation oder Umdeutung aus. | MIG-01 |
 | F-03 | Deskriptoren, Bytegrößen, Hashes, Profil, Content-ID, Versionsangaben und Capability-Daten werden konsistent geprüft. | FMT-02/03/05 |
 | F-04 | `unavailable` hat genau die erlaubte Struktur, Gründe und null-Werte; keine behaupteten Artefakte. | FMT-04 |
 | F-05 | Zusätzliche Runtime-Dateien, Wheel+PYZ-Doppelbelegung, unbekannte Schlüssel und unbekannte Formate werden konservativ abgelehnt. | FMT-05, MIG-01 |
 | F-06 | Result-Erzeugung funktioniert manuell, nach Apply-Erfolg/-Fehler, im Dry-Run, mit explizitem Ziel und über installierten Watcher. | MIG-02 |
 | F-07 | Runtime-only-Ausfall erhält Snapshot/Logs als `unavailable`; echte Resultfehler, Abbruch und Notfallrettung behalten ihre Priorität. | MIG-04 |
 | F-08 | Archivierung/Recovery verwenden keine bloß strukturelle Klassifikation oder schwächere Diagnoseprüfung als Erfolgsbeweis. | MIG-02/05 |
-| F-09 | Eingefrorene Altleser führen Format-3-Results oder eine standalone PYZ nicht als Patch aus und löschen sie nicht aufgrund unbewiesener Fakten. | MIG-03 |
-| F-10 | Reader-first-Zwischenstand schreibt noch Format 2; auslieferbare Writerumschaltung erst mit gemeinsamer Lesefähigkeit, Runtime-Provider und funktionsfähigem eingebettetem Bootstrap. | MIG-02, E-10 |
+| F-09 | Aktuelle Verbraucher führen nicht unterstützte/future Results oder standalone PYZs nicht als Patch aus und verwenden sie nicht als Lösch-/Archivnachweis. | MIG-03 |
+| F-10 | Writer und eigene Leser, Runtime-Provider sowie eingebetteter Bootstrap verstehen denselben unterstützten Vertrag; keine Wiederholung des historischen Format-2-Zwischenstands. | MIG-02, E-10 |
 | F-11 | Normale Wheel-/sdist-Installationswege samt installiertem Watcher bleiben funktional; nur das Result-Runtime-Artefakt wechselt. | SCOPE-01/03 |
-| F-12 | Legacy-Patch-Pakete und bestehende CLI-/API-/Fingerprint-/Replay-/Mode-Verträge bleiben gültig. | GOV-01, SEM-01 |
+| F-12 | Gültige Patchformat-1-Pakete der Basis ab 1.4.0 und bestehende CLI-/API-/Fingerprint-/Replay-/Mode-Verträge bleiben gültig. | GOV-01, SEM-01 |
 | F-13 | Vorhandene Result-Publikations-Fault-Tests auch für Format 3 mit PYZ und `unavailable`: Sync/No-follow, typisierte endliche Retries, gemeinsames Budget, Hashbindung, Runtime-Fallback und Diagnosepriorität bleiben erhalten. | MIG-06, B7 |
 | F-14 | Pack-No-replace und dessen fehlende Stabilitäts-Retries verändern weder Result-Replace/Retry noch die bisherige nichtrekursive Exchange-/Runner-Suche. | GOV-04, PACK-23 |
 
@@ -1181,16 +1203,16 @@ Die normale Installation muss den Watcher weiterhin korrekt dokumentieren. In de
 | P-03 | CLI, öffentliche API, installierte Anwendung und PYZ verwenden dieselbe fachliche Pack-Implementierung. | ARCH-01, PACK-03 |
 | P-04 | Fehlende Pflichtparameter, Optionskonflikte, Byte-/Leerpfade, falsche API-Typen und doppelte CLI-Moduspfade werden korrekt abgewiesen. | PACK-01/03/22 |
 | P-05 | Alle vier Bindungswerte werden exakt übernommen; `expected_*`, Anzeigenamen und gekürzte IDs werden nicht als Ersatz genutzt. | PACK-06/14 |
-| P-06 | Gültige Dirty-, Dry-Run-, Fehler- und Legacy-Referenzen funktionieren; falsche/intern inkonsistente Referenzen scheitern. | PACK-06/07 |
+| P-06 | Gültige Dirty-, Dry-Run-, Fehler- und unveränderte 1.4.0-Referenzen funktionieren; falsche/intern inkonsistente Referenzen scheitern. | PACK-06/07 |
 | P-07 | Runtime-`unavailable` als gültige Referenz funktioniert; deklarierte kaputte Runtime führt nicht zu heimlichem schwächerem Erfolg. | PACK-07, MIG-05 |
 | P-08 | Manifest- und `PATCHHARBOR_META`-Kollisionen, falsche Groß-/Kleinschreibung und nicht vorhandener Entrypoint werden abgewiesen. | PACK-08/11 |
 | P-09 | Zulässige Unterverzeichnisse, Dotfiles und Repository-Anleitungen im Inhaltsbaum werden übernommen; angrenzende Projektdateien nicht. Keine `.gitignore`-Heuristik oder automatische Dateiänderung. | GOV-04, PACK-08/11 |
 | P-10 | Binärinhalte, Zeilenenden und sonstige Nutzbytes bleiben exakt erhalten; fehlende Skriptmarker werden nicht ergänzt. | PACK-11 |
 | P-11 | Default `0644`, explizit `0755`, verbotene Bits, unbekannte Modusschlüssel und vorhandene POSIX-Zielmodi werden korrekt behandelt. | PACK-12 |
-| P-12 | Automatischer UTC-/UUID-Dateiname, Namensanpassung, Legacy-Fallback und leeres/gesetztes Suffix; Uploadname ist keine Quelle. | PACK-15 |
+| P-12 | Automatischer UTC-/UUID-Dateiname, Namensanpassung, aufgezeichneter Namensfallback und leeres/gesetztes Suffix; Uploadname ist keine Quelle. | PACK-15 |
 | P-13 | Expliziter Ausgabename bleibt unverändert; falsches Suffix und temporärer Downloadname werden abgelehnt. | PACK-02/15 |
 | P-14 | Handoff enthält Zielrechnerdaten und ursprüngliches `captured_at`, nicht Pack-Hostdaten; neue Bindung/Dateiname passen exakt. | PACK-16 |
-| P-15 | Legacy-Environment mit unbekannten Werten erzeugt keine erfundenen OS-/Tooldaten; keine mehrfach angehängte alte generierte Anleitung. | PACK-16 |
+| P-15 | Gültiges Environment mit zulässigen unbekannten Werten erzeugt keine erfundenen OS-/Tooldaten; keine mehrfach angehängte alte generierte Anleitung. | PACK-16 |
 | P-16 | Typisiertes Ergebnis und JSON-Envelope enthalten identische vollständige Fakten, Referenzhash, Prüfumfang und Nichtprüfungen. | PACK-04/05 |
 | P-17 | Sowohl `--output` als auch `--output-dir` erzeugen genau eine Paket-UUID und einen UTC-Zeitpunkt pro Auftrag; diese werden stabil zurückgegeben, nur der automatische Name verwendet sie. | PACK-04/15 |
 | P-18 | Paket-UUID/ID6, Referenz-Run-ID und Chat-Bundle-Nummer bleiben getrennt; kein Zählerzustand wird angelegt und der Entrypoint bleibt bytegleich. | PACK-11/15, CHAT-05 |
@@ -1246,6 +1268,11 @@ Die regulären Wheel-/sdist-/pip-/pipx-/uv-Bereitstellungsnachweise werden nach 
 **TEST-07.** Die Result-/CIFS-Nachweise werden getrennt ausgewiesen: lokale Fault-Injection, native Windows-Prüfung und tatsächliche Linux→Windows-CIFS-Abnahme sind unterschiedliche Nachweise. PP-00 klärt den tatsächlichen Stand des vorhandenen CIFS-Auftrags; noch offene Freigaben werden nicht still geschlossen. Für die geänderten Format-3-Resultwege sind der einschlägige Publikationsvertrag und die Praxisabnahme nach `docs/result-publication-cifs.md` beizubehalten beziehungsweise erneut nachzuweisen. Ein lokales Ersatzdateisystem ist keine reale CIFS-Abnahme. Für `pack` gilt nur die engere getestete Zusage aus `PACK-23`; daraus entsteht keine neue allgemeine Netzwerkdateisystemgarantie.
 
 ## 18. Umsetzungsplan, Abhängigkeiten und Arbeitspakete
+
+**Historischer PYZ/PACK-Einführungsplan:** Die folgenden PP-Schritte dokumentieren
+die ursprüngliche Reader-first-Migration einschließlich damals nötiger Legacy-
+Leser. Sie sind abgeschlossen und keine erneute Altformatpflicht. Der aktuelle
+Refactoring-Plan ist `planning/1.5.0/commit-plan.md`.
 
 ### 18.1 Planungsregeln
 
@@ -1312,7 +1339,7 @@ Commit-, Push- und CI-Aktionen erfolgen ausschließlich nach dem bestehenden bea
 - Normale Installation bleibt funktionsfähig, einschließlich separat installiertem Watcher; neue Results enthalten standardmäßig nur die PYZ-Runtime.
 - PYZ-CLI und öffentliche API besitzen den vorgesehenen Core-Funktionsumfang mit denselben Sicherheitsregeln; keine zweite KI-Implementierung.
 - `pack` erfüllt Eingabe-, Bindungs-, Modus-, Handoff-, phasenunabhängigen Fehler- und No-replace-Vertrag; liefert nach bestätigter Publikation auch bei Cleanup-Warnung vollständige Erfolgsdaten und führt weder Entrypoint noch externe Werkzeuge aus.
-- Leser für alte und neue Results, konservative Altbehandlung, Diagnosepriorität und gemeinsame Resultwege sind geprüft. Der unveränderte Result-/CIFS-Sync-/Retry-/Hashvertrag ist auch für Format 3 nachgewiesen; Pack verwendet dagegen die ausdrücklich getrennte Erstfassung ohne Stabilitäts-Retries.
+- Leser für die unveränderte 1.4.0-Basis und aktuelle Results, konservative Behandlung nicht unterstützter Daten, Diagnosepriorität und gemeinsame Resultwege sind geprüft. Der unveränderte Result-/CIFS-Sync-/Retry-/Hashvertrag ist auch für Format 3 nachgewiesen; Pack verwendet dagegen die ausdrücklich getrennte Erstfassung ohne Stabilitäts-Retries.
 - Die Writerfreigabe erfolgte mit funktionsfähigem eingebettetem Bootstrap; das erste neue Result bestand den an seine eigene Anleitung gebundenen Durchstich (`E-10`).
 - Reproduzierbarkeit, request-lokale Herkunft, Selbstupdate und mindestens drei Result-/PYZ-Generationen sind mit konkreten Artefakten nachgewiesen.
 - Die relevanten Z-, F-, P-, S- und E-Tests sowie die fortgeltenden funktionalen Regressionen bestehen in den vorgeschriebenen Lanes; nicht ausgeführte native Nachweise werden nicht durch lokale Annahmen ersetzt.
@@ -1357,6 +1384,10 @@ Die technischen Primärquellen aus Revision 1 werden für Revision 2 unveränder
 | **Q5** | Python 3.12, `zipfile`: `https://docs.python.org/3.12/library/zipfile.html` | ZIP-Struktur, Metadaten und Kompressionsmethoden als technische Grundlage. |
 
 ### 20.3 Revisionen
+
+Revision 5 (2026-10-29, RF-01): Kompatibilitätsbasis ab 1.4.0, geschlossene
+Capability-Varianten und gezielte Entfernung widersprüchlicher Altformatpflichten.
+Keine Laufzeit-, Formatnummern- oder Interpreteränderung in diesem Schritt.
 
 | Revision | Datum | Änderung |
 |---|---|---|
