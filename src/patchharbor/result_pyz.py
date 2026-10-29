@@ -5,11 +5,12 @@ from dataclasses import dataclass, field
 
 from patchharbor.json_document import parse_json_document
 from patchharbor.resource_policy import ResourcePolicy
-from patchharbor.result_runtime import (
-    METADATA_PATH, MAX_METADATA_BYTES, UNAVAILABLE_REASONS, RuntimeFile, _descriptor, _require,
+from patchharbor.result_runtime_metadata import (
+    METADATA_PATH, MAX_METADATA_BYTES, UNAVAILABLE_REASONS, RuntimeFile,
+    read_descriptor as _descriptor, require_metadata as _require,
 )
 from patchharbor import runtime_pyz as pyz
-from patchharbor.runtime_wheel import _VERSION, _HEX
+from patchharbor.runtime_profile import VERSION_PATTERN as _VERSION, SHA256_PATTERN as _HEX
 
 
 _FIELDS = frozenset({

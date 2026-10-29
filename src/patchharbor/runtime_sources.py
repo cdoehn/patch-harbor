@@ -8,7 +8,7 @@ from zipimport import zipimporter
 from patchharbor.platform.filesystem import (
     PathKind, path_kind, read_stable_regular_file_bounded,
 )
-from patchharbor.runtime_wheel import RuntimeDataError
+from patchharbor.runtime_profile import RuntimeDataError
 
 
 def read_directory_resource(root: Path, name: str, maximum: int, *,

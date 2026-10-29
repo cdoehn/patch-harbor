@@ -409,3 +409,20 @@ def test_public_api_does_not_invoke_cli_or_duplicate_core_workflows() -> None:
         "patchharbor_watcher*",
     })
     assert "subprocess" not in _import_roots(_runtime_modules()["patchharbor.api"])
+
+
+def test_current_pyz_and_shared_profiles_do_not_depend_on_legacy_readers() -> None:
+    graph = _dependency_graph()
+    forbidden = {"patchharbor.runtime_wheel", "patchharbor.result_runtime"}
+    for module in ("patchharbor.runtime_pyz", "patchharbor.result_pyz",
+                   "patchharbor.runtime_profile", "patchharbor.result_runtime_metadata",
+                   "patchharbor.wheel_record", "patchharbor.runtime_sources",
+                   "patchharbor.pyz_artifact", "patchharbor.result_resources"):
+        pending, seen = [module], set()
+        while pending:
+            current = pending.pop()
+            if current in seen:
+                continue
+            seen.add(current)
+            pending.extend(graph.get(current, ()))
+        assert not seen & forbidden, (module, seen & forbidden)

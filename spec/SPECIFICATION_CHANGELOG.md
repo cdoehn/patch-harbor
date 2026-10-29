@@ -1,5 +1,19 @@
 # PatchHarbor – Spezifikations-Changelog
 
+## 2026-10-29 – RF-05 / Bundle 061: Runtime-Daten vom Wheel-Reader lösen
+
+- RF-04 tatsächlich angewendet und gepusht auf
+  `afce2628e9c1d85baa7726ec29a308de3d4d5ad2`; 5 von 14 Planpositionen bestätigt.
+- Gemeinsame Rezeptdaten, Fehler, Ressourcenpfade, kanonische JSON-/Hashregeln
+  und Result-Deskriptoren erhalten eigene fachliche Module. PYZ und der aktuelle
+  Buildpfad importieren dafür keinen Legacy-Wheel-Reader mehr.
+- RECORD-Kodierung getrennt; Buildhelfer bleiben an den eigenen Quellbaum gebunden.
+  Bestehende Leseverträge, Profile, IDs/Hashes, Limits und Legacy-Pfade bleiben
+  erhalten; ihre Entfernung ist weiterhin RF-06 vorbehalten.
+- Nutzerentscheidung vom 29. Oktober umgesetzt: Development nur ausgewählte
+  parallele Tests, vollständige parallele Suite im Apply vor jedem Commit.
+  CI bleibt ausschließlich manuell durch Christian. Eigener Apply noch offen.
+
 ## 2026-10-29 – RF-04 / Bundle 060: Verhalten und Schichtgrenzen prüfen
 
 - RF-03 tatsächlich angewendet und gepusht auf

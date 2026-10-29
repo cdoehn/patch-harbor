@@ -7,7 +7,6 @@ from __future__ import annotations
 
 from email.parser import BytesParser
 from email.policy import default as email_policy
-import importlib.util
 import importlib.machinery
 import importlib
 from types import ModuleType, SimpleNamespace
@@ -32,22 +31,9 @@ build_editable = _backend.build_editable
 _ROOT = Path(__file__).resolve().parent
 
 
-def _recipe_module():
-    # Load our anchored, stdlib-only data helper, not an arbitrary CWD package.
-    spec = importlib.util.spec_from_file_location(
-        "_patchharbor_build_recipe", _ROOT / "src/patchharbor/runtime_wheel.py",
-    )
-    if spec is None or spec.loader is None:
-        raise RuntimeError("missing canonical runtime builder")
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-    return module
-
-
-def _pyz_recipe_module():
-    # A private package namespace permits anchored relative data-helper imports
-    # without executing patchharbor.__init__ or selecting an installed package.
+def _profile_module(module_name):
+    # One anchored private namespace for all stdlib-only build data helpers.
+    # Never execute patchharbor.__init__ or select a CWD/installed package.
     name = '_patchharbor_build_profiles_' + uuid4().hex
     package = ModuleType(name)
     package.__path__ = [str(_ROOT / 'src/patchharbor')]
@@ -55,11 +41,19 @@ def _pyz_recipe_module():
     package.__spec__ = importlib.machinery.ModuleSpec(name, loader=None, is_package=True)
     sys.modules[name] = package
     try:
-        return importlib.import_module(name + '.runtime_pyz')
+        return importlib.import_module(name + '.' + module_name)
     finally:
         for key in tuple(sys.modules):
             if key == name or key.startswith(name + '.'):
                 del sys.modules[key]
+
+
+def _recipe_module():
+    return _profile_module('runtime_wheel')
+
+
+def _pyz_recipe_module():
+    return _profile_module('runtime_pyz')
 
 
 def _prepare_pyz_transport(transport: dict[str, bytes], *, version: str,
@@ -86,10 +80,10 @@ def _prepare_pyz_transport(transport: dict[str, bytes], *, version: str,
     prepared.update({name: raw for name, raw in canonical.items()
                      if name.startswith(pyz.RESOURCE_ROOT) or name == pyz.IDENTITY_PATH})
     prepared[pyz.RECIPE_PATH] = recipe.data
-    runtime = _recipe_module()
+    record = _profile_module('wheel_record')
     record_path = f'patchharbor-{version}.dist-info/RECORD'
-    prepared[record_path] = runtime.wheel_record(
-        ((name, runtime.sha256(raw), len(raw)) for name, raw in prepared.items() if name != record_path),
+    prepared[record_path] = record.wheel_record(
+        ((name, pyz.sha256(raw), len(raw)) for name, raw in prepared.items() if name != record_path),
         record_path)
     return prepared
 

@@ -1,11 +1,11 @@
 # PatchHarbor 1.5.0 – Refactoring- und Commitplan
 
 **Plan-ID:** `REFACTOR-1.5.0`
-**Revision:** 5 · 29. Oktober 2026
+**Revision:** 6 · 29. Oktober 2026
 **Zielversion:** 1.5.0; die Produktversion bleibt bis RF-13 bei 1.4.0.
-**Status:** RF-00 bis RF-03 durch Bundles 056 bis 059 bestätigt; RF-04 als Bundle 060 vorbereitet, Apply offen.
-**Fortschritt:** 4 / 14 Plancommits bestätigt; RF-04 ist der nächste zu bestätigende Schritt.
-**Aktueller Auftrag:** genau das nächste Arbeitspaket RF-04 erstellen; keine übernommene Automatik aus älteren Plänen.
+**Status:** RF-00 bis RF-04 durch Bundles 056 bis 060 bestätigt; RF-05 als Bundle 061 vorbereitet, Apply offen.
+**Fortschritt:** 5 / 14 Plancommits bestätigt; RF-05 ist der nächste zu bestätigende Schritt.
+**Aktueller Auftrag:** genau das nächste Arbeitspaket RF-05 erstellen; keine übernommene Automatik aus älteren Plänen.
 **Gemeinsame normative Grundlage:** [Hauptspezifikation](../../spec/SPECIFICATION.md),
 [PYZ/PACK-Erweiterung](../../spec/SPECIFICATION_EXTENSION_PYZ_PACK.md) und
 [CPython-3.10/3.11-Erweiterung](../../spec/SPECIFICATION_EXTENSION_CPYTHON_310_311.md),
@@ -138,7 +138,7 @@ historische Dokumente; ihre Formulierungen werden nicht nachträglich passend ge
 Jeder Schritt baut auf dem vorherigen **tatsächlich bestätigten** Zustand auf.
 Die Reihenfolge schützt besonders die 1.4.0-Basis, bevor Kompatibilitätscode
 entfernt wird. Mehrere fachlich abgegrenzte Schritte dürfen in einem Bundle liegen,
-wenn jeder als echter Dateizustand mit eigenem vollständigen parallelen Gate
+wenn jeder als echter Dateizustand mit eigenem vollständigen parallelen Apply-Gate
 und anschließendem Commit entsteht. Es gibt keine künstliche W/R/C-Dreiteilung;
 falls weitere Aufteilung nötig wird, wird der Plan vorher nachvollziehbar angepasst.
 
@@ -148,8 +148,8 @@ falls weitere Aufteilung nötig wird, wird der Plan vorher nachvollziehbar angep
 | 2 / 14 | RF-01 | CONFIRMED – Bundle 057 | `docs(spec): establish compatibility baseline from 1.4.0 [RF-01]` |
 | 3 / 14 | RF-02 | CONFIRMED – Bundle 058 | `test(compat): freeze supported 1.4.0 artifact contracts [RF-02]` |
 | 4 / 14 | RF-03 | CONFIRMED – Bundle 059 | `refactor(tests): isolate shared fixtures from test modules [RF-03]` |
-| 5 / 14 | RF-04 | NEXT – Bundle 060 vorbereitet, Apply offen | `test(architecture): assert behavior and dependency boundaries [RF-04]` |
-| 6 / 14 | RF-05 | OPEN | `refactor(runtime): separate shared profile primitives from wheel support [RF-05]` |
+| 5 / 14 | RF-04 | CONFIRMED – Bundle 060 | `test(architecture): assert behavior and dependency boundaries [RF-04]` |
+| 6 / 14 | RF-05 | NEXT – Bundle 061 vorbereitet, Apply offen | `refactor(runtime): separate shared profile primitives from wheel support [RF-05]` |
 | 7 / 14 | RF-06 | OPEN | `refactor(compat): remove pre-1.4 result and runtime paths [RF-06]` |
 | 8 / 14 | RF-07 | OPEN | `refactor(bootstrap): generate embedded program from one source [RF-07]` |
 | 9 / 14 | RF-08 | OPEN | `refactor(application): isolate configuration and exchange discovery [RF-08]` |
@@ -265,14 +265,14 @@ CI oder eingefrorenen Fixtures. Apply-/Commit-Nachweis siehe Abschnitt 4.
 - **Abnahme:** gleiches Verhalten kann intern umorganisiert werden, tatsächliche
   Grenzverletzungen werden weiter erkannt; keine neuen Layout-/Prosa-Tests.
 
-**Vorbereitet in Bundle 060:** Prosa- und Quelltextformprüfungen in Chat-/Release-
+**Bestätigt durch Bundle 060:** Prosa- und Quelltextformprüfungen in Chat-/Release-
 Tests entfallen zugunsten vorhandener Verhaltenstests und eines tatsächlich
 validierten Manifest-Beispiels. Der AST-Importgraph erkennt Aliase und relative
 Importe und erlaubt eine aufgeteilte Application-/CLI-Schicht ohne Rückabhängigkeiten.
 22 adversarielle Architekturfälle sichern erlaubte und verbotene Abhängigkeiten.
 Die [vollständige Check- und Collection-Zuordnung](rf04-test-mapping.md) erklärt
 jede Entfernung; Produktcode, Normverträge, CI und Originalfixtures bleiben gleich.
-Vollständiges paralleles Gate vorgeschrieben; eigener Apply-/Commit-Nachweis offen.
+Apply und vollständiges paralleles Gate bestätigt; Nachweis in Abschnitt 4.
 
 ### RF-05 – Gemeinsame Runtime-Primitiven von Wheel-Code trennen
 
@@ -287,6 +287,20 @@ Vollständiges paralleles Gate vorgeschrieben; eigener Apply-/Commit-Nachweis of
 - **Abnahme:** zunächst weiterhin gleiches Lese-/Buildverhalten; Golden-Daten,
   Inhalts-/Produzenten-IDs und unabhängige Installer-Routen unverändert. Azyklische
   Importe und stdlib-only PYZ bleiben nachgewiesen. Noch kein Legacy-Code vorschnell löschen.
+
+**Vorbereitet in Bundle 061:** `runtime_profile.py` besitzt gemeinsame Rezept-
+Daten, kanonische JSON-/Hashregeln, Fehler und Ressourcenpfade.
+`result_runtime_metadata.py` besitzt die gemeinsamen Result-Deskriptoren;
+`wheel_record.py` hält ausschließlich die Wheel-RECORD-Kodierung.
+PYZ-Datenpfade und der aktuelle Buildpfad laden keine alten Wheel-Reader mehr.
+Der PEP-517-Builder lädt Datenhelfer aus seinem eigenen Quellbaum in einem
+kurzlebigen privaten Paketnamensraum. Bestehende Profile, Limits, Fehler,
+Identitätsalgorithmen und Legacy-Lesepfade bleiben in diesem Schritt erhalten.
+Die [Zuordnung und Testauswahl](rf05-runtime-primitives.md) dokumentiert die
+Verlagerung, Originalbyte-Prüfung und verbleibende RF-06-Arbeit.
+Development prüft gemäß Nutzerentscheidung vom 29. Oktober eine gezielte
+parallele Auswahl; Apply prüft vor dem Commit die vollständige parallele Suite.
+Eigener Apply-/Commit-Nachweis noch offen.
 
 ### RF-06 – Überholte Unterstützung und ihre ausschließlichen Tests entfernen
 
@@ -402,7 +416,7 @@ Vollständiges paralleles Gate vorgeschrieben; eigener Apply-/Commit-Nachweis of
   ihre vollständigen parallelen Gates bestätigt. **Dateien:** zentrale Version,
   notwendige Releasehinweise und bestehende Versions-/Packaging-Verträge.
 - Produktversion konsistent auf 1.5.0 setzen; den Stand wieder vollständig
-  parallel prüfen. Wheel, sdist und Core-PYZ mit übereinstimmenden Versionen,
+  im Apply parallel prüfen. Wheel, sdist und Core-PYZ mit übereinstimmenden Versionen,
   IDs, Inventaren und Mindest-Python-Angaben bauen und prüfen.
 - Der Watcher führt den realen Versionscommit aus und pusht genau einmal normal.
   Tag, GitHub Release, Upload auf einen Paketindex, Installation und Dienstneustart
@@ -413,16 +427,22 @@ Vollständiges paralleles Gate vorgeschrieben; eigener Apply-/Commit-Nachweis of
 
 ## 4. Verbindliche Test- und Übergaberegeln
 
-Development und Apply führen für **jeden** tatsächlichen Commitstand die
-vollständige parallele Testsuite aus, auch beim Startcommit und am Bundle-Ende:
+**Aktuelle Nutzerentscheidung vom 29. Oktober 2026:** Development führt nur
+ausgewählte, änderungsbezogene Tests parallel aus, keine vollständige Suite.
+Auswahl und Ergebnisse müssen nachvollziehbar dokumentiert und dürfen nicht
+als Volltest-Nachweis bezeichnet werden. Diese Entscheidung ersetzt ältere
+Development-Volltestpflichten, auch in bereits bestätigten Planabschnitten.
+
+Apply führt für **jeden** tatsächlichen Commitstand die vollständige parallele
+Testsuite aus, auch am Bundle-Ende:
 
 ```text
 python tools/run_tests.py --suite all --report <lokaler-ergebnisnachweis.json>
 ```
 
 Eine explizite positive Workerzahl ist erlaubt. Keine seriellen Gates, keine
-verkürzte Auswahl als Ersatz. Zusätzliche sinnvolle Verhaltenstests werden im
-vollen parallelen Lauf ausgeführt. Tests auf Prosa, Farben, ANSI, Spinner,
+verkürzte Auswahl als Ersatz für das Apply-Gate. Zusätzliche Verhaltenstests
+werden in die passende Development-Auswahl und die vollständige Apply-Suite aufgenommen. Tests auf Prosa, Farben, ANSI, Spinner,
 Tabellenlayout und Konsolenwortlaut werden nicht neu eingeführt.
 
 Exitcode, vollständige Worker-Collection, Worker-Enden, Pflichtfälle, Fehler,
@@ -436,7 +456,7 @@ Modellkontrollen frühestens nach 300 Sekunden, danach im selben Mindestabstand;
 ein zuverlässig gemeldetes Ende darf sofort ausgewertet werden. Die Wartezeit
 übernimmt ein gewöhnlicher Prozess. Keine erneuten Starts durch Zwischenkontrollen.
 
-Die lokale Fullsuite ersetzt keine native Windows-/Interpreter-/CIFS-Abnahme.
+Die vollständige Apply-Suite ersetzt keine native Windows-/Interpreter-/CIFS-Abnahme.
 CI bleibt ausschließlich manuell (`workflow_dispatch`), gestartet von Christian.
 Codex/Entrypoints werten verfügbare CI aus, starten aber keinen Lauf und keinen
 Fünfertakt. Ein fehlender CI-Lauf auf einem Zwischencommit blockiert allein
@@ -502,6 +522,17 @@ erreichte Teilfortschritte werden im tatsächlichen Result ausgewertet.
 - Report-SHA-256: `2b9363578408ba6b3d75375df059f31aaa7b4190c1de28fb780fc6b5dacb1d11`.
 - Keine CI ausgelöst. RF-04 bindet sich an dieses Result; sein eigener
   zukünftiger Apply-/Commit-Erfolg wird nicht vorweggenommen.
+
+### Bestätigter Fortschritt: RF-04 / Bundle 060
+
+- Tatsächlicher Apply, Entrypoint- und Prozess-Exitcode 0; kein Dry-Run.
+- Commit `afce2628e9c1d85baa7726ec29a308de3d4d5ad2`, normaler Push auf `dev`;
+  sauberer Snapshot mit 391 Dateien und genau den 11 geplanten Änderungen.
+- Result `patchharbor-apply_Result_183436_1029_f5cbe0.zip`, SHA-256
+  `80c24575edb99eed9bbef3173332fdbc87455c4b50a58207cf1804b9e0326c47`.
+- Vollständiges paralleles Apply-Gate: 3343 passed, 15 skipped, 12 Worker.
+- Report-SHA-256: `00b41ce7dbef2e97114e953ce0e9686d84b3edba50ff080507f830fd5e68f7e3`.
+- Keine CI ausgelöst. RF-05 verwendet dieses Result als neue Bindungsbasis.
 
 ## 5. Pflichtnachweise über die Schritte hinweg
 

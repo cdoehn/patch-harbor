@@ -10,26 +10,17 @@ from patchharbor.json_document import parse_json_document
 from patchharbor.resource_policy import ResourcePolicy
 from patchharbor import runtime_wheel as wheel
 from patchharbor.runtime_zip import bounded_directory as _bounded_directory
+from patchharbor.result_runtime_metadata import (
+    METADATA_PATH, MAX_METADATA_BYTES, UNAVAILABLE_REASONS, RuntimeFile,
+    read_descriptor as _descriptor, require_metadata as _require,
+)
 
 
-METADATA_PATH = "runtime/runtime.json"
-MAX_METADATA_BYTES = 128 * 1024
-UNAVAILABLE_REASONS = frozenset({
-    "source_not_prepared", "source_changed", "artifact_missing", "artifact_mismatch",
-    "artifact_corrupt", "artifact_unsupported", "resource_limit", "read_error",
-})
 _FIELDS = {
     "marker", "format_version", "status", "reason", "distribution", "version",
     "requires_python", "content_id", "content_id_algorithm", "wheel", "tags",
     "runtime_dependencies", "provenance", "capabilities",
 }
-
-
-@dataclass(frozen=True, slots=True)
-class RuntimeFile:
-    path: str
-    size: int
-    sha256: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -47,23 +38,6 @@ class ResultRuntime:
     result_formats: tuple[int, ...]
 
 
-def _require(condition: bool, message: str) -> None:
-    if not condition:
-        raise ValueError(message)
-
-
-def _descriptor(value: object, *, path: str, limit: int, files: dict[str, bytes]) -> RuntimeFile:
-    _require(type(value) is dict and set(value) == {"path", "size", "sha256"},
-             "invalid runtime descriptor schema")
-    _require(value["path"] == path and type(value["size"]) is int
-             and 0 <= value["size"] <= limit and type(value["sha256"]) is str
-             and wheel._HEX.fullmatch(value["sha256"]) is not None, "invalid runtime descriptor")
-    raw = files[path]
-    _require(len(raw) == value["size"] and wheel.sha256(raw) == value["sha256"],
-             "runtime descriptor size or hash mismatch")
-    return RuntimeFile(path, value["size"], value["sha256"])
-
-
 def _capabilities(value: object) -> tuple[tuple[str, ...], tuple[int, ...], tuple[int, ...]]:
     _require(type(value) is dict and set(value) == {"operations", "patch_formats", "result_formats"},
              "invalid runtime capabilities schema")
@@ -73,7 +47,6 @@ def _capabilities(value: object) -> tuple[tuple[str, ...], tuple[int, ...], tupl
         _require(type(versions) is list and all(type(v) is int for v in versions)
                  and versions in choices, "unsupported runtime read versions")
     return tuple(value["operations"]), tuple(value["patch_formats"]), tuple(value["result_formats"])
-
 
 
 def _read_wheel(raw: bytes, *, policy: ResourcePolicy, remaining_bytes: int) -> wheel.RuntimeRecipe:

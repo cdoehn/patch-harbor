@@ -12,7 +12,7 @@ from patchharbor.chat_instructions import load_chat_template
 from patchharbor.errors import PatchHarborError, result_bundle_error
 from patchharbor.json_document import serialize_json_document
 from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY, ResourcePolicy
-from patchharbor.result_runtime import METADATA_PATH, UNAVAILABLE_REASONS
+from patchharbor.result_runtime_metadata import METADATA_PATH, UNAVAILABLE_REASONS
 from patchharbor.pyz_artifact import PyzArtifact, PyzProvider, own_pyz_profile_present
 from patchharbor import runtime_pyz
 from patchharbor.platform.filesystem import FileChangedDuringRead, FileReadLimitExceeded, UnsupportedFileTypeError

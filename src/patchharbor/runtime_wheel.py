@@ -5,22 +5,27 @@ recipe; this module validates and materializes it without importing its modules.
 """
 from __future__ import annotations
 
-import base64
 from configparser import ConfigParser, Error as ConfigError
-import csv
 from dataclasses import dataclass
 from email.parser import BytesParser
 from email.policy import default as email_policy
-import hashlib
 import io
 import json
 import re
-from typing import Callable, Iterable
+from typing import Callable
 from zipfile import ZIP_STORED, ZipFile, ZipInfo
+
+from .runtime_profile import (
+    RuntimeDataError, RuntimeLimitError, RuntimeEntry, sha256, recipe_json,
+    require_recipe as _require, unique_recipe_object as _unique,
+    reject_recipe_constant as _constant, SHA256_PATTERN as _HEX,
+    VERSION_PATTERN as _VERSION, PATH_SEGMENT_PATTERN as _SEGMENT,
+    RESOURCE_ROOT, CHAT_PATH, DOC_PATH,
+)
+from .wheel_record import wheel_record
 
 
 RECIPE_PATH = "patchharbor/_runtime/recipe.json"
-RESOURCE_ROOT = "patchharbor/_runtime/"
 CONTENT_ALGORITHM = "patchharbor-runtime-content-v1"
 PRODUCER_ALGORITHM = "patchharbor-runtime-producer-v1"
 IDENTITY_PATH = "patchharbor/_runtime_identity.py"
@@ -28,8 +33,6 @@ MAX_RECIPE_BYTES = 1024 * 1024
 MAX_WHEEL_BYTES = 16 * 1024 * 1024
 MAX_ENTRIES = 1000
 MAX_CONTENT_BYTES = 32 * 1024 * 1024
-CHAT_PATH = RESOURCE_ROOT + "CHAT_INSTRUCTIONS.md"
-DOC_PATH = RESOURCE_ROOT + "python-api.md"
 WHEEL_METADATA = (
     b"Wheel-Version: 1.0\nGenerator: patchharbor-canonical-v1\n"
     b"Root-Is-Purelib: true\nTag: py3-none-any\n\n"
@@ -39,26 +42,7 @@ _RECIPE_FIELDS = {
     "marker", "format_version", "distribution", "version", "requires_python",
     "content_id_algorithm", "content_id", "source_commit", "entries",
 }
-_HEX = re.compile(r"[0-9a-f]{64}\Z")
-_VERSION = re.compile(r"[0-9]+(?:\.[0-9]+)*(?:(?:a|b|rc)[0-9]+)?(?:\.post[0-9]+)?(?:\.dev[0-9]+)?\Z")
-_SEGMENT = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_.-]*\Z")
 _DEV_REQUIREMENT = re.compile(r'[^;\r\n]+; extra == [\"\']dev[\"\']\Z')
-
-
-class RuntimeDataError(ValueError):
-    """Invalid prepared resources, distinct from missing local installation."""
-
-
-class RuntimeLimitError(RuntimeDataError):
-    """A fixed canonical-runtime product budget was exceeded."""
-
-
-@dataclass(frozen=True, slots=True)
-class RuntimeEntry:
-    path: str
-    source: str
-    size: int
-    sha256: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -77,33 +61,6 @@ class RuntimeRecipe:
     @property
     def wheel_name(self) -> str:
         return f"patchharbor-{self.version}-py3-none-any.whl"
-
-
-def sha256(data: bytes) -> str:
-    return hashlib.sha256(data).hexdigest()
-
-
-def _require(condition: bool, message: str) -> None:
-    if not condition:
-        raise RuntimeDataError(message)
-
-
-def recipe_json(document: object) -> bytes:
-    """The versioned recipe/producer encoding, shared with the build backend."""
-    return (json.dumps(document, sort_keys=True, ensure_ascii=True,
-                       separators=(",", ":"), allow_nan=False) + "\n").encode("ascii")
-
-
-def _unique(pairs: list[tuple[str, object]]) -> dict[str, object]:
-    result: dict[str, object] = {}
-    for key, value in pairs:
-        _require(key not in result, "duplicate recipe key")
-        result[key] = value
-    return result
-
-
-def _constant(value: str) -> object:
-    raise RuntimeDataError("non-finite recipe value: " + value)
 
 
 def _python_requirement(value: object) -> bool:
@@ -269,21 +226,6 @@ def identity_module(resource_id: str) -> bytes:
     _require(type(resource_id) is str and _HEX.fullmatch(resource_id) is not None,
              "invalid producer ID")
     return (f'# Generated at wheel build; no runtime work.\nRESOURCE_ID = "{resource_id}"\n').encode("ascii")
-
-
-def wheel_record(inventory: Iterable[tuple[str, str, int]], record_path: str) -> bytes:
-    """Serialize validated (path, hex SHA-256, size) facts, excluding RECORD.
-
-    Transport and canonical wheels share this encoding, not their inventories.
-    Callers retain their own path/profile validation and resource budgets.
-    """
-    record = io.StringIO(newline="")
-    writer = csv.writer(record, lineterminator="\n")
-    for name, digest, size in sorted(inventory):
-        encoded = base64.urlsafe_b64encode(bytes.fromhex(digest)).rstrip(b"=").decode("ascii")
-        writer.writerow((name, "sha256=" + encoded, size))
-    writer.writerow((record_path, "", ""))
-    return record.getvalue().encode("utf-8")
 
 
 def materialize(recipe: RuntimeRecipe, read: Callable[[str, int], bytes]) -> bytes:

@@ -2,14 +2,14 @@
 
 Plan: `planning/test-parallel/commit-plan.md` (15 echte W/R/C-Zwischenstände).
 Historischer Vertrag: `planning/test-parallel/specification.md`.
-**Aktuelle Nutzerentscheidung vom 7. Oktober 2026:** Development und Apply
-führen nur vollständige parallele Tests aus, auch am Bundle-Ende. Keine seriellen
-Gates. Nur Christian selbst startet den weiterhin manuellen CI-Workflow.
+**Aktuelle Nutzerentscheidung vom 29. Oktober 2026:** Development führt nur
+ausgewählte, änderungsbezogene Tests parallel aus. Die vollständige parallele
+Suite läuft im Apply vor jedem Commit, auch am Bundle-Ende. Keine seriellen Gates. Nur Christian selbst startet den weiterhin manuellen CI-Workflow.
 Codex und Entrypoints starten keine CI; der frühere Fünfertakt entfällt.
 Die aktive Schleife arbeitet den bestehenden Plan ohne feste Korrekturgrenze ab.
 Der vorhandene Watcher übernimmt ausschließlich fertig veröffentlichte Pakete.
 Details und aktuelle Resultbindung: aktiver
-`planning/python-compatibility/commit-plan.md`.
+`planning/1.5.0/commit-plan.md`.
 
 ## Historische Pixel-Phase: durch den Laptop-Wechsel beendet
 
@@ -74,7 +74,8 @@ Push oder CI erreicht wurden. Das hat die obige spätere Dauerregel ausgelöst.
 Alte Aussagen „PP-00 allein“ und „nächste CI 029“ beschreiben nur diese Historie.
 
 **Die folgenden Beispiele beschreiben die vorhandenen Werkzeuge. Für den aktiven
-Auftrag gilt die oben genannte Laptop-Policy mit vollständigen parallelen Gates.
+Auftrag gilt die obige Laptop-Policy: gezielte parallele Auswahl im Development,
+vollständige parallele Commit-Gates im Apply.
 Ein beschriebener Modusvergleich ist kein Auftrag, serielle Tests zu starten.**
 
 ## Teststart
@@ -129,9 +130,10 @@ Prozess-/Locktests bleiben erhalten; es wird kein echter systemd-Dienst gestarte
 ## Controller-Nachweise
 
 Jeder Launcher-Lauf aktiviert die Vollständigkeitsprüfung, auch ohne gespeicherte
-Datei. Eine persistente JSON-Datei ist optional. Development und Apply
-verwenden ausschließlich den vollständigen parallelen Bericht, auch am
-Bundle-Ende. Eine serielle Referenz ist dafür nicht erforderlich:
+Datei. Eine persistente JSON-Datei ist optional. Development dokumentiert seine
+gezielte parallele Auswahl; ein vollständiger Bericht über diese Auswahl ist
+kein Vollsuite-Nachweis. Apply benötigt den vollständigen parallelen Suite-Bericht
+vor jedem Commit, auch am Bundle-Ende. Eine serielle Referenz ist nicht erforderlich:
 
 ```sh
 python tools/run_tests.py --suite all --workers 4 --report /tmp/ph-parallel.json
@@ -162,7 +164,8 @@ Die Vergleichsbindung umfasst Quellbytes sowie Python-, Betriebssystem-, pytest-
 und xdist-Version und die ausgewählte Windows-Engine. Quellen dürfen während
 eines Laufs nicht wechseln. Lauf-ID, Zeit, Reihenfolge und Worker-Zuteilung
 werden dagegen nicht fachlich verglichen. Ein Quellenwechsel erfordert einen
-neuen vollständigen parallelen Gate-Bericht, auch bei Dokumentänderungen.
+neuen parallelen Bericht zum vorgeschriebenen Umfang: gezielte Development-Auswahl
+oder vollständiges Apply-Gate, auch bei Dokumentänderungen.
 Alte Berichte eines anderen Standes sind kein Gate für neue Quellen. Nur der
 separat beauftragte Modusverifier benötigt zusätzlich seine passende serielle
 Referenz; er gehört nicht zum Development-/Apply-Ablauf.
@@ -239,8 +242,9 @@ als ausführbar behauptet; die Datenlesbarkeit alter Results und die neue
 private temporäre Fixtures. CI ersetzt keine zusätzliche geforderte CIFS-Praxis
 oder die abschließende Releaseentscheidung.
 
-Im Development und im Apply läuft vor jedem Commitstand dieselbe vollständige
-parallele Suite. Dies gilt auch am Bundle-Ende; kein serieller Vorlauf und kein
+Im Development läuft nur die begründete parallele Testauswahl. Im Apply läuft
+vor jedem Commitstand die vollständige parallele Suite, auch am Bundle-Ende;
+kein serieller Vorlauf und kein
 Vergleich mit einer seriellen Referenz:
 
 ```sh

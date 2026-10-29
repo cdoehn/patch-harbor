@@ -305,9 +305,12 @@ does not replace repository-bound Apply.
   [PYZ/PACK extension, revision 3](spec/SPECIFICATION_EXTENSION_PYZ_PACK.md)
 - [Implementation and acceptance record](planning/pyz-pack/commit-plan.md)
 
-For development, install `.[dev]` in a dedicated environment and run
-`python tools/run_tests.py --suite all`. Development and Apply use full parallel
-gates. GitHub CI is manual and started only by the project owner. Local tests
+For development, install `.[dev]` in a dedicated environment and run only a
+change-focused parallel selection, for example
+`python tools/run_tests.py -- tests/test_runtime_pyz.py`. Document the selection
+and its results. Apply runs the full parallel suite before every commit with
+`python tools/run_tests.py --suite all`, including the final commit of a bundle.
+GitHub CI is manual and started only by the project owner. Local tests
 do not substitute for native Windows acceptance or release publication.
 For available options, use `patchharbor --help`, `patchharbor COMMAND --help`
 and `patchharbor-watcher --help`.

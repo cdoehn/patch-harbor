@@ -1089,14 +1089,15 @@ PatchHarbor selbst. Andere Zielprojekte behalten ihre eigenen Test-/CI-Regeln.
 
 Die spätere ausdrückliche Nutzeranweisung vom 7. Oktober 2026 ersetzt ältere
 lokale serielle Gates, die Pixel-CI-only-Regel und den CI-Fünfertakt.
-Development und Apply prüfen jeden Commitstand vollständig parallel, auch am
-Bundle-Ende. Kein serieller Lauf und keine verkürzte Auswahl als Vollabnahme.
+Seit 29. Oktober 2026 prüft Development nur eine dokumentierte, änderungsbezogene
+parallele Testauswahl. Apply prüft jeden Commitstand vollständig parallel, auch am
+Bundle-Ende. Keine Vollsuite im Development. Kein serieller Lauf und keine verkürzte Auswahl als Vollabnahme.
 Nur Christian startet den manuellen CI-Workflow; Codex und Entrypoints tun das nie.
 
-RF-00 bis RF-03 sind durch tatsächliche Applies und Push bestätigt, zuletzt
-RF-03 / Bundle 059 auf `ab1d6d5dae0d6f013c91775e9308dfe86ef6d848`.
-Der Folgeauftrag umfasst RF-04 / Bundle 060: Verhalten und Architekturgrenzen
-statt Quelltextlayout prüfen; dessen Apply steht bei Vorbereitung noch aus.
+RF-00 bis RF-04 sind durch tatsächliche Applies und Push bestätigt, zuletzt
+RF-04 / Bundle 060 auf `afce2628e9c1d85baa7726ec29a308de3d4d5ad2`.
+Der Folgeauftrag umfasst RF-05 / Bundle 061: gemeinsame Runtime-Primitiven
+vom Wheel-Code trennen; dessen Apply steht bei Vorbereitung noch aus.
 Weitere Implementierung oder eine automatische Schleife ist nicht vorweggenommen.
 Vollständige Watcher-Results samt Teilfortschritten werden
 geprüft; fehlende externe Nachweise werden konkret gemeldet. CI startet
@@ -1340,7 +1341,8 @@ leite angemessene Prüfungen aus Testinfrastruktur und Auftrag ab und benenne si
 Starte GitHub-CI nicht allein aufgrund eines PatchHarbor-Defaults.
 
 **PatchHarbor-Projekt:** Für die aktive Laptop-Entwicklung gelten die oben
-festgehaltenen vollständigen parallelen Commit-Gates. Die frühere Pixel-CI-only-
+festgehaltenen gezielten parallelen Development-Prüfungen und vollständigen
+parallelen Apply-Commit-Gates. Die frühere Pixel-CI-only-
 Ausnahme ist beendet. Externe CI startet ausschließlich der Nutzer; notwendige
 native Abschlussnachweise bleiben bis zur tatsächlichen Auswertung offen.
 
