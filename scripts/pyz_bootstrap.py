@@ -494,10 +494,10 @@ def assess(reference, *, trusted_source_sha256=None):
         _require(type(capabilities) is dict and set(capabilities) == {'operations','patch_formats','result_formats'}
                  and capabilities['operations'] == ['inspect_patch','validate_patch','pack_patch'],
                  'unsupported runtime capabilities')
-        for key, expected in (('patch_formats',[1]), ('result_formats',[1,2,3])):
+        for key, choices in (('patch_formats',([1],)), ('result_formats',([1,2,3],[3]))):
             values = capabilities[key]
             _require(type(values) is list and all(type(v) is int for v in values)
-                     and values == expected, 'unsupported runtime read versions')
+                     and values in choices, 'unsupported runtime read versions')
         provenance = metadata['provenance']
         _require(metadata['runtime_dependencies'] == [] and type(provenance) is dict
                  and set(provenance) == {'mode','source_commit','recipe_format_version'}

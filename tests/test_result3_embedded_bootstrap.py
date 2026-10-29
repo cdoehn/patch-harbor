@@ -10,19 +10,22 @@ import pytest
 from patchharbor import runtime_pyz as pyz
 from tests.embedded_pyz_support import bootstrap_program
 from tests.result_pyz_support import attach_pyz
+from tests.result_runtime_support import edit_metadata
 from tests.pack_support import request_files
 from tests.reference_support import reference_entries, write_reference
 
 
 @pytest.mark.packaging
+@pytest.mark.parametrize('result_formats', [[1,2,3],[3]], ids=['original_caps','current_caps'])
 @pytest.mark.parametrize('corrupt_snapshot',[False,True])
 def test_own_embedded_bootstrap_runs_in_fresh_process_and_pack_uses_same_result(
-    built_result_source, request_files, tmp_path, corrupt_snapshot,
+    built_result_source, request_files, tmp_path, corrupt_snapshot, result_formats,
 ):
     recipe=pyz.parse_recipe((built_result_source/pyz.RECIPE_PATH).read_bytes())
     raw=pyz.materialize(recipe,lambda name,size:(built_result_source/name).read_bytes())
     files,_=reference_entries(handoff=True)
     files=attach_pyz(files,raw)
+    edit_metadata(files,lambda doc:doc['capabilities'].update(result_formats=result_formats))
     files['CHAT_INSTRUCTIONS.md']=(built_result_source/pyz.CHAT_PATH).read_bytes()
     if corrupt_snapshot:files['base/tracked.txt']+=b'changed after snapshot'
     reference=tmp_path/'actual-reference.zip';write_reference(reference,files)

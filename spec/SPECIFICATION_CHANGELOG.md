@@ -1,5 +1,19 @@
 # PatchHarbor – Spezifikations-Changelog
 
+## 2026-10-29 – RF-06A / Bundle 062: Capability-Leser vorbereiten
+
+- RF-05 tatsächlich angewendet und gepusht auf
+  `5ee194153d1338777cb6b77a60b7854e7b009388`; 6 von 14 Planpositionen bestätigt.
+- Die bereits spezifizierten geschlossenen Result-3-Capability-Listen
+  `[1, 2, 3]` und `[3]` werden vom nativen Reader und Bootstrap akzeptiert.
+  Strikte Typ-/Schema-/Hash-/Limitprüfungen und native Referenzprüfung bleiben.
+- RF-06 wird in Leser-Vorbereitung (A) und anschließenden Writer-Wechsel samt
+  Legacy-Abbau (B) aufgeteilt: 14 Planpositionen, derzeit 15 vorgesehene Commits.
+  Writer bleibt in A bei `[1, 2, 3]`, bisherige Leser und Originalfixtures bleiben.
+- Verhaltenstests decken beide Profile, ungültige Angaben, unavailable und die
+  eigene eingebettete PYZ ab. Development nur ausgewählt parallel; Apply vollständig
+  parallel vor dem Commit. Keine CI-Auslösung; eigener Apply noch offen.
+
 ## 2026-10-29 – RF-05 / Bundle 061: Runtime-Daten vom Wheel-Reader lösen
 
 - RF-04 tatsächlich angewendet und gepusht auf

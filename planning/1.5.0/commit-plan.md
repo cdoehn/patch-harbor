@@ -1,11 +1,11 @@
 # PatchHarbor 1.5.0 – Refactoring- und Commitplan
 
 **Plan-ID:** `REFACTOR-1.5.0`
-**Revision:** 6 · 29. Oktober 2026
+**Revision:** 7 · 29. Oktober 2026
 **Zielversion:** 1.5.0; die Produktversion bleibt bis RF-13 bei 1.4.0.
-**Status:** RF-00 bis RF-04 durch Bundles 056 bis 060 bestätigt; RF-05 als Bundle 061 vorbereitet, Apply offen.
-**Fortschritt:** 5 / 14 Plancommits bestätigt; RF-05 ist der nächste zu bestätigende Schritt.
-**Aktueller Auftrag:** genau das nächste Arbeitspaket RF-05 erstellen; keine übernommene Automatik aus älteren Plänen.
+**Status:** RF-00 bis RF-05 durch Bundles 056 bis 061 bestätigt; RF-06A als Bundle 062 vorbereitet, Apply offen. RF-06B bleibt offen.
+**Fortschritt:** 6 / 14 Planpositionen und 6 / 15 vorgesehene Commits bestätigt; RF-06A ist der nächste zu bestätigende Teilschritt.
+**Aktueller Auftrag:** genau das nächste Arbeitspaket RF-06A erstellen; keine übernommene Automatik aus älteren Plänen.
 **Gemeinsame normative Grundlage:** [Hauptspezifikation](../../spec/SPECIFICATION.md),
 [PYZ/PACK-Erweiterung](../../spec/SPECIFICATION_EXTENSION_PYZ_PACK.md) und
 [CPython-3.10/3.11-Erweiterung](../../spec/SPECIFICATION_EXTENSION_CPYTHON_310_311.md),
@@ -149,8 +149,8 @@ falls weitere Aufteilung nötig wird, wird der Plan vorher nachvollziehbar angep
 | 3 / 14 | RF-02 | CONFIRMED – Bundle 058 | `test(compat): freeze supported 1.4.0 artifact contracts [RF-02]` |
 | 4 / 14 | RF-03 | CONFIRMED – Bundle 059 | `refactor(tests): isolate shared fixtures from test modules [RF-03]` |
 | 5 / 14 | RF-04 | CONFIRMED – Bundle 060 | `test(architecture): assert behavior and dependency boundaries [RF-04]` |
-| 6 / 14 | RF-05 | NEXT – Bundle 061 vorbereitet, Apply offen | `refactor(runtime): separate shared profile primitives from wheel support [RF-05]` |
-| 7 / 14 | RF-06 | OPEN | `refactor(compat): remove pre-1.4 result and runtime paths [RF-06]` |
+| 6 / 14 | RF-05 | CONFIRMED – Bundle 061 | `refactor(runtime): separate shared profile primitives from wheel support [RF-05]` |
+| 7 / 14 | RF-06 | NEXT – RF-06A / Bundle 062 vorbereitet; RF-06B offen | zwei aufeinanderfolgende Commits, siehe RF-06A/B unten |
 | 8 / 14 | RF-07 | OPEN | `refactor(bootstrap): generate embedded program from one source [RF-07]` |
 | 9 / 14 | RF-08 | OPEN | `refactor(application): isolate configuration and exchange discovery [RF-08]` |
 | 10 / 14 | RF-09 | OPEN | `refactor(application): clarify apply and result orchestration [RF-09]` |
@@ -159,7 +159,9 @@ falls weitere Aufteilung nötig wird, wird der Plan vorher nachvollziehbar angep
 | 13 / 14 | RF-12 | OPEN | `docs(refactor): align current guidance and record cleanup evidence [RF-12]` |
 | 14 / 14 | RF-13 | OPEN | `chore(release): prepare PatchHarbor 1.5.0 acceptance [RF-13]` |
 
-Die 14 Positionen schließen den Startcommit ein. Korrekturen sind eigene
+Die 14 Positionen schließen den Startcommit ein. RF-06 wird in zwei echte
+aufeinanderfolgende Commits aufgeteilt; damit sind derzeit 15 Commits vorgesehen.
+RF-06 gilt erst nach bestätigtem RF-06B als abgeschlossene Planposition. Korrekturen sind eigene
 `RF-xx-FIXn` mit belegtem Fehler und erhöhen diesen Zähler nicht. Ein reines
 Diagnosebundle darf null Commits enthalten. Korrekturen sind zahlenmäßig nicht
 begrenzt; Sicherheitsgrenzen und belastbare Resultbindung bleiben Stop-Bedingungen.
@@ -288,7 +290,7 @@ Apply und vollständiges paralleles Gate bestätigt; Nachweis in Abschnitt 4.
   Inhalts-/Produzenten-IDs und unabhängige Installer-Routen unverändert. Azyklische
   Importe und stdlib-only PYZ bleiben nachgewiesen. Noch kein Legacy-Code vorschnell löschen.
 
-**Vorbereitet in Bundle 061:** `runtime_profile.py` besitzt gemeinsame Rezept-
+**Bestätigt durch Bundle 061:** `runtime_profile.py` besitzt gemeinsame Rezept-
 Daten, kanonische JSON-/Hashregeln, Fehler und Ressourcenpfade.
 `result_runtime_metadata.py` besitzt die gemeinsamen Result-Deskriptoren;
 `wheel_record.py` hält ausschließlich die Wheel-RECORD-Kodierung.
@@ -300,7 +302,7 @@ Die [Zuordnung und Testauswahl](rf05-runtime-primitives.md) dokumentiert die
 Verlagerung, Originalbyte-Prüfung und verbleibende RF-06-Arbeit.
 Development prüft gemäß Nutzerentscheidung vom 29. Oktober eine gezielte
 parallele Auswahl; Apply prüft vor dem Commit die vollständige parallele Suite.
-Eigener Apply-/Commit-Nachweis noch offen.
+Apply-/Commit-Nachweis bestätigt; siehe Abschnitt 4.
 
 ### RF-06 – Überholte Unterstützung und ihre ausschließlichen Tests entfernen
 
@@ -321,6 +323,35 @@ Eigener Apply-/Commit-Nachweis noch offen.
 - **Abnahme:** neues Result → eigene PYZ → Pack/Validate → tatsächlicher Apply →
   nächstes Result; zusätzlich unveränderte 1.4.0-Eingaben, Fehler und Runtime-Ausfälle.
   Altformate in gemischtem Exchange werden nicht als Erfolg oder Archivierungsfreigabe gewertet.
+
+#### RF-06A – Geschlossene Capability-Profile zuerst lesen
+
+- **Voraussetzung:** RF-05 tatsächlich bestätigt; unveränderte RF-02-Fixtures.
+- **Commit:** `refactor(compat): prepare closed capability readers [RF-06A]`.
+- Core-Reader, Bootstrap-Skript und dessen ausführbare Kopie im Handoff akzeptieren
+  genau `[1, 2, 3]` und `[3]`. Patchformate bleiben genau `[1]`; boolesche Werte,
+  andere Typen, Teilmengen, Duplikate und unbekannte Versionen bleiben ungültig.
+- Writer und bisherige Lese-/Buildpfade bleiben in diesem Zwischenschritt bestehen;
+  der aktuelle Produzent deklariert daher weiterhin wahrheitsgemäß `[1, 2, 3]`.
+- **Abnahme:** statischer Reader/Pack/Validate für beide Profile ohne Codeausführung;
+  Bootstrap bleibt Vorprüfung, die native Referenzprüfung weiterhin verpflichtend.
+  Eigene gebaute PYZ und eingebetteter Bootstrap müssen beide Profile in frischen
+  isolierten Prozessen verarbeiten und beschädigte Snapshots weiter ablehnen.
+- **Vorbereitet in Bundle 062:** [Änderungs- und Testzuordnung](rf06-capability-reader.md).
+  Ein Commit; eigener Apply offen. Diese Vorbereitung schließt RF-06 nicht ab.
+
+#### RF-06B – Writer umstellen und überholte Pfade abbauen
+
+- **Voraussetzung:** RF-06A durch tatsächlichen Apply und vollständiges paralleles
+  Gate bestätigt; dessen neues Result ist die Bindungsbasis.
+- **Commit:** `refactor(compat): remove pre-1.4 result and runtime paths [RF-06B]`.
+- Die oben genannten Legacy-Reader/-Provider/-Buildrezepte abbauen und aktuelle
+  Writer auf `[3]` umstellen. Originale 1.4.0-Results bleiben bytegleich lesbar.
+- Vor dem Entfernen alter Tests weiterhin relevante Angriffe auf aktuelle Formate
+  übertragen und jeden entfallenden Fall zuordnen. Installations-Wheels, sdist,
+  Watcher, Runtime-unavailable und technischer Fallback bleiben unterstützt.
+- **Abnahme:** sämtliche RF-06-Nachweise oben einschließlich tatsächlicher Übergabe,
+  Folge-Result und konservativer Behandlung alter Results im gemischten Exchange.
 
 ### RF-07 – Einen gepflegten ausführbaren Bootstrap bereitstellen
 
@@ -534,6 +565,18 @@ erreichte Teilfortschritte werden im tatsächlichen Result ausgewertet.
 - Report-SHA-256: `00b41ce7dbef2e97114e953ce0e9686d84b3edba50ff080507f830fd5e68f7e3`.
 - Keine CI ausgelöst. RF-05 verwendet dieses Result als neue Bindungsbasis.
 
+### Bestätigter Fortschritt: RF-05 / Bundle 061
+
+- Tatsächlicher Apply, Entrypoint- und Prozess-Exitcode 0; kein Dry-Run.
+- Commit `5ee194153d1338777cb6b77a60b7854e7b009388`, normaler Push auf `dev`;
+  sauberer Snapshot mit 396 Dateien und genau den 19 geplanten Änderungen.
+- Result `patchharbor-apply_Result_190808_1029_5527f4.zip`, SHA-256
+  `3c287fbaede17019a5a1e51d00ad066bda23371843aa076374a421d8453802b3`.
+- Vollständiges paralleles Apply-Gate: 3351 passed, 15 skipped, 12 Worker.
+- Report-SHA-256: `bda4980d16f801a4493631a059eacc4940a2c7ef4df2d3a431fecc8dfe0d097b`.
+- Development hatte nur seine ausgewählte parallele Prüfung ausgeführt.
+  Keine CI ausgelöst. RF-06A verwendet dieses Result als neue Bindungsbasis.
+
 ## 5. Pflichtnachweise über die Schritte hinweg
 
 | Bereich | Erforderlicher Nachweis | Hauptschritte |
@@ -566,8 +609,9 @@ Für den vollständigen Abschluss von 1.5.0 werden gemeinsam benötigt:
 
 1. Alle 14 Planpositionen tatsächlich angewendet; kein ungeklärter Teilfortschritt,
    sauberer Endstand und bestätigter abschließender Push.
-2. Vollständige parallele Development-/Apply-Nachweise und unveränderte
-   1.4.0-Kompatibilitätsfixtures auf dem finalen Stand.
+2. Dokumentierte ausgewählte parallele Development-Nachweise, vollständige
+   parallele Apply-Nachweise und unveränderte 1.4.0-Kompatibilitätsfixtures auf
+   dem finalen Stand.
 3. Von Christian gestartete manuelle native CI einschließlich Windows, der
    unterstützten Python-Versionen und Docker; passende Run-ID, vollständiger
    Commit, Jobs, Artefakthashes und fachliche Pflichtnachweise geprüft.

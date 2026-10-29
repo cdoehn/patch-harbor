@@ -797,10 +797,10 @@ def assess(reference, *, trusted_source_sha256=None):
         _require(type(capabilities) is dict and set(capabilities) == {'operations','patch_formats','result_formats'}
                  and capabilities['operations'] == ['inspect_patch','validate_patch','pack_patch'],
                  'unsupported runtime capabilities')
-        for key, expected in (('patch_formats',[1]), ('result_formats',[1,2,3])):
+        for key, choices in (('patch_formats',([1],)), ('result_formats',([1,2,3],[3]))):
             values = capabilities[key]
             _require(type(values) is list and all(type(v) is int for v in values)
-                     and values == expected, 'unsupported runtime read versions')
+                     and values in choices, 'unsupported runtime read versions')
         provenance = metadata['provenance']
         _require(metadata['runtime_dependencies'] == [] and type(provenance) is dict
                  and set(provenance) == {'mode','source_commit','recipe_format_version'}
@@ -1094,10 +1094,12 @@ parallele Testauswahl. Apply prüft jeden Commitstand vollständig parallel, auc
 Bundle-Ende. Keine Vollsuite im Development. Kein serieller Lauf und keine verkürzte Auswahl als Vollabnahme.
 Nur Christian startet den manuellen CI-Workflow; Codex und Entrypoints tun das nie.
 
-RF-00 bis RF-04 sind durch tatsächliche Applies und Push bestätigt, zuletzt
-RF-04 / Bundle 060 auf `afce2628e9c1d85baa7726ec29a308de3d4d5ad2`.
-Der Folgeauftrag umfasst RF-05 / Bundle 061: gemeinsame Runtime-Primitiven
-vom Wheel-Code trennen; dessen Apply steht bei Vorbereitung noch aus.
+RF-00 bis RF-05 sind durch tatsächliche Applies und Push bestätigt, zuletzt
+RF-05 / Bundle 061 auf `5ee194153d1338777cb6b77a60b7854e7b009388`.
+Der Folgeauftrag umfasst RF-06A / Bundle 062: die geschlossenen Capability-
+Profile `[1, 2, 3]` und `[3]` im Reader und Bootstrap vorbereiten; eigener Apply
+steht noch aus. RF-06B stellt später den Writer um und entfernt Legacy-Pfade.
+Die Planposition RF-06 ist erst nach beiden bestätigten Teilschritten abgeschlossen.
 Weitere Implementierung oder eine automatische Schleife ist nicht vorweggenommen.
 Vollständige Watcher-Results samt Teilfortschritten werden
 geprüft; fehlende externe Nachweise werden konkret gemeldet. CI startet

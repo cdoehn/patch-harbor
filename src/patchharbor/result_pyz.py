@@ -55,10 +55,10 @@ def _capabilities(value: object) -> tuple[tuple[str, ...], tuple[int, ...], tupl
              'invalid PYZ capabilities schema')
     _require(value['operations'] == ['inspect_patch','validate_patch','pack_patch'],
              'unsupported PYZ operations')
-    for key, expected in (('patch_formats',[1]), ('result_formats',[1,2,3])):
+    for key, choices in (('patch_formats',([1],)), ('result_formats',([1,2,3],[3]))):
         versions = value[key]
         _require(type(versions) is list and all(type(v) is int for v in versions)
-                 and versions == expected, 'unsupported PYZ read versions')
+                 and versions in choices, 'unsupported PYZ read versions')
     return tuple(value['operations']), tuple(value['patch_formats']), tuple(value['result_formats'])
 
 
