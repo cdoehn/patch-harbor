@@ -14,7 +14,7 @@ from tests.exchange_support import _identity_record
 
 _CRASH = r'''
 import os, sys
-import patchharbor.application as app
+import patchharbor.application_apply as app
 import patchharbor.application_exchange as exchange_app
 import patchharbor.result_bundle_publication as publication
 from patchharbor.cli import main

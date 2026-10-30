@@ -1093,12 +1093,12 @@ parallele Testauswahl. Apply prüft jeden Commitstand vollständig parallel, auc
 Bundle-Ende. Keine Vollsuite im Development. Kein serieller Lauf und keine verkürzte Auswahl als Vollabnahme.
 Nur Christian startet den manuellen CI-Workflow; Codex und Entrypoints tun das nie.
 
-RF-00 bis RF-07 sind durch tatsächliche Applies und Push bestätigt,
-zuletzt Bundle 064 auf `d4210e7a2ae85fc85b50aedddecd1ce24bb414d1`.
-Der Folgeauftrag umfasst RF-08 / Bundle 065: Konfigurationsabläufe und
-Exchange-Ermittlung in eigenen Application-Modulen; öffentliche API,
-Sperrreihenfolge und Sicherheitsprüfungen bleiben erhalten.
-Der eigene Apply von RF-08 ist noch nicht bestätigt.
+RF-00 bis RF-08 sind durch tatsächliche Applies und Push bestätigt,
+zuletzt Bundle 065 auf `2e6d1622ab3f67f1bfd071ee189720fc77f7346b`.
+Der Folgeauftrag umfasst RF-09 / Bundle 066: Apply-Ablauf und Result-Abschluss
+in eigenen Application-Modulen, gemeinsamer Fehlerabschluss vor Mutation.
+Fehlerpriorität, Teilergebnisse und bereits veröffentlichte Nachweise bleiben
+unverändert behandelt. Der eigene Apply von RF-09 ist noch nicht bestätigt.
 Weitere Implementierung oder eine automatische Schleife ist nicht vorweggenommen.
 Vollständige Watcher-Results samt Teilfortschritten werden
 geprüft; fehlende externe Nachweise werden konkret gemeldet. CI startet

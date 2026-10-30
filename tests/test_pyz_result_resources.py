@@ -7,7 +7,7 @@ from zipfile import ZipFile
 
 import pytest
 
-from patchharbor import api, application, result_bundle, result_resources as resources
+from patchharbor import api, application_apply as application, result_bundle, result_resources as resources
 from patchharbor import pyz_artifact, runtime_pyz as pyz
 from patchharbor.result_reader import read_result_reference
 from patchharbor.resource_policy import ResourcePolicy

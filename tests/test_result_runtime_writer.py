@@ -7,7 +7,7 @@ from zipfile import ZipFile
 import pytest
 
 from patchharbor import api
-import patchharbor.application as application
+import patchharbor.application_apply as application
 import patchharbor.result_bundle as result_bundle
 import patchharbor.result_resources as resources
 from patchharbor.result_reader import read_result_reference

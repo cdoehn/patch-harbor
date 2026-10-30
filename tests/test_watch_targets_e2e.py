@@ -10,7 +10,7 @@ import shutil
 
 import pytest
 
-from patchharbor import api, application, application_exchange
+from patchharbor import api, application_apply, application_exchange, application_results
 from patchharbor import exchange_state
 from patchharbor.errors import configuration_error, patch_package_error
 from patchharbor.locks import registry_lock, repository_lock
@@ -43,7 +43,7 @@ def forbid_bundle_work(monkeypatch):
                  "recover_exchange_artifacts", "archive_exchange_artifacts",
                  "capture_repository_context_for_id"):
         monkeypatch.setattr(application_exchange, name, forbidden)
-    monkeypatch.setattr(application, "capture_consistent_repository_snapshot", forbidden)
+    monkeypatch.setattr(application_results, "capture_consistent_repository_snapshot", forbidden)
     monkeypatch.setattr(exchange_state, "load_exchange_state", forbidden)
 
 
@@ -186,7 +186,7 @@ def test_root_replacement_between_selection_and_mutation_is_rejected(pair, tmp_p
     _, contexts, exchanges = pair
     target = api.watch_targets().exchanges[0]
     write_package(exchanges[0] / "ready.zip", contexts[0])
-    apply_package = application.apply_patch_package
+    apply_package = application_apply.apply_patch_package
 
     def replace_root():
         moved = tmp_path / "old-root"
@@ -197,7 +197,7 @@ def test_root_replacement_between_selection_and_mutation_is_rejected(pair, tmp_p
         def compete(package, **kwargs):
             replace_root()
             return apply_package(package, **kwargs)
-        monkeypatch.setattr(application, "apply_patch_package", compete)
+        monkeypatch.setattr(application_apply, "apply_patch_package", compete)
     else:
         read_identity = application_exchange.require_exchange_identity_unchanged
         def compete(identity, **kwargs):
@@ -250,7 +250,7 @@ def test_actual_attempt_progress_does_not_allow_automatic_retry(pair, exit_code)
 def test_error_text_cannot_impersonate_empty_discovery(pair, monkeypatch, factory):
     def fail(*args, **kwargs):
         raise factory("no state-bound patch package matches a registered repository")
-    monkeypatch.setattr(application, "discover_exchange_patch", fail)
+    monkeypatch.setattr(application_apply, "discover_exchange_patch", fail)
     assert api.apply_next().automatic.status is api.AutomaticApplyStatus.ERROR
 
 
@@ -331,11 +331,11 @@ def test_lock_conflict_at_replay_boundary_survives_result_error_wrapping(pair, m
     _, contexts, exchanges = pair
     target = api.watch_targets().exchanges[0]
     write_package(exchanges[0] / "ready.zip", contexts[0])
-    original = application.apply_patch_package
+    original = application_apply.apply_patch_package
     def compete(package, **kwargs):
         with exchange_state._state_lock(registration_user_paths()):
             return original(package, **kwargs)
-    monkeypatch.setattr(application, "apply_patch_package", compete)
+    monkeypatch.setattr(application_apply, "apply_patch_package", compete)
     report = api.apply_next(exchanges=(target,))
     assert not report.execution_present
     assert report.automatic == api.AutomaticApplyResult(
@@ -343,7 +343,7 @@ def test_lock_conflict_at_replay_boundary_survives_result_error_wrapping(pair, m
     )
     records = exchange_state.load_exchange_state(registration_user_paths()).records
     assert all(record.apply_status is None for record in records)
-    monkeypatch.setattr(application, "apply_patch_package", original)
+    monkeypatch.setattr(application_apply, "apply_patch_package", original)
     assert api.apply_next(exchanges=(target,)).success
 
 

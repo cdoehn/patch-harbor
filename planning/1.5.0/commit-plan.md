@@ -1,11 +1,11 @@
 # PatchHarbor 1.5.0 – Refactoring- und Commitplan
 
 **Plan-ID:** `REFACTOR-1.5.0`
-**Revision:** 10 · 30. Oktober 2026
+**Revision:** 11 · 30. Oktober 2026
 **Zielversion:** 1.5.0; die Produktversion bleibt bis RF-13 bei 1.4.0.
-**Status:** RF-00 bis RF-07 bestätigt; RF-08 als Bundle 065 vorbereitet, Apply offen.
-**Fortschritt:** 8 / 14 Planpositionen und 9 / 15 vorgesehene Commits bestätigt.
-**Aktueller Auftrag:** genau das nächste Arbeitspaket RF-08 erstellen; keine übernommene Automatik aus älteren Plänen.
+**Status:** RF-00 bis RF-08 bestätigt; RF-09 als Bundle 066 vorbereitet, Apply offen.
+**Fortschritt:** 9 / 14 Planpositionen und 10 / 15 vorgesehene Commits bestätigt.
+**Aktueller Auftrag:** genau das nächste Arbeitspaket RF-09 erstellen; keine übernommene Automatik aus älteren Plänen.
 **Gemeinsame normative Grundlage:** [Hauptspezifikation](../../spec/SPECIFICATION.md),
 [PYZ/PACK-Erweiterung](../../spec/SPECIFICATION_EXTENSION_PYZ_PACK.md) und
 [CPython-3.10/3.11-Erweiterung](../../spec/SPECIFICATION_EXTENSION_CPYTHON_310_311.md),
@@ -152,8 +152,8 @@ falls weitere Aufteilung nötig wird, wird der Plan vorher nachvollziehbar angep
 | 6 / 14 | RF-05 | CONFIRMED – Bundle 061 | `refactor(runtime): separate shared profile primitives from wheel support [RF-05]` |
 | 7 / 14 | RF-06 | CONFIRMED – Bundles 062/063 | zwei aufeinanderfolgende Commits, siehe RF-06A/B unten |
 | 8 / 14 | RF-07 | CONFIRMED – Bundle 064 | `refactor(bootstrap): generate embedded program from one source [RF-07]` |
-| 9 / 14 | RF-08 | NEXT – Bundle 065 vorbereitet | `refactor(application): isolate configuration and exchange discovery [RF-08]` |
-| 10 / 14 | RF-09 | OPEN | `refactor(application): clarify apply and result orchestration [RF-09]` |
+| 9 / 14 | RF-08 | CONFIRMED – Bundle 065 | `refactor(application): isolate configuration and exchange discovery [RF-08]` |
+| 10 / 14 | RF-09 | NEXT – Bundle 066 vorbereitet | `refactor(application): clarify apply and result orchestration [RF-09]` |
 | 11 / 14 | RF-10 | OPEN | `refactor(cli): share command plumbing and separate parser setup [RF-10]` |
 | 12 / 14 | RF-11 | OPEN | `refactor(ci): centralize acceptance matrix and proof identities [RF-11]` |
 | 13 / 14 | RF-12 | OPEN | `docs(refactor): align current guidance and record cleanup evidence [RF-12]` |
@@ -404,7 +404,7 @@ Apply-Gate, Commit und Push sind durch das Result in Abschnitt 4 bestätigt.
   Registry-/Konfigurationsfehler, mehrdeutige Kandidaten und Locks liefern gleiches
   Verhalten. Watcher-Targets und automatische Auswahl bleiben unverändert gebunden.
 
-**Vorbereitet in Bundle 065:** `application_configuration.py` übernimmt
+**Bestätigt durch Bundle 065:** `application_configuration.py` übernimmt
 Registrierungs-/Konfigurationsabläufe einschließlich des gemeinsamen geschützten
 Schreibablaufs. `application_exchange.py` besitzt Zielermittlung, Scope,
 Kandidatenauswahl, erneute Validierung, Wartung und Attempt-Receipts.
@@ -413,8 +413,8 @@ Apply-/Result- und Script-Orchestrierung bleiben bis RF-09 dort.
 Alle bisherigen Funktions-/Klassenkörper bleiben unverändert; Fehlersimulationen
 folgen ihren neuen Lookup-Orten. Kein bestehender Testfall entfällt.
 [Modulgrenzen und Nachweiszuordnung](rf08-application-discovery.md).
-Development führt nur die dokumentierte parallele Auswahl aus. Vollständiges
-Apply-Gate, Commit und Push von RF-08 sind noch offen.
+Development führte nur die dokumentierte parallele Auswahl aus. Vollständiges
+Apply-Gate, Commit und Push sind durch das Result in Abschnitt 4 bestätigt.
 
 ### RF-09 – Apply- und Result-Orchestrierung übersichtlich trennen
 
@@ -428,6 +428,17 @@ Apply-Gate, Commit und Push von RF-08 sind noch offen.
 - **Abnahme:** erfolgreiche/fehlgeschlagene/unterbrochene Applies, null/mehrere
   Commits, Dry-Run, Result-Veröffentlichungsfehler, Recovery und Wiederanlauf
   liefern weiterhin die richtigen Exitcodes, Logs und Nachweise. CIFS-Prüfreihenfolge erhalten.
+
+**Vorbereitet in Bundle 066:** `application_apply.py` hält Auflösung, Preflight,
+Mutation und Entrypoint-Ausführung zusammen. `application_results.py` übernimmt
+Result-Abschluss, manuelles Bundle und Attempt-Nachweise. Die API-Fassade und
+Script-Eingaben bleiben in `application.py`. Zwei gleiche Vor-Mutations-
+Fehlerabschlüsse teilen sich eine lokale Funktion innerhalb derselben
+Repository-/Ressourcenlebensdauer. Fehler nach Mutation oder Veröffentlichung
+werden nicht damit zusammengelegt. [Änderungs- und Nachweiszuordnung](rf09-application-apply.md).
+API/CLI, Domain-Fehler, RunReport, Publikations-/CIFS-Verträge und bestehende
+Testfälle bleiben erhalten. Development prüft nur die dokumentierte parallele
+Auswahl; vollständiges Apply-Gate, Commit und Push von RF-09 sind noch offen.
 
 ### RF-10 – CLI-Parser und wiederholte Befehlsrahmen bereinigen
 
@@ -650,7 +661,21 @@ erreichte Teilfortschritte werden im tatsächlichen Result ausgewertet.
 - Die 33 zusätzlichen Testfälle und alle bisherigen Fälle sind nachgewiesen.
   Damit sind acht Planpositionen und neun Plancommits bestätigt.
   Development hatte nur ausgewählte parallele Tests ausgeführt. Keine CI gestartet.
-  RF-08 bindet sich an dieses Result; sein eigener Apply-Erfolg steht noch aus.
+  RF-08 band sich an dieses Result; sein eigener Apply ist unten bestätigt.
+
+### Bestätigter Fortschritt: RF-08 / Bundle 065
+
+- Tatsächlicher Apply, Entrypoint- und Prozess-Exitcode 0; kein Dry-Run.
+- Commit `2e6d1622ab3f67f1bfd071ee189720fc77f7346b`, normaler Push auf `dev`;
+  sauberer Snapshot mit 389 Dateien und genau den 15 geplanten Änderungen.
+- Result `patchharbor-apply_Result_070601_1030_b0b624.zip`, SHA-256
+  `1e3b70f4177be9d44f846c3bfe4509d09db84ba4c32358af234355f4add69caf`.
+- Vollständiges paralleles Apply-Gate: 3204 passed, 15 skipped, 12 Worker.
+- Report-SHA-256: `ff3b4212bb5a53f48f4d3207d9e525ae6d469f1c6a06331cb51968a1e6d90f70`.
+- Vollständige Testcollection unverändert, neun Planpositionen und zehn
+  Plancommits bestätigt. Development prüfte nur seine parallele Auswahl;
+  895 passed und ein nativer Windows-Skip inklusive Entrypoint-Prüfung.
+  Keine CI gestartet. RF-09 bindet sich an dieses Result; sein Apply ist offen.
 
 ## 5. Pflichtnachweise über die Schritte hinweg
 

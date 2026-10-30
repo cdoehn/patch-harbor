@@ -1,5 +1,21 @@
 # PatchHarbor – Spezifikations-Changelog
 
+## 2026-10-30 – RF-09 / Bundle 066: Apply- und Result-Orchestrierung
+
+- RF-08 tatsächlich angewendet und gepusht auf
+  `2e6d1622ab3f67f1bfd071ee189720fc77f7346b`; neun Planpositionen und zehn Plancommits bestätigt.
+- Apply-Zustandsübergänge und Result-Abschluss erhalten eigene fachliche
+  Application-Module. Die öffentliche API-Fassade bleibt bestehen.
+- Nur der wiederholte Fehlerabschluss vor Mutation wird lokal geteilt.
+  Lock-/Ressourcenlebensdauer, Producer-Pinning und Ausnahmeverkettung bleiben
+  erhalten; Fehler nach Teilmutation und bereits veröffentlichte Results bleiben
+  getrennte Pfade mit den bestehenden Domain-Fehlern und RunReport-Modellen.
+- Publikationsprüfung einschließlich CIFS-Reihenfolge, Paket-/Fehlerverträge,
+  Produktversion, die drei Normdateien und 1.4.0-Originalartefakte bleiben gleich.
+- Bestehende Tests bleiben erhalten, Fehlersimulationen folgen den neuen
+  Lookup-Orten. Development ausgewählt parallel; Apply vollständig parallel vor
+  dem Commit. CI startet nur Christian. RF-09-Apply, Commit und Push sind offen.
+
 ## 2026-10-30 – RF-08 / Bundle 065: Konfiguration und Exchange-Ermittlung
 
 - RF-07 tatsächlich angewendet und gepusht auf

@@ -14,7 +14,7 @@ import pytest
 
 from patchharbor import api
 import patchharbor.application as application
-from patchharbor import application_configuration, application_exchange
+from patchharbor import application_apply, application_configuration, application_exchange
 from patchharbor.cli import main
 from patchharbor.exit_status import exit_code_for_error
 from patchharbor.patch_inspection import inspect_patch
@@ -70,8 +70,10 @@ def test_package_mode_performs_no_writes_lookup_subprocess_or_apply(tmp_path, mo
         pytest.fail("static package inspection crossed a mutation or process boundary")
     for name in ("Popen", "run"):
         monkeypatch.setattr(subprocess, name, forbidden)
-    for name in ("run_apply_path", "prepare_patch_package", "RunSession"):
+    for name in ("run_apply_path",):
         monkeypatch.setattr(application, name, forbidden)
+    for name in ("prepare_patch_package", "RunSession"):
+        monkeypatch.setattr(application_apply, name, forbidden)
     for workflow in (application_configuration, application_exchange):
         monkeypatch.setattr(workflow, "configuration_user_paths", forbidden)
     import patchharbor.interpreters as interpreters

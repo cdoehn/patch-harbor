@@ -12,7 +12,7 @@ import zipfile
 
 import pytest
 
-import patchharbor.application as application_module
+import patchharbor.application_apply as application_module
 import patchharbor.apply_mutation as apply_mutation_module
 import patchharbor.apply_preflight as apply_preflight_module
 import patchharbor.payload_files as payload_files_module
