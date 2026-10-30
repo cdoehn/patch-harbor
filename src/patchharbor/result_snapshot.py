@@ -6,7 +6,7 @@ from pathlib import Path
 from patchharbor.errors import FailureReason, PatchHarborError
 from patchharbor.bundle_paths import BundlePathError
 from patchharbor.json_document import parse_json_document
-from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY, ResourcePolicy, ResultSnapshotLimitError
+from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY, MAX_RESULT_FILES, ResourcePolicy, ResultSnapshotLimitError
 from patchharbor.result_reader import capture_result_payloads
 from patchharbor.snapshot_budget import SnapshotBudget
 from patchharbor.snapshot_delta import apply_patch, file_value, layer
@@ -62,6 +62,8 @@ def read_result_snapshot(path: Path, *, expected_sha256: str | None = None,
         raise ResultSnapshotError(SnapshotErrorCode.INVALID_PATCH, 'invalid reconstruction syntax') from exc
     if untracked.files.keys() & (index.files.keys() | worktree.files.keys()):
         raise ResultSnapshotError(SnapshotErrorCode.PATH_COLLISION, 'untracked file collides with a tracked path')
+    if len(worktree.files) + len(untracked.files) > MAX_RESULT_FILES:
+        raise ResultSnapshotError(SnapshotErrorCode.RESOURCE_LIMIT, 'too many effective snapshot files')
     effective = layer('effective', {**worktree.files, **untracked.files})
     runtime = facts.runtime
     if runtime is None:

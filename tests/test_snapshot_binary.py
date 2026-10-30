@@ -23,7 +23,7 @@ def encoded_block(kind,raw,*,declared=None,trailing=b''):
 
 
 @pytest.mark.parametrize('program',[
-    b'',b'\x80',b'\x80'*12,b'\x04\x01\x01x', # missing/overflow/wrong source
+    b'',b'\x80',b'\x83\x00\x01\x01x',b'\x80'*12,b'\x04\x01\x01x', # missing/overflow/wrong source
     b'\x03\x01\x00',b'\x03\x01\x01',b'\x03\x01\x02xy', # invalid/truncated/overrun insert
     b'\x03\x01\x91',b'\x03\x01\x91\x03\x01', # truncated/outside-source copy
     b'\x03\x01\x90\x02',b'\x03\x02\x01x', # target over/underflow

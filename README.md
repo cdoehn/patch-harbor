@@ -1,4 +1,4 @@
-# PatchHarbor 1.5.0
+# PatchHarbor 1.6.0
 
 **A bridge between AI coding assistants and local Git repositories.**
 
@@ -19,19 +19,20 @@ It bridges these separate environments using verified ZIP packages, allowing AI 
 - `bundle` captures the repository state for AI-assisted development.
 - `pack` creates verified patch packages from selected files and a Result reference.
 - `apply` validates and executes explicitly prepared patches.
+- `api.read_result_snapshot` returns complete verified file layers without Git or writes.
+- `api.apply_guarded` requires explicit package/target binding and trusted host approval before payloads.
 - `inspect` and `validate` examine packages without executing their code.
 - An optional watcher automatically applies incoming patches after filesystem activity in the Exchange directory has settled for five seconds.
 - Result Bundles normally include an installation-free **Core-PYZ (without the watcher)**, allowing compatible AI Linux environments to work with PatchHarbor without installing it separately.
 - CLI and Python integrations share the same public API.
 
-This source uses version **1.5.0**. It completes the planned refactoring of
-legacy runtime paths, test dependencies, bootstrap generation, Core orchestration,
-CLI boundaries and acceptance evidence. The [measured cleanup](planning/1.5.0/rf12-documentation-cleanup.md)
-records both reductions and the cost of splitting modules.
-The [historical refactoring plan](planning/1.5.0/commit-plan.md) and
-[release acceptance record](planning/1.5.0/release-acceptance.md) distinguish
-source preparation, actual Apply and external acceptance. A version string does
-not establish a published release, a tag or an upgraded local installation.
+This source uses version **1.6.0**. It adds verified, read-only Result snapshots
+and an explicit host admission boundary for Apply. Both are public Python APIs
+in the normal distribution and the Core-PYZ. See the
+[integration contracts and example](docs/python-api.md#verified-result-snapshots-integration-contract-1).
+A version string does not establish a published release, a tag or an upgraded
+local installation. The [1.5.0 refactoring record](planning/1.5.0/commit-plan.md)
+and its [external acceptance](planning/1.5.0/release-acceptance.md) are preserved.
 
 **This source requires CPython 3.10 or newer.** The public API, Core-PYZ, CLI
 and installed watcher retain the 3.10/3.11 contract and the existing 3.12/3.14
@@ -39,7 +40,7 @@ acceptance lanes. Exact interpreter, native CI and release evidence remain in
 the [CPython plan](planning/python-compatibility/commit-plan.md) and active plan;
 a historical successful run does not certify a later checkout.
 
-## Active development: public integration contracts (target 1.6.0)
+## Integration delivery and acceptance (1.6.0)
 
 The [integration plan](planning/specroad-integration/commit-plan.md) adds a
 read-only public Result snapshot API and a guarded host Apply boundary.
@@ -47,28 +48,28 @@ Its [requirement matrix](planning/specroad-integration/test-matrix.md) separates
 specified contracts, local tests, actual Apply and external acceptance.
 The 1.5.0 implementation is confirmed at
 `312e8a3c003c0f9421587b92941ecea7917b5d3f`; its external release acceptance remains
-open. The snapshot API is implemented; the stage records distinguish local checks
-from pending Apply/native acceptance. Guarded host admission is implemented with its own selected checks; actual
-Apply and external acceptance remain pending.
+open. The four prepared stages include both APIs and an isolated built-artifact
+transport proof. Actual Apply, native CI and SpecRoad integration remain separate
+acceptance items; see the [delivery record](planning/specroad-integration/delivery.md).
 
 ## Requirements and installation
 
 This development source requires Python **3.10 or newer**. Repository operations also require Git;
 executing a patch requires its declared Bash or PowerShell interpreter.
-Static `pack`, `inspect` and reference-based `validate` need neither Git nor
-the target shell. The Core has no third-party runtime dependencies.
+Static `pack`, `inspect`, reference-based `validate` and the public snapshot
+reader need neither Git nor the target shell. The Core has no third-party runtime dependencies.
 
 For the normal CLI **and watcher**, install a reviewed wheel or source checkout.
 For example, with an existing Python 3.10+ and pipx:
 
 ```bash
-pipx install --python python3 /absolute/path/patchharbor-1.5.0-py3-none-any.whl
+pipx install --python python3 /absolute/path/patchharbor-1.6.0-py3-none-any.whl
 patchharbor --version
 patchharbor --help
 ```
 
 The wheel path is an artifact you obtain and verify; this command does not assume
-that version 1.5.0 has been published on a package index. **pipx is optional**:
+that version 1.6.0 has been published on a package index. **pipx is optional**:
 a dedicated virtual environment is another installation route. Wheel and sdist
 remain supported for normal installations; the PYZ replaces the runtime embedded
 in new Results, not the installed watcher. See
@@ -300,7 +301,7 @@ does not replace repository-bound Apply.
 
 ## Documentation and development
 
-- [Active 1.5.0 refactoring plan](planning/1.5.0/commit-plan.md) and
+- [Historical 1.5.0 refactoring plan](planning/1.5.0/commit-plan.md) and
   [cleanup evidence](planning/1.5.0/rf12-documentation-cleanup.md): confirmed
   progress, remaining acceptance and reproducible source measurements.
   [Release acceptance](planning/1.5.0/release-acceptance.md) is tracked separately from source version 1.5.0.
@@ -325,3 +326,8 @@ GitHub CI is manual and started only by the project owner. Local tests
 do not substitute for native Windows acceptance or release publication.
 For available options, use `patchharbor --help`, `patchharbor COMMAND --help`
 and `patchharbor-watcher --help`.
+
+Current [1.6.0 integration plan](planning/specroad-integration/commit-plan.md),
+[behavior matrix](planning/specroad-integration/test-matrix.md) and
+[delivery record](planning/specroad-integration/delivery.md) separate prepared
+source, actual Apply and external acceptance.

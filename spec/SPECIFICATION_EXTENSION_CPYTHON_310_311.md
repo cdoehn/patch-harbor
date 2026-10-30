@@ -1,10 +1,10 @@
 # PatchHarbor – CPython 3.10 und 3.11
 
 **Dokument-ID:** `CPYTHON-310-311`
-**Revision:** 4
+**Revision:** 5
 **Stand:** 30. Oktober 2026
 **Status:** Fortgeltender CPython-Vertrag; RF-01 begrenzt die Artefakt-Kompatibilität auf die Basis ab 1.4.0. Implementierungs- und offene Abnahmenachweise bleiben im CPython-Plan erhalten.
-**Produktversion:** 1.5.0; Kompatibilitätsbasis ab 1.4.0. CPython-Untergrenze unverändert 3.10.
+**Produktversion:** 1.6.0; Kompatibilitätsbasis ab 1.4.0. CPython-Untergrenze unverändert 3.10.
 **Historischer Umsetzungsplan:** [CP-00 bis CP-05](../planning/python-compatibility/commit-plan.md)
 **Aktiver Folgeplan:** [SRI-1.6.0](../planning/specroad-integration/commit-plan.md);
 der historische 1.5.0-Plan und seine externe Releaseabnahme bleiben erhalten.

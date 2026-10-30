@@ -3,9 +3,9 @@
 **Dateiname:** `SPECIFICATION.md`<br>
 **Historischer Basisvertrag – Versionsangabe nur für dessen ursprünglichen Stand:**<br>
 **Produktversion:** `1.2.1`<br>
-**Aktuelle Produktversion:** `1.5.0`; Kompatibilitätsbasis ab `1.4.0`, gemeinsam mit beiden Ergänzungen.<br>
-**Spezifikationsstand:** 2026-10-30 · RF-13: Produktversion 1.5.0; Abschlussnachweise im aktiven Plan<br>
-**Status:** Verbindlicher Bestands- und Zielvertrag mit den unten erklärten Ergänzungen. RF-01 korrigierte die Vertragsgrundlage; tatsächlicher Implementierungsfortschritt und Nachweise stehen im Refactoring-Plan.<br>
+**Aktuelle Produktversion:** `1.6.0`; Kompatibilitätsbasis ab `1.4.0`, gemeinsam mit beiden Ergänzungen.<br>
+**Spezifikationsstand:** 2026-10-30 · SRI-04: Integrationsverträge 1.6.0; tatsächliche Abschlussnachweise im Folgeplan<br>
+**Status:** Verbindlicher Bestands- und Zielvertrag mit den unten erklärten Ergänzungen. RF-01 korrigierte die Vertragsgrundlage; aktueller Integrationsfortschritt steht im SRI-Plan; historische Nachweise bleiben erhalten.<br>
 **RIV-Status:** 18/18 Umsetzungsschritte samt Abschlusskorrektur durch Bundle 015 und CI-Run 37306630290 auf `a02391dc045d42e317b3e766f0b1e9fa8dfadec1` bestätigt; Plan abgeschlossen.<br>
 **Watcher-Ereignisse:** Ereignisgesteuerter Watcher Bestandteil der bestätigten Basis; historische WE-Zwischenstände aktivieren keinen neuen Watcher-Plan.<br>
 **Projektname:** `PatchHarbor`<br>
@@ -32,7 +32,7 @@ Der PYZ/PACK-Plan ist mit 16/16 Positionen, Korrektur 046 und der manuellen CI
 auf `30e5de1d67a2d725ff192a0b97e50c2b0336bfcb` abgeschlossen. Er sowie die
 Versions-, RIV-, Watcher- und CPython-Pläne bleiben historische Grundlagen und
 Nachweise; offene Abnahmen werden nicht durch den neuen Plan geschlossen.
-RF-13 setzt Produkt und Runtime auf 1.5.0; die Releaseabnahme folgt den tatsächlichen Nachweisen im aktiven Plan. Änderungen stehen im
+RF-13 bestätigte den 1.5.0-Quellstand; dessen externe Releaseabnahme bleibt im historischen Plan offen. Der Folgeauftrag zielt auf 1.6.0. Änderungen stehen im
 [`SPECIFICATION_CHANGELOG.md`](SPECIFICATION_CHANGELOG.md).
 
 ---

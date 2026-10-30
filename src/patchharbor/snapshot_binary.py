@@ -25,6 +25,8 @@ def _integer(data: bytes, offset: int) -> tuple[int, int]:
         offset += 1
         value |= (byte & 127) << shift
         if not byte & 128:
+            if shift and not byte:
+                raise invalid("noncanonical binary delta integer")
             if value >= 1 << 64:
                 break
             return value, offset

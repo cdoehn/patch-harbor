@@ -644,3 +644,28 @@ Exchange package replaced during admission can additionally be refused by the
 existing replay identity check. No unbound reselection occurs. Locks coordinate
 PatchHarbor operations, not arbitrary external writers. A failed attempt must
 be evaluated from its complete RunReport/Result before any deliberate retry.
+
+## Public-only transport example and delivery
+
+[Executable example](examples/snapshot_transport.py) uses only `patchharbor.api`
+and Python's standard library. It reads one fully verified snapshot, writes an
+ordinary nested project ZIP from `.effective.files`, and packs it with a caller-
+supplied trusted entrypoint. This is necessary because Patch payload paths keep
+their narrower portable namespace; arbitrary repository names stay inside the
+opaque project ZIP. The example never rescans the live original repository.
+
+Use a fresh workspace and an unwatched output directory. `pack_patch` is a
+separate operation and captures its Result independently; the example requires
+its `reference_sha256` to equal the snapshot SHA before returning a deliverable.
+A changed reference is an error, with the staged package retained for diagnosis.
+Do not publish that package. Host closure/layout/entrypoint/proposal checks and
+human consent belong in the trusted admission callback, not this example.
+
+For a new runtime, verify its delivered full SHA and provenance before importing
+it. Then check `integration_capabilities` on the loaded API. Runtime-2's closed
+bootstrap/pack capabilities remain unchanged for old readers. Snapshot readiness
+for SpecRoad15.m.R is distinct from guarded-host readiness and from SpecRoad's
+independent end-to-end acceptance. Exact local artifact hashes/source binding
+and unconfirmed platform checks are recorded in the integration delivery report.
+The `timeout` argument limits entrypoint execution, not arbitrary trusted Python
+callback work; callbacks should perform bounded local policy checks.

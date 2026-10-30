@@ -36,8 +36,8 @@ These are confirmed gaps, not replacements for the existing reader or core.
 | --- | --- | --- |
 | SRI-01 `docs(spec): define public snapshot and guarded apply contracts` | Targeted norm updates, this plan, behavior matrix; no product claims | Prepared; selected parallel gate passed; Apply pending |
 | SRI-02 `feat(api): expose verified result snapshots` | Reuse one capture; immutable public layers, strict text/binary reconstruction, budgets/errors/capability; real fixtures and independent oracle | Locally checked: 471 selected tests; Apply pending |
-| SRI-03 `feat(api): bind host admission to the applied package and target` | Explicit SHA/target, full immutable admission inside existing lock/core, failures and exchange/replay regressions | Implemented; final selected gate and Apply pending |
-| SRI-04 `test(integration): verify and document the delivered transport contracts` | Built 1.6.0 PYZ public-only roundtrip, frozen1.4, version/docs/example and delivery record | Specified |
+| SRI-03 `feat(api): bind host admission to the applied package and target` | Explicit SHA/target, full immutable admission inside existing lock/core, failures and exchange/replay regressions | Locally checked; full selected report outside source; Apply pending |
+| SRI-04 `test(integration): verify and document the delivered transport contracts` | Built 1.6.0 PYZ public-only roundtrip, frozen1.4, version/docs/example and delivery record | Implemented; final selected gate/build and Apply pending |
 
 Target is one bundle with four sequential states, no extra artificial W/R/C
 stages. Only a demonstrated blocker justifies splitting into two coherent parts.
@@ -93,3 +93,17 @@ test preserves exit130 and the ordinary execution/Result facts. The independent
 Exchange identity recheck still refuses a package swapped during admission;
 explicit external files use their captured approved bytes. No fallback bypass
 was added. Both facts are covered by real Apply tests.
+
+## SRI-04 delivery state
+
+Source version1.6.0 adds a public-only executable transport example and a fresh
+`-I -S -B` process proof against both the real built wheel resources and Core-PYZ.
+The process has no Git/shell PATH, rejects process/network use and checkout reads,
+checks every independently expected layer and verifies snapshot-derived package
+contents through public pack/inspect/validate. Frozen1.4 inputs are byte-pinned.
+
+The final source inventory and each selected Development report are bound in
+Bundle071's external delivery record. Each of the four genuine states receives
+its own full parallel Apply gate and commit later. No actual SRI commit or native
+CI result is claimed by these prepared source documents. Full review details and
+remaining acceptance are in [delivery.md](delivery.md).

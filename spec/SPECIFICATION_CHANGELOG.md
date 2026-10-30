@@ -1627,3 +1627,11 @@ Formatvalidator oder Apply-Core. §42.4 unterscheidet vor Ausführung abgebroche
 Callbacks (verweigerte Aufnahme) vom bestehenden INTERRUPTED-Ausführungsstatus.
 Das erhält das Result-3-Schema und vermeidet erfundene Entrypointstarts.
 Tatsächlicher Apply, finale Runtime-Lieferung und native Abnahme bleiben getrennt.
+
+## 2026-10-30 – SRI-04, vorbereitete Produktversion1.6.0
+
+Quellversion, öffentliche API-Dokumentation, ausführbares Transportbeispiel und
+Built-Artefakt-Nachweise ergänzt. Keine Änderung an Patch1/Result3/Runtime2/
+Rezept1, bestehenden Abnahmen, Dienstinstallation oder CI-Auslösung. Der
+Liefernachweis trennt lokale Vorbereitung, tatsächlichen Apply und externe
+Integration/Releasefreigabe.

@@ -1,6 +1,8 @@
 # SRI behavior and evidence matrix
 
-All rows are **specified, not yet confirmed** at SRI-01. Tests assert behavior,
+The following rows are implemented and covered by selected local tests as of
+SRI-04; actual Apply, final built-artifact evidence and external acceptance are
+recorded separately in the delivery record. Tests assert behavior,
 security and structured values, not documentation wording or console styling.
 
 | Requirement | Independent check | Planned evidence |
@@ -19,3 +21,20 @@ tree. Apply supplies a separate full parallel report before each commit. The
 new tests do not replace or loosen existing assertions. Source/fixture review
 separates the new reconstructed snapshot from unchanged declared repo/commit/
 dirty-fingerprint identity and from unauthenticated runtime provenance.
+
+Final concrete selected-test mapping:
+
+- SRI-SNAPSHOT/DELTA/TRUST: `test_result_snapshot.py`,
+  `test_snapshot_security.py`, `test_snapshot_binary.py`, existing reader,
+  reference, producer, archive and compatibility tests. Real cases are produced
+  by `tests/snapshot_support.py`; Git is used only by that host-side oracle.
+- SRI-ADMISSION: `test_guarded_apply.py` plus existing Apply, mutation, API,
+  Exchange/recovery and watcher-worker tests. Covers actual child interruption
+  and publication failure separately from pre-execution callback cancellation.
+- SRI-RUNTIME: `test_snapshot_transport.py` exercises the actual public-only
+  example from trusted build artifacts; existing packaging and frozen1.4 tests
+  remain. No old assertion is disabled and no CI job is started.
+
+These new marked e2e/packaging tests are automatically collected by the existing
+manual full-suite Linux/Windows/CPython lanes. The CI workflow's triggers, lanes
+and previous mandatory proofs are unchanged. Native results are still required.

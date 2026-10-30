@@ -150,3 +150,19 @@ def test_frozen_140_snapshots_preserve_status_and_actual_file_layers(case,monkey
         assert s.primary_result.entrypoint_exit_code==7
     else:
         assert s.base.files==s.index.files==s.worktree.files==s.effective.files
+
+
+def test_count_ceiling_allows_add_before_delete_in_same_git_layer(tmp_path,monkeypatch):
+    from patchharbor import snapshot_delta
+    from tests.registration_support import create_repository,set_isolated_user_environment
+    set_isolated_user_environment(monkeypatch,tmp_path/'user')
+    repo=create_repository(tmp_path/'repo')
+    (repo/'z').write_bytes(b'old\n');git(repo,'add','z');git(repo,'commit','--quiet','-m','two files')
+    api.register(repo);api.configure_exchange_directory(tmp_path/'exchange',repository=repo)
+    (repo/'a').write_bytes(b'new\n');(repo/'z').unlink();git(repo,'add','--all')
+    result=api.bundle(repo)
+    monkeypatch.setattr(snapshot_delta,'MAX_RESULT_FILES',2)
+    snapshot=api.read_result_snapshot(result.path)
+    assert set(snapshot.base.files)=={'tracked.txt','z'}
+    assert set(snapshot.effective.files)=={'tracked.txt','a'}
+    assert snapshot.effective.files['a'].content==b'new\n'

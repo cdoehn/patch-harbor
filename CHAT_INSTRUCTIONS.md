@@ -1,6 +1,6 @@
-# PatchHarbor 1.5.0 – Chat-Initialisierung
+# PatchHarbor 1.6.0 – Chat-Initialisierung
 
-**Vertragsversion:** 1.5.0<br>
+**Vertragsversion:** 1.6.0<br>
 **Patch-Paketmarker:** `patch-harbor`<br>
 **Patch-Paketformat:** `1`<br>
 **Result-Bundle-Marker:** `patch-harbor-result-bundle`<br>
@@ -1035,22 +1035,24 @@ Spezifikationssatz wird vollständig gelesen; seine Bestandteile sind keine
 konkurrierenden Alternativen. Echte unaufgelöste Konkurrenz bleibt ein STOP.
 
 Für die Entwicklung von **PatchHarbor selbst** gilt seit dem ausdrücklichen
-Nutzerauftrag vom 29. Oktober 2026 der Refactoring-Plan für 1.5.0:
+Folgeauftrag für Version 1.6.0 der Integrationsplan für öffentliche Snapshots
+und gebundene Hostfreigabe:
 
 ```text
-Plan: planning/1.5.0/commit-plan.md
+Plan: planning/specroad-integration/commit-plan.md
 Normsatz: spec/SPECIFICATION.md
-          spec/SPECIFICATION_EXTENSION_PYZ_PACK.md (Revision 7)
-          spec/SPECIFICATION_EXTENSION_CPYTHON_310_311.md (Revision 4)
+          spec/SPECIFICATION_EXTENSION_PYZ_PACK.md (Revision 8)
+          spec/SPECIFICATION_EXTENSION_CPYTHON_310_311.md (Revision 5)
 ```
 
-Die drei Normdateien bleiben getrennt. Nur konkrete grobe Fehler und aktuelle
-Widersprüche werden gezielt korrigiert, insbesondere die bisherige Pflicht zur
-Unterstützung von Artefakten vor 1.4.0. Gültige 1.4.0-Artefakte bleiben die Basis
+Die drei Normdateien bleiben getrennt. Der neue Auftrag ergänzt gezielt die
+öffentlichen Integrationsverträge; er ist kein Teil des abgeschlossenen
+Refactoring-Umfangs. Dessen Bereinigung der Altformatpflichten bleibt erhalten. Gültige 1.4.0-Artefakte bleiben die Basis
 zukünftiger Abwärtskompatibilität; Patchformat 1 bleibt erhalten. RF-06 hat
 Result-1/2-Leser und Runtime-Wheel-Pfade entfernt. RF-07 erzeugt den ausführbaren
 Bootstrapblock aus genau einer gepflegten Quelle; nicht manuell im Block ändern.
-Fortschritt und offene Abnahmen stehen im aktuellen Plan. RF-13 setzt die Produktversion auf 1.5.0; die Kompatibilitätsbasis bleibt 1.4.0. Die aktuellen
+Fortschritt und offene Abnahmen stehen im Integrationsplan. Die neue
+Quellversion ist 1.6.0; die Kompatibilitätsbasis bleibt 1.4.0. Die aktuellen
 Testregeln und tatsächlichen Apply-Nachweise stehen weiter unten.
 
 Der frühere PYZ/PACK-Plan ist mit 16/16 Positionen, Korrektur 046 und grüner
@@ -1067,7 +1069,7 @@ Korrekturbundles 052 bis 054 sind tatsächlich angewendet. Alle zwölf Jobs der
 manuellen CI 38596693717 auf `f2e64c241f4e20a1b7e2c4c83faa45ba557f6d0b`
 sind grün; zwölf Artefakte mit 39 vollständigen parallelen Testreports sind geprüft.
 CP-05-VERSION / Bundle 055 stellte die Produktversion auf 1.4.0 um.
-Der damalige einmalige Auftrag zum Tag `v1.4.0` ist kein Tagging-Auftrag für 1.5.0.
+Der damalige einmalige Auftrag zum Tag `v1.4.0` ist kein Tagging-Auftrag für 1.5.0 oder 1.6.0.
 Vorhandene Tags werden weder ersetzt noch verschoben; kein automatisches Tagging.
 Die native CI gehört zum genannten Implementierungscommit vor der Versionsänderung;
 Abnahme des neuen Endstands und erforderliche neue CIFS-Praxis bleiben im Plan offen.
@@ -1094,23 +1096,14 @@ parallele Testauswahl. Apply prüft jeden Commitstand vollständig parallel, auc
 Bundle-Ende. Keine Vollsuite im Development. Kein serieller Lauf und keine verkürzte Auswahl als Vollabnahme.
 Nur Christian startet den manuellen CI-Workflow; Codex und Entrypoints tun das nie.
 
-RF-00 bis RF-12 sind durch tatsächliche Applies und Push bestätigt,
-zuletzt Bundle 069 auf `b555a3614f962a19b94244918486fc87021a829d`
-mit 3281 bestandenen Tests und 15 Skips in der vollständigen parallelen Apply-Suite.
-Der Folgeauftrag umfasst RF-13 / Bundle 070: Produktversion 1.5.0,
-konsistente Versionshinweise und geprüfte Wheel-/sdist-/Core-PYZ-Kandidaten.
-Offene Abschlussnachweise stehen in `planning/1.5.0/release-acceptance.md`.
-Development prüft die dokumentierte Auswahl parallel; Apply prüft vor dem
-Commit vollständig parallel. CI startet ausschließlich Christian.
-Der eigene Apply von RF-13 ist noch nicht bestätigt. Auch nach seinem Erfolg
-bleibt die vollständige Planabnahme bis zur passenden manuellen CI und den
-weiteren vorgeschriebenen Nachweisen offen. Kein neues Bundle allein zur
-Behauptung des Abschlusses; lesender Abschlussreview nach dem aktiven Plan.
-Weitere Implementierung oder eine automatische Schleife ist nicht vorweggenommen.
-Vollständige Watcher-Results samt Teilfortschritten werden
-geprüft; fehlende externe Nachweise werden konkret gemeldet. CI startet
-ausschließlich Christian. Sicherheitsgrenzen und belastbare Resultbindung
-bleiben Voraussetzung; Tokenmeter bleibt gestoppt.
+RF-00 bis RF-13 sind durch tatsächliche Applies bestätigt, zuletzt Bundle 070
+auf `312e8a3c003c0f9421587b92941ecea7917b5d3f` mit 3281 bestandenen Tests
+und 15 Skips in der vollständigen parallelen Apply-Suite. Die 1.5.0-Releaseabnahme
+bleibt separat offen (`planning/1.5.0/release-acceptance.md`).
+Der neue Auftrag umfasst SRI-01 bis SRI-04 / Bundle 071 für 1.6.0; deren
+tatsächliche Commits sind erst durch ein neues Result bestätigt. Kein neuer
+Automatikloop, Watcher-Neustart oder Eingriff in SpecRoad. Tokenmeter bleibt
+gestoppt; Sicherheitsgrenzen und belastbare Resultbindung bleiben Voraussetzung.
 
 Development bleibt ausschließlich in `patchharbor-codex`. Nur die fertig und
 vollständig geprüfte kanonische Patch-ZIP gelangt atomar in den Exchange.
@@ -1122,8 +1115,8 @@ Die frühere 1.3.0-Abnahme einschließlich Christians CIFS-Praxisbestätigung
 belegt nicht automatisch den neuen CPython-Auftrag. Dessen Abnahme benötigt
 echte 3.10-/3.11-Interpreter, passende Artefakte, tatsächliche Applies und die
 von Christian gestartete erweiterte native CI. Die Anforderungen und offenen
-Nachweise stehen im bisherigen CPython-Plan. Die 1.5.0-Abnahme ist im neuen
-Refactoring-Plan beschrieben. Eine ältere globale Installation wird durch
+Nachweise stehen im bisherigen CPython-Plan. Die 1.5.0-Abnahme bleibt im historischen
+Refactoring-Plan; aktuelle Integrationsnachweise stehen im SRI-Plan. Eine ältere globale Installation wird durch
 diesen Quellpatch nicht aktualisiert.
 
 Bestimme die aktive Zielversion aus dem Repository. Eine laut Plan erst zum

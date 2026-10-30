@@ -265,3 +265,11 @@ raise SystemExit(report.process_exit_code)
     snapshot=api.read_result_snapshot(report['result_bundle']['path'])
     assert snapshot.primary_result.interrupted and snapshot.primary_result.entrypoint_started
     assert (repo/'stage/item').read_bytes()==b'approved payload'
+
+
+def test_observer_acceptance_cannot_override_callback_denial(host):
+    repo,_=host;path,digest,_=package(host)
+    report=api.apply_guarded(path,expected_sha256=digest,expected_repository=repo,
+        admission=lambda _:False,observer=lambda _:True)
+    no_execution(repo,report)
+    assert report.primary_tool_error.kind is api.ErrorKind.ADMISSION_REJECTED

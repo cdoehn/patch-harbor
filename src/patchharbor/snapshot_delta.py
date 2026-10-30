@@ -281,12 +281,16 @@ def apply_patch(previous: SnapshotLayer, patch: bytes, name: str,
             raise invalid('change references a missing base file')
         if identity is not None and new_mode is not None and str(blob_id(raw, algorithm)) != after:
             raise invalid('new blob identity mismatch')
+        if original is not None and new_mode == old_mode and raw == old_bytes:
+            raise invalid("no-op file diff")
         if new_mode is None:
             if raw or original is None:
                 raise invalid('deleted file has remaining content')
             del files[path]
         else:
             files[path] = file_value(path, new_mode, raw, algorithm)
-        if len(files) > MAX_RESULT_FILES:
+        # Adds may sort before deletes. Bound the temporary union while allowing
+        # a valid final layer at its file-count ceiling. layer() checks the result.
+        if len(files) > MAX_RESULT_FILES + len(previous.files):
             raise ResultSnapshotError(SnapshotErrorCode.RESOURCE_LIMIT, 'too many reconstructed files')
     return layer(name, files)
