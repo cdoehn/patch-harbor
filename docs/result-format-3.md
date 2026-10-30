@@ -7,8 +7,9 @@ without building or installing anything while handling a request. The productive
 writer uses one runtime shape. For 1.5.0 the supported compatibility baseline
 is unchanged valid **1.4.0 artifacts onward**. Result 1/2 and old embedded wheels
 are no longer supported by this checkout. RF-06 implemented this boundary;
-the source version remains 1.4.0 until RF-13 and does not identify the exact
-implementation. Use the full commit and artifact hashes for that distinction.
+RF-13 sets the source version to 1.5.0. A version alone does not identify the
+exact implementation or prove release acceptance; retain the full commit and
+artifact hashes. The supported format and original 1.4.0 bytes are unchanged.
 
 The normative contract is the joint main specification and
 [PYZ/PACK extension](../spec/SPECIFICATION_EXTENSION_PYZ_PACK.md), especially

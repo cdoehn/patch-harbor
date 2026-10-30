@@ -18,7 +18,7 @@ With an existing pipx and Python 3.10+ on POSIX:
 
 ```bash
 python3 --version
-pipx install --python python3 /absolute/path/patchharbor-1.4.0-py3-none-any.whl
+pipx install --python python3 /absolute/path/patchharbor-1.5.0-py3-none-any.whl
 patchharbor --version
 patchharbor-watcher --help
 ```
@@ -74,7 +74,7 @@ Do not use `python -m patchharbor`: the installed module entrypoint is
    new wheel. For pipx, a newer local wheel can replace the managed package:
 
    ```bash
-   pipx install --force /absolute/path/patchharbor-1.4.0-py3-none-any.whl
+   pipx install --force /absolute/path/patchharbor-1.5.0-py3-none-any.whl
    patchharbor --version
    ```
 

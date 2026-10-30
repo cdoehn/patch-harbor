@@ -1,12 +1,12 @@
 # PatchHarbor – Spezifikationserweiterung: Result-PYZ und `pack`
 
 **Dokument-ID:** `PYZ-PACK`  
-**Revision:** 6
+**Revision:** 7
 **Stand:** 30. Oktober 2026
 **Vorgesehener Ablageort:** `spec/SPECIFICATION_EXTENSION_PYZ_PACK.md`  
 **Basisdokument:** danebenliegende [`SPECIFICATION.md`](SPECIFICATION.md), gebundener Bestandsvertrag 1.2.1 einschließlich RIV und der bereits enthaltenen Result-/CIFS-Publikationsregeln  
-**Status:** Fortgeltender PYZ/PACK-Vertrag; Revision 6 gleicht die aktuelle Testzuständigkeit und den Implementierungsstand ab. Historische Ausführungsnachweise bleiben in ihren bisherigen Plänen.
-**Produktbasis:** 1.4.0; Refactoring-Ziel 1.5.0. Tatsächlicher Fortschritt und Releaseabnahme stehen im aktiven 1.5.0-Plan.
+**Status:** Fortgeltender PYZ/PACK-Vertrag; Revision 7 ordnet Produktversion 1.5.0 bei unveränderter Kompatibilitätsbasis ein. Historische Ausführungsnachweise bleiben in ihren bisherigen Plänen.
+**Produktversion:** 1.5.0; Kompatibilitätsbasis ab 1.4.0. Tatsächlicher Fortschritt und Releaseabnahme stehen im aktiven 1.5.0-Plan.
 
 > **Ziel:** Neue Result-Bundles liefern PatchHarbor als direkt mit Python aufrufbare PYZ statt als zu installierendes Runtime-Wheel. Die PYZ enthält den PatchHarbor-Core mit dessen CLI und öffentlicher Python-API, **aber keinen Watcher**. Zusätzlich erhält PatchHarbor das reguläre Unterkommando `pack` und die öffentliche Funktion `api.pack_patch(...)`, um vorbereitete Inhalte als referenzgebundenes, abschließend validiertes Patch-Paket zu erzeugen.
 
@@ -1391,6 +1391,10 @@ Die technischen Primärquellen aus Revision 1 werden für Revision 2 unveränder
 | **Q5** | Python 3.12, `zipfile`: `https://docs.python.org/3.12/library/zipfile.html` | ZIP-Struktur, Metadaten und Kompressionsmethoden als technische Grundlage. |
 
 ### 20.3 Revisionen
+
+Revision 7 (2026-10-30, RF-13): aktuelle Produktversion 1.5.0 eingeordnet;
+keine Änderung an Formaten, Sicherheitsregeln, Python- oder Kompatibilitätsvertrag.
+Releaseabnahme bleibt an die tatsächlichen Nachweise des finalen Stands gebunden.
 
 Revision 6 (2026-10-30, RF-12): widersprüchliche Testzuständigkeiten und den
 alten CI-Bundle-Zähler durch die geltenden Nutzerentscheidungen ersetzt;

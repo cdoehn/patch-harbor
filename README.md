@@ -1,4 +1,4 @@
-# PatchHarbor 1.4.0
+# PatchHarbor 1.5.0
 
 **A bridge between AI coding assistants and local Git repositories.**
 
@@ -24,12 +24,14 @@ It bridges these separate environments using verified ZIP packages, allowing AI 
 - Result Bundles normally include an installation-free **Core-PYZ (without the watcher)**, allowing compatible AI Linux environments to work with PatchHarbor without installing it separately.
 - CLI and Python integrations share the same public API.
 
-This refactoring checkout still uses version **1.4.0**; the
-[active 1.5.0 plan](planning/1.5.0/commit-plan.md) changes it only in RF-13.
-An installed version, this source state and a published release are different
-facts. RF-00 through RF-11 are confirmed by actual Apply Results; RF-12 updates
-guidance and records the [measured cleanup](planning/1.5.0/rf12-documentation-cleanup.md).
-Release acceptance remains open until the final state has its required evidence.
+This source uses version **1.5.0**. It completes the planned refactoring of
+legacy runtime paths, test dependencies, bootstrap generation, Core orchestration,
+CLI boundaries and acceptance evidence. The [measured cleanup](planning/1.5.0/rf12-documentation-cleanup.md)
+records both reductions and the cost of splitting modules.
+The [active plan](planning/1.5.0/commit-plan.md) and
+[release acceptance record](planning/1.5.0/release-acceptance.md) distinguish
+source preparation, actual Apply and external acceptance. A version string does
+not establish a published release, a tag or an upgraded local installation.
 
 **This source requires CPython 3.10 or newer.** The public API, Core-PYZ, CLI
 and installed watcher retain the 3.10/3.11 contract and the existing 3.12/3.14
@@ -48,13 +50,13 @@ For the normal CLI **and watcher**, install a reviewed wheel or source checkout.
 For example, with an existing Python 3.10+ and pipx:
 
 ```bash
-pipx install --python python3 /absolute/path/patchharbor-1.4.0-py3-none-any.whl
+pipx install --python python3 /absolute/path/patchharbor-1.5.0-py3-none-any.whl
 patchharbor --version
 patchharbor --help
 ```
 
 The wheel path is an artifact you obtain and verify; this command does not assume
-that version 1.4.0 has been published on a package index. **pipx is optional**:
+that version 1.5.0 has been published on a package index. **pipx is optional**:
 a dedicated virtual environment is another installation route. Wheel and sdist
 remain supported for normal installations; the PYZ replaces the runtime embedded
 in new Results, not the installed watcher. See
@@ -289,7 +291,7 @@ does not replace repository-bound Apply.
 - [Active 1.5.0 refactoring plan](planning/1.5.0/commit-plan.md) and
   [cleanup evidence](planning/1.5.0/rf12-documentation-cleanup.md): confirmed
   progress, remaining acceptance and reproducible source measurements.
-  The source version remains 1.4.0 until RF-13.
+  [Release acceptance](planning/1.5.0/release-acceptance.md) is tracked separately from source version 1.5.0.
 - [Installation and updates](docs/install-and-update.md)
 - [Repository configuration, archives, retries and permissions](docs/repository-workflow.md)
 - [Troubleshooting](docs/troubleshooting.md)

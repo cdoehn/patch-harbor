@@ -3,8 +3,8 @@
 **Dateiname:** `SPECIFICATION.md`<br>
 **Historischer Basisvertrag – Versionsangabe nur für dessen ursprünglichen Stand:**<br>
 **Produktversion:** `1.2.1`<br>
-**Aktuelle Produktbasis:** `1.4.0`; Refactoring-Ziel `1.5.0`, gemeinsam mit beiden Ergänzungen.<br>
-**Spezifikationsstand:** 2026-10-30 · RF-12: aktueller Stand und Testzuständigkeit<br>
+**Aktuelle Produktversion:** `1.5.0`; Kompatibilitätsbasis ab `1.4.0`, gemeinsam mit beiden Ergänzungen.<br>
+**Spezifikationsstand:** 2026-10-30 · RF-13: Produktversion 1.5.0; Abschlussnachweise im aktiven Plan<br>
 **Status:** Verbindlicher Bestands- und Zielvertrag mit den unten erklärten Ergänzungen. RF-01 korrigierte die Vertragsgrundlage; tatsächlicher Implementierungsfortschritt und Nachweise stehen im Refactoring-Plan.<br>
 **RIV-Status:** 18/18 Umsetzungsschritte samt Abschlusskorrektur durch Bundle 015 und CI-Run 37306630290 auf `a02391dc045d42e317b3e766f0b1e9fa8dfadec1` bestätigt; Plan abgeschlossen.<br>
 **Watcher-Ereignisse:** Ereignisgesteuerter Watcher Bestandteil der bestätigten Basis; historische WE-Zwischenstände aktivieren keinen neuen Watcher-Plan.<br>
@@ -29,7 +29,7 @@ Der PYZ/PACK-Plan ist mit 16/16 Positionen, Korrektur 046 und der manuellen CI
 auf `30e5de1d67a2d725ff192a0b97e50c2b0336bfcb` abgeschlossen. Er sowie die
 Versions-, RIV-, Watcher- und CPython-Pläne bleiben historische Grundlagen und
 Nachweise; offene Abnahmen werden nicht durch den neuen Plan geschlossen.
-Produkt und Runtime bleiben bis zum vorgesehenen Versionsschritt bei 1.4.0. Änderungen stehen im
+RF-13 setzt Produkt und Runtime auf 1.5.0; die Releaseabnahme folgt den tatsächlichen Nachweisen im aktiven Plan. Änderungen stehen im
 [`SPECIFICATION_CHANGELOG.md`](SPECIFICATION_CHANGELOG.md).
 
 ---
@@ -4148,8 +4148,8 @@ Christian manuell nach §33; ein Push ist kein CI-Nachweis.
 
 Die damalige Dokumentübernahme erledigte keinen der 18 RIV-Umsetzungspunkte.
 Fortschritt, tatsächliche Umsetzung und Nachweise richten sich nach dem aktiven
-1.5.0-Plan. Die Produktversion bleibt bis RF-13 bei 1.4.0; dies ist keine
-Abnahme des späteren Releasezustands. Jeder Folgepatch übernimmt seine vollständige
+1.5.0-Plan. RF-13 setzt die Produktversion auf 1.5.0; allein die Versionsänderung
+ist keine Abnahme des Releasezustands. Jeder Folgepatch übernimmt seine vollständige
 Bindung aus dem dann aktuellen maßgeblichen Result.
 
 ### 41.3 Diagnosebundles ohne Commit

@@ -1,6 +1,6 @@
-# PatchHarbor 1.4.0 – Chat-Initialisierung
+# PatchHarbor 1.5.0 – Chat-Initialisierung
 
-**Vertragsversion:** 1.4.0<br>
+**Vertragsversion:** 1.5.0<br>
 **Patch-Paketmarker:** `patch-harbor`<br>
 **Patch-Paketformat:** `1`<br>
 **Result-Bundle-Marker:** `patch-harbor-result-bundle`<br>
@@ -1040,8 +1040,8 @@ Nutzerauftrag vom 29. Oktober 2026 der Refactoring-Plan für 1.5.0:
 ```text
 Plan: planning/1.5.0/commit-plan.md
 Normsatz: spec/SPECIFICATION.md
-          spec/SPECIFICATION_EXTENSION_PYZ_PACK.md (Revision 6)
-          spec/SPECIFICATION_EXTENSION_CPYTHON_310_311.md (Revision 3)
+          spec/SPECIFICATION_EXTENSION_PYZ_PACK.md (Revision 7)
+          spec/SPECIFICATION_EXTENSION_CPYTHON_310_311.md (Revision 4)
 ```
 
 Die drei Normdateien bleiben getrennt. Nur konkrete grobe Fehler und aktuelle
@@ -1050,7 +1050,7 @@ Unterstützung von Artefakten vor 1.4.0. Gültige 1.4.0-Artefakte bleiben die Ba
 zukünftiger Abwärtskompatibilität; Patchformat 1 bleibt erhalten. RF-06 hat
 Result-1/2-Leser und Runtime-Wheel-Pfade entfernt. RF-07 erzeugt den ausführbaren
 Bootstrapblock aus genau einer gepflegten Quelle; nicht manuell im Block ändern.
-Fortschritt und offene Abnahmen stehen im aktuellen Plan. Produktversion bleibt bis RF-13 bei 1.4.0. Die aktuellen
+Fortschritt und offene Abnahmen stehen im aktuellen Plan. RF-13 setzt die Produktversion auf 1.5.0; die Kompatibilitätsbasis bleibt 1.4.0. Die aktuellen
 Testregeln und tatsächlichen Apply-Nachweise stehen weiter unten.
 
 Der frühere PYZ/PACK-Plan ist mit 16/16 Positionen, Korrektur 046 und grüner
@@ -1094,14 +1094,18 @@ parallele Testauswahl. Apply prüft jeden Commitstand vollständig parallel, auc
 Bundle-Ende. Keine Vollsuite im Development. Kein serieller Lauf und keine verkürzte Auswahl als Vollabnahme.
 Nur Christian startet den manuellen CI-Workflow; Codex und Entrypoints tun das nie.
 
-RF-00 bis RF-11 sind durch tatsächliche Applies und Push bestätigt,
-zuletzt Bundle 068 auf `7294d77fde0598dd57a6fdc3c19f6925e5520bdb`
+RF-00 bis RF-12 sind durch tatsächliche Applies und Push bestätigt,
+zuletzt Bundle 069 auf `b555a3614f962a19b94244918486fc87021a829d`
 mit 3281 bestandenen Tests und 15 Skips in der vollständigen parallelen Apply-Suite.
-Der Folgeauftrag umfasst RF-12 / Bundle 069: aktuelle Dokumentation und
-nachprüfbare Bereinigung gegenüber dem Startstand des 1.5.0-Plans.
+Der Folgeauftrag umfasst RF-13 / Bundle 070: Produktversion 1.5.0,
+konsistente Versionshinweise und geprüfte Wheel-/sdist-/Core-PYZ-Kandidaten.
+Offene Abschlussnachweise stehen in `planning/1.5.0/release-acceptance.md`.
 Development prüft die dokumentierte Auswahl parallel; Apply prüft vor dem
 Commit vollständig parallel. CI startet ausschließlich Christian.
-Der eigene Apply von RF-12 ist noch nicht bestätigt.
+Der eigene Apply von RF-13 ist noch nicht bestätigt. Auch nach seinem Erfolg
+bleibt die vollständige Planabnahme bis zur passenden manuellen CI und den
+weiteren vorgeschriebenen Nachweisen offen. Kein neues Bundle allein zur
+Behauptung des Abschlusses; lesender Abschlussreview nach dem aktiven Plan.
 Weitere Implementierung oder eine automatische Schleife ist nicht vorweggenommen.
 Vollständige Watcher-Results samt Teilfortschritten werden
 geprüft; fehlende externe Nachweise werden konkret gemeldet. CI startet

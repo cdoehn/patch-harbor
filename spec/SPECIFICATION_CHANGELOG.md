@@ -1,5 +1,22 @@
 # PatchHarbor – Spezifikations-Changelog
 
+## 2026-10-30 – RF-13 / Bundle 070: Version 1.5.0 und Abschlussabnahme
+
+- RF-12 tatsächlich angewendet und gepusht auf
+  `b555a3614f962a19b94244918486fc87021a829d`; dreizehn Planpositionen und vierzehn Plancommits bestätigt.
+- Zentrale Produktversion und unabhängiger Packaging-Prüfwert auf 1.5.0 gesetzt;
+  aktuelle Versionshinweise aktualisiert. Kompatibilitätsbasis bleibt 1.4.0;
+  historische Fixtures und ihre Originalversionen/-Hashes werden nicht geändert.
+- Wheel, sdist und Core-PYZ werden als lokale Kandidaten gebaut und mit
+  Inhalts-/Metadatenprüfungen dokumentiert. Die versionierten Paket-/API-/Python-
+  und Sicherheitsverträge bleiben unverändert; die drei Normdateien bleiben getrennt.
+- Development ausgewählt parallel; Apply vollständig parallel vor dem Commit,
+  danach genau ein normaler Push. Kein automatisches Tag, Release, Hostupdate,
+  Dienstneustart oder CI-Start.
+- Eigener RF-13-Apply und vollständige Planabnahme sind offen. Abschluss verlangt
+  passende manuelle CI und die übrigen Nachweise aus dem aktiven Plan;
+  `planning/1.5.0/release-acceptance.md` hält deren Anforderungen fest.
+
 ## 2026-10-30 – RF-12 / Bundle 069: aktuelle Hinweise und messbare Bereinigung
 
 - RF-11 tatsächlich angewendet und gepusht auf

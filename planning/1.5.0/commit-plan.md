@@ -1,11 +1,11 @@
 # PatchHarbor 1.5.0 – Refactoring- und Commitplan
 
 **Plan-ID:** `REFACTOR-1.5.0`
-**Revision:** 14 · 30. Oktober 2026
-**Zielversion:** 1.5.0; die Produktversion bleibt bis RF-13 bei 1.4.0.
-**Status:** RF-00 bis RF-11 bestätigt; RF-12 als Bundle 069 vorbereitet, Apply offen.
-**Fortschritt:** 12 / 14 Planpositionen und 13 / 15 vorgesehene Commits bestätigt.
-**Aktueller Auftrag:** genau das nächste Arbeitspaket RF-12 erstellen; keine übernommene Automatik aus älteren Plänen.
+**Revision:** 15 · 30. Oktober 2026
+**Zielversion:** 1.5.0; RF-13 setzt den vorbereiteten Quellstand auf 1.5.0, Releaseabnahme offen.
+**Status:** RF-00 bis RF-12 bestätigt; RF-13 als Bundle 070 vorbereitet, eigener Apply und Abschlussabnahme offen.
+**Fortschritt:** 13 / 14 Planpositionen und 14 / 15 vorgesehene Commits bestätigt.
+**Aktueller Auftrag:** genau den Versions- und Abnahmeschritt RF-13 vorbereiten; keine übernommene Automatik aus älteren Plänen.
 **Gemeinsame normative Grundlage:** [Hauptspezifikation](../../spec/SPECIFICATION.md),
 [PYZ/PACK-Erweiterung](../../spec/SPECIFICATION_EXTENSION_PYZ_PACK.md) und
 [CPython-3.10/3.11-Erweiterung](../../spec/SPECIFICATION_EXTENSION_CPYTHON_310_311.md),
@@ -156,8 +156,8 @@ falls weitere Aufteilung nötig wird, wird der Plan vorher nachvollziehbar angep
 | 10 / 14 | RF-09 | CONFIRMED – Bundle 066 | `refactor(application): clarify apply and result orchestration [RF-09]` |
 | 11 / 14 | RF-10 | CONFIRMED – Bundle 067 | `refactor(cli): share command plumbing and separate parser setup [RF-10]` |
 | 12 / 14 | RF-11 | CONFIRMED – Bundle 068 | `refactor(ci): centralize acceptance matrix and proof identities [RF-11]` |
-| 13 / 14 | RF-12 | NEXT – Bundle 069 vorbereitet | `docs(refactor): align current guidance and record cleanup evidence [RF-12]` |
-| 14 / 14 | RF-13 | OPEN | `chore(release): prepare PatchHarbor 1.5.0 acceptance [RF-13]` |
+| 13 / 14 | RF-12 | CONFIRMED – Bundle 069 | `docs(refactor): align current guidance and record cleanup evidence [RF-12]` |
+| 14 / 14 | RF-13 | NEXT – Bundle 070 vorbereitet; Abschlussnachweise offen | `chore(release): prepare PatchHarbor 1.5.0 acceptance [RF-13]` |
 
 Die 14 Positionen schließen den Startcommit ein. RF-06 wird in zwei echte
 aufeinanderfolgende Commits aufgeteilt; damit sind derzeit 15 Commits vorgesehen.
@@ -514,15 +514,15 @@ parallele Apply-Gate ist bestätigt (Nachweise unten). CI startet ausschließlic
   Tests oder generische Helfer. Keine versprochene Prozent-/Laufzeitersparnis ohne Messung;
   alte CI-/Apply-Nachweise bleiben unverändert zugänglich.
 
-**Vorbereitet in Bundle 069:** aktuelle README-, API-, Runtime- und
+**Bestätigt durch Bundle 069:** aktuelle README-, API-, Runtime- und
 Installationshinweise spiegeln den bestätigten Code wider. Die drei Normdateien
 bleiben getrennt; lediglich veraltete Implementierungsaussagen und widersprüchliche
 Test-/CI-Regeln werden korrigiert. Reproduzierbare Messung und Grenzen:
 [RF-12-Bereinigungsnachweis](rf12-documentation-cleanup.md),
 [Git-Blob-Messdaten](cleanup-evidence.json) und [lesendes Messskript](measure_cleanup.py).
 Produktcode, ausführbarer Bootstrap, Tests, CI und historische Belege bleiben
-unverändert. Development prüft ausgewählt parallel; RF-12-Apply, vollständiges
-Commit-Gate und Push sind offen.
+unverändert. RF-12-Apply, vollständiges paralleles Commit-Gate und normaler
+Push sind bestätigt (Nachweise unten); keine CI gestartet.
 
 ### RF-13 – Version 1.5.0 und Abschlussabnahme vorbereiten
 
@@ -538,6 +538,19 @@ Commit-Gate und Push sind offen.
 - **Abnahme:** Abschnitt 6 auf genau dem finalen Versionsstand erfüllen. Eine
   ältere grüne CI oder ein erfolgreicher Build ist kein Ersatz. Bei fehlenden
   externen Nachweisen bleibt der Plan offen, ohne weitere spekulative Patches.
+
+**Vorbereitet in Bundle 070:** Die zentrale Version und der unabhängige
+Packaging-Prüfwert lauten 1.5.0. Aktuelle Versionshinweise sind angeglichen;
+1.4.0-Fixtures, öffentliche Formate, Sicherheitsverträge, Bootstrapprogramm
+und manuelle CI bleiben unverändert. Wheel, sdist und Core-PYZ werden mit
+dem bestehenden Builder erzeugt, ihre Metadaten/Inventare/Hashes geprüft und
+außerhalb des Quellinventars protokolliert. Development prüft die dokumentierte
+Auswahl parallel. Apply prüft vor dem Versionscommit die volle parallele Suite
+und pusht anschließend genau einmal normal; kein Tag oder CI-Start.
+[Abnahmestand und Nachweisanforderungen](release-acceptance.md) bleiben getrennt
+von Versionsvorbereitung und dem noch ausstehenden eigenen Apply. Nach erfolgreichem
+Apply sind die geplanten Implementierungscommits abgearbeitet; bis zur externen
+Abnahme folgt kein spekulatives weiteres Bundle.
 
 ## 4. Verbindliche Test- und Übergaberegeln
 
@@ -808,3 +821,16 @@ einzelne Tag-Aufträge und frühere offene Pläne werden nicht automatisch reakt
 - Report-SHA-256: `c7904815cb683b662499a58356d573f22395e14f1f747fb5d3079fd63c1888e4`.
 - Keine CI ausgelöst. RF-12 verwendet dieses Result als neue Bindungsbasis;
   zwölf Planpositionen und dreizehn Plancommits sind bestätigt.
+
+### Bestätigter Fortschritt: RF-12 / Bundle 069
+
+- Tatsächlicher Apply, Entrypoint- und Prozess-Exitcode 0; kein Dry-Run.
+- Commit `b555a3614f962a19b94244918486fc87021a829d`, normaler Push auf `dev`;
+  sauberer Snapshot mit 408 Dateien und genau den 18 geplanten Änderungen.
+- Result `patchharbor-apply_Result_183805_1030_c9afb8.zip`, SHA-256
+  `85ea27933e46b0f8bc75d921ab9a64b602e0477af66c4146163213657af2ed0e`.
+- Vollständiges paralleles Apply-Gate: 3281 passed, 15 skipped, 12 Worker;
+  unveränderte Collection gegenüber RF-11.
+- Report-SHA-256: `bd3a67102c2fdf7e240b731fc1422da2b3238749cd07b9e352329d244cd2b7d7`.
+- Keine CI ausgelöst. RF-13 verwendet dieses Result als neue Bindungsbasis;
+  dreizehn Planpositionen und vierzehn Plancommits sind bestätigt.
