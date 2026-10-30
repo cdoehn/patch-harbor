@@ -61,6 +61,7 @@ from patchharbor.application_apply import (
     preflight_patch_package_repository,
     resolve_patch_package,
     run_apply_path,
+    run_guarded_apply_path,
 )
 from patchharbor.application_results import (
     bundle_repository,

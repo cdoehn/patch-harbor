@@ -608,3 +608,39 @@ Invalid API argument types/values use TypeError/ValueError. A valid failed, dirt
 or dry-run Result is returned with its actual facts. Integrity does not prove
 authenticity, a historical commit tree or an independently recomputed dirty
 fingerprint; the existing four binding values are preserved.
+
+## Guarded host Apply (integration contract 1)
+
+`api.apply_guarded(patch, *, expected_sha256, expected_repository, admission,
+output_directory=None, timeout=DEFAULT_TIMEOUT_SECONDS, output=None, observer=None)`
+uses the ordinary Apply core. Check
+`api.integration_capabilities().guarded_apply_contract_version == 1`.
+Unlike the unchanged `apply`, the new operation requires one explicit package,
+its full lowercase SHA-256, the expected repository root, and a trusted callback.
+The existing `apply(patch=..., repository=...)` remains invalid.
+
+The callback receives immutable `api.PatchAdmission`: `.inspection` is the full
+`PatchInspection`, `.contents` maps every archive member to its captured bytes
+(including manifest, entrypoint, payloads and optional handoff), and `.context`
+is the locked `RepositoryContext`. Only the actual Boolean True accepts.
+Require your own approved entrypoint hash, complete allowed inventory, binding
+to the original proposal/Result, fresh staging paths and human consent here.
+Those application rules are not inferred from filenames or invented by Core.
+The callback is trusted host code, not an untrusted package plugin or a sandbox.
+
+Denied/missing approval and callback exceptions, including callback cancellation,
+return `RunReport.primary_tool_error.kind == ErrorKind.ADMISSION_REJECTED` with
+SOURCE_ERROR. No payloads or entrypoint run. Normal diagnostics, maintenance and
+Result publication may still occur. Digest mismatch is SOURCE_ERROR; target or
+state mismatch is STATE_MISMATCH. Existing Result-publication failures retain
+the actual primary execution outcome. A callback cancellation is not falsely
+reported as an interrupted child; an actual child interruption retains its
+existing INTERRUPTED/130 contract. Ordinary external KeyboardInterrupt behavior
+outside the callback is unchanged.
+
+The callback runs once under the normal repository lock. State and targets are
+rechecked before mutation. Original captured bytes are used throughout; an
+Exchange package replaced during admission can additionally be refused by the
+existing replay identity check. No unbound reselection occurs. Locks coordinate
+PatchHarbor operations, not arbitrary external writers. A failed attempt must
+be evaluated from its complete RunReport/Result before any deliberate retry.

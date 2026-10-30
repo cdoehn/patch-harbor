@@ -1619,3 +1619,11 @@ versionierte Fähigkeitsabfrage und verbindliche Hostfreigabe im vorhandenen
 Apply-Core spezifiziert (Hauptspec §42, PYZ/PACK §21, CPython §9).
 Wire-Verträge und historische Abnahmen bleiben erhalten. Dieser Spezifikations-
 stand behauptet noch keine implementierte oder durch Apply bestätigte Funktion.
+
+## 2026-10-30 – SRI-02/03 Implementierung und Vertragspräzisierung
+
+Snapshotrekonstruktion und gebundene Hostfreigabe implementiert; kein eigener
+Formatvalidator oder Apply-Core. §42.4 unterscheidet vor Ausführung abgebrochene
+Callbacks (verweigerte Aufnahme) vom bestehenden INTERRUPTED-Ausführungsstatus.
+Das erhält das Result-3-Schema und vermeidet erfundene Entrypointstarts.
+Tatsächlicher Apply, finale Runtime-Lieferung und native Abnahme bleiben getrennt.

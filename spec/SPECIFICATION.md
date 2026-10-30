@@ -4307,7 +4307,12 @@ das anschließend angewendet wird. Nur der Wert `True` erteilt Freigabe; False,
 None, andere Werte und Callbackfehler lehnen vor Payloads/Entrypoint ab.
 `ErrorKind.ADMISSION_REJECTED` mit SOURCE_ERROR unterscheidet diese Ablehnung im
 RunReport; SHA-Abweichung ist SOURCE_ERROR, Ziel-/Zustandsabweichung STATE_MISMATCH.
-Abbruch bleibt INTERRUPTED. Bestehende Fehler-/Result-Prioritäten bleiben erhalten.
+Ein Entrypoint-Abbruch bleibt INTERRUPTED. Ein Abbruch des Hostcallbacks vor
+Ausführung ist ADMISSION_REJECTED/SOURCE_ERROR, auch bei KeyboardInterrupt oder
+SystemExit: Das unveränderte Result-3-Schema reserviert INTERRUPTED für einen
+tatsächlich gestarteten Entrypoint. Kein vorgetäuschter Ausführungsstart und
+keine Erweiterung des geschlossenen Wire-Schemas. Andere äußere Interrupts
+behalten den bestehenden API-Vertrag. Fehler-/Result-Prioritäten bleiben erhalten.
 
 Freigabe läuft innerhalb der vorhandenen Preflight-/Lock-Lebensdauer. Danach
 werden Identität, Zustand und Payloadziele vor Mutation erneut geprüft.

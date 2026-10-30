@@ -35,6 +35,7 @@ class ErrorKind(str, Enum):
     """Stable machine-readable categories for structured tool failures."""
 
     TOOL_ERROR = "tool_error"
+    ADMISSION_REJECTED = "admission_rejected"
     CONFIGURATION_ERROR = "configuration_error"
     REGISTRY_ERROR = "registry_error"
     REPOSITORY_RESOLUTION_ERROR = "repository_resolution_error"

@@ -8,6 +8,8 @@ from __future__ import annotations
 from collections.abc import Callable, Iterator
 from contextlib import ExitStack, contextmanager
 from dataclasses import replace
+from patchharbor.apply_admission import AdmissionCallback, ApplyAdmissionPolicy
+from patchharbor.errors import FailureReason, repository_resolution_error
 from pathlib import Path
 
 from patchharbor.progress import (
@@ -88,6 +90,7 @@ def preflight_patch_package_repository(
     dry_run: bool = True,
     output: OutputTargets | None = None,
     before_mutation: Callable[[], None] | None = None,
+    admission_policy: ApplyAdmissionPolicy | None = None,
 ) -> Iterator[ApplyMutationGate]:
     """Yield the explicit mutation gate while private inputs and locks live."""
     actual_session = session or RunSession.start()
@@ -141,6 +144,8 @@ def preflight_patch_package_repository(
         activity("BINDING", "Repository binding matches", "success")
         with ExitStack() as private_resources:
             try:
+                if admission_policy is not None:
+                    admission_policy.check_target(resolved)
                 prepared_package = private_resources.enter_context(
                     prepare_patch_package(
                         package,
@@ -151,6 +156,8 @@ def preflight_patch_package_repository(
                     prepared_package.payloads,
                     cwd=resolved.repository.value,
                 )
+                if admission_policy is not None:
+                    admission_policy.authorize(package, resolved)
             except PatchHarborError as error:
                 raise reported_preflight_failure(error) from error
 
@@ -249,6 +256,7 @@ def apply_patch_package(
     before_mutation: Callable[[], None] | None = None,
     publish_attempt_outcome: Callable[[bool, GitObjectId | None], None] | None = None,
     before_result_publication: Callable[[str], None] | None = None,
+    admission_policy: ApplyAdmissionPolicy | None = None,
 ) -> RunReport:
     """Write one validated package, run its private entrypoint, and bundle it."""
     actual_session = session or RunSession.start()
@@ -259,6 +267,7 @@ def apply_patch_package(
         dry_run=False,
         output=output,
         before_mutation=before_mutation,
+        admission_policy=admission_policy,
     ) as mutation_gate:
         _require_payload_mutation(
             mutation_gate,
@@ -292,11 +301,14 @@ def run_apply_path(
     automatic: bool = False,
     current_directory: Path | None = None,
     exchanges: tuple[ExchangeWatchTarget, ...] | None = None,
+    admission_policy: ApplyAdmissionPolicy | None = None,
 ) -> RunReport:
     """Run one Apply request through a single public application boundary."""
     actual_session = session or RunSession.start()
     if exchanges is not None and (not automatic or path is not None):
         raise ValueError("Exchange watch scope requires automatic parameterless Apply")
+    if admission_policy is not None and (path is None or dry_run or automatic):
+        raise ValueError("guarded Apply requires one explicit, actual request")
     attempted = False
 
     def finish(report: RunReport, error: PatchHarborError | None = None) -> RunReport:
@@ -331,6 +343,12 @@ def run_apply_path(
 
     try:
         discovered: DiscoveredExchangePatch | None = None
+        if admission_policy is not None:
+            try:
+                target = admission_policy.expected_repository.resolve(strict=True)
+            except (OSError, RuntimeError) as exc:
+                raise repository_resolution_error("cannot resolve explicitly expected repository") from exc
+            admission_policy = replace(admission_policy, expected_repository=target)
         if path is None:
             scope = (
                 _automatic_exchange_discovery_scope(exchanges)
@@ -345,6 +363,8 @@ def run_apply_path(
         else:
             selected_path = path
             package = resolve_patch_package(selected_path)
+            if admission_policy is not None and package.package_sha256 != admission_policy.expected_sha256:
+                raise PatchHarborError("captured package SHA-256 differs from expected bytes", FailureReason.SOURCE_ERROR)
             if not dry_run:
                 discovered = _maintain_explicit_exchange(package, selected_path, output=output)
     except PatchHarborError as error:
@@ -383,6 +403,7 @@ def run_apply_path(
             timeout_seconds=timeout_seconds,
             output=output,
             session=actual_session,
+            admission_policy=admission_policy,
             before_mutation=(
                 publish_attempt
                 if discovered is not None
@@ -410,3 +431,14 @@ def run_apply_path(
             warnings=package.warnings,
             error=error,
         ), error)
+
+
+def run_guarded_apply_path(
+    path: Path, *, expected_sha256: str, expected_repository: Path, admission: AdmissionCallback,
+    output_directory: Path | None = None, timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
+    output: OutputTargets | None = None,
+) -> RunReport:
+    """Supply explicit host conditions to the single existing Apply workflow."""
+    return run_apply_path(path, dry_run=False, output_directory=output_directory,
+        timeout_seconds=timeout_seconds, output=output,
+        admission_policy=ApplyAdmissionPolicy(expected_sha256, expected_repository, admission))

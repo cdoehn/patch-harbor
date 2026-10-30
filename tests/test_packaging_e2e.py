@@ -28,6 +28,7 @@ pytestmark = pytest.mark.packaging
 MAX_WHEEL_BYTES = 384 * 1024
 RELEASE_VERSION = "1.5.0"
 EXPECTED_RUNTIME_FILES = {
+    "patchharbor/apply_admission.py",
     "patchharbor/result_snapshot.py",
     "patchharbor/snapshot_types.py",
     "patchharbor/snapshot_budget.py",

@@ -19,7 +19,7 @@ from patchharbor.result_reader import (
 from patchharbor.repository_state import capture_repository_context
 from patchharbor.parser import Message as PatchMessage
 from patchharbor.patch_manifest import PATCH_MANIFEST_NAME, PatchManifest
-from patchharbor.patch_package import parse_package_entrypoint, resolve_patch_package
+from patchharbor.patch_package import ValidatedPatchPackage, parse_package_entrypoint, resolve_patch_package
 from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY, ResourcePolicy
 
 
@@ -79,6 +79,11 @@ def inspect_patch(
 ) -> PatchInspection:
     owned = {} if expected_identity is None else {'expected_identity': expected_identity}
     package = resolve_patch_package(path, resource_policy=resource_policy, **owned)
+    return inspect_captured_patch(package)
+
+
+def inspect_captured_patch(package: ValidatedPatchPackage) -> PatchInspection:
+    """Project static facts from owned bytes, including locked admission callers."""
     script = parse_package_entrypoint(package.entrypoint)
     # Whitelist the syntax, but do not look for an installed shell.
     select_interpreter(script.text)

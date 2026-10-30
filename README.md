@@ -48,7 +48,8 @@ specified contracts, local tests, actual Apply and external acceptance.
 The 1.5.0 implementation is confirmed at
 `312e8a3c003c0f9421587b92941ecea7917b5d3f`; its external release acceptance remains
 open. The snapshot API is implemented; the stage records distinguish local checks
-from pending Apply/native acceptance. Host admission follows in SRI-03.
+from pending Apply/native acceptance. Guarded host admission is implemented with its own selected checks; actual
+Apply and external acceptance remain pending.
 
 ## Requirements and installation
 

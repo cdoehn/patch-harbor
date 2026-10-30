@@ -35,8 +35,8 @@ These are confirmed gaps, not replacements for the existing reader or core.
 | Stage / intended commit | Scope and acceptance | Status |
 | --- | --- | --- |
 | SRI-01 `docs(spec): define public snapshot and guarded apply contracts` | Targeted norm updates, this plan, behavior matrix; no product claims | Prepared; selected parallel gate passed; Apply pending |
-| SRI-02 `feat(api): expose verified result snapshots` | Reuse one capture; immutable public layers, strict text/binary reconstruction, budgets/errors/capability; real fixtures and independent oracle | Implemented; final selected gate and Apply pending |
-| SRI-03 `feat(api): bind host admission to the applied package and target` | Explicit SHA/target, full immutable admission inside existing lock/core, failures and exchange/replay regressions | Specified |
+| SRI-02 `feat(api): expose verified result snapshots` | Reuse one capture; immutable public layers, strict text/binary reconstruction, budgets/errors/capability; real fixtures and independent oracle | Locally checked: 471 selected tests; Apply pending |
+| SRI-03 `feat(api): bind host admission to the applied package and target` | Explicit SHA/target, full immutable admission inside existing lock/core, failures and exchange/replay regressions | Implemented; final selected gate and Apply pending |
 | SRI-04 `test(integration): verify and document the delivered transport contracts` | Built 1.6.0 PYZ public-only roundtrip, frozen1.4, version/docs/example and delivery record | Specified |
 
 Target is one bundle with four sequential states, no extra artificial W/R/C
@@ -75,3 +75,21 @@ consumer is introduced. Preliminary selected run `snapshot-reviewed` passed
 parallel gate and includes additional frozen1.4 tests. Apply and native CI remain
 unconfirmed. Capability version1 announces snapshots; guarded Apply remains None
 until SRI-03. Preserved 1.5.0 acceptance is unaffected.
+
+## SRI-03 implementation record
+
+The existing Apply application now accepts an internal admission policy through
+a narrow public `apply_guarded` facade. Static inspection is projected from the
+already captured package. Target checks and one mandatory callback run within
+the existing lock and private-input lifetime; existing mutation/replay/Result
+logic remains responsible for execution. 157 preliminary selected tests passed
+on CPython3.14.4/Linux; the final stage has its own report.
+
+An observed schema constraint required one explicit clarification of §42.4:
+Result3 represents INTERRUPTED only for an actually started entrypoint. Therefore
+a callback KeyboardInterrupt/SystemExit is a pre-execution admission rejection
+(SOURCE_ERROR), with no false execution flag. A separate actual child-interrupt
+test preserves exit130 and the ordinary execution/Result facts. The independent
+Exchange identity recheck still refuses a package swapped during admission;
+explicit external files use their captured approved bytes. No fallback bypass
+was added. Both facts are covered by real Apply tests.
