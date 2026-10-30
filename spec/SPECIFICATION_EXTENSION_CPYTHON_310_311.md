@@ -6,7 +6,8 @@
 **Status:** Fortgeltender CPython-Vertrag; RF-01 begrenzt die Artefakt-Kompatibilität auf die Basis ab 1.4.0. Implementierungs- und offene Abnahmenachweise bleiben im CPython-Plan erhalten.
 **Produktversion:** 1.5.0; Kompatibilitätsbasis ab 1.4.0. CPython-Untergrenze unverändert 3.10.
 **Historischer Umsetzungsplan:** [CP-00 bis CP-05](../planning/python-compatibility/commit-plan.md)
-**Aktiver Plan:** [REFACTOR-1.5.0](../planning/1.5.0/commit-plan.md)
+**Aktiver Folgeplan:** [SRI-1.6.0](../planning/specroad-integration/commit-plan.md);
+der historische 1.5.0-Plan und seine externe Releaseabnahme bleiben erhalten.
 
 ## 1. Geltung und gezielte Vertragsänderung
 
@@ -216,3 +217,12 @@ Sicherheitsentscheidungen sind PatchHarbor-Verträge, keine Garantie der Quellen
 | 3 | 2026-10-30 | RF-12: CPY-15/CT-16 an die geltende ausgewählte parallele Development-Prüfung und vollständige parallele Apply-Gates angeglichen; Interpreter- und Sicherheitsverträge unverändert. |
 | 2 | 2026-10-29 | RF-01: Supportbasis ab 1.4.0 statt Pflicht für Results 1/2 und originale 1.3.0-PYZ; historische Bytes bleiben unverändert, Untergrenze und Sicherheitsverträge erhalten. |
 | 1 | 2026-10-13 | Beauftragtes Ziel CPython 3.10/3.11, Vertragsabgrenzung, geschlossene Legacy-/Ziel-PYZ-Varianten und Abnahmematrix; noch keine Runtime-Änderung. |
+
+## 9. Additive Integrationsverträge 1.6.0
+
+CPY-02/04/05 gelten auch für Hauptspec §42: öffentliche Snapshotprüfung und
+Fähigkeitsabfrage laufen mit der Core-PYZ ohne Git/Shell/Netzwerk, Hostfreigabe
+mit denselben Voraussetzungen wie Apply. Dieselbe Implementierung muss unter
+CPython 3.10/3.11 und den bestehenden 3.12/3.14-Lanes funktionieren. Nicht
+vorhandene native Nachweise bleiben offen; keine neue 3.13-CI-Lane oder
+Änderung des ausschließlich manuellen Workflowstarts wird behauptet.

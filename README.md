@@ -28,7 +28,7 @@ This source uses version **1.5.0**. It completes the planned refactoring of
 legacy runtime paths, test dependencies, bootstrap generation, Core orchestration,
 CLI boundaries and acceptance evidence. The [measured cleanup](planning/1.5.0/rf12-documentation-cleanup.md)
 records both reductions and the cost of splitting modules.
-The [active plan](planning/1.5.0/commit-plan.md) and
+The [historical refactoring plan](planning/1.5.0/commit-plan.md) and
 [release acceptance record](planning/1.5.0/release-acceptance.md) distinguish
 source preparation, actual Apply and external acceptance. A version string does
 not establish a published release, a tag or an upgraded local installation.
@@ -38,6 +38,16 @@ and installed watcher retain the 3.10/3.11 contract and the existing 3.12/3.14
 acceptance lanes. Exact interpreter, native CI and release evidence remain in
 the [CPython plan](planning/python-compatibility/commit-plan.md) and active plan;
 a historical successful run does not certify a later checkout.
+
+## Active development: public integration contracts (target 1.6.0)
+
+The [integration plan](planning/specroad-integration/commit-plan.md) adds a
+read-only public Result snapshot API and a guarded host Apply boundary.
+Its [requirement matrix](planning/specroad-integration/test-matrix.md) separates
+specified contracts, local tests, actual Apply and external acceptance.
+The 1.5.0 implementation is confirmed at
+`312e8a3c003c0f9421587b92941ecea7917b5d3f`; its external release acceptance remains
+open. This planning stage does not yet implement the new APIs.
 
 ## Requirements and installation
 

@@ -1611,3 +1611,11 @@ manuellen Python-/Plattform-Lanes, eindeutige Artefakte, tatsächliche Build-/
 Interpreterquittungen und ausschließlich lesende CI-Auswertung. Docker- und
 PowerShell-Nachweise vervollständigt; historische Runtime-Ausführungsgrenzen
 bleiben erhalten. Kein automatischer CI-Start; CP-05 wartet auf native Nachweise.
+
+## 2026-10-30 – SRI-01, Ziel 1.6.0
+
+Allgemeine öffentliche Result-Snapshots mit strikter Python-only-Rekonstruktion,
+versionierte Fähigkeitsabfrage und verbindliche Hostfreigabe im vorhandenen
+Apply-Core spezifiziert (Hauptspec §42, PYZ/PACK §21, CPython §9).
+Wire-Verträge und historische Abnahmen bleiben erhalten. Dieser Spezifikations-
+stand behauptet noch keine implementierte oder durch Apply bestätigte Funktion.

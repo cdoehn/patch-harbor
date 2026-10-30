@@ -14,7 +14,10 @@
 **Patch-Paketmarker:** `patch-harbor`
 
 Der ausdrücklich beauftragte Entwicklungsplan liegt unter
-[`planning/1.5.0/commit-plan.md`](../planning/1.5.0/commit-plan.md).
+[`planning/specroad-integration/commit-plan.md`](../planning/specroad-integration/commit-plan.md),
+Zielversion **1.6.0**. Der bestätigte 1.5.0-Quellstand und seine noch offene
+externe Releaseabnahme bleiben im historischen Plan erhalten. §42 definiert
+die additive Erweiterung; sie ist kein Teil des Refactoring-Auftrags.
 Für diesen Auftrag gelten gemeinsam diese drei Normdateien:
 
 - dieses Basisdokument,
@@ -4193,3 +4196,150 @@ sind im Plan als Herkunft erhalten. Geprüfte Ansatzpunkte sind insbesondere
 `archive_evidence.py`, Result-Lebenszyklus, `chat_instructions.py`, `pyproject.toml`
 und die Test-/CI-Verträge. Dies war der damalige Analyseumfang vor der
 RIV-Implementierung; deren heutiger Abschluss ist am Dokumentanfang belegt.
+
+## 42. Öffentliche Integrationsverträge 1.6.0 (SRI)
+
+Diese Erweiterung ergänzt §§16, 19 und 32 sowie die beiden Normergänzungen.
+Sie definiert allgemeine Integrationsgrenzen, keine SpecRoad-Sonderlogik.
+Stand und Nachweise: `planning/specroad-integration/commit-plan.md`.
+Spezifiziert, implementiert, lokal geprüft, tatsächlich angewendet und extern
+abgenommen sind unterschiedliche Zustände. Versionsanhebung ist kein Release.
+
+### 42.1 Öffentliche Snapshot-Operation (SRI-SNAPSHOT)
+
+`api.read_result_snapshot(result, *, expected_sha256=None, observer=None)`
+liefert `api.ResultSnapshot`. Ohne künstliches Patch-Paket erfasst der bestehende
+Resultreader genau einmal stabile Bytes und validiert vollständig Result 3,
+Manifest, Kontext, Laufstatus, Inventare, Inhalte, Runtime und ZIP-Budgets.
+`expected_sha256`, wenn angegeben, ist eine vollständige kleingeschriebene
+SHA-256; Abweichung lehnt ab. Spätere Dateiänderungen beeinflussen das Ergebnis
+nicht. Weder ursprüngliches Repository noch Result werden erneut geöffnet.
+
+Alle Ergebnistypen werden über `patchharbor.api` exportiert. `ResultSnapshot`
+enthält `sha256`, `format_version`, `context` (unveränderte `ReferenceContext`
+mit allen vier Bindungsfeldern und dirty), `run_id`, `operation`, `dry_run`,
+`primary_result`, `warnings`, `runtime` sowie die fünf `SnapshotLayer`-Werte:
+
+| Schicht | Bedeutung |
+| --- | --- |
+| `base` | Im Result gespeicherte HEAD-Dateien |
+| `index` | base nach streng angewendetem staged-Patch |
+| `worktree` | index nach streng angewendetem unstaged-Patch |
+| `untracked` | Separates geprüftes Inventar, keine Überschreibregel |
+| `effective` | worktree plus zulässige untracked-Dateien |
+
+`SnapshotLayer.files` ist eine unveränderbare nach UTF-8-Pfad sortierte Abbildung
+auf unveränderbare `SnapshotFile`-Werte: `path`, `mode` (`100644`/`100755`),
+`content` als immutable Bytes, `sha256`, `object_id`, abgeleitete `size` und
+`kind="regular"`. Unveränderte Inhalte werden zwischen Schichten geteilt.
+`SnapshotRuntime` gibt Status, Unverfügbarkeitsgrund, Version, Python-Anforderung,
+Profil, Content-ID sowie Artefakt-SHA/Größe wieder; untersuchter Runtimecode
+wird weder importiert noch ausgeführt. Fehlende eingebettete Runtime ist bei
+vollständig gültiger unavailable-Deklaration kein Snapshotfehler.
+
+### 42.2 Strikte Rekonstruktion (SRI-DELTA)
+
+Verarbeitet werden die tatsächlichen binärtauglichen Full-index-Git-Diffs des
+Produzenten (§19.8/9): SHA-1 und SHA-256, Text mit exaktem Kontext, neue/leere/
+gelöschte Dateien, Rohbytes und fehlendes finales LF, Modusänderungen,
+UTF-8/Leerzeichen und Git-C-/Oktal-Pfadquotierung, binäre literal- und delta-Blöcke.
+Umbenennungen sind Löschung plus Hinzufügung (`--no-renames`). Neue Produzenten
+fixieren `a/`-/`b/`-Präfixe und vollständige Pfade explizit, unabhängig von lokalen
+Diff-Präferenzen. Kombinierte Merge-Diffs, Rename-/Copy-Metadaten und andere
+unbekannte Formen werden konkret abgelehnt, nicht erraten.
+
+Keine Git-/Shell-/Subprozesshilfe, Filter, Hooks oder Fuzzy-Anwendung.
+Hunkpositionen, Zähler und Kontext müssen exakt passen. Vorhandene volle
+Blob-IDs werden vor und nach Änderung nachgerechnet. Binäre Zlib-/Base85-Blöcke,
+Delta-Größen, Quellbereiche und Rückrichtung werden vollständig geprüft.
+Doppelte Änderungen desselben Pfads innerhalb einer Schicht sind unzulässig.
+Datei-/Verzeichnis- und portable Namenskollisionen werden pro resultierender
+Schicht abgelehnt. Ein staged gelöschter Pfad darf als untracked neu entstehen;
+eine noch im Index verwaltete Datei ist kein untracked-Ersatz.
+Es gibt weder stilles Überschreiben noch teilweise erfolgreiche Rekonstruktion.
+
+Bestehende Archiv-/Runtimebudgets bleiben unverändert. Zusätzlich gelten:
+256 MiB je rekonstruierter Datei/expandiertem Binärblock, 512 MiB kumulativ für
+Basis-/untracked-Inhalte und neu allozierte Rekonstruktionsinhalte einschließlich
+Binärprogramme und Rückprüfung. Geteilte unveränderte Inhalte zählen einmal.
+Jede Schicht enthält höchstens 250.000 Dateien. Byte-/Bereichsgrenzen werden vor
+Expansion, Kopie oder Schreibschritt geprüft; komprimierte Größen ersetzen
+niemals die expandierten Grenzen. Es gibt keinen öffentlichen Budget-Bypass.
+
+### 42.3 Prüfgrenzen und Fehler (SRI-TRUST)
+
+Result-SHA, Blob-IDs, Inhalts-SHA, Größen, Modus- und Schichtkonsistenz werden
+unabhängig geprüft. `repo_id` und Commit sind deklarierte Bindungswerte; ohne
+Git-Baum-/Commitobjekte ist deren historische Herkunft nicht bewiesen. Der
+bestehende Dirty-Fingerprint enthält Git-Statusfakten, die Result 3 nicht als
+kanonische Fingerprint-Eingabe speichert. Er wird erhalten und schema-/quergeprüft,
+aber nicht als aus dem effektiven Baum nachgerechnet ausgegeben. Nur der
+kanonische Clean-Fingerprint ist unabhängig vergleichbar. Kein neuer Digest
+wird als bestehender `state_fingerprint` ausgegeben.
+Integrität beweist weder Authentizität noch erfolgreiches Apply. Gültige Fehler-,
+Dry-Run- und Dirty-Results behalten ihren tatsächlichen Status.
+
+`ResultSnapshotError` ist `PatchHarborError` mit unverändertem
+`FailureReason.SOURCE_ERROR` und maschinenlesbarem `SnapshotErrorCode`:
+`invalid_result`, `digest_mismatch`, `invalid_patch`, `unsupported_patch`,
+`path_collision`, `resource_limit`. Ungültige API-Argumente bleiben TypeError/
+ValueError vor fachlicher Arbeit. Kein repository-only-Fallback. Kein Schreiben,
+Materialisieren, Netzwerk, Git, Paketmanager oder globale Zustandsänderung.
+Best-effort Observer erteilen keine Freigabe und bleiben request-lokal.
+
+### 42.4 Verbindliche Hostfreigabe (SRI-ADMISSION)
+
+`api.apply_guarded(patch, *, expected_sha256, expected_repository, admission,
+output_directory=None, timeout=DEFAULT_TIMEOUT_SECONDS, output=None,
+observer=None)` liefert den bestehenden `RunReport`. Die drei neuen
+Pflichtbedingungen können nicht weggelassen werden. Es wird genau ein explizites
+Paket einmal stabil erfasst; sein vollständiger SHA wird vor Übernahme geprüft.
+Die Pfadangabe `expected_repository` benennt die erwartete kanonische lokale
+Repositorywurzel zusätzlich zur Manifestbindung. Unter dem vorhandenen
+Repositorylock müssen Registrierung, Identität, Pfad und Zustand übereinstimmen.
+Die alte Signatur `apply(patch=..., repository=...)` bleibt unzulässig.
+
+Der vertrauenswürdige Hostcallback `admission(PatchAdmission) -> bool` erhält
+vollständige unveränderbare Daten: bestehende `PatchInspection`, alle ZIP-Dateien
+in `contents` als unveränderbare Pfad/Bytes-Abbildung, sowie den gesperrten
+`RepositoryContext`. Inventar und Bytes stammen aus exakt dem erfassten Paket,
+das anschließend angewendet wird. Nur der Wert `True` erteilt Freigabe; False,
+None, andere Werte und Callbackfehler lehnen vor Payloads/Entrypoint ab.
+`ErrorKind.ADMISSION_REJECTED` mit SOURCE_ERROR unterscheidet diese Ablehnung im
+RunReport; SHA-Abweichung ist SOURCE_ERROR, Ziel-/Zustandsabweichung STATE_MISMATCH.
+Abbruch bleibt INTERRUPTED. Bestehende Fehler-/Result-Prioritäten bleiben erhalten.
+
+Freigabe läuft innerhalb der vorhandenen Preflight-/Lock-Lebensdauer. Danach
+werden Identität, Zustand und Payloadziele vor Mutation erneut geprüft.
+Privater Entrypoint, Replay, Attempt-Nachweise, Timeout, Logs und Resultpublikation
+bleiben im bestehenden Core; kein zweiter Apply-Ablauf. Verweigerung darf normale
+Diagnose-/Result-/Wartungseffekte haben, aber keine Paketpayloads oder Ausführung.
+Callbacks sind Hostcode, keine Sandbox und kein aus dem Paket geladenes Plugin.
+SpecRoad behält Closure, Staginglayout, erlaubten Entrypoint, Proposal- und
+menschliche Freigabe. Kooperative Locks schützen nicht universell gegen fremde
+nicht kooperierende Schreibzugriffe. Wiederaufnahme/Publikationsfehler bleiben
+beobachtete Ergebnisse, keine implizite Wiederholung.
+
+### 42.5 Fähigkeiten, Lieferung und Abnahme (SRI-RUNTIME)
+
+`api.integration_capabilities()` liefert unveränderbare `IntegrationCapabilities`:
+`contract_version=1`, `snapshot_contract_version` und
+`guarded_apply_contract_version` jeweils `1` bei implementierter Fähigkeit,
+sonst `None`. Ältere Versionen besitzen diese Funktion nicht. Eine bloße
+Produktversion, ein erfolgreicher Bootstrap oder importierbare Symbole ersetzen
+keine explizite Fähigkeitsabfrage und Verhaltenstests.
+
+Patchformat 1, Resultformat 3, Runtimeformat 2, Rezeptformat 1 und
+`patchharbor-core-no-watcher-v1` bleiben unverändert. Die geschlossene
+Runtime-2-Liste ist der bestehende Bootstrap-/Pack-Vertrag, keine erschöpfende
+Liste aller öffentlichen APIs; sie wird nicht um frei erfundene Felder ergänzt.
+Neue Fähigkeiten werden an der tatsächlich geladenen, herkunftsgeprüften API
+erfragt. Originale gültige Artefakte ab 1.4.0 bleiben lesbar, Result 1/2 nicht.
+
+Normalinstallation und tatsächlich gebaute Core-PYZ verwenden denselben Code,
+CPython >=3.10 und keine Fremdabhängigkeiten. Neue CLI-/Watcher-Startwege sind
+nicht erforderlich. Die manuelle CI-Matrix bleibt unverändert nutzbar; Start
+allein durch Christian. Entwicklung prüft ausgewählte Tests parallel, Apply den
+vollen parallelen Stand vor jedem Commit. SRI-SNAPSHOT (SpecRoad 15.m.R) und
+SRI-ADMISSION haben getrennte Bereitschaftsnachweise; SpecRoads eigener Rundweg
+ist erst nach dessen Integration bestätigt.

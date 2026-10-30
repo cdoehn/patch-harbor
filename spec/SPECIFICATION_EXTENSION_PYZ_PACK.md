@@ -1427,3 +1427,14 @@ Die Review-Unterlagen `REVIEW_SPECIFICATION_EXTENSION_PYZ_PACK.md` und `PRUEFNAC
 | K-02 | `PACK-15`, `CHAT-05`: Chat-Bundle-Nummer unabhängig von Paket-ID und Referenz-Run-ID; kein neuer Zähler oder Entrypoint-Rewrite. | P-18 und fachlicher Chat-/Planreview. |
 
 Die Überarbeitung schließt die genannten Vertrags- und Planungslücken **auf Dokumentebene**. Sämtliche in der Tabelle genannten Produkttests und Plattformnachweise sind weiterhin Aufgaben der späteren Implementierung. Das erfolgreiche Prüfen dieser Markdown-Datei ersetzt sie nicht.
+
+## 21. Additive Integrations-API 1.6.0
+
+Hauptspec §42 ergänzt den bestehenden Python-only-Vertrag um
+`read_result_snapshot` und die Hostoperation `apply_guarded`, beide mit
+öffentlichen Typen und `integration_capabilities` in derselben Core-PYZ.
+Snapshotprüfung benötigt kein Git und führt keine untersuchte Runtime aus;
+Host-Apply behält seine Systemvoraussetzungen. Die geschlossenen Wire-Schemas,
+Bootstrap-Prüfung und originale 1.4.0-Artefakte bleiben unverändert.
+Der aktive Folgeplan ist `planning/specroad-integration/commit-plan.md`;
+frühere Plan- und Releaseabnahmen werden dadurch nicht geschlossen.
