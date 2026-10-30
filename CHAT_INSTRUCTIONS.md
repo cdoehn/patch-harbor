@@ -1040,16 +1040,17 @@ Nutzerauftrag vom 29. Oktober 2026 der Refactoring-Plan für 1.5.0:
 ```text
 Plan: planning/1.5.0/commit-plan.md
 Normsatz: spec/SPECIFICATION.md
-          spec/SPECIFICATION_EXTENSION_PYZ_PACK.md (Revision 5)
-          spec/SPECIFICATION_EXTENSION_CPYTHON_310_311.md (Revision 2)
+          spec/SPECIFICATION_EXTENSION_PYZ_PACK.md (Revision 6)
+          spec/SPECIFICATION_EXTENSION_CPYTHON_310_311.md (Revision 3)
 ```
 
 Die drei Normdateien bleiben getrennt. Nur konkrete grobe Fehler und aktuelle
 Widersprüche werden gezielt korrigiert, insbesondere die bisherige Pflicht zur
 Unterstützung von Artefakten vor 1.4.0. Gültige 1.4.0-Artefakte bleiben die Basis
-zukünftiger Abwärtskompatibilität; Patchformat 1 bleibt erhalten. RF-01 korrigiert
-die betroffenen Normstellen; die anschließenden Implementierungsschritte stehen
-im aktuellen Plan. Produktversion bleibt bis RF-13 bei 1.4.0. Die aktuellen
+zukünftiger Abwärtskompatibilität; Patchformat 1 bleibt erhalten. RF-06 hat
+Result-1/2-Leser und Runtime-Wheel-Pfade entfernt. RF-07 erzeugt den ausführbaren
+Bootstrapblock aus genau einer gepflegten Quelle; nicht manuell im Block ändern.
+Fortschritt und offene Abnahmen stehen im aktuellen Plan. Produktversion bleibt bis RF-13 bei 1.4.0. Die aktuellen
 Testregeln und tatsächlichen Apply-Nachweise stehen weiter unten.
 
 Der frühere PYZ/PACK-Plan ist mit 16/16 Positionen, Korrektur 046 und grüner
@@ -1093,13 +1094,14 @@ parallele Testauswahl. Apply prüft jeden Commitstand vollständig parallel, auc
 Bundle-Ende. Keine Vollsuite im Development. Kein serieller Lauf und keine verkürzte Auswahl als Vollabnahme.
 Nur Christian startet den manuellen CI-Workflow; Codex und Entrypoints tun das nie.
 
-RF-00 bis RF-10 sind durch tatsächliche Applies und Push bestätigt,
-zuletzt Bundle 067 auf `35af08c9c38482c1974102f5ac902e629fa11f01`.
-Der Folgeauftrag umfasst RF-11 / Bundle 068: gemeinsame CI-Matrix und
-Artefaktrollen sowie stabile, variantenbezogene Nachweiskennungen.
+RF-00 bis RF-11 sind durch tatsächliche Applies und Push bestätigt,
+zuletzt Bundle 068 auf `7294d77fde0598dd57a6fdc3c19f6925e5520bdb`
+mit 3281 bestandenen Tests und 15 Skips in der vollständigen parallelen Apply-Suite.
+Der Folgeauftrag umfasst RF-12 / Bundle 069: aktuelle Dokumentation und
+nachprüfbare Bereinigung gegenüber dem Startstand des 1.5.0-Plans.
 Development prüft die dokumentierte Auswahl parallel; Apply prüft vor dem
 Commit vollständig parallel. CI startet ausschließlich Christian.
-Der eigene Apply von RF-11 ist noch nicht bestätigt.
+Der eigene Apply von RF-12 ist noch nicht bestätigt.
 Weitere Implementierung oder eine automatische Schleife ist nicht vorweggenommen.
 Vollständige Watcher-Results samt Teilfortschritten werden
 geprüft; fehlende externe Nachweise werden konkret gemeldet. CI startet

@@ -1,12 +1,12 @@
 # PatchHarbor – Spezifikationserweiterung: Result-PYZ und `pack`
 
 **Dokument-ID:** `PYZ-PACK`  
-**Revision:** 5
-**Stand:** 29. Oktober 2026
+**Revision:** 6
+**Stand:** 30. Oktober 2026
 **Vorgesehener Ablageort:** `spec/SPECIFICATION_EXTENSION_PYZ_PACK.md`  
 **Basisdokument:** danebenliegende [`SPECIFICATION.md`](SPECIFICATION.md), gebundener Bestandsvertrag 1.2.1 einschließlich RIV und der bereits enthaltenen Result-/CIFS-Publikationsregeln  
-**Status:** Fortgeltender PYZ/PACK-Vertrag; Revision 5 korrigiert die Kompatibilitätsbasis für 1.5.0. Historische Ausführungsnachweise bleiben in ihren bisherigen Plänen.
-**Produktbasis:** 1.4.0; Refactoring-Ziel 1.5.0. RF-01 ändert keine Laufzeit.
+**Status:** Fortgeltender PYZ/PACK-Vertrag; Revision 6 gleicht die aktuelle Testzuständigkeit und den Implementierungsstand ab. Historische Ausführungsnachweise bleiben in ihren bisherigen Plänen.
+**Produktbasis:** 1.4.0; Refactoring-Ziel 1.5.0. Tatsächlicher Fortschritt und Releaseabnahme stehen im aktiven 1.5.0-Plan.
 
 > **Ziel:** Neue Result-Bundles liefern PatchHarbor als direkt mit Python aufrufbare PYZ statt als zu installierendes Runtime-Wheel. Die PYZ enthält den PatchHarbor-Core mit dessen CLI und öffentlicher Python-API, **aber keinen Watcher**. Zusätzlich erhält PatchHarbor das reguläre Unterkommando `pack` und die öffentliche Funktion `api.pack_patch(...)`, um vorbereitete Inhalte als referenzgebundenes, abschließend validiertes Patch-Paket zu erzeugen.
 
@@ -276,7 +276,7 @@ Nicht enthalten sind `patchharbor_watcher/`, Watcher-Launcher, systemd-Units als
 
 Im PYZ-Profil gibt es keine `.pth`-Dateien, `sitecustomize.py`, `usercustomize.py`, fremden importierbaren Top-Level-Pakete, nativen Erweiterungen, lokalen Launcher-Kopien, `.pyc` oder `__pycache__`. Das normale Installations-Wheel darf weiterhin seine erforderlichen Installationsmetadaten und den Watcher enthalten. Diese werden nicht ungeprüft in die PYZ kopiert.
 
-Zu den expliziten Pflichtdateien gehören neben dem Root-Einstieg mindestens `patchharbor/__init__.py`, `patchharbor/api.py`, `patchharbor/cli.py`, `patchharbor/py.typed`, `patchharbor/_pyz_identity.py`, `patchharbor/_runtime/pyz-main.py`, `patchharbor/_runtime/pyz-recipe.json`, `patchharbor/_runtime/CHAT_INSTRUCTIONS.md`, `patchharbor/_runtime/python-api.md` und `patchharbor/_runtime/LICENSE`. Sämtliche weiteren tatsächlich benötigten Core-Module werden ebenfalls inventarisiert; die Liste erlaubt keinen unvollständigen Importgraphen. Alte generierte Wheel-Identitäts-/Reproduktionsressourcen sind nicht Teil des neuen PYZ-Inventars. Legacy-Wheel-Lesecode ist ab der Kompatibilitätsbasis 1.4.0 keine Pflicht mehr; seine Entfernung folgt RF-06.
+Zu den expliziten Pflichtdateien gehören neben dem Root-Einstieg mindestens `patchharbor/__init__.py`, `patchharbor/api.py`, `patchharbor/cli.py`, `patchharbor/py.typed`, `patchharbor/_pyz_identity.py`, `patchharbor/_runtime/pyz-main.py`, `patchharbor/_runtime/pyz-recipe.json`, `patchharbor/_runtime/CHAT_INSTRUCTIONS.md`, `patchharbor/_runtime/python-api.md` und `patchharbor/_runtime/LICENSE`. Sämtliche weiteren tatsächlich benötigten Core-Module werden ebenfalls inventarisiert; die Liste erlaubt keinen unvollständigen Importgraphen. Alte generierte Wheel-Identitäts-/Reproduktionsressourcen sind nicht Teil des neuen PYZ-Inventars. Legacy-Wheel-Lesecode ist ab der Kompatibilitätsbasis 1.4.0 keine Pflicht mehr; RF-06 hat diesen Produktpfad entfernt.
 
 Eine `.dist-info`-Struktur ist **kein Pflichtbestandteil der PYZ und wird im ersten Profil nicht eingebettet**. Der PYZ-Code darf seine eigene Version und seine eigenen Ressourcen nicht aus einer zufällig installierten Distribution gleichen Namens beziehen.
 
@@ -494,7 +494,7 @@ beschreibt den eingebetteten 1.4.0-Produzenten und verpflichtet den neuen Leser
 nicht zur Unterstützung von Result 1/2. Neue Produzenten deklarieren ihre
 tatsächlichen Fähigkeiten. Originalmetadaten, IDs und Hashes werden nicht
 umgeschrieben; neue Vertragsformen benötigen eine ausdrückliche Versionierung.
-RF-01 legt diesen Zielvertrag fest, die Implementierung folgt in RF-06.
+RF-01 legte diesen Zielvertrag fest; RF-06 hat ihn implementiert.
 
 `operations` benennt wie der bisherige Runtime-Vertrag die vorgesehenen **Chat-Werkzeugoperationen**. Es ist **keine Sperrliste für die übrige Core-CLI oder API**. Deren Funktionsumfang wird durch das Profil und `ARCH-02` festgelegt. Ein Hersteller darf damit insbesondere nicht das funktionierende `bundle` aus der PYZ herauslassen.
 
@@ -1261,7 +1261,14 @@ Die normale Installation muss den Watcher weiterhin korrekt dokumentieren. In de
 
 Die regulären Wheel-/sdist-/pip-/pipx-/uv-Bereitstellungsnachweise werden nach der bestehenden Packaging-Policy abgedeckt; nicht jede Kombination muss zu einem neuen vollständigen Kreuzprodukt ausgebaut werden. Ein optionaler ARM64-/Ubuntu-in-Termux-Nachweis wird gesondert bezeichnet und nicht als allgemeine Android-Unterstützung ausgegeben.
 
-**TEST-05.** Die bestehende manuelle CI-Dispatch-Policy, ihr aktueller Bundle-Zähler und die vorhandenen seriellen/parallelen Testzuständigkeiten werden nicht durch diese Erweiterung ersetzt. Keine neuen Push-/PR-/Zeitplan-Trigger und kein zusätzlicher serieller CI-Volltestlauf allein wegen dieser Features. Das vorhandene 120-Minuten-Timeout des Acceptance-/Release-Gate-Jobs bleibt erhalten. [B6]
+**TEST-05.** CI bleibt ausschließlich `workflow_dispatch`, gestartet nur von
+Christian; kein automatischer Dispatch, Retry oder Fünf-Bundle-Zähler.
+Keine Push-/PR-/Zeitplan-Trigger. Gemäß der Nutzerentscheidung vom 29. Oktober
+2026 prüft Development ausschließlich eine dokumentierte änderungsbezogene
+Auswahl parallel. Apply prüft jeden Commitstand vollständig parallel, auch vor
+dem letzten Commit; keine seriellen Gates. Das vorhandene 120-Minuten-Timeout
+des Acceptance-/Release-Gate-Jobs bleibt erhalten. Historische Policies in [B6]
+ersetzen diese neuere Anweisung nicht.
 
 **TEST-06.** Zusätzlich sind PYZ-Größe, zusätzlicher komprimierter Resultumfang, begrenzter Speicherbedarf, Start- und Pack-Zeiten für repräsentative Fälle zu dokumentieren. Dies sind Messwerte mit Umgebung und Eingabegröße, keine pauschalen Leistungsversprechen oder künstlich engen Timing-Assertions.
 
@@ -1384,6 +1391,10 @@ Die technischen Primärquellen aus Revision 1 werden für Revision 2 unveränder
 | **Q5** | Python 3.12, `zipfile`: `https://docs.python.org/3.12/library/zipfile.html` | ZIP-Struktur, Metadaten und Kompressionsmethoden als technische Grundlage. |
 
 ### 20.3 Revisionen
+
+Revision 6 (2026-10-30, RF-12): widersprüchliche Testzuständigkeiten und den
+alten CI-Bundle-Zähler durch die geltenden Nutzerentscheidungen ersetzt;
+bereits umgesetzte RF-06-Verträge als solche eingeordnet. Keine Formatänderung.
 
 Revision 5 (2026-10-29, RF-01): Kompatibilitätsbasis ab 1.4.0, geschlossene
 Capability-Varianten und gezielte Entfernung widersprüchlicher Altformatpflichten.

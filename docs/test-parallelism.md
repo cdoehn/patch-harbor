@@ -1,12 +1,12 @@
 # Entwicklungstests mit pytest-xdist
 
-Plan: `planning/test-parallel/commit-plan.md` (15 echte W/R/C-Zwischenstände).
+Historischer Einführungsplan: `planning/test-parallel/commit-plan.md` (15 echte W/R/C-Zwischenstände).
 Historischer Vertrag: `planning/test-parallel/specification.md`.
 **Aktuelle Nutzerentscheidung vom 29. Oktober 2026:** Development führt nur
 ausgewählte, änderungsbezogene Tests parallel aus. Die vollständige parallele
 Suite läuft im Apply vor jedem Commit, auch am Bundle-Ende. Keine seriellen Gates. Nur Christian selbst startet den weiterhin manuellen CI-Workflow.
 Codex und Entrypoints starten keine CI; der frühere Fünfertakt entfällt.
-Die aktive Schleife arbeitet den bestehenden Plan ohne feste Korrekturgrenze ab.
+Eine ausdrücklich aktivierte Schleife arbeitet den bestehenden Plan ohne feste Korrekturgrenze ab; ein einzelner Folgeauftrag startet keine Schleife.
 Der vorhandene Watcher übernimmt ausschließlich fertig veröffentlichte Pakete.
 Details und aktuelle Resultbindung: aktiver
 `planning/1.5.0/commit-plan.md`.

@@ -1,8 +1,8 @@
 # PatchHarbor – CPython 3.10 und 3.11
 
 **Dokument-ID:** `CPYTHON-310-311`
-**Revision:** 2
-**Stand:** 29. Oktober 2026
+**Revision:** 3
+**Stand:** 30. Oktober 2026
 **Status:** Fortgeltender CPython-Vertrag; RF-01 begrenzt die Artefakt-Kompatibilität auf die Basis ab 1.4.0. Implementierungs- und offene Abnahmenachweise bleiben im CPython-Plan erhalten.
 **Produktbasis:** 1.4.0; Refactoring-Ziel 1.5.0. CPython-Untergrenze unverändert 3.10.
 **Historischer Umsetzungsplan:** [CP-00 bis CP-05](../planning/python-compatibility/commit-plan.md)
@@ -159,8 +159,10 @@ Checkouts. Ein Skip ist kein positiver Unterstützungsnachweis.
 Linux und Windows einschließlich PowerShell-Integration und Watcher. Bestehende
 3.12-/3.14-, Docker- und native Windows-Gates bleiben erhalten. Nur Christian
 startet `workflow_dispatch`; keine Push-/PR-/Zeitplan-Trigger, kein automatischer
-Dispatch oder Retry durch Codex, Watcher oder Entrypoint. Development und Apply
-prüfen jeden Commit mit der vollständigen parallelen Suite; keine seriellen Gates.
+Dispatch oder Retry durch Codex, Watcher oder Entrypoint. Gemäß Nutzerentscheidung
+vom 29. Oktober 2026 prüft Development nur eine dokumentierte änderungsbezogene
+Auswahl parallel. Apply prüft jeden Commit mit der vollständigen parallelen
+Suite, auch vor dem letzten Commit am Bundle-Ende; keine seriellen Gates.
 
 **CPY-16.** Abnahme erfordert vollständigen Commit, tatsächlich geprüfte
 Python-Patchstände, gebaute Wheel-/sdist-/PYZ-Hashes, echte lokale/Apply-Results
@@ -190,7 +192,7 @@ für die geänderte Kombination. Tags, Releases und Hostupdates sind eigene Auft
 | CT-13 | Normale Wheel-/sdist-Installation unter 3.10/3.11 bereitet Ressourcen vor; PYZ bleibt ohne Watcher/Runtime-Dependencies und ohne Cache materialisierbar. |
 | CT-14 | Gebaute PYZ führt drei isolierte Generationen, Eigenressourcen/Pinning/Selbstupdate und Byte-Reproduktion unter beiden Interpretern durch. |
 | CT-15 | Tatsächlich installierter Watcher: native Ereignisse, fünf Sekunden Ruhe, Änderungen während Apply, Duplikate, Neustart/Ende und beide Windows-Shells. |
-| CT-16 | Vollständige parallele lokale/Apply-Gates, eindeutige manuelle CI-IDs/Commitbindungen und getrennte neue CIFS-Praxis bei betroffenen Pfaden. |
+| CT-16 | Dokumentierte parallele Development-Auswahl und vollständige parallele Apply-Gates, eindeutige manuelle CI-IDs/Commitbindungen und getrennte neue CIFS-Praxis bei betroffenen Pfaden. |
 
 ## 7. Primärquellen und Abgrenzung
 
@@ -210,5 +212,6 @@ Sicherheitsentscheidungen sind PatchHarbor-Verträge, keine Garantie der Quellen
 
 | Revision | Datum | Änderung |
 | --- | --- | --- |
+| 3 | 2026-10-30 | RF-12: CPY-15/CT-16 an die geltende ausgewählte parallele Development-Prüfung und vollständige parallele Apply-Gates angeglichen; Interpreter- und Sicherheitsverträge unverändert. |
 | 2 | 2026-10-29 | RF-01: Supportbasis ab 1.4.0 statt Pflicht für Results 1/2 und originale 1.3.0-PYZ; historische Bytes bleiben unverändert, Untergrenze und Sicherheitsverträge erhalten. |
 | 1 | 2026-10-13 | Beauftragtes Ziel CPython 3.10/3.11, Vertragsabgrenzung, geschlossene Legacy-/Ziel-PYZ-Varianten und Abnahmematrix; noch keine Runtime-Änderung. |

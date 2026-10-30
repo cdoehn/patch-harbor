@@ -54,7 +54,7 @@ Pro Generation werden Artefaktgröße, komprimierter Result-Mehrbedarf und maxim
 `tracemalloc`-Python-Allokation unter `foreign-repository-*-metrics.json` erfasst.
 Die kleinen Fixture-Repositories haben Grenzen von 2 MiB komprimiertem Mehrbedarf
 und 128 MiB Python-Allokation. Das ist keine Messung des gesamten Prozess-RSS und
-keine Behauptung über beliebig große Snapshots. Native Windows-/Python-3.12-CI
+keine Behauptung über beliebig große Snapshots. Die native manuelle CI einschließlich der CPython-3.10-/3.11- und bestehenden 3.12-/3.14-Lanes
 startet nur Christian manuell; reale Linux→Windows-CIFS-Nachweise bleiben separat.
 
 Der [Bootstrap-Vertrag](runtime-bootstrap.md) trennt begrenzte Runtime-Vorprüfung,

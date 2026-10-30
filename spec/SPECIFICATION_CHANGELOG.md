@@ -1,5 +1,21 @@
 # PatchHarbor – Spezifikations-Changelog
 
+## 2026-10-30 – RF-12 / Bundle 069: aktuelle Hinweise und messbare Bereinigung
+
+- RF-11 tatsächlich angewendet und gepusht auf
+  `7294d77fde0598dd57a6fdc3c19f6925e5520bdb`; zwölf Planpositionen und dreizehn Plancommits bestätigt.
+- Aktuelle Hinweise unterscheiden Result-3-/Core-PYZ-Unterstützung ab 1.4.0,
+  normale Wheel-/sdist-Installation mit Watcher und sicheren Runtime-Fallback.
+  Entfernte Runtime-Wheel-Anleitungen sind ausdrücklich historisch.
+- Die drei Normdateien bleiben getrennt. Hauptspec §33, PYZ/PACK TEST-05 und
+  CPY-15/CT-16 übernehmen die bereits geltende ausgewählte parallele Development-
+  Prüfung, vollständige parallele Apply-Gates und ausschließlich Christians CI-Start.
+- Ein lesendes Git-Blob-Messskript und seine Daten belegen Umfang, Modulgrößen,
+  entfernte Pfade, Testimporte und gepflegte/generierte Bootstrapquellen.
+  Die Zuordnung entfernter Tests und historische CI-/Apply-Nachweise bleiben erhalten.
+- Produktcode, öffentliche Verträge, Bootstrapprogramm, Tests, CI und Version
+  bleiben unverändert. RF-12-Apply, vollständiges Commit-Gate und Push sind offen.
+
 ## 2026-10-30 – RF-11 / Bundle 068: zentraler CI- und Nachweiskatalog
 
 - RF-10 tatsächlich angewendet und gepusht auf

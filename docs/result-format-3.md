@@ -6,8 +6,9 @@ prepare the Core-PYZ
 without building or installing anything while handling a request. The productive
 writer uses one runtime shape. For 1.5.0 the supported compatibility baseline
 is unchanged valid **1.4.0 artifacts onward**. Result 1/2 and old embedded wheels
-are no longer required. RF-01 specifies this boundary; the running 1.4.0 code
-is unchanged until the later implementation steps.
+are no longer supported by this checkout. RF-06 implemented this boundary;
+the source version remains 1.4.0 until RF-13 and does not identify the exact
+implementation. Use the full commit and artifact hashes for that distinction.
 
 The normative contract is the joint main specification and
 [PYZ/PACK extension](../spec/SPECIFICATION_EXTENSION_PYZ_PACK.md), especially
@@ -35,7 +36,7 @@ distribution `patchharbor`. Its closed fields additionally describe `status`,
   recipe version 1 (an integer, not a boolean).
 - Chat-tool operations `inspect_patch`, `validate_patch`, `pack_patch`, patch
   formats `[1]`, result formats `[1, 2, 3]` for unchanged 1.4.0 producers or `[3]`
-  for the later cleaned producer. The new reader accepts exactly those two lists.
+  for the current producer. The new reader accepts exactly those two lists.
   Capabilities describe the embedded producer, not the current reader's support
   obligations; they do not restrict other Core operations. No Watcher in the PYZ.
   Existing bytes, identities and hashes are never rewritten.
@@ -62,7 +63,7 @@ namespace; it retains all other integrity checks and is never used by `pack` or
 full native reference validation. No downgrade or repaired reference is invented.
 
 Historically PP-05B checked Format-3 integration with frozen Format-1/2
-consumers. Future compatibility checks use unchanged 1.4.0 artifacts and
+consumers. Current compatibility checks use unchanged 1.4.0 artifacts and
 current consumers; pre-1.4.0 positive fixtures are no longer release gates. A standalone
 PYZ remains a non-patch artifact. Unavailable, corrupt and future Results cannot
 become archival/recovery success proofs. The canonical handoff includes the

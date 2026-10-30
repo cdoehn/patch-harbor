@@ -139,10 +139,10 @@ successful Apply: those consumers still require a clean, completed success,
 no warnings or dry run, the appropriate expected binding and, for recovery,
 the existing receipt, local digest and Git evidence. Their conservative ZIP
 path policy is unchanged. Current writers emit format 3 with one verified Core-PYZ
-or a declared runtime-only restriction. The existing 1.4.0 implementation also
-reads formats 1/2. For 1.5.0, compatibility is required from 1.4.0 artifacts
-onward; RF-01 changes this contract, with code cleanup scheduled for RF-06.
-No public signature, result field, validation scope or error code changes in RF-01.
+or a declared runtime-only restriction. This checkout reads Result 3 only;
+RF-06 removed the Result-1/2 readers and runtime-wheel path. Unchanged valid
+1.4.0 artifacts remain supported, including their original producer capabilities.
+Public signatures, result fields, validation scopes and error codes are unchanged.
 Full reference validation rejects a corrupt declared runtime. The separately
 reviewed [bootstrap and previous handoff procedure](runtime-bootstrap.md) can
 check repository evidence independently when only that optional addition fails.
@@ -171,8 +171,9 @@ including `core.fileMode=false`; validation does not emulate conversion helpers.
 Both binding scopes retain `authenticity`, `execution`, `interpreter_availability`,
 `tests`, `ci`, `replay` in `not_checked`. Reference additionally reports
 `live_repository_state`, `local_registration`, `reconstructed_state_fingerprint`,
-`legacy_delta_log_hashes`: format 1 has no independent cryptographic hashes for
-every delta/log, and no deltas are applied here. Repository additionally reports
+`legacy_delta_log_hashes`. That last name is a retained public output field,
+not a claim that the current reader accepts Result 1. Reference validation does
+not independently authenticate every log/delta or apply deltas. Repository additionally reports
 `future_repository_state`. This is a point-in-time comparison, not an execution,
 replay or sender-trust authorization. Any binding mismatch raises error 9;
 invalid/unreadable/unsupported references raise input error 4. Repository errors

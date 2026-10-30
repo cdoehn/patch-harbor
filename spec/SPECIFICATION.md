@@ -4,8 +4,8 @@
 **Historischer Basisvertrag – Versionsangabe nur für dessen ursprünglichen Stand:**<br>
 **Produktversion:** `1.2.1`<br>
 **Aktuelle Produktbasis:** `1.4.0`; Refactoring-Ziel `1.5.0`, gemeinsam mit beiden Ergänzungen.<br>
-**Spezifikationsstand:** 2026-10-29 · Kompatibilitätsbasis RF-01<br>
-**Status:** Verbindlicher Bestands- und Zielvertrag mit den unten erklärten Ergänzungen. RF-01 korrigiert die Vertragsgrundlage; Laufzeitbereinigung und deren Nachweise folgen im Refactoring-Plan.<br>
+**Spezifikationsstand:** 2026-10-30 · RF-12: aktueller Stand und Testzuständigkeit<br>
+**Status:** Verbindlicher Bestands- und Zielvertrag mit den unten erklärten Ergänzungen. RF-01 korrigierte die Vertragsgrundlage; tatsächlicher Implementierungsfortschritt und Nachweise stehen im Refactoring-Plan.<br>
 **RIV-Status:** 18/18 Umsetzungsschritte samt Abschlusskorrektur durch Bundle 015 und CI-Run 37306630290 auf `a02391dc045d42e317b3e766f0b1e9fa8dfadec1` bestätigt; Plan abgeschlossen.<br>
 **Watcher-Ereignisse:** Ereignisgesteuerter Watcher Bestandteil der bestätigten Basis; historische WE-Zwischenstände aktivieren keinen neuen Watcher-Plan.<br>
 **Projektname:** `PatchHarbor`<br>
@@ -3580,8 +3580,11 @@ Codex, Watcher und Entrypoints starten oder wiederholen keine CI. Keine
 Push-/PR-/Zeitplan-Auslöser. Bekannte CI-Fehler und fehlende native Nachweise
 bleiben sichtbar und an ihren tatsächlich geprüften Stand gebunden.
 
-Development und Apply prüfen jeden Commitstand ausschließlich mit der
-vollständigen parallelen Suite, auch am Bundle-Ende. Im Apply läuft
+Die Nutzerentscheidung vom 29. Oktober 2026 präzisiert den Testumfang:
+Development prüft ausschließlich eine dokumentierte änderungsbezogene Auswahl
+parallel, keine Vollsuite. Apply prüft jeden Commitstand mit der vollständigen
+parallelen Suite, auch vor dem letzten Commit am Bundle-Ende. Keine seriellen
+Gates. Im Apply läuft
 `.venv/bin/python tools/run_tests.py --suite all` vor dem Commit. Nach allen
 erfolgreichen Phasen und Commits folgt genau ein normaler abschließender Push.
 Das gilt auch für Dokumentations- und W/R/C-Commits. Diagnosebundles mit null
@@ -4144,11 +4147,10 @@ Kein Zwischenpush, Reset/Rollback oder automatischer Tag. CI startet nur
 Christian manuell nach §33; ein Push ist kein CI-Nachweis.
 
 Die damalige Dokumentübernahme erledigte keinen der 18 RIV-Umsetzungspunkte.
-Der heutige RF-01-Schritt ändert ausschließlich Vertrags-/Statusdokumentation;
-Fortschritt und Nachweise richten sich nach dem aktiven 1.5.0-Plan. Paketversion und Releasezustand
-bleiben unverändert. Jeder spätere Patch übernimmt seine vollständige Bindung
-aus dem dann aktuellen maßgeblichen Result, insbesondere nach Anwendung dieses
-Dokumentationsbundles.
+Fortschritt, tatsächliche Umsetzung und Nachweise richten sich nach dem aktiven
+1.5.0-Plan. Die Produktversion bleibt bis RF-13 bei 1.4.0; dies ist keine
+Abnahme des späteren Releasezustands. Jeder Folgepatch übernimmt seine vollständige
+Bindung aus dem dann aktuellen maßgeblichen Result.
 
 ### 41.3 Diagnosebundles ohne Commit
 

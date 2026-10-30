@@ -24,24 +24,18 @@ It bridges these separate environments using verified ZIP packages, allowing AI 
 - Result Bundles normally include an installation-free **Core-PYZ (without the watcher)**, allowing compatible AI Linux environments to work with PatchHarbor without installing it separately.
 - CLI and Python integrations share the same public API.
 
-This source tree uses version **1.4.0**. The version string, an installed version,
-and a published release are different facts. Implementation and acceptance
-evidence are recorded in the completed
-[PYZ/PACK plan](planning/pyz-pack/commit-plan.md) and
-[test matrix](planning/pyz-pack/test-matrix.md); a development checkout is not
-itself a release announcement.
+This refactoring checkout still uses version **1.4.0**; the
+[active 1.5.0 plan](planning/1.5.0/commit-plan.md) changes it only in RF-13.
+An installed version, this source state and a published release are different
+facts. RF-00 through RF-11 are confirmed by actual Apply Results; RF-12 updates
+guidance and records the [measured cleanup](planning/1.5.0/rf12-documentation-cleanup.md).
+Release acceptance remains open until the final state has its required evidence.
 
-The [CPython 3.10/3.11 plan](planning/python-compatibility/commit-plan.md)
-extends the public API, Core-PYZ, CLI and installed watcher while preserving old
-Results. All twelve jobs of the expanded manual
-[native CI matrix](https://github.com/cdoehn/patch-harbor/actions/runs/38596693717)
-passed on the corrected implementation before this version change, including
-Python 3.10 and 3.11 on Linux and Windows. The plan records the exact commits,
-artifact evidence and remaining release acceptance separately.
-
-**This source requires Python 3.10 or newer.** Original 1.3.0 release artifacts
-retain their Python 3.12 minimum. Version 1.4.0 identifies the compatible release;
-use its reviewed artifacts for the new Python support.
+**This source requires CPython 3.10 or newer.** The public API, Core-PYZ, CLI
+and installed watcher retain the 3.10/3.11 contract and the existing 3.12/3.14
+acceptance lanes. Exact interpreter, native CI and release evidence remain in
+the [CPython plan](planning/python-compatibility/commit-plan.md) and active plan;
+a historical successful run does not certify a later checkout.
 
 ## Requirements and installation
 
@@ -157,10 +151,11 @@ provides `import_api(prepared)` for API use without installing PatchHarbor.
 New Results use **Format 3**. When runtime embedding succeeds, they contain
 exactly one `runtime/patchharbor-<version>.pyz`. A valid `unavailable` status
 instead contains runtime metadata and a warning, with no executable artifact.
-Version 1.4.0 still reads older Results. The 1.5.0 refactoring contract preserves
-valid artifacts from **1.4.0 onward**; support for earlier Result formats and
-embedded runtime wheels is no longer required. RF-01 documents this boundary;
-the implementation changes follow the [refactoring plan](planning/1.5.0/commit-plan.md).
+This checkout reads **Result format 3**, preserving unchanged valid artifacts
+from **1.4.0 onward**. RF-06 removed the Result-1/2 readers, embedded runtime-wheel
+provider and wheel-installation bootstrap. Patch format 1 remains supported.
+Original 1.4.0 producer capabilities `[1, 2, 3]` remain valid metadata; the current
+producer declares `[3]`. Neither fact makes Result 1/2 a supported reference.
 
 Use the executable bootstrap from the trusted Result's handoff, or a separately
 reviewed copy of `scripts/pyz_bootstrap.py`, to assess and prepare its exact PYZ.
@@ -291,9 +286,10 @@ does not replace repository-bound Apply.
 
 ## Documentation and development
 
-- [Active 1.5.0 refactoring plan](planning/1.5.0/commit-plan.md): planning bootstrap;
-  the running product remains 1.4.0 until the release step. The plan establishes
-  compatibility from 1.4.0 onward and keeps the existing specification split.
+- [Active 1.5.0 refactoring plan](planning/1.5.0/commit-plan.md) and
+  [cleanup evidence](planning/1.5.0/rf12-documentation-cleanup.md): confirmed
+  progress, remaining acceptance and reproducible source measurements.
+  The source version remains 1.4.0 until RF-13.
 - [Installation and updates](docs/install-and-update.md)
 - [Repository configuration, archives, retries and permissions](docs/repository-workflow.md)
 - [Troubleshooting](docs/troubleshooting.md)
@@ -301,8 +297,9 @@ does not replace repository-bound Apply.
 - [Runtime bootstrap](docs/runtime-bootstrap.md), [Result 3](docs/result-format-3.md)
 - [Watcher](docs/watcher-events.md), [CIFS publication](docs/result-publication-cifs.md)
 - [Development tests and manual CI policy](docs/test-parallelism.md)
-- Joint requirements: [main specification](spec/SPECIFICATION.md) and
-  [PYZ/PACK extension, revision 3](spec/SPECIFICATION_EXTENSION_PYZ_PACK.md)
+- Joint requirements: [main specification](spec/SPECIFICATION.md),
+  [PYZ/PACK extension](spec/SPECIFICATION_EXTENSION_PYZ_PACK.md) and
+  [CPython extension](spec/SPECIFICATION_EXTENSION_CPYTHON_310_311.md)
 - [Implementation and acceptance record](planning/pyz-pack/commit-plan.md)
 
 For development, install `.[dev]` in a dedicated environment and run only a
