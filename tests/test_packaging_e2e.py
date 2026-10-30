@@ -31,6 +31,8 @@ EXPECTED_RUNTIME_FILES = {
     "patchharbor/py.typed",
     "patchharbor/__init__.py",
     "patchharbor/application.py",
+    "patchharbor/application_configuration.py",
+    "patchharbor/application_exchange.py",
     "patchharbor/api.py",
     "patchharbor/api_types.py",
     "patchharbor/archive_policy.py",

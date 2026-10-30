@@ -15,6 +15,7 @@ from tests.exchange_support import _identity_record
 _CRASH = r'''
 import os, sys
 import patchharbor.application as app
+import patchharbor.application_exchange as exchange_app
 import patchharbor.result_bundle_publication as publication
 from patchharbor.cli import main
 point = sys.argv[1]
@@ -27,12 +28,12 @@ elif point == "after_commit":
 elif point == "before_publish":
     publication.replace_path = crash
 elif point == "after_publish":
-    app.mark_exchange_apply_finished = crash
+    exchange_app.mark_exchange_apply_finished = crash
 elif point == "persistence_error":
     from patchharbor.errors import patch_package_error
     def fail(*args, **kwargs):
         raise patch_package_error("simulated ledger write failure")
-    app.mark_exchange_apply_finished = fail
+    exchange_app.mark_exchange_apply_finished = fail
 else:
     raise AssertionError(point)
 raise SystemExit(main(["apply", "--json", *sys.argv[2:]]))

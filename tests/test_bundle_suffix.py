@@ -137,7 +137,7 @@ def test_invalid_cli_value_never_overwrites_existing_configuration(paths, tmp_pa
 
 
 def test_suffix_update_holds_shared_lock(paths, tmp_path: Path, monkeypatch) -> None:
-    import patchharbor.application as application
+    import patchharbor.application_configuration as application
     from tests.platform_support import project_environment
     from tests.registration_support import probe_registry_lock
     write_exchange_directory(paths, tmp_path / "exchange")

@@ -10,7 +10,7 @@ import shutil
 
 import pytest
 
-from patchharbor import api, application
+from patchharbor import api, application, application_exchange
 from patchharbor import exchange_state
 from patchharbor.errors import configuration_error, patch_package_error
 from patchharbor.locks import registry_lock, repository_lock
@@ -41,8 +41,9 @@ def forbid_bundle_work(monkeypatch):
         pytest.fail("watch/readiness query performed bundle or repository-state work")
     for name in ("scan_exchange_directory", "materialize_exchange_patch",
                  "recover_exchange_artifacts", "archive_exchange_artifacts",
-                 "capture_repository_context_for_id", "capture_consistent_repository_snapshot"):
-        monkeypatch.setattr(application, name, forbidden)
+                 "capture_repository_context_for_id"):
+        monkeypatch.setattr(application_exchange, name, forbidden)
+    monkeypatch.setattr(application, "capture_consistent_repository_snapshot", forbidden)
     monkeypatch.setattr(exchange_state, "load_exchange_state", forbidden)
 
 
@@ -112,9 +113,9 @@ def test_scoped_apply_never_scans_hashes_or_maintains_other_exchange(pair, monke
     original = downloading.read_bytes()
     target = api.watch_targets().exchanges[0]
     scanned, maintained = [], []
-    scan = application.scan_exchange_directory
-    archive = application.archive_exchange_artifacts
-    recover = application.recover_exchange_artifacts
+    scan = application_exchange.scan_exchange_directory
+    archive = application_exchange.archive_exchange_artifacts
+    recover = application_exchange.recover_exchange_artifacts
 
     def scan_a(directory, **kwargs):
         assert directory == exchanges[0]
@@ -127,9 +128,9 @@ def test_scoped_apply_never_scans_hashes_or_maintains_other_exchange(pair, monke
         maintained.append(kwargs["repository_id"])
         return function(artifacts, **kwargs)
 
-    monkeypatch.setattr(application, "scan_exchange_directory", scan_a)
-    monkeypatch.setattr(application, "archive_exchange_artifacts", lambda a, **kw: maintain_a(archive, a, **kw))
-    monkeypatch.setattr(application, "recover_exchange_artifacts", lambda a, **kw: maintain_a(recover, a, **kw))
+    monkeypatch.setattr(application_exchange, "scan_exchange_directory", scan_a)
+    monkeypatch.setattr(application_exchange, "archive_exchange_artifacts", lambda a, **kw: maintain_a(archive, a, **kw))
+    monkeypatch.setattr(application_exchange, "recover_exchange_artifacts", lambda a, **kw: maintain_a(recover, a, **kw))
     report = api.apply_next(exchanges=(target,))
     assert report.success
     assert report.automatic.status is api.AutomaticApplyStatus.ATTEMPTED
@@ -198,11 +199,11 @@ def test_root_replacement_between_selection_and_mutation_is_rejected(pair, tmp_p
             return apply_package(package, **kwargs)
         monkeypatch.setattr(application, "apply_patch_package", compete)
     else:
-        read_identity = application.require_exchange_identity_unchanged
+        read_identity = application_exchange.require_exchange_identity_unchanged
         def compete(identity, **kwargs):
             read_identity(identity, **kwargs)
             replace_root()
-        monkeypatch.setattr(application, "require_exchange_identity_unchanged", compete)
+        monkeypatch.setattr(application_exchange, "require_exchange_identity_unchanged", compete)
     report = api.apply_next(exchanges=(target,))
     assert not report.success and not report.execution_present
     assert report.automatic.status is api.AutomaticApplyStatus.ERROR

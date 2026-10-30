@@ -1,11 +1,11 @@
 # PatchHarbor 1.5.0 – Refactoring- und Commitplan
 
 **Plan-ID:** `REFACTOR-1.5.0`
-**Revision:** 9 · 30. Oktober 2026
+**Revision:** 10 · 30. Oktober 2026
 **Zielversion:** 1.5.0; die Produktversion bleibt bis RF-13 bei 1.4.0.
-**Status:** RF-00 bis RF-06 bestätigt; RF-07 als Bundle 064 vorbereitet, Apply offen.
-**Fortschritt:** 7 / 14 Planpositionen und 8 / 15 vorgesehene Commits bestätigt.
-**Aktueller Auftrag:** genau das nächste Arbeitspaket RF-07 erstellen; keine übernommene Automatik aus älteren Plänen.
+**Status:** RF-00 bis RF-07 bestätigt; RF-08 als Bundle 065 vorbereitet, Apply offen.
+**Fortschritt:** 8 / 14 Planpositionen und 9 / 15 vorgesehene Commits bestätigt.
+**Aktueller Auftrag:** genau das nächste Arbeitspaket RF-08 erstellen; keine übernommene Automatik aus älteren Plänen.
 **Gemeinsame normative Grundlage:** [Hauptspezifikation](../../spec/SPECIFICATION.md),
 [PYZ/PACK-Erweiterung](../../spec/SPECIFICATION_EXTENSION_PYZ_PACK.md) und
 [CPython-3.10/3.11-Erweiterung](../../spec/SPECIFICATION_EXTENSION_CPYTHON_310_311.md),
@@ -151,8 +151,8 @@ falls weitere Aufteilung nötig wird, wird der Plan vorher nachvollziehbar angep
 | 5 / 14 | RF-04 | CONFIRMED – Bundle 060 | `test(architecture): assert behavior and dependency boundaries [RF-04]` |
 | 6 / 14 | RF-05 | CONFIRMED – Bundle 061 | `refactor(runtime): separate shared profile primitives from wheel support [RF-05]` |
 | 7 / 14 | RF-06 | CONFIRMED – Bundles 062/063 | zwei aufeinanderfolgende Commits, siehe RF-06A/B unten |
-| 8 / 14 | RF-07 | NEXT – Bundle 064 vorbereitet | `refactor(bootstrap): generate embedded program from one source [RF-07]` |
-| 9 / 14 | RF-08 | OPEN | `refactor(application): isolate configuration and exchange discovery [RF-08]` |
+| 8 / 14 | RF-07 | CONFIRMED – Bundle 064 | `refactor(bootstrap): generate embedded program from one source [RF-07]` |
+| 9 / 14 | RF-08 | NEXT – Bundle 065 vorbereitet | `refactor(application): isolate configuration and exchange discovery [RF-08]` |
 | 10 / 14 | RF-09 | OPEN | `refactor(application): clarify apply and result orchestration [RF-09]` |
 | 11 / 14 | RF-10 | OPEN | `refactor(cli): share command plumbing and separate parser setup [RF-10]` |
 | 12 / 14 | RF-11 | OPEN | `refactor(ci): centralize acceptance matrix and proof identities [RF-11]` |
@@ -382,15 +382,15 @@ Commit und Push sind durch das Result in Abschnitt 4 bestätigt.
   eigener Bootstrap im frischen stdlib-Prozess; Beschädigung, Shadowing,
   Rechte-/Handle-Fehler und technische Nichtverfügbarkeit bleiben korrekt behandelt.
 
-**Vorbereitet in Bundle 064:** Das unveränderte Skript ist die einzige gepflegte
+**Bestätigt durch Bundle 064:** Das unveränderte Skript ist die einzige gepflegte
 Programmquelle. `scripts/render_chat_bootstrap.py` erzeugt ausschließlich den
 markierten ausführbaren Block und bietet einen rein lesenden Check. Wheel-,
 sdist- und Editable-Builds verweigern fehlende, mehrdeutige oder veraltete
 Generierung, ohne den Quellbaum automatisch zu reparieren. Der sdist enthält
 gezielt die zwei benötigten Buildskripte; Wheel/PYZ enthalten keine zusätzlichen
 Buildwerkzeuge. [Arbeitsweise und Nachweiszuordnung](rf07-bootstrap-source.md).
-Development prüft die dort dokumentierte parallele Auswahl; vollständiges
-Apply-Gate, Commit und Push von RF-07 stehen noch aus.
+Development prüfte die dort dokumentierte parallele Auswahl; vollständiges
+Apply-Gate, Commit und Push sind durch das Result in Abschnitt 4 bestätigt.
 
 ### RF-08 – Konfiguration und Exchange-Ermittlung fachlich isolieren
 
@@ -403,6 +403,18 @@ Apply-Gate, Commit und Push von RF-07 stehen noch aus.
 - **Abnahme:** Konfiguration aus Unterverzeichnissen, geteilter Exchange,
   Registry-/Konfigurationsfehler, mehrdeutige Kandidaten und Locks liefern gleiches
   Verhalten. Watcher-Targets und automatische Auswahl bleiben unverändert gebunden.
+
+**Vorbereitet in Bundle 065:** `application_configuration.py` übernimmt
+Registrierungs-/Konfigurationsabläufe einschließlich des gemeinsamen geschützten
+Schreibablaufs. `application_exchange.py` besitzt Zielermittlung, Scope,
+Kandidatenauswahl, erneute Validierung, Wartung und Attempt-Receipts.
+`application.py` bleibt die Fassade für die unveränderte öffentliche API;
+Apply-/Result- und Script-Orchestrierung bleiben bis RF-09 dort.
+Alle bisherigen Funktions-/Klassenkörper bleiben unverändert; Fehlersimulationen
+folgen ihren neuen Lookup-Orten. Kein bestehender Testfall entfällt.
+[Modulgrenzen und Nachweiszuordnung](rf08-application-discovery.md).
+Development führt nur die dokumentierte parallele Auswahl aus. Vollständiges
+Apply-Gate, Commit und Push von RF-08 sind noch offen.
 
 ### RF-09 – Apply- und Result-Orchestrierung übersichtlich trennen
 
@@ -624,7 +636,21 @@ erreichte Teilfortschritte werden im tatsächlichen Result ausgewertet.
 - Collection-Änderungen entsprechen vollständig der geprüften Testzuordnung.
   RF-06A und RF-06B schließen zusammen die siebte Planposition ab.
   Development hatte nur ausgewählte parallele Tests ausgeführt. Keine CI gestartet.
-  RF-07 bindet sich an dieses Result; sein eigener Apply-Erfolg steht noch aus.
+  RF-07 band sich an dieses Result; sein eigener Apply ist unten bestätigt.
+
+### Bestätigter Fortschritt: RF-07 / Bundle 064
+
+- Tatsächlicher Apply, Entrypoint- und Prozess-Exitcode 0; kein Dry-Run.
+- Commit `d4210e7a2ae85fc85b50aedddecd1ce24bb414d1`, normaler Push auf `dev`;
+  sauberer Snapshot mit 386 Dateien und genau den zehn geplanten Änderungen.
+- Result `patchharbor-apply_Result_061002_1030_8bfd9f.zip`, SHA-256
+  `367aa89d86ca085ef8a63c2c99d1faf4cccb89b151752176c4b27b0c7556a8a8`.
+- Vollständiges paralleles Apply-Gate: 3204 passed, 15 skipped, 12 Worker.
+- Report-SHA-256: `99c6dac8838515c7f6c0e50882d921a7675185b2b61af4e66eb58902bf4547dc`.
+- Die 33 zusätzlichen Testfälle und alle bisherigen Fälle sind nachgewiesen.
+  Damit sind acht Planpositionen und neun Plancommits bestätigt.
+  Development hatte nur ausgewählte parallele Tests ausgeführt. Keine CI gestartet.
+  RF-08 bindet sich an dieses Result; sein eigener Apply-Erfolg steht noch aus.
 
 ## 5. Pflichtnachweise über die Schritte hinweg
 

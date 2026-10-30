@@ -1,5 +1,21 @@
 # PatchHarbor – Spezifikations-Changelog
 
+## 2026-10-30 – RF-08 / Bundle 065: Konfiguration und Exchange-Ermittlung
+
+- RF-07 tatsächlich angewendet und gepusht auf
+  `d4210e7a2ae85fc85b50aedddecd1ce24bb414d1`; 8 Planpositionen und 9 Plancommits bestätigt.
+- Zwei begrenzte Application-Module übernehmen vorhandene Konfigurations-,
+  Registrierungs-, Watch-Target- und Discovery-Abläufe. Die öffentliche API
+  bleibt unverändert; der Watcher nutzt dieselbe fachliche Implementierung.
+- Bestehende Funktions-/Klassenkörper, Lock-Lebensdauer, erneute Identitäts- und
+  Konfigurationsprüfung, deterministische Auswahl und Replay-Nachweise bleiben
+  erhalten. Fehlersimulationen folgen den tatsächlichen neuen Lookup-Orten.
+- Neue Module werden in Wheel/PYZ mit ausgeliefert; kein Watcher in der Core-PYZ.
+  Kein bestehender Testfall entfällt. Development ausgewählt parallel, Apply
+  vollständig parallel vor dem Commit. CI nur manuell durch Christian.
+- Die drei Normdateien, Paket-/Fehlerverträge, 1.4.0-Originalartefakte und
+  Produktversion bleiben unverändert. RF-08-Apply, Commit und Push sind offen.
+
 ## 2026-10-30 – RF-07 / Bundle 064: Eine gepflegte Bootstrapquelle
 
 - RF-06B tatsächlich angewendet und gepusht auf
