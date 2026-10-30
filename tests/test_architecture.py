@@ -416,7 +416,7 @@ def test_current_pyz_and_shared_profiles_do_not_depend_on_legacy_readers() -> No
     forbidden = {"patchharbor.runtime_wheel", "patchharbor.result_runtime"}
     for module in ("patchharbor.runtime_pyz", "patchharbor.result_pyz",
                    "patchharbor.runtime_profile", "patchharbor.result_runtime_metadata",
-                   "patchharbor.wheel_record", "patchharbor.runtime_sources",
+                   "patchharbor.runtime_sources",
                    "patchharbor.pyz_artifact", "patchharbor.result_resources"):
         pending, seen = [module], set()
         while pending:

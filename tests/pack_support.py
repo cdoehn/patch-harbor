@@ -5,25 +5,23 @@ import pytest
 
 from patchharbor import api
 
-from tests.result_runtime_support import attach_runtime
+from tests.result_runtime_support import attach_pyz
 from tests.reference_support import edit_document, reference_entries, write_reference
 
 
 SCRIPT=b'#!/usr/bin/env bash\n# PATCHHARBOR\nexit 0\n'
 
 
-def _reference(tmp_path, *, kind="bundle", dirty=False, handoff=True, version=1, suffix=".txt"):
-    files, binding = reference_entries(kind=kind, dirty=dirty, handoff=handoff)
+def _reference(tmp_path, *, kind="bundle", dirty=False, suffix=".txt"):
+    files, binding = reference_entries(kind=kind, dirty=dirty)
     edit_document(files, "context.json", lambda doc: doc.update(bundle_suffix=suffix))
-    if handoff:
-        edit_document(files, "environment.json", lambda doc: doc.update(
+    edit_document(files, "environment.json", lambda doc: doc.update(
             bundle_suffix=suffix, repository_path="/foreign/missing/repository",
             captured_at="2026-10-03T12:00:00Z", repository_name="recorded-repo",
             exchange_directory="/foreign/exchange", output_directory=None,
             runtime={"system": "ForeignOS", "python_version": "3.12.0", "unknown": None,
                      "extra": {"items": [1, {"nested": True}]}}))
-    if version == 2:
-        files = attach_runtime(files, None)
+    files = attach_pyz(files, None)
     path = tmp_path / "reference.zip"
     write_reference(path, files)
     return path, files, binding

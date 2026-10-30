@@ -752,8 +752,6 @@ def assess(reference, *, trusted_source_sha256=None):
         manifest = _json(_read(archive, 'manifest.json', MAX_INPUT))
         _require(manifest.get('marker') == 'patch-harbor-result-bundle'
                  and type(manifest.get('format_version')) is int, 'not a supported Result')
-        if manifest['format_version'] in (1,2):
-            raise BootstrapUnavailable('legacy Result: use its documented wheel/previous handoff path')
         _require(manifest['format_version'] == 3, 'unsupported Result version')
         runtime = manifest.get('runtime')
         _require(type(runtime) is dict and set(runtime) == {'status','reason','metadata','artifact'},
@@ -1094,12 +1092,12 @@ parallele Testauswahl. Apply prüft jeden Commitstand vollständig parallel, auc
 Bundle-Ende. Keine Vollsuite im Development. Kein serieller Lauf und keine verkürzte Auswahl als Vollabnahme.
 Nur Christian startet den manuellen CI-Workflow; Codex und Entrypoints tun das nie.
 
-RF-00 bis RF-05 sind durch tatsächliche Applies und Push bestätigt, zuletzt
-RF-05 / Bundle 061 auf `5ee194153d1338777cb6b77a60b7854e7b009388`.
-Der Folgeauftrag umfasst RF-06A / Bundle 062: die geschlossenen Capability-
-Profile `[1, 2, 3]` und `[3]` im Reader und Bootstrap vorbereiten; eigener Apply
-steht noch aus. RF-06B stellt später den Writer um und entfernt Legacy-Pfade.
-Die Planposition RF-06 ist erst nach beiden bestätigten Teilschritten abgeschlossen.
+RF-00 bis RF-05 und RF-06A sind durch tatsächliche Applies und Push bestätigt,
+zuletzt Bundle 062 auf `220c0af2189cebe29ae2c991c4a6afb65dc3cc1f`.
+Der Folgeauftrag umfasst RF-06B / Bundle 063: Result 1/2, Runtime-Wheel-Provider
+und alten Installations-Bootstrap entfernen; der aktuelle Writer deklariert `[3]`.
+Originale 1.4.0-Result-3-Daten mit `[1, 2, 3]` bleiben lesbar. Die Planposition
+RF-06 ist erst nach bestätigtem Apply von RF-06B abgeschlossen; dieser steht aus.
 Weitere Implementierung oder eine automatische Schleife ist nicht vorweggenommen.
 Vollständige Watcher-Results samt Teilfortschritten werden
 geprüft; fehlende externe Nachweise werden konkret gemeldet. CI startet

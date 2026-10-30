@@ -214,6 +214,6 @@ def test_missing_loaded_pyz_identity_cannot_select_the_legacy_pack_provider(monk
     provider_for(monkeypatch, tmp_path, kind=kind)
     monkeypatch.setattr(provider_module, '_pyz_resource_id', None)
     def forbidden(): pytest.fail('defective own PYZ silently selected legacy runtime')
-    monkeypatch.setattr(patch_pack, 'RuntimeProvider', forbidden)
+    monkeypatch.setattr(patch_pack, 'read_stable_regular_file_bounded', forbidden)
     with pytest.raises(PatchHarborError) as caught: patch_pack.capture_pack_template()
     assert caught.value.reason is FailureReason.PAYLOAD_PREPARATION_ERROR

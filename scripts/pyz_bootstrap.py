@@ -449,8 +449,6 @@ def assess(reference, *, trusted_source_sha256=None):
         manifest = _json(_read(archive, 'manifest.json', MAX_INPUT))
         _require(manifest.get('marker') == 'patch-harbor-result-bundle'
                  and type(manifest.get('format_version')) is int, 'not a supported Result')
-        if manifest['format_version'] in (1,2):
-            raise BootstrapUnavailable('legacy Result: use its documented wheel/previous handoff path')
         _require(manifest['format_version'] == 3, 'unsupported Result version')
         runtime = manifest.get('runtime')
         _require(type(runtime) is dict and set(runtime) == {'status','reason','metadata','artifact'},

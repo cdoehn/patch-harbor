@@ -43,9 +43,8 @@ def build(tmp_path,reference,sources,*,filename=None,policy=DEFAULT_RESOURCE_POL
 
 @pytest.mark.parametrize('kind',['bundle','success','dry_run','failure','mismatch','timeout','interrupted'])
 @pytest.mark.parametrize('dirty',[False,True])
-@pytest.mark.parametrize('version,handoff',[(1,False),(1,True),(2,True)])
-def test_candidate_preserves_exact_binding_and_is_natively_valid(tmp_path,kind,dirty,version,handoff):
-    path,_,binding=_reference(tmp_path,kind=kind,dirty=dirty,handoff=handoff,version=version)
+def test_candidate_preserves_exact_binding_and_is_natively_valid(tmp_path,kind,dirty):
+    path,_,binding=_reference(tmp_path,kind=kind,dirty=dirty)
     reference=capture_result_reference(path)
     source=inputs(tmp_path)
     metadata,raw,warnings=build(tmp_path,reference,source)
@@ -62,16 +61,11 @@ def test_candidate_preserves_exact_binding_and_is_natively_valid(tmp_path,kind,d
         assert env['bundle_type']=='Patch' and env['bundle_filename']==metadata.filename
         assert env['bundle_suffix']=='.txt'
         assert env['run_id']==reference.facts.run_id
-        if handoff:
-            assert env['captured_at']=='2026-10-03T12:00:00Z'
-            assert env['repository_path']=='/foreign/missing/repository'
-            assert env['exchange_directory']=='/foreign/exchange'
-            assert env['output_directory'] is None
-            assert env['runtime']['system']=='ForeignOS'
-        else:
-            assert env['captured_at'] is None and env['runtime'] is None
-            assert env['exchange_directory'] is None and env['output_directory'] is None
-            assert warnings
+        assert env['captured_at']=='2026-10-03T12:00:00Z'
+        assert env['repository_path']=='/foreign/missing/repository'
+        assert env['exchange_directory']=='/foreign/exchange'
+        assert env['output_directory'] is None
+        assert env['runtime']['system']=='ForeignOS'
 
 
 def test_candidate_profile_is_ordered_reproducible_and_uses_explicit_modes(tmp_path):
@@ -110,8 +104,9 @@ def test_automatic_name_uses_own_uuid_utc_and_portable_display_prefix(tmp_path,n
 @pytest.mark.parametrize('recorded,expected',[('/foreign/project','project'),
     ('C:\\Users\\somebody\\project','project'),('\\\\host\\share\\project','project'),('/', 'repository')])
 def test_legacy_name_uses_recorded_path_syntax_without_local_resolution(tmp_path,monkeypatch,recorded,expected):
-    path,files,_=_reference(tmp_path,handoff=False)
+    path,files,_=_reference(tmp_path)
     edit_document(files,'logs/run.json',lambda d:d.update(repository_path=recorded))
+    edit_document(files,'environment.json',lambda d:d.update(repository_path=recorded,repository_name=None))
     write_reference(path,files);reference=capture_result_reference(path)
     monkeypatch.setattr(Path,'resolve',lambda *a,**k:pytest.fail('foreign path resolution'))
     metadata=prepare_metadata(reference,PACKAGE_ID,STAMP)

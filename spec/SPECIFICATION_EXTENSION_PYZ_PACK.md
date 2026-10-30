@@ -284,7 +284,7 @@ Eine `.dist-info`-Struktur ist **kein Pflichtbestandteil der PYZ und wird im ers
 
 **PYZ-04.** Ressourcen werden aus genau der geladenen Distribution gelesen. Zugriffe, die aus `__file__` ein vermeintlich reales Paketverzeichnis konstruieren, müssen für den PYZ-Weg ersetzt werden. Geeignet sind verankerte Resource-Reader, etwa `importlib.resources.files(...)`, beziehungsweise kontrollierte Archivleser. Paketressourcen können innerhalb eines ZIPs liegen; ein echter Dateisystempfad ist nicht generell vorhanden. [Q4]
 
-Das betrifft insbesondere `chat_instructions.py`, `runtime_artifact.py`, die gemeinsame Result-Ressourcenbindung und die neue Paketgenerierung. Ein defekter eigener Ressourcensatz darf nicht zu einer Vorlage aus CWD, dem Zielrepository oder einer anderen PatchHarbor-Installation führen.
+Das betrifft insbesondere `chat_instructions.py`, `pyz_artifact.py`, die gemeinsame Result-Ressourcenbindung und die neue Paketgenerierung. Ein defekter eigener Ressourcensatz darf nicht zu einer Vorlage aus CWD, dem Zielrepository oder einer anderen PatchHarbor-Installation führen.
 
 Für `inspect`, referenzbasiertes `validate` und die Vorlagenverwendung von `pack` ist kein Entpacken des vollständigen Python-Pakets erforderlich. Temporäre Materialisierung einzelner Ressourcen ist nur zulässig, wenn die jeweilige Operation sie fachlich benötigt und ihre Nebenwirkungsgrenzen eingehalten werden. Die lesenden Prüffunktionen dürfen dadurch keine fachlichen Schreibzugriffe erhalten.
 

@@ -1,6 +1,7 @@
 """Shared reference fixtures and behavior probes."""
 from __future__ import annotations
 
+from functools import lru_cache
 import hashlib
 import json
 import stat
@@ -11,9 +12,11 @@ from patchharbor.archive_evidence import CLEAN_FINGERPRINT
 from patchharbor.run_report import PrimaryResult
 
 from tests.patch_inspection_support import MANIFEST, write_package
+from tests.result_runtime_support import attach_pyz, edit_document
+from tests.runtime_pyz_support import prepared
 
 
-def reference_entries(*, kind="bundle", dirty=False, object_format="sha1", handoff=False):
+def reference_entries(*, kind="bundle", dirty=False, object_format="sha1", handoff=True):
     binding = {k: MANIFEST[k] for k in ("repo_id", "base_commit", "state_fingerprint", "fingerprint_algorithm")}
     binding["base_commit"] = "12" * (20 if object_format == "sha1" else 32)
     binding["state_fingerprint"] = "a" * 16 if dirty else CLEAN_FINGERPRINT
@@ -26,7 +29,7 @@ def reference_entries(*, kind="bundle", dirty=False, object_format="sha1", hando
                "timeout": PrimaryResult.timeout_result, "interrupted": PrimaryResult.interrupted_result}[kind]()
     raw = b"base\x00\xff\n"
     blob = hashlib.new(object_format, b"blob " + str(len(raw)).encode() + b"\0" + raw).hexdigest()
-    manifest = {"marker": "patch-harbor-result-bundle", "format_version": 1, **binding,
+    manifest = {"marker": "patch-harbor-result-bundle", "format_version": 3, **binding,
                 "created_at": stamp, "run_id": run_id, "dirty": dirty, "dry_run": kind == "dry_run",
                 "entrypoint_started": primary.entrypoint_started, "execution_present": primary.entrypoint_started,
                 "primary_result": primary.kind.value, "result_bundle_status": "created",
@@ -60,7 +63,7 @@ def reference_entries(*, kind="bundle", dirty=False, object_format="sha1", hando
                                                 "run_id": run_id, "bundle_suffix": ""}).encode()
     files.update({name: json.dumps(doc).encode() for name, doc in
                   (("manifest.json", manifest), ("context.json", context), ("logs/run.json", run))})
-    return files, binding
+    return attach_pyz(files, reference_runtime()), binding
 
 
 def write_reference(path, files, *, executable=()):
@@ -76,6 +79,10 @@ def bound_package(path, binding):
     write_package(path, changes={"patch.json": json.dumps({**MANIFEST, **binding}).encode()})
 
 
-def edit_document(files, name, mutate):
-    document = json.loads(files[name]); mutate(document)
-    files[name] = json.dumps(document).encode()
+@lru_cache(maxsize=1)
+def reference_runtime():
+    # One immutable synthetic data artifact; static readers must never execute it.
+    from tests.runtime_pyz_support import inputs
+    payloads = inputs()
+    payloads['patchharbor/api.py'] = b'raise AssertionError("reference data executed")\n'
+    return prepared(payloads)[2]

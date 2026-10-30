@@ -1,5 +1,22 @@
 # PatchHarbor – Spezifikations-Changelog
 
+## 2026-10-30 – RF-06B / Bundle 063: Überholte Result-/Runtime-Pfade entfernen
+
+- RF-06A tatsächlich angewendet und gepusht auf
+  `220c0af2189cebe29ae2c991c4a6afb65dc3cc1f`; 7 tatsächliche Plancommits,
+  6 vollständig bestätigte Planpositionen. RF-06B ist noch nicht angewendet.
+- Native Leser beschränken sich auf Result 3; aktuelle Writer deklarieren `[3]`.
+  Unveränderte 1.4.0-Results mit `[1, 2, 3]` bleiben unterstützt. Patchformat 1,
+  Metadatenformat 2, PYZ-Rezept und Fehler-/Sicherheitsverträge bleiben bestehen.
+- Result-Wheel-Reader, Provider, Installations-Bootstrap, alte Build-Rezepte und
+  ausschließliche Fixtures/Tests abbauen. Gemeinsame Sicherheitstests auf Result 3
+  und PYZ übertragen; alte Results liefern keine Archivierungs-/Recovery-Freigabe.
+- Normale Wheel/sdist-Installation, Watcher, Source-/Editable-Diagnose und sicherer
+  technischer PYZ-Fallback bleiben. Der vorhandene uv-CI-Nachweis prüft jetzt das
+  normale Installations-Wheel und dessen PYZ unter derselben Nachweiskennung.
+- Development nur ausgewählte parallele Tests; Apply vollständig parallel vor
+  dem Commit. Kein CI-Start. Die Spezifikationsaufteilung bleibt unverändert.
+
 ## 2026-10-29 – RF-06A / Bundle 062: Capability-Leser vorbereiten
 
 - RF-05 tatsächlich angewendet und gepusht auf

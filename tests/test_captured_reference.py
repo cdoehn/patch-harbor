@@ -25,9 +25,8 @@ from tests.pack_support import _reference
 
 @pytest.mark.parametrize("kind", ["bundle", "success", "dry_run", "failure", "mismatch", "timeout", "interrupted"])
 @pytest.mark.parametrize("dirty", [False, True])
-@pytest.mark.parametrize("handoff", [False, True])
-def test_capture_retains_actual_binding_suffix_and_exact_handoff(tmp_path, kind, dirty, handoff):
-    path, files, binding = _reference(tmp_path, kind=kind, dirty=dirty, handoff=handoff)
+def test_capture_retains_actual_binding_suffix_and_exact_handoff(tmp_path, kind, dirty):
+    path, files, binding = _reference(tmp_path, kind=kind, dirty=dirty)
     captured = reader.capture_result_reference(path)
     assert captured.sha256 == hashlib.sha256(path.read_bytes()).hexdigest()
     assert captured.bundle_suffix == ".txt"
@@ -36,23 +35,21 @@ def test_capture_retains_actual_binding_suffix_and_exact_handoff(tmp_path, kind,
         assert str(getattr(captured.facts.context, name)) == value
     if kind != "bundle":
         assert captured.facts.expected.base_commit != captured.facts.context.base_commit
-    assert captured.facts.handoff_present is handoff
-    if handoff:
-        assert captured.handoff.instructions == files["CHAT_INSTRUCTIONS.md"]
-        assert captured.handoff.environment == files["environment.json"]
-    else:
-        assert captured.handoff is None
+    assert captured.facts.handoff_present
+    assert captured.handoff.instructions == files["CHAT_INSTRUCTIONS.md"]
+    assert captured.handoff.environment == files["environment.json"]
     legacy = reader.read_result_reference(path)
     assert type(legacy) is tuple and len(legacy) == 2
     assert legacy == (captured.facts, captured.sha256)
 
 
 def test_missing_legacy_suffix_is_empty_and_does_not_invent_environment(tmp_path):
-    path, files, _ = _reference(tmp_path, handoff=False)
+    path, files, _ = _reference(tmp_path)
     edit_document(files, "context.json", lambda doc: doc.pop("bundle_suffix"))
+    edit_document(files, "environment.json", lambda doc: doc.update(bundle_suffix=""))
     write_reference(path, files)
     captured = reader.capture_result_reference(path)
-    assert captured.bundle_suffix == "" and captured.handoff is None
+    assert captured.bundle_suffix == "" and captured.handoff is not None
 
 
 def test_capture_and_passive_bytes_cannot_be_changed_by_a_renderer(tmp_path):
@@ -72,9 +69,9 @@ def test_capture_and_passive_bytes_cannot_be_changed_by_a_renderer(tmp_path):
 
 @pytest.mark.parametrize("kind,dirty", [("bundle", False), ("success", True), ("failure", True), ("dry_run", False)])
 def test_unavailable_runtime_is_still_a_complete_reference(tmp_path, kind, dirty):
-    path, files, _ = _reference(tmp_path, version=2, kind=kind, dirty=dirty)
+    path, files, _ = _reference(tmp_path, kind=kind, dirty=dirty)
     captured = reader.capture_result_reference(path)
-    assert captured.facts.format_version == 2
+    assert captured.facts.format_version == 3
     assert captured.facts.runtime.status == "unavailable"
     assert captured.facts.warnings
     assert captured.handoff.environment == files["environment.json"]
@@ -82,7 +79,7 @@ def test_unavailable_runtime_is_still_a_complete_reference(tmp_path, kind, dirty
 
 @pytest.mark.parametrize("fault", ["runtime_hash", "extra_runtime", "snapshot_hash", "handoff_suffix", "unknown_algorithm"])
 def test_capture_never_uses_weaker_repository_only_diagnostics(tmp_path, monkeypatch, fault):
-    path, files, _ = _reference(tmp_path, version=2)
+    path, files, _ = _reference(tmp_path)
     if fault == "runtime_hash":
         files["runtime/runtime.json"] += b" "
     elif fault == "extra_runtime":
@@ -179,7 +176,7 @@ def test_capture_does_not_open_an_extra_resource_budget(tmp_path, limit):
 
 
 def test_internal_and_public_reference_validation_have_identical_facts(tmp_path):
-    path, _, binding = _reference(tmp_path, version=2, kind="failure", dirty=True)
+    path, _, binding = _reference(tmp_path, kind="failure", dirty=True)
     captured = reader.capture_result_reference(path)
     patch = tmp_path / "patch.zip"
     bound_package(patch, binding)
@@ -234,7 +231,7 @@ def test_internal_end_validation_honours_package_budget(tmp_path):
 def test_capture_and_internal_validation_are_read_only_without_git_registry_or_network(tmp_path, monkeypatch):
     import patchharbor.registry as registry
     import patchharbor.repository_state as state
-    path, _, binding = _reference(tmp_path, version=2)
+    path, _, binding = _reference(tmp_path)
     patch = tmp_path / "patch.zip"
     bound_package(patch, binding)
     before = {item.name: item.read_bytes() for item in tmp_path.iterdir()}

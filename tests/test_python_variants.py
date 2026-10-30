@@ -109,10 +109,15 @@ def test_frozen_reference_formats_remain_byte_exact_and_readable(tmp_path, versi
     record = provenance['files'][path.name]
     original = path.read_bytes()
     assert len(original) == record['bytes'] and pyz.sha256(original) == record['sha256']
-    facts, digest = read_result_reference(path)
-    assert facts.format_version == version and digest == record['sha256']
     patch = tmp_path / 'bound.zip'; bound_package(patch, provenance['binding'])
-    assert api.validate_patch(patch, reference_bundle=path).binding_matches
+    if version in (1, 2):
+        with pytest.raises(api.PatchHarborError): read_result_reference(path)
+        with pytest.raises(api.PatchHarborError): api.validate_patch(patch, reference_bundle=path)
+        with pytest.raises(ValueError): bootstrap.assess(path)
+    else:
+        facts, digest = read_result_reference(path)
+        assert facts.format_version == version and digest == record['sha256']
+        assert api.validate_patch(patch, reference_bundle=path).binding_matches
     assert path.read_bytes() == original
     if version == 3:
         with ZipFile(path) as archive: raw = archive.read('runtime/patchharbor-1.3.0.pyz')
@@ -197,21 +202,6 @@ def test_writer_uses_python310_requirement_and_start_bytes(built_result_source):
     assert json.loads(runtime_payload(None, reason='source_not_prepared').metadata)['requires_python'] == '>=3.10'
 
 
-@pytest.mark.packaging
-@pytest.mark.skipif(sys.version_info < (3, 12), reason='historical 1.3.0 runtime itself requires Python 3.12')
-@pytest.mark.parametrize('requirement', ['>=3.12', '>=3.10'])
-def test_complete_frozen_130_reader_keeps_or_rejects_variant_without_mixed_modules(tmp_path, requirement):
-    with ZipFile(FIXTURES / 'result-format3.zip') as archive:
-        old = archive.read('runtime/patchharbor-1.3.0.pyz')
-    runtime = tmp_path / 'original.pyz'; runtime.write_bytes(old)
-    reference, _, binding = result_file(tmp_path, variant(requirement))
-    patch = tmp_path / 'patch.zip'; bound_package(patch, binding)
-    outcome = subprocess.run([sys.executable, '-I', '-S', '-B', str(runtime), 'validate', str(patch),
-                              '--reference-bundle', str(reference), '--json'], cwd=tmp_path,
-                             capture_output=True, text=True, timeout=60)
-    assert outcome.returncode == (0 if requirement == '>=3.12' else 4), outcome.stderr
-    assert json.loads(outcome.stdout)['success'] is (requirement == '>=3.12')
-    assert runtime.read_bytes() == old
 
 
 @pytest.mark.packaging

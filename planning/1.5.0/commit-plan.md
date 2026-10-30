@@ -1,11 +1,11 @@
 # PatchHarbor 1.5.0 – Refactoring- und Commitplan
 
 **Plan-ID:** `REFACTOR-1.5.0`
-**Revision:** 7 · 29. Oktober 2026
+**Revision:** 8 · 30. Oktober 2026
 **Zielversion:** 1.5.0; die Produktversion bleibt bis RF-13 bei 1.4.0.
-**Status:** RF-00 bis RF-05 durch Bundles 056 bis 061 bestätigt; RF-06A als Bundle 062 vorbereitet, Apply offen. RF-06B bleibt offen.
-**Fortschritt:** 6 / 14 Planpositionen und 6 / 15 vorgesehene Commits bestätigt; RF-06A ist der nächste zu bestätigende Teilschritt.
-**Aktueller Auftrag:** genau das nächste Arbeitspaket RF-06A erstellen; keine übernommene Automatik aus älteren Plänen.
+**Status:** RF-00 bis RF-05 und RF-06A bestätigt; RF-06B als Bundle 063 vorbereitet, Apply offen.
+**Fortschritt:** 6 / 14 Planpositionen und 7 / 15 vorgesehene Commits bestätigt; RF-06B schließt bei bestätigtem Apply die siebte Position ab.
+**Aktueller Auftrag:** genau das nächste Arbeitspaket RF-06B erstellen; keine übernommene Automatik aus älteren Plänen.
 **Gemeinsame normative Grundlage:** [Hauptspezifikation](../../spec/SPECIFICATION.md),
 [PYZ/PACK-Erweiterung](../../spec/SPECIFICATION_EXTENSION_PYZ_PACK.md) und
 [CPython-3.10/3.11-Erweiterung](../../spec/SPECIFICATION_EXTENSION_CPYTHON_310_311.md),
@@ -150,7 +150,7 @@ falls weitere Aufteilung nötig wird, wird der Plan vorher nachvollziehbar angep
 | 4 / 14 | RF-03 | CONFIRMED – Bundle 059 | `refactor(tests): isolate shared fixtures from test modules [RF-03]` |
 | 5 / 14 | RF-04 | CONFIRMED – Bundle 060 | `test(architecture): assert behavior and dependency boundaries [RF-04]` |
 | 6 / 14 | RF-05 | CONFIRMED – Bundle 061 | `refactor(runtime): separate shared profile primitives from wheel support [RF-05]` |
-| 7 / 14 | RF-06 | NEXT – RF-06A / Bundle 062 vorbereitet; RF-06B offen | zwei aufeinanderfolgende Commits, siehe RF-06A/B unten |
+| 7 / 14 | RF-06 | NEXT – RF-06A bestätigt; RF-06B / Bundle 063 vorbereitet | zwei aufeinanderfolgende Commits, siehe RF-06A/B unten |
 | 8 / 14 | RF-07 | OPEN | `refactor(bootstrap): generate embedded program from one source [RF-07]` |
 | 9 / 14 | RF-08 | OPEN | `refactor(application): isolate configuration and exchange discovery [RF-08]` |
 | 10 / 14 | RF-09 | OPEN | `refactor(application): clarify apply and result orchestration [RF-09]` |
@@ -337,8 +337,9 @@ Apply-/Commit-Nachweis bestätigt; siehe Abschnitt 4.
   Bootstrap bleibt Vorprüfung, die native Referenzprüfung weiterhin verpflichtend.
   Eigene gebaute PYZ und eingebetteter Bootstrap müssen beide Profile in frischen
   isolierten Prozessen verarbeiten und beschädigte Snapshots weiter ablehnen.
-- **Vorbereitet in Bundle 062:** [Änderungs- und Testzuordnung](rf06-capability-reader.md).
-  Ein Commit; eigener Apply offen. Diese Vorbereitung schließt RF-06 nicht ab.
+- **Bestätigt durch Bundle 062:** [Änderungs- und Testzuordnung](rf06-capability-reader.md).
+  Ein Commit tatsächlich angewendet und gepusht; Nachweis in Abschnitt 4.
+  Diese Vorbereitung allein schließt RF-06 nicht ab.
 
 #### RF-06B – Writer umstellen und überholte Pfade abbauen
 
@@ -352,6 +353,18 @@ Apply-/Commit-Nachweis bestätigt; siehe Abschnitt 4.
   Watcher, Runtime-unavailable und technischer Fallback bleiben unterstützt.
 - **Abnahme:** sämtliche RF-06-Nachweise oben einschließlich tatsächlicher Übergabe,
   Folge-Result und konservativer Behandlung alter Results im gemischten Exchange.
+
+**Vorbereitet in Bundle 063:** Der native Reader unterstützt ausschließlich
+Result 3; Original-1.4.0-Capabilities `[1, 2, 3]` bleiben gültig. Der aktuelle
+Writer deklariert `[3]`. Result-Wheel-Reader, Provider, alter Installations-
+Bootstrap, Wheel-Rezeptgenerator und deren ausschließliche Fixtures entfallen.
+Der nur noch beim Build benötigte RECORD-Serializer liegt im Buildbackend.
+Der Pack-Templatepfad verwendet den eigenen PYZ-Provider oder den begrenzten
+Source-Pfad. Normales Installations-Wheel, sdist, pipx, uv und Watcher bleiben.
+Die [Abbau- und Testzuordnung](rf06-legacy-removal.md) ordnet jeden entfernten
+Test zu; relevante Grenzen sind auf aktuelle Formate übertragen. Development
+prüft nur die dokumentierte parallele Auswahl. Vollständiges Apply-Gate,
+Commit und Push dieses Bundles sind noch offen.
 
 ### RF-07 – Einen gepflegten ausführbaren Bootstrap bereitstellen
 
@@ -576,6 +589,18 @@ erreichte Teilfortschritte werden im tatsächlichen Result ausgewertet.
 - Report-SHA-256: `bda4980d16f801a4493631a059eacc4940a2c7ef4df2d3a431fecc8dfe0d097b`.
 - Development hatte nur seine ausgewählte parallele Prüfung ausgeführt.
   Keine CI ausgelöst. RF-06A verwendet dieses Result als neue Bindungsbasis.
+
+### Bestätigter Teilschritt: RF-06A / Bundle 062
+
+- Tatsächlicher Apply, Entrypoint- und Prozess-Exitcode 0; kein Dry-Run.
+- Commit `220c0af2189cebe29ae2c991c4a6afb65dc3cc1f`, normaler Push auf `dev`;
+  sauberer Snapshot mit 398 Dateien und genau den acht geplanten Änderungen.
+- Result `patchharbor-apply_Result_203434_1029_8a726e.zip`, SHA-256
+  `88a35eba58b85477e0768333e89b70ff16f775f63a1d176d4e1209884ca56700`.
+- Vollständiges paralleles Apply-Gate: 3386 passed, 15 skipped, 12 Worker.
+- Report-SHA-256: `2ece84af0a0360c5ae6984a7d382148e8136d1fbaadfb3fe04326a9fa4d166ed`.
+- RF-06A ist bestätigt, die Planposition RF-06 bleibt bis RF-06B offen.
+  Keine CI ausgelöst. RF-06B ist an dieses neue Result gebunden.
 
 ## 5. Pflichtnachweise über die Schritte hinweg
 

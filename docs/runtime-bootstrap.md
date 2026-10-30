@@ -1,5 +1,10 @@
 # Installation-free PYZ bootstrap and safe handoff fallback
 
+The former wheel bootstrap and its installation commands below are historical.
+RF-06B removes `scripts/runtime_bootstrap.py`. Use the reviewed PYZ bootstrap
+in `scripts/pyz_bootstrap.py` and [current Result guidance](result-format-3.md).
+The uv proof now installs the normal distribution wheel and uses its Core-PYZ.
+
 
 ## Stdlib-only PYZ bootstrap and embedded executable
 

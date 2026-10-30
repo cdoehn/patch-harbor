@@ -23,6 +23,7 @@ def test_prepared_payload_matches_strict_native_reader(monkeypatch,tmp_path,kind
     artifact=provider.capture().artifact if embedded else None
     payload=resources.runtime_payload(artifact,reason=None if embedded else 'source_not_prepared')
     files,_=reference_entries(handoff=True)
+    files = {name: raw for name, raw in files.items() if not name.startswith('runtime/')}
     files.update(dict(payload.entries()))
     edit_document(files,'manifest.json',lambda d:d.update(format_version=3,runtime=payload.document()))
     edit_document(files,'logs/run.json',lambda d:d.update(warnings=list(payload.warnings)))

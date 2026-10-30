@@ -36,16 +36,10 @@ def _binding(reference: CapturedResultReference) -> dict[str, str]:
 
 
 def _target_environment(reference: CapturedResultReference) -> tuple[dict, tuple[str, ...]]:
-    if reference.handoff is not None:
-        # These exact immutable bytes came from the complete native reader.
-        return parse_json_document(reference.handoff.environment), ()
-    context = reference.facts.context
-    return {
-        'marker': ENVIRONMENT_MARKER, 'format_version': ENVIRONMENT_FORMAT_VERSION,
-        'captured_at': None, 'repository_name': None,
-        'repository_path': context.repository_path, 'run_id': reference.facts.run_id,
-        'exchange_directory': None, 'output_directory': None, 'runtime': None,
-    }, ('reference has no recorded environment; unknown target facts remain null',)
+    if reference.handoff is None:
+        raise _failure('Result 3 requires recorded handoff data', FailureReason.SOURCE_ERROR)
+    # These exact immutable bytes came from the complete native reader.
+    return parse_json_document(reference.handoff.environment), ()
 
 
 def _repository_prefix(document: dict) -> tuple[str, tuple[str, ...]]:

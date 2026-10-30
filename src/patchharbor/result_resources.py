@@ -86,7 +86,7 @@ def runtime_payload(artifact: PyzArtifact | None, *, reason: str | None = None) 
                artifact=dict(type='pyz',**_descriptor(path,artifact.pyz_bytes)),runtime_dependencies=[],
                provenance=dict(mode='canonical_resources',source_commit=recipe.source_commit,recipe_format_version=1),
                capabilities=dict(operations=['inspect_patch','validate_patch','pack_patch'],
-                                 patch_formats=[1],result_formats=[1,2,3]))
+                                 patch_formats=[1],result_formats=[3]))
     with ZipFile(BytesIO(artifact.pyz_bytes)) as archive:
         inner_bytes = sum(info.file_size for info in archive.infolist())
     return ResultRuntimePayload('embedded',None,serialize_json_document(doc).encode(),
@@ -116,7 +116,7 @@ def capture_result_resources() -> PinnedResultResources:
         if provision.artifact is not None or own_pyz_profile_present():
             template = provider.capture_required_template().decode('utf-8')
         else:
-            # A true source/legacy checkout has no prepared PYZ identity. Its
+            # A source checkout has no prepared PYZ identity. Its
             # existing anchored mandatory template is still needed for diagnosis.
             template = load_chat_template()
         if not template or template.startswith('\ufeff'):

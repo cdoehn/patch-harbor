@@ -1,5 +1,9 @@
 # Result-Format 2: historischer Leservertrag
 
+RF-06B entfernt den Format-2-Reader. Die nachfolgende Beschreibung ist historisch;
+aktuelle Reader lehnen Result 1/2 ab. [Result 3](result-format-3.md) und unveränderte
+Artefakte ab PatchHarbor 1.4.0 bleiben die unterstützte Grundlage.
+
 Historischer Stand `1.e.W`: damals erzeugten die regulären Result-Wege Format 2.
 Ab PP-06B schreibt der aktuelle Core [Result 3](result-format-3.md). Der hier
 beschriebene geschlossene Leservertrag dokumentiert nur den Altstand.

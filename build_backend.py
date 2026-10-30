@@ -7,6 +7,9 @@ from __future__ import annotations
 
 from email.parser import BytesParser
 from email.policy import default as email_policy
+import base64
+import csv
+import io
 import importlib.machinery
 import importlib
 from types import ModuleType, SimpleNamespace
@@ -48,12 +51,19 @@ def _profile_module(module_name):
                 del sys.modules[key]
 
 
-def _recipe_module():
-    return _profile_module('runtime_wheel')
-
-
 def _pyz_recipe_module():
     return _profile_module('runtime_pyz')
+
+
+def _wheel_record(inventory, record_path):
+    """Serialize installation-wheel RECORD facts; no runtime resource policy."""
+    record = io.StringIO(newline="")
+    writer = csv.writer(record, lineterminator="\n")
+    for name, digest, size in sorted(inventory):
+        encoded = base64.urlsafe_b64encode(bytes.fromhex(digest)).rstrip(b"=").decode("ascii")
+        writer.writerow((name, "sha256=" + encoded, size))
+    writer.writerow((record_path, "", ""))
+    return record.getvalue().encode("utf-8")
 
 
 def _prepare_pyz_transport(transport: dict[str, bytes], *, version: str,
@@ -80,61 +90,10 @@ def _prepare_pyz_transport(transport: dict[str, bytes], *, version: str,
     prepared.update({name: raw for name, raw in canonical.items()
                      if name.startswith(pyz.RESOURCE_ROOT) or name == pyz.IDENTITY_PATH})
     prepared[pyz.RECIPE_PATH] = recipe.data
-    record = _profile_module('wheel_record')
     record_path = f'patchharbor-{version}.dist-info/RECORD'
-    prepared[record_path] = record.wheel_record(
+    prepared[record_path] = _wheel_record(
         ((name, pyz.sha256(raw), len(raw)) for name, raw in prepared.items() if name != record_path),
         record_path)
-    return prepared
-
-
-def _prepare_recipe(runtime, payloads: dict[str, bytes], *, version: str, requires_python: str):
-    """Build-only recipe construction; validate with the anchored runtime reader."""
-    dist_info = f"patchharbor-{version}.dist-info/"
-    doc = {
-        "marker": "patch-harbor-runtime-recipe", "format_version": 1,
-        "distribution": "patchharbor", "version": version, "requires_python": requires_python,
-        "content_id_algorithm": runtime.CONTENT_ALGORITHM, "source_commit": None,
-        "entries": [{"path": name,
-                     "source": runtime.RESOURCE_ROOT + "metadata/" + name[len(dist_info):] if name.startswith(dist_info) else name,
-                     "size": len(raw), "sha256": runtime.sha256(raw)} for name, raw in sorted(payloads.items())],
-    }
-    doc["content_id"] = runtime.sha256(runtime.recipe_json(doc))
-    return runtime.parse_recipe(runtime.recipe_json(doc))
-
-
-def _prepare_transport(runtime, transport: dict[str, bytes], *, version: str,
-                       requires_python: str, chat: bytes, documentation: bytes) -> dict[str, bytes]:
-    """Prepare one transport inventory without filesystem or request ownership."""
-    dist_info = f"patchharbor-{version}.dist-info"
-    canonical = {name: raw for name, raw in transport.items()
-                 if name.startswith(("patchharbor/", "patchharbor_watcher/"))
-                 and not name.startswith(runtime.RESOURCE_ROOT)
-                 and name not in {runtime.IDENTITY_PATH, "patchharbor/_pyz_identity.py"}}
-    canonical[runtime.CHAT_PATH] = chat
-    canonical[runtime.DOC_PATH] = documentation
-    for name, raw in transport.items():
-        if name.startswith(dist_info + "/") and not name.endswith("/RECORD"):
-            suffix = name[len(dist_info) + 1:]
-            if suffix == "WHEEL":
-                raw = runtime.WHEEL_METADATA
-            canonical[name] = raw
-            canonical[runtime.RESOURCE_ROOT + "metadata/" + suffix] = raw
-    initial = _prepare_recipe(runtime, canonical, version=version, requires_python=requires_python)
-    canonical[runtime.IDENTITY_PATH] = runtime.identity_module(runtime.producer_id(initial))
-    recipe = _prepare_recipe(runtime, canonical, version=version, requires_python=requires_python)
-    # A successful build must already materialize the candidate later read from
-    # an ordinary installation, without preserving its downloaded transport.
-    runtime.materialize(recipe, lambda name, size: canonical[name])
-    record_path = dist_info + "/RECORD"
-    prepared = {name: raw for name, raw in transport.items()
-                if not name.startswith(runtime.RESOURCE_ROOT)
-                and name not in {record_path, "patchharbor/_pyz_identity.py"}}
-    prepared.update({name: raw for name, raw in canonical.items()
-                     if name.startswith(runtime.RESOURCE_ROOT) or name == runtime.IDENTITY_PATH})
-    prepared[runtime.RECIPE_PATH] = recipe.data
-    prepared[record_path] = runtime.wheel_record(
-        ((name, runtime.sha256(raw), len(raw)) for name, raw in prepared.items()), record_path)
     return prepared
 
 
