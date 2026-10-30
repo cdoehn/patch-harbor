@@ -7,6 +7,7 @@ from types import SimpleNamespace
 import pytest
 
 import patchharbor.cli as cli
+import patchharbor.cli_commands as cli_commands
 from patchharbor.cli import main
 from patchharbor.run_report import ResultBundleStatus
 
@@ -96,7 +97,7 @@ def test_parameterless_apply_propagates_manual_or_automatic_origin(
     monkeypatch.setattr(cli.api, "apply", fake_apply)
     monkeypatch.setattr(cli.api, "apply_next", fake_apply_next)
     monkeypatch.setattr(
-        cli,
+        cli_commands,
         "_write_apply_completion",
         lambda _report, **_options: 0,
     )

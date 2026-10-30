@@ -1,11 +1,11 @@
 # PatchHarbor 1.5.0 – Refactoring- und Commitplan
 
 **Plan-ID:** `REFACTOR-1.5.0`
-**Revision:** 11 · 30. Oktober 2026
+**Revision:** 12 · 30. Oktober 2026
 **Zielversion:** 1.5.0; die Produktversion bleibt bis RF-13 bei 1.4.0.
-**Status:** RF-00 bis RF-08 bestätigt; RF-09 als Bundle 066 vorbereitet, Apply offen.
-**Fortschritt:** 9 / 14 Planpositionen und 10 / 15 vorgesehene Commits bestätigt.
-**Aktueller Auftrag:** genau das nächste Arbeitspaket RF-09 erstellen; keine übernommene Automatik aus älteren Plänen.
+**Status:** RF-00 bis RF-09 bestätigt; RF-10 als Bundle 067 vorbereitet, Apply offen.
+**Fortschritt:** 10 / 14 Planpositionen und 11 / 15 vorgesehene Commits bestätigt.
+**Aktueller Auftrag:** genau das nächste Arbeitspaket RF-10 erstellen; keine übernommene Automatik aus älteren Plänen.
 **Gemeinsame normative Grundlage:** [Hauptspezifikation](../../spec/SPECIFICATION.md),
 [PYZ/PACK-Erweiterung](../../spec/SPECIFICATION_EXTENSION_PYZ_PACK.md) und
 [CPython-3.10/3.11-Erweiterung](../../spec/SPECIFICATION_EXTENSION_CPYTHON_310_311.md),
@@ -153,8 +153,8 @@ falls weitere Aufteilung nötig wird, wird der Plan vorher nachvollziehbar angep
 | 7 / 14 | RF-06 | CONFIRMED – Bundles 062/063 | zwei aufeinanderfolgende Commits, siehe RF-06A/B unten |
 | 8 / 14 | RF-07 | CONFIRMED – Bundle 064 | `refactor(bootstrap): generate embedded program from one source [RF-07]` |
 | 9 / 14 | RF-08 | CONFIRMED – Bundle 065 | `refactor(application): isolate configuration and exchange discovery [RF-08]` |
-| 10 / 14 | RF-09 | NEXT – Bundle 066 vorbereitet | `refactor(application): clarify apply and result orchestration [RF-09]` |
-| 11 / 14 | RF-10 | OPEN | `refactor(cli): share command plumbing and separate parser setup [RF-10]` |
+| 10 / 14 | RF-09 | CONFIRMED – Bundle 066 | `refactor(application): clarify apply and result orchestration [RF-09]` |
+| 11 / 14 | RF-10 | NEXT – Bundle 067 vorbereitet | `refactor(cli): share command plumbing and separate parser setup [RF-10]` |
 | 12 / 14 | RF-11 | OPEN | `refactor(ci): centralize acceptance matrix and proof identities [RF-11]` |
 | 13 / 14 | RF-12 | OPEN | `docs(refactor): align current guidance and record cleanup evidence [RF-12]` |
 | 14 / 14 | RF-13 | OPEN | `chore(release): prepare PatchHarbor 1.5.0 acceptance [RF-13]` |
@@ -429,7 +429,7 @@ Apply-Gate, Commit und Push sind durch das Result in Abschnitt 4 bestätigt.
   Commits, Dry-Run, Result-Veröffentlichungsfehler, Recovery und Wiederanlauf
   liefern weiterhin die richtigen Exitcodes, Logs und Nachweise. CIFS-Prüfreihenfolge erhalten.
 
-**Vorbereitet in Bundle 066:** `application_apply.py` hält Auflösung, Preflight,
+**Bestätigt durch Bundle 066:** `application_apply.py` hält Auflösung, Preflight,
 Mutation und Entrypoint-Ausführung zusammen. `application_results.py` übernimmt
 Result-Abschluss, manuelles Bundle und Attempt-Nachweise. Die API-Fassade und
 Script-Eingaben bleiben in `application.py`. Zwei gleiche Vor-Mutations-
@@ -437,8 +437,8 @@ Fehlerabschlüsse teilen sich eine lokale Funktion innerhalb derselben
 Repository-/Ressourcenlebensdauer. Fehler nach Mutation oder Veröffentlichung
 werden nicht damit zusammengelegt. [Änderungs- und Nachweiszuordnung](rf09-application-apply.md).
 API/CLI, Domain-Fehler, RunReport, Publikations-/CIFS-Verträge und bestehende
-Testfälle bleiben erhalten. Development prüft nur die dokumentierte parallele
-Auswahl; vollständiges Apply-Gate, Commit und Push von RF-09 sind noch offen.
+Testfälle bleiben erhalten. Development prüfte nur die dokumentierte parallele
+Auswahl; vollständiges Apply-Gate, Commit und Push sind in Abschnitt 4 bestätigt.
 
 ### RF-10 – CLI-Parser und wiederholte Befehlsrahmen bereinigen
 
@@ -452,6 +452,18 @@ Auswahl; vollständiges Apply-Gate, Commit und Push von RF-09 sind noch offen.
 - **Abnahme:** CLI und API für dieselben Eingaben verhalten sich fachlich gleich;
   ungültige Kombinationen bleiben abgelehnt. Installierte Entrypoints und PYZ
   funktionieren außerhalb des Checkouts unter den unterstützten Interpretern.
+
+**Vorbereitet in Bundle 067:** `cli_parser.py` gliedert dieselbe Grammatik in
+fünf Befehlsgruppen. `cli_commands.py` hält API-Aufrufe und Befehlsabläufe,
+`cli_output.py` gemeinsame Observer-/JSON-/Abschlussgrenzen. `cli.py` bleibt
+Entrypoint mit UTF-8-Konfiguration und expliziter Auswahl. Die vier gleichartigen
+Konfigurationsabläufe werden einmal gepflegt; Query-/Bundle-Fehler teilen ihre
+Ausgabe mit weiterhin getrennten JSON-Versionen. Gemeinsame Ausgabeparameter
+werden einmal gebildet. Pack, Apply und Script-Ausführung behalten ihre eigenen
+Fehler-/Publikationsgrenzen. [Änderungs- und Nachweiszuordnung](rf10-cli-boundaries.md).
+34 zusätzliche Verhaltenstests sichern API-Argumente, Clear-/Observer-Verhalten,
+Fehlercodes und JSON-Versionen. Kein bestehender Testfall entfällt. Development
+prüft nur die dokumentierte parallele Auswahl; RF-10-Apply, Commit und Push sind offen.
 
 ### RF-11 – CI-Matrix und fachliche Nachweise zentral pflegen
 
@@ -675,7 +687,21 @@ erreichte Teilfortschritte werden im tatsächlichen Result ausgewertet.
 - Vollständige Testcollection unverändert, neun Planpositionen und zehn
   Plancommits bestätigt. Development prüfte nur seine parallele Auswahl;
   895 passed und ein nativer Windows-Skip inklusive Entrypoint-Prüfung.
-  Keine CI gestartet. RF-09 bindet sich an dieses Result; sein Apply ist offen.
+  Keine CI gestartet. RF-09 band sich an dieses Result; sein Apply ist unten bestätigt.
+
+### Bestätigter Fortschritt: RF-09 / Bundle 066
+
+- Tatsächlicher Apply, Entrypoint- und Prozess-Exitcode 0; kein Dry-Run.
+- Commit `5fa1ad3cbf1ac2ae1b0d0eb1d5812c10ca3d53de`, normaler Push auf `dev`;
+  sauberer Snapshot mit 392 Dateien und genau den 14 geplanten Änderungen.
+- Result `patchharbor-apply_Result_095934_1030_309588.zip`, SHA-256
+  `194e2ac3550ed6d34866e0cc8ea5a9f773a5ccf1c8c960d652dbbc2405738b58`.
+- Vollständiges paralleles Apply-Gate: 3204 passed, 15 skipped, 12 Worker.
+- Report-SHA-256: `fec7e9002424fde58af02c5437ea91f55afbfa248ca8ab2d3e3f6393ef97f82c`.
+- Vollständige Collection unverändert. Zehn Planpositionen und elf Plancommits
+  bestätigt. Development hatte nur seine parallele Auswahl ausgeführt:
+  727 passed, keine Skips, inklusive Entrypoint-Prüfung.
+  Keine CI gestartet. RF-10 bindet sich an dieses Result; sein Apply ist offen.
 
 ## 5. Pflichtnachweise über die Schritte hinweg
 

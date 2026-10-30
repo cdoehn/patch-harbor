@@ -1,5 +1,23 @@
 # PatchHarbor – Spezifikations-Changelog
 
+## 2026-10-30 – RF-10 / Bundle 067: CLI-Grammatik und Befehlsrahmen
+
+- RF-09 tatsächlich angewendet und gepusht auf
+  `5fa1ad3cbf1ac2ae1b0d0eb1d5812c10ca3d53de`; zehn Planpositionen und elf Plancommits bestätigt.
+- Parser, Befehlsabläufe und Ausgabegrenzen erhalten eigene CLI-Module.
+  Bestehende Parser-Anweisungen bleiben in derselben Reihenfolge und werden
+  fachlich gruppiert; öffentliche Optionen und strikte Argumentprüfung bleiben.
+- Vier Konfigurationsabläufe teilen Observer-/Fehler-/Ausgabehandling.
+  Gleichartige Fehlerausgabe wahrt JSON-Version 1 bzw. 2 und stderr-Zuordnung;
+  gemeinsame Darstellungsparameter werden nur einmal weitergereicht.
+- Pack-Ausgabefehler nach Veröffentlichung, Apply-Result und Script-Runner
+  behalten eigene Grenzen. API, Core-Abläufe, Watcher, Formate, Produktversion
+  und die drei Normdateien bleiben unverändert.
+- Zusätzliche Tests prüfen fachliches Verhalten und maschinenlesbare Verträge,
+  keine Prosa, Farben oder Darstellung. Development ausgewählt parallel;
+  Apply vollständig parallel vor dem Commit. CI ausschließlich durch Christian.
+  RF-10-Apply, Commit und Push sind offen.
+
 ## 2026-10-30 – RF-09 / Bundle 066: Apply- und Result-Orchestrierung
 
 - RF-08 tatsächlich angewendet und gepusht auf
