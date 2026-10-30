@@ -263,3 +263,37 @@ der Dokumentation oder die Konsolendarstellung. Ein erzeugtes Patchpaket, ein
 lokales Testergebnis oder dieser Text ist keine externe CI-Freigabe. Jeder
 W/R/C-Commit entsteht nur nach seinem eigenen Testgate; spätere Schritte bleiben
 bis dahin unappliziert. Bei Fehler bleiben erfolgreiche Commits bestehen.
+
+## Stabile Abnahmenachweise und CI-Katalog (RF-11)
+
+`tools/acceptance-catalog.json` enthält die zwölf unveränderten CI-Lanes,
+Windows-Testauswahl, Build-Artefaktrollen und die erforderlichen Nachweisvarianten.
+Nach einer bewussten Katalogänderung pflegt
+`python scripts/render_acceptance_matrix.py` nur die markierten Matrixblöcke in
+`.github/workflows/acceptance-tests.yml`. `--check` prüft diese ohne Schreiben;
+die manuellen Jobs führen diese Prüfung ebenfalls aus. Beide Modi starten keine CI.
+
+Ein fachlicher Test trägt zum Beispiel
+`@pytest.mark.proof("handoff.commit-sequence", parameter="count")`.
+Die Varianten stammen aus dem tatsächlichen Parameterwert (`0`, `1`, `3`),
+nicht aus Funktionsnamen oder frei wählbaren pytest-IDs. Unparametrisierte
+Nachweise verwenden die Variante `default`. Genau eine Kennung pro Testfall
+ist erlaubt; unbekannte IDs, Varianten oder Parameter werden abgewiesen.
+
+Neue interne Testberichte verwenden `format_version: 2`. `proofs` ordnet
+gesammelten Node-IDs jeweils `id` und `variant` zu. Jeder Worker bestätigt die
+gleiche Zuordnung, auch wenn er keinen Test ausgeführt hat. Die neutrale
+Prüfung erhält alle bisherigen Phasen-, Collection-, Input- und Worker-Gates
+und verwirft doppelte Varianten oder widersprüchliche Zuordnungen. Der
+CI-Auswerter verlangt jede im Katalog für die Lane vorgeschriebene Variante
+genau einmal mit bestandenem Ergebnis über alle Suite-Berichte hinweg.
+Ein Skip oder ein einzelner beliebig markierter Fall ersetzt keine übrigen Varianten.
+
+Neue Buildberichte verwenden Format 2, nennen `wheel`, `sdist`, `pyz` als Rollen
+und verlangen Testberichtformat 2. Neue CI-Reviewbelege verwenden Format 3 und
+speichern die geprüften Pflichtvarianten samt Bericht und Test-ID. Historische
+Build-/Testberichte im Format 1 bleiben prüfbar: Nur dort dient eine eingefrorene
+Namenszuordnung als Übersetzung. Eine Mischung alter Testberichte mit neuen
+Buildberichten wird abgewiesen. Öffentliche PatchHarbor-Result-/Patch-Formate
+bleiben davon unberührt. Die bestehenden Lauf-/Commit-/Interpreterbindungen,
+ZIP-Budgets und ausschließlich lesenden GitHub-Aufrufe bleiben verbindlich.

@@ -1093,12 +1093,13 @@ parallele Testauswahl. Apply prüft jeden Commitstand vollständig parallel, auc
 Bundle-Ende. Keine Vollsuite im Development. Kein serieller Lauf und keine verkürzte Auswahl als Vollabnahme.
 Nur Christian startet den manuellen CI-Workflow; Codex und Entrypoints tun das nie.
 
-RF-00 bis RF-09 sind durch tatsächliche Applies und Push bestätigt,
-zuletzt Bundle 066 auf `5fa1ad3cbf1ac2ae1b0d0eb1d5812c10ca3d53de`.
-Der Folgeauftrag umfasst RF-10 / Bundle 067: CLI-Parser nach Befehlsgruppen,
-gemeinsame Konfigurations-/Fehlerausgabe und getrennte CLI-Module.
-Befehle, Optionen, API-Aufrufe und maschinenlesbare Verträge bleiben erhalten.
-Der eigene Apply von RF-10 ist noch nicht bestätigt.
+RF-00 bis RF-10 sind durch tatsächliche Applies und Push bestätigt,
+zuletzt Bundle 067 auf `35af08c9c38482c1974102f5ac902e629fa11f01`.
+Der Folgeauftrag umfasst RF-11 / Bundle 068: gemeinsame CI-Matrix und
+Artefaktrollen sowie stabile, variantenbezogene Nachweiskennungen.
+Development prüft die dokumentierte Auswahl parallel; Apply prüft vor dem
+Commit vollständig parallel. CI startet ausschließlich Christian.
+Der eigene Apply von RF-11 ist noch nicht bestätigt.
 Weitere Implementierung oder eine automatische Schleife ist nicht vorweggenommen.
 Vollständige Watcher-Results samt Teilfortschritten werden
 geprüft; fehlende externe Nachweise werden konkret gemeldet. CI startet

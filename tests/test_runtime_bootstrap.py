@@ -17,6 +17,7 @@ from tests.reference_support import bound_package, reference_entries, write_refe
 pytestmark = pytest.mark.packaging
 
 
+@pytest.mark.proof('installation.uv')
 def test_uv_installed_runtime_works_outside_checkout(built_result_source, tmp_path):
     uv = shutil.which('uv')
     if uv is None:

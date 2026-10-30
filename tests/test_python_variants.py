@@ -204,6 +204,7 @@ def test_writer_uses_python310_requirement_and_start_bytes(built_result_source):
 
 
 
+@pytest.mark.proof('pyz.stdlib-variant', parameter='requirement')
 @pytest.mark.packaging
 @pytest.mark.parametrize('requirement', ['>=3.12', '>=3.10'])
 def test_built_reader_variant_bootstraps_and_packs_in_fresh_stdlib_process(built_result_source, tmp_path, requirement):

@@ -139,6 +139,7 @@ def test_bootstrap_refuses_redirected_input_and_workspace_parents(tmp_path):
     assert not (real / 'private').exists()
 
 
+@pytest.mark.proof('bootstrap.windows-handle-change')
 @pytest.mark.platform
 @pytest.mark.skipif(os.name != 'nt', reason='native Windows metadata and DACLs')
 def test_native_bootstrap_detects_same_size_restored_mtime_change(tmp_path, monkeypatch):
@@ -176,6 +177,7 @@ def test_native_bootstrap_detects_same_size_restored_mtime_change(tmp_path, monk
     with pytest.raises(OSError): os.fstat(descriptors[0])
 
 
+@pytest.mark.proof('bootstrap.windows-junction')
 @pytest.mark.platform
 @pytest.mark.skipif(os.name != 'nt', reason='native Windows junction')
 def test_native_bootstrap_rejects_junction_parent_without_pathlib_api(tmp_path, monkeypatch):
@@ -192,6 +194,7 @@ def test_native_bootstrap_rejects_junction_parent_without_pathlib_api(tmp_path, 
     assert (real / 'input').read_bytes() == b'keep'
 
 
+@pytest.mark.proof('bootstrap.windows-private-dacl')
 @pytest.mark.platform
 @pytest.mark.skipif(os.name != 'nt', reason='native Windows protected workspace DACL')
 def test_native_bootstrap_prepares_private_inheriting_dacl(tmp_path):

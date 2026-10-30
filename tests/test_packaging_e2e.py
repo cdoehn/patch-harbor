@@ -347,6 +347,7 @@ def test_release_metadata_is_complete_and_runtime_has_no_dependencies() -> None:
     assert (PROJECT_ROOT / "LICENSE").is_file()
 
 
+@pytest.mark.proof('installation.cli-api-watcher')
 def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> None:
     release_source = _copy_project_for_release(tmp_path)
     distribution_dir = tmp_path / "dist"

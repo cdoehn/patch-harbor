@@ -1,5 +1,24 @@
 # PatchHarbor – Spezifikations-Changelog
 
+## 2026-10-30 – RF-11 / Bundle 068: zentraler CI- und Nachweiskatalog
+
+- RF-10 tatsächlich angewendet und gepusht auf
+  `35af08c9c38482c1974102f5ac902e629fa11f01`; elf Planpositionen und zwölf Plancommits bestätigt.
+- Ein JSON-Katalog versorgt erzeugte Workflow-Matrizen, lesende CI-Auswertung,
+  Windows-Testauswahl, Artefaktrollen und erforderliche fachliche Varianten.
+  Alle zwölf bisherigen Jobs und ihre Prüfbereiche bleiben erhalten.
+- Testberichtformat 2 transportiert explizite Nachweis-IDs und Varianten über
+  Collection und Worker-Abschlüsse. Fehlende, doppelte, übersprungene oder
+  widersprüchliche Pflichtnachweise werden abgewiesen. Aktuelle Nachweise hängen
+  nicht mehr von Testfunktions-/Dateinamen oder pytest-Anzeigenamen ab.
+- Buildberichtformat 2 bindet Artefaktrollen und verlangt Testberichtformat 2;
+  CI-Reviewformat 3 enthält die geprüften Pflichtnachweise. Historische interne
+  Format-1-Nachweise bleiben getrennt lesbar. Produkt-, Result-/Patch-Verträge,
+  Version und die drei Normdateien bleiben unverändert.
+- Development ausgewählt parallel, Apply vollständig parallel vor dem Commit.
+  CI ausschließlich manuell durch Christian; kein Dispatch durch Werkzeuge.
+  RF-11-Apply, Commit und Push sind offen.
+
 ## 2026-10-30 – RF-10 / Bundle 067: CLI-Grammatik und Befehlsrahmen
 
 - RF-09 tatsächlich angewendet und gepusht auf

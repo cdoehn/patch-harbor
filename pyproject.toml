@@ -50,6 +50,7 @@ dev = [
 addopts = "--strict-markers"
 testpaths = ["tests"]
 markers = [
+  "proof: stable acceptance proof identity and explicit parameter variant",
   "acceptance: public cross-platform acceptance workflow",
   "e2e: end-to-end CLI behavior",
   "platform: platform-specific integration behavior",

@@ -84,6 +84,7 @@ if COUNT:
     return repo, remote, context, report, facts, events
 
 
+@pytest.mark.proof('handoff.commit-sequence', parameter='count')
 @pytest.mark.parametrize("count", [0, 1, 3])
 def test_real_diagnostic_and_commit_sequences_keep_gates_and_single_final_push(tmp_path, count):
     repo, remote, before, report, facts, events = sequence(tmp_path, count)

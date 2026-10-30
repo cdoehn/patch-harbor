@@ -9,6 +9,7 @@ from zipfile import BadZipFile, ZipFile
 import pytest
 from scripts import run_handoff_ci as ci
 from tools.test_results import report_digest
+from tools.acceptance_catalog import artifact_names, legacy_proofs
 
 COMMIT = 'a' * 40
 
@@ -53,6 +54,8 @@ def finish(doc):
         doc['finished'][worker] = {'run_id': doc['run_id'], 'binding': doc['binding'], 'exitstatus': 0,
                                    'collection': doc['collections'][worker], 'collection_reports': [],
                                    'report_count': len(rows), 'reports_sha256': report_digest(rows)}
+        if doc['format_version'] == 2:
+            doc['finished'][worker]['proofs'] = deepcopy(doc['proofs'])
 
 
 def encode(files):
@@ -212,3 +215,81 @@ def test_transport_is_get_only_and_refuses_mutation_before_any_subprocess(monkey
 def test_invalid_machine_identifiers_do_not_create_workspace(github, commit, run_id):
     with pytest.raises(ValueError): ci.run(commit, run_id, workspace=github.workspace)
     assert not github.workspace.exists() and not github.calls
+
+
+def upgrade_reports(github):
+    """Format-2 fixtures deliberately rename every test, retaining only proof IDs."""
+    for artifact in github.artifacts:
+        with ZipFile(BytesIO(github.blobs[artifact['id']])) as archive:
+            files = {n: archive.read(n) for n in archive.namelist()}
+        build = json.loads(files['patchharbor-build.json'])
+        build.update(format_version=2, test_report_format=2)
+        roles = {name: role for role, name in artifact_names(build['version']).items()}
+        for row in build['artifacts']:
+            row['role'] = roles[row['name']]
+        files['patchharbor-build.json'] = json.dumps(build).encode()
+        for name in list(files):
+            if not name.endswith('-tests.json'):
+                continue
+            doc = json.loads(files[name])
+            original = doc['collections']['gw0']
+            rename = {node: f'renamed/{name}.py::check_{i}' for i, node in enumerate(original)}
+            doc.update(format_version=2, proofs={rename[node]: proof for node, proof in legacy_proofs(original).items()})
+            doc['collections'] = {worker: [rename[node] for node in nodes] for worker, nodes in doc['collections'].items()}
+            for row in doc['reports']:
+                row['nodeid'] = rename[row['nodeid']]
+            finish(doc)
+            files[name] = json.dumps(doc).encode()
+        github.blobs[artifact['id']] = encode(files)
+
+
+def test_current_ci_uses_explicit_proofs_after_all_test_paths_and_functions_are_renamed(github):
+    upgrade_reports(github)
+    result = ci.run(COMMIT, 100, workspace=github.workspace)
+    assert result['status'] == 'success' and result['format_version'] == 3
+    assert result['dispatch_attempts'] == 0 and len(result['artifacts']) == 12
+    for artifact in result['artifacts']:
+        assert artifact['proofs'] and artifact['build']['test_report_format'] == 2
+        assert all(proof['nodeid'].startswith('renamed/') and proof['test_format'] == 2 for proof in artifact['proofs'])
+
+
+@pytest.mark.parametrize('fault', ['missing_variant', 'skipped_variant', 'duplicate_variant',
+    'wrong_variant', 'unknown_identity', 'outside_collection', 'missing_worker_proofs',
+    'different_worker_proofs', 'missing_proofs', 'downgrade', 'build_format', 'artifact_role',
+    'wrong_engine', 'duplicate_across_suites'])
+def test_current_proof_contract_cannot_hide_missing_cases_or_downgrade_evidence(github, fault):
+    upgrade_reports(github)
+    target = next(row for row in github.artifacts if row['name'] == 'patchharbor-packaging-windows-2025-py3.10')
+    with ZipFile(BytesIO(github.blobs[target['id']])) as archive:
+        files = {n: archive.read(n) for n in archive.namelist()}
+    build = json.loads(files['patchharbor-build.json'])
+    name = 'patchharbor-packaging-tests.json'
+    doc = json.loads(files[name])
+    node = next(n for n, proof in doc['proofs'].items() if proof == {'id': 'pyz.own-instruction-apply', 'variant': 'mixed'})
+    if fault == 'missing_variant': del doc['proofs'][node]
+    if fault == 'skipped_variant':
+        next(row for row in doc['reports'] if row['nodeid'] == node and row['when'] == 'call').update(outcome='skipped', reason='not checked')
+    if fault == 'duplicate_variant': doc['proofs'][doc['collections']['gw0'][0]] = deepcopy(doc['proofs'][node])
+    if fault == 'wrong_variant': doc['proofs'][node]['variant'] = 'only-one-case'
+    if fault == 'unknown_identity': doc['proofs'][node]['id'] = 'invented'
+    if fault == 'outside_collection': doc['proofs']['not-collected'] = doc['proofs'].pop(node)
+    if fault == 'downgrade':
+        doc.pop('proofs'); doc['format_version'] = 1
+    if fault == 'build_format': build['test_report_format'] = 1
+    if fault == 'artifact_role': build['artifacts'][0]['role'] = 'unrelated'
+    if fault == 'wrong_engine':
+        build['binding']['windows_engine'] = 'pwsh'
+        doc['binding']['windows_engine'] = 'pwsh'
+    if fault == 'duplicate_across_suites':
+        other = json.loads(files['patchharbor-core-tests.json'])
+        other['proofs'][other['collections']['gw0'][0]] = deepcopy(doc['proofs'][node])
+        finish(other); files['patchharbor-core-tests.json'] = json.dumps(other).encode()
+    finish(doc)
+    if fault == 'missing_worker_proofs': del doc['finished']['gw1']['proofs']
+    if fault == 'different_worker_proofs': doc['finished']['gw1']['proofs'].pop(node)
+    if fault == 'missing_proofs': doc.pop('proofs')
+    files[name] = json.dumps(doc).encode(); files['patchharbor-build.json'] = json.dumps(build).encode()
+    github.blobs[target['id']] = encode(files)
+    with pytest.raises(ValueError): ci.run(COMMIT, 100, workspace=github.workspace)
+    saved = json.loads((github.workspace/'evidence.json').read_bytes())
+    assert saved['status'] == 'failed' and saved['dispatch_attempts'] == 0

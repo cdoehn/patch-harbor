@@ -48,6 +48,7 @@ def _readonly_installation(python, outside, environment):
         yield
 
 
+@pytest.mark.proof('installation.three-generations', parameter='route')
 @pytest.mark.parametrize("route", ["wheel", "source", "sdist"])
 def test_standard_installation_and_three_offline_canonical_generations(tmp_path, route):
     source, output, outside = tmp_path / "source", tmp_path / "dist", tmp_path / "outside"
