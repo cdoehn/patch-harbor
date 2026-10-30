@@ -1,5 +1,20 @@
 # PatchHarbor – Spezifikations-Changelog
 
+## 2026-10-30 – RF-07 / Bundle 064: Eine gepflegte Bootstrapquelle
+
+- RF-06B tatsächlich angewendet und gepusht auf
+  `3afcc56b00ccdc9818b2436ecde999b46176b1ea`; 7 Planpositionen und 8 Plancommits bestätigt.
+- `scripts/pyz_bootstrap.py` bleibt bytegleich und ist die einzige gepflegte
+  Bootstrap-Programmquelle. Der markierte ausführbare Handoff-Block wird daraus
+  deterministisch erzeugt; umliegende Dokumentation bleibt separat editierbar.
+- Build-Gates lehnen veraltete/fehlende Generierung ohne Quellbaum-Reparatur ab.
+  Der sdist erhält genau die benötigten zwei Buildskripte; keine zusätzlichen
+  Runtime-Abhängigkeiten oder Buildwerkzeuge in Wheel/PYZ.
+- Sicherheits-, Fehler-, Paket-, Offline- und Fallback-Verträge bleiben bestehen.
+  Entwicklung nur ausgewählt parallel; Apply vollständig parallel vor dem Commit.
+  Kein CI-Start. Die drei Normdateien bleiben getrennt und unverändert.
+  RF-07-Apply, Commit und Push sind noch offen.
+
 ## 2026-10-30 – RF-06B / Bundle 063: Überholte Result-/Runtime-Pfade entfernen
 
 - RF-06A tatsächlich angewendet und gepusht auf

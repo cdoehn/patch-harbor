@@ -245,9 +245,8 @@ Bestehende 1.4.0-Capabilities `[1, 2, 3]` bleiben gültig; neue bereinigte
 Produzenten deklarieren `[3]`. Angaben beschreiben den jeweiligen Produzenten,
 nicht die Lesepflicht des aktuellen Werkzeugs. Originalbytes bleiben unverändert.
 
-RF-01 aktualisiert nur den Vertrag. Der folgende ausführbare Bootstrap ist noch
-unverändert aus 1.4.0 und kann zusätzliche historische Varianten erkennen; daraus
-folgt keine fortgesetzte Altformatzusage. Seine Bereinigung folgt RF-06/RF-07.
+Der folgende ausführbare Bootstrap prüft unterstützte Result-3-Daten.
+Nicht unterstützte Resultformate sind keine Grundlage für eine Ersatz-Ausführung.
 Die PYZ enthält den vollständigen Core ohne Watcher. Kein pip-, venv-, Build-
 oder Downloadschritt und keine Änderung der vorhandenen Installation.
 
@@ -299,6 +298,7 @@ schwächere Referenz. Eine falsche Bindung bleibt blockierend.
 Der folgende Code entspricht dem geprüften Repository-Helfer; ein Checkout ist
 für seine Nutzung nicht nötig.
 
+<!-- BEGIN GENERATED PYZ BOOTSTRAP: scripts/pyz_bootstrap.py -->
 ```python
 # PATCHHARBOR-PYZ-BOOTSTRAP
 """Reviewed stdlib-only PYZ bootstrap; a precheck is not native Result validation.
@@ -989,6 +989,7 @@ if __name__ == '__main__':
         print(json.dumps({'status':'invalid','reason':str(exc),'full_reference_valid':False}), file=sys.stderr)
         raise SystemExit(2)
 ```
+<!-- END GENERATED PYZ BOOTSTRAP -->
 
 ### Runtime-Ausfall und bisheriger sicherer Übergabeweg
 
@@ -1047,9 +1048,9 @@ Die drei Normdateien bleiben getrennt. Nur konkrete grobe Fehler und aktuelle
 Widersprüche werden gezielt korrigiert, insbesondere die bisherige Pflicht zur
 Unterstützung von Artefakten vor 1.4.0. Gültige 1.4.0-Artefakte bleiben die Basis
 zukünftiger Abwärtskompatibilität; Patchformat 1 bleibt erhalten. RF-01 korrigiert
-die betroffenen Normstellen. Produktversion, ausführbarer Bootstrap und
-Laufzeitverhalten bleiben unverändert. Nur ein blockierender Status-Wortlautcheck
-entfällt; die bestehenden Verhaltenstests und vollständigen Gates bleiben erhalten.
+die betroffenen Normstellen; die anschließenden Implementierungsschritte stehen
+im aktuellen Plan. Produktversion bleibt bis RF-13 bei 1.4.0. Die aktuellen
+Testregeln und tatsächlichen Apply-Nachweise stehen weiter unten.
 
 Der frühere PYZ/PACK-Plan ist mit 16/16 Positionen, Korrektur 046 und grüner
 manueller CI auf `30e5de1d67a2d725ff192a0b97e50c2b0336bfcb` abgeschlossen.
@@ -1092,12 +1093,12 @@ parallele Testauswahl. Apply prüft jeden Commitstand vollständig parallel, auc
 Bundle-Ende. Keine Vollsuite im Development. Kein serieller Lauf und keine verkürzte Auswahl als Vollabnahme.
 Nur Christian startet den manuellen CI-Workflow; Codex und Entrypoints tun das nie.
 
-RF-00 bis RF-05 und RF-06A sind durch tatsächliche Applies und Push bestätigt,
-zuletzt Bundle 062 auf `220c0af2189cebe29ae2c991c4a6afb65dc3cc1f`.
-Der Folgeauftrag umfasst RF-06B / Bundle 063: Result 1/2, Runtime-Wheel-Provider
-und alten Installations-Bootstrap entfernen; der aktuelle Writer deklariert `[3]`.
-Originale 1.4.0-Result-3-Daten mit `[1, 2, 3]` bleiben lesbar. Die Planposition
-RF-06 ist erst nach bestätigtem Apply von RF-06B abgeschlossen; dieser steht aus.
+RF-00 bis RF-06 sind durch tatsächliche Applies und Push bestätigt,
+zuletzt Bundle 063 auf `3afcc56b00ccdc9818b2436ecde999b46176b1ea`.
+Der Folgeauftrag umfasst RF-07 / Bundle 064: eine gepflegte Bootstrapquelle,
+deterministisch erzeugter ausführbarer Block und Build-Prüfung gegen veraltete
+Kopien. Die Bootstrap-Programmlogik bleibt unverändert. Der eigene Apply von
+RF-07 ist noch nicht bestätigt.
 Weitere Implementierung oder eine automatische Schleife ist nicht vorweggenommen.
 Vollständige Watcher-Results samt Teilfortschritten werden
 geprüft; fehlende externe Nachweise werden konkret gemeldet. CI startet

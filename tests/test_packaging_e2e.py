@@ -370,6 +370,11 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
     pyz_raw = pyz_artifacts[0].read_bytes()
     pyz_recipe = runtime_pyz.read_pyz(pyz_raw, policy=DEFAULT_RESOURCE_POLICY,
                                       remaining_bytes=runtime_pyz.MAX_CONTENT_BYTES)
+    from tests.embedded_pyz_support import bootstrap_program
+    expected_program = (release_source / "scripts/pyz_bootstrap.py").read_text(encoding="utf-8")
+    with zipfile.ZipFile(pyz_artifacts[0]) as portable:
+        assert bootstrap_program(portable.read(runtime_pyz.CHAT_PATH)) + "\n" == expected_program
+        assert not any(name.startswith("scripts/") for name in portable.namelist())
     with zipfile.ZipFile(wheels[0]) as transport:
         assert transport.read(runtime_pyz.RECIPE_PATH) == pyz_recipe.data
         assert runtime_pyz.materialize(pyz_recipe, lambda name,size:transport.read(name)) == pyz_raw
@@ -394,6 +399,7 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
             "patchharbor/_runtime/CHAT_INSTRUCTIONS.md",
             "patchharbor/_runtime/python-api.md",
         }
+        assert not any(name.startswith("scripts/") for name in names)
         assert "patchharbor/input.py" not in names
         assert "patchharbor/files.py" not in names
 
@@ -465,6 +471,8 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
             f"{root}/pyproject.toml",
             f"{root}/build_backend.py",
             f"{root}/MANIFEST.in",
+            f"{root}/scripts/pyz_bootstrap.py",
+            f"{root}/scripts/render_chat_bootstrap.py",
             f"{root}/src/patchharbor/cli.py",
             f"{root}/src/patchharbor/api.py",
             f"{root}/src/patchharbor/api_types.py",
@@ -480,8 +488,15 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
             f"{root}/src/patchharbor_watcher/worker.py",
         ):
             assert required in names
+        # Only the two offline build inputs belong in the source distribution.
+        # Release/CI/maintenance commands remain excluded, as do all scripts in wheels.
+        assert {name for name in names if name.startswith(f"{root}/scripts/")} == {
+            f"{root}/scripts/pyz_bootstrap.py", f"{root}/scripts/render_chat_bootstrap.py"}
+        for helper in ("scripts/pyz_bootstrap.py", "scripts/render_chat_bootstrap.py"):
+            source_file = source_distribution.extractfile(f"{root}/{helper}")
+            assert source_file is not None
+            assert source_file.read() == (release_source / helper).read_bytes()
         for forbidden in (
-            f"{root}/scripts/",
             f"{root}/tests/",
             f"{root}/planning/",
             f"{root}/.github/",

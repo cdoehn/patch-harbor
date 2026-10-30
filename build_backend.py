@@ -29,9 +29,18 @@ get_requires_for_build_sdist = _backend.get_requires_for_build_sdist
 get_requires_for_build_editable = _backend.get_requires_for_build_editable
 prepare_metadata_for_build_wheel = _backend.prepare_metadata_for_build_wheel
 prepare_metadata_for_build_editable = _backend.prepare_metadata_for_build_editable
-build_editable = _backend.build_editable
 
 _ROOT = Path(__file__).resolve().parent
+
+
+def _check_bootstrap():
+    # Anchor the build checker to this source tree. Compile its bytes directly
+    # so a failed read-only check cannot create __pycache__ in the checkout.
+    path = _ROOT / "scripts/render_chat_bootstrap.py"
+    checker = ModuleType("_patchharbor_bootstrap_build_check")
+    checker.__file__ = str(path)
+    exec(compile(path.read_bytes(), str(path), "exec"), checker.__dict__)
+    checker.check(_ROOT)
 
 
 def _profile_module(module_name):
@@ -98,6 +107,7 @@ def _prepare_pyz_transport(transport: dict[str, bytes], *, version: str,
 
 
 def build_wheel(wheel_directory, config_settings=None, metadata_directory=None):
+    _check_bootstrap()
     output = Path(wheel_directory).resolve()
     output.mkdir(parents=True, exist_ok=True)
     metadata_directory = str(Path(metadata_directory).resolve()) if metadata_directory else None
@@ -107,8 +117,10 @@ def build_wheel(wheel_directory, config_settings=None, metadata_directory=None):
         source = Path(temporary) / "source"
         source.mkdir()
         for name in ("pyproject.toml", "README.md", "LICENSE", "CHAT_INSTRUCTIONS.md",
-                     "MANIFEST.in", "build_backend.py", "setup.cfg"):
+                     "MANIFEST.in", "build_backend.py", "setup.cfg",
+                     "scripts/pyz_bootstrap.py", "scripts/render_chat_bootstrap.py"):
             if (_ROOT / name).is_file():
+                (source / name).parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(_ROOT / name, source / name)
         for name in ("src", "docs"):
             shutil.copytree(_ROOT / name, source / name, ignore=shutil.ignore_patterns(
@@ -152,4 +164,10 @@ def build_wheel(wheel_directory, config_settings=None, metadata_directory=None):
 
 
 def build_sdist(sdist_directory, config_settings=None):
+    _check_bootstrap()
     return _backend.build_sdist(sdist_directory, config_settings)
+
+
+def build_editable(wheel_directory, config_settings=None, metadata_directory=None):
+    _check_bootstrap()
+    return _backend.build_editable(wheel_directory, config_settings, metadata_directory)

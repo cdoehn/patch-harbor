@@ -32,6 +32,8 @@ _RELEASE_INPUT_FILES = (
     "pyproject.toml",
     "build_backend.py",
     "MANIFEST.in",
+    "scripts/pyz_bootstrap.py",
+    "scripts/render_chat_bootstrap.py",
 )
 _RELEASE_INPUT_TREES = ("src", "docs")
 _FORBIDDEN_STAGED_ROOTS = {"build", "dist"}
@@ -239,6 +241,7 @@ def _copy_release_inputs(destination: Path) -> None:
         source = PROJECT_ROOT / relative_name
         if not source.is_file():
             raise FileNotFoundError(f"missing release input: {relative_name}")
+        (destination / relative_name).parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source, destination / relative_name)
 
     for relative_name in _RELEASE_INPUT_TREES:
