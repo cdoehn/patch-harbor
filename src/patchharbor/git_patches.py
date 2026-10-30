@@ -25,6 +25,9 @@ def capture_change_patches(
     reconstruction_arguments = (
         "--binary",
         "--full-index",
+        "--src-prefix=a/",
+        "--dst-prefix=b/",
+        "--no-relative",
         *CANONICAL_DIFF_ARGUMENTS,
     )
     try:

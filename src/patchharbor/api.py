@@ -31,6 +31,8 @@ from patchharbor.api_types import (
     PatchEntry, PatchEntryRole, PatchInspection, PatchManifest, PatchMessage,
     PatchValidationResult, PatchValidationScope, ReferenceContext,
     PatchPackResult,
+    IntegrationCapabilities, ResultSnapshot, ResultSnapshotError, SnapshotErrorCode,
+    SnapshotFile, SnapshotLayer, SnapshotRuntime,
     ApplyLock, ApplyLockKind, ApplyReadiness, AutomaticApplyResult,
     AutomaticApplyStatus, ExchangeWatchTarget, WatchControlPaths, WatchTargets,
 )
@@ -60,7 +62,35 @@ __all__ = [
     "AutomaticApplyStatus", "ExchangeWatchTarget", "WatchControlPaths", "WatchTargets",
     "watch_targets", "watch_control_paths", "apply_readiness",
     "pack_patch", "PatchPackResult",
+    "IntegrationCapabilities", "ResultSnapshot", "ResultSnapshotError", "SnapshotErrorCode",
+    "SnapshotFile", "SnapshotLayer", "SnapshotRuntime", "integration_capabilities", "read_result_snapshot",
 ]
+
+
+
+def integration_capabilities() -> IntegrationCapabilities:
+    """Versioned contracts of this loaded API, separate from artifact metadata."""
+    return IntegrationCapabilities(1, 1, None)
+
+
+def _sha256_argument(value: str, name: str) -> str:
+    if not isinstance(value, str):
+        raise TypeError(f"{name} must be text")
+    if len(value) != 64 or any(c not in "0123456789abcdef" for c in value):
+        raise ValueError(f"{name} must be a complete lowercase SHA-256")
+    return value
+
+
+def read_result_snapshot(
+    result: PathInput, *, expected_sha256: str | None = None,
+    observer: ProgressObserver | None = None,
+) -> ResultSnapshot:
+    """Fully validate and reconstruct one captured Result without writes or Git."""
+    path = _path(result, "result")
+    digest = None if expected_sha256 is None else _sha256_argument(expected_sha256, "expected_sha256")
+    from patchharbor.result_snapshot import read_result_snapshot as _read_result_snapshot
+    with _observe_activity(_observer(observer)):
+        return _read_result_snapshot(path, expected_sha256=digest)
 
 
 def pack_patch(

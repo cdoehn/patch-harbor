@@ -34,8 +34,8 @@ These are confirmed gaps, not replacements for the existing reader or core.
 
 | Stage / intended commit | Scope and acceptance | Status |
 | --- | --- | --- |
-| SRI-01 `docs(spec): define public snapshot and guarded apply contracts` | Targeted norm updates, this plan, behavior matrix; no product claims | Prepared; own selected gate and Apply pending |
-| SRI-02 `feat(api): expose verified result snapshots` | Reuse one capture; immutable public layers, strict text/binary reconstruction, budgets/errors/capability; real fixtures and independent oracle | Specified |
+| SRI-01 `docs(spec): define public snapshot and guarded apply contracts` | Targeted norm updates, this plan, behavior matrix; no product claims | Prepared; selected parallel gate passed; Apply pending |
+| SRI-02 `feat(api): expose verified result snapshots` | Reuse one capture; immutable public layers, strict text/binary reconstruction, budgets/errors/capability; real fixtures and independent oracle | Implemented; final selected gate and Apply pending |
 | SRI-03 `feat(api): bind host admission to the applied package and target` | Explicit SHA/target, full immutable admission inside existing lock/core, failures and exchange/replay regressions | Specified |
 | SRI-04 `test(integration): verify and document the delivered transport contracts` | Built 1.6.0 PYZ public-only roundtrip, frozen1.4, version/docs/example and delivery record | Specified |
 
@@ -63,3 +63,15 @@ No SpecRoad code/configuration is changed. Its independent runtime-hash adoption
 approved entrypoint/closure policy and own end-to-end roundtrip remain external.
 This plan ends after confirmed four stages and required acceptance; no new
 follow-up plan is silently created.
+
+## SRI-02 implementation record
+
+The shared reader now exposes request-local captured payloads internally; existing
+reference consumers keep their prior contract. The public reader reconstructs
+text and both binary block forms in memory, with strict paths/IDs/ranges/budgets.
+The producer pins diff prefixes/full paths. No second Result validator or Git
+consumer is introduced. Preliminary selected run `snapshot-reviewed` passed
+234 tests on CPython3.14.4/Linux; the final SRI-02 source has its own selected
+parallel gate and includes additional frozen1.4 tests. Apply and native CI remain
+unconfirmed. Capability version1 announces snapshots; guarded Apply remains None
+until SRI-03. Preserved 1.5.0 acceptance is unaffected.

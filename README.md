@@ -47,7 +47,8 @@ Its [requirement matrix](planning/specroad-integration/test-matrix.md) separates
 specified contracts, local tests, actual Apply and external acceptance.
 The 1.5.0 implementation is confirmed at
 `312e8a3c003c0f9421587b92941ecea7917b5d3f`; its external release acceptance remains
-open. This planning stage does not yet implement the new APIs.
+open. The snapshot API is implemented; the stage records distinguish local checks
+from pending Apply/native acceptance. Host admission follows in SRI-03.
 
 ## Requirements and installation
 

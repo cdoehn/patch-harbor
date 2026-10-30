@@ -22,7 +22,7 @@ from patchharbor.json_document import parse_json_document as _document
 from patchharbor.result_pyz import ResultPyzRuntime, read_result_pyz
 from patchharbor.models import BundlePayload, GitObjectFormat, GitObjectId, RepositoryId
 from patchharbor.platform.filesystem import (
-    FileChangedDuringRead, FileSystemOperationError, UnsupportedFileTypeError,
+    FileChangedDuringRead, FileReadLimitExceeded, FileSystemOperationError, UnsupportedFileTypeError,
     read_stable_regular_file_with_sha256,
 )
 from patchharbor.progress import activity
@@ -403,8 +403,17 @@ def _parse_result_payloads(payloads: tuple[BundlePayload, ...], *,
                        tuple(sorted(inventory)), expected, digest, completed, version, runtime, bool(handoff))
 
 
-def capture_result_reference(path: Path, *, resource_policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY,
-                             expected_identity: os.stat_result | None = None) -> CapturedResultReference:
+@dataclass(frozen=True, slots=True)
+class CapturedResultPayloads:
+    """The complete validated payloads from one stable read; request-local only."""
+
+    facts: ResultFacts
+    sha256: str
+    payloads: tuple[BundlePayload, ...]
+
+
+def capture_result_payloads(path: Path, *, resource_policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY,
+                             expected_identity: os.stat_result | None = None) -> CapturedResultPayloads:
     """Own one stable read and complete validation, with no retries or fallback.
 
     Source errors retain their category. The optional identity is forwarded for
@@ -418,26 +427,33 @@ def capture_result_reference(path: Path, *, resource_policy: ResourcePolicy = DE
             target = path.resolve(strict=True) if expected_identity is None else path.absolute()
         except RuntimeError as exc:  # pathlib symlink loops on Python 3.12/3.13
             raise ValueError("cannot resolve Result reference path") from exc
-        _require(target.lstat().st_size <= resource_policy.max_input_artifact_bytes, "reference exceeds resource limit")
+        if target.lstat().st_size > resource_policy.max_input_artifact_bytes:
+            raise FileReadLimitExceeded("reference exceeds resource limit")
         captured = read_stable_regular_file_with_sha256(
             target, retained_content_limit=resource_policy.max_input_artifact_bytes, allow_path_identity_fallback=True,
             expected_identity=expected_identity, max_bytes=resource_policy.max_input_artifact_bytes)
         _require(captured.content is not None, "reference exceeds resource limit")
         payloads = read_zip_payload_bytes(captured.content, policy=resource_policy, path_normalizer=result_member_path)
         facts = parse_result_payloads(payloads, resource_policy=resource_policy)
-        # These are the very bytes just validated, not a second ZIP/path read.
-        # Decode only the bounded context again; all semantic checks stay in the
-        # existing parser. No mutable parsed object escapes this boundary.
-        selected = {entry.relative_path: entry.content for entry in payloads
-                    if entry.relative_path in {"context.json", CHAT_INSTRUCTIONS_NAME, ENVIRONMENT_NAME}}
-        suffix = _document(selected["context.json"]).get("bundle_suffix", "")
-        handoff = (BundleHandoff(selected[CHAT_INSTRUCTIONS_NAME], selected[ENVIRONMENT_NAME])
-                   if facts.handoff_present else None)
-        return CapturedResultReference(facts, captured.sha256, suffix, handoff)
+        return CapturedResultPayloads(facts, captured.sha256, payloads)
     except (FileChangedDuringRead, FileSystemOperationError, UnsupportedFileTypeError,
             NotZipArchiveError, ZipPayloadError, OSError, ValueError, TypeError, KeyError,
             UnicodeError, RecursionError, OverflowError, PatchHarborError) as exc:
         raise PatchHarborError(f"invalid Result reference {path}: {exc}", FailureReason.SOURCE_ERROR) from exc
+
+
+
+def capture_result_reference(path: Path, *, resource_policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY,
+                             expected_identity: os.stat_result | None = None) -> CapturedResultReference:
+    """Project the existing small reference from the same shared capture."""
+    captured = capture_result_payloads(path, resource_policy=resource_policy,
+                                       expected_identity=expected_identity)
+    selected = {entry.relative_path: entry.content for entry in captured.payloads
+                if entry.relative_path in {"context.json", CHAT_INSTRUCTIONS_NAME, ENVIRONMENT_NAME}}
+    suffix = _document(selected["context.json"]).get("bundle_suffix", "")
+    handoff = (BundleHandoff(selected[CHAT_INSTRUCTIONS_NAME], selected[ENVIRONMENT_NAME])
+               if captured.facts.handoff_present else None)
+    return CapturedResultReference(captured.facts, captured.sha256, suffix, handoff)
 
 
 def read_result_reference(path: Path, *, resource_policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY,

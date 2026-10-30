@@ -580,3 +580,31 @@ diagnostic fallback is never a successful full reference or a `pack` input.
 See [Result format 3](result-format-3.md). Production uses this format from PP-06B;
 the earlier legacy-reader support promise is now replaced by the 1.4.0
 compatibility baseline. Public validation scopes remain unchanged.
+
+## Verified Result snapshots (integration contract 1)
+
+`api.integration_capabilities()` returns immutable contract-version fields.
+Check `snapshot_contract_version == 1` before calling
+`api.read_result_snapshot(result, expected_sha256=full_sha256)`. The immutable
+result provides `sha256`, `format_version`, `context`, `run_id`, `operation`,
+`dry_run`, `primary_result`, `warnings`, `runtime` and five `SnapshotLayer` values:
+`base`, `index`, `worktree`, `untracked`, `effective`. Each `.files` is an immutable
+path mapping. `SnapshotFile` contains `path`, regular `kind`, Git `mode`, `size`,
+`content` bytes, `sha256` and computed Git `object_id`. Unchanged files are shared.
+`SnapshotRuntime` contains status/reason, version/Python requirement/profile,
+content ID and artifact SHA/size; examined code is never executed.
+
+No Git, shell, installed dependencies or target repository is required. Input
+is captured once and all returned bytes remain usable after the file is moved
+or replaced. Text/binary staged and unstaged changes are strictly applied without
+fuzzy context. Untracked entries cannot overwrite a tracked path. Existing ZIP
+limits plus 256-MiB individual and 512-MiB cumulative reconstruction budgets
+apply, including binary programs and reverse verification.
+
+Malformed input raises `api.ResultSnapshotError` (a `PatchHarborError`, reason
+SOURCE_ERROR) with `.code` from `api.SnapshotErrorCode`. Codes are invalid_result,
+digest_mismatch, invalid_patch, unsupported_patch, path_collision and resource_limit.
+Invalid API argument types/values use TypeError/ValueError. A valid failed, dirty
+or dry-run Result is returned with its actual facts. Integrity does not prove
+authenticity, a historical commit tree or an independently recomputed dirty
+fingerprint; the existing four binding values are preserved.
