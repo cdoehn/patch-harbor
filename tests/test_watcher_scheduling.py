@@ -9,24 +9,12 @@ import pytest
 
 from patchharbor import api
 from patchharbor.errors import configuration_error
-from patchharbor_watcher.apply_boundary import ApplyCompletion
 from patchharbor_watcher.events import DirectoryEvent, EventBackendError, EventErrorKind, EventKind
 from patchharbor_watcher.lifecycle import WatcherStopController
 from patchharbor_watcher.loop import run_repository_watcher
 from patchharbor_watcher.protocol import LockReference, Progress
 from patchharbor_watcher.scheduling import Schedule
-
-
-def completion(status='no_candidate', lock=None, code=10):
-    return ApplyCompletion(code, {'command': 'apply', 'success': code == 0,
-        'process_exit_code': code, 'error': None, 'watcher_progress': {
-            'version': 1, 'status': status, 'blocked_on': None if lock is None else {
-                'kind': lock.kind, 'repo_id': lock.repo_id}}}, None, '')
-
-
-def target(path):
-    identity = path.stat()
-    return api.ExchangeWatchTarget(path, identity.st_dev, identity.st_ino, (api.RepositoryId('00000000-0000-4000-8000-000000000001'),))
+from tests.watcher_support import completion, target
 
 
 class InlineWorker:

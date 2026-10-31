@@ -1,55 +1,20 @@
 """Result-3 producer integration through actual registered fixture repositories."""
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from zipfile import ZipFile
 
 import pytest
 
 from patchharbor import api
-import patchharbor.application as application
+import patchharbor.application_apply as application
 import patchharbor.result_bundle as result_bundle
 import patchharbor.result_resources as resources
 from patchharbor.result_reader import read_result_reference
-from patchharbor.pyz_artifact import PyzArtifact, PyzProvision
-from patchharbor import runtime_pyz as pyz
-from tests.platform_support import native_script, native_value
-from tests.registration_support import create_repository, git
-from tests.test_runtime_pyz import prepared, inputs
-
-
-@pytest.fixture(scope="module")
-def artifact():
-    fixture_inputs = inputs()
-    # Keep the runtime above the explicit 128-KiB publication-test budget.
-    fixture_inputs["patchharbor/budget_fixture.py"] = b"# Runtime budget fixture\n" * 10000
-    recipe,payloads,raw=prepared(fixture_inputs)
-    return PyzArtifact(recipe,raw,pyz.sha256(raw),payloads[pyz.CHAT_PATH],
-                       payloads[pyz.DOC_PATH],payloads[pyz.LICENSE_PATH])
-
-
-@pytest.fixture
-def repository(tmp_path):
-    repository = create_repository(tmp_path / "foreign-project")
-    api.register(repository)
-    exchange = tmp_path / "exchange"
-    api.configure_exchange_directory(exchange, repository=repository)
-    return repository, exchange
-
-
-def package(repository, exchange, *, exit_code=0):
-    context = api.context(repository)
-    entrypoint = native_value("run.sh", "run.ps1")
-    manifest = {"marker": "patch-harbor", "format_version": 1,
-                **{key: str(getattr(context, key)) for key in
-                   ("repo_id", "base_commit", "state_fingerprint", "fingerprint_algorithm")},
-                "entrypoint": entrypoint}
-    path = exchange / "test-patch.zip"
-    with ZipFile(path, "w") as archive:
-        archive.writestr("patch.json", json.dumps(manifest))
-        archive.writestr(entrypoint, native_script(f"exit {exit_code}", f"exit {exit_code}"))
-    return path
+from patchharbor.pyz_artifact import PyzProvision
+from tests.registration_support import git
+from tests.result_pyz_support import artifact
+from tests.apply_support import repository, package
 
 
 @pytest.mark.parametrize("route", ["bundle", "apply", "dry_run", "failure", "watcher"])

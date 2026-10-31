@@ -12,6 +12,7 @@ import pytest
 from patchharbor import api
 from tests.platform_support import native_script, native_value
 from tests.registration_support import create_repository, git, set_isolated_user_environment
+from tests.apply_support import write_package
 
 pytestmark = pytest.mark.e2e
 
@@ -24,23 +25,6 @@ def workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     exchange = tmp_path / "exchange"
     api.configure_exchange_directory(exchange, repository=repository)
     return repository, context, exchange
-
-
-def write_package(path: Path, context: api.RepositoryContext, *, exit_code: int = 0) -> None:
-    entrypoint = native_value("run.sh", "run.ps1")
-    manifest = {
-        "marker": "patch-harbor", "format_version": 1,
-        "repo_id": str(context.repo_id), "base_commit": str(context.base_commit),
-        "state_fingerprint": context.state_fingerprint,
-        "fingerprint_algorithm": context.fingerprint_algorithm, "entrypoint": entrypoint,
-    }
-    body = native_script(
-        f"printf 'api-child\\n'; printf 'api-stderr\\n' >&2; exit {exit_code}",
-        f"[Console]::Out.WriteLine('api-child'); [Console]::Error.WriteLine('api-stderr'); exit {exit_code}",
-    )
-    with zipfile.ZipFile(path, "w") as archive:
-        archive.writestr("patch.json", json.dumps(manifest))
-        archive.writestr(entrypoint, body)
 
 
 def test_repository_configuration_and_bundle_are_structured_and_silent(

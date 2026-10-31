@@ -14,7 +14,7 @@ from patchharbor.patch_inspection import validate_patch
 from patchharbor.platform.filesystem import FileChangedDuringRead
 from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY
 import patchharbor.result_reader as reader
-from tests.test_reference_validation import reference_entries, write_reference, bound_package, edit_document
+from tests.reference_support import reference_entries, write_reference, bound_package, edit_document
 
 
 INVALID_FIELDS = [

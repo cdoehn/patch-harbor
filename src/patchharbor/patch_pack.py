@@ -27,7 +27,6 @@ from patchharbor.platform.pack_output import open_output_directory
 from patchharbor.progress import activity
 from patchharbor.result_reader import capture_result_reference
 from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY
-from patchharbor.runtime_artifact import RuntimeProvider
 
 
 
@@ -39,7 +38,7 @@ def capture_pack_template() -> str:
     """Pin the executing producer's verified template without foreign fallback."""
     try:
         selected_pyz = own_pyz_profile_present()
-        provision=(PyzProvider() if selected_pyz else RuntimeProvider()).capture()
+        provision=PyzProvider().capture()
         if provision.artifact is not None:
             raw=provision.artifact.chat_template
         elif provision.reason=='source_not_prepared' and not selected_pyz:

@@ -16,22 +16,9 @@ from patchharbor import result_verification as verification
 from patchharbor.platform import filesystem
 from patchharbor.platform.cifs import cache_wait_budget
 from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY
-from tests.test_result_bundle_publication import _publish, prepare_result_bundle_publication, UUID
-from tests.test_result_runtime_writer import repository, package
-
-
-@pytest.fixture
-def destination(tmp_path):
-    return prepare_result_bundle_publication(tmp_path / "result.zip",
-        run_id=UUID("12345678-1234-4234-8234-123456789abc"))
-
-
-@pytest.fixture
-def sleeps(monkeypatch):
-    calls = []
-    monkeypatch.setattr(verification, "sleep", calls.append)
-    monkeypatch.setattr(verification, "publication_wait_budget", lambda path: 300)
-    return calls
+from tests.result_publication_support import _publish
+from tests.apply_support import repository, package
+from tests.result_publication_support import destination, sleeps
 
 
 def unstable(*args, **kwargs):

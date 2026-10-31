@@ -93,7 +93,7 @@ def test_process_guard_recovers_a_deleted_working_directory(tmp_path: Path) -> N
 
 
 def test_dynamic_environment_checker_import_does_not_leak_process_state() -> None:
-    from tests.test_docker_integration_runner import _environment_check_module
+    from tests.runner_support import _environment_check_module
     name = "patchharbor_docker_environment_check"
     sentinel = object()
     before = sys.modules.get(name, sentinel)

@@ -17,27 +17,8 @@ from patchharbor import patch_pack as core
 from patchharbor.errors import FailureReason, PatchHarborError
 from patchharbor.platform.filesystem import FileChangedDuringRead
 from patchharbor.platform.pack_output import OwnedPackFile, OutputDirectory
-from tests.test_captured_reference import _reference
-from tests.test_pack_sources import SCRIPT
-
-
-@pytest.fixture
-def request_files(tmp_path):
-    reference, _, _ = _reference(tmp_path)
-    contents = tmp_path / 'contents'; contents.mkdir()
-    (contents / 'run.sh').write_bytes(SCRIPT)
-    (contents / 'binary').write_bytes(b'\0\xff\r\n')
-    output = tmp_path / 'out'; output.mkdir()
-    return contents, reference, output
-
-
-def pack(files, **kwargs):
-    contents, reference, output = files
-    options = dict(reference_bundle=reference, entrypoint='run.sh', output_directory=output)
-    options.update(kwargs)
-    if 'output' in kwargs:
-        options.pop('output_directory')
-    return api.pack_patch(contents, **options)
+from tests.pack_support import SCRIPT
+from tests.pack_support import request_files, pack
 
 
 def fail(reason, call):
@@ -316,7 +297,6 @@ def test_missing_own_template_fails_without_borrowing_reference_instructions(req
         def capture(self):
             from types import SimpleNamespace
             return SimpleNamespace(artifact=None, reason='integrity_failure')
-    monkeypatch.setattr(core, 'RuntimeProvider', Missing)
     monkeypatch.setattr(core, 'PyzProvider', Missing)
     fail(FailureReason.PAYLOAD_PREPARATION_ERROR, lambda: pack(request_files))
     assert not list(request_files[2].iterdir())

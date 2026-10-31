@@ -19,34 +19,14 @@ from patchharbor.exit_status import exit_code_for_error
 from patchharbor.json_document import parse_json_document
 from patchharbor.platform.filesystem import FileChangedDuringRead
 from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY
-from tests.result_runtime_support import attach_runtime
-from tests.test_reference_validation import (
-    bound_package, edit_document, reference_entries, write_reference,
-)
-
-
-def _reference(tmp_path, *, kind="bundle", dirty=False, handoff=True, version=1, suffix=".txt"):
-    files, binding = reference_entries(kind=kind, dirty=dirty, handoff=handoff)
-    edit_document(files, "context.json", lambda doc: doc.update(bundle_suffix=suffix))
-    if handoff:
-        edit_document(files, "environment.json", lambda doc: doc.update(
-            bundle_suffix=suffix, repository_path="/foreign/missing/repository",
-            captured_at="2026-10-03T12:00:00Z", repository_name="recorded-repo",
-            exchange_directory="/foreign/exchange", output_directory=None,
-            runtime={"system": "ForeignOS", "python_version": "3.12.0", "unknown": None,
-                     "extra": {"items": [1, {"nested": True}]}}))
-    if version == 2:
-        files = attach_runtime(files, None)
-    path = tmp_path / "reference.zip"
-    write_reference(path, files)
-    return path, files, binding
+from tests.reference_support import bound_package, edit_document, write_reference
+from tests.pack_support import _reference
 
 
 @pytest.mark.parametrize("kind", ["bundle", "success", "dry_run", "failure", "mismatch", "timeout", "interrupted"])
 @pytest.mark.parametrize("dirty", [False, True])
-@pytest.mark.parametrize("handoff", [False, True])
-def test_capture_retains_actual_binding_suffix_and_exact_handoff(tmp_path, kind, dirty, handoff):
-    path, files, binding = _reference(tmp_path, kind=kind, dirty=dirty, handoff=handoff)
+def test_capture_retains_actual_binding_suffix_and_exact_handoff(tmp_path, kind, dirty):
+    path, files, binding = _reference(tmp_path, kind=kind, dirty=dirty)
     captured = reader.capture_result_reference(path)
     assert captured.sha256 == hashlib.sha256(path.read_bytes()).hexdigest()
     assert captured.bundle_suffix == ".txt"
@@ -55,23 +35,21 @@ def test_capture_retains_actual_binding_suffix_and_exact_handoff(tmp_path, kind,
         assert str(getattr(captured.facts.context, name)) == value
     if kind != "bundle":
         assert captured.facts.expected.base_commit != captured.facts.context.base_commit
-    assert captured.facts.handoff_present is handoff
-    if handoff:
-        assert captured.handoff.instructions == files["CHAT_INSTRUCTIONS.md"]
-        assert captured.handoff.environment == files["environment.json"]
-    else:
-        assert captured.handoff is None
+    assert captured.facts.handoff_present
+    assert captured.handoff.instructions == files["CHAT_INSTRUCTIONS.md"]
+    assert captured.handoff.environment == files["environment.json"]
     legacy = reader.read_result_reference(path)
     assert type(legacy) is tuple and len(legacy) == 2
     assert legacy == (captured.facts, captured.sha256)
 
 
 def test_missing_legacy_suffix_is_empty_and_does_not_invent_environment(tmp_path):
-    path, files, _ = _reference(tmp_path, handoff=False)
+    path, files, _ = _reference(tmp_path)
     edit_document(files, "context.json", lambda doc: doc.pop("bundle_suffix"))
+    edit_document(files, "environment.json", lambda doc: doc.update(bundle_suffix=""))
     write_reference(path, files)
     captured = reader.capture_result_reference(path)
-    assert captured.bundle_suffix == "" and captured.handoff is None
+    assert captured.bundle_suffix == "" and captured.handoff is not None
 
 
 def test_capture_and_passive_bytes_cannot_be_changed_by_a_renderer(tmp_path):
@@ -91,9 +69,9 @@ def test_capture_and_passive_bytes_cannot_be_changed_by_a_renderer(tmp_path):
 
 @pytest.mark.parametrize("kind,dirty", [("bundle", False), ("success", True), ("failure", True), ("dry_run", False)])
 def test_unavailable_runtime_is_still_a_complete_reference(tmp_path, kind, dirty):
-    path, files, _ = _reference(tmp_path, version=2, kind=kind, dirty=dirty)
+    path, files, _ = _reference(tmp_path, kind=kind, dirty=dirty)
     captured = reader.capture_result_reference(path)
-    assert captured.facts.format_version == 2
+    assert captured.facts.format_version == 3
     assert captured.facts.runtime.status == "unavailable"
     assert captured.facts.warnings
     assert captured.handoff.environment == files["environment.json"]
@@ -101,7 +79,7 @@ def test_unavailable_runtime_is_still_a_complete_reference(tmp_path, kind, dirty
 
 @pytest.mark.parametrize("fault", ["runtime_hash", "extra_runtime", "snapshot_hash", "handoff_suffix", "unknown_algorithm"])
 def test_capture_never_uses_weaker_repository_only_diagnostics(tmp_path, monkeypatch, fault):
-    path, files, _ = _reference(tmp_path, version=2)
+    path, files, _ = _reference(tmp_path)
     if fault == "runtime_hash":
         files["runtime/runtime.json"] += b" "
     elif fault == "extra_runtime":
@@ -198,7 +176,7 @@ def test_capture_does_not_open_an_extra_resource_budget(tmp_path, limit):
 
 
 def test_internal_and_public_reference_validation_have_identical_facts(tmp_path):
-    path, _, binding = _reference(tmp_path, version=2, kind="failure", dirty=True)
+    path, _, binding = _reference(tmp_path, kind="failure", dirty=True)
     captured = reader.capture_result_reference(path)
     patch = tmp_path / "patch.zip"
     bound_package(patch, binding)
@@ -220,7 +198,7 @@ def test_internal_validation_does_not_skip_any_binding_comparison(tmp_path, fiel
 
 
 def test_internal_validation_uses_actual_package_bytes_and_original_error_categories(tmp_path):
-    from tests.test_patch_inspection import MANIFEST, write_package
+    from tests.patch_inspection_support import MANIFEST, write_package
     path, _, binding = _reference(tmp_path)
     captured = reader.capture_result_reference(path)
     patch = tmp_path / "patch.zip"
@@ -253,7 +231,7 @@ def test_internal_end_validation_honours_package_budget(tmp_path):
 def test_capture_and_internal_validation_are_read_only_without_git_registry_or_network(tmp_path, monkeypatch):
     import patchharbor.registry as registry
     import patchharbor.repository_state as state
-    path, _, binding = _reference(tmp_path, version=2)
+    path, _, binding = _reference(tmp_path)
     patch = tmp_path / "patch.zip"
     bound_package(patch, binding)
     before = {item.name: item.read_bytes() for item in tmp_path.iterdir()}

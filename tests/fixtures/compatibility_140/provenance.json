@@ -1,0 +1,908 @@
+{
+  "fixture_format": 1,
+  "created_at": "2026-10-29T12:48:34.839238+00:00",
+  "purpose": "Unmodified artifacts captured from genuine 1.4.0 bundle/pack/apply operations on public sample data.",
+  "producer": {
+    "version": "1.4.0",
+    "bytes": 973604,
+    "sha256": "4e0d26997bffe9476e79d98211cef2d93be7899063a0eb3480bea2ffa3d8f594",
+    "content_id": "3a9f8c9e85c37601095405496523eaf322d3fe5d1539f57a0bc66157816d1560",
+    "declared_source_commit": null,
+    "requires_python": ">=3.10",
+    "trusted_result": "patchharbor-apply_Result_121920_1029_43a1e8.zip",
+    "trusted_result_sha256": "09301a80390bd41410d37a6485d5377071af1d5e96b7946f0b05b7c108d91de1"
+  },
+  "unprepared_source": {
+    "release_tag": "v1.4.0",
+    "source_commit": "282db1ef5c0af8e2a3ecf41f431f80006487dde4",
+    "source_kind": "unchanged release source without generated runtime resources",
+    "verified_pyz_core_files": 102,
+    "files": {
+      "CHAT_INSTRUCTIONS.md": "a8b0aecadc9708dc6b346a4c9c579e2d9402fb2fe4e10400875dc291d9023b01",
+      "LICENSE": "6765dc3fb17e5c1c97f3457b54bdeb8dc6c388de3f88c4c23dfc20a2745f3f50",
+      "README.md": "58a60fa8ef67e247c6b145df0a0134c42085e3ff0944724132e8f9ceff3a1a44",
+      "docs/python-api.md": "6ab31ee0466e6240051298dc94d5c22edb0bb8b34f042c399fd917b356f91c4e",
+      "pyproject.toml": "f50ef969445ceac86646e908bf9ca7d6500fe71907dd4bd405b5892480f835ab",
+      "src/patchharbor/__init__.py": "56eb0bf69eef7c0e90a8e47e7b889219fdba924b5fde77a933f73fa68298a0d6",
+      "src/patchharbor/api.py": "9a36942072b8e63d4fff5af36395f5825d8454d95314f627fcded9356594e78e",
+      "src/patchharbor/api_types.py": "637202d26342945dac16f05db3e65c50d86f312f2136a2817d24286ad644b2c7",
+      "src/patchharbor/application.py": "f2ba018c4a43816620700a30a6c675d19e258a76a1293aba65033cdfe5400b8d",
+      "src/patchharbor/apply_mutation.py": "ccf3c2b9cf21a7be83bcdd98b6d08708b14f1c78a4af686146efed88c7235da3",
+      "src/patchharbor/apply_preflight.py": "da06d08fcc549fa75495a5aa2e0b3eb12ffb0c3f3504bd8bbb60c8e226d0d932",
+      "src/patchharbor/apply_repository.py": "d614533c5c80a33807cea51309387740e950c7f91ca5015af44410e17a29e211",
+      "src/patchharbor/archive_evidence.py": "d01f11907df6df2d78b1124ed25fdca1fd9502cecc0648d6029debbd6cd35fa3",
+      "src/patchharbor/archive_files.py": "6f4805333d647195ec172f02c8072737591d4285986f6ded841a58bfb58581d0",
+      "src/patchharbor/archive_git.py": "c97d329d2acd691dbacefd5c82cb860df87abb6a55aed66902d7484722300dc1",
+      "src/patchharbor/archive_policy.py": "e77096d620fc8dedc9f3d1b82dc7c2271db1abd117e48802ca6109fdbfb982f7",
+      "src/patchharbor/bundle_handoff.py": "cf41124a9f0ad96d751208412b8a279a232d464ef25ab2f6dd4c0937e3af2c00",
+      "src/patchharbor/bundle_names.py": "6b2d0bdde19989ed091a7e2eb3cbbe71bf80012e8539794a6c75a48f75d1fd53",
+      "src/patchharbor/bundle_paths.py": "1f28b4a6db85bf60e742d8b8534a05d7748350693543e05b0f86a78fa60c3075",
+      "src/patchharbor/bundles.py": "86e3b1bff36efe7b155024ecb42b57839cfe970b335030249f452143bdde167f",
+      "src/patchharbor/chat_instructions.py": "9b9a82c9f17ef7f5dd2030a1d8f2495468665d5c03297612a94ece8c171e1fae",
+      "src/patchharbor/cli.py": "02440ec9f7f654c160b28cdd7077b616bea61080bb8670da9962ebd3841ce238",
+      "src/patchharbor/compat.py": "ffe4da58790fd82973413484a867174222a224dd526353fcf71345216f6de641",
+      "src/patchharbor/configuration.py": "9e4ae74cd8b262b74b753f1bdd4f5f64f871152f6b429389a01c615271eea7f0",
+      "src/patchharbor/configuration_context.py": "a22be16892f5dd8e5f590a1396c74ad81e440ab0c6521231451a834c9672968d",
+      "src/patchharbor/context_output.py": "255e7a6c2785768f526593b9bccad15bb53cc8d0ef1b5f30f247126bab4d36ed",
+      "src/patchharbor/errors.py": "cbf984e1a614811df50b21614440fdf8dfb01e9f0d7a4aa2b1b592f1919524ce",
+      "src/patchharbor/exchange.py": "6054446c6760e6f1ee67cc8c113dd5798c85684848c3d2551afcee03ef126bb3",
+      "src/patchharbor/exchange_archive.py": "c065e081c5b294b3ff539aee3ac0f2ec11ba4397c61a609faa18e24e75c92c84",
+      "src/patchharbor/exchange_paths.py": "677d7f995eade3901aa71773e35e110c819a9a83bd0c1fb26294e7473471d339",
+      "src/patchharbor/exchange_recovery.py": "1855a7cc0d3752b97a9d84e5579dde54e50e30e25feb7005378d91aff6d9308c",
+      "src/patchharbor/exchange_state.py": "8424ee606eb9a49a018e3888de04e099d8d97ec9f40c3c6eb15fa8f0f9d90aa5",
+      "src/patchharbor/execution.py": "06790421689781fc77bd1d5712d111a6ae1edda15d95e50b0e172724ce4f334f",
+      "src/patchharbor/exit_status.py": "0d58bb9396de54b269cdbfc30d25817ba2568e73c8f7a41075b69b84dc291aef",
+      "src/patchharbor/git_capture.py": "f14120e7cc3b71dd117a35ba206092621992797d8739a7e2ab3f15e3ccfdab7c",
+      "src/patchharbor/git_commands.py": "fc74a7247ee7cc09ef791fb602573fbf17f0ea7480b54d5c9f2f656cddcf3aec",
+      "src/patchharbor/git_objects.py": "c06a5f06e9594d7c2ed7e327d276c0e7fc9cf7446e5c48f3aebfc1f6ecd7fe0c",
+      "src/patchharbor/git_patches.py": "26859d011ba07734b80015824d488a9d5eb14acbf5e3e177d5c59a52bd8f4e1c",
+      "src/patchharbor/identifier_presentation.py": "77b9ee880a2f14efcab67a3fc3a96290e50a8c0fe274f55e6e10e14533064f13",
+      "src/patchharbor/inspection_output.py": "0e3001c8de5c72715beb9d691df717e1e65e327772b2dcab782c6f90b1b71a44",
+      "src/patchharbor/interpreters.py": "3e2e9e6b0931fb26fb963e6e4b48bd3087fe956b80572697ff2aa5ad23a95a6d",
+      "src/patchharbor/json_document.py": "e09804fbf6395f286dff96fb845fd5a7563a56c294f3c0c70763b0f0138cfd40",
+      "src/patchharbor/locks.py": "4947175871cf1b0ee6a89fe912c13c1ca0b5e0e65e5c3274ae57bbda76d80206",
+      "src/patchharbor/models.py": "b3076088ce96e8be5533464051ad2e8df28502d8342ffce40f7a559d9d1bf2cf",
+      "src/patchharbor/output.py": "0855f9f31095a0b874bebbb7529aa8174bb533f9c10ebd96f9cd1eef97d5e62f",
+      "src/patchharbor/pack_candidate.py": "0ae6725f091d33ac5eeb87817483e9f03370bdce88d5c1c4db65d2a4a1377e76",
+      "src/patchharbor/pack_sources.py": "37511790ac4fd6fb288fd65b81970897b0b13a68a33af79d20fc573598c1d27a",
+      "src/patchharbor/pack_types.py": "8388f9a3263ac7ffb1feb3bd35ebe54c9d706ba54198b6461a3f4b63d75c90e6",
+      "src/patchharbor/parser.py": "4f3bbdb624f9429ef068128d62e44ff748f57302bd5af7070e52bb7b05ca118d",
+      "src/patchharbor/patch_inspection.py": "ca825917144762892e3d256e21cc00d11063dca54cc1bb5c640e8666de9b6642",
+      "src/patchharbor/patch_manifest.py": "7031bc6e8672818da3dab6623ab1919846bb3af36d07261b4250902014deb484",
+      "src/patchharbor/patch_pack.py": "fa755972c9affc763e8273561e8bb6d2df3ba7357e364f3b72e3fc71329f52f4",
+      "src/patchharbor/patch_package.py": "d099e676174c7bc32e84640eab33fc78744ac061aadf2cf826db26f1daec136f",
+      "src/patchharbor/payload_files.py": "6981eb1740fa265bc77ab2d104fe2aeed6ebf36f44ff1e868b5933a34a506bc2",
+      "src/patchharbor/payload_modes.py": "09904e21b8b73da5552773937dc32665d4745d620cb19e032d56b579f4343488",
+      "src/patchharbor/platform/__init__.py": "d4ac6617c276ba5dd0f1841f47339ef3127eb621180b228197e4d954d5755cfc",
+      "src/patchharbor/platform/archive.py": "c9386d5558ff597bd5da53103821017c84b811d28b4e36bd733df5d494326c99",
+      "src/patchharbor/platform/cifs.py": "65f2bc34fdb309da1369325d91e72f60bf8349df1070da10afb6c8da73e83c27",
+      "src/patchharbor/platform/directories.py": "abc1301ec14770c33a555ee0cf64e72bf98bd97e392871672e570aa0b528933e",
+      "src/patchharbor/platform/environment.py": "253f2a1237f3239e9e6a967e198a0dd74455a25c8f6221e3900a766568077632",
+      "src/patchharbor/platform/errors.py": "dfadb1e8caeec79bf769a2524a99b411bdc113d95a045c97f3f19b14224e8c3f",
+      "src/patchharbor/platform/file_handles.py": "a0d5d2b08da26e9d11043b195c0080073a3f2940a9978fb168111b2968a05248",
+      "src/patchharbor/platform/file_times.py": "02bcedeb2666d5f332a76e5070379dcbf2fc2994f3b0e9beae63dde79339982c",
+      "src/patchharbor/platform/filesystem.py": "4b24a5276bd27ebddbc5bbbbbe9284f254de7be3d7dfff5e174d9d8cabe02ef8",
+      "src/patchharbor/platform/lifecycle.py": "dae8bc5f1c94f22f71013d996c969541a001fafd60df37efd27e87abda4b26f6",
+      "src/patchharbor/platform/locking.py": "ba1002e134adbd8445e4bbac6b9521afffdc86d49201ec1b8cf3ea0e1e836653",
+      "src/patchharbor/platform/pack_output.py": "77aff9f2a57c5555891eb3296ba3b116dd144cdb11be1e09f418d7bea90cbe11",
+      "src/patchharbor/platform/paths.py": "d8326ca798a7d1f4e43f50573387c3dd5b590d135781b88017ef35e775ce47bd",
+      "src/patchharbor/platform/posix.py": "56973f5c58dc3f5bd73db9be19de9b81410cd9872b1a6dba5d1371ff8447ade3",
+      "src/patchharbor/platform/private_directory.py": "8c80eaf7b5e6c292ccc8b67846a580c048c3a22cc0d630410fdafce2dd599996",
+      "src/patchharbor/platform/runtime.py": "3b4c259691ab6c4db614ed2c257c6abfb39ec56ea25a6ed2183b0c748b657f7b",
+      "src/patchharbor/platform/source_tree.py": "92b2211704d4357b8d25d18b04032e39416771eca5dd7c26b108c7dd2c60f9aa",
+      "src/patchharbor/platform/windows.py": "e73a0b88b73e94c14bea76e028632cb2662d304c3dfb442aa11ffeb5b20581ae",
+      "src/patchharbor/presentation.py": "c5ba4ba98d6e3d310184442b274cd2f03337dca03dbd3c36c88815b89670709e",
+      "src/patchharbor/progress.py": "34155f20d459a629063a72fad50d6baab0920346f2475c17b80467d43c6f3e94",
+      "src/patchharbor/py.typed": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "src/patchharbor/pyz_artifact.py": "3397d1d413b7f3728a7acf1bd4a7e17db7e046759e2376454f63f796150fdc57",
+      "src/patchharbor/registration.py": "cf1a454c19ee75d8092d55e5b2fcc5b0152f3184d2bfae3a9ac7b1e13d72dbf2",
+      "src/patchharbor/registry.py": "d66767b3759fbff4a6e66cbfe56837d1a0b6924375fb28daf8e016d28442ab26",
+      "src/patchharbor/repository.py": "6a50a372e60f543faa6aa6f2a31633c8aae8427cb580d5e5b4c55e464aeab70d",
+      "src/patchharbor/repository_paths.py": "1c4f78ee82c87bf365ca42b533c5152322be7f67f14e6e6b4665142e5c1bcaa3",
+      "src/patchharbor/repository_state.py": "a920fb552575b7898dfcc0175f031c64b83a39d3134d022f43c45258c7f2aec7",
+      "src/patchharbor/resource_policy.py": "1bf88e372252f5f6b5fbb4c4308426e227f4d0d26362a48696231762cd64d14f",
+      "src/patchharbor/result_bundle.py": "75ef50d49cc5ed344af3d8260e01e10393b84504acb0089132dd614d325d6941",
+      "src/patchharbor/result_bundle_capture.py": "dafc7954feafb6316a6b6e06dd0a451c1527757ab49e142061c308faae44702f",
+      "src/patchharbor/result_bundle_handoff.py": "af95cf23aa8e1826eace150b1ef50d514c155789acc85316a0f63a12652cec0e",
+      "src/patchharbor/result_bundle_publication.py": "3bbcfeb6835705a21222972d74f16b2a6a12108719a5874ab975ac067a8e11cf",
+      "src/patchharbor/result_bundle_snapshot.py": "2cabe781f175267e39d893e42df0c178a86faa3501494c134a1802c2ff18114a",
+      "src/patchharbor/result_bundle_target.py": "c4ab45b6f51d2f1d7442b2e2e3a4675c3ad4594a1b8d50f3549a3ebb34a7f58f",
+      "src/patchharbor/result_bundle_writer.py": "55cc0fbdba5150fc1f744d6dec8b974d89a2e9d176985dfb2f34475c612bbcd3",
+      "src/patchharbor/result_pyz.py": "8944235ad4125dd43bbb4471a08341cdb84440c8e3afe8f22606e0f98940e608",
+      "src/patchharbor/result_reader.py": "ccf2448f8cc272facdfe0b53aa10e49ec2d690c68bbf372aa5f6022cf17477eb",
+      "src/patchharbor/result_resources.py": "e339f048c7790c3733daa74e6cbaa1684648f3831dd6109d2a8eb8545e1ed4d0",
+      "src/patchharbor/result_runtime.py": "3e8012f08d72052464e015a7e24cbedb694bbc74c3e397cec944024ddafffa5d",
+      "src/patchharbor/result_verification.py": "bacd9687bf1d545b7bfca35c36f301a81e7c5f3e95f243066875c3ec4de13b1c",
+      "src/patchharbor/run_log.py": "512d39af2aa573a6173e7e8800ea68ace89d5662ac26fab0ef7c312dca6cfbca",
+      "src/patchharbor/run_report.py": "6fbd2b5ab180e0bf6df6ecd3ebe500724c9c2eaaa310ce4ef95aa701c951f87d",
+      "src/patchharbor/runtime_artifact.py": "f051f21035953f8c5ab004eb6c73044c06537de390ae1290fd42a6f094b7a6f7",
+      "src/patchharbor/runtime_pyz.py": "5504df8fa652c1cbd8f85644d7a9cb7d3cdcec0866499c188d512bbd332a771c",
+      "src/patchharbor/runtime_sources.py": "54869ebc7671d79661cd5eaf7a874ae18983c0234ca0b114a7998f6464233326",
+      "src/patchharbor/runtime_wheel.py": "3daa772606b20ef63756be2d739b88caf4882c8504701dda78d879efe9e276f4",
+      "src/patchharbor/runtime_zip.py": "5591ffbf68545b5e66f307bb10f37ed7f7a3becb1f0ee53b8200e054c6f58a8f",
+      "src/patchharbor/sources.py": "3e704d2af048087c9da2d7fba6ec5d5e30a21e1acedd6a8324ca30e7feab8bc5",
+      "src/patchharbor/state_fingerprint.py": "79e15d44d1503a6984bb675abfe2e5617df1c8ff073e7f72edcab7d1ee021741",
+      "src/patchharbor/temporary_resources.py": "4d0b979500660fbccef9e827ca56a9ffd4604c96831fa6d3b8fd330b86c99b4b",
+      "src/patchharbor/user_paths.py": "0b1264b86a2cb783644ce5de6df0fb02ecb6a684da04842a624f957b58f939a6",
+      "src/patchharbor/watch_contract.py": "8c2f406b5257a1599335da71b74ed63ba91c434f7242d91dd9672af13dd7d57c",
+      "src/patchharbor/zip_payloads.py": "38adcb94c843bc70e14b975deed93f15ba1d78ef3aa8e4c6bc6fb5cf0ec2d162",
+      "src/patchharbor_watcher/__init__.py": "017167942313e2f3ca854d10c3982ca22bea4dc06c0ef27523c0b6892398ce22",
+      "src/patchharbor_watcher/apply_boundary.py": "a1e058920d6e203fd9d884831b8d5d231818340d9435b78dbc6e80ce6bb7684d",
+      "src/patchharbor_watcher/cli.py": "9c33cfa2d4d389e4c3a58a303715cef15276c3175aa4f21baf87b86ee5ad22fa",
+      "src/patchharbor_watcher/events.py": "1eb831f739e6bcf56c75c224e98b5cde325512df4fa1df7c525792f37750f3f4",
+      "src/patchharbor_watcher/lifecycle.py": "0f1e4f6c86a9d2ffabc698d1cdf3fd3852f228eba48b59dad3e5e60e0f5387b2",
+      "src/patchharbor_watcher/loop.py": "e9ad1d0fe76e44c7469aa53bdb617e3e9fb9363bac61a5dac4d8169aa2267cb2",
+      "src/patchharbor_watcher/observation.py": "e011b39389d332809f900e761c109fdd6434e21a3d6a31a7ac1bcb22b0873c26",
+      "src/patchharbor_watcher/platform/__init__.py": "e9f6c6a4533783ec4115b3a31eb29953c54f7b7f3262ce6ff2a332109625834a",
+      "src/patchharbor_watcher/platform/linux.py": "c52d91da52b2b0e22bb09d9a21182af8d49efb0149d17db5360751ef13aec790",
+      "src/patchharbor_watcher/platform/windows.py": "5fbd767c69c20f45eb89030ab7ca67815fdfdd320802bfca681d80b77762406f",
+      "src/patchharbor_watcher/protocol.py": "97cf830e784aa3e24f4b105239220c950a35bf1a8f3f020b9a72ff0bd6b4d268",
+      "src/patchharbor_watcher/scheduling.py": "d93fdd471cd20173e0987bc233cc5ee71c63dc72623ad32b6a9ad0acaebef291",
+      "src/patchharbor_watcher/systemd_linux.py": "e22938279953571745eb39bb98a9128ec07193e1f6bf27a530b5513d6e450383",
+      "src/patchharbor_watcher/worker.py": "30864ea0d856ad614fd25ed075264f9a88549de67a25dcaf112a0fc130ceb565"
+    }
+  },
+  "generation": {
+    "script_sha256": "db91d7afe22266932da7714026b934eb856ac54a27bb1a5178cc9344278d441b",
+    "python": "3.14.4 (main, Aug 20 2026, 10:41:58) [GCC 15.2.0]",
+    "platform": "linux",
+    "git": "git version 2.53.0",
+    "network_used": false,
+    "archives_rewritten": false,
+    "note": "Git commits exist only in temporary sample repos. No push; directories deleted after capture."
+  },
+  "results": {
+    "clean": {
+      "bytes": 265212,
+      "sha256": "d5b1f6453da2d8a2ad2e73fde0d4a0d8775777fd1fa083bd0ac8da4f223db636",
+      "original_filename": "sample_Result_124830_1029_4f7c74.zip",
+      "format_version": 3,
+      "binding": {
+        "repo_id": "e40e9233-cf7b-4df4-ad15-03539a001dc0",
+        "base_commit": "9d71c0d9a39065e93759f224dc5d1d8d29f115c9",
+        "state_fingerprint": "7c9d2a24e397e0e5",
+        "fingerprint_algorithm": "patchharbor-state-v1"
+      },
+      "operation": "bundle",
+      "primary_kind": "success",
+      "entrypoint_exit_code": null,
+      "process_exit_code": 0,
+      "dry_run": false,
+      "dirty": false,
+      "runtime_status": "embedded",
+      "runtime_reason": null,
+      "runtime_version": "1.4.0",
+      "expected_base_commit": null,
+      "completed_commit": null,
+      "patch_sha256": null,
+      "patch_fixture": null,
+      "before_commit": "9d71c0d9a39065e93759f224dc5d1d8d29f115c9",
+      "after_commit": "9d71c0d9a39065e93759f224dc5d1d8d29f115c9",
+      "actual_new_commits": [],
+      "archive_eligible": true,
+      "entries": {
+        "manifest.json": {
+          "bytes": 1278,
+          "sha256": "d4bf60e35583345ee0d22f361e577b3e72250fba9ad2729f622c05831b679d5a"
+        },
+        "context.json": {
+          "bytes": 263,
+          "sha256": "2f72f4824069ec2441e588b564c819f03564ba5c66ef2dd4304ba34a9b5f33f6"
+        },
+        "logs/run.json": {
+          "bytes": 775,
+          "sha256": "4577c2229dfad1e25fd870293e1d42ad2ab9fc2f77f103adf8fc0471b068b566"
+        },
+        "CHAT_INSTRUCTIONS.md": {
+          "bytes": 84794,
+          "sha256": "5bc5383f901ba6f7733560945c3917f0658ba5865cd8faba116e6590366a403d"
+        },
+        "environment.json": {
+          "bytes": 1166,
+          "sha256": "6a957e3be8527fde93d792b172637780f7d56650c3d973b8502704c5406a964e"
+        },
+        "runtime/runtime.json": {
+          "bytes": 731,
+          "sha256": "7314eccf2fe5ddb916cbf6ef6fded7c08505ac3df7e725791fd8c8a3f2e81958"
+        },
+        "runtime/patchharbor-1.4.0.pyz": {
+          "bytes": 973604,
+          "sha256": "4e0d26997bffe9476e79d98211cef2d93be7899063a0eb3480bea2ffa3d8f594"
+        },
+        "base/Grüße.txt": {
+          "bytes": 15,
+          "sha256": "d3b26e1f1ce13bde26578063b679fab4dbba401f23bc8ed938f8f4d5713f5048"
+        },
+        "base/delete-me.txt": {
+          "bytes": 17,
+          "sha256": "63118c24b54a97287f001cfab5684134d17399889d5a102cd3dca37710f2330d"
+        },
+        "base/tool.sh": {
+          "bytes": 25,
+          "sha256": "63eef671f4ef99784cec18378189e181e3b5ae015c36efa9290393aabe750710"
+        },
+        "base/tracked.txt": {
+          "bytes": 5,
+          "sha256": "f34848ca92665c342abd5816c9e3eda0e82180671195362bcd0080544a3bc2ac"
+        },
+        "changes/staged.patch": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "changes/unstaged.patch": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    },
+    "diagnostic": {
+      "bytes": 265475,
+      "sha256": "f647c1b09ac44b358c49a0e49f9920ce2f0addcda4aa83da9ff914bfdbb02276",
+      "original_filename": "sample_Result_124830_1029_b87380.zip",
+      "format_version": 3,
+      "binding": {
+        "repo_id": "e40e9233-cf7b-4df4-ad15-03539a001dc0",
+        "base_commit": "9d71c0d9a39065e93759f224dc5d1d8d29f115c9",
+        "state_fingerprint": "7c9d2a24e397e0e5",
+        "fingerprint_algorithm": "patchharbor-state-v1"
+      },
+      "operation": "apply",
+      "primary_kind": "success",
+      "entrypoint_exit_code": 0,
+      "process_exit_code": 0,
+      "dry_run": false,
+      "dirty": false,
+      "runtime_status": "embedded",
+      "runtime_reason": null,
+      "runtime_version": "1.4.0",
+      "expected_base_commit": "9d71c0d9a39065e93759f224dc5d1d8d29f115c9",
+      "completed_commit": null,
+      "patch_sha256": "a829a164840b807931e8186e0cd15fa42bc3c3b7937654478ec78de6bcd46d21",
+      "patch_fixture": "patch-diagnostic.zip",
+      "before_commit": "9d71c0d9a39065e93759f224dc5d1d8d29f115c9",
+      "after_commit": "9d71c0d9a39065e93759f224dc5d1d8d29f115c9",
+      "actual_new_commits": [],
+      "archive_eligible": true,
+      "entries": {
+        "manifest.json": {
+          "bytes": 1716,
+          "sha256": "be1e584087d46022f336c38747fd23b5097f7541830db3e54e3d108e6dd9386d"
+        },
+        "context.json": {
+          "bytes": 263,
+          "sha256": "2f72f4824069ec2441e588b564c819f03564ba5c66ef2dd4304ba34a9b5f33f6"
+        },
+        "logs/run.json": {
+          "bytes": 767,
+          "sha256": "7c421cf759e1679aa255242d9b0ac1395be09b21b7cc7c96951426efc7cb63ef"
+        },
+        "CHAT_INSTRUCTIONS.md": {
+          "bytes": 84806,
+          "sha256": "b2783595b7833a9d3ba7550acb7e9cff763d12ae889298b0cc628470ac32b17b"
+        },
+        "environment.json": {
+          "bytes": 1178,
+          "sha256": "bf47f5b1f2a58d5e54113ea0b0aaef19670d93978b56daf723b403c781441776"
+        },
+        "runtime/runtime.json": {
+          "bytes": 731,
+          "sha256": "7314eccf2fe5ddb916cbf6ef6fded7c08505ac3df7e725791fd8c8a3f2e81958"
+        },
+        "runtime/patchharbor-1.4.0.pyz": {
+          "bytes": 973604,
+          "sha256": "4e0d26997bffe9476e79d98211cef2d93be7899063a0eb3480bea2ffa3d8f594"
+        },
+        "logs/execution.log": {
+          "bytes": 32,
+          "sha256": "65f3db1373a0c4bce91585c8f99441d337a1698c534d09c21ecdaad16a1421be"
+        },
+        "base/Grüße.txt": {
+          "bytes": 15,
+          "sha256": "d3b26e1f1ce13bde26578063b679fab4dbba401f23bc8ed938f8f4d5713f5048"
+        },
+        "base/delete-me.txt": {
+          "bytes": 17,
+          "sha256": "63118c24b54a97287f001cfab5684134d17399889d5a102cd3dca37710f2330d"
+        },
+        "base/tool.sh": {
+          "bytes": 25,
+          "sha256": "63eef671f4ef99784cec18378189e181e3b5ae015c36efa9290393aabe750710"
+        },
+        "base/tracked.txt": {
+          "bytes": 5,
+          "sha256": "f34848ca92665c342abd5816c9e3eda0e82180671195362bcd0080544a3bc2ac"
+        },
+        "changes/staged.patch": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "changes/unstaged.patch": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    },
+    "single": {
+      "bytes": 265612,
+      "sha256": "9a06c7e28d1694bd77caf747c8b9aac4c8b4a917f12576530203720193a6818d",
+      "original_filename": "sample_Result_124831_1029_58356c.zip",
+      "format_version": 3,
+      "binding": {
+        "repo_id": "e40e9233-cf7b-4df4-ad15-03539a001dc0",
+        "base_commit": "9fde41407ad65ac881eca744b3ecd3fc11e5b4bb",
+        "state_fingerprint": "7c9d2a24e397e0e5",
+        "fingerprint_algorithm": "patchharbor-state-v1"
+      },
+      "operation": "apply",
+      "primary_kind": "success",
+      "entrypoint_exit_code": 0,
+      "process_exit_code": 0,
+      "dry_run": false,
+      "dirty": false,
+      "runtime_status": "embedded",
+      "runtime_reason": null,
+      "runtime_version": "1.4.0",
+      "expected_base_commit": "9d71c0d9a39065e93759f224dc5d1d8d29f115c9",
+      "completed_commit": "9fde41407ad65ac881eca744b3ecd3fc11e5b4bb",
+      "patch_sha256": "64d6399975f466251d444563773861c1b7202b0e8cdae5d81db34266d54bbae9",
+      "patch_fixture": "patch-single.zip",
+      "before_commit": "9d71c0d9a39065e93759f224dc5d1d8d29f115c9",
+      "after_commit": "9fde41407ad65ac881eca744b3ecd3fc11e5b4bb",
+      "actual_new_commits": [
+        "9fde41407ad65ac881eca744b3ecd3fc11e5b4bb"
+      ],
+      "archive_eligible": true,
+      "entries": {
+        "manifest.json": {
+          "bytes": 1861,
+          "sha256": "85fb468f77b29e8929cb88a93f7d3950a8e86380754543766af969d827e97622"
+        },
+        "context.json": {
+          "bytes": 263,
+          "sha256": "5614acc52ae0913504e896aef908952165fff5f08299a10fdd9b337d7343c0ec"
+        },
+        "logs/run.json": {
+          "bytes": 768,
+          "sha256": "8f820b508c55c1694a6501c6eb9e9b50eaa87eff213429b779d8025bc4016aa4"
+        },
+        "CHAT_INSTRUCTIONS.md": {
+          "bytes": 84802,
+          "sha256": "41e2b85a9979532d65b1fadc94f91c7814c953a3a140ca780e5c1135e12b43e2"
+        },
+        "environment.json": {
+          "bytes": 1174,
+          "sha256": "1eccc21a5efc621d7f86fa13f1d321f8909fbb5eff923d71d306daa72d368e8f"
+        },
+        "runtime/runtime.json": {
+          "bytes": 731,
+          "sha256": "7314eccf2fe5ddb916cbf6ef6fded7c08505ac3df7e725791fd8c8a3f2e81958"
+        },
+        "runtime/patchharbor-1.4.0.pyz": {
+          "bytes": 973604,
+          "sha256": "4e0d26997bffe9476e79d98211cef2d93be7899063a0eb3480bea2ffa3d8f594"
+        },
+        "logs/execution.log": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "base/Grüße.txt": {
+          "bytes": 15,
+          "sha256": "d3b26e1f1ce13bde26578063b679fab4dbba401f23bc8ed938f8f4d5713f5048"
+        },
+        "base/delete-me.txt": {
+          "bytes": 17,
+          "sha256": "63118c24b54a97287f001cfab5684134d17399889d5a102cd3dca37710f2330d"
+        },
+        "base/payload.sh": {
+          "bytes": 17,
+          "sha256": "306c6ca7407560340797866e077e053627ad409277d1b9da58106fce4cf717cb"
+        },
+        "base/tool.sh": {
+          "bytes": 25,
+          "sha256": "63eef671f4ef99784cec18378189e181e3b5ae015c36efa9290393aabe750710"
+        },
+        "base/tracked.txt": {
+          "bytes": 4,
+          "sha256": "2c8b08da5ce60398e1f19af0e5dccc744df274b826abe585eaba68c525434806"
+        },
+        "changes/staged.patch": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "changes/unstaged.patch": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    },
+    "multi": {
+      "bytes": 265613,
+      "sha256": "d9fff89d3f06d6a58def85410006e165a7ed60534edf4c6f8f9bee5b2d0e168f",
+      "original_filename": "sample_Result_124832_1029_50febf.zip",
+      "format_version": 3,
+      "binding": {
+        "repo_id": "e40e9233-cf7b-4df4-ad15-03539a001dc0",
+        "base_commit": "4337ca1e0ee2faf80e59279f01fea5974e5f37f4",
+        "state_fingerprint": "7c9d2a24e397e0e5",
+        "fingerprint_algorithm": "patchharbor-state-v1"
+      },
+      "operation": "apply",
+      "primary_kind": "success",
+      "entrypoint_exit_code": 0,
+      "process_exit_code": 0,
+      "dry_run": false,
+      "dirty": false,
+      "runtime_status": "embedded",
+      "runtime_reason": null,
+      "runtime_version": "1.4.0",
+      "expected_base_commit": "9fde41407ad65ac881eca744b3ecd3fc11e5b4bb",
+      "completed_commit": "4337ca1e0ee2faf80e59279f01fea5974e5f37f4",
+      "patch_sha256": "2f80ec7d2164a6593615b0a34d6fd45bcf648cc9c069124e271b2ed1a2282771",
+      "patch_fixture": "patch-multi.zip",
+      "before_commit": "9fde41407ad65ac881eca744b3ecd3fc11e5b4bb",
+      "after_commit": "4337ca1e0ee2faf80e59279f01fea5974e5f37f4",
+      "actual_new_commits": [
+        "31780df83fedae42087a1d98d5dca503ee7efbd4",
+        "4337ca1e0ee2faf80e59279f01fea5974e5f37f4"
+      ],
+      "archive_eligible": true,
+      "entries": {
+        "manifest.json": {
+          "bytes": 1861,
+          "sha256": "b86b8a170534ade8f630ad35ccac74d4c8f3b36ea37e5f49159cfa3730bbcbd1"
+        },
+        "context.json": {
+          "bytes": 263,
+          "sha256": "aacd91f52b6812d5f38212ae6bc4b0366e9f9878fb5cc70b422944b712e9b831"
+        },
+        "logs/run.json": {
+          "bytes": 769,
+          "sha256": "20e5a359ca86fec4d976fd2936959722871094860ccd8c4efc49e4b9ed41f117"
+        },
+        "CHAT_INSTRUCTIONS.md": {
+          "bytes": 84801,
+          "sha256": "ddebd20ae0b8433d7c529e4ec3fdc6d69b435f4eb209201b6e42d94113781dff"
+        },
+        "environment.json": {
+          "bytes": 1173,
+          "sha256": "fd1407a8d7ff6cecb0e2c59a5c5cbccef9e73b4ef4b5e32ed0d224dc8e55caae"
+        },
+        "runtime/runtime.json": {
+          "bytes": 731,
+          "sha256": "7314eccf2fe5ddb916cbf6ef6fded7c08505ac3df7e725791fd8c8a3f2e81958"
+        },
+        "runtime/patchharbor-1.4.0.pyz": {
+          "bytes": 973604,
+          "sha256": "4e0d26997bffe9476e79d98211cef2d93be7899063a0eb3480bea2ffa3d8f594"
+        },
+        "logs/execution.log": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "base/Grüße.txt": {
+          "bytes": 15,
+          "sha256": "d3b26e1f1ce13bde26578063b679fab4dbba401f23bc8ed938f8f4d5713f5048"
+        },
+        "base/delete-me.txt": {
+          "bytes": 17,
+          "sha256": "63118c24b54a97287f001cfab5684134d17399889d5a102cd3dca37710f2330d"
+        },
+        "base/payload.sh": {
+          "bytes": 17,
+          "sha256": "306c6ca7407560340797866e077e053627ad409277d1b9da58106fce4cf717cb"
+        },
+        "base/tool.sh": {
+          "bytes": 25,
+          "sha256": "63eef671f4ef99784cec18378189e181e3b5ae015c36efa9290393aabe750710"
+        },
+        "base/tracked.txt": {
+          "bytes": 6,
+          "sha256": "6a269249e115c361cee7c3544469f6a423ff400ac299fe094673e8c38f20905e"
+        },
+        "changes/staged.patch": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "changes/unstaged.patch": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    },
+    "dry-run": {
+      "bytes": 265476,
+      "sha256": "a91bdb1b7590109b5ed508aec481bf6cfc5f90e64efca728082babf7183b0e05",
+      "original_filename": "sample_Result_124832_1029_b30aaf.zip",
+      "format_version": 3,
+      "binding": {
+        "repo_id": "e40e9233-cf7b-4df4-ad15-03539a001dc0",
+        "base_commit": "4337ca1e0ee2faf80e59279f01fea5974e5f37f4",
+        "state_fingerprint": "7c9d2a24e397e0e5",
+        "fingerprint_algorithm": "patchharbor-state-v1"
+      },
+      "operation": "apply",
+      "primary_kind": "dry_run_success",
+      "entrypoint_exit_code": null,
+      "process_exit_code": 0,
+      "dry_run": true,
+      "dirty": false,
+      "runtime_status": "embedded",
+      "runtime_reason": null,
+      "runtime_version": "1.4.0",
+      "expected_base_commit": "4337ca1e0ee2faf80e59279f01fea5974e5f37f4",
+      "completed_commit": null,
+      "patch_sha256": "a5b4e85c8737f88603efaec422874e66b674a56d47535fe494ce5858dc345917",
+      "patch_fixture": "patch-dry-run.zip",
+      "before_commit": "4337ca1e0ee2faf80e59279f01fea5974e5f37f4",
+      "after_commit": "4337ca1e0ee2faf80e59279f01fea5974e5f37f4",
+      "actual_new_commits": [],
+      "archive_eligible": false,
+      "entries": {
+        "manifest.json": {
+          "bytes": 1832,
+          "sha256": "98149f87ea00ae06937dc74381940bed094b080d2ebfaf50de9ed480b90173f7"
+        },
+        "context.json": {
+          "bytes": 263,
+          "sha256": "aacd91f52b6812d5f38212ae6bc4b0366e9f9878fb5cc70b422944b712e9b831"
+        },
+        "logs/run.json": {
+          "bytes": 780,
+          "sha256": "d79c80817c2311d044376f11c32f72cbf0e72781c7dc4448c5ee75a72f31b083"
+        },
+        "CHAT_INSTRUCTIONS.md": {
+          "bytes": 84803,
+          "sha256": "76f80a5ed2b785e06d1e82fdcb50abf510f928b0e113a3136ff575731f7a0276"
+        },
+        "environment.json": {
+          "bytes": 1175,
+          "sha256": "5eccf81a9dfd6584495249a9f4762d29c5c00636450dcde7a19c13c09ab1fae8"
+        },
+        "runtime/runtime.json": {
+          "bytes": 731,
+          "sha256": "7314eccf2fe5ddb916cbf6ef6fded7c08505ac3df7e725791fd8c8a3f2e81958"
+        },
+        "runtime/patchharbor-1.4.0.pyz": {
+          "bytes": 973604,
+          "sha256": "4e0d26997bffe9476e79d98211cef2d93be7899063a0eb3480bea2ffa3d8f594"
+        },
+        "base/Grüße.txt": {
+          "bytes": 15,
+          "sha256": "d3b26e1f1ce13bde26578063b679fab4dbba401f23bc8ed938f8f4d5713f5048"
+        },
+        "base/delete-me.txt": {
+          "bytes": 17,
+          "sha256": "63118c24b54a97287f001cfab5684134d17399889d5a102cd3dca37710f2330d"
+        },
+        "base/payload.sh": {
+          "bytes": 17,
+          "sha256": "306c6ca7407560340797866e077e053627ad409277d1b9da58106fce4cf717cb"
+        },
+        "base/tool.sh": {
+          "bytes": 25,
+          "sha256": "63eef671f4ef99784cec18378189e181e3b5ae015c36efa9290393aabe750710"
+        },
+        "base/tracked.txt": {
+          "bytes": 6,
+          "sha256": "6a269249e115c361cee7c3544469f6a423ff400ac299fe094673e8c38f20905e"
+        },
+        "changes/staged.patch": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "changes/unstaged.patch": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    },
+    "partial-failure": {
+      "bytes": 266013,
+      "sha256": "9faeeffc544f97ce204d4e6d240579ed75d23c95164afef5b7bb731de71f5bf1",
+      "original_filename": "sample_Result_124833_1029_79fa4c.zip",
+      "format_version": 3,
+      "binding": {
+        "repo_id": "e40e9233-cf7b-4df4-ad15-03539a001dc0",
+        "base_commit": "aecea93dd37eb11d8c6c614b19f41ba1577d3e06",
+        "state_fingerprint": "3ec9980971ba7d2b",
+        "fingerprint_algorithm": "patchharbor-state-v1"
+      },
+      "operation": "apply",
+      "primary_kind": "entrypoint_exit",
+      "entrypoint_exit_code": 7,
+      "process_exit_code": 7,
+      "dry_run": false,
+      "dirty": true,
+      "runtime_status": "embedded",
+      "runtime_reason": null,
+      "runtime_version": "1.4.0",
+      "expected_base_commit": "4337ca1e0ee2faf80e59279f01fea5974e5f37f4",
+      "completed_commit": null,
+      "patch_sha256": "ba2a12b28cf7d6c3f834987044a4ea4b0e07f84100ec6f1a4cd043f00d7da7d0",
+      "patch_fixture": "patch-partial-failure.zip",
+      "before_commit": "4337ca1e0ee2faf80e59279f01fea5974e5f37f4",
+      "after_commit": "aecea93dd37eb11d8c6c614b19f41ba1577d3e06",
+      "actual_new_commits": [
+        "aecea93dd37eb11d8c6c614b19f41ba1577d3e06"
+      ],
+      "archive_eligible": false,
+      "entries": {
+        "manifest.json": {
+          "bytes": 1964,
+          "sha256": "1902c0b8aac83a927b241437f80fb790ee27b8c072225ee73a308c5ae4e9b883"
+        },
+        "context.json": {
+          "bytes": 262,
+          "sha256": "253d9638ff6271ef12289620c7459008d0dfff17e0cc0bf3b0da606f8ef2c7f4"
+        },
+        "logs/run.json": {
+          "bytes": 777,
+          "sha256": "fad1f11a2d7410334fdd0f38a17ac3cd2d903a0e2224aa01601f9f76b986bedd"
+        },
+        "CHAT_INSTRUCTIONS.md": {
+          "bytes": 84811,
+          "sha256": "cb5d55397691b48b1ed3e2a363c083ee7a87834d5f4d8257da774c0e9d34b80a"
+        },
+        "environment.json": {
+          "bytes": 1183,
+          "sha256": "e57a2691a85058c9d5c27a7441d9a40f948e9fc330bd7569a9dcf1c98cb16afe"
+        },
+        "runtime/runtime.json": {
+          "bytes": 731,
+          "sha256": "7314eccf2fe5ddb916cbf6ef6fded7c08505ac3df7e725791fd8c8a3f2e81958"
+        },
+        "runtime/patchharbor-1.4.0.pyz": {
+          "bytes": 973604,
+          "sha256": "4e0d26997bffe9476e79d98211cef2d93be7899063a0eb3480bea2ffa3d8f594"
+        },
+        "logs/execution.log": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "base/Grüße.txt": {
+          "bytes": 15,
+          "sha256": "d3b26e1f1ce13bde26578063b679fab4dbba401f23bc8ed938f8f4d5713f5048"
+        },
+        "base/delete-me.txt": {
+          "bytes": 17,
+          "sha256": "63118c24b54a97287f001cfab5684134d17399889d5a102cd3dca37710f2330d"
+        },
+        "base/payload.sh": {
+          "bytes": 17,
+          "sha256": "306c6ca7407560340797866e077e053627ad409277d1b9da58106fce4cf717cb"
+        },
+        "base/tool.sh": {
+          "bytes": 25,
+          "sha256": "63eef671f4ef99784cec18378189e181e3b5ae015c36efa9290393aabe750710"
+        },
+        "base/tracked.txt": {
+          "bytes": 15,
+          "sha256": "6b6ebe5601608d2c25b596894662873368156446d46b5b186682f36099232928"
+        },
+        "changes/staged.patch": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "changes/unstaged.patch": {
+          "bytes": 226,
+          "sha256": "9228781259099f6ebcfb610e681de70a8e1fa8fccab09dea29e352ec46eaf642"
+        },
+        "untracked/failed-untracked.txt": {
+          "bytes": 17,
+          "sha256": "29c5e9126dca774e2b7f6b32d5034d4ff2a77e5fb15db6370707eea64840bbe3"
+        }
+      }
+    },
+    "dirty": {
+      "bytes": 266140,
+      "sha256": "cdf23c845454420cb68dc591cffa3ee481cde18f340a083fe556abb65336d765",
+      "original_filename": "sample_Result_124833_1029_852cb1.zip",
+      "format_version": 3,
+      "binding": {
+        "repo_id": "e40e9233-cf7b-4df4-ad15-03539a001dc0",
+        "base_commit": "aecea93dd37eb11d8c6c614b19f41ba1577d3e06",
+        "state_fingerprint": "9256056f40328a64",
+        "fingerprint_algorithm": "patchharbor-state-v1"
+      },
+      "operation": "bundle",
+      "primary_kind": "success",
+      "entrypoint_exit_code": null,
+      "process_exit_code": 0,
+      "dry_run": false,
+      "dirty": true,
+      "runtime_status": "embedded",
+      "runtime_reason": null,
+      "runtime_version": "1.4.0",
+      "expected_base_commit": null,
+      "completed_commit": null,
+      "patch_sha256": null,
+      "patch_fixture": null,
+      "before_commit": "aecea93dd37eb11d8c6c614b19f41ba1577d3e06",
+      "after_commit": "aecea93dd37eb11d8c6c614b19f41ba1577d3e06",
+      "actual_new_commits": [],
+      "archive_eligible": false,
+      "entries": {
+        "manifest.json": {
+          "bytes": 1644,
+          "sha256": "333621e5705bff88be014d9c5de3104338172f847835c9c3a75a63f76fe540a4"
+        },
+        "context.json": {
+          "bytes": 262,
+          "sha256": "d2f9bc59fe4878ccd7e704247db984742f87ca70a04e6f069e6b4feaaafa2623"
+        },
+        "logs/run.json": {
+          "bytes": 775,
+          "sha256": "a934c0fc5db52b6d9c4f859aad045b731ee4b2c6f86ca486022e9d71e697f6bf"
+        },
+        "CHAT_INSTRUCTIONS.md": {
+          "bytes": 84794,
+          "sha256": "a7a59a96fe2c25c14e1e11d75cd4bc99899f30f620ded1edf6f19b573e00aae4"
+        },
+        "environment.json": {
+          "bytes": 1166,
+          "sha256": "6db39860d1c7667b40ce5dad9b3ea05b83656d037350e9d18cec319471633292"
+        },
+        "runtime/runtime.json": {
+          "bytes": 731,
+          "sha256": "7314eccf2fe5ddb916cbf6ef6fded7c08505ac3df7e725791fd8c8a3f2e81958"
+        },
+        "runtime/patchharbor-1.4.0.pyz": {
+          "bytes": 973604,
+          "sha256": "4e0d26997bffe9476e79d98211cef2d93be7899063a0eb3480bea2ffa3d8f594"
+        },
+        "base/Grüße.txt": {
+          "bytes": 15,
+          "sha256": "d3b26e1f1ce13bde26578063b679fab4dbba401f23bc8ed938f8f4d5713f5048"
+        },
+        "base/delete-me.txt": {
+          "bytes": 17,
+          "sha256": "63118c24b54a97287f001cfab5684134d17399889d5a102cd3dca37710f2330d"
+        },
+        "base/payload.sh": {
+          "bytes": 17,
+          "sha256": "306c6ca7407560340797866e077e053627ad409277d1b9da58106fce4cf717cb"
+        },
+        "base/tool.sh": {
+          "bytes": 25,
+          "sha256": "63eef671f4ef99784cec18378189e181e3b5ae015c36efa9290393aabe750710"
+        },
+        "base/tracked.txt": {
+          "bytes": 15,
+          "sha256": "6b6ebe5601608d2c25b596894662873368156446d46b5b186682f36099232928"
+        },
+        "changes/staged.patch": {
+          "bytes": 207,
+          "sha256": "f1e4ad7c71cfaf6d6b327cc11339edd00ce3a0978ff57c4923cbb2bfb07f06f4"
+        },
+        "changes/unstaged.patch": {
+          "bytes": 424,
+          "sha256": "98e725e77ccf3fee5850bb524fb2f98303efbc3b3a73887cac84fb8cdd244524"
+        },
+        "untracked/failed-untracked.txt": {
+          "bytes": 17,
+          "sha256": "29c5e9126dca774e2b7f6b32d5034d4ff2a77e5fb15db6370707eea64840bbe3"
+        },
+        "untracked/untracked.bin": {
+          "bytes": 9,
+          "sha256": "58ace0fc33f354715c0a9d8e4ca5498b8bb9f1320421a405f8e1f7cfb5c269a2"
+        }
+      }
+    },
+    "unavailable": {
+      "bytes": 33302,
+      "sha256": "0828aef01d94341c84f27925b3c4a44cefe8542a71b13a2f87e9d635856f76cb",
+      "original_filename": "unprepared-sample_Result_124834_1029_5ca911.zip",
+      "format_version": 3,
+      "binding": {
+        "repo_id": "e2e43639-f458-4e34-8cc4-2a86be99fbb1",
+        "base_commit": "9d71c0d9a39065e93759f224dc5d1d8d29f115c9",
+        "state_fingerprint": "7c9d2a24e397e0e5",
+        "fingerprint_algorithm": "patchharbor-state-v1"
+      },
+      "operation": "bundle",
+      "primary_kind": "success",
+      "entrypoint_exit_code": null,
+      "process_exit_code": 0,
+      "dry_run": false,
+      "dirty": false,
+      "runtime_status": "unavailable",
+      "runtime_reason": "source_not_prepared",
+      "runtime_version": "1.4.0",
+      "expected_base_commit": null,
+      "completed_commit": null,
+      "patch_sha256": null,
+      "patch_fixture": null,
+      "before_commit": "9d71c0d9a39065e93759f224dc5d1d8d29f115c9",
+      "after_commit": "9d71c0d9a39065e93759f224dc5d1d8d29f115c9",
+      "actual_new_commits": [],
+      "archive_eligible": false,
+      "entries": {
+        "manifest.json": {
+          "bytes": 1159,
+          "sha256": "3119074c713c8ea6bf8e8fa3ed3268af7fc5f99ea2da087a844ceeef0cc9661b"
+        },
+        "context.json": {
+          "bytes": 263,
+          "sha256": "7f57cbb7fea0d0790f9b62a8f54d07923d3f7ff6846023d2322a77ccc29a600a"
+        },
+        "logs/run.json": {
+          "bytes": 828,
+          "sha256": "4caea92ee3a27cdfc8705be1828908a0252c531f7bad9aab17803190633ad16f"
+        },
+        "CHAT_INSTRUCTIONS.md": {
+          "bytes": 84869,
+          "sha256": "6ce17c3b6e1ca5f2508fdcb9dc4e857f6ed72dda754a1652b37b5fc828ee105b"
+        },
+        "environment.json": {
+          "bytes": 1208,
+          "sha256": "3ed5714d5e7e0c92cf83cbb2d893781a26092bdee09e53513a9d703fec6e71f9"
+        },
+        "runtime/runtime.json": {
+          "bytes": 324,
+          "sha256": "65ee7e0a0c908522c93082fa1cbe330934017f3ebe2114010ace2a6917846d07"
+        },
+        "base/Grüße.txt": {
+          "bytes": 15,
+          "sha256": "d3b26e1f1ce13bde26578063b679fab4dbba401f23bc8ed938f8f4d5713f5048"
+        },
+        "base/delete-me.txt": {
+          "bytes": 17,
+          "sha256": "63118c24b54a97287f001cfab5684134d17399889d5a102cd3dca37710f2330d"
+        },
+        "base/tool.sh": {
+          "bytes": 25,
+          "sha256": "63eef671f4ef99784cec18378189e181e3b5ae015c36efa9290393aabe750710"
+        },
+        "base/tracked.txt": {
+          "bytes": 5,
+          "sha256": "f34848ca92665c342abd5816c9e3eda0e82180671195362bcd0080544a3bc2ac"
+        },
+        "changes/staged.patch": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "changes/unstaged.patch": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    }
+  },
+  "patches": {
+    "diagnostic": {
+      "bytes": 31162,
+      "sha256": "a829a164840b807931e8186e0cd15fa42bc3c3b7937654478ec78de6bcd46d21",
+      "reference": "sample_Result_124830_1029_4f7c74.zip",
+      "reference_fixture": "result-clean.zip",
+      "original_filename": "sample_Patch_124830_1029_32eb4f.zip"
+    },
+    "single": {
+      "bytes": 31416,
+      "sha256": "64d6399975f466251d444563773861c1b7202b0e8cdae5d81db34266d54bbae9",
+      "reference": "sample_Result_124830_1029_b87380.zip",
+      "reference_fixture": "result-diagnostic.zip",
+      "original_filename": "sample_Patch_124831_1029_981b69.zip"
+    },
+    "multi": {
+      "bytes": 31309,
+      "sha256": "2f80ec7d2164a6593615b0a34d6fd45bcf648cc9c069124e271b2ed1a2282771",
+      "reference": "sample_Result_124831_1029_58356c.zip",
+      "reference_fixture": "result-single.zip",
+      "original_filename": "sample_Patch_124831_1029_cefafb.zip"
+    },
+    "dry-run": {
+      "bytes": 31284,
+      "sha256": "a5b4e85c8737f88603efaec422874e66b674a56d47535fe494ce5858dc345917",
+      "reference": "sample_Result_124832_1029_50febf.zip",
+      "reference_fixture": "result-multi.zip",
+      "original_filename": "sample_Patch_124832_1029_ca8ccb.zip"
+    },
+    "partial-failure": {
+      "bytes": 31349,
+      "sha256": "ba2a12b28cf7d6c3f834987044a4ea4b0e07f84100ec6f1a4cd043f00d7da7d0",
+      "reference": "sample_Result_124832_1029_50febf.zip",
+      "reference_fixture": "result-multi.zip",
+      "original_filename": "sample_Patch_124833_1029_7128de.zip"
+    }
+  }
+}

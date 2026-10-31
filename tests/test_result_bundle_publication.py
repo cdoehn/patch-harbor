@@ -1,30 +1,19 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from dataclasses import replace
 import errno
-import json
 from pathlib import Path
 from uuid import UUID
 
 import pytest
 
 import patchharbor.result_bundle_publication as publication_module
-from patchharbor.bundle_handoff import BundleHandoff
 from patchharbor.exit_status import ExitCode, exit_code_for_error
 from patchharbor.errors import PatchHarborError
 from patchharbor.platform.filesystem import FileSystemOperationError
-from patchharbor.result_bundle_publication import (
-    ResultBundlePublication,
-    prepare_result_bundle_publication,
-    publish_result_bundle,
-    release_result_bundle_publication,
-    reserve_result_bundle_publication,
-    result_bundle_filename,
-)
-from patchharbor.result_bundle_snapshot import build_result_bundle_snapshot
+from patchharbor.result_bundle_publication import ResultBundlePublication, prepare_result_bundle_publication, release_result_bundle_publication, reserve_result_bundle_publication, result_bundle_filename
 from patchharbor.run_report import RunSession
-from tests.run_report_support import successful_bundle_run_report
+from tests.result_publication_support import _publish
 
 
 def test_result_bundle_filename_starts_with_repository_and_uses_short_run_id() -> None:
@@ -38,33 +27,6 @@ def test_result_bundle_filename_starts_with_repository_and_uses_short_run_id() -
         session,
         repository_name="patch-harbor",
     ) == "patch-harbor_Result_102139_0830_123456.zip"
-
-
-def _publish(publication: ResultBundlePublication, *, runtime=None, **options) -> None:
-    from patchharbor.result_bundle import _context_document, _manifest_document
-    from patchharbor.result_resources import runtime_payload
-    final_path = publication.final_path
-    report = successful_bundle_run_report(final_path.parent / "repository", final_path)
-    if runtime is None:
-        runtime = runtime_payload(None, reason="source_not_prepared")
-    report = replace(report, warnings=runtime.warnings)
-    snapshot = build_result_bundle_snapshot(base_entries=(), staged_patch=b"", unstaged_patch=b"", untracked_entries=())
-    context = _context_document(report)
-    environment = {
-        "marker": "patch-harbor-environment", "format_version": 1, "bundle_type": "Result",
-        "repository_context": {k: context[k] for k in ("repo_id", "base_commit", "state_fingerprint", "fingerprint_algorithm")},
-        "run_id": report.run_id_text, "bundle_suffix": "",
-    }
-    publish_result_bundle(
-        publication,
-        manifest=_manifest_document(report=report, snapshot=snapshot, runtime=runtime),
-        context_document=context,
-        handoff=BundleHandoff(b"contract\n", json.dumps(environment).encode()),
-        run_report=report,
-        snapshot=snapshot,
-        runtime=runtime,
-        **options,
-    )
 
 
 def _publish_empty_bundle(final_path: Path) -> None:

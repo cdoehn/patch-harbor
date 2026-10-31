@@ -9,7 +9,7 @@ from types import SimpleNamespace
 import pytest
 
 from patchharbor import api
-from patchharbor import application
+from patchharbor import application, application_configuration
 from patchharbor_watcher import cli as watcher_cli
 from patchharbor_watcher import worker
 from tests.platform_support import create_symlink_or_skip
@@ -89,11 +89,11 @@ def test_application_rechecks_loaded_local_configuration(monkeypatch, tmp_path):
     api.register(repo)
     api.configure_exchange_directory(tmp_path / "exchange", repository=repo)
     calls = []
-    original = application.revalidate_exchange_directory
+    original = application_configuration.revalidate_exchange_directory
     def recheck(settings):
         calls.append(settings)
         return original(settings)
-    monkeypatch.setattr(application, "revalidate_exchange_directory", recheck)
+    monkeypatch.setattr(application_configuration, "revalidate_exchange_directory", recheck)
     application.repository_configuration(repo)
     assert calls == []
     application.repository_configuration(repo, revalidate=True)
@@ -108,13 +108,13 @@ def test_recheck_rejects_target_replacement_between_load_and_use(monkeypatch, tm
     api.configure_exchange_directory(exchange, repository=repo)
     replacement = tmp_path / "replacement"
     replacement.mkdir()
-    original_load = application.load_configuration
+    original_load = application_configuration.load_configuration
     def replace_after_load(paths, **kwargs):
         settings = original_load(paths, **kwargs)
         exchange.rename(tmp_path / "old-exchange")
         create_symlink_or_skip(exchange, replacement, target_is_directory=True)
         return settings
-    monkeypatch.setattr(application, "load_configuration", replace_after_load)
+    monkeypatch.setattr(application_configuration, "load_configuration", replace_after_load)
     with pytest.raises(api.PatchHarborError) as captured:
         api.configuration(repo, revalidate=True)
     assert captured.value.error_kind is api.ErrorKind.CONFIGURATION_ERROR

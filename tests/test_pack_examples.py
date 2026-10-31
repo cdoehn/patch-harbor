@@ -12,8 +12,8 @@ from patchharbor import api
 from patchharbor.result_reader import read_result_reference
 from tests.platform_support import native_python_script, native_script, native_value
 from tests.registration_support import create_repository, git
-from tests.test_pyz_result_e2e import installed_producer
-from tests.test_runtime_packaging import _run
+from tests.runtime_installation_support import installed_producer
+from tests.runtime_installation_support import _run
 
 pytestmark = pytest.mark.packaging
 

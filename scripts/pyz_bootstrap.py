@@ -449,8 +449,6 @@ def assess(reference, *, trusted_source_sha256=None):
         manifest = _json(_read(archive, 'manifest.json', MAX_INPUT))
         _require(manifest.get('marker') == 'patch-harbor-result-bundle'
                  and type(manifest.get('format_version')) is int, 'not a supported Result')
-        if manifest['format_version'] in (1,2):
-            raise BootstrapUnavailable('legacy Result: use its documented wheel/previous handoff path')
         _require(manifest['format_version'] == 3, 'unsupported Result version')
         runtime = manifest.get('runtime')
         _require(type(runtime) is dict and set(runtime) == {'status','reason','metadata','artifact'},
@@ -494,10 +492,10 @@ def assess(reference, *, trusted_source_sha256=None):
         _require(type(capabilities) is dict and set(capabilities) == {'operations','patch_formats','result_formats'}
                  and capabilities['operations'] == ['inspect_patch','validate_patch','pack_patch'],
                  'unsupported runtime capabilities')
-        for key, expected in (('patch_formats',[1]), ('result_formats',[1,2,3])):
+        for key, choices in (('patch_formats',([1],)), ('result_formats',([1,2,3],[3]))):
             values = capabilities[key]
             _require(type(values) is list and all(type(v) is int for v in values)
-                     and values == expected, 'unsupported runtime read versions')
+                     and values in choices, 'unsupported runtime read versions')
         provenance = metadata['provenance']
         _require(metadata['runtime_dependencies'] == [] and type(provenance) is dict
                  and set(provenance) == {'mode','source_commit','recipe_format_version'}

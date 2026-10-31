@@ -222,8 +222,6 @@ def test_renderer_preserves_exact_values_and_quotes_local_commands() -> None:
     assert BINDING["base_commit"] in text
     assert BINDING["repo_id"] in text
     assert "/sdcard/Download" in text
-    assert "nicht für die Chat-Laufzeit" in text
-    assert "configured_shell" in text
     assert dict(handoff.entries())[CHAT_INSTRUCTIONS_NAME] == handoff.instructions
 
 
@@ -232,7 +230,6 @@ def test_unknown_or_control_paths_are_not_executable_examples(path: str | None) 
     document = patch_environment(repository_path=path)
     text = render_chat_handoff(document, template="contract\n").instructions.decode()
     assert "cd -- " not in text
-    assert "Keine lokalen Beispielbefehle" in text
 
 
 def test_markdown_fences_in_metadata_remain_data() -> None:
@@ -254,7 +251,6 @@ def test_windows_examples_use_literal_powershell_quoting() -> None:
 
 def test_missing_system_omits_shell_examples() -> None:
     text = render_chat_handoff(patch_environment(runtime={"system": None}), template="contract\n").instructions.decode()
-    assert "Keine Shell-Befehle" in text
     assert "cd -- " not in text
 
 

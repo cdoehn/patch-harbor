@@ -12,9 +12,9 @@ from time import sleep
 import pytest
 
 from scripts import pyz_bootstrap as bootstrap
-from tests import test_python_compat as core_cases
+from tests.windows_creation_support import assert_private_creation
 from tests.pyz_variant_support import variant
-from tests.test_python_variants import result_file
+from tests.pyz_variant_support import result_file
 
 
 @pytest.mark.parametrize('fault', [None, 'change', 'capture_change', 'missing_primitive', 'stat_disagreement'])
@@ -96,11 +96,8 @@ def test_native_bootstrap_open_never_follows_reparse_and_transfers_ownership_onc
 @pytest.mark.parametrize('failure', [None, 'thread', 'token', 'size', 'info', 'sid', 'convert', 'create'])
 @pytest.mark.parametrize('impersonated', [False, True])
 def test_bootstrap_atomic_dacl_keeps_core_failure_and_cleanup_contract(tmp_path, monkeypatch, failure, impersonated):
-    # Exercise the same public OS failures against both independent entry paths.
-    # This changes only the test helper's selected adapter, never product globals.
-    monkeypatch.setattr(core_cases, 'private_directory', bootstrap)
-    core_cases.test_private_windows_creation_never_uses_permissive_acl_on_failure(
-        tmp_path, monkeypatch, failure, impersonated)
+    assert_private_creation(bootstrap._windows_create_private_directory,
+                            tmp_path, monkeypatch, failure, impersonated)
 
 
 def test_fdopen_failure_closes_bootstrap_descriptor(tmp_path, monkeypatch):
@@ -142,6 +139,7 @@ def test_bootstrap_refuses_redirected_input_and_workspace_parents(tmp_path):
     assert not (real / 'private').exists()
 
 
+@pytest.mark.proof('bootstrap.windows-handle-change')
 @pytest.mark.platform
 @pytest.mark.skipif(os.name != 'nt', reason='native Windows metadata and DACLs')
 def test_native_bootstrap_detects_same_size_restored_mtime_change(tmp_path, monkeypatch):
@@ -179,6 +177,7 @@ def test_native_bootstrap_detects_same_size_restored_mtime_change(tmp_path, monk
     with pytest.raises(OSError): os.fstat(descriptors[0])
 
 
+@pytest.mark.proof('bootstrap.windows-junction')
 @pytest.mark.platform
 @pytest.mark.skipif(os.name != 'nt', reason='native Windows junction')
 def test_native_bootstrap_rejects_junction_parent_without_pathlib_api(tmp_path, monkeypatch):
@@ -195,6 +194,7 @@ def test_native_bootstrap_rejects_junction_parent_without_pathlib_api(tmp_path, 
     assert (real / 'input').read_bytes() == b'keep'
 
 
+@pytest.mark.proof('bootstrap.windows-private-dacl')
 @pytest.mark.platform
 @pytest.mark.skipif(os.name != 'nt', reason='native Windows protected workspace DACL')
 def test_native_bootstrap_prepares_private_inheriting_dacl(tmp_path):

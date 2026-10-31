@@ -1,6 +1,6 @@
-# PatchHarbor 1.4.0 – Chat-Initialisierung
+# PatchHarbor 1.6.0 – Chat-Initialisierung
 
-**Vertragsversion:** 1.4.0<br>
+**Vertragsversion:** 1.6.0<br>
 **Patch-Paketmarker:** `patch-harbor`<br>
 **Patch-Paketformat:** `1`<br>
 **Result-Bundle-Marker:** `patch-harbor-result-bundle`<br>
@@ -236,16 +236,19 @@ globale Rückabwicklung.
 
 ### Installationsfreier Start aus dem vorliegenden Format-3-Result
 
-Das konkrete Resultformat entscheidet: Format 1/2 behält den unten beschriebenen
-Legacyweg; Format 3 mit `embedded` verwendet genau seine PYZ. Der neue Writer
-produziert Format 3. Bereits laufende alte Installationen behalten ihr bisheriges
-Format bis zu einem gesonderten Upgrade. Der Bootstrap prüft die genaue
-Anforderung der ausgewählten PYZ: unveränderte historische Artefakte benötigen
-Python >=3.12; die neue geschlossene Variante verlangt >=3.10. Unbekannte oder
-widersprüchliche Varianten sind Fehler. Der aktuelle Produktionswriter und die Distribution wechseln in CP-03
-gemeinsam auf >=3.10. Bereits veröffentlichte Altartefakte bleiben unverändert.
-Die PYZ enthält den vollständigen Core ohne Watcher. Es gibt keinen pip-, venv-,
-Build- oder Downloadschritt und keine Änderung der vorhandenen Installation.
+Die Kompatibilitätsbasis für die Entwicklung ab 1.5.0 sind unveränderte gültige
+1.4.0-Results mit Format 3. Bei `embedded` verwende genau deren Core-PYZ mit
+Python >=3.10; `unavailable` bleibt eine gültige Referenz ohne Werkzeugzugabe.
+Result 1/2 und ursprüngliche 1.3.0-PYZs sind keine Supportpflicht mehr.
+Nicht unterstützte Formate sind kein Anlass, alte Wheel-Laufzeiten zu installieren.
+Bestehende 1.4.0-Capabilities `[1, 2, 3]` bleiben gültig; neue bereinigte
+Produzenten deklarieren `[3]`. Angaben beschreiben den jeweiligen Produzenten,
+nicht die Lesepflicht des aktuellen Werkzeugs. Originalbytes bleiben unverändert.
+
+Der folgende ausführbare Bootstrap prüft unterstützte Result-3-Daten.
+Nicht unterstützte Resultformate sind keine Grundlage für eine Ersatz-Ausführung.
+Die PYZ enthält den vollständigen Core ohne Watcher. Kein pip-, venv-, Build-
+oder Downloadschritt und keine Änderung der vorhandenen Installation.
 
 Prüfe Herkunft und Code dieser Anleitung zuerst. Ein SHA aus demselben unbekannten
 ZIP ist kein Herkunftsnachweis. Speichere den folgenden Python-Code aus genau dieser
@@ -295,6 +298,7 @@ schwächere Referenz. Eine falsche Bindung bleibt blockierend.
 Der folgende Code entspricht dem geprüften Repository-Helfer; ein Checkout ist
 für seine Nutzung nicht nötig.
 
+<!-- BEGIN GENERATED PYZ BOOTSTRAP: scripts/pyz_bootstrap.py -->
 ```python
 # PATCHHARBOR-PYZ-BOOTSTRAP
 """Reviewed stdlib-only PYZ bootstrap; a precheck is not native Result validation.
@@ -748,8 +752,6 @@ def assess(reference, *, trusted_source_sha256=None):
         manifest = _json(_read(archive, 'manifest.json', MAX_INPUT))
         _require(manifest.get('marker') == 'patch-harbor-result-bundle'
                  and type(manifest.get('format_version')) is int, 'not a supported Result')
-        if manifest['format_version'] in (1,2):
-            raise BootstrapUnavailable('legacy Result: use its documented wheel/previous handoff path')
         _require(manifest['format_version'] == 3, 'unsupported Result version')
         runtime = manifest.get('runtime')
         _require(type(runtime) is dict and set(runtime) == {'status','reason','metadata','artifact'},
@@ -793,10 +795,10 @@ def assess(reference, *, trusted_source_sha256=None):
         _require(type(capabilities) is dict and set(capabilities) == {'operations','patch_formats','result_formats'}
                  and capabilities['operations'] == ['inspect_patch','validate_patch','pack_patch'],
                  'unsupported runtime capabilities')
-        for key, expected in (('patch_formats',[1]), ('result_formats',[1,2,3])):
+        for key, choices in (('patch_formats',([1],)), ('result_formats',([1,2,3],[3]))):
             values = capabilities[key]
             _require(type(values) is list and all(type(v) is int for v in values)
-                     and values == expected, 'unsupported runtime read versions')
+                     and values in choices, 'unsupported runtime read versions')
         provenance = metadata['provenance']
         _require(metadata['runtime_dependencies'] == [] and type(provenance) is dict
                  and set(provenance) == {'mode','source_commit','recipe_format_version'}
@@ -987,47 +989,20 @@ if __name__ == '__main__':
         print(json.dumps({'status':'invalid','reason':str(exc),'full_reference_valid':False}), file=sys.stderr)
         raise SystemExit(2)
 ```
+<!-- END GENERATED PYZ BOOTSTRAP -->
 
-### Legacy-Result 2: geprüftes Wheel und bisheriger Übergabeweg
+### Runtime-Ausfall und bisheriger sicherer Übergabeweg
 
-Result-Format 2 ergänzt `runtime/runtime.json` und gegebenenfalls ein kanonisches
-Wheel. Format 1 sowie `unavailable` bleiben gültige Referenzen. `runtime/` ist
-Werkzeugmaterial außerhalb des Repository-Snapshots; `base/runtime/` ist etwas
-anderes. Das Finden eines Wheels erlaubt weder Installation noch Import.
+Dieser Fallback gilt für eine fehlende oder technisch unbenutzbare Werkzeugzugabe
+einer unterstützten Repositoryreferenz. Result 1/2 und alte Runtime-Wheels sind
+historische Daten, kein automatischer Ersatzweg. Unbekannte Formate und ungültige
+Pflichtdaten werden nicht durch Runtime-Installation oder Umdeklaration geheilt.
+Das frühere Wheel-Beispiel in `docs/runtime-bootstrap.md` ist ausdrücklich Historie.
+Eine fehlende PYZ allein verhindert die Arbeit am sicher geprüften Snapshot nicht.
 
-Prüfe zuerst Herkunft und Berechtigung mit bereits vertrauenswürdigen Werkzeugen.
-Ein Hash aus derselben unbekannten Quelle authentifiziert keinen Absender.
-Prüfe äußere ZIP-Sicherheit, vollständiges Inventar, Größen, Hashes und das enge
-Wheel-Profil einschließlich RECORD, Python-Anforderung, dependency-freier
-Metadaten und Ausschluss von `.pth`, Fremdmodulen und Launchern **vor** Codeausführung.
-Unbekannte Herkunft oder fehlender verlässlicher Prüfer führt zum bisherigen Weg.
-Ein Skript aus dem ungeprüften Wheel darf nicht seine eigene Vertrauensbasis sein.
-
-Erst danach explizit eine frische Umgebung außerhalb des Ziel-Snapshots anlegen.
-Nur das geprüfte lokale Wheel offline installieren: kein Index, Nachladen,
-Buildfallback, Interpreterdownload oder `--ignore-requires-python`. Ein vorhandener
-Installer muss die vollständige `Requires-Python`-Bedingung vor Installation am
-Zielinterpreter prüfen, etwa durch einen lokalen pip-Dry-Run. Eine venv ist keine
-Sicherheits-Sandbox. Keine Session-Secrets weitergeben; `PYTHONPATH`/`PYTHONHOME`
-bereinigen und einen fremden Arbeitsordner sowie den isolierten Interpreter nutzen.
-
-Das separat reviewed Repository-Beispiel `scripts/runtime_bootstrap.py` und
-`docs/runtime-bootstrap.md` konkretisieren den Ablauf. Der Helfer setzt eine
-bereits vertrauenswürdige passende Core-Installation voraus; er ist keine neue
-öffentliche API und wird nicht aus einer fremden Result-Runtime gestartet.
-Fehlt er, bleibt die folgende bisherige Prüfung verbindlich.
-
-Mit dem konkret geprüften venv-Interpreter (Windows: `Scripts/python.exe`,
-POSIX: `bin/python`) prüfen:
-
-```text
-<venv-python> -I -m patchharbor.cli inspect /absolut/patch.zip --json
-<venv-python> -I -m patchharbor.cli validate /absolut/patch.zip --reference-bundle /absolut/result.zip --json
-```
-
-**Fehlt oder versagt das Wheel, muss der bisherige Übergabeweg verwendet werden.**
+**Fehlt oder versagt die PYZ, muss der bisherige sichere Übergabeweg verwendet werden.**
 Das gilt für fehlende/defekte Bytes, ungeklärte Herkunft, inkompatibles Python,
-fehlenden Installer und technische Import-/Nutzungsfehler. Ein Versuch genügt;
+technische Vorbereitungs-, Import- oder Nutzungsfehler. Ein Versuch genügt;
 keine Reparatur- oder Netzwerkschleife. Entwickle am geprüften tatsächlichen
 Snapshot; verwende vorhandene vertrauenswürdige Paketprüfer oder die etablierten
 ZIP-, Payload-, Hash- und Bindungsprüfungen. Alle vier vollständigen Werte aus
@@ -1038,7 +1013,7 @@ Bei ausschließlich defektem Runtime-Zusatz separat äußere ZIP-Sicherheit,
 Pflichtdateien, Snapshot-Inventar/Blob-IDs/Hashes, Kontext und Run-Konsistenz
 prüfen. Originalbytes und vollständige Result-SHA behalten; weder reparieren
 noch als Format 1 umdeklarieren. Dieser Nachweis ist keine erfolgreiche native
-Vollvalidierung des defekten Format-2-Results. Ungültige Repositorydaten,
+Vollvalidierung des defekten Results. Ungültige Repositorydaten,
 unsichere Paketpfade und Bindungsabweichungen bleiben blockierend.
 
 Ausfallgrund, Werkzeuge, tatsächliche Prüfungen und fehlende Nachweise benennen.
@@ -1059,37 +1034,46 @@ verdrängen. Ein im Plan ausdrücklich als gemeinsam geltend erklärter
 Spezifikationssatz wird vollständig gelesen; seine Bestandteile sind keine
 konkurrierenden Alternativen. Echte unaufgelöste Konkurrenz bleibt ein STOP.
 
-Für die Entwicklung von **PatchHarbor selbst** gilt für den ausdrücklich
-beauftragten CPython-3.10/3.11-Auftrag konkret:
+Für die Entwicklung von **PatchHarbor selbst** gilt seit dem ausdrücklichen
+Folgeauftrag für Version 1.6.0 der Integrationsplan für öffentliche Snapshots
+und gebundene Hostfreigabe:
 
 ```text
-Plan: planning/python-compatibility/commit-plan.md
+Plan: planning/specroad-integration/commit-plan.md
 Normsatz: spec/SPECIFICATION.md
-          spec/SPECIFICATION_EXTENSION_PYZ_PACK.md (Revision 4)
-          spec/SPECIFICATION_EXTENSION_CPYTHON_310_311.md (Revision 1)
+          spec/SPECIFICATION_EXTENSION_PYZ_PACK.md (Revision 8)
+          spec/SPECIFICATION_EXTENSION_CPYTHON_310_311.md (Revision 5)
 ```
+
+Die drei Normdateien bleiben getrennt. Der neue Auftrag ergänzt gezielt die
+öffentlichen Integrationsverträge; er ist kein Teil des abgeschlossenen
+Refactoring-Umfangs. Dessen Bereinigung der Altformatpflichten bleibt erhalten. Gültige 1.4.0-Artefakte bleiben die Basis
+zukünftiger Abwärtskompatibilität; Patchformat 1 bleibt erhalten. RF-06 hat
+Result-1/2-Leser und Runtime-Wheel-Pfade entfernt. RF-07 erzeugt den ausführbaren
+Bootstrapblock aus genau einer gepflegten Quelle; nicht manuell im Block ändern.
+Fortschritt und offene Abnahmen stehen im Integrationsplan. Die neue
+Quellversion ist 1.6.0; die Kompatibilitätsbasis bleibt 1.4.0. Die aktuellen
+Testregeln und tatsächlichen Apply-Nachweise stehen weiter unten.
 
 Der frühere PYZ/PACK-Plan ist mit 16/16 Positionen, Korrektur 046 und grüner
 manueller CI auf `30e5de1d67a2d725ff192a0b97e50c2b0336bfcb` abgeschlossen.
 Die historische Basisversion ist 1.3.0; Christian hat die neue Version 1.4.0 festgelegt.
 Keine Versionsnummer reaktiviert einen historischen Versions-, RIV-, Watcher-
-oder PYZ/PACK-Plan. Der neue Normsatz ändert nur seine ausdrücklich benannten
-Python-Anforderungen. Diese Projektzuordnung gilt nicht pauschal für andere
+oder PYZ/PACK-Plan. Der CPython-Plan bleibt als bisheriger Implementierungs- und
+Abnahmenachweis erhalten; offene Abnahmen werden nicht durch diesen Planwechsel
+als erledigt erklärt. Diese Projektzuordnung gilt nicht pauschal für andere
 Repositorys, denen PatchHarbor dieselbe generische Vorlage mitliefert.
 
-**Aktueller Implementierungsschritt:** CP-00 bis CP-04 und die drei
+**Historischer Implementierungsstand:** CP-00 bis CP-04 und die drei
 Korrekturbundles 052 bis 054 sind tatsächlich angewendet. Alle zwölf Jobs der
 manuellen CI 38596693717 auf `f2e64c241f4e20a1b7e2c4c83faa45ba557f6d0b`
 sind grün; zwölf Artefakte mit 39 vollständigen parallelen Testreports sind geprüft.
-CP-05-VERSION / Bundle 055 stellt die Produktversion auf 1.4.0 um.
-Christian hat das Tag `v1.4.0` ausdrücklich beauftragt: Nur dieser Entrypoint
-darf nach dem vollständigen parallelen Commit-Gate ein neues annotiertes Tag
-auf seinen geprüften Commit setzen und zusammen mit dev atomar normal pushen.
-Vorhandene Tags werden weder ersetzt noch verschoben. Dies ist keine allgemeine
-Erlaubnis für automatisches Tagging und kein CI-Startauftrag.
+CP-05-VERSION / Bundle 055 stellte die Produktversion auf 1.4.0 um.
+Der damalige einmalige Auftrag zum Tag `v1.4.0` ist kein Tagging-Auftrag für 1.5.0 oder 1.6.0.
+Vorhandene Tags werden weder ersetzt noch verschoben; kein automatisches Tagging.
 Die native CI gehört zum genannten Implementierungscommit vor der Versionsänderung;
 Abnahme des neuen Endstands und erforderliche neue CIFS-Praxis bleiben im Plan offen.
-Alte PYZ-/Resultvarianten und Sicherheitsverträge bleiben unverändert.
+Die neue Kompatibilitätsbasis steht im 1.5.0-Plan; Sicherheitsverträge bleiben erhalten.
 
 **Historie:** Die einmalige CI-only-Ausnahme für PP-00 / Bundles 024/025
 ist mit dessen erfolgreichem Abschluss erfüllt. Result
@@ -1107,15 +1091,19 @@ PatchHarbor selbst. Andere Zielprojekte behalten ihre eigenen Test-/CI-Regeln.
 
 Die spätere ausdrückliche Nutzeranweisung vom 7. Oktober 2026 ersetzt ältere
 lokale serielle Gates, die Pixel-CI-only-Regel und den CI-Fünfertakt.
-Development und Apply prüfen jeden Commitstand vollständig parallel, auch am
-Bundle-Ende. Kein serieller Lauf und keine verkürzte Auswahl als Vollabnahme.
+Seit 29. Oktober 2026 prüft Development nur eine dokumentierte, änderungsbezogene
+parallele Testauswahl. Apply prüft jeden Commitstand vollständig parallel, auch am
+Bundle-Ende. Keine Vollsuite im Development. Kein serieller Lauf und keine verkürzte Auswahl als Vollabnahme.
 Nur Christian startet den manuellen CI-Workflow; Codex und Entrypoints tun das nie.
 
-Die Nutzeranweisung vom 14. Oktober 2026 autorisiert die automatische
-Fortsetzung des bestehenden CPython-Plans ab CP-03. Vollständige Watcher-Results
-samt Teilfortschritten werden jeweils geprüft. Fehlende externe Abschlussnachweise
-werden konkret gemeldet; CI startet ausschließlich Christian. Sicherheitsgrenzen und belastbare
-Resultbindung bleiben Voraussetzung; Tokenmeter bleibt gestoppt.
+RF-00 bis RF-13 sind durch tatsächliche Applies bestätigt, zuletzt Bundle 070
+auf `312e8a3c003c0f9421587b92941ecea7917b5d3f` mit 3281 bestandenen Tests
+und 15 Skips in der vollständigen parallelen Apply-Suite. Die 1.5.0-Releaseabnahme
+bleibt separat offen (`planning/1.5.0/release-acceptance.md`).
+Der neue Auftrag umfasst SRI-01 bis SRI-04 / Bundle 071 für 1.6.0; deren
+tatsächliche Commits sind erst durch ein neues Result bestätigt. Kein neuer
+Automatikloop, Watcher-Neustart oder Eingriff in SpecRoad. Tokenmeter bleibt
+gestoppt; Sicherheitsgrenzen und belastbare Resultbindung bleiben Voraussetzung.
 
 Development bleibt ausschließlich in `patchharbor-codex`. Nur die fertig und
 vollständig geprüfte kanonische Patch-ZIP gelangt atomar in den Exchange.
@@ -1127,7 +1115,8 @@ Die frühere 1.3.0-Abnahme einschließlich Christians CIFS-Praxisbestätigung
 belegt nicht automatisch den neuen CPython-Auftrag. Dessen Abnahme benötigt
 echte 3.10-/3.11-Interpreter, passende Artefakte, tatsächliche Applies und die
 von Christian gestartete erweiterte native CI. Die Anforderungen und offenen
-Nachweise stehen im neuen Plan. Eine ältere globale Installation wird durch
+Nachweise stehen im bisherigen CPython-Plan. Die 1.5.0-Abnahme bleibt im historischen
+Refactoring-Plan; aktuelle Integrationsnachweise stehen im SRI-Plan. Eine ältere globale Installation wird durch
 diesen Quellpatch nicht aktualisiert.
 
 Bestimme die aktive Zielversion aus dem Repository. Eine laut Plan erst zum
@@ -1353,7 +1342,8 @@ leite angemessene Prüfungen aus Testinfrastruktur und Auftrag ab und benenne si
 Starte GitHub-CI nicht allein aufgrund eines PatchHarbor-Defaults.
 
 **PatchHarbor-Projekt:** Für die aktive Laptop-Entwicklung gelten die oben
-festgehaltenen vollständigen parallelen Commit-Gates. Die frühere Pixel-CI-only-
+festgehaltenen gezielten parallelen Development-Prüfungen und vollständigen
+parallelen Apply-Commit-Gates. Die frühere Pixel-CI-only-
 Ausnahme ist beendet. Externe CI startet ausschließlich der Nutzer; notwendige
 native Abschlussnachweise bleiben bis zur tatsächlichen Auswertung offen.
 

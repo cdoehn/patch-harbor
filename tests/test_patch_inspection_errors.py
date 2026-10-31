@@ -21,7 +21,7 @@ import patchharbor.patch_package as packages
 from patchharbor.platform.filesystem import FileChangedDuringRead
 from patchharbor.progress import activity, observe_activity
 from patchharbor.resource_policy import ResourcePolicy
-from tests.test_patch_inspection import MANIFEST, SCRIPT, write_package
+from tests.patch_inspection_support import MANIFEST, SCRIPT, write_package
 
 
 def json_cli_failure(path, command, code):

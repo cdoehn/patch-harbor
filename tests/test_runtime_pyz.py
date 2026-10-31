@@ -9,24 +9,7 @@ import pytest
 
 from patchharbor import __version__, runtime_pyz as pyz
 from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY
-
-
-def inputs():
-    payloads = {name: b'# fixture module\n' for name in pyz.REQUIRED - {pyz.IDENTITY_PATH}}
-    payloads['patchharbor/py.typed'] = b''
-    payloads[pyz.CHAT_PATH] = b'controlled template\n'
-    payloads[pyz.DOC_PATH] = b'controlled API documentation\n'
-    payloads[pyz.LICENSE_PATH] = b'controlled license\n'
-    payloads[pyz.MAIN_PATH] = payloads['__main__.py'] = pyz.MAIN_BYTES
-    return payloads
-
-
-def prepared(payloads=None, *, version=__version__, **kwargs):
-    payloads = inputs() if payloads is None else payloads
-    recipe, identity = pyz.create_recipe(payloads, version=version, requires_python='>=3.12', **kwargs)
-    payloads = {**payloads, pyz.IDENTITY_PATH: identity}
-    artifact = pyz.materialize(recipe, lambda name, size: payloads[name])
-    return recipe, payloads, artifact
+from tests.runtime_pyz_support import inputs, prepared
 
 
 def read(raw, **kwargs):
@@ -212,20 +195,19 @@ def test_runtime_resource_and_shared_budgets_are_independent(monkeypatch):
 
 @pytest.mark.packaging
 def test_normal_wheel_prepares_distinct_finite_profiles_without_watcher_in_pyz(built_result_source):
-    from patchharbor import runtime_wheel
     pyz_recipe=pyz.parse_recipe((built_result_source/pyz.RECIPE_PATH).read_bytes())
     pyz_raw=pyz.materialize(pyz_recipe,lambda name,size:(built_result_source/name).read_bytes())
     assert read(pyz_raw)==pyz_recipe
     # Production installation retains the Watcher, while only its Core-PYZ
     # runtime profile is prepared. Legacy wheel readers have separate fixtures.
     assert (built_result_source/'patchharbor_watcher/__init__.py').is_file()
-    assert not (built_result_source/runtime_wheel.RECIPE_PATH).exists()
-    assert not (built_result_source/runtime_wheel.IDENTITY_PATH).exists()
+    assert not (built_result_source/'patchharbor/_runtime/recipe.json').exists()
+    assert not (built_result_source/'patchharbor/_runtime_identity.py').exists()
     with ZipFile(BytesIO(pyz_raw)) as archive:
         assert not any(name.startswith('patchharbor_watcher/') for name in archive.namelist())
-        assert runtime_wheel.RECIPE_PATH not in archive.namelist()
-        assert runtime_wheel.IDENTITY_PATH not in archive.namelist()
-        assert 'patchharbor/runtime_wheel.py' in archive.namelist()
+        assert 'patchharbor/_runtime/recipe.json' not in archive.namelist()
+        assert 'patchharbor/_runtime_identity.py' not in archive.namelist()
+        assert 'patchharbor/runtime_wheel.py' not in archive.namelist()
 
 
 @pytest.mark.parametrize('version', [(3, 8), (3, 11)])

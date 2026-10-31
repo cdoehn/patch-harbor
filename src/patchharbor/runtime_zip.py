@@ -1,4 +1,4 @@
-"""Bounded canonical runtime ZIP metadata, shared by legacy wheel and PYZ."""
+"""Bounded canonical runtime ZIP metadata, for the Core-PYZ."""
 import struct
 
 

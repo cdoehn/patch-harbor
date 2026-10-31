@@ -22,9 +22,9 @@ from patchharbor.runtime_zip import bounded_directory
 
 
 def own_pyz_profile_present() -> bool:
-    """A missing loaded identity cannot silently select a legacy fallback.
+    """A missing loaded identity cannot silently select a source fallback.
 
-    Clean source trees and canonical legacy installations have no PYZ recipe.
+    Clean source trees have no prepared PYZ recipe.
     ZIP execution is always explicit and must satisfy its selected profile.
     """
     if _pyz_resource_id is not None:

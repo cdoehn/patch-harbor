@@ -14,7 +14,7 @@ import patchharbor.result_bundle_handoff as result_handoff_module
 from patchharbor.result_bundle import create_manual_result_bundle
 from tests.platform_support import PROJECT_ROOT, native_script, native_value, run_cli
 from tests.registration_support import create_repository, git, user_configuration_path
-from tests.test_exchange_e2e import _configure_user, _register_context, _manifest
+from tests.exchange_support import _configure_user, _register_context, _manifest
 
 
 pytestmark = pytest.mark.e2e

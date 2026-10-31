@@ -156,7 +156,7 @@ def test_atomic_replace_failure_preserves_previous_bytes(local, tmp_path, monkey
 
 
 def test_configure_holds_both_locks_through_publication(local, tmp_path, monkeypatch):
-    import patchharbor.application as application
+    import patchharbor.application_configuration as application
     original = application.write_prepared_configuration
     calls = []
     def publish(paths, settings):
@@ -171,7 +171,7 @@ def test_configure_holds_both_locks_through_publication(local, tmp_path, monkeyp
 
 
 def test_registry_change_during_update_is_rejected(local, tmp_path, monkeypatch):
-    import patchharbor.application as application
+    import patchharbor.application_configuration as application
     from patchharbor.registry import registry_snapshot
     original = application.load_registry
     count = 0

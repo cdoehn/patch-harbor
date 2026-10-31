@@ -3,6 +3,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
+if __package__:
+    from .acceptance_catalog import WINDOWS_TESTS
+else:
+    from acceptance_catalog import WINDOWS_TESTS
+
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_WORKERS = "auto"
 EVIDENCE_PLUGIN = "tools.test_evidence"
@@ -22,28 +27,5 @@ SUITES = {
     "e2e": ("-m", "e2e or acceptance", "tests"),
     "platform": ("-m", "platform", "tests"),
     "packaging": ("-m", "packaging", "tests"),
-    "windows": (
-        "tests/test_windows_acceptance_e2e.py",
-        "tests/test_python_compat.py",
-        "tests/test_python_compat_windows.py",
-        "tests/test_bootstrap_python_compat.py",
-        "tests/test_python_variants.py",
-        "tests/test_producer_compatibility.py",
-        "tests/test_watcher_events_native.py",
-        "tests/test_watcher_event_loop_e2e.py",
-        "tests/test_packaging_e2e.py",
-        "tests/test_pyz_result_e2e.py",
-        "tests/test_pack_examples.py",
-        "tests/test_pyz_bootstrap.py",
-        "tests/test_result_file_limits.py",
-        "tests/test_pyz_resources.py",
-        "tests/test_pack_sources.py",
-        "tests/test_pack_api.py",
-        "tests/test_pack_cli.py",
-        "tests/test_result_runtime_roundtrip.py",
-        "tests/test_runtime_packaging.py",
-        "tests/test_result3_publication_policy.py",
-        "tests/test_result_runtime_publication.py",
-        "tests/test_pack_exchange_e2e.py",
-    ),
+    "windows": WINDOWS_TESTS,
 }

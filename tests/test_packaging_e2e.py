@@ -26,11 +26,21 @@ from tests.registration_support import isolated_user_environment
 pytestmark = pytest.mark.packaging
 
 MAX_WHEEL_BYTES = 384 * 1024
-RELEASE_VERSION = "1.4.0"
+RELEASE_VERSION = "1.6.0"
 EXPECTED_RUNTIME_FILES = {
+    "patchharbor/apply_admission.py",
+    "patchharbor/result_snapshot.py",
+    "patchharbor/snapshot_types.py",
+    "patchharbor/snapshot_budget.py",
+    "patchharbor/snapshot_binary.py",
+    "patchharbor/snapshot_delta.py",
     "patchharbor/py.typed",
     "patchharbor/__init__.py",
     "patchharbor/application.py",
+    "patchharbor/application_apply.py",
+    "patchharbor/application_results.py",
+    "patchharbor/application_configuration.py",
+    "patchharbor/application_exchange.py",
     "patchharbor/api.py",
     "patchharbor/api_types.py",
     "patchharbor/archive_policy.py",
@@ -58,6 +68,9 @@ EXPECTED_RUNTIME_FILES = {
     "patchharbor/platform/environment.py",
     "patchharbor/bundles.py",
     "patchharbor/cli.py",
+    "patchharbor/cli_commands.py",
+    "patchharbor/cli_output.py",
+    "patchharbor/cli_parser.py",
     "patchharbor/compat.py",
     "patchharbor/configuration.py",
     "patchharbor/configuration_context.py",
@@ -98,10 +111,9 @@ EXPECTED_RUNTIME_FILES = {
     "patchharbor/result_bundle_snapshot.py",
     "patchharbor/result_reader.py",
     "patchharbor/result_resources.py",
-    "patchharbor/runtime_artifact.py",
-    "patchharbor/result_runtime.py",
+    "patchharbor/result_runtime_metadata.py",
     "patchharbor/result_pyz.py",
-    "patchharbor/runtime_wheel.py",
+    "patchharbor/runtime_profile.py",
     "patchharbor/runtime_zip.py",
     "patchharbor/runtime_pyz.py",
     "patchharbor/runtime_sources.py",
@@ -341,6 +353,7 @@ def test_release_metadata_is_complete_and_runtime_has_no_dependencies() -> None:
     assert (PROJECT_ROOT / "LICENSE").is_file()
 
 
+@pytest.mark.proof('installation.cli-api-watcher')
 def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> None:
     release_source = _copy_project_for_release(tmp_path)
     distribution_dir = tmp_path / "dist"
@@ -371,6 +384,11 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
     pyz_raw = pyz_artifacts[0].read_bytes()
     pyz_recipe = runtime_pyz.read_pyz(pyz_raw, policy=DEFAULT_RESOURCE_POLICY,
                                       remaining_bytes=runtime_pyz.MAX_CONTENT_BYTES)
+    from tests.embedded_pyz_support import bootstrap_program
+    expected_program = (release_source / "scripts/pyz_bootstrap.py").read_text(encoding="utf-8")
+    with zipfile.ZipFile(pyz_artifacts[0]) as portable:
+        assert bootstrap_program(portable.read(runtime_pyz.CHAT_PATH)) + "\n" == expected_program
+        assert not any(name.startswith("scripts/") for name in portable.namelist())
     with zipfile.ZipFile(wheels[0]) as transport:
         assert transport.read(runtime_pyz.RECIPE_PATH) == pyz_recipe.data
         assert runtime_pyz.materialize(pyz_recipe, lambda name,size:transport.read(name)) == pyz_raw
@@ -395,6 +413,7 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
             "patchharbor/_runtime/CHAT_INSTRUCTIONS.md",
             "patchharbor/_runtime/python-api.md",
         }
+        assert not any(name.startswith("scripts/") for name in names)
         assert "patchharbor/input.py" not in names
         assert "patchharbor/files.py" not in names
 
@@ -466,6 +485,8 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
             f"{root}/pyproject.toml",
             f"{root}/build_backend.py",
             f"{root}/MANIFEST.in",
+            f"{root}/scripts/pyz_bootstrap.py",
+            f"{root}/scripts/render_chat_bootstrap.py",
             f"{root}/src/patchharbor/cli.py",
             f"{root}/src/patchharbor/api.py",
             f"{root}/src/patchharbor/api_types.py",
@@ -481,8 +502,15 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
             f"{root}/src/patchharbor_watcher/worker.py",
         ):
             assert required in names
+        # Only the two offline build inputs belong in the source distribution.
+        # Release/CI/maintenance commands remain excluded, as do all scripts in wheels.
+        assert {name for name in names if name.startswith(f"{root}/scripts/")} == {
+            f"{root}/scripts/pyz_bootstrap.py", f"{root}/scripts/render_chat_bootstrap.py"}
+        for helper in ("scripts/pyz_bootstrap.py", "scripts/render_chat_bootstrap.py"):
+            source_file = source_distribution.extractfile(f"{root}/{helper}")
+            assert source_file is not None
+            assert source_file.read() == (release_source / helper).read_bytes()
         for forbidden in (
-            f"{root}/scripts/",
             f"{root}/tests/",
             f"{root}/planning/",
             f"{root}/.github/",

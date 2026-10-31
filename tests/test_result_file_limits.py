@@ -28,9 +28,9 @@ from patchharbor.zip_payloads import read_zip_payload_bytes
 from scripts import pyz_bootstrap as bootstrap
 from tests.embedded_pyz_support import bootstrap_program
 from tests.run_report_support import successful_bundle_run_report
-from tests.test_reference_validation import reference_entries, edit_document
-from tests.test_result_bundle_publication import _publish
-from tests.test_runtime_pyz import prepared
+from tests.reference_support import reference_entries, edit_document
+from tests.result_publication_support import _publish
+from tests.runtime_pyz_support import prepared
 
 
 def publication_inputs(tmp_path, count):

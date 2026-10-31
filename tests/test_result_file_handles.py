@@ -7,8 +7,8 @@ import pytest
 from patchharbor.platform import file_handles, filesystem
 from patchharbor.platform.file_handles import open_regular_nofollow
 from patchharbor import result_bundle_publication as publication
-from tests.test_result_verification import destination, sleeps
-from tests.test_result_bundle_publication import _publish
+from tests.result_publication_support import destination, sleeps
+from tests.result_publication_support import _publish
 
 
 def symlink_or_skip(link, target):

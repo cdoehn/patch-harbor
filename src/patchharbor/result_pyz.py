@@ -5,11 +5,12 @@ from dataclasses import dataclass, field
 
 from patchharbor.json_document import parse_json_document
 from patchharbor.resource_policy import ResourcePolicy
-from patchharbor.result_runtime import (
-    METADATA_PATH, MAX_METADATA_BYTES, UNAVAILABLE_REASONS, RuntimeFile, _descriptor, _require,
+from patchharbor.result_runtime_metadata import (
+    METADATA_PATH, MAX_METADATA_BYTES, UNAVAILABLE_REASONS, RuntimeFile,
+    read_descriptor as _descriptor, require_metadata as _require,
 )
 from patchharbor import runtime_pyz as pyz
-from patchharbor.runtime_wheel import _VERSION, _HEX
+from patchharbor.runtime_profile import VERSION_PATTERN as _VERSION, SHA256_PATTERN as _HEX
 
 
 _FIELDS = frozenset({
@@ -54,10 +55,10 @@ def _capabilities(value: object) -> tuple[tuple[str, ...], tuple[int, ...], tupl
              'invalid PYZ capabilities schema')
     _require(value['operations'] == ['inspect_patch','validate_patch','pack_patch'],
              'unsupported PYZ operations')
-    for key, expected in (('patch_formats',[1]), ('result_formats',[1,2,3])):
+    for key, choices in (('patch_formats',([1],)), ('result_formats',([1,2,3],[3]))):
         versions = value[key]
         _require(type(versions) is list and all(type(v) is int for v in versions)
-                 and versions == expected, 'unsupported PYZ read versions')
+                 and versions in choices, 'unsupported PYZ read versions')
     return tuple(value['operations']), tuple(value['patch_formats']), tuple(value['result_formats'])
 
 

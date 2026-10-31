@@ -23,8 +23,8 @@ from patchharbor_watcher.loop import run_repository_watcher
 from patchharbor_watcher.platform import open_event_source
 from tests.platform_support import project_environment
 from tests.registration_support import create_repository, set_isolated_user_environment
-from tests.test_api_e2e import write_package
-from tests.test_watcher_scheduling import completion, target
+from tests.apply_support import write_package
+from tests.watcher_support import completion, target
 
 pytestmark = [pytest.mark.e2e,
     pytest.mark.skipif(not (sys.platform.startswith('linux') or sys.platform == 'win32'), reason='native event backend required')]

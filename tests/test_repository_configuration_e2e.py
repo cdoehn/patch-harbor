@@ -9,10 +9,10 @@ import zipfile
 import pytest
 
 from patchharbor import api
-from patchharbor import application
+from patchharbor import application_exchange as application
 from patchharbor.user_paths import registration_user_paths
 from tests.registration_support import create_repository, git, set_isolated_user_environment
-from tests.test_api_e2e import write_package
+from tests.apply_support import write_package
 
 pytestmark = pytest.mark.e2e
 

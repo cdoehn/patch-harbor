@@ -127,7 +127,7 @@ computed observations, not new declared hashes in format-1 `patch.json`.
 frozen `ReferenceContext`. Its fields are `repo_id`, `base_commit` (the existing
 typed IDs), `state_fingerprint`, `fingerprint_algorithm`, `dirty` and
 `repository_path` (recorded text, including foreign Windows paths; never resolved
-on this machine). This reader checks the complete format-1/2/3 inventory, blob IDs,
+on this machine). The supported Result-3 reader checks the complete inventory, blob IDs,
 untracked SHA-256 and metadata consistency, accepting consistent dirty, failure
 and dry-run Results. It uses actual context, never the previous expected binding.
 Repository snapshot paths retain the existing portable UTF-8 repository rules;
@@ -139,7 +139,10 @@ successful Apply: those consumers still require a clean, completed success,
 no warnings or dry run, the appropriate expected binding and, for recovery,
 the existing receipt, local digest and Git evidence. Their conservative ZIP
 path policy is unchanged. Current writers emit format 3 with one verified Core-PYZ
-or a declared runtime-only restriction; readers also accept formats 1 and 2.
+or a declared runtime-only restriction. This checkout reads Result 3 only;
+RF-06 removed the Result-1/2 readers and runtime-wheel path. Unchanged valid
+1.4.0 artifacts remain supported, including their original producer capabilities.
+Public signatures, result fields, validation scopes and error codes are unchanged.
 Full reference validation rejects a corrupt declared runtime. The separately
 reviewed [bootstrap and previous handoff procedure](runtime-bootstrap.md) can
 check repository evidence independently when only that optional addition fails.
@@ -168,8 +171,9 @@ including `core.fileMode=false`; validation does not emulate conversion helpers.
 Both binding scopes retain `authenticity`, `execution`, `interpreter_availability`,
 `tests`, `ci`, `replay` in `not_checked`. Reference additionally reports
 `live_repository_state`, `local_registration`, `reconstructed_state_fingerprint`,
-`legacy_delta_log_hashes`: format 1 has no independent cryptographic hashes for
-every delta/log, and no deltas are applied here. Repository additionally reports
+`legacy_delta_log_hashes`. That last name is a retained public output field,
+not a claim that the current reader accepts Result 1. Reference validation does
+not independently authenticate every log/delta or apply deltas. Repository additionally reports
 `future_repository_state`. This is a point-in-time comparison, not an execution,
 replay or sender-trust authorization. Any binding mismatch raises error 9;
 invalid/unreadable/unsupported references raise input error 4. Repository errors
@@ -566,12 +570,102 @@ from bootstrap checks; no installation or subprocess is needed for these calls.
 Result-3 production uses the same shared Core and request-local resource capture.
 
 
-## Reader-first Result 3 (PP-05A)
+## Historical reader-first introduction of Result 3 (PP-05A)
 
-`validate_patch(..., reference_bundle=...)` and `pack_patch` now use the same
+At PP-05A, `validate_patch(..., reference_bundle=...)` and `pack_patch` began using the same
 full reader for Result formats 1, 2 and 3. The new format verifies its PYZ as
 strict data, without importing it. Public signatures/scopes are unchanged;
 corrupt references retain source-error category 4. A private repository-only
 diagnostic fallback is never a successful full reference or a `pack` input.
 See [Result format 3](result-format-3.md). Production uses this format from PP-06B;
-legacy reader schemas and public validation scopes remain unchanged.
+the earlier legacy-reader support promise is now replaced by the 1.4.0
+compatibility baseline. Public validation scopes remain unchanged.
+
+## Verified Result snapshots (integration contract 1)
+
+`api.integration_capabilities()` returns immutable contract-version fields.
+Check `snapshot_contract_version == 1` before calling
+`api.read_result_snapshot(result, expected_sha256=full_sha256)`. The immutable
+result provides `sha256`, `format_version`, `context`, `run_id`, `operation`,
+`dry_run`, `primary_result`, `warnings`, `runtime` and five `SnapshotLayer` values:
+`base`, `index`, `worktree`, `untracked`, `effective`. Each `.files` is an immutable
+path mapping. `SnapshotFile` contains `path`, regular `kind`, Git `mode`, `size`,
+`content` bytes, `sha256` and computed Git `object_id`. Unchanged files are shared.
+`SnapshotRuntime` contains status/reason, version/Python requirement/profile,
+content ID and artifact SHA/size; examined code is never executed.
+
+No Git, shell, installed dependencies or target repository is required. Input
+is captured once and all returned bytes remain usable after the file is moved
+or replaced. Text/binary staged and unstaged changes are strictly applied without
+fuzzy context. Untracked entries cannot overwrite a tracked path. Existing ZIP
+limits plus 256-MiB individual and 512-MiB cumulative reconstruction budgets
+apply, including binary programs and reverse verification.
+
+Malformed input raises `api.ResultSnapshotError` (a `PatchHarborError`, reason
+SOURCE_ERROR) with `.code` from `api.SnapshotErrorCode`. Codes are invalid_result,
+digest_mismatch, invalid_patch, unsupported_patch, path_collision and resource_limit.
+Invalid API argument types/values use TypeError/ValueError. A valid failed, dirty
+or dry-run Result is returned with its actual facts. Integrity does not prove
+authenticity, a historical commit tree or an independently recomputed dirty
+fingerprint; the existing four binding values are preserved.
+
+## Guarded host Apply (integration contract 1)
+
+`api.apply_guarded(patch, *, expected_sha256, expected_repository, admission,
+output_directory=None, timeout=DEFAULT_TIMEOUT_SECONDS, output=None, observer=None)`
+uses the ordinary Apply core. Check
+`api.integration_capabilities().guarded_apply_contract_version == 1`.
+Unlike the unchanged `apply`, the new operation requires one explicit package,
+its full lowercase SHA-256, the expected repository root, and a trusted callback.
+The existing `apply(patch=..., repository=...)` remains invalid.
+
+The callback receives immutable `api.PatchAdmission`: `.inspection` is the full
+`PatchInspection`, `.contents` maps every archive member to its captured bytes
+(including manifest, entrypoint, payloads and optional handoff), and `.context`
+is the locked `RepositoryContext`. Only the actual Boolean True accepts.
+Require your own approved entrypoint hash, complete allowed inventory, binding
+to the original proposal/Result, fresh staging paths and human consent here.
+Those application rules are not inferred from filenames or invented by Core.
+The callback is trusted host code, not an untrusted package plugin or a sandbox.
+
+Denied/missing approval and callback exceptions, including callback cancellation,
+return `RunReport.primary_tool_error.kind == ErrorKind.ADMISSION_REJECTED` with
+SOURCE_ERROR. No payloads or entrypoint run. Normal diagnostics, maintenance and
+Result publication may still occur. Digest mismatch is SOURCE_ERROR; target or
+state mismatch is STATE_MISMATCH. Existing Result-publication failures retain
+the actual primary execution outcome. A callback cancellation is not falsely
+reported as an interrupted child; an actual child interruption retains its
+existing INTERRUPTED/130 contract. Ordinary external KeyboardInterrupt behavior
+outside the callback is unchanged.
+
+The callback runs once under the normal repository lock. State and targets are
+rechecked before mutation. Original captured bytes are used throughout; an
+Exchange package replaced during admission can additionally be refused by the
+existing replay identity check. No unbound reselection occurs. Locks coordinate
+PatchHarbor operations, not arbitrary external writers. A failed attempt must
+be evaluated from its complete RunReport/Result before any deliberate retry.
+
+## Public-only transport example and delivery
+
+[Executable example](examples/snapshot_transport.py) uses only `patchharbor.api`
+and Python's standard library. It reads one fully verified snapshot, writes an
+ordinary nested project ZIP from `.effective.files`, and packs it with a caller-
+supplied trusted entrypoint. This is necessary because Patch payload paths keep
+their narrower portable namespace; arbitrary repository names stay inside the
+opaque project ZIP. The example never rescans the live original repository.
+
+Use a fresh workspace and an unwatched output directory. `pack_patch` is a
+separate operation and captures its Result independently; the example requires
+its `reference_sha256` to equal the snapshot SHA before returning a deliverable.
+A changed reference is an error, with the staged package retained for diagnosis.
+Do not publish that package. Host closure/layout/entrypoint/proposal checks and
+human consent belong in the trusted admission callback, not this example.
+
+For a new runtime, verify its delivered full SHA and provenance before importing
+it. Then check `integration_capabilities` on the loaded API. Runtime-2's closed
+bootstrap/pack capabilities remain unchanged for old readers. Snapshot readiness
+for SpecRoad15.m.R is distinct from guarded-host readiness and from SpecRoad's
+independent end-to-end acceptance. Exact local artifact hashes/source binding
+and unconfirmed platform checks are recorded in the integration delivery report.
+The `timeout` argument limits entrypoint execution, not arbitrary trusted Python
+callback work; callbacks should perform bounded local policy checks.

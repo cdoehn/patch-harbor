@@ -11,14 +11,14 @@ Use a wheel from a trusted build or a reviewed source checkout at the intended
 commit. Compare its complete SHA-256 with the build's trusted artifact record.
 A digest supplied only by an unknown sender is not authentication. The version
 in the source tree is not evidence that an index release or Git tag exists.
-The [acceptance plan](../planning/pyz-pack/commit-plan.md) records release gates;
+The [active acceptance plan](../planning/1.5.0/commit-plan.md) records release gates;
 `patchharbor --version` reports the executable you are actually invoking.
 
 With an existing pipx and Python 3.10+ on POSIX:
 
 ```bash
 python3 --version
-pipx install --python python3 /absolute/path/patchharbor-1.4.0-py3-none-any.whl
+pipx install --python python3 /absolute/path/patchharbor-1.5.0-py3-none-any.whl
 patchharbor --version
 patchharbor-watcher --help
 ```
@@ -74,7 +74,7 @@ Do not use `python -m patchharbor`: the installed module entrypoint is
    new wheel. For pipx, a newer local wheel can replace the managed package:
 
    ```bash
-   pipx install --force /absolute/path/patchharbor-1.4.0-py3-none-any.whl
+   pipx install --force /absolute/path/patchharbor-1.5.0-py3-none-any.whl
    patchharbor --version
    ```
 
@@ -124,5 +124,7 @@ python scripts/build_release.py --outdir dist
 
 This builds wheel, sdist and the separate canonical Core-PYZ. It does not publish
 a release, create a tag, install the artifacts, or replace a running watcher.
-Run the [prescribed full parallel gates](test-parallelism.md) and retain the
-artifact hashes/evidence for the actual source state before handing it off.
+Development runs the documented change-focused parallel selection; Apply runs
+the full parallel suite before every commit, including the final commit.
+Retain artifact hashes and evidence for the actual source state. Only Christian
+starts manual CI; see the [test policy](test-parallelism.md).

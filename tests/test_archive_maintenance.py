@@ -15,28 +15,16 @@ import patchharbor.repository_state as repository_state
 from patchharbor.configuration import load_configuration
 from patchharbor.configuration_context import configuration_paths_for_id
 from patchharbor.registry import load_registry
-from patchharbor.exchange import scan_exchange_directory
 from patchharbor.models import RepositoryId
-from patchharbor.user_paths import configuration_user_paths
 from tests.platform_support import run_cli
 from tests.registration_support import (
     create_repository, exchange_state_path, git, user_configuration_path,
 )
-from tests.test_exchange_archive_e2e import _world, _bundle, _advance, _committing_patch, _scan, ARCHIVE
-from tests.test_exchange_e2e import _register_context
+from tests.archive_support import _world, _bundle, _advance, _committing_patch, _scan, ARCHIVE
+from tests.exchange_support import _register_context
+from tests.archive_support import _inputs
 
 pytestmark = pytest.mark.usefixtures("prepared_result_producer")
-
-
-def _inputs(env, exchange, monkeypatch):
-    for name, value in env.items():
-        monkeypatch.setenv(name, value)
-    paths = configuration_user_paths()
-    registry = load_registry(paths)
-    local = configuration_paths_for_id(registry.repositories[0].repo_id, registry)
-    configuration = load_configuration(local)
-    artifacts = scan_exchange_directory(exchange, paths=paths)
-    return paths, configuration, artifacts
 
 
 def _maintain(inputs, repo_id):

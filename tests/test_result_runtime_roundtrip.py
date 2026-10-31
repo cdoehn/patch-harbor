@@ -14,7 +14,7 @@ from patchharbor import api
 from scripts.build_release import _copy_release_inputs
 from tests.platform_support import native_python_script, native_value
 from tests.registration_support import create_repository, git
-from tests.test_runtime_packaging import _run, _venv
+from tests.runtime_installation_support import _run, _venv
 
 pytestmark = pytest.mark.packaging
 

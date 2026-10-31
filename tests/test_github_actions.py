@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 
 from tests.platform_support import PROJECT_ROOT
+from tests.acceptance_support import workflow_matrices
 
 
 WORKFLOW_DIRECTORY = PROJECT_ROOT / ".github" / "workflows"
@@ -25,13 +26,13 @@ def test_acceptance_workflow_has_blocking_native_and_docker_release_gates() -> N
         ("Release gate - Windows 2025", "windows-2025"),
         ("Release gate - Ubuntu 26.04", "ubuntu-26.04"),
     ):
-        assert f"name: {name}" in text
-        assert f"runner: {runner}" in text
+        assert any(row['name'].startswith(name) and row['runner'] == runner
+                   for row in workflow_matrices(text)['acceptance'])
 
     assert "ubuntu-docker-integration:" in text
-    assert "name: Docker release gate - Ubuntu ${{ matrix.ubuntu }}" in text
-    assert '          - "24.04"' in text
-    assert '          - "26.04"' in text
+    assert {row['name'] for row in workflow_matrices(text)['ubuntu-docker-integration']} == {
+        'Docker release gate - Ubuntu 24.04', 'Docker release gate - Ubuntu 26.04'}
+    assert {row['ubuntu'] for row in workflow_matrices(text)['ubuntu-docker-integration']} == {'24.04', '26.04'}
     assert './scripts/run_docker_integration_tests.sh "${{ matrix.ubuntu }}"' in text
     assert "PATCHHARBOR_DOCKER_LOG_DIR" in text
     assert "if: always()" in text
@@ -81,9 +82,10 @@ def test_acceptance_workflow_requires_both_windows_powershell_variants() -> None
     assert 'windows_engine: "powershell.exe"' in text
     assert "PATCHHARBOR_WINDOWS_ACCEPTANCE_ENGINE: ${{ matrix.windows_engine }}" in text
     assert "windows-powershell7-acceptance:" in text
-    assert "name: Release gate - Windows 2025 - PowerShell 7" in text
-    assert "runs-on: windows-2025" in text
-    assert "PATCHHARBOR_WINDOWS_ACCEPTANCE_ENGINE: pwsh" in text
+    assert all(row['name'].startswith('Release gate - Windows 2025 - PowerShell 7')
+               and row['runner'] == 'windows-2025' and row['windows_engine'] == 'pwsh'
+               for row in workflow_matrices(text)['windows-powershell7-acceptance'])
+    assert 'runs-on: ${{ matrix.runner }}' in text
     assert "--suite windows" in text
     assert "continue-on-error" not in text
 
@@ -163,9 +165,11 @@ def test_native_python_matrix_and_artifact_names_are_unambiguous():
     for version in ("3.10", "3.11", "3.12"):
         assert f"Release gate - Ubuntu 24.04 - Python {version}" in matrix
         assert f"Release gate - Windows 2025 - Python {version}" in matrix
-    assert 'python: ["3.10", "3.11", "3.12"]' in text
-    assert 'patchharbor-packaging-${{ matrix.runner }}-py${{ matrix.python }}' in text
-    assert 'patchharbor-windows-powershell7-py${{ matrix.python }}' in text
+    groups = workflow_matrices(text)
+    assert {row['python'] for row in groups['windows-powershell7-acceptance']} == {'3.10', '3.11', '3.12'}
+    assert all(row['artifact'] == f"patchharbor-packaging-{row['runner']}-py{row['python']}" for row in groups['acceptance'])
+    assert all(row['artifact'] == f"patchharbor-windows-powershell7-py{row['python']}" for row in groups['windows-powershell7-acceptance'])
+    assert text.count('name: ${{ matrix.artifact }}') == 3
     assert text.count('scripts/capture_ci_build.py') == 2
     from scripts.run_handoff_ci import JOBS, ARTIFACTS
     assert len(JOBS) == len(ARTIFACTS) == 12

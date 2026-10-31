@@ -20,7 +20,12 @@ from patchharbor.patch_inspection import (
     PatchEntry, PatchEntryRole, PatchInspection, PatchManifest, PatchMessage,
     PatchValidationResult, PatchValidationScope,
 )
+from patchharbor.apply_admission import AdmissionCallback, PatchAdmission
 from patchharbor.result_reader import ReferenceContext
+from patchharbor.snapshot_types import (
+    IntegrationCapabilities, ResultSnapshot, ResultSnapshotError, SnapshotErrorCode,
+    SnapshotFile, SnapshotLayer, SnapshotRuntime,
+)
 from patchharbor.pack_types import PatchPackResult
 from patchharbor.watch_contract import (
     ApplyLock, ApplyLockKind, ApplyReadiness, AutomaticApplyResult,

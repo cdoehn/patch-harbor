@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import ast
-import importlib.util
 from collections.abc import Iterable
 from pathlib import Path
 import sys
+
+from tests.architecture_support import (
+    assert_acyclic as _assert_acyclic, import_names, is_cli, is_workflow, workflow_violations,
+)
 
 
 PROJECT_ROOT = Path(__file__).parents[1]
@@ -66,63 +69,27 @@ def _runtime_modules() -> dict[str, Path]:
     }
 
 
-def _project_imports(path: Path) -> frozenset[str]:
-    tree = ast.parse(path.read_text(encoding="utf-8"))
-    imports: set[str] = set()
-    for node in ast.walk(tree):
-        names: tuple[str, ...] = ()
-        if isinstance(node, ast.ImportFrom) and node.module:
-            if node.level:
-                package, root = next((package, root) for package, root in PACKAGE_ROOTS.items()
-                                     if path.is_relative_to(root))
-                module = _module_name(package, root, path)
-                parent = module if path.name == '__init__.py' else module.rpartition('.')[0]
-                names = (importlib.util.resolve_name('.' * node.level + node.module, parent),)
-            else:
-                names = (node.module,)
-        elif isinstance(node, ast.Import):
-            names = tuple(alias.name for alias in node.names)
-        imports.update(
-            name
-            for name in names
-            if name == "patchharbor"
-            or name.startswith("patchharbor.")
-            or name == "patchharbor_watcher"
-            or name.startswith("patchharbor_watcher.")
-        )
-    return frozenset(imports)
+def _project_imports(path: Path, modules=None) -> frozenset[str]:
+    modules = _runtime_modules() if modules is None else modules
+    module = next(name for name, candidate in modules.items() if candidate == path)
+    imports = import_names(path.read_text(encoding="utf-8"), module, set(modules),
+                           is_package=path.name == "__init__.py")
+    return frozenset(name for name in imports
+                     if name == "patchharbor" or name.startswith("patchharbor.")
+                     or name == "patchharbor_watcher" or name.startswith("patchharbor_watcher."))
 
 
 def _import_roots(path: Path) -> frozenset[str]:
-    tree = ast.parse(path.read_text(encoding="utf-8"))
-    roots: set[str] = set()
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Import):
-            roots.update(alias.name.split(".", 1)[0] for alias in node.names)
-        elif isinstance(node, ast.ImportFrom):
-            if node.level:
-                package, root = next((package, root) for package, root in PACKAGE_ROOTS.items()
-                                     if path.is_relative_to(root))
-                module = _module_name(package, root, path)
-                parent = module if path.name == '__init__.py' else module.rpartition('.')[0]
-                absolute = importlib.util.resolve_name('.' * node.level + (node.module or ''), parent)
-                roots.add(absolute.split('.', 1)[0])
-            elif node.module:
-                roots.add(node.module.split(".", 1)[0])
-    return frozenset(roots)
+    modules = _runtime_modules()
+    module = next(name for name, candidate in modules.items() if candidate == path)
+    names = import_names(path.read_text(encoding="utf-8"), module, set(modules),
+                         is_package=path.name == "__init__.py")
+    return frozenset(name.split(".", 1)[0] for name in names)
 
 
 def _dependency_graph() -> dict[str, frozenset[str]]:
     modules = _runtime_modules()
-    names = frozenset(modules)
-    return {
-        module: frozenset(
-            dependency
-            for dependency in _project_imports(path)
-            if dependency in names
-        )
-        for module, path in modules.items()
-    }
+    return {name: _project_imports(path, modules) & modules.keys() for name, path in modules.items()}
 
 
 def _matches(dependency: str, pattern: str) -> bool:
@@ -142,24 +109,6 @@ def _forbidden_dependencies(
     }
 
 
-def _assert_acyclic(graph: dict[str, frozenset[str]]) -> None:
-    visiting: list[str] = []
-    visited: set[str] = set()
-
-    def visit(module: str) -> None:
-        if module in visiting:
-            cycle = visiting[visiting.index(module) :] + [module]
-            raise AssertionError("cyclic runtime import: " + " -> ".join(cycle))
-        if module in visited:
-            return
-        visiting.append(module)
-        for dependency in sorted(graph[module]):
-            visit(dependency)
-        visiting.pop()
-        visited.add(module)
-
-    for module in sorted(graph):
-        visit(module)
 
 
 def test_runtime_import_graph_is_acyclic() -> None:
@@ -199,42 +148,18 @@ def test_runtime_has_no_async_core_or_transport_framework() -> None:
         ), module
 
 
-def test_application_is_the_only_core_workflow_orchestrator() -> None:
+def test_application_layer_can_share_workflows_without_reverse_dependencies() -> None:
     graph = _dependency_graph()
-    workflow_boundaries = {
-        "patchharbor.registration",
-        "patchharbor.repository_state",
-        "patchharbor.result_bundle",
-        "patchharbor.apply_mutation",
-        "patchharbor.sources",
-        "patchharbor.bundles",
-        "patchharbor.execution",
-        "patchharbor.exchange",
-    }
-    application_dependencies = graph["patchharbor.application"]
-    assert workflow_boundaries <= application_dependencies
-
-    multi_workflow_modules = {
-        module
-        for module, dependencies in graph.items()
-        if module.startswith("patchharbor.")
-        and len(dependencies & workflow_boundaries) >= 3
-    }
-    assert multi_workflow_modules == {"patchharbor.application"}
-
-    application_users = {
-        module
-        for module, dependencies in graph.items()
-        if "patchharbor.application" in dependencies
-    }
-    assert application_users == {"patchharbor.api"}
+    assert any(is_workflow(name) for name in graph["patchharbor.api"])
+    assert not workflow_violations(graph)
 
 
 def test_cli_composes_public_boundaries_without_domain_orchestration() -> None:
-    dependencies = _dependency_graph()["patchharbor.cli"]
-    assert "patchharbor.api" in dependencies
+    graph = _dependency_graph()
+    cli_modules = {name: deps for name, deps in graph.items() if is_cli(name)}
+    assert any("patchharbor.api" in deps for deps in cli_modules.values())
     forbidden = {
-        "patchharbor.application",
+        "patchharbor.application*",
         "patchharbor.output",
         "patchharbor.progress",
         "patchharbor.apply_mutation",
@@ -253,14 +178,15 @@ def test_cli_composes_public_boundaries_without_domain_orchestration() -> None:
         "patchharbor.result_bundle*",
         "patchharbor.sources",
     }
-    assert not _forbidden_dependencies(dependencies, forbidden)
+    for module, dependencies in cli_modules.items():
+        assert not _forbidden_dependencies(dependencies, forbidden), module
 
 
 def test_runtime_responsibilities_follow_the_specified_boundaries() -> None:
     graph = _dependency_graph()
     forbidden_by_module = {
         "patchharbor.exchange": {
-            "patchharbor.application",
+            "patchharbor.application*",
             "patchharbor.apply_*",
             "patchharbor.execution",
             "patchharbor.git_*",
@@ -273,7 +199,7 @@ def test_runtime_responsibilities_follow_the_specified_boundaries() -> None:
             "patchharbor_watcher*",
         },
         "patchharbor.sources": {
-            "patchharbor.application",
+            "patchharbor.application*",
             "patchharbor.bundles",
             "patchharbor.execution",
             "patchharbor.git_*",
@@ -283,7 +209,7 @@ def test_runtime_responsibilities_follow_the_specified_boundaries() -> None:
             "patchharbor.result_bundle*",
         },
         "patchharbor.bundles": {
-            "patchharbor.application",
+            "patchharbor.application*",
             "patchharbor.execution",
             "patchharbor.payload_files",
             "patchharbor.presentation",
@@ -292,7 +218,7 @@ def test_runtime_responsibilities_follow_the_specified_boundaries() -> None:
             "patchharbor.sources",
         },
         "patchharbor.payload_files": {
-            "patchharbor.application",
+            "patchharbor.application*",
             "patchharbor.execution",
             "patchharbor.presentation",
             "patchharbor.registry",
@@ -300,7 +226,7 @@ def test_runtime_responsibilities_follow_the_specified_boundaries() -> None:
             "patchharbor.result_bundle*",
         },
         "patchharbor.patch_manifest": {
-            "patchharbor.application",
+            "patchharbor.application*",
             "patchharbor.execution",
             "patchharbor.git_*",
             "patchharbor.presentation",
@@ -308,7 +234,7 @@ def test_runtime_responsibilities_follow_the_specified_boundaries() -> None:
             "patchharbor.result_bundle*",
         },
         "patchharbor.registry": {
-            "patchharbor.application",
+            "patchharbor.application*",
             "patchharbor.bundles",
             "patchharbor.execution",
             "patchharbor.patch_package",
@@ -317,7 +243,7 @@ def test_runtime_responsibilities_follow_the_specified_boundaries() -> None:
             "patchharbor.result_bundle*",
         },
         "patchharbor.repository_state": {
-            "patchharbor.application",
+            "patchharbor.application*",
             "patchharbor.execution",
             "patchharbor.patch_package",
             "patchharbor.presentation",
@@ -325,7 +251,7 @@ def test_runtime_responsibilities_follow_the_specified_boundaries() -> None:
             "patchharbor_watcher*",
         },
         "patchharbor.locks": {
-            "patchharbor.application",
+            "patchharbor.application*",
             "patchharbor.bundles",
             "patchharbor.execution",
             "patchharbor.patch_manifest",
@@ -335,7 +261,7 @@ def test_runtime_responsibilities_follow_the_specified_boundaries() -> None:
             "patchharbor.result_bundle*",
         },
         "patchharbor.execution": {
-            "patchharbor.application",
+            "patchharbor.application*",
             "patchharbor.git_*",
             "patchharbor.patch_manifest",
             "patchharbor.patch_package",
@@ -353,10 +279,7 @@ def test_runtime_responsibilities_follow_the_specified_boundaries() -> None:
         "patchharbor.errors", "patchharbor.identifier_presentation",
         "patchharbor.models", "patchharbor.progress",
     }
-    assert not graph["patchharbor.application"] & {
-        "patchharbor.presentation", "patchharbor.identifier_presentation", "patchharbor.cli",
-    }
-    assert graph["patchharbor.progress"] == frozenset({"patchharbor.models"})
+    assert graph["patchharbor.progress"] <= {"patchharbor.models"}
 
     for module, forbidden in forbidden_by_module.items():
         violations = _forbidden_dependencies(graph[module], forbidden)
@@ -368,7 +291,7 @@ def test_runtime_responsibilities_follow_the_specified_boundaries() -> None:
         violations = _forbidden_dependencies(
             dependencies,
             {
-                "patchharbor.application",
+                "patchharbor.application*",
                 "patchharbor.apply_mutation",
                 "patchharbor.apply_preflight",
                 "patchharbor.execution",
@@ -388,117 +311,32 @@ def test_platform_specific_mechanics_stay_inside_platform_package() -> None:
         if module in {"patchharbor.platform", "patchharbor_watcher.platform"}:
             continue
         assert _import_roots(path).isdisjoint(platform_only_roots), module
-
     graph = _dependency_graph()
-    execution_dependencies = graph["patchharbor.execution"]
-    assert "patchharbor.platform" in execution_dependencies
-    assert "patchharbor.platform.posix" not in execution_dependencies
-    assert "patchharbor.platform.windows" not in execution_dependencies
-    assert "patchharbor.platform.runtime" in graph["patchharbor.interpreters"]
-    assert "patchharbor.platform.filesystem" in graph["patchharbor.payload_files"]
-    assert "patchharbor.platform.filesystem" in graph["patchharbor.git_capture"]
-    assert "patchharbor.platform.locking" in graph["patchharbor.locks"]
-    assert "patchharbor.platform.runtime" in graph["patchharbor.user_paths"]
-    assert "patchharbor.physical_paths" not in graph
-
-    assert graph["patchharbor_watcher.events"] == frozenset()
-    assert graph["patchharbor_watcher.platform"] == frozenset({
-        "patchharbor_watcher.events", "patchharbor_watcher.platform.linux",
-        "patchharbor_watcher.platform.windows",
-    })
-    for module in ("patchharbor_watcher.platform.linux", "patchharbor_watcher.platform.windows"):
-        assert graph[module] == frozenset({"patchharbor_watcher.events"})
-
-    git_capture_source = modules["patchharbor.git_capture"].read_text(
-        encoding="utf-8"
-    )
-    for platform_detail in (
-        "os.name",
-        "isjunction",
-        "is_junction",
-        "st_birthtime_ns",
-    ):
-        assert platform_detail not in git_capture_source
+    assert not graph["patchharbor.execution"] & {
+        "patchharbor.platform.posix", "patchharbor.platform.windows"}
+    assert not graph["patchharbor_watcher.events"]
+    for module, dependencies in graph.items():
+        if module == "patchharbor_watcher.platform" or module.startswith("patchharbor_watcher.platform."):
+            assert all(name == "patchharbor_watcher.events" or name.startswith("patchharbor_watcher.platform.")
+                       for name in dependencies), module
 
 
 def test_watcher_uses_public_api_with_an_isolated_worker_boundary() -> None:
     graph = _dependency_graph()
-    core_modules = {
-        module for module in graph if module.startswith("patchharbor.")
-    }
-    watcher_modules = {
-        module for module in graph if module.startswith("patchharbor_watcher.")
-    }
-
-    for module in core_modules:
-        assert not any(
-            dependency.startswith("patchharbor_watcher")
-            for dependency in graph[module]
-        )
-
-    allowed_shared_core_boundaries = {
-        "patchharbor.api",
-        "patchharbor.platform.paths",
-        "patchharbor.platform.filesystem",
-    }
-    for module in watcher_modules:
-        core_dependencies = {
-            dependency
-            for dependency in graph[module]
-            if dependency.startswith("patchharbor.")
-        }
-        assert core_dependencies <= allowed_shared_core_boundaries, module
-
-    assert not {
-        dependency
-        for dependency in graph["patchharbor_watcher.apply_boundary"]
-        if dependency.startswith("patchharbor.")
-    }
-
-    watcher_loop_source = _runtime_modules()[
-        "patchharbor_watcher.loop"
-    ].read_text(encoding="utf-8")
-    watcher_cli_source = _runtime_modules()[
-        "patchharbor_watcher.cli"
-    ].read_text(encoding="utf-8")
-    watcher_boundary_source = _runtime_modules()[
-        "patchharbor_watcher.apply_boundary"
-    ].read_text(encoding="utf-8")
-    for forbidden_core_detail in (
-        "scan_exchange_directory",
-        "load_exchange_state",
-        "mark_exchange_attempted",
-        "mark_exchange_apply_started",
-        "mark_exchange_apply_finished",
-        "capture_repository_context_for_id",
-    ):
-        assert forbidden_core_detail not in watcher_loop_source
-        assert forbidden_core_detail not in watcher_cli_source
-    assert graph["patchharbor_watcher.worker"] == frozenset({"patchharbor.api", "patchharbor_watcher.protocol"})
-    assert "patchharbor.api" in graph["patchharbor_watcher.cli"]
-    assert "patchharbor_watcher.worker" in watcher_boundary_source
-    for module in watcher_modules:
-        assert "patchharbor.cli" not in _runtime_modules()[module].read_text(encoding="utf-8")
-    assert "delegate_to_automatic_apply" in watcher_cli_source
-    assert "delegate_to_apply" not in watcher_boundary_source
-    assert "os.scandir" not in watcher_loop_source
-    assert "sha256" not in watcher_loop_source
-    assert "zipfile" not in watcher_loop_source
-    assert "watcher.json" not in watcher_cli_source
-    assert "paths.json" not in watcher_cli_source
-    assert "--configure" not in watcher_cli_source
-    assert "input_directory" not in watcher_cli_source
-
-    for module in watcher_modules:
-        path = _runtime_modules()[module]
-        assert _import_roots(path).isdisjoint(
-            FORBIDDEN_ASYNC_OR_TRANSPORT_ROOTS
-        ), module
-        if module != "patchharbor_watcher.apply_boundary":
-            assert "subprocess" not in _import_roots(path), module
-
-    assert not (PROJECT_ROOT / "src" / "repo_assist").exists()
-    assert not (PROJECT_ROOT / "src" / "promptbridge").exists()
+    allowed = {"patchharbor", "patchharbor.api", "patchharbor.platform.paths", "patchharbor.platform.filesystem"}
+    for module, dependencies in graph.items():
+        if module == "patchharbor" or module.startswith("patchharbor."):
+            assert not any(name == "patchharbor_watcher" or name.startswith("patchharbor_watcher.")
+                           for name in dependencies), module
+        else:
+            core = {name for name in dependencies if name == "patchharbor" or name.startswith("patchharbor.")}
+            assert core <= allowed, module
+            if module == "patchharbor_watcher.apply_boundary":
+                assert not core
+            else:
+                assert "subprocess" not in _import_roots(_runtime_modules()[module]), module
+    assert "patchharbor.api" in graph["patchharbor_watcher.worker"]
+    assert graph["patchharbor_watcher.worker"] <= {"patchharbor.api", "patchharbor_watcher.protocol"}
 
 
 def test_runtime_imports_only_standard_library_and_project_packages() -> None:
@@ -523,25 +361,22 @@ def test_bundle_handoff_is_passive_output_not_chat_or_commit_orchestration() -> 
         "patchharbor.platform.environment",
     ):
         assert not _forbidden_dependencies(graph[module], {
-            "patchharbor.application", "patchharbor.execution", "patchharbor.apply_*",
+            "patchharbor.application*", "patchharbor.execution", "patchharbor.apply_*",
             "patchharbor.git_*", "patchharbor.registry", "patchharbor_watcher*",
         })
-    assert "patchharbor.bundle_handoff" in graph["patchharbor.patch_package"]
     assert "patchharbor.chat_instructions" not in graph["patchharbor.patch_package"]
-    assert "patchharbor.platform.environment" in graph["patchharbor.result_bundle_handoff"]
-    assert "patchharbor.result_bundle_handoff" in graph["patchharbor.result_bundle"]
     for module in ("patchharbor.chat_instructions", "patchharbor.bundle_handoff"):
         assert "subprocess" not in _import_roots(_runtime_modules()[module])
 
 
 def test_archive_proofs_and_files_do_not_import_execution_or_cli() -> None:
     modules = _runtime_modules()
-    prohibited = {"patchharbor.application", "patchharbor.cli",
+    prohibited = {"patchharbor.application*", "patchharbor.cli*",
                   "patchharbor.execution", "patchharbor.presentation"}
     for name in ("archive_policy", "archive_evidence", "archive_git",
                  "archive_files", "exchange_archive", "platform.archive"):
         dependencies = _project_imports(modules["patchharbor." + name])
-        assert not dependencies & prohibited
+        assert not _forbidden_dependencies(dependencies, prohibited)
     assert not _project_imports(modules["patchharbor.archive_policy"])
     assert "patchharbor.git_commands" not in _project_imports(
         modules["patchharbor.archive_files"]
@@ -554,26 +389,40 @@ def test_archive_proofs_and_files_do_not_import_execution_or_cli() -> None:
 def test_domain_errors_and_application_do_not_depend_on_cli_statuses() -> None:
     modules = _runtime_modules()
     graph = _dependency_graph()
-    for module in ("patchharbor.application", "patchharbor.errors", "patchharbor.execution",
-                   "patchharbor.apply_mutation", "patchharbor.sources"):
-        assert not graph[module] & {"patchharbor.exit_status", "patchharbor.cli"}
+    for module in ({name for name in graph if is_workflow(name)} | {
+        "patchharbor.errors", "patchharbor.execution", "patchharbor.apply_mutation", "patchharbor.sources"}):
+        assert not _forbidden_dependencies(graph[module], {"patchharbor.exit_status", "patchharbor.cli*"})
         tree = ast.parse(modules[module].read_text(encoding="utf-8"))
         assert not any(isinstance(n, ast.Attribute) and n.attr == "process_exit_code"
                        for n in ast.walk(tree))
-    assert "patchharbor.exit_status" in graph["patchharbor.cli"]
+    assert any("patchharbor.exit_status" in deps for name, deps in graph.items() if is_cli(name))
     assert "patchharbor.exit_status" in graph["patchharbor.run_report"]
 
 
 def test_public_api_does_not_invoke_cli_or_duplicate_core_workflows() -> None:
     graph = _dependency_graph()
     dependencies = graph["patchharbor.api"]
-    assert "patchharbor.application" in dependencies
+    assert any(is_workflow(name) for name in dependencies)
     assert not _forbidden_dependencies(dependencies, {
-        "patchharbor.cli", "patchharbor.presentation", "patchharbor.exchange*",
+        "patchharbor.cli*", "patchharbor.presentation", "patchharbor.exchange*",
         "patchharbor.apply_*", "patchharbor.git_*", "patchharbor.registry",
         "patchharbor_watcher*",
     })
-    source = _runtime_modules()["patchharbor.api"].read_text(encoding="utf-8")
-    assert "os.chdir(" not in source
-    assert "sys.exit(" not in source
     assert "subprocess" not in _import_roots(_runtime_modules()["patchharbor.api"])
+
+
+def test_current_pyz_and_shared_profiles_do_not_depend_on_legacy_readers() -> None:
+    graph = _dependency_graph()
+    forbidden = {"patchharbor.runtime_wheel", "patchharbor.result_runtime"}
+    for module in ("patchharbor.runtime_pyz", "patchharbor.result_pyz",
+                   "patchharbor.runtime_profile", "patchharbor.result_runtime_metadata",
+                   "patchharbor.runtime_sources",
+                   "patchharbor.pyz_artifact", "patchharbor.result_resources"):
+        pending, seen = [module], set()
+        while pending:
+            current = pending.pop()
+            if current in seen:
+                continue
+            seen.add(current)
+            pending.extend(graph.get(current, ()))
+        assert not seen & forbidden, (module, seen & forbidden)

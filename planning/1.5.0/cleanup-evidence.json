@@ -1,0 +1,1707 @@
+{
+  "added_production_files": {
+    "src/patchharbor/application_apply.py": {
+      "bytes": 15113,
+      "lines": 412,
+      "sha256": "0acba845137cdc816fc9e51fca91144cc138d4bbf256c13ab50fa93105750d0e"
+    },
+    "src/patchharbor/application_configuration.py": {
+      "bytes": 6967,
+      "lines": 182,
+      "sha256": "63d713891326232a2d4ab1808bcb6e0752676eae667476de2ae7d04b2511a336"
+    },
+    "src/patchharbor/application_exchange.py": {
+      "bytes": 26034,
+      "lines": 602,
+      "sha256": "4e6a4d0b0f3c962a885a3b2d5203d49035b30b1cbfa24831b3cfcdfb9acb976c"
+    },
+    "src/patchharbor/application_results.py": {
+      "bytes": 7041,
+      "lines": 181,
+      "sha256": "76628188fbca594c0ecc48df1023899642110b3097e44ca363e496253095941d"
+    },
+    "src/patchharbor/cli_commands.py": {
+      "bytes": 20452,
+      "lines": 591,
+      "sha256": "17bc4e391c04a7e68094aeb6f6bebca9880070af125af5a743039dc8a2b46707"
+    },
+    "src/patchharbor/cli_output.py": {
+      "bytes": 6891,
+      "lines": 203,
+      "sha256": "1cbe98f1b49944945fd7f48f0bd7aae089d0746ff00c867027c62c74b51afa0c"
+    },
+    "src/patchharbor/cli_parser.py": {
+      "bytes": 17754,
+      "lines": 489,
+      "sha256": "43ea129b406cc50b34d22658ac04c06f12176cf5f40f2073c40a630771c47591"
+    },
+    "src/patchharbor/result_runtime_metadata.py": {
+      "bytes": 1411,
+      "lines": 34,
+      "sha256": "92474b3d1ea31cb43d90932c45200ee491875c8ad323818091a75c65486c2fb0"
+    },
+    "src/patchharbor/runtime_profile.py": {
+      "bytes": 1977,
+      "lines": 63,
+      "sha256": "53ac83516d9fb748dcdd2520dc1a4de39c0b6b898ff8efc2eaf78b6a9fa006f2"
+    }
+  },
+  "after": {
+    "acceptance_matrix_generator_present": true,
+    "application_family": {
+      "bytes": 63762,
+      "files": 5,
+      "lines": 1646
+    },
+    "bootstrap": {
+      "authored_program_copies": 1,
+      "embedded": {
+        "bytes": 36245,
+        "lines": 687,
+        "sha256": "043e5afd0e3ffee49f8bfeb6b226193dafd9b194dc257907a9054d750206b343"
+      },
+      "generated_program_copies": 1,
+      "generator_present": true,
+      "program_bytes_equal": true,
+      "script": {
+        "bytes": 36245,
+        "lines": 687,
+        "sha256": "043e5afd0e3ffee49f8bfeb6b226193dafd9b194dc257907a9054d750206b343"
+      }
+    },
+    "cli_family": {
+      "bytes": 50427,
+      "files": 4,
+      "lines": 1433
+    },
+    "production_modules": {
+      "src/patchharbor/__init__.py": {
+        "bytes": 433,
+        "lines": 14,
+        "sha256": "392005ca896585f88115e9080e3283c79a96499e99ccbc6231a45a2365bfbc36"
+      },
+      "src/patchharbor/api.py": {
+        "bytes": 20427,
+        "lines": 430,
+        "sha256": "9a36942072b8e63d4fff5af36395f5825d8454d95314f627fcded9356594e78e"
+      },
+      "src/patchharbor/api_types.py": {
+        "bytes": 3988,
+        "lines": 118,
+        "sha256": "637202d26342945dac16f05db3e65c50d86f312f2136a2817d24286ad644b2c7"
+      },
+      "src/patchharbor/application.py": {
+        "bytes": 8607,
+        "lines": 269,
+        "sha256": "b4bac945fc701af539488d25bcce0d6ad777731c51ff172dfdcefd664c912304"
+      },
+      "src/patchharbor/application_apply.py": {
+        "bytes": 15113,
+        "lines": 412,
+        "sha256": "0acba845137cdc816fc9e51fca91144cc138d4bbf256c13ab50fa93105750d0e"
+      },
+      "src/patchharbor/application_configuration.py": {
+        "bytes": 6967,
+        "lines": 182,
+        "sha256": "63d713891326232a2d4ab1808bcb6e0752676eae667476de2ae7d04b2511a336"
+      },
+      "src/patchharbor/application_exchange.py": {
+        "bytes": 26034,
+        "lines": 602,
+        "sha256": "4e6a4d0b0f3c962a885a3b2d5203d49035b30b1cbfa24831b3cfcdfb9acb976c"
+      },
+      "src/patchharbor/application_results.py": {
+        "bytes": 7041,
+        "lines": 181,
+        "sha256": "76628188fbca594c0ecc48df1023899642110b3097e44ca363e496253095941d"
+      },
+      "src/patchharbor/apply_mutation.py": {
+        "bytes": 6010,
+        "lines": 173,
+        "sha256": "ccf3c2b9cf21a7be83bcdd98b6d08708b14f1c78a4af686146efed88c7235da3"
+      },
+      "src/patchharbor/apply_preflight.py": {
+        "bytes": 4980,
+        "lines": 155,
+        "sha256": "da06d08fcc549fa75495a5aa2e0b3eb12ffb0c3f3504bd8bbb60c8e226d0d932"
+      },
+      "src/patchharbor/apply_repository.py": {
+        "bytes": 7492,
+        "lines": 205,
+        "sha256": "d614533c5c80a33807cea51309387740e950c7f91ca5015af44410e17a29e211"
+      },
+      "src/patchharbor/archive_evidence.py": {
+        "bytes": 3268,
+        "lines": 68,
+        "sha256": "d01f11907df6df2d78b1124ed25fdca1fd9502cecc0648d6029debbd6cd35fa3"
+      },
+      "src/patchharbor/archive_files.py": {
+        "bytes": 1051,
+        "lines": 26,
+        "sha256": "6f4805333d647195ec172f02c8072737591d4285986f6ded841a58bfb58581d0"
+      },
+      "src/patchharbor/archive_git.py": {
+        "bytes": 5092,
+        "lines": 110,
+        "sha256": "c97d329d2acd691dbacefd5c82cb860df87abb6a55aed66902d7484722300dc1"
+      },
+      "src/patchharbor/archive_policy.py": {
+        "bytes": 1016,
+        "lines": 30,
+        "sha256": "e77096d620fc8dedc9f3d1b82dc7c2271db1abd117e48802ca6109fdbfb982f7"
+      },
+      "src/patchharbor/bundle_handoff.py": {
+        "bytes": 4374,
+        "lines": 105,
+        "sha256": "cf41124a9f0ad96d751208412b8a279a232d464ef25ab2f6dd4c0937e3af2c00"
+      },
+      "src/patchharbor/bundle_names.py": {
+        "bytes": 1645,
+        "lines": 46,
+        "sha256": "6b2d0bdde19989ed091a7e2eb3cbbe71bf80012e8539794a6c75a48f75d1fd53"
+      },
+      "src/patchharbor/bundle_paths.py": {
+        "bytes": 4272,
+        "lines": 134,
+        "sha256": "1f28b4a6db85bf60e742d8b8534a05d7748350693543e05b0f86a78fa60c3075"
+      },
+      "src/patchharbor/bundles.py": {
+        "bytes": 7392,
+        "lines": 247,
+        "sha256": "86e3b1bff36efe7b155024ecb42b57839cfe970b335030249f452143bdde167f"
+      },
+      "src/patchharbor/chat_instructions.py": {
+        "bytes": 6912,
+        "lines": 144,
+        "sha256": "9b9a82c9f17ef7f5dd2030a1d8f2495468665d5c03297612a94ece8c171e1fae"
+      },
+      "src/patchharbor/cli.py": {
+        "bytes": 5330,
+        "lines": 150,
+        "sha256": "4d65a578bd911119d92ca8be81ceb14608a5dfa5422fa021c0aac280099b1703"
+      },
+      "src/patchharbor/cli_commands.py": {
+        "bytes": 20452,
+        "lines": 591,
+        "sha256": "17bc4e391c04a7e68094aeb6f6bebca9880070af125af5a743039dc8a2b46707"
+      },
+      "src/patchharbor/cli_output.py": {
+        "bytes": 6891,
+        "lines": 203,
+        "sha256": "1cbe98f1b49944945fd7f48f0bd7aae089d0746ff00c867027c62c74b51afa0c"
+      },
+      "src/patchharbor/cli_parser.py": {
+        "bytes": 17754,
+        "lines": 489,
+        "sha256": "43ea129b406cc50b34d22658ac04c06f12176cf5f40f2073c40a630771c47591"
+      },
+      "src/patchharbor/compat.py": {
+        "bytes": 733,
+        "lines": 20,
+        "sha256": "ffe4da58790fd82973413484a867174222a224dd526353fcf71345216f6de641"
+      },
+      "src/patchharbor/configuration.py": {
+        "bytes": 12403,
+        "lines": 343,
+        "sha256": "9e4ae74cd8b262b74b753f1bdd4f5f64f871152f6b429389a01c615271eea7f0"
+      },
+      "src/patchharbor/configuration_context.py": {
+        "bytes": 1687,
+        "lines": 36,
+        "sha256": "a22be16892f5dd8e5f590a1396c74ad81e440ab0c6521231451a834c9672968d"
+      },
+      "src/patchharbor/context_output.py": {
+        "bytes": 1942,
+        "lines": 56,
+        "sha256": "255e7a6c2785768f526593b9bccad15bb53cc8d0ef1b5f30f247126bab4d36ed"
+      },
+      "src/patchharbor/errors.py": {
+        "bytes": 5877,
+        "lines": 178,
+        "sha256": "cbf984e1a614811df50b21614440fdf8dfb01e9f0d7a4aa2b1b592f1919524ce"
+      },
+      "src/patchharbor/exchange.py": {
+        "bytes": 15974,
+        "lines": 446,
+        "sha256": "6054446c6760e6f1ee67cc8c113dd5798c85684848c3d2551afcee03ef126bb3"
+      },
+      "src/patchharbor/exchange_archive.py": {
+        "bytes": 11724,
+        "lines": 197,
+        "sha256": "c065e081c5b294b3ff539aee3ac0f2ec11ba4397c61a609faa18e24e75c92c84"
+      },
+      "src/patchharbor/exchange_paths.py": {
+        "bytes": 2019,
+        "lines": 67,
+        "sha256": "677d7f995eade3901aa71773e35e110c819a9a83bd0c1fb26294e7473471d339"
+      },
+      "src/patchharbor/exchange_recovery.py": {
+        "bytes": 10278,
+        "lines": 183,
+        "sha256": "1855a7cc0d3752b97a9d84e5579dde54e50e30e25feb7005378d91aff6d9308c"
+      },
+      "src/patchharbor/exchange_state.py": {
+        "bytes": 25256,
+        "lines": 696,
+        "sha256": "8424ee606eb9a49a018e3888de04e099d8d97ec9f40c3c6eb15fa8f0f9d90aa5"
+      },
+      "src/patchharbor/execution.py": {
+        "bytes": 13419,
+        "lines": 384,
+        "sha256": "06790421689781fc77bd1d5712d111a6ae1edda15d95e50b0e172724ce4f334f"
+      },
+      "src/patchharbor/exit_status.py": {
+        "bytes": 3585,
+        "lines": 98,
+        "sha256": "0d58bb9396de54b269cdbfc30d25817ba2568e73c8f7a41075b69b84dc291aef"
+      },
+      "src/patchharbor/git_capture.py": {
+        "bytes": 26231,
+        "lines": 815,
+        "sha256": "f14120e7cc3b71dd117a35ba206092621992797d8739a7e2ab3f15e3ccfdab7c"
+      },
+      "src/patchharbor/git_commands.py": {
+        "bytes": 4127,
+        "lines": 149,
+        "sha256": "fc74a7247ee7cc09ef791fb602573fbf17f0ea7480b54d5c9f2f656cddcf3aec"
+      },
+      "src/patchharbor/git_objects.py": {
+        "bytes": 6287,
+        "lines": 200,
+        "sha256": "c06a5f06e9594d7c2ed7e327d276c0e7fc9cf7446e5c48f3aebfc1f6ecd7fe0c"
+      },
+      "src/patchharbor/git_patches.py": {
+        "bytes": 1397,
+        "lines": 49,
+        "sha256": "26859d011ba07734b80015824d488a9d5eb14acbf5e3e177d5c59a52bd8f4e1c"
+      },
+      "src/patchharbor/identifier_presentation.py": {
+        "bytes": 527,
+        "lines": 20,
+        "sha256": "77b9ee880a2f14efcab67a3fc3a96290e50a8c0fe274f55e6e10e14533064f13"
+      },
+      "src/patchharbor/inspection_output.py": {
+        "bytes": 2285,
+        "lines": 51,
+        "sha256": "0e3001c8de5c72715beb9d691df717e1e65e327772b2dcab782c6f90b1b71a44"
+      },
+      "src/patchharbor/interpreters.py": {
+        "bytes": 3665,
+        "lines": 122,
+        "sha256": "3e2e9e6b0931fb26fb963e6e4b48bd3087fe956b80572697ff2aa5ad23a95a6d"
+      },
+      "src/patchharbor/json_document.py": {
+        "bytes": 1421,
+        "lines": 46,
+        "sha256": "e09804fbf6395f286dff96fb845fd5a7563a56c294f3c0c70763b0f0138cfd40"
+      },
+      "src/patchharbor/locks.py": {
+        "bytes": 2743,
+        "lines": 93,
+        "sha256": "4947175871cf1b0ee6a89fe912c13c1ca0b5e0e65e5c3274ae57bbda76d80206"
+      },
+      "src/patchharbor/models.py": {
+        "bytes": 6195,
+        "lines": 241,
+        "sha256": "b3076088ce96e8be5533464051ad2e8df28502d8342ffce40f7a559d9d1bf2cf"
+      },
+      "src/patchharbor/output.py": {
+        "bytes": 9589,
+        "lines": 277,
+        "sha256": "0855f9f31095a0b874bebbb7529aa8174bb533f9c10ebd96f9cd1eef97d5e62f"
+      },
+      "src/patchharbor/pack_candidate.py": {
+        "bytes": 8897,
+        "lines": 180,
+        "sha256": "4904079a4435484237f2a98af94fcc67705c9dbf7116389e27ae90403580aa95"
+      },
+      "src/patchharbor/pack_sources.py": {
+        "bytes": 10216,
+        "lines": 205,
+        "sha256": "37511790ac4fd6fb288fd65b81970897b0b13a68a33af79d20fc573598c1d27a"
+      },
+      "src/patchharbor/pack_types.py": {
+        "bytes": 1872,
+        "lines": 43,
+        "sha256": "8388f9a3263ac7ffb1feb3bd35ebe54c9d706ba54198b6461a3f4b63d75c90e6"
+      },
+      "src/patchharbor/parser.py": {
+        "bytes": 4853,
+        "lines": 164,
+        "sha256": "4f3bbdb624f9429ef068128d62e44ff748f57302bd5af7070e52bb7b05ca118d"
+      },
+      "src/patchharbor/patch_inspection.py": {
+        "bytes": 6918,
+        "lines": 161,
+        "sha256": "ca825917144762892e3d256e21cc00d11063dca54cc1bb5c640e8666de9b6642"
+      },
+      "src/patchharbor/patch_manifest.py": {
+        "bytes": 4731,
+        "lines": 149,
+        "sha256": "7031bc6e8672818da3dab6623ab1919846bb3af36d07261b4250902014deb484"
+      },
+      "src/patchharbor/patch_pack.py": {
+        "bytes": 10477,
+        "lines": 174,
+        "sha256": "3757b850517623ea6c97fda2a3518ec15696c0442fa3608affce055cfcd58fa9"
+      },
+      "src/patchharbor/patch_package.py": {
+        "bytes": 6954,
+        "lines": 184,
+        "sha256": "d099e676174c7bc32e84640eab33fc78744ac061aadf2cf826db26f1daec136f"
+      },
+      "src/patchharbor/payload_files.py": {
+        "bytes": 6207,
+        "lines": 185,
+        "sha256": "6981eb1740fa265bc77ab2d104fe2aeed6ebf36f44ff1e868b5933a34a506bc2"
+      },
+      "src/patchharbor/payload_modes.py": {
+        "bytes": 1633,
+        "lines": 37,
+        "sha256": "09904e21b8b73da5552773937dc32665d4745d620cb19e032d56b579f4343488"
+      },
+      "src/patchharbor/platform/__init__.py": {
+        "bytes": 862,
+        "lines": 32,
+        "sha256": "d4ac6617c276ba5dd0f1841f47339ef3127eb621180b228197e4d954d5755cfc"
+      },
+      "src/patchharbor/platform/archive.py": {
+        "bytes": 6666,
+        "lines": 148,
+        "sha256": "c9386d5558ff597bd5da53103821017c84b811d28b4e36bd733df5d494326c99"
+      },
+      "src/patchharbor/platform/cifs.py": {
+        "bytes": 1897,
+        "lines": 50,
+        "sha256": "65f2bc34fdb309da1369325d91e72f60bf8349df1070da10afb6c8da73e83c27"
+      },
+      "src/patchharbor/platform/directories.py": {
+        "bytes": 1516,
+        "lines": 36,
+        "sha256": "abc1301ec14770c33a555ee0cf64e72bf98bd97e392871672e570aa0b528933e"
+      },
+      "src/patchharbor/platform/environment.py": {
+        "bytes": 4281,
+        "lines": 114,
+        "sha256": "253f2a1237f3239e9e6a967e198a0dd74455a25c8f6221e3900a766568077632"
+      },
+      "src/patchharbor/platform/errors.py": {
+        "bytes": 1353,
+        "lines": 34,
+        "sha256": "dfadb1e8caeec79bf769a2524a99b411bdc113d95a045c97f3f19b14224e8c3f"
+      },
+      "src/patchharbor/platform/file_handles.py": {
+        "bytes": 3427,
+        "lines": 76,
+        "sha256": "a0d5d2b08da26e9d11043b195c0080073a3f2940a9978fb168111b2968a05248"
+      },
+      "src/patchharbor/platform/file_times.py": {
+        "bytes": 2613,
+        "lines": 75,
+        "sha256": "02bcedeb2666d5f332a76e5070379dcbf2fc2994f3b0e9beae63dde79339982c"
+      },
+      "src/patchharbor/platform/filesystem.py": {
+        "bytes": 20502,
+        "lines": 554,
+        "sha256": "4b24a5276bd27ebddbc5bbbbbe9284f254de7be3d7dfff5e174d9d8cabe02ef8"
+      },
+      "src/patchharbor/platform/lifecycle.py": {
+        "bytes": 6316,
+        "lines": 204,
+        "sha256": "dae8bc5f1c94f22f71013d996c969541a001fafd60df37efd27e87abda4b26f6"
+      },
+      "src/patchharbor/platform/locking.py": {
+        "bytes": 2752,
+        "lines": 100,
+        "sha256": "ba1002e134adbd8445e4bbac6b9521afffdc86d49201ec1b8cf3ea0e1e836653"
+      },
+      "src/patchharbor/platform/pack_output.py": {
+        "bytes": 9655,
+        "lines": 222,
+        "sha256": "77aff9f2a57c5555891eb3296ba3b116dd144cdb11be1e09f418d7bea90cbe11"
+      },
+      "src/patchharbor/platform/paths.py": {
+        "bytes": 1549,
+        "lines": 58,
+        "sha256": "d8326ca798a7d1f4e43f50573387c3dd5b590d135781b88017ef35e775ce47bd"
+      },
+      "src/patchharbor/platform/posix.py": {
+        "bytes": 1402,
+        "lines": 53,
+        "sha256": "56973f5c58dc3f5bd73db9be19de9b81410cd9872b1a6dba5d1371ff8447ade3"
+      },
+      "src/patchharbor/platform/private_directory.py": {
+        "bytes": 4791,
+        "lines": 98,
+        "sha256": "8c80eaf7b5e6c292ccc8b67846a580c048c3a22cc0d630410fdafce2dd599996"
+      },
+      "src/patchharbor/platform/runtime.py": {
+        "bytes": 684,
+        "lines": 22,
+        "sha256": "3b4c259691ab6c4db614ed2c257c6abfb39ec56ea25a6ed2183b0c748b657f7b"
+      },
+      "src/patchharbor/platform/source_tree.py": {
+        "bytes": 9325,
+        "lines": 198,
+        "sha256": "92b2211704d4357b8d25d18b04032e39416771eca5dd7c26b108c7dd2c60f9aa"
+      },
+      "src/patchharbor/platform/windows.py": {
+        "bytes": 8095,
+        "lines": 252,
+        "sha256": "e73a0b88b73e94c14bea76e028632cb2662d304c3dfb442aa11ffeb5b20581ae"
+      },
+      "src/patchharbor/presentation.py": {
+        "bytes": 21533,
+        "lines": 565,
+        "sha256": "c5ba4ba98d6e3d310184442b274cd2f03337dca03dbd3c36c88815b89670709e"
+      },
+      "src/patchharbor/progress.py": {
+        "bytes": 2571,
+        "lines": 88,
+        "sha256": "34155f20d459a629063a72fad50d6baab0920346f2475c17b80467d43c6f3e94"
+      },
+      "src/patchharbor/pyz_artifact.py": {
+        "bytes": 6880,
+        "lines": 149,
+        "sha256": "38d147b584ee2be17b16f5988b42d808bac18633f0d3351d676fe69cd3cc0a75"
+      },
+      "src/patchharbor/registration.py": {
+        "bytes": 17377,
+        "lines": 525,
+        "sha256": "cf1a454c19ee75d8092d55e5b2fcc5b0152f3184d2bfae3a9ac7b1e13d72dbf2"
+      },
+      "src/patchharbor/registry.py": {
+        "bytes": 8348,
+        "lines": 239,
+        "sha256": "d66767b3759fbff4a6e66cbfe56837d1a0b6924375fb28daf8e016d28442ab26"
+      },
+      "src/patchharbor/repository.py": {
+        "bytes": 11941,
+        "lines": 357,
+        "sha256": "6a50a372e60f543faa6aa6f2a31633c8aae8427cb580d5e5b4c55e464aeab70d"
+      },
+      "src/patchharbor/repository_paths.py": {
+        "bytes": 3311,
+        "lines": 94,
+        "sha256": "1c4f78ee82c87bf365ca42b533c5152322be7f67f14e6e6b4665142e5c1bcaa3"
+      },
+      "src/patchharbor/repository_state.py": {
+        "bytes": 11683,
+        "lines": 337,
+        "sha256": "a920fb552575b7898dfcc0175f031c64b83a39d3134d022f43c45258c7f2aec7"
+      },
+      "src/patchharbor/resource_policy.py": {
+        "bytes": 2531,
+        "lines": 73,
+        "sha256": "1bf88e372252f5f6b5fbb4c4308426e227f4d0d26362a48696231762cd64d14f"
+      },
+      "src/patchharbor/result_bundle.py": {
+        "bytes": 22378,
+        "lines": 608,
+        "sha256": "75ef50d49cc5ed344af3d8260e01e10393b84504acb0089132dd614d325d6941"
+      },
+      "src/patchharbor/result_bundle_capture.py": {
+        "bytes": 2965,
+        "lines": 94,
+        "sha256": "dafc7954feafb6316a6b6e06dd0a451c1527757ab49e142061c308faae44702f"
+      },
+      "src/patchharbor/result_bundle_handoff.py": {
+        "bytes": 2221,
+        "lines": 49,
+        "sha256": "af95cf23aa8e1826eace150b1ef50d514c155789acc85316a0f63a12652cec0e"
+      },
+      "src/patchharbor/result_bundle_publication.py": {
+        "bytes": 12961,
+        "lines": 365,
+        "sha256": "3bbcfeb6835705a21222972d74f16b2a6a12108719a5874ab975ac067a8e11cf"
+      },
+      "src/patchharbor/result_bundle_snapshot.py": {
+        "bytes": 6286,
+        "lines": 181,
+        "sha256": "2cabe781f175267e39d893e42df0c178a86faa3501494c134a1802c2ff18114a"
+      },
+      "src/patchharbor/result_bundle_target.py": {
+        "bytes": 7801,
+        "lines": 222,
+        "sha256": "c4ab45b6f51d2f1d7442b2e2e3a4675c3ad4594a1b8d50f3549a3ebb34a7f58f"
+      },
+      "src/patchharbor/result_bundle_writer.py": {
+        "bytes": 4137,
+        "lines": 117,
+        "sha256": "55cc0fbdba5150fc1f744d6dec8b974d89a2e9d176985dfb2f34475c612bbcd3"
+      },
+      "src/patchharbor/result_pyz.py": {
+        "bytes": 6363,
+        "lines": 111,
+        "sha256": "56625c6393e96dd380c5695ab561274393b5a9040a09de317fefb6c3474664d7"
+      },
+      "src/patchharbor/result_reader.py": {
+        "bytes": 24660,
+        "lines": 448,
+        "sha256": "3df56d747c120d50d4cee784a696c6586694421a20a101723bd0d2f25945c5b6"
+      },
+      "src/patchharbor/result_resources.py": {
+        "bytes": 7192,
+        "lines": 147,
+        "sha256": "e0d54aeb95fc7e16b392e113ec59ce8eb01a38199451556b5d3b92f70a09ac5e"
+      },
+      "src/patchharbor/result_runtime_metadata.py": {
+        "bytes": 1411,
+        "lines": 34,
+        "sha256": "92474b3d1ea31cb43d90932c45200ee491875c8ad323818091a75c65486c2fb0"
+      },
+      "src/patchharbor/result_verification.py": {
+        "bytes": 5505,
+        "lines": 113,
+        "sha256": "bacd9687bf1d545b7bfca35c36f301a81e7c5f3e95f243066875c3ec4de13b1c"
+      },
+      "src/patchharbor/run_log.py": {
+        "bytes": 3616,
+        "lines": 121,
+        "sha256": "512d39af2aa573a6173e7e8800ea68ace89d5662ac26fab0ef7c312dca6cfbca"
+      },
+      "src/patchharbor/run_report.py": {
+        "bytes": 36544,
+        "lines": 1024,
+        "sha256": "6fbd2b5ab180e0bf6df6ecd3ebe500724c9c2eaaa310ce4ef95aa701c951f87d"
+      },
+      "src/patchharbor/runtime_profile.py": {
+        "bytes": 1977,
+        "lines": 63,
+        "sha256": "53ac83516d9fb748dcdd2520dc1a4de39c0b6b898ff8efc2eaf78b6a9fa006f2"
+      },
+      "src/patchharbor/runtime_pyz.py": {
+        "bytes": 14973,
+        "lines": 281,
+        "sha256": "8d6089bc82998f5f6d948fcd3ada95f5627869a5e03bf518cf97d975b2062bcd"
+      },
+      "src/patchharbor/runtime_sources.py": {
+        "bytes": 3131,
+        "lines": 75,
+        "sha256": "a8b8a18d3eda1d74f145fe6cc10b8f9204282424790a6c7a677e9157eacee915"
+      },
+      "src/patchharbor/runtime_zip.py": {
+        "bytes": 1651,
+        "lines": 34,
+        "sha256": "de5e5cb628558be6e6d56a23ff1e3db82cc8826d015925057c0f00b30aa073fe"
+      },
+      "src/patchharbor/sources.py": {
+        "bytes": 5539,
+        "lines": 157,
+        "sha256": "3e704d2af048087c9da2d7fba6ec5d5e30a21e1acedd6a8324ca30e7feab8bc5"
+      },
+      "src/patchharbor/state_fingerprint.py": {
+        "bytes": 3042,
+        "lines": 116,
+        "sha256": "79e15d44d1503a6984bb675abfe2e5617df1c8ff073e7f72edcab7d1ee021741"
+      },
+      "src/patchharbor/temporary_resources.py": {
+        "bytes": 2612,
+        "lines": 81,
+        "sha256": "4d0b979500660fbccef9e827ca56a9ffd4604c96831fa6d3b8fd330b86c99b4b"
+      },
+      "src/patchharbor/user_paths.py": {
+        "bytes": 3961,
+        "lines": 123,
+        "sha256": "0b1264b86a2cb783644ce5de6df0fb02ecb6a684da04842a624f957b58f939a6"
+      },
+      "src/patchharbor/watch_contract.py": {
+        "bytes": 4135,
+        "lines": 117,
+        "sha256": "8c2f406b5257a1599335da71b74ed63ba91c434f7242d91dd9672af13dd7d57c"
+      },
+      "src/patchharbor/zip_payloads.py": {
+        "bytes": 11284,
+        "lines": 329,
+        "sha256": "38adcb94c843bc70e14b975deed93f15ba1d78ef3aa8e4c6bc6fb5cf0ec2d162"
+      },
+      "src/patchharbor_watcher/__init__.py": {
+        "bytes": 147,
+        "lines": 4,
+        "sha256": "017167942313e2f3ca854d10c3982ca22bea4dc06c0ef27523c0b6892398ce22"
+      },
+      "src/patchharbor_watcher/apply_boundary.py": {
+        "bytes": 2691,
+        "lines": 83,
+        "sha256": "a1e058920d6e203fd9d884831b8d5d231818340d9435b78dbc6e80ce6bb7684d"
+      },
+      "src/patchharbor_watcher/cli.py": {
+        "bytes": 3297,
+        "lines": 95,
+        "sha256": "9c33cfa2d4d389e4c3a58a303715cef15276c3175aa4f21baf87b86ee5ad22fa"
+      },
+      "src/patchharbor_watcher/events.py": {
+        "bytes": 6625,
+        "lines": 171,
+        "sha256": "1eb831f739e6bcf56c75c224e98b5cde325512df4fa1df7c525792f37750f3f4"
+      },
+      "src/patchharbor_watcher/lifecycle.py": {
+        "bytes": 2073,
+        "lines": 62,
+        "sha256": "0f1e4f6c86a9d2ffabc698d1cdf3fd3852f228eba48b59dad3e5e60e0f5387b2"
+      },
+      "src/patchharbor_watcher/loop.py": {
+        "bytes": 11595,
+        "lines": 324,
+        "sha256": "e9ad1d0fe76e44c7469aa53bdb617e3e9fb9363bac61a5dac4d8169aa2267cb2"
+      },
+      "src/patchharbor_watcher/observation.py": {
+        "bytes": 2596,
+        "lines": 62,
+        "sha256": "e011b39389d332809f900e761c109fdd6434e21a3d6a31a7ac1bcb22b0873c26"
+      },
+      "src/patchharbor_watcher/platform/__init__.py": {
+        "bytes": 772,
+        "lines": 16,
+        "sha256": "e9f6c6a4533783ec4115b3a31eb29953c54f7b7f3262ce6ff2a332109625834a"
+      },
+      "src/patchharbor_watcher/platform/linux.py": {
+        "bytes": 7555,
+        "lines": 168,
+        "sha256": "c52d91da52b2b0e22bb09d9a21182af8d49efb0149d17db5360751ef13aec790"
+      },
+      "src/patchharbor_watcher/platform/windows.py": {
+        "bytes": 12842,
+        "lines": 272,
+        "sha256": "5fbd767c69c20f45eb89030ab7ca67815fdfdd320802bfca681d80b77762406f"
+      },
+      "src/patchharbor_watcher/protocol.py": {
+        "bytes": 4552,
+        "lines": 107,
+        "sha256": "97cf830e784aa3e24f4b105239220c950a35bf1a8f3f020b9a72ff0bd6b4d268"
+      },
+      "src/patchharbor_watcher/scheduling.py": {
+        "bytes": 3483,
+        "lines": 96,
+        "sha256": "d93fdd471cd20173e0987bc233cc5ee71c63dc72623ad32b6a9ad0acaebef291"
+      },
+      "src/patchharbor_watcher/systemd_linux.py": {
+        "bytes": 3578,
+        "lines": 107,
+        "sha256": "e22938279953571745eb39bb98a9128ec07193e1f6bf27a530b5513d6e450383"
+      },
+      "src/patchharbor_watcher/worker.py": {
+        "bytes": 2622,
+        "lines": 58,
+        "sha256": "30864ea0d856ad614fd25ed075264f9a88549de67a25dcaf112a0fc130ceb565"
+      }
+    },
+    "production_python": {
+      "bytes": 859297,
+      "files": 122,
+      "lines": 22721
+    },
+    "test_python_excluding_fixtures": {
+      "bytes": 1511026,
+      "files": 178,
+      "lines": 36981
+    },
+    "test_support_python": {
+      "bytes": 106938,
+      "files": 33,
+      "lines": 2638
+    },
+    "test_to_test_static_import_edges": [],
+    "tracked_files": 405
+  },
+  "after_commit": "7294d77fde0598dd57a6fdc3c19f6925e5520bdb",
+  "before": {
+    "acceptance_matrix_generator_present": false,
+    "application_family": {
+      "bytes": 59300,
+      "files": 1,
+      "lines": 1497
+    },
+    "bootstrap": {
+      "authored_program_copies": 2,
+      "embedded": {
+        "bytes": 36390,
+        "lines": 689,
+        "sha256": "f30220eb4111443481c70994fb0fc055547b23d5c9e5eb2d98afb7004c22ff61"
+      },
+      "generated_program_copies": 0,
+      "generator_present": false,
+      "program_bytes_equal": true,
+      "script": {
+        "bytes": 36390,
+        "lines": 689,
+        "sha256": "f30220eb4111443481c70994fb0fc055547b23d5c9e5eb2d98afb7004c22ff61"
+      }
+    },
+    "cli_family": {
+      "bytes": 53224,
+      "files": 1,
+      "lines": 1513
+    },
+    "production_modules": {
+      "src/patchharbor/__init__.py": {
+        "bytes": 898,
+        "lines": 24,
+        "sha256": "56eb0bf69eef7c0e90a8e47e7b889219fdba924b5fde77a933f73fa68298a0d6"
+      },
+      "src/patchharbor/api.py": {
+        "bytes": 20427,
+        "lines": 430,
+        "sha256": "9a36942072b8e63d4fff5af36395f5825d8454d95314f627fcded9356594e78e"
+      },
+      "src/patchharbor/api_types.py": {
+        "bytes": 3988,
+        "lines": 118,
+        "sha256": "637202d26342945dac16f05db3e65c50d86f312f2136a2817d24286ad644b2c7"
+      },
+      "src/patchharbor/application.py": {
+        "bytes": 59300,
+        "lines": 1497,
+        "sha256": "f2ba018c4a43816620700a30a6c675d19e258a76a1293aba65033cdfe5400b8d"
+      },
+      "src/patchharbor/apply_mutation.py": {
+        "bytes": 6010,
+        "lines": 173,
+        "sha256": "ccf3c2b9cf21a7be83bcdd98b6d08708b14f1c78a4af686146efed88c7235da3"
+      },
+      "src/patchharbor/apply_preflight.py": {
+        "bytes": 4980,
+        "lines": 155,
+        "sha256": "da06d08fcc549fa75495a5aa2e0b3eb12ffb0c3f3504bd8bbb60c8e226d0d932"
+      },
+      "src/patchharbor/apply_repository.py": {
+        "bytes": 7492,
+        "lines": 205,
+        "sha256": "d614533c5c80a33807cea51309387740e950c7f91ca5015af44410e17a29e211"
+      },
+      "src/patchharbor/archive_evidence.py": {
+        "bytes": 3268,
+        "lines": 68,
+        "sha256": "d01f11907df6df2d78b1124ed25fdca1fd9502cecc0648d6029debbd6cd35fa3"
+      },
+      "src/patchharbor/archive_files.py": {
+        "bytes": 1051,
+        "lines": 26,
+        "sha256": "6f4805333d647195ec172f02c8072737591d4285986f6ded841a58bfb58581d0"
+      },
+      "src/patchharbor/archive_git.py": {
+        "bytes": 5092,
+        "lines": 110,
+        "sha256": "c97d329d2acd691dbacefd5c82cb860df87abb6a55aed66902d7484722300dc1"
+      },
+      "src/patchharbor/archive_policy.py": {
+        "bytes": 1016,
+        "lines": 30,
+        "sha256": "e77096d620fc8dedc9f3d1b82dc7c2271db1abd117e48802ca6109fdbfb982f7"
+      },
+      "src/patchharbor/bundle_handoff.py": {
+        "bytes": 4374,
+        "lines": 105,
+        "sha256": "cf41124a9f0ad96d751208412b8a279a232d464ef25ab2f6dd4c0937e3af2c00"
+      },
+      "src/patchharbor/bundle_names.py": {
+        "bytes": 1645,
+        "lines": 46,
+        "sha256": "6b2d0bdde19989ed091a7e2eb3cbbe71bf80012e8539794a6c75a48f75d1fd53"
+      },
+      "src/patchharbor/bundle_paths.py": {
+        "bytes": 4272,
+        "lines": 134,
+        "sha256": "1f28b4a6db85bf60e742d8b8534a05d7748350693543e05b0f86a78fa60c3075"
+      },
+      "src/patchharbor/bundles.py": {
+        "bytes": 7392,
+        "lines": 247,
+        "sha256": "86e3b1bff36efe7b155024ecb42b57839cfe970b335030249f452143bdde167f"
+      },
+      "src/patchharbor/chat_instructions.py": {
+        "bytes": 6912,
+        "lines": 144,
+        "sha256": "9b9a82c9f17ef7f5dd2030a1d8f2495468665d5c03297612a94ece8c171e1fae"
+      },
+      "src/patchharbor/cli.py": {
+        "bytes": 53224,
+        "lines": 1513,
+        "sha256": "02440ec9f7f654c160b28cdd7077b616bea61080bb8670da9962ebd3841ce238"
+      },
+      "src/patchharbor/compat.py": {
+        "bytes": 733,
+        "lines": 20,
+        "sha256": "ffe4da58790fd82973413484a867174222a224dd526353fcf71345216f6de641"
+      },
+      "src/patchharbor/configuration.py": {
+        "bytes": 12403,
+        "lines": 343,
+        "sha256": "9e4ae74cd8b262b74b753f1bdd4f5f64f871152f6b429389a01c615271eea7f0"
+      },
+      "src/patchharbor/configuration_context.py": {
+        "bytes": 1687,
+        "lines": 36,
+        "sha256": "a22be16892f5dd8e5f590a1396c74ad81e440ab0c6521231451a834c9672968d"
+      },
+      "src/patchharbor/context_output.py": {
+        "bytes": 1942,
+        "lines": 56,
+        "sha256": "255e7a6c2785768f526593b9bccad15bb53cc8d0ef1b5f30f247126bab4d36ed"
+      },
+      "src/patchharbor/errors.py": {
+        "bytes": 5877,
+        "lines": 178,
+        "sha256": "cbf984e1a614811df50b21614440fdf8dfb01e9f0d7a4aa2b1b592f1919524ce"
+      },
+      "src/patchharbor/exchange.py": {
+        "bytes": 15974,
+        "lines": 446,
+        "sha256": "6054446c6760e6f1ee67cc8c113dd5798c85684848c3d2551afcee03ef126bb3"
+      },
+      "src/patchharbor/exchange_archive.py": {
+        "bytes": 11724,
+        "lines": 197,
+        "sha256": "c065e081c5b294b3ff539aee3ac0f2ec11ba4397c61a609faa18e24e75c92c84"
+      },
+      "src/patchharbor/exchange_paths.py": {
+        "bytes": 2019,
+        "lines": 67,
+        "sha256": "677d7f995eade3901aa71773e35e110c819a9a83bd0c1fb26294e7473471d339"
+      },
+      "src/patchharbor/exchange_recovery.py": {
+        "bytes": 10278,
+        "lines": 183,
+        "sha256": "1855a7cc0d3752b97a9d84e5579dde54e50e30e25feb7005378d91aff6d9308c"
+      },
+      "src/patchharbor/exchange_state.py": {
+        "bytes": 25256,
+        "lines": 696,
+        "sha256": "8424ee606eb9a49a018e3888de04e099d8d97ec9f40c3c6eb15fa8f0f9d90aa5"
+      },
+      "src/patchharbor/execution.py": {
+        "bytes": 13419,
+        "lines": 384,
+        "sha256": "06790421689781fc77bd1d5712d111a6ae1edda15d95e50b0e172724ce4f334f"
+      },
+      "src/patchharbor/exit_status.py": {
+        "bytes": 3585,
+        "lines": 98,
+        "sha256": "0d58bb9396de54b269cdbfc30d25817ba2568e73c8f7a41075b69b84dc291aef"
+      },
+      "src/patchharbor/git_capture.py": {
+        "bytes": 26231,
+        "lines": 815,
+        "sha256": "f14120e7cc3b71dd117a35ba206092621992797d8739a7e2ab3f15e3ccfdab7c"
+      },
+      "src/patchharbor/git_commands.py": {
+        "bytes": 4127,
+        "lines": 149,
+        "sha256": "fc74a7247ee7cc09ef791fb602573fbf17f0ea7480b54d5c9f2f656cddcf3aec"
+      },
+      "src/patchharbor/git_objects.py": {
+        "bytes": 6287,
+        "lines": 200,
+        "sha256": "c06a5f06e9594d7c2ed7e327d276c0e7fc9cf7446e5c48f3aebfc1f6ecd7fe0c"
+      },
+      "src/patchharbor/git_patches.py": {
+        "bytes": 1397,
+        "lines": 49,
+        "sha256": "26859d011ba07734b80015824d488a9d5eb14acbf5e3e177d5c59a52bd8f4e1c"
+      },
+      "src/patchharbor/identifier_presentation.py": {
+        "bytes": 527,
+        "lines": 20,
+        "sha256": "77b9ee880a2f14efcab67a3fc3a96290e50a8c0fe274f55e6e10e14533064f13"
+      },
+      "src/patchharbor/inspection_output.py": {
+        "bytes": 2285,
+        "lines": 51,
+        "sha256": "0e3001c8de5c72715beb9d691df717e1e65e327772b2dcab782c6f90b1b71a44"
+      },
+      "src/patchharbor/interpreters.py": {
+        "bytes": 3665,
+        "lines": 122,
+        "sha256": "3e2e9e6b0931fb26fb963e6e4b48bd3087fe956b80572697ff2aa5ad23a95a6d"
+      },
+      "src/patchharbor/json_document.py": {
+        "bytes": 1421,
+        "lines": 46,
+        "sha256": "e09804fbf6395f286dff96fb845fd5a7563a56c294f3c0c70763b0f0138cfd40"
+      },
+      "src/patchharbor/locks.py": {
+        "bytes": 2743,
+        "lines": 93,
+        "sha256": "4947175871cf1b0ee6a89fe912c13c1ca0b5e0e65e5c3274ae57bbda76d80206"
+      },
+      "src/patchharbor/models.py": {
+        "bytes": 6195,
+        "lines": 241,
+        "sha256": "b3076088ce96e8be5533464051ad2e8df28502d8342ffce40f7a559d9d1bf2cf"
+      },
+      "src/patchharbor/output.py": {
+        "bytes": 9589,
+        "lines": 277,
+        "sha256": "0855f9f31095a0b874bebbb7529aa8174bb533f9c10ebd96f9cd1eef97d5e62f"
+      },
+      "src/patchharbor/pack_candidate.py": {
+        "bytes": 9253,
+        "lines": 186,
+        "sha256": "0ae6725f091d33ac5eeb87817483e9f03370bdce88d5c1c4db65d2a4a1377e76"
+      },
+      "src/patchharbor/pack_sources.py": {
+        "bytes": 10216,
+        "lines": 205,
+        "sha256": "37511790ac4fd6fb288fd65b81970897b0b13a68a33af79d20fc573598c1d27a"
+      },
+      "src/patchharbor/pack_types.py": {
+        "bytes": 1872,
+        "lines": 43,
+        "sha256": "8388f9a3263ac7ffb1feb3bd35ebe54c9d706ba54198b6461a3f4b63d75c90e6"
+      },
+      "src/patchharbor/parser.py": {
+        "bytes": 4853,
+        "lines": 164,
+        "sha256": "4f3bbdb624f9429ef068128d62e44ff748f57302bd5af7070e52bb7b05ca118d"
+      },
+      "src/patchharbor/patch_inspection.py": {
+        "bytes": 6918,
+        "lines": 161,
+        "sha256": "ca825917144762892e3d256e21cc00d11063dca54cc1bb5c640e8666de9b6642"
+      },
+      "src/patchharbor/patch_manifest.py": {
+        "bytes": 4731,
+        "lines": 149,
+        "sha256": "7031bc6e8672818da3dab6623ab1919846bb3af36d07261b4250902014deb484"
+      },
+      "src/patchharbor/patch_pack.py": {
+        "bytes": 10575,
+        "lines": 175,
+        "sha256": "fa755972c9affc763e8273561e8bb6d2df3ba7357e364f3b72e3fc71329f52f4"
+      },
+      "src/patchharbor/patch_package.py": {
+        "bytes": 6954,
+        "lines": 184,
+        "sha256": "d099e676174c7bc32e84640eab33fc78744ac061aadf2cf826db26f1daec136f"
+      },
+      "src/patchharbor/payload_files.py": {
+        "bytes": 6207,
+        "lines": 185,
+        "sha256": "6981eb1740fa265bc77ab2d104fe2aeed6ebf36f44ff1e868b5933a34a506bc2"
+      },
+      "src/patchharbor/payload_modes.py": {
+        "bytes": 1633,
+        "lines": 37,
+        "sha256": "09904e21b8b73da5552773937dc32665d4745d620cb19e032d56b579f4343488"
+      },
+      "src/patchharbor/platform/__init__.py": {
+        "bytes": 862,
+        "lines": 32,
+        "sha256": "d4ac6617c276ba5dd0f1841f47339ef3127eb621180b228197e4d954d5755cfc"
+      },
+      "src/patchharbor/platform/archive.py": {
+        "bytes": 6666,
+        "lines": 148,
+        "sha256": "c9386d5558ff597bd5da53103821017c84b811d28b4e36bd733df5d494326c99"
+      },
+      "src/patchharbor/platform/cifs.py": {
+        "bytes": 1897,
+        "lines": 50,
+        "sha256": "65f2bc34fdb309da1369325d91e72f60bf8349df1070da10afb6c8da73e83c27"
+      },
+      "src/patchharbor/platform/directories.py": {
+        "bytes": 1516,
+        "lines": 36,
+        "sha256": "abc1301ec14770c33a555ee0cf64e72bf98bd97e392871672e570aa0b528933e"
+      },
+      "src/patchharbor/platform/environment.py": {
+        "bytes": 4281,
+        "lines": 114,
+        "sha256": "253f2a1237f3239e9e6a967e198a0dd74455a25c8f6221e3900a766568077632"
+      },
+      "src/patchharbor/platform/errors.py": {
+        "bytes": 1353,
+        "lines": 34,
+        "sha256": "dfadb1e8caeec79bf769a2524a99b411bdc113d95a045c97f3f19b14224e8c3f"
+      },
+      "src/patchharbor/platform/file_handles.py": {
+        "bytes": 3427,
+        "lines": 76,
+        "sha256": "a0d5d2b08da26e9d11043b195c0080073a3f2940a9978fb168111b2968a05248"
+      },
+      "src/patchharbor/platform/file_times.py": {
+        "bytes": 2613,
+        "lines": 75,
+        "sha256": "02bcedeb2666d5f332a76e5070379dcbf2fc2994f3b0e9beae63dde79339982c"
+      },
+      "src/patchharbor/platform/filesystem.py": {
+        "bytes": 20502,
+        "lines": 554,
+        "sha256": "4b24a5276bd27ebddbc5bbbbbe9284f254de7be3d7dfff5e174d9d8cabe02ef8"
+      },
+      "src/patchharbor/platform/lifecycle.py": {
+        "bytes": 6316,
+        "lines": 204,
+        "sha256": "dae8bc5f1c94f22f71013d996c969541a001fafd60df37efd27e87abda4b26f6"
+      },
+      "src/patchharbor/platform/locking.py": {
+        "bytes": 2752,
+        "lines": 100,
+        "sha256": "ba1002e134adbd8445e4bbac6b9521afffdc86d49201ec1b8cf3ea0e1e836653"
+      },
+      "src/patchharbor/platform/pack_output.py": {
+        "bytes": 9655,
+        "lines": 222,
+        "sha256": "77aff9f2a57c5555891eb3296ba3b116dd144cdb11be1e09f418d7bea90cbe11"
+      },
+      "src/patchharbor/platform/paths.py": {
+        "bytes": 1549,
+        "lines": 58,
+        "sha256": "d8326ca798a7d1f4e43f50573387c3dd5b590d135781b88017ef35e775ce47bd"
+      },
+      "src/patchharbor/platform/posix.py": {
+        "bytes": 1402,
+        "lines": 53,
+        "sha256": "56973f5c58dc3f5bd73db9be19de9b81410cd9872b1a6dba5d1371ff8447ade3"
+      },
+      "src/patchharbor/platform/private_directory.py": {
+        "bytes": 4791,
+        "lines": 98,
+        "sha256": "8c80eaf7b5e6c292ccc8b67846a580c048c3a22cc0d630410fdafce2dd599996"
+      },
+      "src/patchharbor/platform/runtime.py": {
+        "bytes": 684,
+        "lines": 22,
+        "sha256": "3b4c259691ab6c4db614ed2c257c6abfb39ec56ea25a6ed2183b0c748b657f7b"
+      },
+      "src/patchharbor/platform/source_tree.py": {
+        "bytes": 9325,
+        "lines": 198,
+        "sha256": "92b2211704d4357b8d25d18b04032e39416771eca5dd7c26b108c7dd2c60f9aa"
+      },
+      "src/patchharbor/platform/windows.py": {
+        "bytes": 8095,
+        "lines": 252,
+        "sha256": "e73a0b88b73e94c14bea76e028632cb2662d304c3dfb442aa11ffeb5b20581ae"
+      },
+      "src/patchharbor/presentation.py": {
+        "bytes": 21533,
+        "lines": 565,
+        "sha256": "c5ba4ba98d6e3d310184442b274cd2f03337dca03dbd3c36c88815b89670709e"
+      },
+      "src/patchharbor/progress.py": {
+        "bytes": 2571,
+        "lines": 88,
+        "sha256": "34155f20d459a629063a72fad50d6baab0920346f2475c17b80467d43c6f3e94"
+      },
+      "src/patchharbor/pyz_artifact.py": {
+        "bytes": 6906,
+        "lines": 149,
+        "sha256": "3397d1d413b7f3728a7acf1bd4a7e17db7e046759e2376454f63f796150fdc57"
+      },
+      "src/patchharbor/registration.py": {
+        "bytes": 17377,
+        "lines": 525,
+        "sha256": "cf1a454c19ee75d8092d55e5b2fcc5b0152f3184d2bfae3a9ac7b1e13d72dbf2"
+      },
+      "src/patchharbor/registry.py": {
+        "bytes": 8348,
+        "lines": 239,
+        "sha256": "d66767b3759fbff4a6e66cbfe56837d1a0b6924375fb28daf8e016d28442ab26"
+      },
+      "src/patchharbor/repository.py": {
+        "bytes": 11941,
+        "lines": 357,
+        "sha256": "6a50a372e60f543faa6aa6f2a31633c8aae8427cb580d5e5b4c55e464aeab70d"
+      },
+      "src/patchharbor/repository_paths.py": {
+        "bytes": 3311,
+        "lines": 94,
+        "sha256": "1c4f78ee82c87bf365ca42b533c5152322be7f67f14e6e6b4665142e5c1bcaa3"
+      },
+      "src/patchharbor/repository_state.py": {
+        "bytes": 11683,
+        "lines": 337,
+        "sha256": "a920fb552575b7898dfcc0175f031c64b83a39d3134d022f43c45258c7f2aec7"
+      },
+      "src/patchharbor/resource_policy.py": {
+        "bytes": 2531,
+        "lines": 73,
+        "sha256": "1bf88e372252f5f6b5fbb4c4308426e227f4d0d26362a48696231762cd64d14f"
+      },
+      "src/patchharbor/result_bundle.py": {
+        "bytes": 22378,
+        "lines": 608,
+        "sha256": "75ef50d49cc5ed344af3d8260e01e10393b84504acb0089132dd614d325d6941"
+      },
+      "src/patchharbor/result_bundle_capture.py": {
+        "bytes": 2965,
+        "lines": 94,
+        "sha256": "dafc7954feafb6316a6b6e06dd0a451c1527757ab49e142061c308faae44702f"
+      },
+      "src/patchharbor/result_bundle_handoff.py": {
+        "bytes": 2221,
+        "lines": 49,
+        "sha256": "af95cf23aa8e1826eace150b1ef50d514c155789acc85316a0f63a12652cec0e"
+      },
+      "src/patchharbor/result_bundle_publication.py": {
+        "bytes": 12961,
+        "lines": 365,
+        "sha256": "3bbcfeb6835705a21222972d74f16b2a6a12108719a5874ab975ac067a8e11cf"
+      },
+      "src/patchharbor/result_bundle_snapshot.py": {
+        "bytes": 6286,
+        "lines": 181,
+        "sha256": "2cabe781f175267e39d893e42df0c178a86faa3501494c134a1802c2ff18114a"
+      },
+      "src/patchharbor/result_bundle_target.py": {
+        "bytes": 7801,
+        "lines": 222,
+        "sha256": "c4ab45b6f51d2f1d7442b2e2e3a4675c3ad4594a1b8d50f3549a3ebb34a7f58f"
+      },
+      "src/patchharbor/result_bundle_writer.py": {
+        "bytes": 4137,
+        "lines": 117,
+        "sha256": "55cc0fbdba5150fc1f744d6dec8b974d89a2e9d176985dfb2f34475c612bbcd3"
+      },
+      "src/patchharbor/result_pyz.py": {
+        "bytes": 6265,
+        "lines": 110,
+        "sha256": "8944235ad4125dd43bbb4471a08341cdb84440c8e3afe8f22606e0f98940e608"
+      },
+      "src/patchharbor/result_reader.py": {
+        "bytes": 24971,
+        "lines": 450,
+        "sha256": "ccf2448f8cc272facdfe0b53aa10e49ec2d690c68bbf372aa5f6022cf17477eb"
+      },
+      "src/patchharbor/result_resources.py": {
+        "bytes": 7199,
+        "lines": 147,
+        "sha256": "e339f048c7790c3733daa74e6cbaa1684648f3831dd6109d2a8eb8545e1ed4d0"
+      },
+      "src/patchharbor/result_runtime.py": {
+        "bytes": 11790,
+        "lines": 203,
+        "sha256": "3e8012f08d72052464e015a7e24cbedb694bbc74c3e397cec944024ddafffa5d"
+      },
+      "src/patchharbor/result_verification.py": {
+        "bytes": 5505,
+        "lines": 113,
+        "sha256": "bacd9687bf1d545b7bfca35c36f301a81e7c5f3e95f243066875c3ec4de13b1c"
+      },
+      "src/patchharbor/run_log.py": {
+        "bytes": 3616,
+        "lines": 121,
+        "sha256": "512d39af2aa573a6173e7e8800ea68ace89d5662ac26fab0ef7c312dca6cfbca"
+      },
+      "src/patchharbor/run_report.py": {
+        "bytes": 36544,
+        "lines": 1024,
+        "sha256": "6fbd2b5ab180e0bf6df6ecd3ebe500724c9c2eaaa310ce4ef95aa701c951f87d"
+      },
+      "src/patchharbor/runtime_artifact.py": {
+        "bytes": 3630,
+        "lines": 91,
+        "sha256": "f051f21035953f8c5ab004eb6c73044c06537de390ae1290fd42a6f094b7a6f7"
+      },
+      "src/patchharbor/runtime_pyz.py": {
+        "bytes": 14855,
+        "lines": 279,
+        "sha256": "5504df8fa652c1cbd8f85644d7a9cb7d3cdcec0866499c188d512bbd332a771c"
+      },
+      "src/patchharbor/runtime_sources.py": {
+        "bytes": 3129,
+        "lines": 75,
+        "sha256": "54869ebc7671d79661cd5eaf7a874ae18983c0234ca0b114a7998f6464233326"
+      },
+      "src/patchharbor/runtime_wheel.py": {
+        "bytes": 15712,
+        "lines": 329,
+        "sha256": "3daa772606b20ef63756be2d739b88caf4882c8504701dda78d879efe9e276f4"
+      },
+      "src/patchharbor/runtime_zip.py": {
+        "bytes": 1665,
+        "lines": 34,
+        "sha256": "5591ffbf68545b5e66f307bb10f37ed7f7a3becb1f0ee53b8200e054c6f58a8f"
+      },
+      "src/patchharbor/sources.py": {
+        "bytes": 5539,
+        "lines": 157,
+        "sha256": "3e704d2af048087c9da2d7fba6ec5d5e30a21e1acedd6a8324ca30e7feab8bc5"
+      },
+      "src/patchharbor/state_fingerprint.py": {
+        "bytes": 3042,
+        "lines": 116,
+        "sha256": "79e15d44d1503a6984bb675abfe2e5617df1c8ff073e7f72edcab7d1ee021741"
+      },
+      "src/patchharbor/temporary_resources.py": {
+        "bytes": 2612,
+        "lines": 81,
+        "sha256": "4d0b979500660fbccef9e827ca56a9ffd4604c96831fa6d3b8fd330b86c99b4b"
+      },
+      "src/patchharbor/user_paths.py": {
+        "bytes": 3961,
+        "lines": 123,
+        "sha256": "0b1264b86a2cb783644ce5de6df0fb02ecb6a684da04842a624f957b58f939a6"
+      },
+      "src/patchharbor/watch_contract.py": {
+        "bytes": 4135,
+        "lines": 117,
+        "sha256": "8c2f406b5257a1599335da71b74ed63ba91c434f7242d91dd9672af13dd7d57c"
+      },
+      "src/patchharbor/zip_payloads.py": {
+        "bytes": 11284,
+        "lines": 329,
+        "sha256": "38adcb94c843bc70e14b975deed93f15ba1d78ef3aa8e4c6bc6fb5cf0ec2d162"
+      },
+      "src/patchharbor_watcher/__init__.py": {
+        "bytes": 147,
+        "lines": 4,
+        "sha256": "017167942313e2f3ca854d10c3982ca22bea4dc06c0ef27523c0b6892398ce22"
+      },
+      "src/patchharbor_watcher/apply_boundary.py": {
+        "bytes": 2691,
+        "lines": 83,
+        "sha256": "a1e058920d6e203fd9d884831b8d5d231818340d9435b78dbc6e80ce6bb7684d"
+      },
+      "src/patchharbor_watcher/cli.py": {
+        "bytes": 3297,
+        "lines": 95,
+        "sha256": "9c33cfa2d4d389e4c3a58a303715cef15276c3175aa4f21baf87b86ee5ad22fa"
+      },
+      "src/patchharbor_watcher/events.py": {
+        "bytes": 6625,
+        "lines": 171,
+        "sha256": "1eb831f739e6bcf56c75c224e98b5cde325512df4fa1df7c525792f37750f3f4"
+      },
+      "src/patchharbor_watcher/lifecycle.py": {
+        "bytes": 2073,
+        "lines": 62,
+        "sha256": "0f1e4f6c86a9d2ffabc698d1cdf3fd3852f228eba48b59dad3e5e60e0f5387b2"
+      },
+      "src/patchharbor_watcher/loop.py": {
+        "bytes": 11595,
+        "lines": 324,
+        "sha256": "e9ad1d0fe76e44c7469aa53bdb617e3e9fb9363bac61a5dac4d8169aa2267cb2"
+      },
+      "src/patchharbor_watcher/observation.py": {
+        "bytes": 2596,
+        "lines": 62,
+        "sha256": "e011b39389d332809f900e761c109fdd6434e21a3d6a31a7ac1bcb22b0873c26"
+      },
+      "src/patchharbor_watcher/platform/__init__.py": {
+        "bytes": 772,
+        "lines": 16,
+        "sha256": "e9f6c6a4533783ec4115b3a31eb29953c54f7b7f3262ce6ff2a332109625834a"
+      },
+      "src/patchharbor_watcher/platform/linux.py": {
+        "bytes": 7555,
+        "lines": 168,
+        "sha256": "c52d91da52b2b0e22bb09d9a21182af8d49efb0149d17db5360751ef13aec790"
+      },
+      "src/patchharbor_watcher/platform/windows.py": {
+        "bytes": 12842,
+        "lines": 272,
+        "sha256": "5fbd767c69c20f45eb89030ab7ca67815fdfdd320802bfca681d80b77762406f"
+      },
+      "src/patchharbor_watcher/protocol.py": {
+        "bytes": 4552,
+        "lines": 107,
+        "sha256": "97cf830e784aa3e24f4b105239220c950a35bf1a8f3f020b9a72ff0bd6b4d268"
+      },
+      "src/patchharbor_watcher/scheduling.py": {
+        "bytes": 3483,
+        "lines": 96,
+        "sha256": "d93fdd471cd20173e0987bc233cc5ee71c63dc72623ad32b6a9ad0acaebef291"
+      },
+      "src/patchharbor_watcher/systemd_linux.py": {
+        "bytes": 3578,
+        "lines": 107,
+        "sha256": "e22938279953571745eb39bb98a9128ec07193e1f6bf27a530b5513d6e450383"
+      },
+      "src/patchharbor_watcher/worker.py": {
+        "bytes": 2622,
+        "lines": 58,
+        "sha256": "30864ea0d856ad614fd25ed075264f9a88549de67a25dcaf112a0fc130ceb565"
+      }
+    },
+    "production_python": {
+      "bytes": 886435,
+      "files": 116,
+      "lines": 23194
+    },
+    "test_python_excluding_fixtures": {
+      "bytes": 1513664,
+      "files": 155,
+      "lines": 37317
+    },
+    "test_support_python": {
+      "bytes": 55077,
+      "files": 17,
+      "lines": 1439
+    },
+    "test_to_test_static_import_edges": [
+      [
+        "tests.test_archive_maintenance",
+        "tests.test_exchange_archive_e2e"
+      ],
+      [
+        "tests.test_archive_maintenance",
+        "tests.test_exchange_e2e"
+      ],
+      [
+        "tests.test_bootstrap_python_compat",
+        "tests.test_python_compat"
+      ],
+      [
+        "tests.test_bootstrap_python_compat",
+        "tests.test_python_variants"
+      ],
+      [
+        "tests.test_bundle_handoff_e2e",
+        "tests.test_exchange_e2e"
+      ],
+      [
+        "tests.test_bundle_suffix_e2e",
+        "tests.test_exchange_e2e"
+      ],
+      [
+        "tests.test_captured_reference",
+        "tests.test_patch_inspection"
+      ],
+      [
+        "tests.test_captured_reference",
+        "tests.test_reference_validation"
+      ],
+      [
+        "tests.test_exchange_archive_e2e",
+        "tests.test_exchange_e2e"
+      ],
+      [
+        "tests.test_exchange_recovery",
+        "tests.test_archive_maintenance"
+      ],
+      [
+        "tests.test_exchange_recovery",
+        "tests.test_exchange_e2e"
+      ],
+      [
+        "tests.test_exchange_recovery",
+        "tests.test_exchange_recovery_e2e"
+      ],
+      [
+        "tests.test_exchange_recovery",
+        "tests.test_exchange_state"
+      ],
+      [
+        "tests.test_exchange_recovery_e2e",
+        "tests.test_exchange_archive_e2e"
+      ],
+      [
+        "tests.test_exchange_recovery_e2e",
+        "tests.test_exchange_e2e"
+      ],
+      [
+        "tests.test_pack_api",
+        "tests.test_captured_reference"
+      ],
+      [
+        "tests.test_pack_api",
+        "tests.test_pack_sources"
+      ],
+      [
+        "tests.test_pack_candidate",
+        "tests.test_captured_reference"
+      ],
+      [
+        "tests.test_pack_candidate",
+        "tests.test_reference_validation"
+      ],
+      [
+        "tests.test_pack_cli",
+        "tests.test_pack_api"
+      ],
+      [
+        "tests.test_pack_examples",
+        "tests.test_pyz_result_e2e"
+      ],
+      [
+        "tests.test_pack_examples",
+        "tests.test_runtime_packaging"
+      ],
+      [
+        "tests.test_patch_inspection_errors",
+        "tests.test_patch_inspection"
+      ],
+      [
+        "tests.test_python_compat",
+        "tests.test_pack_api"
+      ],
+      [
+        "tests.test_python_variants",
+        "tests.test_reference_validation"
+      ],
+      [
+        "tests.test_pyz_bootstrap",
+        "tests.test_pack_api"
+      ],
+      [
+        "tests.test_pyz_bootstrap",
+        "tests.test_reference_validation"
+      ],
+      [
+        "tests.test_pyz_bootstrap",
+        "tests.test_runtime_pyz"
+      ],
+      [
+        "tests.test_pyz_measurements",
+        "tests.test_pack_api"
+      ],
+      [
+        "tests.test_pyz_resources",
+        "tests.test_pack_api"
+      ],
+      [
+        "tests.test_pyz_resources",
+        "tests.test_runtime_pyz"
+      ],
+      [
+        "tests.test_pyz_result_e2e",
+        "tests.test_runtime_packaging"
+      ],
+      [
+        "tests.test_pyz_result_resources",
+        "tests.test_pyz_resources"
+      ],
+      [
+        "tests.test_pyz_result_resources",
+        "tests.test_reference_validation"
+      ],
+      [
+        "tests.test_pyz_result_resources",
+        "tests.test_result_runtime_writer"
+      ],
+      [
+        "tests.test_reference_validation",
+        "tests.test_patch_inspection"
+      ],
+      [
+        "tests.test_reference_validation_errors",
+        "tests.test_reference_validation"
+      ],
+      [
+        "tests.test_repository_configuration_acceptance",
+        "tests.test_api_e2e"
+      ],
+      [
+        "tests.test_repository_configuration_e2e",
+        "tests.test_api_e2e"
+      ],
+      [
+        "tests.test_repository_validation",
+        "tests.test_reference_validation"
+      ],
+      [
+        "tests.test_result3_embedded_bootstrap",
+        "tests.test_pack_api"
+      ],
+      [
+        "tests.test_result3_embedded_bootstrap",
+        "tests.test_reference_validation"
+      ],
+      [
+        "tests.test_result3_publication_policy",
+        "tests.test_result_bundle_publication"
+      ],
+      [
+        "tests.test_result3_publication_policy",
+        "tests.test_result_runtime_writer"
+      ],
+      [
+        "tests.test_result_file_handles",
+        "tests.test_result_bundle_publication"
+      ],
+      [
+        "tests.test_result_file_handles",
+        "tests.test_result_verification"
+      ],
+      [
+        "tests.test_result_file_limits",
+        "tests.test_reference_validation"
+      ],
+      [
+        "tests.test_result_file_limits",
+        "tests.test_result_bundle_publication"
+      ],
+      [
+        "tests.test_result_file_limits",
+        "tests.test_runtime_pyz"
+      ],
+      [
+        "tests.test_result_format2",
+        "tests.test_exchange_archive_e2e"
+      ],
+      [
+        "tests.test_result_format2",
+        "tests.test_exchange_e2e"
+      ],
+      [
+        "tests.test_result_format2",
+        "tests.test_exchange_recovery_e2e"
+      ],
+      [
+        "tests.test_result_format2",
+        "tests.test_reference_validation"
+      ],
+      [
+        "tests.test_result_format2",
+        "tests.test_runtime_artifact"
+      ],
+      [
+        "tests.test_result_format3",
+        "tests.test_reference_validation"
+      ],
+      [
+        "tests.test_result_format3",
+        "tests.test_runtime_pyz"
+      ],
+      [
+        "tests.test_result_format3_consumers",
+        "tests.test_exchange_archive_e2e"
+      ],
+      [
+        "tests.test_result_format3_consumers",
+        "tests.test_exchange_e2e"
+      ],
+      [
+        "tests.test_result_format3_consumers",
+        "tests.test_exchange_recovery_e2e"
+      ],
+      [
+        "tests.test_result_format3_consumers",
+        "tests.test_reference_validation"
+      ],
+      [
+        "tests.test_result_format3_consumers",
+        "tests.test_result_format3"
+      ],
+      [
+        "tests.test_result_format3_consumers",
+        "tests.test_result_robustness"
+      ],
+      [
+        "tests.test_result_robustness",
+        "tests.test_exchange_archive_e2e"
+      ],
+      [
+        "tests.test_result_robustness",
+        "tests.test_exchange_e2e"
+      ],
+      [
+        "tests.test_result_robustness",
+        "tests.test_patch_inspection"
+      ],
+      [
+        "tests.test_result_robustness",
+        "tests.test_reference_validation"
+      ],
+      [
+        "tests.test_result_robustness",
+        "tests.test_result_format2"
+      ],
+      [
+        "tests.test_result_robustness",
+        "tests.test_runtime_artifact"
+      ],
+      [
+        "tests.test_result_runtime_publication",
+        "tests.test_result_runtime_writer"
+      ],
+      [
+        "tests.test_result_runtime_roundtrip",
+        "tests.test_runtime_packaging"
+      ],
+      [
+        "tests.test_result_runtime_writer",
+        "tests.test_runtime_pyz"
+      ],
+      [
+        "tests.test_result_verification",
+        "tests.test_result_bundle_publication"
+      ],
+      [
+        "tests.test_result_verification",
+        "tests.test_result_runtime_writer"
+      ],
+      [
+        "tests.test_runtime_bootstrap",
+        "tests.test_result_runtime_writer"
+      ],
+      [
+        "tests.test_runtime_packaging",
+        "tests.test_patch_inspection"
+      ],
+      [
+        "tests.test_runtime_robustness",
+        "tests.test_runtime_artifact"
+      ],
+      [
+        "tests.test_test_isolation",
+        "tests.test_docker_integration_runner"
+      ],
+      [
+        "tests.test_test_mode_verification",
+        "tests.test_test_evidence"
+      ],
+      [
+        "tests.test_watch_targets_e2e",
+        "tests.test_api_e2e"
+      ],
+      [
+        "tests.test_watcher_event_loop_e2e",
+        "tests.test_api_e2e"
+      ],
+      [
+        "tests.test_watcher_event_loop_e2e",
+        "tests.test_watcher_scheduling"
+      ],
+      [
+        "tests.test_watcher_events_native",
+        "tests.test_watcher_events"
+      ]
+    ],
+    "tracked_files": 354
+  },
+  "before_commit": "caad28b84bdf9461c98cf8a218061e06ff894074",
+  "format_version": 1,
+  "generated_scope": "Embedded CHAT bootstrap and workflow matrices are counted separately from authored programs. Build-only PYZ identities/resources are not tracked Python sources. Frozen fixture binaries are excluded from Python source totals.",
+  "method": "Tracked regular Git blobs; physical splitlines including blanks/comments. Static AST imports only; unique directed test-module edges. No dynamic import/runtime/performance measurement.",
+  "removed_production_files": {
+    "src/patchharbor/result_runtime.py": {
+      "bytes": 11790,
+      "lines": 203,
+      "sha256": "3e8012f08d72052464e015a7e24cbedb694bbc74c3e397cec944024ddafffa5d"
+    },
+    "src/patchharbor/runtime_artifact.py": {
+      "bytes": 3630,
+      "lines": 91,
+      "sha256": "f051f21035953f8c5ab004eb6c73044c06537de390ae1290fd42a6f094b7a6f7"
+    },
+    "src/patchharbor/runtime_wheel.py": {
+      "bytes": 15712,
+      "lines": 329,
+      "sha256": "3daa772606b20ef63756be2d739b88caf4882c8504701dda78d879efe9e276f4"
+    }
+  },
+  "removed_scripts": {
+    "scripts/runtime_bootstrap.py": {
+      "bytes": 12112,
+      "lines": 222,
+      "sha256": "5ed65a2022c56bdf862731116ff142aa9c9b3f040139ac91f6a723526703c26e"
+    }
+  },
+  "removed_test_files": [
+    "tests/bootstrap_process.py",
+    "tests/fixtures/result_format1/archive_evidence.py",
+    "tests/fixtures/result_format1/exchange.py",
+    "tests/fixtures/result_format1/patch_inspection.py",
+    "tests/fixtures/result_format1/provenance.json",
+    "tests/fixtures/result_format1/result_reader.py",
+    "tests/fixtures/result_format2/patchharbor-1.2.1-py3-none-any.whl",
+    "tests/fixtures/result_format2/provenance.json",
+    "tests/fixtures/result_runtime_unavailable.json",
+    "tests/test_result_format2.py",
+    "tests/test_runtime_artifact.py",
+    "tests/test_runtime_robustness.py"
+  ]
+}

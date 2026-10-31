@@ -13,9 +13,12 @@ import re
 from typing import Callable, Mapping
 from zipfile import BadZipFile, ZIP_STORED, ZipFile, ZipInfo
 
-from .runtime_wheel import (
+from .runtime_profile import (
     RuntimeDataError, RuntimeLimitError, RuntimeEntry, recipe_json, sha256,
-    _require, _unique, _constant, _HEX, _VERSION, _SEGMENT, CHAT_PATH, DOC_PATH,
+    require_recipe as _require, unique_recipe_object as _unique,
+    reject_recipe_constant as _constant, SHA256_PATTERN as _HEX,
+    VERSION_PATTERN as _VERSION, PATH_SEGMENT_PATTERN as _SEGMENT,
+    RESOURCE_ROOT, CHAT_PATH, DOC_PATH,
 )
 from .runtime_zip import bounded_directory
 
@@ -25,7 +28,6 @@ CONTENT_ALGORITHM = 'patchharbor-pyz-content-v1'
 PRODUCER_ALGORITHM = 'patchharbor-pyz-producer-v1'
 RECIPE_PATH = 'patchharbor/_runtime/pyz-recipe.json'
 IDENTITY_PATH = 'patchharbor/_pyz_identity.py'
-RESOURCE_ROOT = 'patchharbor/_runtime/'
 LICENSE_PATH = RESOURCE_ROOT + 'LICENSE'
 MAIN_PATH = RESOURCE_ROOT + 'pyz-main.py'
 MAX_RECIPE_BYTES = 1024 * 1024

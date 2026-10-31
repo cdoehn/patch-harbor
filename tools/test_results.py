@@ -36,7 +36,8 @@ def validate(document: dict, *, collection_only: bool = False) -> tuple:
     A skip is not a passed test. It remains visible in the signature; a changed
     skip, missing test or changed bound input cannot match a serial reference.
     """
-    if (not isinstance(document, dict) or document.get("format_version") != 1
+    if (not isinstance(document, dict) or type(document.get('format_version')) is not int
+            or document['format_version'] not in (1, 2)
             or type(document.get("exitstatus")) is not int or document["exitstatus"] != 0
             or document.get("errors") != [] or not isinstance(document.get("binding"), dict)
             or not document["binding"] or not isinstance(document.get("run_id"), str)
@@ -58,6 +59,20 @@ def validate(document: dict, *, collection_only: bool = False) -> tuple:
         if ids is not None and ids != worker_ids:
             raise EvidenceError("Worker collections differ")
         ids = worker_ids
+    if document['format_version'] == 2:
+        proofs = document.get('proofs')
+        if not isinstance(proofs, dict) or set(proofs) - set(ids):
+            raise EvidenceError('Proof assignments missing or outside the collection')
+        identities = []
+        for proof in proofs.values():
+            if (not isinstance(proof, dict) or set(proof) != {'id', 'variant'}
+                    or not all(isinstance(value, str) and value for value in proof.values())):
+                raise EvidenceError('Invalid proof identity or variant')
+            identities.append((proof['id'], proof['variant']))
+        if len(identities) != len(set(identities)):
+            raise EvidenceError('Duplicate acceptance proof variant')
+    elif 'proofs' in document:
+        raise EvidenceError('Format-1 evidence cannot contain format-2 proof assignments')
     skips = _collection_reports(document.get("collection_reports"))
     if set(ids) & {i for i, _ in skips}:
         raise EvidenceError("Collection skip also appears as a runnable test")
@@ -81,6 +96,8 @@ def validate(document: dict, *, collection_only: bool = False) -> tuple:
                 or end.get("collection") != collections[worker]
                 or _collection_reports(end.get("collection_reports")) != skips):
             raise EvidenceError("Worker result, binding or collection missing or inconsistent")
+        if document['format_version'] == 2 and end.get('proofs') != document['proofs']:
+            raise EvidenceError('Worker proof assignments missing or inconsistent')
         received = [r for r in reports if isinstance(r, dict) and r.get("worker") == worker]
         if end.get("report_count") != len(received) or end.get("reports_sha256") != report_digest(received):
             raise EvidenceError("Worker report delivery is incomplete")
@@ -131,3 +148,6 @@ def equivalent(reference: dict, actual: dict) -> None:
         raise EvidenceError("Inputs or interpreter differ")
     if validate(reference) != validate(actual):
         raise EvidenceError("Test IDs, results, subtests or skips differ")
+    if (reference['format_version'] != actual['format_version']
+            or reference.get('proofs') != actual.get('proofs')):
+        raise EvidenceError('Evidence format or proof assignments differ')

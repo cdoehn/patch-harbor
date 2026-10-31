@@ -18,9 +18,9 @@ from scripts import pyz_bootstrap as bootstrap
 from patchharbor import api, runtime_pyz as pyz
 from tests.result_pyz_support import attach_pyz
 from tests.result_runtime_support import edit_metadata
-from tests.test_pack_api import request_files
-from tests.test_runtime_pyz import inputs, prepared
-from tests.test_reference_validation import reference_entries, write_reference, edit_document
+from tests.pack_support import request_files
+from tests.runtime_pyz_support import inputs, prepared
+from tests.reference_support import reference_entries, write_reference, edit_document
 
 
 @pytest.fixture
@@ -166,10 +166,10 @@ def test_budgets_precede_zipfile_inventory_allocation(reference,monkeypatch,faul
 
 
 @pytest.mark.parametrize('version',[1,2])
-def test_legacy_result_selects_explicit_previous_path(reference,version):
+def test_unsupported_result_never_selects_an_execution_fallback(reference,version):
     path,files,_=reference
     edit_document(files,'manifest.json',lambda d:d.update(format_version=version));write_reference(path,files)
-    with pytest.raises(bootstrap.BootstrapUnavailable):trusted(path)
+    with pytest.raises(ValueError):trusted(path)
 
 
 def test_unavailable_runtime_does_not_erase_or_repair_the_original_result(reference):

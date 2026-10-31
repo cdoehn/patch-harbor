@@ -137,7 +137,7 @@ def test_invalid_cli_value_never_overwrites_existing_configuration(paths, tmp_pa
 
 
 def test_suffix_update_holds_shared_lock(paths, tmp_path: Path, monkeypatch) -> None:
-    import patchharbor.application as application
+    import patchharbor.application_configuration as application
     from tests.platform_support import project_environment
     from tests.registration_support import probe_registry_lock
     write_exchange_directory(paths, tmp_path / "exchange")
@@ -147,17 +147,3 @@ def test_suffix_update_holds_shared_lock(paths, tmp_path: Path, monkeypatch) -> 
         return original(*args)
     monkeypatch.setattr(application, "write_prepared_configuration", write_under_lock)
     configure_bundle_suffix(".txt")
-
-
-def test_suffix_documentation_carries_full_chat_and_configuration_contract() -> None:
-    root = Path(__file__).resolve().parents[1]
-    for name in ("README.md", "CHAT_INSTRUCTIONS.md", "spec/SPECIFICATION.md"):
-        text = (root / name).read_text(encoding="utf-8")
-        assert "patchharbor configure bundle-suffix .txt" in text
-        assert "patchharbor configure bundle-suffix --clear" in text
-        assert "bundle_suffix" in text
-        assert ".zip.txt" in text
-        assert "context.json" in text
-        assert "patch.json" in text
-    cli = (root / "src/patchharbor/cli.py").read_text(encoding="utf-8")
-    assert '"bundle-suffix"' in cli

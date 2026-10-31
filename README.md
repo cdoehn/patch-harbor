@@ -1,4 +1,4 @@
-# PatchHarbor 1.4.0
+# PatchHarbor 1.6.0
 
 **A bridge between AI coding assistants and local Git repositories.**
 
@@ -19,48 +19,57 @@ It bridges these separate environments using verified ZIP packages, allowing AI 
 - `bundle` captures the repository state for AI-assisted development.
 - `pack` creates verified patch packages from selected files and a Result reference.
 - `apply` validates and executes explicitly prepared patches.
+- `api.read_result_snapshot` returns complete verified file layers without Git or writes.
+- `api.apply_guarded` requires explicit package/target binding and trusted host approval before payloads.
 - `inspect` and `validate` examine packages without executing their code.
 - An optional watcher automatically applies incoming patches after filesystem activity in the Exchange directory has settled for five seconds.
 - Result Bundles normally include an installation-free **Core-PYZ (without the watcher)**, allowing compatible AI Linux environments to work with PatchHarbor without installing it separately.
 - CLI and Python integrations share the same public API.
 
-This source tree uses version **1.4.0**. The version string, an installed version,
-and a published release are different facts. Implementation and acceptance
-evidence are recorded in the completed
-[PYZ/PACK plan](planning/pyz-pack/commit-plan.md) and
-[test matrix](planning/pyz-pack/test-matrix.md); a development checkout is not
-itself a release announcement.
+This source uses version **1.6.0**. It adds verified, read-only Result snapshots
+and an explicit host admission boundary for Apply. Both are public Python APIs
+in the normal distribution and the Core-PYZ. See the
+[integration contracts and example](docs/python-api.md#verified-result-snapshots-integration-contract-1).
+A version string does not establish a published release, a tag or an upgraded
+local installation. The [1.5.0 refactoring record](planning/1.5.0/commit-plan.md)
+and its [external acceptance](planning/1.5.0/release-acceptance.md) are preserved.
 
-The [CPython 3.10/3.11 plan](planning/python-compatibility/commit-plan.md)
-extends the public API, Core-PYZ, CLI and installed watcher while preserving old
-Results. All twelve jobs of the expanded manual
-[native CI matrix](https://github.com/cdoehn/patch-harbor/actions/runs/38596693717)
-passed on the corrected implementation before this version change, including
-Python 3.10 and 3.11 on Linux and Windows. The plan records the exact commits,
-artifact evidence and remaining release acceptance separately.
+**This source requires CPython 3.10 or newer.** The public API, Core-PYZ, CLI
+and installed watcher retain the 3.10/3.11 contract and the existing 3.12/3.14
+acceptance lanes. Exact interpreter, native CI and release evidence remain in
+the [CPython plan](planning/python-compatibility/commit-plan.md) and active plan;
+a historical successful run does not certify a later checkout.
 
-**This source requires Python 3.10 or newer.** Original 1.3.0 release artifacts
-retain their Python 3.12 minimum. Version 1.4.0 identifies the compatible release;
-use its reviewed artifacts for the new Python support.
+## Integration delivery and acceptance (1.6.0)
+
+The [integration plan](planning/specroad-integration/commit-plan.md) adds a
+read-only public Result snapshot API and a guarded host Apply boundary.
+Its [requirement matrix](planning/specroad-integration/test-matrix.md) separates
+specified contracts, local tests, actual Apply and external acceptance.
+The 1.5.0 implementation is confirmed at
+`312e8a3c003c0f9421587b92941ecea7917b5d3f`; its external release acceptance remains
+open. The four prepared stages include both APIs and an isolated built-artifact
+transport proof. Actual Apply, native CI and SpecRoad integration remain separate
+acceptance items; see the [delivery record](planning/specroad-integration/delivery.md).
 
 ## Requirements and installation
 
 This development source requires Python **3.10 or newer**. Repository operations also require Git;
 executing a patch requires its declared Bash or PowerShell interpreter.
-Static `pack`, `inspect` and reference-based `validate` need neither Git nor
-the target shell. The Core has no third-party runtime dependencies.
+Static `pack`, `inspect`, reference-based `validate` and the public snapshot
+reader need neither Git nor the target shell. The Core has no third-party runtime dependencies.
 
 For the normal CLI **and watcher**, install a reviewed wheel or source checkout.
 For example, with an existing Python 3.10+ and pipx:
 
 ```bash
-pipx install --python python3 /absolute/path/patchharbor-1.4.0-py3-none-any.whl
+pipx install --python python3 /absolute/path/patchharbor-1.6.0-py3-none-any.whl
 patchharbor --version
 patchharbor --help
 ```
 
 The wheel path is an artifact you obtain and verify; this command does not assume
-that version 1.4.0 has been published on a package index. **pipx is optional**:
+that version 1.6.0 has been published on a package index. **pipx is optional**:
 a dedicated virtual environment is another installation route. Wheel and sdist
 remain supported for normal installations; the PYZ replaces the runtime embedded
 in new Results, not the installed watcher. See
@@ -157,7 +166,11 @@ provides `import_api(prepared)` for API use without installing PatchHarbor.
 New Results use **Format 3**. When runtime embedding succeeds, they contain
 exactly one `runtime/patchharbor-<version>.pyz`. A valid `unavailable` status
 instead contains runtime metadata and a warning, with no executable artifact.
-Legacy Format-1/2 Results remain readable.
+This checkout reads **Result format 3**, preserving unchanged valid artifacts
+from **1.4.0 onward**. RF-06 removed the Result-1/2 readers, embedded runtime-wheel
+provider and wheel-installation bootstrap. Patch format 1 remains supported.
+Original 1.4.0 producer capabilities `[1, 2, 3]` remain valid metadata; the current
+producer declares `[3]`. Neither fact makes Result 1/2 a supported reference.
 
 Use the executable bootstrap from the trusted Result's handoff, or a separately
 reviewed copy of `scripts/pyz_bootstrap.py`, to assess and prepare its exact PYZ.
@@ -181,7 +194,8 @@ If the runtime is absent or technically unusable, use the
 with trusted compatible tools and record the reason. A semantic validation
 failure or invalid binding remains an error; fallback is not a bypass.
 The [bootstrap guide](docs/runtime-bootstrap.md) covers trust, extraction,
-Python-only API use and legacy wheels.
+Python-only API use and the safe runtime-unavailable fallback. Its old wheel
+procedure is retained as historical documentation.
 
 ## Manual operation and watcher
 
@@ -287,6 +301,10 @@ does not replace repository-bound Apply.
 
 ## Documentation and development
 
+- [Historical 1.5.0 refactoring plan](planning/1.5.0/commit-plan.md) and
+  [cleanup evidence](planning/1.5.0/rf12-documentation-cleanup.md): confirmed
+  progress, remaining acceptance and reproducible source measurements.
+  [Release acceptance](planning/1.5.0/release-acceptance.md) is tracked separately from source version 1.5.0.
 - [Installation and updates](docs/install-and-update.md)
 - [Repository configuration, archives, retries and permissions](docs/repository-workflow.md)
 - [Troubleshooting](docs/troubleshooting.md)
@@ -294,13 +312,22 @@ does not replace repository-bound Apply.
 - [Runtime bootstrap](docs/runtime-bootstrap.md), [Result 3](docs/result-format-3.md)
 - [Watcher](docs/watcher-events.md), [CIFS publication](docs/result-publication-cifs.md)
 - [Development tests and manual CI policy](docs/test-parallelism.md)
-- Joint requirements: [main specification](spec/SPECIFICATION.md) and
-  [PYZ/PACK extension, revision 3](spec/SPECIFICATION_EXTENSION_PYZ_PACK.md)
+- Joint requirements: [main specification](spec/SPECIFICATION.md),
+  [PYZ/PACK extension](spec/SPECIFICATION_EXTENSION_PYZ_PACK.md) and
+  [CPython extension](spec/SPECIFICATION_EXTENSION_CPYTHON_310_311.md)
 - [Implementation and acceptance record](planning/pyz-pack/commit-plan.md)
 
-For development, install `.[dev]` in a dedicated environment and run
-`python tools/run_tests.py --suite all`. Development and Apply use full parallel
-gates. GitHub CI is manual and started only by the project owner. Local tests
+For development, install `.[dev]` in a dedicated environment and run only a
+change-focused parallel selection, for example
+`python tools/run_tests.py -- tests/test_runtime_pyz.py`. Document the selection
+and its results. Apply runs the full parallel suite before every commit with
+`python tools/run_tests.py --suite all`, including the final commit of a bundle.
+GitHub CI is manual and started only by the project owner. Local tests
 do not substitute for native Windows acceptance or release publication.
 For available options, use `patchharbor --help`, `patchharbor COMMAND --help`
 and `patchharbor-watcher --help`.
+
+Current [1.6.0 integration plan](planning/specroad-integration/commit-plan.md),
+[behavior matrix](planning/specroad-integration/test-matrix.md) and
+[delivery record](planning/specroad-integration/delivery.md) separate prepared
+source, actual Apply and external acceptance.

@@ -1,8 +1,16 @@
-# Result-Format 2: festgelegter Leservertrag
+# Result-Format 2: historischer Leservertrag
+
+RF-06B hat den Format-2-Reader entfernt. Die nachfolgende Beschreibung ist historisch;
+aktuelle Reader lehnen Result 1/2 ab. [Result 3](result-format-3.md) und unveränderte
+Artefakte ab PatchHarbor 1.4.0 bleiben die unterstützte Grundlage.
 
 Historischer Stand `1.e.W`: damals erzeugten die regulären Result-Wege Format 2.
 Ab PP-06B schreibt der aktuelle Core [Result 3](result-format-3.md). Der hier
-beschriebene geschlossene Leservertrag für vorhandene Result-2-Dateien bleibt gültig.
+beschriebene geschlossene Leservertrag dokumentiert nur den Altstand.
+Ab der Kompatibilitätsbasis 1.4.0 (RF-01) besteht keine Pflicht mehr, Result 1/2
+oder deren Runtime-Wheels zu verarbeiten. Die folgenden Felder und Beispiele
+werden nicht umgedeutet; sie sind historische Dokumentation, keine aktuelle
+Freigabeforderung. Der nachfolgende Abschnitt beschreibt ausschließlich den damaligen Leser.
 Vorbereitete Standardinstallationen betten ihre Runtime ein; unvorbereiteter
 Quellbetrieb liefert `unavailable/source_not_prepared` mit Warnung. Allgemeine Referenzgültigkeit und Archiv-/Recovery-Erfolg bleiben
 getrennt. Der Leser importiert, installiert oder startet keinen Wheel-Code.
@@ -98,7 +106,12 @@ Vor Veröffentlichung wird das gesamte zusätzliche Runtime-Budget berücksichti
 Bei Runtime-Ausfall bleibt ein vollständiges Result mit Warnung und ohne Wheel möglich;
 fehlende Pflichtvorlagen und echte Snapshot-/Publikationsfehler bleiben Fehler.
 
-Positive und negative Eingaben werden in `tests/test_result_format2.py` aus
+Die folgenden historischen Testpfade wurden in RF-06 entfernt, nicht in
+ausführbare Legacy-Helfer verschoben. Aktuelle Sicherheitsnachweise und ihre
+Zuordnung stehen in [RF-06](../planning/1.5.0/rf06-legacy-removal.md);
+`tests/fixtures/compatibility_140/` enthält die unveränderte aktuelle Basis.
+
+Damals wurden positive und negative Eingaben in `tests/test_result_format2.py` aus
 festgelegten Metadaten-Fixtures und einem tatsächlich gebauten kanonischen Wheel
 erzeugt; bestehende Format-1-Referenz-, Archiv-/Recovery- und Writer-Tests bleiben.
 
@@ -118,5 +131,8 @@ Format-2-Results konservativ und wählen weder Results noch Wheels als Patch.
 
 [Result format 3](result-format-3.md) uses PYZ metadata 2 and a separate `artifact`
 contract. Its reader does not reinterpret the legacy `wheel` field. Since PP-06B
-new production uses Format 3; the legacy offline wheel/previous-handoff path
-remains supported. Old consumers conservatively retain new Results.
+new production uses Format 3. The current reader rejects Result 1/2 and the
+legacy runtime-wheel path has been removed. The
+[previous handoff procedure](runtime-bootstrap.md#mandatory-previous-procedure)
+still covers technically unavailable runtimes in otherwise supported references;
+it cannot make unsupported or invalid Results acceptable.

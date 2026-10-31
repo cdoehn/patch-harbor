@@ -66,7 +66,8 @@ passive Zielinformationen stammen aus genau diesen geprüften Bytes.
 Manifest und Handoff sind neue Dateien. Die Vorlage stammt aus den verifizierten
 Ressourcen des ausführenden Packers; die schon gerenderte Referenzanleitung wird
 nicht als neue Vorlage eingesetzt. Bekannte Zielpfade, Runtimeinformationen und
-Erfassungszeit bleiben erhalten. Unbekannte Legacy-Umgebungswerte bleiben `null`.
+Erfassungszeit bleiben erhalten. Zulässige unbekannte Umgebungswerte bleiben `null`; Pflichtdaten einer
+unterstützten Result-3-Referenz dürfen nicht fehlen.
 Fremde Pfade werden als Text verwendet und nicht auf dem Pack-Rechner aufgelöst.
 
 ## Ausgabe und Veröffentlichung

@@ -7,13 +7,13 @@ from zipfile import ZipFile
 
 import pytest
 
-from patchharbor import api, application, result_bundle, result_resources as resources
+from patchharbor import api, application_apply as application, result_bundle, result_resources as resources
 from patchharbor import pyz_artifact, runtime_pyz as pyz
 from patchharbor.result_reader import read_result_reference
 from patchharbor.resource_policy import ResourcePolicy
-from tests.test_pyz_resources import provider_for
-from tests.test_reference_validation import reference_entries, write_reference, edit_document
-from tests.test_result_runtime_writer import repository, package
+from tests.runtime_pyz_support import provider_for
+from tests.reference_support import reference_entries, write_reference, edit_document
+from tests.apply_support import repository, package
 
 
 @pytest.mark.parametrize('kind',['directory','zip'])
@@ -23,6 +23,7 @@ def test_prepared_payload_matches_strict_native_reader(monkeypatch,tmp_path,kind
     artifact=provider.capture().artifact if embedded else None
     payload=resources.runtime_payload(artifact,reason=None if embedded else 'source_not_prepared')
     files,_=reference_entries(handoff=True)
+    files = {name: raw for name, raw in files.items() if not name.startswith('runtime/')}
     files.update(dict(payload.entries()))
     edit_document(files,'manifest.json',lambda d:d.update(format_version=3,runtime=payload.document()))
     edit_document(files,'logs/run.json',lambda d:d.update(warnings=list(payload.warnings)))

@@ -22,6 +22,7 @@ from typing import TextIO
 import patchharbor.application as _application
 from patchharbor.api_types import (
     ActivityEvent, BundleResult, CandidateSelector, ConfigurationResult,
+    AdmissionCallback, PatchAdmission,
     DirectoryCandidate, GitObjectFormat, GitObjectId, OutputStreams, PackageFile,
     PrimaryResult, PrimaryResultKind, ProgressEvent, ProgressObserver,
     RegistryListResult, RegistryRepository, RegistryStatus, RepositoryContext,
@@ -31,6 +32,8 @@ from patchharbor.api_types import (
     PatchEntry, PatchEntryRole, PatchInspection, PatchManifest, PatchMessage,
     PatchValidationResult, PatchValidationScope, ReferenceContext,
     PatchPackResult,
+    IntegrationCapabilities, ResultSnapshot, ResultSnapshotError, SnapshotErrorCode,
+    SnapshotFile, SnapshotLayer, SnapshotRuntime,
     ApplyLock, ApplyLockKind, ApplyReadiness, AutomaticApplyResult,
     AutomaticApplyStatus, ExchangeWatchTarget, WatchControlPaths, WatchTargets,
 )
@@ -44,6 +47,7 @@ PathInput = str | os.PathLike[str]
 
 __all__ = [
     "ActivityEvent", "BundleResult", "CandidateSelector", "ConfigurationResult",
+    "AdmissionCallback", "PatchAdmission", "apply_guarded",
     "DEFAULT_TIMEOUT_SECONDS", "DirectoryCandidate", "ErrorKind", "FailureReason",
     "GitObjectFormat", "GitObjectId", "OutputStreams", "PackageFile", "PathInput",
     "PatchHarborError", "PrimaryResult", "PrimaryResultKind", "ProgressEvent",
@@ -60,7 +64,35 @@ __all__ = [
     "AutomaticApplyStatus", "ExchangeWatchTarget", "WatchControlPaths", "WatchTargets",
     "watch_targets", "watch_control_paths", "apply_readiness",
     "pack_patch", "PatchPackResult",
+    "IntegrationCapabilities", "ResultSnapshot", "ResultSnapshotError", "SnapshotErrorCode",
+    "SnapshotFile", "SnapshotLayer", "SnapshotRuntime", "integration_capabilities", "read_result_snapshot",
 ]
+
+
+
+def integration_capabilities() -> IntegrationCapabilities:
+    """Versioned contracts of this loaded API, separate from artifact metadata."""
+    return IntegrationCapabilities(1, 1, 1)
+
+
+def _sha256_argument(value: str, name: str) -> str:
+    if not isinstance(value, str):
+        raise TypeError(f"{name} must be text")
+    if len(value) != 64 or any(c not in "0123456789abcdef" for c in value):
+        raise ValueError(f"{name} must be a complete lowercase SHA-256")
+    return value
+
+
+def read_result_snapshot(
+    result: PathInput, *, expected_sha256: str | None = None,
+    observer: ProgressObserver | None = None,
+) -> ResultSnapshot:
+    """Fully validate and reconstruct one captured Result without writes or Git."""
+    path = _path(result, "result")
+    digest = None if expected_sha256 is None else _sha256_argument(expected_sha256, "expected_sha256")
+    from patchharbor.result_snapshot import read_result_snapshot as _read_result_snapshot
+    with _observe_activity(_observer(observer)):
+        return _read_result_snapshot(path, expected_sha256=digest)
 
 
 def pack_patch(
@@ -324,6 +356,33 @@ never writes payloads, runs the entrypoint, consumes replay or archives bundles.
             path, dry_run=dry_run, output_directory=destination,
             timeout_seconds=seconds, output=targets, current_directory=directory,
         )
+
+
+
+def apply_guarded(
+    patch: PathInput, *, expected_sha256: str, expected_repository: PathInput,
+    admission: AdmissionCallback, output_directory: PathInput | None = None,
+    timeout: float = DEFAULT_TIMEOUT_SECONDS, output: OutputStreams | None = None,
+    observer: ProgressObserver | None = None,
+) -> RunReport:
+    """Apply the captured package only after explicit trusted host admission.
+
+The callback runs once under the ordinary repository lock, before payloads,
+with immutable complete package bytes and the bound repository context.
+Only True accepts; denial/errors return the normal failure report. This is
+host code, not a sandbox. Existing diagnostic/Result effects remain possible.
+    """
+    path = _path(patch, "patch")
+    target = _path(expected_repository, "expected_repository")
+    digest = _sha256_argument(expected_sha256, "expected_sha256")
+    if not callable(admission):
+        raise TypeError("admission must be callable")
+    destination = _optional_path(output_directory, "output_directory")
+    seconds, targets = _timeout(timeout), _output(output)
+    with _observe_activity(_observer(observer)):
+        return _application.run_guarded_apply_path(path, expected_sha256=digest,
+            expected_repository=target, admission=admission, output_directory=destination,
+            timeout_seconds=seconds, output=targets)
 
 
 def dry_run(

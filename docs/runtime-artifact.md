@@ -1,4 +1,8 @@
-# Kanonische Runtimeprofile: PYZ und Legacy-Wheel
+# Kanonisches Core-PYZ-Profil und historische Wheel-Dokumentation
+
+Die nachfolgenden Runtime-Wheel-Pfade sind historisch. RF-06B hat deren
+Reader, Provider und Build-Rezepte entfernt. Aktuell gelten die [Result-3-PYZ](result-format-3.md)
+und die normale Wheel-/sdist-Installation; das Installations-Wheel bleibt erhalten.
 
 
 ## Kanonisches Core-PYZ-Profil
@@ -12,10 +16,12 @@ Das sortierte finite Inventar enthält Root-`__main__.py`, Core-Code, Typingmark
 Chatvorlage, API-Dokumentation, Lizenz und das generierte `_pyz_identity.py`.
 `__main__.py` stammt ausschließlich aus der inventarisierten Ressource
 `patchharbor/_runtime/pyz-main.py` mit gleichen Bytes. Der Einstieg prüft
-Python >=3.10 vor dem ersten Core-Import. Originale 1.3.0-Artefakte
-behalten ihren unveränderten >=3.12-Startcode und ihre ursprünglichen Hashes. Watcher, dist-info, alte generierte
+Python >=3.10 vor dem ersten Core-Import. Die Kompatibilitätsbasis für 1.5.0
+sind unveränderte 1.4.0-Artefakte. Originale 1.3.0-Artefakte bleiben historische
+Bytes, ohne fortgesetzte Supportpflicht für deren >=3.12-Variante. Watcher, dist-info, alte generierte
 Wheel-Identitäten/-Rezepte, fremde Pakete, Bytecode, Hooks und Runtime-Artefakte
-sind ausgeschlossen. Legacy-Wheel-Lesecode bleibt im Core.
+sind ausgeschlossen. RF-06 hat den Legacy-Wheel-Lesecode entfernt; unveränderte
+1.4.0-Artefakte bleiben durch die eingefrorenen Kompatibilitätsfixtures geprüft.
 
 Die Ableitung ist endlich: Producer-ID aus versioniertem Inventar ohne eigene
 Identitätsdatei; daraus feste Identitätsbytes; vollständiges Inventar samt
@@ -35,8 +41,8 @@ Der normale Build bereitet seit PP-06B ausschließlich das PYZ-Profil vor.
 Installationswheel und sdist bleiben normale Distributionsartefakte; neue Results
 enthalten genau eine PYZ oder ein begründetes unavailable ohne Artefakt.
 Alte Wheel-Identitäten/-Ressourcen werden weder in die PYZ noch in das neue
-vorbereitete Profil übernommen. Die Legacy-Buildhelfer dienen ausdrücklich den
-Tests des historischen Datenvertrags, nicht einer zweiten Produktivproduktion.
+vorbereitete Profil übernommen. Die Legacy-Wheel-Buildhelfer sind entfernt;
+historische ZIPs dienen nur noch als unveränderte negative Datenfixtures.
 Build-Helfer werden über einen privaten am Quellpfad verankerten Namensraum geladen,
 niemals aus einem zufälligen gleichnamigen Paket in CWD oder Site-Packages.
 
@@ -46,7 +52,7 @@ kompatibel. Kandidat und installierte Rezeptmaterialisierung müssen bytegleich 
 Die gemeinsame Core-Parität, eigene Ressourcen und produktive Result-Erzeugung
 werden ab PP-06B einschließlich Erstnutzung und drei Generationen geprüft.
 
-## PP-04B: herkunftsgebundene Ressourcen
+## Herkunftsgebundene Ressourcen
 
 `runtime_sources.py` bindet Ressourcen an das tatsächlich geladene Modul. Für
 Verzeichnisinstallationen prüft der gemeinsame Reader reguläre Dateien,
@@ -63,8 +69,8 @@ Auftrag verwendbar. Fehlende, ungültige und zu große Ressourcen werden getrenn
 als unavailable gemeldet; unerwartete Programmfehler und Abbrüche bleiben sichtbar.
 
 `pack` verwendet bei vorhandenem PYZ-Literal diesen Provider für seine Vorlage,
-sonst den unveränderten Legacy-Provider oder den ausdrücklich verankerten
-Source-Vertrag. Ein defektes eigenes PYZ-Profil wird nicht mit einem Wheel oder
+sonst den ausdrücklich verankerten Source-Vertrag. Der Legacy-Provider ist
+entfernt. Ein defektes eigenes PYZ-Profil wird nicht mit einem Wheel oder
 CWD-Dokument verdeckt. Die API benötigt dafür keine Installation, Schreibrechte
 im Runtimeverzeichnis oder externen Werkzeuge. Verzeichnis und daraus gebaute
 PYZ liefern dieselben kanonischen Artefaktbytes und Dokumente.
@@ -74,10 +80,11 @@ Runtimefehlern darf eine Pflichtvorlage nur durch eine begrenzte eigene Prüfung
 gegen geladenen Producer-ID, Rezept und exakte Vorlagenbytes erhalten bleiben.
 Diese Prüfung behauptet keinen vollständigen gültigen Runtime-Artefaktbestand.
 
-## Fortgeführter Legacy-Wheel-Vertrag
+## Historischer Legacy-Wheel-Vertrag
 
 Die folgende Beschreibung dokumentiert den historischen Wheel-Aufbau. Sein
-Datenvertrag bleibt für alte Results erhalten; frühe 1.c-Statusangaben beschreiben
+Datenvertrag ist keine aktuelle Lesepflicht. Sämtliche folgenden 1.c-/Wheel-
+Anforderungen und Nachweise dokumentieren den damaligen Stand und beschreiben
 keinen neuen aktiven Plan. Der aktuelle Produktionswriter verwendet Format 3;
 die folgenden Installations-/Produzentenangaben beschreiben den Altstand.
 

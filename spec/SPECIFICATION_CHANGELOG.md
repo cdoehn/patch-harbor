@@ -1,5 +1,235 @@
 # PatchHarbor – Spezifikations-Changelog
 
+## 2026-10-30 – RF-13 / Bundle 070: Version 1.5.0 und Abschlussabnahme
+
+- RF-12 tatsächlich angewendet und gepusht auf
+  `b555a3614f962a19b94244918486fc87021a829d`; dreizehn Planpositionen und vierzehn Plancommits bestätigt.
+- Zentrale Produktversion und unabhängiger Packaging-Prüfwert auf 1.5.0 gesetzt;
+  aktuelle Versionshinweise aktualisiert. Kompatibilitätsbasis bleibt 1.4.0;
+  historische Fixtures und ihre Originalversionen/-Hashes werden nicht geändert.
+- Wheel, sdist und Core-PYZ werden als lokale Kandidaten gebaut und mit
+  Inhalts-/Metadatenprüfungen dokumentiert. Die versionierten Paket-/API-/Python-
+  und Sicherheitsverträge bleiben unverändert; die drei Normdateien bleiben getrennt.
+- Development ausgewählt parallel; Apply vollständig parallel vor dem Commit,
+  danach genau ein normaler Push. Kein automatisches Tag, Release, Hostupdate,
+  Dienstneustart oder CI-Start.
+- Eigener RF-13-Apply und vollständige Planabnahme sind offen. Abschluss verlangt
+  passende manuelle CI und die übrigen Nachweise aus dem aktiven Plan;
+  `planning/1.5.0/release-acceptance.md` hält deren Anforderungen fest.
+
+## 2026-10-30 – RF-12 / Bundle 069: aktuelle Hinweise und messbare Bereinigung
+
+- RF-11 tatsächlich angewendet und gepusht auf
+  `7294d77fde0598dd57a6fdc3c19f6925e5520bdb`; zwölf Planpositionen und dreizehn Plancommits bestätigt.
+- Aktuelle Hinweise unterscheiden Result-3-/Core-PYZ-Unterstützung ab 1.4.0,
+  normale Wheel-/sdist-Installation mit Watcher und sicheren Runtime-Fallback.
+  Entfernte Runtime-Wheel-Anleitungen sind ausdrücklich historisch.
+- Die drei Normdateien bleiben getrennt. Hauptspec §33, PYZ/PACK TEST-05 und
+  CPY-15/CT-16 übernehmen die bereits geltende ausgewählte parallele Development-
+  Prüfung, vollständige parallele Apply-Gates und ausschließlich Christians CI-Start.
+- Ein lesendes Git-Blob-Messskript und seine Daten belegen Umfang, Modulgrößen,
+  entfernte Pfade, Testimporte und gepflegte/generierte Bootstrapquellen.
+  Die Zuordnung entfernter Tests und historische CI-/Apply-Nachweise bleiben erhalten.
+- Produktcode, öffentliche Verträge, Bootstrapprogramm, Tests, CI und Version
+  bleiben unverändert. RF-12-Apply, vollständiges Commit-Gate und Push sind offen.
+
+## 2026-10-30 – RF-11 / Bundle 068: zentraler CI- und Nachweiskatalog
+
+- RF-10 tatsächlich angewendet und gepusht auf
+  `35af08c9c38482c1974102f5ac902e629fa11f01`; elf Planpositionen und zwölf Plancommits bestätigt.
+- Ein JSON-Katalog versorgt erzeugte Workflow-Matrizen, lesende CI-Auswertung,
+  Windows-Testauswahl, Artefaktrollen und erforderliche fachliche Varianten.
+  Alle zwölf bisherigen Jobs und ihre Prüfbereiche bleiben erhalten.
+- Testberichtformat 2 transportiert explizite Nachweis-IDs und Varianten über
+  Collection und Worker-Abschlüsse. Fehlende, doppelte, übersprungene oder
+  widersprüchliche Pflichtnachweise werden abgewiesen. Aktuelle Nachweise hängen
+  nicht mehr von Testfunktions-/Dateinamen oder pytest-Anzeigenamen ab.
+- Buildberichtformat 2 bindet Artefaktrollen und verlangt Testberichtformat 2;
+  CI-Reviewformat 3 enthält die geprüften Pflichtnachweise. Historische interne
+  Format-1-Nachweise bleiben getrennt lesbar. Produkt-, Result-/Patch-Verträge,
+  Version und die drei Normdateien bleiben unverändert.
+- Development ausgewählt parallel, Apply vollständig parallel vor dem Commit.
+  CI ausschließlich manuell durch Christian; kein Dispatch durch Werkzeuge.
+  RF-11-Apply, Commit und Push sind offen.
+
+## 2026-10-30 – RF-10 / Bundle 067: CLI-Grammatik und Befehlsrahmen
+
+- RF-09 tatsächlich angewendet und gepusht auf
+  `5fa1ad3cbf1ac2ae1b0d0eb1d5812c10ca3d53de`; zehn Planpositionen und elf Plancommits bestätigt.
+- Parser, Befehlsabläufe und Ausgabegrenzen erhalten eigene CLI-Module.
+  Bestehende Parser-Anweisungen bleiben in derselben Reihenfolge und werden
+  fachlich gruppiert; öffentliche Optionen und strikte Argumentprüfung bleiben.
+- Vier Konfigurationsabläufe teilen Observer-/Fehler-/Ausgabehandling.
+  Gleichartige Fehlerausgabe wahrt JSON-Version 1 bzw. 2 und stderr-Zuordnung;
+  gemeinsame Darstellungsparameter werden nur einmal weitergereicht.
+- Pack-Ausgabefehler nach Veröffentlichung, Apply-Result und Script-Runner
+  behalten eigene Grenzen. API, Core-Abläufe, Watcher, Formate, Produktversion
+  und die drei Normdateien bleiben unverändert.
+- Zusätzliche Tests prüfen fachliches Verhalten und maschinenlesbare Verträge,
+  keine Prosa, Farben oder Darstellung. Development ausgewählt parallel;
+  Apply vollständig parallel vor dem Commit. CI ausschließlich durch Christian.
+  RF-10-Apply, Commit und Push sind offen.
+
+## 2026-10-30 – RF-09 / Bundle 066: Apply- und Result-Orchestrierung
+
+- RF-08 tatsächlich angewendet und gepusht auf
+  `2e6d1622ab3f67f1bfd071ee189720fc77f7346b`; neun Planpositionen und zehn Plancommits bestätigt.
+- Apply-Zustandsübergänge und Result-Abschluss erhalten eigene fachliche
+  Application-Module. Die öffentliche API-Fassade bleibt bestehen.
+- Nur der wiederholte Fehlerabschluss vor Mutation wird lokal geteilt.
+  Lock-/Ressourcenlebensdauer, Producer-Pinning und Ausnahmeverkettung bleiben
+  erhalten; Fehler nach Teilmutation und bereits veröffentlichte Results bleiben
+  getrennte Pfade mit den bestehenden Domain-Fehlern und RunReport-Modellen.
+- Publikationsprüfung einschließlich CIFS-Reihenfolge, Paket-/Fehlerverträge,
+  Produktversion, die drei Normdateien und 1.4.0-Originalartefakte bleiben gleich.
+- Bestehende Tests bleiben erhalten, Fehlersimulationen folgen den neuen
+  Lookup-Orten. Development ausgewählt parallel; Apply vollständig parallel vor
+  dem Commit. CI startet nur Christian. RF-09-Apply, Commit und Push sind offen.
+
+## 2026-10-30 – RF-08 / Bundle 065: Konfiguration und Exchange-Ermittlung
+
+- RF-07 tatsächlich angewendet und gepusht auf
+  `d4210e7a2ae85fc85b50aedddecd1ce24bb414d1`; 8 Planpositionen und 9 Plancommits bestätigt.
+- Zwei begrenzte Application-Module übernehmen vorhandene Konfigurations-,
+  Registrierungs-, Watch-Target- und Discovery-Abläufe. Die öffentliche API
+  bleibt unverändert; der Watcher nutzt dieselbe fachliche Implementierung.
+- Bestehende Funktions-/Klassenkörper, Lock-Lebensdauer, erneute Identitäts- und
+  Konfigurationsprüfung, deterministische Auswahl und Replay-Nachweise bleiben
+  erhalten. Fehlersimulationen folgen den tatsächlichen neuen Lookup-Orten.
+- Neue Module werden in Wheel/PYZ mit ausgeliefert; kein Watcher in der Core-PYZ.
+  Kein bestehender Testfall entfällt. Development ausgewählt parallel, Apply
+  vollständig parallel vor dem Commit. CI nur manuell durch Christian.
+- Die drei Normdateien, Paket-/Fehlerverträge, 1.4.0-Originalartefakte und
+  Produktversion bleiben unverändert. RF-08-Apply, Commit und Push sind offen.
+
+## 2026-10-30 – RF-07 / Bundle 064: Eine gepflegte Bootstrapquelle
+
+- RF-06B tatsächlich angewendet und gepusht auf
+  `3afcc56b00ccdc9818b2436ecde999b46176b1ea`; 7 Planpositionen und 8 Plancommits bestätigt.
+- `scripts/pyz_bootstrap.py` bleibt bytegleich und ist die einzige gepflegte
+  Bootstrap-Programmquelle. Der markierte ausführbare Handoff-Block wird daraus
+  deterministisch erzeugt; umliegende Dokumentation bleibt separat editierbar.
+- Build-Gates lehnen veraltete/fehlende Generierung ohne Quellbaum-Reparatur ab.
+  Der sdist erhält genau die benötigten zwei Buildskripte; keine zusätzlichen
+  Runtime-Abhängigkeiten oder Buildwerkzeuge in Wheel/PYZ.
+- Sicherheits-, Fehler-, Paket-, Offline- und Fallback-Verträge bleiben bestehen.
+  Entwicklung nur ausgewählt parallel; Apply vollständig parallel vor dem Commit.
+  Kein CI-Start. Die drei Normdateien bleiben getrennt und unverändert.
+  RF-07-Apply, Commit und Push sind noch offen.
+
+## 2026-10-30 – RF-06B / Bundle 063: Überholte Result-/Runtime-Pfade entfernen
+
+- RF-06A tatsächlich angewendet und gepusht auf
+  `220c0af2189cebe29ae2c991c4a6afb65dc3cc1f`; 7 tatsächliche Plancommits,
+  6 vollständig bestätigte Planpositionen. RF-06B ist noch nicht angewendet.
+- Native Leser beschränken sich auf Result 3; aktuelle Writer deklarieren `[3]`.
+  Unveränderte 1.4.0-Results mit `[1, 2, 3]` bleiben unterstützt. Patchformat 1,
+  Metadatenformat 2, PYZ-Rezept und Fehler-/Sicherheitsverträge bleiben bestehen.
+- Result-Wheel-Reader, Provider, Installations-Bootstrap, alte Build-Rezepte und
+  ausschließliche Fixtures/Tests abbauen. Gemeinsame Sicherheitstests auf Result 3
+  und PYZ übertragen; alte Results liefern keine Archivierungs-/Recovery-Freigabe.
+- Normale Wheel/sdist-Installation, Watcher, Source-/Editable-Diagnose und sicherer
+  technischer PYZ-Fallback bleiben. Der vorhandene uv-CI-Nachweis prüft jetzt das
+  normale Installations-Wheel und dessen PYZ unter derselben Nachweiskennung.
+- Development nur ausgewählte parallele Tests; Apply vollständig parallel vor
+  dem Commit. Kein CI-Start. Die Spezifikationsaufteilung bleibt unverändert.
+
+## 2026-10-29 – RF-06A / Bundle 062: Capability-Leser vorbereiten
+
+- RF-05 tatsächlich angewendet und gepusht auf
+  `5ee194153d1338777cb6b77a60b7854e7b009388`; 6 von 14 Planpositionen bestätigt.
+- Die bereits spezifizierten geschlossenen Result-3-Capability-Listen
+  `[1, 2, 3]` und `[3]` werden vom nativen Reader und Bootstrap akzeptiert.
+  Strikte Typ-/Schema-/Hash-/Limitprüfungen und native Referenzprüfung bleiben.
+- RF-06 wird in Leser-Vorbereitung (A) und anschließenden Writer-Wechsel samt
+  Legacy-Abbau (B) aufgeteilt: 14 Planpositionen, derzeit 15 vorgesehene Commits.
+  Writer bleibt in A bei `[1, 2, 3]`, bisherige Leser und Originalfixtures bleiben.
+- Verhaltenstests decken beide Profile, ungültige Angaben, unavailable und die
+  eigene eingebettete PYZ ab. Development nur ausgewählt parallel; Apply vollständig
+  parallel vor dem Commit. Keine CI-Auslösung; eigener Apply noch offen.
+
+## 2026-10-29 – RF-05 / Bundle 061: Runtime-Daten vom Wheel-Reader lösen
+
+- RF-04 tatsächlich angewendet und gepusht auf
+  `afce2628e9c1d85baa7726ec29a308de3d4d5ad2`; 5 von 14 Planpositionen bestätigt.
+- Gemeinsame Rezeptdaten, Fehler, Ressourcenpfade, kanonische JSON-/Hashregeln
+  und Result-Deskriptoren erhalten eigene fachliche Module. PYZ und der aktuelle
+  Buildpfad importieren dafür keinen Legacy-Wheel-Reader mehr.
+- RECORD-Kodierung getrennt; Buildhelfer bleiben an den eigenen Quellbaum gebunden.
+  Bestehende Leseverträge, Profile, IDs/Hashes, Limits und Legacy-Pfade bleiben
+  erhalten; ihre Entfernung ist weiterhin RF-06 vorbehalten.
+- Nutzerentscheidung vom 29. Oktober umgesetzt: Development nur ausgewählte
+  parallele Tests, vollständige parallele Suite im Apply vor jedem Commit.
+  CI bleibt ausschließlich manuell durch Christian. Eigener Apply noch offen.
+
+## 2026-10-29 – RF-04 / Bundle 060: Verhalten und Schichtgrenzen prüfen
+
+- RF-03 tatsächlich angewendet und gepusht auf
+  `ab1d6d5dae0d6f013c91775e9308dfe86ef6d848`; 4 von 14 Planpositionen bestätigt.
+- Tests auf historische Planprosa, Überschriften und konkrete Quelltextformen
+  durch zugeordnete Verhaltenstests ersetzen; Manifest-Beispiel tatsächlich
+  gegen eine unveränderte 1.4.0-Referenz validieren, ohne Ausführung.
+- AST-Abhängigkeiten einschließlich relativer Importe und Aliase prüfen;
+  aufgeteilte Workflows erlauben, Rückabhängigkeiten, Zyklen und Grenzverletzungen
+  weiter ablehnen. 22 kleine adversarielle Architekturfälle ergänzen die Suite.
+- Keine Normdatei, Produktquelle, Paketversion, CI-Konfiguration oder eingefrorene
+  Fixture geändert. Vollständige parallele lokale Gates; eigener Apply noch offen.
+
+## 2026-10-29 – RF-03 / Bundle 059: Gemeinsame Testhilfen entkoppeln
+
+- RF-02 tatsächlich angewendet und gepusht auf
+  `f959ea054c37977650be43db690909c2d510f29d`; 3 von 14 Planpositionen bestätigt.
+- 88 direkte Testmodul-Importstellen und ein Modulalias in fachliche
+  Supportmodule umgestellt; vollständige Zuordnung im aktiven Planverzeichnis.
+- Testfälle, Parametrisierungen, Marker und Fixture-Scopes bleiben erhalten.
+  Windows-ACL-Fehlerfälle nutzen dieselbe Prüflogik mit explizitem Adapter;
+  Bootstrap-Tests verändern keine globalen Referenzen anderer Testmodule mehr.
+- Kein Produktcode, Normvertrag, Artefaktformat, Versionswert, CI-Workflow
+  oder eingefrorenes Fixture geändert. Vollständige parallele lokale Gates;
+  eigener Apply noch offen, kein CI-Start oder Tag.
+
+## 2026-10-29 – RF-02 / Bundle 058: Originale 1.4.0-Verträge sichern
+
+- RF-01 tatsächlich angewendet und gepusht auf
+  `37e2c88c5afd41be2abb83a394b22748a5256ef9`; 2 von 14 Planpositionen bestätigt.
+- Acht unveränderte Original-Results und fünf Original-Patches aus kleinen
+  isolierten Testrepositories sichern die in RF-01 festgelegte 1.4.0-Basis.
+  Provenienz, vollständige Hashes, Modi und echte Ausführungsergebnisse sind
+  festgehalten; bestehende Runtime-Capabilities werden nicht umgeschrieben.
+- Verhaltenstests prüfen Reader/Pack/Inspect/Validate, konservative Exchange-
+  und Recovery-Nachweise, unbekannte/manipulierte Daten, Dirty-Zustände,
+  Dry-Runs, 0/1/mehrere Commits und Fehler mit erhaltenem Teilfortschritt.
+- Gepinnte Original-PYZ nur isoliert ausführen; statische Leser importieren sie
+  nicht. `unavailable` kommt aus echten unvorbereiteten 1.4.0-Quellen.
+- Kein Normvertrag, Produktcode, Format oder Versionswert geändert. Vollständige
+  parallele lokale Gates; eigener Apply noch offen, kein CI-Start oder Tag.
+
+## 2026-10-29 – RF-01 / Bundle 057: Kompatibilitätsbasis ab 1.4.0
+
+- RF-00 tatsächlich angewendet und gepusht auf
+  `05cceef59891a68a3e0fdd2115fa79e718db1347`; 1 von 14 Planpositionen bestätigt.
+- Drei bestehende Normdateien bleiben getrennt. Veraltete Muss-Regeln für
+  Result 1/2, alte Result-Runtime-Wheels und originale 1.3.0-PYZs gezielt ersetzt;
+  historische Einführungsabläufe ausdrücklich als Historie eingeordnet.
+- Abwärtskompatibilität ab 1.4.0 bleibt verpflichtend: Patchformat 1 und seine
+  sieben Felder, Result 3, Runtime-Metadaten 2, Rezept 1 und Core-PYZ-Profil bleiben.
+  Bestehende `[1, 2, 3]`-Capabilities bleiben gültig; bereinigte Produzenten
+  deklarieren `[3]`. Kein Versionsraten, Umetikettieren oder Hashumschreiben.
+- CPython >=3.10, sichere Runtime-unavailable-/Fallback-Fälle, normale
+  Installations-Wheels/sdist und Watcher bleiben erhalten. Nicht unterstützte
+  Daten lösen keine Ersatz-Ausführung aus und sind keine Erfolgsbelege.
+- Überholte serielle Gates und automatischer CI-Fünfertakt in der Hauptspec an
+  die bestehende Nutzerentscheidung angeglichen: nur volle parallele Gates,
+  manuelle CI ausschließlich durch Christian. Keine Workflowänderung.
+- Korrespondierende Chat-/Runtime-Hinweise angeglichen. Der volle parallele
+  Erstlauf belegt genau einen veralteten Spec-Status-Wortlautcheck; nur dieser
+  redaktionelle Assert entfällt. Keine fachliche Prüfung oder Testfunktion
+  entfernt, keine neuen Prosatests. Installierte Artefakte bleiben durch die
+  vorhandenen Packaging-/Runtime-Verhaltenstests und vollständigen Gates geprüft.
+- Kein Produktcode, ausführbarer Bootstrap, Artefaktformat oder Versionswert
+  geändert; Altpfade werden erst nach RF-02-Fixtures in RF-06 bereinigt.
+  Kein Tag oder CI-Start.
+
 ## 2026-10-14 – CP-05-VERSION / Bundle 055: Version 1.4.0 und Tagauftrag
 
 - FIX3 tatsächlich angewendet; manuelle CI 38596693717 auf vollständigem Commit
@@ -1381,3 +1611,27 @@ manuellen Python-/Plattform-Lanes, eindeutige Artefakte, tatsächliche Build-/
 Interpreterquittungen und ausschließlich lesende CI-Auswertung. Docker- und
 PowerShell-Nachweise vervollständigt; historische Runtime-Ausführungsgrenzen
 bleiben erhalten. Kein automatischer CI-Start; CP-05 wartet auf native Nachweise.
+
+## 2026-10-30 – SRI-01, Ziel 1.6.0
+
+Allgemeine öffentliche Result-Snapshots mit strikter Python-only-Rekonstruktion,
+versionierte Fähigkeitsabfrage und verbindliche Hostfreigabe im vorhandenen
+Apply-Core spezifiziert (Hauptspec §42, PYZ/PACK §21, CPython §9).
+Wire-Verträge und historische Abnahmen bleiben erhalten. Dieser Spezifikations-
+stand behauptet noch keine implementierte oder durch Apply bestätigte Funktion.
+
+## 2026-10-30 – SRI-02/03 Implementierung und Vertragspräzisierung
+
+Snapshotrekonstruktion und gebundene Hostfreigabe implementiert; kein eigener
+Formatvalidator oder Apply-Core. §42.4 unterscheidet vor Ausführung abgebrochene
+Callbacks (verweigerte Aufnahme) vom bestehenden INTERRUPTED-Ausführungsstatus.
+Das erhält das Result-3-Schema und vermeidet erfundene Entrypointstarts.
+Tatsächlicher Apply, finale Runtime-Lieferung und native Abnahme bleiben getrennt.
+
+## 2026-10-30 – SRI-04, vorbereitete Produktversion1.6.0
+
+Quellversion, öffentliche API-Dokumentation, ausführbares Transportbeispiel und
+Built-Artefakt-Nachweise ergänzt. Keine Änderung an Patch1/Result3/Runtime2/
+Rezept1, bestehenden Abnahmen, Dienstinstallation oder CI-Auslösung. Der
+Liefernachweis trennt lokale Vorbereitung, tatsächlichen Apply und externe
+Integration/Releasefreigabe.

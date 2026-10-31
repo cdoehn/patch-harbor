@@ -16,21 +16,11 @@ import pytest
 
 from scripts.build_release import _copy_release_inputs
 from tests.runtime_permissions import readonly_tree
-from tests.test_patch_inspection import write_package
+from tests.patch_inspection_support import write_package
 from tests.registration_support import create_repository
+from tests.runtime_installation_support import _run, _venv
 
 pytestmark = pytest.mark.packaging
-
-
-def _run(command, cwd, environment):
-    result = subprocess.run(command, cwd=cwd, env=environment, capture_output=True, text=True, timeout=300)
-    assert result.returncode == 0, result.stdout + result.stderr
-    return result.stdout
-
-
-def _venv(root, cwd, environment):
-    _run([sys.executable, "-m", "venv", "--without-pip", str(root)], cwd, environment)
-    return root / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
 
 
 def _install_builder(python, outside, environment):
@@ -58,6 +48,7 @@ def _readonly_installation(python, outside, environment):
         yield
 
 
+@pytest.mark.proof('installation.three-generations', parameter='route')
 @pytest.mark.parametrize("route", ["wheel", "source", "sdist"])
 def test_standard_installation_and_three_offline_canonical_generations(tmp_path, route):
     source, output, outside = tmp_path / "source", tmp_path / "dist", tmp_path / "outside"
@@ -129,6 +120,7 @@ api.configure_exchange_directory(repo.parent/(repo.name+'-results'),repository=r
 tracemalloc.start();bundle=api.bundle(repo);peak=tracemalloc.get_traced_memory()[1];tracemalloc.stop()
 facts,digest=read_result_reference(bundle.path)
 assert facts.format_version==3 and facts.runtime.status=='embedded'
+assert facts.runtime.result_formats==(3,)
 assert not facts.warnings and facts.context.repository_path==str(repo)
 with ZipFile(bundle.path) as archive:
     raw=archive.read(facts.runtime.artifact.path)

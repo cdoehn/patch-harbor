@@ -215,7 +215,7 @@ def test_invalid_missing_and_linked_roots_fail_before_activation(tmp_path):
 def test_linux_overflow_and_watch_loss_are_structured(tmp_path, monkeypatch, mask):
     from types import SimpleNamespace
     from patchharbor_watcher.platform import linux
-    from tests.test_watcher_events import inotify_record
+    from tests.watcher_support import inotify_record
     with open_event_source((tmp_path,)) as source:
         wd = next(wd for wd, path in source._watches.items() if path == tmp_path)
         raw = inotify_record(-1 if mask == linux.IN_Q_OVERFLOW else wd, mask, None)

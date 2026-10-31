@@ -15,6 +15,7 @@ from tests.windows_private_support import assert_private_dacl
 pytestmark = [pytest.mark.platform, pytest.mark.skipif(os.name != "nt", reason="native Windows primitives")]
 
 
+@pytest.mark.proof('windows.handle-change')
 def test_native_legacy_handle_adapter_detects_real_change_with_restored_mtime(tmp_path, monkeypatch):
     path = tmp_path / "same-size.bin"
     path.write_bytes(b"original")
@@ -50,6 +51,7 @@ def test_native_legacy_handle_adapter_detects_real_change_with_restored_mtime(tm
         os.fstat(descriptor)
 
 
+@pytest.mark.proof('windows.junction')
 def test_native_junction_is_rejected_without_new_pathlib_api(tmp_path, monkeypatch):
     target = tmp_path / "target"
     target.mkdir()
@@ -71,6 +73,7 @@ def test_native_junction_is_rejected_without_new_pathlib_api(tmp_path, monkeypat
     assert target.is_dir()
 
 
+@pytest.mark.proof('windows.private-dacl', parameter='kind')
 @pytest.mark.parametrize("kind", ["named", "random"])
 def test_native_private_request_dacl_is_protected_and_inherited(tmp_path, monkeypatch, kind):
     monkeypatch.setattr(temporary_resources, "system_temporary_directory", lambda: tmp_path)

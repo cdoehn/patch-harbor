@@ -61,7 +61,9 @@ ZIP-Hash wird festgehalten. Ein optionaler Recovery-Beleg verwendet genau diesen
 Hash und wird einmal geschrieben. Vor dem atomaren Rename müssen die aktuellen
 Bytes erneut denselben Hash liefern. Ein inhaltlich anderes Result wird nicht
 durch längeres Warten akzeptiert. Apply, Entrypoint, Commit und Push sind außerhalb
-der Wiederholung. Die dokumentierten PYZ-/Legacy-Wheel-Fallbacks bleiben erhalten.
+der Wiederholung. Der begrenzte Runtime-unavailable-/PYZ-Fallback bleibt
+erhalten; alte Result-Runtime-Wheels sind ab der 1.4.0-Kompatibilitätsbasis
+keine Supportpflicht mehr. Dies ändert weder Retrybudget noch Publikationsregeln.
 
 ## Diagnose und Praxisabnahme
 

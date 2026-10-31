@@ -8,54 +8,11 @@ import pytest
 
 from tests.platform_support import run_cli
 from tests.registration_support import create_repository, git, exchange_state_path, user_configuration_path
-from tests.test_exchange_e2e import (
-    _configure_user, _register_context, _write_custom_package, _identity_record,
-)
+from tests.exchange_support import _configure_user, _register_context, _write_custom_package, _identity_record
+from tests.archive_support import ARCHIVE, _world, _bundle, _advance, _scan, _committing_patch, _rewrite
 
 
 pytestmark = [pytest.mark.e2e, pytest.mark.usefixtures("prepared_result_producer")]
-ARCHIVE = "PatchHarbor-Archive"
-
-
-def _world(tmp_path):
-    environment, exchange = _configure_user(tmp_path)
-    repository = create_repository(tmp_path / "repo-a")
-    context = _register_context(repository, environment)
-    return environment, exchange, repository, context
-
-
-def _bundle(repository, environment):
-    completed = run_cli(repository, "bundle", "--json", environment_overrides=environment)
-    assert completed.returncode == 0, completed.stderr
-    return Path(json.loads(completed.stdout)["result"]["result_bundle_path"])
-
-
-def _advance(repository, message="next state"):
-    git(repository, "commit", "--allow-empty", "-m", message)
-
-
-def _scan(repository, environment, *, automatic=False):
-    arguments = ("--automatic",) if automatic else ()
-    return run_cli(repository, "apply", "--json", *arguments, environment_overrides=environment)
-
-
-def _committing_patch(path, context):
-    _write_custom_package(
-        path, context,
-        posix_entrypoint="git commit --allow-empty -m archive-test >/dev/null",
-        powershell_entrypoint="git commit --allow-empty -m archive-test; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }",
-    )
-
-
-def _rewrite(path, mutate):
-    with zipfile.ZipFile(path) as archive:
-        files = {name: archive.read(name) for name in archive.namelist()}
-    mutate(files)
-    with zipfile.ZipFile(path, "w") as archive:
-        for name, raw in files.items():
-            archive.writestr(name, raw)
-
-
 @pytest.mark.parametrize("name", [ARCHIVE, ".PatchHarbor-Archive", "My-Archive"])
 def test_archive_configuration_and_automatic_child_creation(tmp_path, name):
     env, exchange, repo, _ = _world(tmp_path)

@@ -13,6 +13,7 @@ import pytest
 
 from tools.test_results import EvidenceError, equivalent, report_digest, validate
 from tools.result_io import write_report
+from tools.acceptance_catalog import PROOFS
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -50,6 +51,7 @@ def pytest_addoption(parser):
 
 
 def pytest_configure(config):
+    config.addinivalue_line('markers', 'proof(identity, parameter=None, variant="default"): stable acceptance proof and variant')
     if config.getoption("--ph-reference") and not config.getoption("--ph-report"):
         raise pytest.UsageError("--ph-reference requires --ph-report")
     if config.getoption("--ph-report") or config.getoption("--ph-check"):
@@ -63,15 +65,42 @@ def _reason(report) -> str:
     return str(value[2] if isinstance(value, tuple) and len(value) == 3 else value)
 
 
+def proof_identity(item) -> dict[str, str] | None:
+    """Bind an explicit proof to this exact parameter case, never its node name."""
+    markers = list(item.iter_markers('proof'))
+    if not markers:
+        return None
+    if len(markers) != 1:
+        raise pytest.UsageError('Exactly one proof marker per test case is allowed')
+    marker = markers[0]
+    if (len(marker.args) != 1 or not isinstance(marker.args[0], str)
+            or marker.args[0] not in PROOFS
+            or set(marker.kwargs) - {'parameter', 'variant'}
+            or {'parameter', 'variant'} <= set(marker.kwargs)):
+        raise pytest.UsageError('Unknown or ambiguous acceptance proof marker')
+    if 'parameter' in marker.kwargs:
+        name = marker.kwargs['parameter']
+        params = getattr(getattr(item, 'callspec', None), 'params', {})
+        if not isinstance(name, str) or name not in params or type(params[name]) not in (str, int):
+            raise pytest.UsageError('Proof parameter must identify a string or integer case')
+        variant = str(params[name])
+    else:
+        variant = marker.kwargs.get('variant', 'default')
+    identity = marker.args[0]
+    if variant not in PROOFS[identity]['variants']:
+        raise pytest.UsageError('Unknown acceptance proof variant: ' + identity)
+    return {'id': identity, 'variant': variant}
+
+
 class Capture:
     def __init__(self, config):
         self.config = config
         self.worker = hasattr(config, "workerinput")
-        self.document = {"format_version": 1, "run_id": str(uuid.uuid4()),
+        self.document = {"format_version": 2, "run_id": str(uuid.uuid4()),
                          "binding": input_binding(), "expected_workers": 0,
                          "mode": "collection" if config.option.collectonly else "run",
                          "started": [], "finished": {},
-                         "collections": {}, "collection_reports": [], "reports": [], "errors": [],
+                         "collections": {}, "proofs": {}, "collection_reports": [], "reports": [], "errors": [],
                          "exitstatus": None, "controller_pid": os.getpid()}
 
         self.worker_key = config.workerinput["workerid"] if self.worker else "serial"
@@ -89,6 +118,8 @@ class Capture:
 
     def pytest_collection_finish(self, session):
         self.document["collections"][self.worker_key] = [item.nodeid for item in session.items]
+        self.document['proofs'] = {item.nodeid: proof for item in session.items
+                                   if (proof := proof_identity(item)) is not None}
 
     @pytest.hookimpl(optionalhook=True)
     def pytest_xdist_node_collection_finished(self, node, ids):
@@ -120,6 +151,11 @@ class Capture:
         if not isinstance(summary, dict) or node.gateway.id in self.document["finished"]:
             self.document["errors"].append("Missing or duplicate worker completion")
         else:
+            if self.document['finished']:
+                if self.document['proofs'] != summary.get('proofs'):
+                    self.document['errors'].append('Worker proof assignments differ')
+            else:
+                self.document['proofs'] = summary.get('proofs')
             self.document["finished"][node.gateway.id] = summary
 
     @pytest.hookimpl(trylast=True)
@@ -129,6 +165,7 @@ class Capture:
                 "run_id": self.document["run_id"], "binding": self.document["binding"],
                 "exitstatus": int(session.exitstatus),
                 "collection": self.document["collections"].get(self.worker_key),
+                "proofs": self.document['proofs'],
                 "collection_reports": self.document["collection_reports"],
                 "report_count": len(self.document["reports"]),
                 "reports_sha256": report_digest(self.document["reports"]),
