@@ -1,5 +1,16 @@
 # PatchHarbor – Spezifikations-Changelog
 
+## 2026-10-31 – SAFE-01: sicherer Referenzexport für 1.7.0
+
+- Hauptspec §43 definiert explizite sichere Kontext-/Bundle-Aufrufe, einen
+  gebundenen öffentlichen Preflight, Capability und semantische Fehler.
+- Keine Helferausführung oder Quellmutation; Deltaerzeugung aus erfassten
+  Bytes, vollständig native Results, begrenzte Betriebswirkungen ohne Wartung.
+- Fünf Arbeitsschritte, drei echte Commits in einem geplanten Bundle.
+  Bestehende API-/Paketverträge und historische Nachweise bleiben erhalten.
+- Produktkennung 1.7.0 vom Nutzer gewählt; CI, Tag und Release nicht gestartet.
+
+
 ## 2026-10-30 – RF-13 / Bundle 070: Version 1.5.0 und Abschlussabnahme
 
 - RF-12 tatsächlich angewendet und gepusht auf

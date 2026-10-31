@@ -226,3 +226,12 @@ mit denselben Voraussetzungen wie Apply. Dieselbe Implementierung muss unter
 CPython 3.10/3.11 und den bestehenden 3.12/3.14-Lanes funktionieren. Nicht
 vorhandene native Nachweise bleiben offen; keine neue 3.13-CI-Lane oder
 Änderung des ausschließlich manuellen Workflowstarts wird behauptet.
+
+## Additiver sicherer Referenzexport 1.7.0
+
+Hauptspec §43 und `planning/safe-reference/commit-plan.md` definieren den neuen
+expliziten Hostvertrag. Öffentliche Capability und derselbe Core werden in
+Wheel und PYZ ausgeliefert. Der Watcher bleibt ausgeschlossen. Der neue sichere
+Hostvertrag gilt für Linux x86-64 / CPython 3.10–3.14; bestehende Funktionen auf
+anderen Hosts und das Python-only-Lesen bleiben unverändert. Historische
+Plan-/Releaseabnahmen werden nicht geschlossen; CI startet nur der Nutzer.

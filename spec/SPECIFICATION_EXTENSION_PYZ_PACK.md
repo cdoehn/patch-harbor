@@ -1439,3 +1439,12 @@ Host-Apply behält seine Systemvoraussetzungen. Die geschlossenen Wire-Schemas,
 Bootstrap-Prüfung und originale 1.4.0-Artefakte bleiben unverändert.
 Der aktive Folgeplan ist `planning/specroad-integration/commit-plan.md`;
 frühere Plan- und Releaseabnahmen werden dadurch nicht geschlossen.
+
+## Additiver sicherer Referenzexport 1.7.0
+
+Hauptspec §43 und `planning/safe-reference/commit-plan.md` definieren den neuen
+expliziten Hostvertrag. Öffentliche Capability und derselbe Core werden in
+Wheel und PYZ ausgeliefert. Der Watcher bleibt ausgeschlossen. Der neue sichere
+Hostvertrag gilt für Linux x86-64 / CPython 3.10–3.14; bestehende Funktionen auf
+anderen Hosts und das Python-only-Lesen bleiben unverändert. Historische
+Plan-/Releaseabnahmen werden nicht geschlossen; CI startet nur der Nutzer.

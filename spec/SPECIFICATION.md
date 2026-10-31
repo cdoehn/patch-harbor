@@ -4,7 +4,7 @@
 **Historischer Basisvertrag – Versionsangabe nur für dessen ursprünglichen Stand:**<br>
 **Produktversion:** `1.2.1`<br>
 **Aktuelle Produktversion:** `1.6.0`; Kompatibilitätsbasis ab `1.4.0`, gemeinsam mit beiden Ergänzungen.<br>
-**Spezifikationsstand:** 2026-10-30 · SRI-04: Integrationsverträge 1.6.0; tatsächliche Abschlussnachweise im Folgeplan<br>
+**Spezifikationsstand:** 2026-10-31 · SAFE-01: sicherer Referenzexport, Zielversion 1.7.0<br>
 **Status:** Verbindlicher Bestands- und Zielvertrag mit den unten erklärten Ergänzungen. RF-01 korrigierte die Vertragsgrundlage; aktueller Integrationsfortschritt steht im SRI-Plan; historische Nachweise bleiben erhalten.<br>
 **RIV-Status:** 18/18 Umsetzungsschritte samt Abschlusskorrektur durch Bundle 015 und CI-Run 37306630290 auf `a02391dc045d42e317b3e766f0b1e9fa8dfadec1` bestätigt; Plan abgeschlossen.<br>
 **Watcher-Ereignisse:** Ereignisgesteuerter Watcher Bestandteil der bestätigten Basis; historische WE-Zwischenstände aktivieren keinen neuen Watcher-Plan.<br>
@@ -14,8 +14,10 @@
 **Patch-Paketmarker:** `patch-harbor`
 
 Der ausdrücklich beauftragte Entwicklungsplan liegt unter
-[`planning/specroad-integration/commit-plan.md`](../planning/specroad-integration/commit-plan.md),
-Zielversion **1.6.0**. Der bestätigte 1.5.0-Quellstand und seine noch offene
+[`planning/safe-reference/commit-plan.md`](../planning/safe-reference/commit-plan.md),
+Zielversion **1.7.0** (ausdrückliche Nutzerwahl). §43 ergänzt den sicheren
+Referenzexport. Die vier SRI-Commits und CI-072 sind tatsächlich angewendet;
+deren externe CI-/SpecRoad-Abnahme bleibt getrennt offen. Der bestätigte 1.5.0-Quellstand und seine noch offene
 externe Releaseabnahme bleiben im historischen Plan erhalten. §42 definiert
 die additive Erweiterung; sie ist kein Teil des Refactoring-Auftrags.
 Für diesen Auftrag gelten gemeinsam diese drei Normdateien:
@@ -4348,3 +4350,172 @@ allein durch Christian. Entwicklung prüft ausgewählte Tests parallel, Apply de
 vollen parallelen Stand vor jedem Commit. SRI-SNAPSHOT (SpecRoad 15.m.R) und
 SRI-ADMISSION haben getrennte Bereitschaftsnachweise; SpecRoads eigener Rundweg
 ist erst nach dessen Integration bestätigt.
+
+## 43. Sicherer öffentlicher Referenzexport (SAFE-REFERENCE, 1.7.0)
+
+Dieser additive Vertrag gilt gemeinsam mit beiden bestehenden Ergänzungen.
+Er ersetzt für ausdrücklich sichere Aufrufe die bisherige Git-Worktree-Diff-
+Erfassung, nicht Result 3, Patch 1 oder `patchharbor-state-v1`. Normale Aufrufe,
+CLI, Watcher, Guarded Apply und ursprüngliche Artefakte ab 1.4.0 bleiben erhalten.
+
+### 43.1 Öffentliche Auswahl und Fähigkeit
+
+Öffentliche Imports erfolgen ausschließlich aus `patchharbor.api`:
+
+```python
+context(repository=".", *, capture_mode="git", observer=None) -> RepositoryContext
+prepare_reference_export(repository, *, output_directory=None,
+                         expected_context=None, observer=None) -> SafeExportPlan
+bundle(repository=".", *, output_directory=None, capture_mode="git",
+       export_plan=None, observer=None) -> BundleResult
+```
+
+`capture_mode` ist exakt `"git"` oder `"safe"`; falsche Typen ergeben TypeError,
+unbekannte Werte ValueError, jeweils vor fachlicher Arbeit. Der bisherige
+Default bleibt unverändert. `prepare_reference_export` ist immer sicher und
+verlangt einen expliziten bereits registrierten Repositorypfad, auch ein
+Unterverzeichnis. Ein optionaler `expected_context: RepositoryContext` muss
+dem erneut geprüften sicheren Kontext entsprechen; andernfalls `stale`.
+`bundle(..., capture_mode="safe")` verlangt einen `SafeExportPlan`. Der gewählte
+Repositoryroot muss passen. Ein zusätzlich angegebenes `output_directory`
+muss dem im Plan geprüften Ziel entsprechen; bei Weglassen gilt dessen Ziel.
+Ein Plan zusammen mit `capture_mode="git"` ist unzulässig. Kein Fallback.
+
+`IntegrationCapabilities` behält seine drei bestehenden Versionsfelder und
+`contract_version == 1`. Das additive Feld `safe_reference_contract_version`
+ist `1` genau auf dem unterstützten Hostprofil, andernfalls `None`. Verbraucher
+verlangen vor einem vorbereitenden/erzeugenden Aufruf ausdrücklich
+`getattr(api.integration_capabilities(), "safe_reference_contract_version", None) == 1`.
+Alte oder unbekannte Fähigkeiten reichen nicht aus. Versionsstrings und ein
+abgefangener TypeError ersetzen keine Fähigkeitsprüfung.
+
+Vertrag 1 unterstützt CPython 3.10–3.14 auf Linux x86-64 mit installiertem,
+vertrauenswürdigem Git, `/proc/self/fd`, POSIX-Verzeichnisdeskriptoren und
+atomarer exklusiver Hardlink-Veröffentlichung auf dem Ausgabe-Dateisystem.
+Nicht erfüllte Voraussetzungen werden semantisch verweigert. Daraus folgt
+keine neue Plattformzusage für andere Hosts; deren bisherige APIs bleiben
+nutzbar. Fehlende native CI-Nachweise sind ausdrücklich auszuweisen.
+
+### 43.2 Quelle, Registrierung und Konvertierungen
+
+Sichere Kontextabfrage und Planvorbereitung schreiben nichts. Sie registrieren
+nicht, erstellen keine Defaults/Verzeichnisse und starten keine Wartung.
+Sie lesen bestehende eindeutige Registrierung, lokale Identität/Konfiguration,
+HEAD und vollständigen Zustand. Fehler und Abbrüche schützen dieselben Bytes
+wie Erfolg: Projektdateien einschließlich ignorierter Daten und Receipts,
+Git-Index, HEAD/Refs, Historie und Git-Konfiguration werden weder verändert
+noch nachträglich repariert. Normale Lesezugriffe und Betriebssystem-Caches
+sind keine Zusage unveränderter Zugriffszeitstempel.
+
+Die gesamte Git-Grenze verhindert fsmonitor, externe Diff-/Textconv-Helfer,
+Hooks und automatisches Nachladen. Es gibt keinen Git-Worktree-Diff/-Refresh,
+keine Filterausführung und keine Indexschreiboperation. Indexeinträge und
+stabile Rohbytes werden verglichen; Stat-/racy-index-Caches sind kein Oracle.
+Fehlende Objektinhalte und nicht sicher lesbare Teilklone werden abgewiesen.
+Umgebungsbereinigung bleibt bestehen; Aufrufer müssen keine Git-Konfiguration
+manipulieren. Vertrauenswürdige Observer gehören dem aufrufenden Host; die
+Garantie isoliert nicht beliebigen vom Aufrufer selbst ausgeführten Code.
+
+Effektive Attribute aus Worktree UND Index, `.git/info/attributes`, globalen
+und systemweiten Quellen sowie Git-Zeilenendenkonfiguration werden geprüft.
+Für erfasste getrackte Dateien werden aktive Clean-/Smudge-/Process-Filter,
+`working-tree-encoding` und `ident` konservativ vor Helferausführung verweigert.
+Unspecified/unset aktiviert keinen solchen Helfer. Text-/EOL-Regeln bleiben
+zulässig, wenn sie die Rohbytes nicht konvertieren; CRLF mit möglicher
+Normalisierung wird verweigert. Auch saubere Filterdateien sind kein
+Harmlosigkeitsnachweis. Ungetrackte Inhalte behalten ihre Rohbyte-Semantik.
+Unterstützte Zustände liefern unveränderte state-v1-Bindungen; eine ablehnende
+Prüfung behauptet keine neue alternative Fingerprintsemantik.
+
+### 43.3 Snapshot und Frische
+
+Die vorhandene kanonische Zustandserfassung, Base-/Indexobjektprüfung,
+Pfad-/Modusregeln und Result-Snapshottypen werden wiederverwendet. Deltas des
+sicheren Produzenten werden aus erfassten Rohbytes als Git-kompatible
+Full-index-Binärpatches mit beidseitigen Literalblöcken erzeugt, ohne Git auf
+Worktree-Inhalte loszulassen. Dies ist die gezielte sichere Alternative zu
+unverändertem Git-Diff-stdout in §19; beide bleiben dasselbe native Resultformat.
+Ein unabhängiges Git-Apply-Oracle prüft die Deltas nur in synthetischen Tests.
+Keine parallele Resultvalidierung oder private SpecRoad-Rekonstruktion.
+
+Clean, staged, unstaged, beides an derselben Datei, untracked, Binär-/Leerdateien,
+fehlendes LF, neue/gelöschte Dateien, Rename als Delete/Add und Modi einschließlich
+`core.fileMode` bleiben unterstützt. Ignorierte Dateien werden nicht exportiert.
+Vorhandene Inhalts-, Datei-, Archiv- und Rekonstruktionsbudgets bleiben bindend.
+Vollständige Snapshots und Bindungen werden vor/nach Erfassung und vor finaler
+Veröffentlichung erneut verglichen. Auch Registrierungs-, Konfigurations- und
+Pfadbindung werden revalidiert. Kein stiller Retry mit neuer Basis. Verifikation
+der eigenen unveränderten temporären ZIP darf bestehende endliche CIFS-Regeln
+nutzen; das ist keine Wiederholung der Quellerfassung.
+
+### 43.4 Plan und zulässige Betriebswirkungen
+
+`SafeExportPlan` ist unveränderbar und enthält den sicheren `context`,
+`output_directory`, `diagnostics_parent`, `lock_paths`, die gelesene
+`configured_exchange`, `maintenance_enabled=False` und eine opaque
+`binding_sha256`. Die interne vollständige Bindung pinnt Registrierung,
+Konfiguration, lokale Identität und physische Verzeichnisidentitäten; ein
+selbst erfundenes oder verändertes Planobjekt umgeht keine Revalidierung.
+
+Das Ausgabeziel muss bereits bestehen, außerhalb aller registrierten
+Repositorys und der PH-Konfigurations-/Sperrbereiche liegen und darf nicht
+über Links oder Sonderdateien umgeleitet sein. Es wird nicht automatisch
+angelegt. Eigentümer und Schreibrechte müssen kontrollierte Ausbringung
+erlauben; weltweit beschreibbare Betriebsverzeichnisse sind unzulässig.
+Vorhandene Gruppenrechte bleiben erhalten. Private neue Dateien erhalten 0600,
+private Diagnoseverzeichnisse 0700; die API ändert keine Bestandsrechte.
+Bei expliziter Ausgabe wird das konfigurierte Exchange nur als Konfiguration
+gelesen. Ohne explizite Ausgabe ist es das geprüfte Ausgabeziel. In beiden
+Fällen gibt es keine Archivierung, Replay-Reparatur oder globale Exchange-
+Wartung. Fremde Dateien, andere Repositorys und vorhandene Ausgaben bleiben
+unverändert. Keine impliziten System-Temp-Diagnosen.
+
+Erst der sichere Export darf die zwei angegebenen Standard-PH-Locks öffnen
+bzw. anlegen, private run-spezifische Diagnosebytes unter `diagnostics_parent`
+und eine eigene temporäre ZIP im Ausgabeordner schreiben. Locks sind nicht
+neu definiert: derselbe bestehende Registry-/Repository-Lock koordiniert mit
+normalem Apply. Auch bei Revalidierungsfehlern können bereits zulässige eigene
+Lockdateien verbleiben. Ein Planungsaufruf führt diese Wirkungen nicht aus.
+Verzeichnisdeskriptoren verankern alle Schreiboperationen; Pfadtausch darf
+keinen neuen Schreibbereich freigeben. Betriebspfade werden im Plan vollständig
+sichtbar, interne Staging-/Diagnosenamen sind eindeutig request-lokal.
+
+### 43.5 Veröffentlichung und Fehler
+
+Vorhandene Resultdokumente, Runtimeproduktion, ZIP-Schreiber und vollständige
+native Verifikation bleiben maßgeblich. Die sichere Veröffentlichung ergänzt
+§18.5 um einen exklusiven atomaren Schritt: ein fremder vorhandener Finalname
+wird auch bei einem Rennen nicht überschrieben. Ein final sichtbarer Erfolg
+enthält nur die vollständig geprüften Bytes. Die eingebaute Runtime stammt
+vom tatsächlich geladenen vorbereiteten Produzenten; unavailable bleibt ein
+ehrlicher gültiger Zustand, kein stiller Download. Eine Integrationslieferung
+muss eine passende tatsächlich eingebettete Runtime nachweisen.
+
+`SafeExportError` erweitert `PatchHarborError` mit `SafeExportErrorCode`:
+`unsupported_host`, `unsupported_conversion`, `repository`, `configuration`,
+`unsafe_path`, `stale`, `resource_limit`, `io`, `interrupted`, `cleanup`.
+Bestehende `FailureReason`-Werte bleiben erhalten: stale -> STATE_MISMATCH,
+Konvertierung/Host -> UNSUPPORTED_REPOSITORY_STATE, Registrierung ->
+REPOSITORY_ERROR, Konfiguration/Pfade -> SOURCE_ERROR, spätere I/O/Cleanup ->
+RESULT_BUNDLE_ERROR, Abbruch -> INTERRUPTED. Bestehende LockBusyError bleibt
+unverändert. Ungültige Argumente bleiben TypeError/ValueError vor Betriebswirkung.
+
+Frühe Validierungsfehler erzeugen keine Diagnose-/Stagingdateien. Spätere
+Fehler erhalten eigene notwendige Diagnosebytes soweit möglich innerhalb der
+gebundenen Grenze und nennen `emergency_diagnostics_path`. Bei bereits
+veröffentlichtem gültigem Result und anschließendem Fehler trägt der Fehler
+`published_path`; das ist ein tatsächlicher Teilfortschritt, kein erfolgreicher
+API-Rückgabewert. Cleanupfehler werden nicht verschluckt. KeyboardInterrupt/
+SystemExit liefern denselben Quellschutz; SIGKILL kann eigene temporäre Daten
+hinterlassen, aber keinen als fertig veröffentlichten unvollständigen Export.
+Geschlossene Result-/Run-Schemas werden dafür nicht erweitert oder umgedeutet.
+
+### 43.6 Abnahme und Verantwortungsgrenze
+
+PH-SAFE-01 bis PH-SAFE-15 im aktuellen Plan sind vollständig zuzuordnen.
+Entwicklungsprüfungen, vollständige parallele Apply-Gates, manuelle CI und
+Produktfreigabe sind getrennte Nachweise. Echte Wheel-/PYZ-Builds benötigen
+externe vollständige Hashes, Quellinventar und bestätigten Commitbezug. Saubere
+und Dirty-Integrationsreferenzen enthalten ausschließlich synthetische Daten.
+SpecRoad bindet die neue Runtime ausdrücklich selbst; seine Schritte, Control,
+Watcher, Receipt-/Reviewregeln und äußeren Hinpakete werden nicht verändert.
