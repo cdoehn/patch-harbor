@@ -23,6 +23,29 @@ from tests.compatibility_140_support import (
     corrupt_reference, json_bytes, prepared_pyz, provenance, result_members,
     rewrite_zip, sha256,
 )
+from tests.registration_support import create_repository, git
+
+
+def test_windows_checkout_preserves_byte_pinned_fixture_sources(tmp_path):
+    source = Path(__file__).resolve().parents[1]
+    names = ('tests/fixtures/compatibility_140/provenance.json',
+             'tests/produce_compatibility_140.py')
+    expected = {name: (source / name).read_bytes() for name in names}
+    repo = create_repository(tmp_path / 'repository', with_commit=False)
+    git(repo, 'config', 'core.autocrlf', 'false')
+    for name, raw in {**expected, '.gitattributes': (source / '.gitattributes').read_bytes(),
+                      'control.txt': b'ordinary text\n'}.items():
+        target = repo / name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(raw)
+    git(repo, 'add', '--all')
+    checkout = tmp_path / 'windows-checkout'
+    checkout.mkdir()
+    git(repo, '-c', 'core.autocrlf=true', 'checkout-index', '--all',
+        '--prefix=' + checkout.as_posix() + '/')
+    assert (checkout / 'control.txt').read_bytes() == b'ordinary text\r\n'
+    for name, raw in expected.items():
+        assert (checkout / name).read_bytes() == raw, name
 
 
 def pack_contents(root):

@@ -8,6 +8,7 @@ from patchharbor.bundle_paths import BundlePathError
 from patchharbor.json_document import parse_json_document
 from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY, MAX_RESULT_FILES, ResourcePolicy, ResultSnapshotLimitError
 from patchharbor.result_reader import capture_result_payloads
+from patchharbor.runtime_profile import RuntimeLimitError
 from patchharbor.snapshot_budget import SnapshotBudget
 from patchharbor.snapshot_delta import apply_patch, file_value, layer
 from patchharbor.snapshot_types import ResultSnapshot, ResultSnapshotError, SnapshotErrorCode, SnapshotRuntime
@@ -23,7 +24,7 @@ def read_result_snapshot(path: Path, *, expected_sha256: str | None = None,
         cause: BaseException | None = exc
         code = SnapshotErrorCode.INVALID_RESULT
         while cause is not None:
-            if isinstance(cause, (ZipResourceLimitError, FileReadLimitExceeded, ResultSnapshotLimitError)):
+            if isinstance(cause, (ZipResourceLimitError, FileReadLimitExceeded, ResultSnapshotLimitError, RuntimeLimitError)):
                 code = SnapshotErrorCode.RESOURCE_LIMIT
                 break
             if isinstance(cause, BundlePathError) or (isinstance(cause, PatchHarborError)

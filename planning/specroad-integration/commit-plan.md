@@ -34,10 +34,10 @@ These are confirmed gaps, not replacements for the existing reader or core.
 
 | Stage / intended commit | Scope and acceptance | Status |
 | --- | --- | --- |
-| SRI-01 `docs(spec): define public snapshot and guarded apply contracts` | Targeted norm updates, this plan, behavior matrix; no product claims | Prepared; selected parallel gate passed; Apply pending |
-| SRI-02 `feat(api): expose verified result snapshots` | Reuse one capture; immutable public layers, strict text/binary reconstruction, budgets/errors/capability; real fixtures and independent oracle | Locally checked: 471 selected tests; Apply pending |
-| SRI-03 `feat(api): bind host admission to the applied package and target` | Explicit SHA/target, full immutable admission inside existing lock/core, failures and exchange/replay regressions | Locally checked; full selected report outside source; Apply pending |
-| SRI-04 `test(integration): verify and document the delivered transport contracts` | Built 1.6.0 PYZ public-only roundtrip, frozen1.4, version/docs/example and delivery record | Implemented; final selected gate/build and Apply pending |
+| SRI-01 `docs(spec): define public snapshot and guarded apply contracts` | Targeted norm updates, this plan, behavior matrix; no product claims | Actual Apply confirmed at `9eb602a7d3166d6e498356ac63e76216161d9177`; 3281 passed / 15 skips |
+| SRI-02 `feat(api): expose verified result snapshots` | Reuse one capture; immutable public layers, strict text/binary reconstruction, budgets/errors/capability; real fixtures and independent oracle | Actual Apply confirmed at `2a97cadbf676c457d614478c4601444cac562858`; 3379 passed / 15 skips |
+| SRI-03 `feat(api): bind host admission to the applied package and target` | Explicit SHA/target, full immutable admission inside existing lock/core, failures and exchange/replay regressions | Actual Apply confirmed at `aa4bb8b4aeb3cbfe262cb3a15f91e86bad2de0cd`; 3403 passed / 15 skips |
+| SRI-04 `test(integration): verify and document the delivered transport contracts` | Built 1.6.0 PYZ public-only roundtrip, frozen1.4, version/docs/example and delivery record | Actual Apply confirmed at `29c9cfdc095517e7c4cfd4a4c0588cd90655f0b9`; 3411 passed / 15 skips |
 
 Target is one bundle with four sequential states, no extra artificial W/R/C
 stages. Only a demonstrated blocker justifies splitting into two coherent parts.
@@ -63,6 +63,11 @@ No SpecRoad code/configuration is changed. Its independent runtime-hash adoption
 approved entrypoint/closure policy and own end-to-end roundtrip remain external.
 This plan ends after confirmed four stages and required acceptance; no new
 follow-up plan is silently created.
+
+## Historical preparation records
+
+The records below describe Bundle 071 before Apply. The table above and the
+current acceptance record below supersede their pending-Apply wording.
 
 ## SRI-02 implementation record
 
@@ -107,3 +112,19 @@ Bundle071's external delivery record. Each of the four genuine states receives
 its own full parallel Apply gate and commit later. No actual SRI commit or native
 CI result is claimed by these prepared source documents. Full review details and
 remaining acceptance are in [delivery.md](delivery.md).
+
+## Current acceptance and correction (31 October 2026)
+
+Bundle 071's actual successful Result confirms all four ordered commits and
+their individual complete parallel gates, ending at
+`29c9cfdc095517e7c4cfd4a4c0588cd90655f0b9`, clean and pushed to dev.
+The subsequent merge `d6c3450da8f3bc6731911141acfec62449e06a96` has the same
+tracked tree and is now the clean Apply/dev baseline. Implementation is complete;
+native CI and independent SpecRoad acceptance are separate outstanding checks.
+
+Manually dispatched CI run 41220319490 on main completed with six successful
+and six failed jobs. [CI-072](ci-correction.md) records the three causes and
+one proposed correction commit for dev, including a full parallel Apply gate.
+Its actual Apply and the next manually dispatched dev CI remain unconfirmed.
+No new feature plan or automatic CI is started; historical 1.5.0 acceptance
+remains unchanged.

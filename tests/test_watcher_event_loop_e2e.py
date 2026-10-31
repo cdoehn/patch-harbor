@@ -35,6 +35,8 @@ class RunningWatcher:
         self.stop = WatcherStopController()
         self.subscribed = Event()
         self.errors = []
+        self.log_stream = StringIO()
+        self.error_stream = StringIO()
         self.options = options
         self.started_at = None
         self.thread = Thread(target=self.run, daemon=True)
@@ -47,7 +49,7 @@ class RunningWatcher:
 
     def run(self):
         try:
-            run_repository_watcher(log_stream=StringIO(), error_stream=StringIO(),
+            run_repository_watcher(log_stream=self.log_stream, error_stream=self.error_stream,
                 stop_requested=self.stop.stop_requested, bind_wake=self.stop.bind_wake,
                 source_factory=self.source, **self.options)
         except BaseException as exc:
@@ -163,6 +165,7 @@ def test_real_event_loop_ignores_neighbor_download_until_its_own_quiet_period(tm
     write_package(a / 'ready', context)
     downloading, finished, stop_writer, neighbor_scanned = Event(), Event(), Event(), Event()
     calls = []
+    completions = []
     writes = []
     writer_errors = []
     def writer():
@@ -184,6 +187,7 @@ def test_real_event_loop_ignores_neighbor_download_until_its_own_quiet_period(tm
         if b in calls[-1][1]:
             neighbor_scanned.set()
         result = delegate_to_automatic_apply(exchanges=exchanges, environment=project_environment())
+        completions.append((monotonic(), result.progress.status, result.process_exit_code))
         if result.progress.status == 'attempted':
             finished.set()
         return result
@@ -192,7 +196,16 @@ def test_real_event_loop_ignores_neighbor_download_until_its_own_quiet_period(tm
         with RunningWatcher(delegate=delegate) as watcher:
             writing.start()
             assert downloading.wait(2)
-            assert finished.wait(20), watcher.errors
+            # A real Core child and shell execution can exceed 20s on parallel
+            # Windows runners. Keep the actual five-second quiet period intact.
+            budget = 120 if sys.platform == 'win32' else 20
+            assert finished.wait(budget), {
+                'subscribed_at': watcher.started_at, 'calls': calls, 'completions': completions,
+                'writes': len(writes), 'last_write': writes[-1] if writes else None,
+                'writer_errors': writer_errors, 'watcher_errors': watcher.errors,
+                'log': watcher.log_stream.getvalue(), 'stderr': watcher.error_stream.getvalue(),
+            }
+            assert [(status, code) for _, status, code in completions if status == 'attempted'] == [('attempted', 0)]
             assert not writer_errors and len(writes) > 1, (writes, writer_errors)
             assert all(scope == (a,) for _, scope in calls), (calls, writes)
             stop_writer.set()

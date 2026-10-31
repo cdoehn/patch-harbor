@@ -1,6 +1,7 @@
 """Adversarial complete Result inputs; mutations target independently produced data."""
 from dataclasses import replace
 import hashlib
+from io import BytesIO
 import json
 import os
 import re
@@ -16,6 +17,7 @@ from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY
 from patchharbor.result_snapshot import read_result_snapshot
 from tests.reference_support import reference_entries, write_reference
 from tests.snapshot_support import produce_case, result_files, update_json
+from tests.registration_support import git
 
 pytestmark = pytest.mark.e2e
 
@@ -122,16 +124,56 @@ def test_actual_file_change_during_read_is_rejected(tmp_path,monkeypatch):
     assert len(calls)==2
 
 
-def test_archive_and_reconstructed_budgets_are_independent(changed_result):
+@pytest.mark.parametrize('limit', ['entries', 'bytes'])
+def test_outer_archive_budget_is_reported_as_resource_limit(changed_result, limit):
     case,files,modes=changed_result
-    # Tiny outer entry budget exercises the shared reader, without relaxing production limits.
+    policy = replace(DEFAULT_RESOURCE_POLICY, **(
+        {'max_zip_entries': 3} if limit == 'entries' else
+        {'max_zip_total_bytes': sum(map(len, files.values())) - 1}))
     with pytest.raises(api.ResultSnapshotError) as caught:
-        read_result_snapshot(case.result,resource_policy=replace(DEFAULT_RESOURCE_POLICY,max_zip_entries=3))
+        read_result_snapshot(case.result, resource_policy=policy)
     assert caught.value.code is api.SnapshotErrorCode.RESOURCE_LIMIT
-    # Retained file versions plus both binary directions exceed an otherwise valid outer ZIP budget.
-    outer=sum(map(len,files.values()))
-    policy=replace(DEFAULT_RESOURCE_POLICY,max_zip_total_bytes=outer)
-    with pytest.raises(api.ResultSnapshotError) as caught:read_result_snapshot(case.result,resource_policy=policy)
+
+
+def archive_content_bytes(path):
+    files, _ = result_files(path)
+    total = sum(map(len, files.values()))
+    for name, raw in files.items():
+        if name.startswith('runtime/') and name.endswith('.pyz'):
+            with ZipFile(BytesIO(raw)) as archive:
+                total += sum(member.file_size for member in archive.infolist())
+    return total
+
+
+def test_embedded_pyz_budget_is_reported_as_resource_limit(tmp_path, monkeypatch, prepared_result_producer):
+    case = produce_case(tmp_path, monkeypatch, kind='clean')
+    total = archive_content_bytes(case.result)
+    policy = replace(DEFAULT_RESOURCE_POLICY, max_zip_total_bytes=total)
+    assert read_result_snapshot(case.result, resource_policy=policy).runtime.status == 'embedded'
+    with pytest.raises(api.ResultSnapshotError) as caught:
+        read_result_snapshot(case.result, resource_policy=replace(policy, max_zip_total_bytes=total - 1))
+    assert caught.value.code is api.SnapshotErrorCode.RESOURCE_LIMIT
+
+
+@pytest.mark.parametrize('runtime', ['embedded', 'unavailable'])
+def test_reconstruction_budget_is_independent_of_outer_and_runtime_archives(tmp_path, monkeypatch, request, runtime):
+    request.getfixturevalue('prepared_result_producer' if runtime == 'embedded' else 'unavailable_result_producer')
+    case = produce_case(tmp_path, monkeypatch, kind='clean')
+    data = case.repository / 'compressible.bin'
+    data.write_bytes(b'\0A' * (512 * 1024))
+    git(case.repository, 'add', 'compressible.bin')
+    git(case.repository, 'commit', '--quiet', '-m', 'compressible base')
+    data.write_bytes(b'\0B' * (512 * 1024))
+    git(case.repository, 'add', 'compressible.bin')
+    expected = b'\0C' * (512 * 1024)
+    data.write_bytes(expected)
+    result = api.bundle(case.repository).path
+    policy = replace(DEFAULT_RESOURCE_POLICY, max_zip_total_bytes=archive_content_bytes(result))
+    # The complete outer and embedded archives pass before reconstruction starts.
+    assert result_reader.capture_result_reference(result, resource_policy=policy).facts.runtime.status == runtime
+    assert api.read_result_snapshot(result).effective.files['compressible.bin'].content == expected
+    with pytest.raises(api.ResultSnapshotError) as caught:
+        read_result_snapshot(result, resource_policy=policy)
     assert caught.value.code is api.SnapshotErrorCode.RESOURCE_LIMIT
 
 
