@@ -10,7 +10,13 @@
       "runner": "ubuntu-24.04",
       "label": "Ubuntu 24.04",
       "platform": "Linux",
-      "windows_engine": ""
+      "windows_engine": "",
+      "pythons": [
+        "3.10",
+        "3.11",
+        "3.12",
+        "3.13"
+      ]
     },
     {
       "runner": "windows-2025",
@@ -224,6 +230,27 @@
       ],
       "scope": "full",
       "legacy_format1_node": "tests/test_handoff_commit_sequence.py::test_real_diagnostic_and_commit_sequences_keep_gates_and_single_final_push[{variant}]"
+    },
+    {
+      "id": "reference.safe-distribution",
+      "variants": [
+        "wheel-clean",
+        "wheel-mixed",
+        "wheel-filter",
+        "pyz-clean",
+        "pyz-mixed",
+        "pyz-filter"
+      ],
+      "required_variants": [
+        "wheel-clean",
+        "wheel-mixed",
+        "wheel-filter",
+        "pyz-clean",
+        "pyz-mixed",
+        "pyz-filter"
+      ],
+      "scope": "linux",
+      "legacy_format1_node": "tests/test_safe_reference_distribution.py::test_built_artifact_safe_export_and_offline_native_read[{variant}]"
     }
   ]
 }

@@ -1646,3 +1646,13 @@ Built-Artefakt-Nachweise ergänzt. Keine Änderung an Patch1/Result3/Runtime2/
 Rezept1, bestehenden Abnahmen, Dienstinstallation oder CI-Auslösung. Der
 Liefernachweis trennt lokale Vorbereitung, tatsächlichen Apply und externe
 Integration/Releasefreigabe.
+
+## SAFE-02/03 – 1.7.0 Implementierung und öffentliche Integration
+
+Der additive Vertrag aus §43 ist implementiert: explizite safe-Erfassung,
+gebundener lesender Preflight, Null-Helfer-/Quellschutz, native Result-3-
+Deltas, private verankerte Betriebsdateien und exklusive Veröffentlichung.
+Fehler nach tatsächlicher Publikation melden den vollständigen Teilzustand.
+Bestehende Standardpfade und historische Fixtures bleiben erhalten.
+Die manuelle Matrix ergänzt Linux 3.13 und benannte echte Distributionbeweise;
+Ausführung/Releasefreigabe werden durch diese Änderung nicht behauptet.

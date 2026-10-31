@@ -22,6 +22,9 @@ def nodes_for(suite, platform):
         nodes += ['tests/test_packaging_e2e.py::test_release_distributions_run_after_pipx_installation',
                   'tests/test_python_variants.py::test_built_reader_variant_bootstraps_and_packs_in_fresh_stdlib_process[>=3.10]',
                   'tests/test_runtime_bootstrap.py::test_uv_installed_runtime_works_outside_checkout']
+    if platform == 'Linux' and suite == 'packaging':
+        nodes += [f'tests/test_safe_reference_distribution.py::test_built_artifact_safe_export_and_offline_native_read[{route}-{kind}]'
+                  for route in ('wheel', 'pyz') for kind in ('clean', 'mixed', 'filter')]
     if suite == 'e2e':
         nodes += [f'tests/test_handoff_commit_sequence.py::test_real_diagnostic_and_commit_sequences_keep_gates_and_single_final_push[{n}]' for n in (0, 1, 3)]
     if platform == 'Windows' and suite in ('platform', 'windows'):
@@ -112,10 +115,10 @@ def github(tmp_path, monkeypatch):
     return state
 
 
-def test_manual_review_covers_twelve_jobs_and_all_python_artifacts_without_dispatch(github):
+def test_manual_review_covers_thirteen_jobs_and_all_python_artifacts_without_dispatch(github):
     result = ci.run(COMMIT, 100, workspace=github.workspace)
     assert result['status'] == 'success' and result['dispatch_attempts'] == 0
-    assert len(result['jobs']) == len(result['artifacts']) == 12
+    assert len(result['jobs']) == len(result['artifacts']) == 13
     assert {r['name'] for r in result['artifacts']} == set(ci.ARTIFACTS)
     assert all(r['build']['commit'] == COMMIT and r['reports'] for r in result['artifacts'])
     before = list(github.calls)
@@ -247,7 +250,7 @@ def test_current_ci_uses_explicit_proofs_after_all_test_paths_and_functions_are_
     upgrade_reports(github)
     result = ci.run(COMMIT, 100, workspace=github.workspace)
     assert result['status'] == 'success' and result['format_version'] == 3
-    assert result['dispatch_attempts'] == 0 and len(result['artifacts']) == 12
+    assert result['dispatch_attempts'] == 0 and len(result['artifacts']) == 13
     for artifact in result['artifacts']:
         assert artifact['proofs'] and artifact['build']['test_report_format'] == 2
         assert all(proof['nodeid'].startswith('renamed/') and proof['test_format'] == 2 for proof in artifact['proofs'])

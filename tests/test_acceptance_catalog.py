@@ -10,20 +10,24 @@ from tests.acceptance_support import workflow_matrices
 from tools.acceptance_catalog import CATALOG, LANES, artifact_names, required_proofs
 
 
-def test_catalog_preserves_all_twelve_existing_platform_python_and_shell_lanes():
+def test_catalog_preserves_existing_lanes_and_adds_linux_python_313():
     actual = {(lane.group, lane.runner, lane.python, lane.windows_engine, lane.ubuntu) for lane in LANES}
     expected = {('acceptance', runner, python, engine, '')
                 for runner, engine in (('ubuntu-24.04', ''), ('windows-2025', 'powershell.exe'))
                 for python in ('3.10', '3.11', '3.12')}
+    expected.add(('acceptance', 'ubuntu-24.04', '3.13', '', ''))
     expected.add(('acceptance', 'ubuntu-26.04', '3.14', '', ''))
     expected.update(('windows-powershell7-acceptance', 'windows-2025', python, 'pwsh', '')
                     for python in ('3.10', '3.11', '3.12'))
     expected.update(('ubuntu-docker-integration', 'ubuntu-24.04', '3.12', '', ubuntu)
                     for ubuntu in ('24.04', '26.04'))
-    assert len(LANES) == len(actual) == 12 and actual == expected
+    assert len(LANES) == len(actual) == 13 and actual == expected
     for lane in LANES:
         assert lane.suites == (('windows',) if lane.windows_engine == 'pwsh' else ('core', 'e2e', 'platform', 'packaging'))
         proofs = required_proofs(lane)
+        assert {v for i, v in proofs if i == 'reference.safe-distribution'} == (
+            {r + '-' + k for r in ('wheel', 'pyz') for k in ('clean', 'mixed', 'filter')}
+            if lane.platform == 'Linux' else set())
         assert {v for i, v in proofs if i == 'pyz.own-instruction-apply'} == {'full', 'diff', 'mixed'}
         assert {v for i, v in proofs if i == 'installation.three-generations'} == {'wheel', 'source', 'sdist'}
         assert {v for i, v in proofs if i == 'pyz.stdlib-variant'} == {'>=3.10'}

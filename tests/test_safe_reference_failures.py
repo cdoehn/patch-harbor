@@ -138,6 +138,8 @@ def test_directory_swap_during_publication_cannot_write_into_source(tmp_path,mon
 
 
 def test_real_permission_failure_does_not_mutate_source_or_publish(tmp_path,monkeypatch):
+    if os.geteuid() == 0:
+        pytest.skip('POSIX root bypasses permission bits; no native denial proof')
     repo,exchange,output=host(tmp_path,monkeypatch);output.chmod(0o500)
     plan=api.prepare_reference_export(repo,output_directory=output);before=source_bytes(repo)
     try:
@@ -254,6 +256,8 @@ def test_directory_swap_at_diagnostic_creation_never_redirects_writes(tmp_path, 
 
 
 def test_real_source_read_failure_has_semantic_io_error_without_repair(tmp_path, monkeypatch):
+    if os.geteuid() == 0:
+        pytest.skip('POSIX root bypasses permission bits; no native denial proof')
     repo, _, output = host(tmp_path, monkeypatch)
     target = repo / 'tracked.txt'
     before = source_bytes(repo)
@@ -266,4 +270,25 @@ def test_real_source_read_failure_has_semantic_io_error_without_repair(tmp_path,
         assert not list(output.iterdir())
     finally:
         target.chmod(before['tracked.txt'][0])
+    assert source_bytes(repo) == before
+
+
+@pytest.mark.parametrize('failure', [KeyboardInterrupt, SystemExit, OSError])
+def test_failure_immediately_after_atomic_link_reports_real_partial_outcome(tmp_path, monkeypatch, failure):
+    repo, _, output = host(tmp_path, monkeypatch)
+    before = source_bytes(repo)
+    plan = api.prepare_reference_export(repo, output_directory=output)
+    publish = safe_export.BoundDirectory.publish
+    def linked_then_interrupted(self, *args):
+        publish(self, *args)
+        raise failure('after atomic link')
+    monkeypatch.setattr(safe_export.BoundDirectory, 'publish', linked_then_interrupted)
+    with pytest.raises(api.SafeExportError) as caught:
+        api.bundle(repo, capture_mode='safe', export_plan=plan)
+    error = caught.value
+    expected_code = api.SafeExportErrorCode.IO if failure is OSError else api.SafeExportErrorCode.INTERRUPTED
+    assert error.code is expected_code
+    assert error.published_path.is_file()
+    assert api.read_result_snapshot(error.published_path).context.base_commit == plan.context.base_commit
+    assert json.loads((error.emergency_diagnostics_path / 'failure.json').read_bytes())['published_path'] == str(error.published_path)
     assert source_bytes(repo) == before

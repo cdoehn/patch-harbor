@@ -6,7 +6,7 @@
 **Vorgesehener Ablageort:** `spec/SPECIFICATION_EXTENSION_PYZ_PACK.md`  
 **Basisdokument:** danebenliegende [`SPECIFICATION.md`](SPECIFICATION.md), gebundener Bestandsvertrag 1.2.1 einschließlich RIV und der bereits enthaltenen Result-/CIFS-Publikationsregeln  
 **Status:** Fortgeltender PYZ/PACK-Vertrag; Revision 8 ergänzt die öffentlichen Integrationsverträge für 1.6.0 bei unveränderter Kompatibilitätsbasis. Historische Ausführungsnachweise bleiben in ihren bisherigen Plänen.
-**Produktversion:** 1.6.0; Kompatibilitätsbasis ab 1.4.0. Aktueller Folgeplan: `planning/specroad-integration/commit-plan.md`; historische Abnahmen bleiben erhalten.
+**Produktversion:** 1.7.0; Kompatibilitätsbasis ab 1.4.0. Aktueller Folgeplan: `planning/safe-reference/commit-plan.md`; historische Abnahmen bleiben erhalten.
 
 > **Ziel:** Neue Result-Bundles liefern PatchHarbor als direkt mit Python aufrufbare PYZ statt als zu installierendes Runtime-Wheel. Die PYZ enthält den PatchHarbor-Core mit dessen CLI und öffentlicher Python-API, **aber keinen Watcher**. Zusätzlich erhält PatchHarbor das reguläre Unterkommando `pack` und die öffentliche Funktion `api.pack_patch(...)`, um vorbereitete Inhalte als referenzgebundenes, abschließend validiertes Patch-Paket zu erzeugen.
 
@@ -80,7 +80,7 @@ CPY-01 bestimmt die Python-Abgrenzung in §2.2 sowie Untergrenze/Matrix in
 PYZ-02 und TEST-04. Seit RF-01 gilt gemeinsam Hauptspec §1.1: Kompatibilität
 ab 1.4.0, keine Pflicht für ältere Results oder ursprüngliche 1.3.0-PYZs.
 CPY-10–13 und MIG-01 konkretisieren dies ohne Änderung der Python-Untergrenze.
-Aktiv ist [SRI-1.6.0](../planning/specroad-integration/commit-plan.md); die drei Normdateien
+Aktiv ist [SAFE-REFERENCE 1.7.0](../planning/safe-reference/commit-plan.md); die drei Normdateien
 bleiben getrennt. Codebereinigung folgt erst nach Sicherung der 1.4.0-Fixtures.
 Unberührte Profile, Sicherheits-, Fehler- und Paketverträge bleiben erhalten.
 

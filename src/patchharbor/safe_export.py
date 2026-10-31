@@ -97,6 +97,7 @@ def _export_reference(path: Path, *, plan: SafeExportPlan, output_directory: Pat
         except (PatchHarborError, OSError, RuntimeError, ValueError, KeyboardInterrupt, SystemExit) as exc:
             error = converted_error(exc, writing=True)
             error.published_path = getattr(exc, 'published_path', None) or published_path
+            lifecycle['published_path'] = error.published_path
             if diagnostics is not None:
                 error.emergency_diagnostics_path = diagnostics.current_path()
                 try:

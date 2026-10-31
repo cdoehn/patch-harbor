@@ -161,10 +161,11 @@ def test_ci_uses_parallel_policy_without_a_serial_reference():
 def test_native_python_matrix_and_artifact_names_are_unambiguous():
     text = _workflow_text()
     matrix = text.split("        include:\n", 1)[1].split("    steps:", 1)[0]
-    assert len(re.findall(r"^          - name:", matrix, flags=re.MULTILINE)) == 7
+    assert len(re.findall(r"^          - name:", matrix, flags=re.MULTILINE)) == 8
     for version in ("3.10", "3.11", "3.12"):
         assert f"Release gate - Ubuntu 24.04 - Python {version}" in matrix
         assert f"Release gate - Windows 2025 - Python {version}" in matrix
+    assert "Release gate - Ubuntu 24.04 - Python 3.13" in matrix
     groups = workflow_matrices(text)
     assert {row['python'] for row in groups['windows-powershell7-acceptance']} == {'3.10', '3.11', '3.12'}
     assert all(row['artifact'] == f"patchharbor-packaging-{row['runner']}-py{row['python']}" for row in groups['acceptance'])
@@ -172,7 +173,7 @@ def test_native_python_matrix_and_artifact_names_are_unambiguous():
     assert text.count('name: ${{ matrix.artifact }}') == 3
     assert text.count('scripts/capture_ci_build.py') == 2
     from scripts.run_handoff_ci import JOBS, ARTIFACTS
-    assert len(JOBS) == len(ARTIFACTS) == 12
+    assert len(JOBS) == len(ARTIFACTS) == 13
 
 
 def test_windows_selection_includes_new_native_compatibility_and_installed_watcher_proofs():

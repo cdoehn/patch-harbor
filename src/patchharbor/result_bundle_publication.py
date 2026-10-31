@@ -290,6 +290,19 @@ def publish_result_bundle(
     owned_token = publication.reservation_token
     pinned_descriptor = None
     published_path = None
+    verified = False
+    def locate_published():
+        if directory_guard is None or not verified or owned_stat is None:
+            return None
+        try:
+            info = os.stat(publication.final_path.name, dir_fd=directory_guard.fd,
+                           follow_symlinks=False)
+            parent = directory_guard.current_path()
+            if parent is not None and stat.S_ISREG(info.st_mode) and os.path.samestat(info, owned_stat):
+                return parent / publication.final_path.name
+        except OSError:
+            pass
+        return None
     try:
         if directory_guard is not None:
             directory_guard.verify()
@@ -350,6 +363,7 @@ def publish_result_bundle(
         )
         if final_digest != digest:
             raise result_bundle_error("Result Bundle bytes changed before publication")
+        verified = True
         if before_atomic_publish is not None:
             before_atomic_publish()
             require_owned()
@@ -373,14 +387,21 @@ def publish_result_bundle(
             ),
         )
     except PatchHarborError as exc:
-        if directory_guard is not None and published_path is not None:
+        if directory_guard is not None:
+            published_path = locate_published() or published_path
             exc.published_path = published_path
         raise
     except OSError as exc:
         error = result_bundle_error("cannot publish the Result Bundle")
         if directory_guard is not None:
+            published_path = locate_published() or published_path
             error.published_path = published_path
         raise error from exc
+    except (KeyboardInterrupt, SystemExit, RuntimeError, ValueError) as exc:
+        if directory_guard is not None:
+            published_path = locate_published() or published_path
+            exc.published_path = published_path
+        raise
     finally:
         try:
             if directory_guard is None:

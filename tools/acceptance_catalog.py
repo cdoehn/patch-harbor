@@ -16,7 +16,7 @@ for proof in PROOFS.values():
     variants = proof['variants']
     if (not variants or len(set(variants)) != len(variants)
             or not set(proof['required_variants']) <= set(variants)
-            or proof['scope'] not in ('all', 'windows', 'uv', 'full')):
+            or proof['scope'] not in ('all', 'windows', 'uv', 'full', 'linux')):
         raise ValueError('Invalid acceptance proof variants or scope')
 
 
@@ -77,6 +77,8 @@ def artifact_names(version: str) -> dict[str, str]:
 
 def required_proofs(lane: Lane) -> frozenset[tuple[str, str]]:
     scopes = {'all'}
+    if lane.platform == 'Linux':
+        scopes.add('linux')
     if lane.platform == 'Windows':
         scopes.add('windows')
     if lane.platform == 'Linux' and lane.python == '3.14':
