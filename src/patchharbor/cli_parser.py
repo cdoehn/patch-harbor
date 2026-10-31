@@ -485,5 +485,10 @@ def _build_parser() -> argparse.ArgumentParser:
     _add_repository_commands(commands)
     _add_package_commands(commands)
     _add_bundle_apply_commands(commands)
+    runtime = commands.add_parser('runtime', help='export the installed Core runtime')
+    runtime_commands = runtime.add_subparsers(dest='runtime_command', required=True)
+    export = runtime_commands.add_parser('export', help='export own canonical PYZ without installing or downloading')
+    export.add_argument('--output-dir', required=True, type=_explicit_package_path)
+    export.add_argument('--json', action='store_true', dest='json_output')
     _add_fs_commands(commands)
     return parser

@@ -3,8 +3,8 @@
 **Dateiname:** `SPECIFICATION.md`<br>
 **Historischer Basisvertrag – Versionsangabe nur für dessen ursprünglichen Stand:**<br>
 **Produktversion:** `1.2.1`<br>
-**Aktuelle Produktversion:** `1.7.0`; Kompatibilitätsbasis ab `1.4.0`, gemeinsam mit beiden Ergänzungen.<br>
-**Spezifikationsstand:** 2026-10-31 · SAFE-01: sicherer Referenzexport, Zielversion 1.7.0<br>
+**Aktuelle Produktversion:** `1.8.0`; Kompatibilitätsbasis ab `1.4.0`, gemeinsam mit beiden Ergänzungen.<br>
+**Spezifikationsstand:** 2026-10-31 · REL-180: öffentlicher Runtime-Export und vollständige Releases<br>
 **Status:** Verbindlicher Bestands- und Zielvertrag mit den unten erklärten Ergänzungen. RF-01 korrigierte die Vertragsgrundlage; aktueller Integrationsfortschritt steht im SRI-Plan; historische Nachweise bleiben erhalten.<br>
 **RIV-Status:** 18/18 Umsetzungsschritte samt Abschlusskorrektur durch Bundle 015 und CI-Run 37306630290 auf `a02391dc045d42e317b3e766f0b1e9fa8dfadec1` bestätigt; Plan abgeschlossen.<br>
 **Watcher-Ereignisse:** Ereignisgesteuerter Watcher Bestandteil der bestätigten Basis; historische WE-Zwischenstände aktivieren keinen neuen Watcher-Plan.<br>
@@ -13,7 +13,13 @@
 **Skriptmarker:** `# PATCHHARBOR`<br>
 **Patch-Paketmarker:** `patch-harbor`
 
-Der ausdrücklich beauftragte Entwicklungsplan liegt unter
+Der aktuelle Auftrag und Plan stehen in
+[`planning/runtime-release/commit-plan.md`](../planning/runtime-release/commit-plan.md),
+Zielversion **1.8.0**, verbindlicher Export-/Releasevertrag §44. Dieser Auftrag
+autorisiert ausdrücklich CI, normalen Push, Tag und Release nach den Gates.
+Die folgenden SAFE-/SRI-Hinweise beschreiben deren historischen Auftrag.
+
+Der zuvor ausdrücklich beauftragte Entwicklungsplan liegt unter
 [`planning/safe-reference/commit-plan.md`](../planning/safe-reference/commit-plan.md),
 Zielversion **1.7.0** (ausdrückliche Nutzerwahl). §43 ergänzt den sicheren
 Referenzexport. Die vier SRI-Commits und CI-072 sind tatsächlich angewendet;
@@ -4519,3 +4525,122 @@ externe vollständige Hashes, Quellinventar und bestätigten Commitbezug. Sauber
 und Dirty-Integrationsreferenzen enthalten ausschließlich synthetische Daten.
 SpecRoad bindet die neue Runtime ausdrücklich selbst; seine Schritte, Control,
 Watcher, Receipt-/Reviewregeln und äußeren Hinpakete werden nicht verändert.
+
+
+## 44. Öffentlicher Runtime-Export und vollständige Releases ab 1.8.0
+
+Dieser versionsunabhängige Vertrag ergänzt die drei Normdateien. Jede zukünftige
+über den regulären Releaseweg veröffentlichte Version behält Export und eigene
+geprüfte PYZ. Historische Artefakte werden weder verändert noch umetikettiert.
+Lokaler Export und GitHub-Veröffentlichung sind getrennte Operationen.
+
+### 44.1 CLI, API und stabile Herkunft
+
+`patchharbor runtime export --output-dir DIRECTORY [--json]` und
+`api.export_runtime(output_directory, *, observer=None) -> RuntimeExportResult`
+exportieren ausschließlich die kanonische Core-PYZ der laufenden Distribution.
+Alle öffentlichen Typen stehen unter `patchharbor.api`. `RuntimeExportResult`
+ist unveränderbar: `path` (absoluter Path), `distribution_version`, `size`,
+`sha256` (64 Hexzeichen), `profile`, `requires_python`, `content_id`,
+`source_commit` (belegter voller Commit oder None), `warnings` (Tupel).
+Rezept, geladene Produzentenidentität, Ressourcen, Metadaten und Datei stammen
+aus derselben stabil geprüften Erfassung mit dem vorhandenen PyzProvider.
+Keine zweite ZIP-Logik. Nach der Erfassung veränderte Ressourcen verändern
+weder die exportierten Bytes noch deren Fakten. Ein neuer Aufruf prüft erneut.
+
+Unterstützt: normale Wheel-/pipx-/venv- und sdist-Installation sowie die eigene
+PYZ unter CPython >=3.10 auf den bestehenden Linux-/Windows-Pfaden. Das eigene
+Exportziel heißt genau `patchharbor-<distribution_version>.pyz`. Keine fremde
+Version, kein Download, pip/uv/Build, Git, Repository, Result, Registrierung,
+Exchange, Konfiguration, Wartung, Watcher oder Dienst ist erforderlich oder
+wird verändert/gestartet. Kein zusätzlicher Runtime-Dependency, kein Watcher
+in der PYZ. Source/Editable ohne offizielle Buildressourcen meldet unavailable;
+Anwender verwenden den offiziellen Build oder eine reguläre Installation.
+Eine korrekt installierte offizielle Distribution muss exportierbar sein.
+
+### 44.2 Ziel, Veröffentlichung und Fehler
+
+Das explizite Zielverzeichnis muss bereits existieren und darf keine Symlink-/
+Junction-/Reparse-Umleitung enthalten. Es wird nicht erstellt oder implizit aus
+Exchange gewählt. Relative Angaben werden einmal absolut verankert. Vorhandene
+Ziele, auch Links, werden niemals ersetzt. Native gepinnte Verzeichnis-/
+Dateihandles und dieselbe exklusive No-replace-Primitive wie bei pack schützen
+gegen Zieltausch. Die eigenen temporären Dateien liegen ausschließlich dort,
+sind privat, werden vollständig geschrieben, synchronisiert und anhand des
+fixierten Hashes geprüft, bevor der fertige Name sichtbar wird. Kein Retry und
+keine allgemeine Netzwerkdateisystem-/Stromausfallgarantie. Fehlende sichere
+Primitive verweigert den Export. Vorhandene Daten werden nicht repariert.
+
+`RuntimeExportError` erweitert PatchHarborError mit `code` (Enum),
+`unavailable_reason` und `published_path`. unavailable -> SOURCE_ERROR/4;
+unsafe_path (fehlendes/umgeleitetes Ziel) -> SOURCE_ERROR/4; collision und io ->
+PAYLOAD_PREPARATION_ERROR/6; interrupted -> INTERRUPTED/130. Unavailable-Gründe
+sind die bestehenden source_not_prepared, source_changed, resources_missing,
+resources_invalid und resource_limit. API-Typ-/Leerwertfehler sind TypeError/
+ValueError vor Arbeit; CLI-Grammatikfehler Usage/2. Fehler veröffentlichen keinen
+behaupteten Erfolg. Aufgetretene Cleanupfehler ergänzen den Primärfehler; nach
+bestätigter Veröffentlichung liefern optionale Cleanupfehler Erfolgsfakten mit
+Warnungen. Ein abgefangener Abbruch kann ein vollständig veröffentlichtes Ziel
+in published_path benennen. SIGKILL oder Unterbrechung direkt an der atomaren
+Grenze kann temporäre oder vollständig fertige Daten ohne Antwort hinterlassen;
+vor Wiederholung Ziel prüfen. Niemals eine unvollständige fertige Datei.
+CLI-Ausgabefehler nach Export sind getrennt (7 beziehungsweise Abbruch 130).
+
+JSON `output_version=1`, `command="runtime.export"` verwendet das gemeinsame
+Envelope (§5.2). Erfolg enthält genau die oben genannten Resultfelder; path ist
+String, warnings ein Array, source_commit null ohne Herkunft. Fehler enthält
+result=null und die vier bisherigen Fehlerfelder plus code, unavailable_reason,
+published_path (String oder null). Erfolg=false entspricht dem Prozessstatus.
+Keine erfundenen Herkunftscommits. CLI und API verwenden denselben Export.
+
+### 44.3 Gebundene Release-Dateien
+
+Pflichtassets jeder Version: `patchharbor-<version>.pyz`,
+`patchharbor-<version>-py3-none-any.whl`, `patchharbor-<version>.tar.gz`,
+`runtime-manifest.json`, `SHA256SUMS`. GitHubs Source-Archive sind kein Ersatz.
+Offizieller Build, installierter Export, Export aus PYZ und Runtime eines Results
+dieser identischen Distribution müssen bytegleich sein. Zusätzliche Provenienz
+steht außerhalb der PYZ und verändert die kanonischen Bytes nicht.
+
+Manifestformat 1 hat marker=patchharbor-runtime-release, format_version=1,
+version, source_commit (voll), tag, runtime (filename, size, sha256, profile,
+requires_python, content_id), integration_capabilities und capability_host.
+Die Fähigkeiten werden aus der geprüften PYZ abgefragt; Host und tatsächliche
+Fähigkeitswerte sind Beobachtungen, keine pauschale Plattformfreigabe.
+SHA256SUMS hasht die drei gebauten Dateien und das Manifest, niemals sich selbst.
+Nur portable Dateinamen, keine absoluten Hostpfade/privaten Dateien. Ein erwarteter
+Hash muss aus einer vertrauenswürdigen Freigabe stammen; eine mitgelieferte
+Prüfsumme allein authentifiziert weder Anbieter noch Freigabe.
+
+### 44.4 Release-Gates
+
+Version und voller erwarteter Abschlusscommit sind explizite Workfloweingaben.
+Der gepushte, saubere exakt ausgecheckte Abschlusscommit ist Buildquelle;
+der vorhandene Acceptance-Workflow/Katalog liefert die erforderlichen nativen
+Python-/Linux-/Windows-/PowerShell-/Docker-Gates für genau diesen Commit.
+Kein grüner anderer HEAD. Tag erst nach allen erforderlichen Gates. Einmal
+gebaute und frisch installierte Artefakte werden geprüft und anschließend
+unverändert hochgeladen; kein ungeprüfter Neubau nach letztem Gate.
+
+Release zunächst Draft. Pflichtassetmenge, Manifest, Version, Tag-/Commitbindung
+und tatsächliche Downloads müssen vor Veröffentlichung vollständig stimmen.
+Danach erneut herunterladen und gegen Originalbytes/Hashes prüfen. Es gibt keine
+atomare Mehrdateiveröffentlichung. Wiederholung erkennt einen identischen Release
+oder vervollständigt ausschließlich einen eindeutig eigenen passenden Draft;
+abweichende Tags/Assets werden nicht ersetzt. Keine Force-Pushes/Versionswechsel.
+Schreibrechte nur im Publikationsjob; keine Secrets in Assets/Logs. Das Gate gilt
+für den Repositoryworkflow, nicht als Behauptung über allmächtige Administratoren.
+CI bleibt explizit ausgelöst; dieser Auftrag erlaubt die nötigen Aufrufe. Kein
+Release/CI im Apply-Entrypoint, kein neuer oder veränderter laufender Watcher.
+
+### 44.5 Verbraucher und Abnahme
+
+Direkter Bibliotheksimport aus der extern gehashten Release-PYZ in frischem
+Prozess benötigt keinen Result-Bootstrap. Öffentliche APIs und tatsächliche
+Capability-Verträge gelten weiter. snapshot_contract_version und
+safe_reference_contract_version werden nicht wegen der Produktversion erhöht.
+Safe-Reference bleibt Linux x86-64 / CPython 3.10–3.14 (§43). Isolierte synthetische
+Clean-/Dirty-Referenzen müssen Kontext, Plan-/Betriebsgrenzen, sicheren Export,
+extern gehashten Snapshot, korrekte Inventare und Quellunverändertheit belegen.
+Abnahmeplan und ausgewählte Development-Nachweise, vollständige parallele
+Apply-Gates, genaue CI und Release-Downloads sind getrennt zu dokumentieren.

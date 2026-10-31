@@ -6,7 +6,7 @@
 **Vorgesehener Ablageort:** `spec/SPECIFICATION_EXTENSION_PYZ_PACK.md`  
 **Basisdokument:** danebenliegende [`SPECIFICATION.md`](SPECIFICATION.md), gebundener Bestandsvertrag 1.2.1 einschließlich RIV und der bereits enthaltenen Result-/CIFS-Publikationsregeln  
 **Status:** Fortgeltender PYZ/PACK-Vertrag; Revision 8 ergänzt die öffentlichen Integrationsverträge für 1.6.0 bei unveränderter Kompatibilitätsbasis. Historische Ausführungsnachweise bleiben in ihren bisherigen Plänen.
-**Produktversion:** 1.7.0; Kompatibilitätsbasis ab 1.4.0. Aktueller Folgeplan: `planning/safe-reference/commit-plan.md`; historische Abnahmen bleiben erhalten.
+**Produktversion:** 1.8.0; Kompatibilitätsbasis ab 1.4.0. Aktueller Folgeplan: `planning/safe-reference/commit-plan.md`; historische Abnahmen bleiben erhalten.
 
 > **Ziel:** Neue Result-Bundles liefern PatchHarbor als direkt mit Python aufrufbare PYZ statt als zu installierendes Runtime-Wheel. Die PYZ enthält den PatchHarbor-Core mit dessen CLI und öffentlicher Python-API, **aber keinen Watcher**. Zusätzlich erhält PatchHarbor das reguläre Unterkommando `pack` und die öffentliche Funktion `api.pack_patch(...)`, um vorbereitete Inhalte als referenzgebundenes, abschließend validiertes Patch-Paket zu erzeugen.
 
@@ -1448,3 +1448,14 @@ Wheel und PYZ ausgeliefert. Der Watcher bleibt ausgeschlossen. Der neue sichere
 Hostvertrag gilt für Linux x86-64 / CPython 3.10–3.14; bestehende Funktionen auf
 anderen Hosts und das Python-only-Lesen bleiben unverändert. Historische
 Plan-/Releaseabnahmen werden nicht geschlossen; CI startet nur der Nutzer.
+
+
+## Öffentlicher Export und Releasevertrag ab 1.8.0
+
+Hauptspec §44 und `planning/runtime-release/commit-plan.md` ergänzen dauerhaft
+Core-Parität um `runtime export` / `api.export_runtime`. Dieselbe kanonische
+PYZ wird aus Installation, PYZ und Result geliefert und bei jedem zukünftigen
+Release als echtes Asset verlangt. Python-/Safe-Reference-Grenzen und Capability-
+Versionen bleiben erhalten. Der ausdrückliche 1.8.0-Auftrag autorisiert CI, Tag
+und Release nach exakten Abschlussgates; frühere allgemeine Nutzer-only-Regeln
+blockieren diesen Auftrag nicht. Kein CI-/Releaseaufruf im Apply-Entrypoint.

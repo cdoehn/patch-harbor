@@ -25,8 +25,8 @@ from tests.registration_support import isolated_user_environment
 
 pytestmark = pytest.mark.packaging
 
-MAX_WHEEL_BYTES = 384 * 1024
-RELEASE_VERSION = "1.7.0"
+MAX_WHEEL_BYTES = 416 * 1024  # 1.8 public export + packaged API documentation; no runtime budget change.
+RELEASE_VERSION = "1.8.0"
 EXPECTED_RUNTIME_FILES = {
     "patchharbor/safe_capture.py",
     "patchharbor/safe_export.py",
@@ -122,6 +122,8 @@ EXPECTED_RUNTIME_FILES = {
     "patchharbor/runtime_profile.py",
     "patchharbor/runtime_zip.py",
     "patchharbor/runtime_pyz.py",
+    "patchharbor/runtime_export.py",
+    "patchharbor/runtime_export_types.py",
     "patchharbor/runtime_sources.py",
     "patchharbor/pyz_artifact.py",
     "patchharbor/result_bundle_target.py",

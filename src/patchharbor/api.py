@@ -32,7 +32,7 @@ from patchharbor.api_types import (
     RunToolError, ScriptPrepared, ScriptResult, UnregisterResult,
     PatchEntry, PatchEntryRole, PatchInspection, PatchManifest, PatchMessage,
     PatchValidationResult, PatchValidationScope, ReferenceContext,
-    PatchPackResult,
+    PatchPackResult, RuntimeExportResult, RuntimeExportError, RuntimeExportErrorCode,
     IntegrationCapabilities, ResultSnapshot, ResultSnapshotError, SnapshotErrorCode,
     SnapshotFile, SnapshotLayer, SnapshotRuntime,
     ApplyLock, ApplyLockKind, ApplyReadiness, AutomaticApplyResult,
@@ -67,6 +67,7 @@ __all__ = [
     "AutomaticApplyStatus", "ExchangeWatchTarget", "WatchControlPaths", "WatchTargets",
     "watch_targets", "watch_control_paths", "apply_readiness",
     "pack_patch", "PatchPackResult",
+    "export_runtime", "RuntimeExportResult", "RuntimeExportError", "RuntimeExportErrorCode",
     "IntegrationCapabilities", "ResultSnapshot", "ResultSnapshotError", "SnapshotErrorCode",
     "SnapshotFile", "SnapshotLayer", "SnapshotRuntime", "integration_capabilities", "read_result_snapshot",
 ]
@@ -516,3 +517,12 @@ normal nonzero script exits are returned as ScriptResult(success=False).
                 source, cwd=directory, timeout_seconds=seconds, output=targets,
             )
         return ScriptResult(exit_code)
+
+
+def export_runtime(output_directory: PathInput, *, observer: ProgressObserver | None = None) -> RuntimeExportResult:
+    """Export this distribution's canonical Core-PYZ into an existing explicit directory."""
+    directory = _path(output_directory, 'output_directory')
+    selected_observer = _observer(observer)
+    from patchharbor.runtime_export import export_runtime as _export_runtime
+    with _observe_activity(selected_observer):
+        return _export_runtime(directory)

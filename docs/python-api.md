@@ -776,3 +776,22 @@ Result bytes externally and call `read_result_snapshot(path, expected_sha256=...
 compare all four binding fields with the approved context. The reader verifies
 all native inventories, hashes, sizes, paths, file types and runtime metadata.
 A self-declared hash inside the ZIP does not replace that external binding.
+
+
+## Runtime export (since 1.8.0)
+
+`api.export_runtime(output_directory, *, observer=None)` returns immutable
+`RuntimeExportResult`: path, distribution_version, size, sha256, profile,
+requires_python, content_id, source_commit (None unless proven), warnings.
+The explicitly selected directory must exist, with no linked parents. Existing
+targets are protected. No Result, Git, registry, network or build tool is needed.
+Use a regular wheel/sdist installation or the official Core-PYZ; unprepared
+source/editable installations report `RuntimeExportError` code `unavailable`.
+The error exposes code, unavailable_reason and published_path. See main spec
+§44 for interruption, filesystem and CLI/JSON semantics. No GitHub publication.
+
+```python
+from patchharbor import api
+runtime = api.export_runtime('/absolute/existing/output')
+print(runtime.path, runtime.sha256, runtime.size)
+```

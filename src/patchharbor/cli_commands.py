@@ -589,3 +589,38 @@ def _configuration_command(
         archive_directory=configuration.archive_directory, stdout=stdout,
     )
     return 0
+
+
+def _runtime_export_command(args: argparse.Namespace, *, stdout: TextIO, stderr: TextIO) -> int:
+    from dataclasses import asdict
+    result = error = None
+    try:
+        exported = api.export_runtime(args.output_dir)
+        result = asdict(exported)
+        result['path'] = str(exported.path)
+    except api.RuntimeExportError as exc:
+        error = exc
+    except KeyboardInterrupt:
+        error = api.RuntimeExportError(api.RuntimeExportErrorCode.INTERRUPTED, 'runtime export interrupted')
+    code = 0 if error is None else int(exit_code_for_error(error))
+    document = _json_envelope('runtime.export', result=result, error=error, process_exit_code=code)
+    if error is not None:
+        document['error'].update(code=error.code.value, unavailable_reason=error.unavailable_reason,
+                                 published_path=None if error.published_path is None else str(error.published_path))
+    try:
+        if args.json_output:
+            _write_json_document(document, stdout)
+        elif result is not None:
+            print(result['path'], file=stdout)
+            print('sha256: '+result['sha256'], file=stdout)
+            for warning in result['warnings']:
+                print(format_tool_message(warning), file=stderr)
+        else:
+            print(format_tool_message(str(error)), file=stderr)
+        stdout.flush()
+        stderr.flush()
+    except (OSError, UnicodeError):
+        return int(ExitCode.EXECUTION_ERROR)
+    except KeyboardInterrupt:
+        return int(ExitCode.INTERRUPTED)
+    return code

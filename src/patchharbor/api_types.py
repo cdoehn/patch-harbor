@@ -28,6 +28,7 @@ from patchharbor.snapshot_types import (
     SnapshotFile, SnapshotLayer, SnapshotRuntime,
 )
 from patchharbor.pack_types import PatchPackResult
+from patchharbor.runtime_export_types import RuntimeExportResult, RuntimeExportError, RuntimeExportErrorCode
 from patchharbor.watch_contract import (
     ApplyLock, ApplyLockKind, ApplyReadiness, AutomaticApplyResult,
     AutomaticApplyStatus, ExchangeWatchTarget, WatchControlPaths, WatchTargets,

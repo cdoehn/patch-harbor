@@ -18,6 +18,7 @@ from patchharbor.cli_commands import (
     _configuration_command,
     _context_command,
     _pack_command,
+    _runtime_export_command,
     _package_command,
     _register_command,
     _registry_list_command,
@@ -113,6 +114,9 @@ def main(
 
     if args.command == "context":
         return _context_command(args.repository, json_output=args.json_output, **presentation)
+
+    if args.command == 'runtime':
+        return _runtime_export_command(args, stdout=actual_stdout, stderr=actual_stderr)
 
     if args.command == 'pack':
         return _pack_command(args, stdout=actual_stdout, stderr=actual_stderr)

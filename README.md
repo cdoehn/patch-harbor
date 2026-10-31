@@ -1,4 +1,4 @@
-# PatchHarbor 1.7.0
+# PatchHarbor 1.8.0
 
 **A bridge between AI coding assistants and local Git repositories.**
 
@@ -26,7 +26,7 @@ It bridges these separate environments using verified ZIP packages, allowing AI 
 - Result Bundles normally include an installation-free **Core-PYZ (without the watcher)**, allowing compatible AI Linux environments to work with PatchHarbor without installing it separately.
 - CLI and Python integrations share the same public API.
 
-This source uses version **1.7.0**. It adds an explicit source-safe reference
+This source uses version **1.8.0**. It adds an explicit source-safe reference
 export through the public Python API on Linux x86-64 with CPython 3.10–3.14.
 The safe mode refuses unsupported Git conversions before running any helper,
 binds the approved source and output boundary, and suppresses Exchange maintenance.
@@ -53,13 +53,13 @@ For the normal CLI **and watcher**, install a reviewed wheel or source checkout.
 For example, with an existing Python 3.10+ and pipx:
 
 ```bash
-pipx install --python python3 /absolute/path/patchharbor-1.7.0-py3-none-any.whl
+pipx install --python python3 /absolute/path/patchharbor-1.8.0-py3-none-any.whl
 patchharbor --version
 patchharbor --help
 ```
 
 The wheel path is an artifact you obtain and verify; this command does not assume
-that version 1.7.0 has been published on a package index. **pipx is optional**:
+that version 1.8.0 has been published on a package index. **pipx is optional**:
 a dedicated virtual environment is another installation route. Wheel and sdist
 remain supported for normal installations; the PYZ replaces the runtime embedded
 in new Results, not the installed watcher. See
@@ -321,3 +321,20 @@ Current [1.6.0 integration plan](planning/specroad-integration/commit-plan.md),
 [behavior matrix](planning/specroad-integration/test-matrix.md) and
 [delivery record](planning/specroad-integration/delivery.md) separate prepared
 source, actual Apply and external acceptance.
+
+
+## Export the installed Core runtime
+
+```sh
+patchharbor runtime export --output-dir /absolute/existing/output --json
+python -I -S -B patchharbor-1.8.0.pyz runtime export --output-dir /another/existing/output --json
+```
+
+This exports the running distribution's canonical PYZ without Git, a Result,
+registration, network or build tools. It never replaces an existing file.
+Unprepared source/editable trees report unavailable; build with
+`python scripts/build_release.py --outdir dist` and install the wheel normally.
+The public Python API is `api.export_runtime(output_directory)`.
+Every release from 1.8.0 requires PYZ, wheel, built sdist, runtime-manifest.json
+and SHA256SUMS. Version strings alone are not a publication or platform proof.
+See [the release plan](planning/runtime-release/commit-plan.md) and main spec §44.

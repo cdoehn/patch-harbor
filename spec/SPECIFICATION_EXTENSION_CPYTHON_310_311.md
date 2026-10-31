@@ -4,7 +4,7 @@
 **Revision:** 5
 **Stand:** 30. Oktober 2026
 **Status:** Fortgeltender CPython-Vertrag; RF-01 begrenzt die Artefakt-Kompatibilität auf die Basis ab 1.4.0. Implementierungs- und offene Abnahmenachweise bleiben im CPython-Plan erhalten.
-**Produktversion:** 1.7.0; Kompatibilitätsbasis ab 1.4.0. CPython-Untergrenze unverändert 3.10.
+**Produktversion:** 1.8.0; Kompatibilitätsbasis ab 1.4.0. CPython-Untergrenze unverändert 3.10.
 **Historischer Umsetzungsplan:** [CP-00 bis CP-05](../planning/python-compatibility/commit-plan.md)
 **Aktiver Folgeplan:** [SAFE-REFERENCE 1.7.0](../planning/safe-reference/commit-plan.md);
 der historische 1.5.0-Plan und seine externe Releaseabnahme bleiben erhalten.
@@ -235,3 +235,14 @@ Wheel und PYZ ausgeliefert. Der Watcher bleibt ausgeschlossen. Der neue sichere
 Hostvertrag gilt für Linux x86-64 / CPython 3.10–3.14; bestehende Funktionen auf
 anderen Hosts und das Python-only-Lesen bleiben unverändert. Historische
 Plan-/Releaseabnahmen werden nicht geschlossen; CI startet nur der Nutzer.
+
+
+## Öffentlicher Export und Releasevertrag ab 1.8.0
+
+Hauptspec §44 und `planning/runtime-release/commit-plan.md` ergänzen dauerhaft
+Core-Parität um `runtime export` / `api.export_runtime`. Dieselbe kanonische
+PYZ wird aus Installation, PYZ und Result geliefert und bei jedem zukünftigen
+Release als echtes Asset verlangt. Python-/Safe-Reference-Grenzen und Capability-
+Versionen bleiben erhalten. Der ausdrückliche 1.8.0-Auftrag autorisiert CI, Tag
+und Release nach exakten Abschlussgates; frühere allgemeine Nutzer-only-Regeln
+blockieren diesen Auftrag nicht. Kein CI-/Releaseaufruf im Apply-Entrypoint.

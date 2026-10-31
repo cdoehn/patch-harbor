@@ -1656,3 +1656,10 @@ Fehler nach tatsächlicher Publikation melden den vollständigen Teilzustand.
 Bestehende Standardpfade und historische Fixtures bleiben erhalten.
 Die manuelle Matrix ergänzt Linux 3.13 und benannte echte Distributionbeweise;
 Ausführung/Releasefreigabe werden durch diese Änderung nicht behauptet.
+
+
+## 2026-10-31 – REL-180-01
+
+Define the permanent public runtime export and complete GitHub release contract,
+version 1.8.0; reuse canonical PYZ and native no-replace publication. Actual Apply,
+exact-commit CI and release download remain required external evidence.
