@@ -12,6 +12,23 @@ on:
         description: Optional full pushed commit required by the handoff
         type: string
         default: ""
+      release_action:
+        description: Explicit release step; none runs the acceptance matrix
+        type: choice
+        options: [none, prepare, publish]
+        default: none
+      release_version:
+        description: Stable version for prepare/publish; must match expected_commit
+        type: string
+        default: ""
+      acceptance_run_id:
+        description: Successful acceptance Run-ID for exactly expected_commit
+        type: string
+        default: ""
+      prepared_run_id:
+        description: Successful prepare Run-ID whose original assets will be published
+        type: string
+        default: ""
 
 env:
   PATCHHARBOR_EXPECTED_COMMIT: ${{ inputs.expected_commit }}
@@ -21,6 +38,7 @@ permissions:
 
 jobs:
   acceptance:
+    if: ${{ inputs.release_action == 'none' || inputs.release_action == '' }}
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 120
@@ -143,6 +161,7 @@ jobs:
           retention-days: 14
 
   windows-powershell7-acceptance:
+    if: ${{ inputs.release_action == 'none' || inputs.release_action == '' }}
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
@@ -214,6 +233,7 @@ jobs:
           retention-days: 14
 
   ubuntu-docker-integration:
+    if: ${{ inputs.release_action == 'none' || inputs.release_action == '' }}
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 90
@@ -261,5 +281,88 @@ jobs:
           path: |
             ${{ runner.temp }}/patchharbor-docker-integration/ubuntu-${{ matrix.ubuntu }}
             !${{ runner.temp }}/patchharbor-docker-integration/ubuntu-${{ matrix.ubuntu }}/patchharbor-build-artifacts/**
+          if-no-files-found: error
+          retention-days: 14
+
+  release-prepare:
+    name: Prepare verified runtime release
+    if: ${{ inputs.release_action == 'prepare' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_VERSION: ${{ inputs.release_version }}
+      ACCEPTANCE_RUN_ID: ${{ inputs.acceptance_run_id }}
+      DISPATCH_COMMIT: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Check explicit checkout binding
+        run: python -c "import os; assert os.environ['PATCHHARBOR_EXPECTED_COMMIT'] == os.environ['DISPATCH_COMMIT']"
+      - name: Install build and verification dependencies
+        run: python -m pip install --disable-pip-version-check -e ".[dev]"
+      - name: Build once and verify public consumers before tagging and CI
+        run: >-
+          python scripts/release_runtime.py prepare
+          --version "$RELEASE_VERSION" --commit "$PATCHHARBOR_EXPECTED_COMMIT"
+          --assets "${{ runner.temp }}/release/assets" --workspace "${{ runner.temp }}/release/evidence"
+      - name: Preserve the exact candidate bytes for subsequent CI and publication
+        uses: actions/upload-artifact@v7
+        with:
+          name: patchharbor-prepared-release
+          path: ${{ runner.temp }}/release
+          if-no-files-found: error
+          retention-days: 14
+
+  release-publish:
+    name: Publish verified runtime release
+    if: ${{ inputs.release_action == 'publish' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: write
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_VERSION: ${{ inputs.release_version }}
+      ACCEPTANCE_RUN_ID: ${{ inputs.acceptance_run_id }}
+      PREPARED_RUN_ID: ${{ inputs.prepared_run_id }}
+      DISPATCH_COMMIT: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Verify preparation run and exact dispatch commit
+        run: >-
+          python scripts/release_runtime.py verify-preparation
+          --version "$RELEASE_VERSION" --commit "$PATCHHARBOR_EXPECTED_COMMIT"
+          --acceptance-run-id "$ACCEPTANCE_RUN_ID" --prepared-run-id "$PREPARED_RUN_ID"
+          --assets "${{ runner.temp }}/release/assets" --workspace "${{ runner.temp }}/release/evidence"
+      - name: Download the original prepared assets without rebuilding
+        uses: actions/download-artifact@v7
+        with:
+          name: patchharbor-prepared-release
+          path: ${{ runner.temp }}/release
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.prepared_run_id }}
+      - name: Install metadata and canonical-byte verification dependencies
+        run: python -m pip install --disable-pip-version-check -e ".[dev]"
+      - name: Require exact tag and CI, upload draft, verify and publish
+        run: >-
+          python scripts/release_runtime.py publish
+          --version "$RELEASE_VERSION" --commit "$PATCHHARBOR_EXPECTED_COMMIT"
+          --acceptance-run-id "$ACCEPTANCE_RUN_ID"
+          --assets "${{ runner.temp }}/release/assets" --workspace "${{ runner.temp }}/release/evidence"
+      - name: Preserve post-publication download proof
+        uses: actions/upload-artifact@v7
+        with:
+          name: patchharbor-published-release-proof
+          path: ${{ runner.temp }}/release/evidence/published.json
           if-no-files-found: error
           retention-days: 14

@@ -76,7 +76,9 @@
     "tests/test_runtime_packaging.py",
     "tests/test_result3_publication_policy.py",
     "tests/test_result_runtime_publication.py",
-    "tests/test_pack_exchange_e2e.py"
+    "tests/test_pack_exchange_e2e.py",
+    "tests/test_runtime_export.py",
+    "tests/test_runtime_export_distribution.py"
   ],
   "artifact_roles": {
     "wheel": "patchharbor-{version}-py3-none-any.whl",
@@ -251,6 +253,30 @@
       ],
       "scope": "linux",
       "legacy_format1_node": "tests/test_safe_reference_distribution.py::test_built_artifact_safe_export_and_offline_native_read[{variant}]"
+    },
+    {
+      "id": "runtime.public-export",
+      "variants": [
+        "default"
+      ],
+      "required_variants": [
+        "default"
+      ],
+      "scope": "all",
+      "legacy_format1_node": "tests/test_runtime_export_distribution.py::test_wheel_sdist_pyz_public_export_byte_equality"
+    },
+    {
+      "id": "runtime.direct-consumer",
+      "variants": [
+        "clean",
+        "dirty"
+      ],
+      "required_variants": [
+        "clean",
+        "dirty"
+      ],
+      "scope": "linux",
+      "legacy_format1_node": "tests/test_runtime_export_distribution.py::test_release_pyz_direct_consumer_without_result_bootstrap[{variant}]"
     }
   ]
 }

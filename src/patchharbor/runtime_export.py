@@ -4,7 +4,7 @@ from pathlib import Path
 
 from patchharbor.compat import add_exception_note
 from patchharbor.platform.filesystem import (
-    FileChangedDuringRead, FileReadLimitExceeded, UnsupportedFileTypeError,
+    FileChangedDuringRead, FileReadLimitExceeded, UnsupportedFileTypeError, PathKind, path_kind,
 )
 from patchharbor.platform.pack_output import open_output_directory
 from patchharbor.pyz_artifact import PyzProvider
@@ -29,7 +29,7 @@ def export_runtime(output_directory: Path) -> RuntimeExportResult:
             root = output_directory.absolute()
             # The native directory opener rejects every linked/reparse parent.
             # Resolve is only a comparison, never a way to admit a redirected path.
-            if root.resolve(strict=True) != root:
+            if root.resolve(strict=True) != root or any(path_kind(p) is not PathKind.DIRECTORY for p in (root,*root.parents)):
                 raise OSError('output directory must not contain links or parent traversal')
             scope = open_output_directory(root)
             target = root / recipe.pyz_name

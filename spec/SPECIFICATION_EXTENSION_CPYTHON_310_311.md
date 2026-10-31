@@ -246,3 +246,13 @@ Release als echtes Asset verlangt. Python-/Safe-Reference-Grenzen und Capability
 Versionen bleiben erhalten. Der ausdrückliche 1.8.0-Auftrag autorisiert CI, Tag
 und Release nach exakten Abschlussgates; frühere allgemeine Nutzer-only-Regeln
 blockieren diesen Auftrag nicht. Kein CI-/Releaseaufruf im Apply-Entrypoint.
+
+
+Aktuelle Nutzerentscheidung im REL-180-Auftrag: Nach Apply-Abschluss, lokalen
+Abnahmen und geprüftem Build darf Codex das neue v1.8.0-Tag am vollständigen
+Abschlusscommit anlegen; danach folgt die exakte CI. Bei fehlgeschlagener CI
+wird ausschließlich dieses selbst neu angelegte und weiterhin unveränderte
+Tag entfernt. Bestehende fremde oder abweichende Tags werden nicht verändert.
+Der Release bleibt bis zu grüner CI und allen Asset-/Downloadprüfungen
+unveröffentlicht. Diese Entscheidung ersetzt die frühere manuelle Taganlage
+und den zwischenzeitlich erlaubten Abschluss ohne GitHub-Veröffentlichung.

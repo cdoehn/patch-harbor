@@ -135,3 +135,77 @@ def test_capture_remains_consistent_when_resources_change_before_write(monkeypat
 def test_invalid_api_arguments_are_rejected_before_capture(monkeypatch,value):
     monkeypatch.setattr(pyz_artifact.PyzProvider,'capture',lambda _:pytest.fail('capture'))
     with pytest.raises((TypeError,ValueError)):api.export_runtime(value)
+
+
+@pytest.mark.skipif(os.name=='nt',reason='Windows pinned handle prevents deliberate replacement')
+@pytest.mark.parametrize('fault',['bytes','replacement','link','hardlink'])
+def test_changed_temporary_output_never_publishes(monkeypatch,tmp_path,fault):
+    _,_,recipe,_=provider_for(monkeypatch,tmp_path)
+    out=tmp_path/'out';out.mkdir();foreign=tmp_path/'foreign';foreign.write_bytes(b'preserve')
+    original=OwnedPackFile.verify_hash
+    def changed(self,*a):
+        if fault=='bytes':self.path.write_bytes(b'corrupt')
+        elif fault=='hardlink':os.link(self.path,out/'foreign-link')
+        else:
+            self.path.unlink()
+            if fault=='replacement':self.path.write_bytes(b'foreign')
+            else:self.path.symlink_to(foreign)
+        original(self,*a)
+    monkeypatch.setattr(OwnedPackFile,'verify_hash',changed)
+    with pytest.raises(api.RuntimeExportError):api.export_runtime(out)
+    assert not (out/recipe.pyz_name).exists() and foreign.read_bytes()==b'preserve'
+    if fault in ('replacement','link'):assert len(list(out.iterdir()))==1
+
+
+def test_concurrent_exports_have_one_winner(monkeypatch,tmp_path):
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Barrier
+    _,_,recipe,raw=provider_for(monkeypatch,tmp_path)
+    out=tmp_path/'out';out.mkdir();barrier=Barrier(2);original=OwnedPackFile.publish
+    def synchronized(self,name):barrier.wait(timeout=30);return original(self,name)
+    monkeypatch.setattr(OwnedPackFile,'publish',synchronized)
+    def attempt():
+        try:return api.export_runtime(out)
+        except api.RuntimeExportError as e:return e
+    with ThreadPoolExecutor(2) as pool:results=list(pool.map(lambda _:attempt(),range(2)))
+    assert sum(isinstance(r,api.RuntimeExportResult) for r in results)==1
+    assert sum(isinstance(r,api.RuntimeExportError) and r.code==api.RuntimeExportErrorCode.COLLISION for r in results)==1
+    assert (out/recipe.pyz_name).read_bytes()==raw and len(list(out.iterdir()))==1
+
+
+@pytest.mark.skipif(os.name=='nt',reason='Windows rename has no temporary second name')
+def test_cleanup_failure_keeps_complete_success_with_warning(monkeypatch,tmp_path):
+    provider_for(monkeypatch,tmp_path)
+    out=tmp_path/'out';out.mkdir();original=os.unlink
+    def fail(path,*a,**k):
+        if str(path).startswith('.patchharbor-pack-'):raise OSError('cleanup denied')
+        return original(path,*a,**k)
+    monkeypatch.setattr(os,'unlink',fail)
+    result=api.export_runtime(out)
+    assert result.warnings and result.sha256==sha256(result.path.read_bytes()).hexdigest()
+
+
+def test_interrupt_after_known_publication_reports_actual_path(monkeypatch,tmp_path):
+    _,_,recipe,raw=provider_for(monkeypatch,tmp_path)
+    out=tmp_path/'out';out.mkdir();original=OwnedPackFile.publish
+    def interrupted(self,name):original(self,name);raise KeyboardInterrupt()
+    monkeypatch.setattr(OwnedPackFile,'publish',interrupted)
+    with pytest.raises(api.RuntimeExportError) as caught:api.export_runtime(out)
+    assert caught.value.code==api.RuntimeExportErrorCode.INTERRUPTED
+    assert caught.value.published_path==out/recipe.pyz_name
+    assert caught.value.published_path.read_bytes()==raw
+
+
+@pytest.mark.packaging
+def test_real_output_permission_denial_preserves_existing_data(monkeypatch,tmp_path):
+    from tests.runtime_permissions import readonly_tree
+    if os.name!='nt' and os.geteuid()==0:pytest.skip('root bypasses POSIX modes')
+    provider_for(monkeypatch,tmp_path)
+    out=tmp_path/'out';out.mkdir();(out/'existing').write_bytes(b'preserve')
+    with readonly_tree(out,owner=tmp_path,environment=os.environ.copy()):
+        before=set(out.iterdir())
+        with pytest.raises(PermissionError):(out/'probe').write_bytes(b'no')
+        with pytest.raises(api.RuntimeExportError) as caught:api.export_runtime(out)
+        assert caught.value.code==api.RuntimeExportErrorCode.IO
+        assert (out/'existing').read_bytes()==b'preserve' and set(out.iterdir())==before
+    assert set(p.name for p in out.iterdir())=={'existing'}

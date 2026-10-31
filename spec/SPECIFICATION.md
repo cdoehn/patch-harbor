@@ -4618,7 +4618,8 @@ Version und voller erwarteter Abschlusscommit sind explizite Workfloweingaben.
 Der gepushte, saubere exakt ausgecheckte Abschlusscommit ist Buildquelle;
 der vorhandene Acceptance-Workflow/Katalog liefert die erforderlichen nativen
 Python-/Linux-/Windows-/PowerShell-/Docker-Gates für genau diesen Commit.
-Kein grüner anderer HEAD. Tag erst nach allen erforderlichen Gates. Einmal
+Kein grüner anderer HEAD. Build und lokale Abnahmen gehen dem Tag voraus;
+die explizite CI folgt auf demselben Commit vor jeder Veröffentlichung. Einmal
 gebaute und frisch installierte Artefakte werden geprüft und anschließend
 unverändert hochgeladen; kein ungeprüfter Neubau nach letztem Gate.
 
@@ -4644,3 +4645,19 @@ Clean-/Dirty-Referenzen müssen Kontext, Plan-/Betriebsgrenzen, sicheren Export,
 extern gehashten Snapshot, korrekte Inventare und Quellunverändertheit belegen.
 Abnahmeplan und ausgewählte Development-Nachweise, vollständige parallele
 Apply-Gates, genaue CI und Release-Downloads sind getrennt zu dokumentieren.
+
+
+Aktuelle Nutzerentscheidung im REL-180-Auftrag: Nach Apply-Abschluss, lokalen
+Abnahmen und geprüftem Build darf Codex das neue v1.8.0-Tag am vollständigen
+Abschlusscommit anlegen; danach folgt die exakte CI. Bei fehlgeschlagener CI
+wird ausschließlich dieses selbst neu angelegte und weiterhin unveränderte
+Tag entfernt. Bestehende fremde oder abweichende Tags werden nicht verändert.
+Der Release bleibt bis zu grüner CI und allen Asset-/Downloadprüfungen
+unveröffentlicht. Diese Entscheidung ersetzt die frühere manuelle Taganlage
+und den zwischenzeitlich erlaubten Abschluss ohne GitHub-Veröffentlichung.
+
+
+Jeder offizielle Build erzeugt immer Wheel, sdist und Core-PYZ, unabhängig von Tags.
+Der Produktvertrag vollständiger Assets für jede spätere Veröffentlichung gilt
+unverändert. Das Manifestfeld tag benennt die vorgesehene Releasekennung und
+behauptet bei einer vorbereiteten Lieferung nicht deren Existenz auf GitHub.

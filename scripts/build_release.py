@@ -262,7 +262,7 @@ def _copy_release_inputs(destination: Path) -> None:
     _assert_clean_release_stage(destination)
 
 
-def _materialize_pyz_candidate(wheel: Path) -> Path:
+def canonical_pyz_from_wheel(wheel: Path):
     """Official builds emit the same finite bytes prepared in the installation."""
     spec = importlib.util.spec_from_file_location(
         '_patchharbor_release_backend', PROJECT_ROOT / 'build_backend.py')
@@ -276,6 +276,11 @@ def _materialize_pyz_candidate(wheel: Path) -> Path:
         raw = profile.materialize(recipe, lambda name, size: archive.read(name))
     profile.read_pyz(raw, policy=SimpleNamespace(max_zip_entries=1000, max_content_bytes=256*1024*1024),
                      remaining_bytes=profile.MAX_CONTENT_BYTES)
+    return recipe, raw
+
+
+def _materialize_pyz_candidate(wheel: Path) -> Path:
+    recipe, raw = canonical_pyz_from_wheel(wheel)
     output = wheel.parent / recipe.pyz_name
     output.write_bytes(raw)
     return output

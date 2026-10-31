@@ -151,6 +151,23 @@ def artifact_evidence(artifact, expected, *, commit):
                 'bytes': len(raw), 'build': build, 'reports': reports, 'proofs': proofs}
 
 
+RELEASE_JOBS = {'Prepare verified runtime release', 'Publish verified runtime release'}
+
+
+def validate_jobs(jobs, commit):
+    """Allow only known skipped release jobs alongside the complete green matrix."""
+    matrix = [row for row in jobs if row['name'] in JOBS]
+    other = [row for row in jobs if row['name'] not in JOBS]
+    require(len(matrix) == len(JOBS) and {row['name'] for row in matrix} == JOBS
+            and all(row['status'] == 'completed' and row['conclusion'] == 'success'
+                    and row['head_sha'] == commit for row in matrix),
+            'incomplete or failed acceptance matrix')
+    require(len({row['name'] for row in other}) == len(other)
+            and all(row['name'] in RELEASE_JOBS and row['status'] == 'completed'
+                    and row['conclusion'] == 'skipped' and row['head_sha'] == commit for row in other),
+            'unexpected or active release jobs in acceptance evidence')
+
+
 def run(commit, run_id, *, workspace=None, attempt=1):
     require(isinstance(commit, str) and re.fullmatch(r'[0-9a-f]{40}', commit), 'full Git commit required')
     require(type(run_id) is int and run_id > 0 and type(attempt) is int and attempt > 0, 'numeric run and attempt required')
@@ -175,10 +192,8 @@ def run(commit, run_id, *, workspace=None, attempt=1):
             evidence['status'] = 'pending'; save(receipt, evidence); return evidence
         jobs = pages(f'actions/runs/{run_id}/attempts/{attempt}/jobs', 'jobs')
         evidence['jobs'] = jobs
-        require(observed['conclusion'] == 'success' and len(jobs) == len(JOBS)
-                and {row['name'] for row in jobs} == JOBS
-                and all(row['status'] == 'completed' and row['conclusion'] == 'success' and row['head_sha'] == commit for row in jobs),
-                'incomplete or failed twelve-job CI matrix')
+        require(observed['conclusion'] == 'success', 'acceptance run did not succeed')
+        validate_jobs(jobs, commit)
         artifacts = pages(f'actions/runs/{run_id}/artifacts', 'artifacts')
         evidence['available_artifacts'] = artifacts
         for name, expected_platform in ARTIFACTS.items():

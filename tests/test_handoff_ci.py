@@ -17,12 +17,14 @@ COMMIT = 'a' * 40
 def nodes_for(suite, platform):
     nodes = [f'tests/test_probe.py::test_{suite}']
     if suite in ('packaging', 'windows'):
+        nodes += ['tests/test_runtime_export_distribution.py::test_wheel_sdist_pyz_public_export_byte_equality']
         nodes += [f'tests/test_pyz_result_e2e.py::test_first_production_result_uses_own_instruction_then_regular_pyz_apply[{kind}]' for kind in ('full', 'diff', 'mixed')]
         nodes += [f'tests/test_runtime_packaging.py::test_standard_installation_and_three_offline_canonical_generations[{route}]' for route in ('wheel', 'source', 'sdist')]
         nodes += ['tests/test_packaging_e2e.py::test_release_distributions_run_after_pipx_installation',
                   'tests/test_python_variants.py::test_built_reader_variant_bootstraps_and_packs_in_fresh_stdlib_process[>=3.10]',
                   'tests/test_runtime_bootstrap.py::test_uv_installed_runtime_works_outside_checkout']
     if platform == 'Linux' and suite == 'packaging':
+        nodes += [f'tests/test_runtime_export_distribution.py::test_release_pyz_direct_consumer_without_result_bootstrap[{case}]' for case in ('clean','dirty')]
         nodes += [f'tests/test_safe_reference_distribution.py::test_built_artifact_safe_export_and_offline_native_read[{route}-{kind}]'
                   for route in ('wheel', 'pyz') for kind in ('clean', 'mixed', 'filter')]
     if suite == 'e2e':
