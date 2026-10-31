@@ -80,6 +80,15 @@ its canonical-byte audit can import the same anchored build backend. Candidate
 files are never rebuilt there. The final R gate selects release/CI/catalog and
 architecture contracts affected by that workflow adjustment.
 
+R-final: 119 selected release/CI/catalog/architecture cases passed with 12 workers.
+C consolidates README, installation, runtime/API and release instructions and
+links the already verified public-only consumer. No new runtime behavior.
+Final Development selection covers export/distribution/release, canonical
+resources, packaging, snapshots, safe-reference and existing integration paths.
+The exact selection, source hash, logs and exit receipts are in Exchange/reports.
+Actual Apply, candidate/tag, native CI and published downloads remain external
+gates until their own evidence is recorded; no local test closes them.
+
 Actual Apply 075 confirmed REL-180-01 at
 `ded3093d4f91931b2d4e39c045d6e052033abc18` after 3,545 passed / 15 skips.
 REL-180-02 stopped before commit: one stale launcher expectation omitted the

@@ -11,14 +11,14 @@ Use a wheel from a trusted build or a reviewed source checkout at the intended
 commit. Compare its complete SHA-256 with the build's trusted artifact record.
 A digest supplied only by an unknown sender is not authentication. The version
 in the source tree is not evidence that an index release or Git tag exists.
-The [active acceptance plan](../planning/1.5.0/commit-plan.md) records release gates;
+The [active acceptance plan](../planning/runtime-release/commit-plan.md) records release gates;
 `patchharbor --version` reports the executable you are actually invoking.
 
 With an existing pipx and Python 3.10+ on POSIX:
 
 ```bash
 python3 --version
-pipx install --python python3 /absolute/path/patchharbor-1.5.0-py3-none-any.whl
+pipx install --python python3 /absolute/path/patchharbor-1.8.0-py3-none-any.whl
 patchharbor --version
 patchharbor-watcher --help
 ```
@@ -53,7 +53,9 @@ into the operating system's Python environment. To import `patchharbor.api`, use
 this environment's Python. A tool environment is not another application's
 default import path.
 
-For no-installation Core use, follow the [verified PYZ bootstrap](runtime-bootstrap.md).
+For no-installation Core use, obtain the reviewed [release PYZ](runtime-export.md)
+and verify its externally approved hash. The [Result bootstrap](runtime-bootstrap.md)
+remains available when a Result is the intended input.
 Do not use `python -m patchharbor`: the installed module entrypoint is
 `python -m patchharbor.cli`. The executable PYZ has its own `__main__`.
 
@@ -74,7 +76,7 @@ Do not use `python -m patchharbor`: the installed module entrypoint is
    new wheel. For pipx, a newer local wheel can replace the managed package:
 
    ```bash
-   pipx install --force /absolute/path/patchharbor-1.5.0-py3-none-any.whl
+   pipx install --force /absolute/path/patchharbor-1.8.0-py3-none-any.whl
    patchharbor --version
    ```
 
@@ -126,5 +128,6 @@ This builds wheel, sdist and the separate canonical Core-PYZ. It does not publis
 a release, create a tag, install the artifacts, or replace a running watcher.
 Development runs the documented change-focused parallel selection; Apply runs
 the full parallel suite before every commit, including the final commit.
-Retain artifact hashes and evidence for the actual source state. Only Christian
-starts manual CI; see the [test policy](test-parallelism.md).
+Retain artifact hashes and evidence for the actual source state. CI is explicitly dispatched under the applicable user authorization; the
+1.8.0 release task authorizes its own required CI. See the
+[release procedure](release-runtime.md) and [test policy](test-parallelism.md).

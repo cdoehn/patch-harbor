@@ -24,15 +24,19 @@ It bridges these separate environments using verified ZIP packages, allowing AI 
 - `inspect` and `validate` examine packages without executing their code.
 - An optional watcher automatically applies incoming patches after filesystem activity in the Exchange directory has settled for five seconds.
 - Result Bundles normally include an installation-free **Core-PYZ (without the watcher)**, allowing compatible AI Linux environments to work with PatchHarbor without installing it separately.
+- `runtime export` supplies the installed canonical Core-PYZ without a Result or Git.
 - CLI and Python integrations share the same public API.
 
-This source uses version **1.8.0**. It adds an explicit source-safe reference
-export through the public Python API on Linux x86-64 with CPython 3.10–3.14.
-The safe mode refuses unsupported Git conversions before running any helper,
-binds the approved source and output boundary, and suppresses Exchange maintenance.
-See [safe reference export](docs/python-api.md#source-safe-reference-export-contract-1)
-and the [implementation and evidence plan](planning/safe-reference/commit-plan.md).
-Normal CLI, watcher and default API behavior retain their existing contracts.
+This source uses version **1.8.0**. It adds the public
+`patchharbor runtime export --output-dir ...` command and `api.export_runtime`.
+Every official build emits the canonical Core-PYZ alongside wheel and sdist;
+complete releases include these files, a runtime manifest and checksums.
+See [runtime export and direct library use](docs/runtime-export.md),
+[the release procedure](docs/release-runtime.md) and
+[the implementation plan](planning/runtime-release/commit-plan.md).
+The existing [safe reference export](docs/safe-reference-integration.md) and
+public integration contracts remain unchanged. Safe export remains limited to
+Linux x86-64 with CPython 3.10–3.14.
 
 **CPython 3.10 or newer is required.** Core-PYZ has no watcher; the normal
 wheel and sdist include it. A version string establishes neither a published

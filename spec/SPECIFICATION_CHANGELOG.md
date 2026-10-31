@@ -1,5 +1,19 @@
 # PatchHarbor – Spezifikations-Changelog
 
+## 2026-10-31 – REL-180: öffentlicher Runtime-Export und vollständige Releases
+
++- Version 1.8.0, öffentliche CLI/API und dauerhafter Vertrag in Hauptspec §44.
++- Kanonische eigene Runtime aus Wheel, sdist und PYZ, ohne Result/Git/Netzwerk.
++- Offizielle Builds erzeugen immer Wheel, sdist und Core-PYZ. Release-Metadaten
++  und Originalbytes werden vor und nach Veröffentlichung überprüft.
++- Aktuelle ausdrückliche Freigabe: bestätigter Apply, Build/Abnahmen, neues Tag,
++  exakte CI, dann Veröffentlichung. Bei CI-Fehler nur eigenes unverändertes
++  neues Tag entfernen. Keine Tag-/CI-/Releaseaktion im Apply-Entrypoint.
++- Drei echte Zustände, ausgewählte parallele Development-Gates, vollständige
++  parallele Apply-Gates vor jedem tatsächlichen Commit. Capability-Versionen
++  und historische Artefakte bleiben erhalten. Externe Abschlussbelege separat.
+
+
 ## 2026-10-31 – SAFE-01: sicherer Referenzexport für 1.7.0
 
 - Hauptspec §43 definiert explizite sichere Kontext-/Bundle-Aufrufe, einen

@@ -795,3 +795,13 @@ from patchharbor import api
 runtime = api.export_runtime('/absolute/existing/output')
 print(runtime.path, runtime.sha256, runtime.size)
 ```
+
+The [runtime guide](runtime-export.md) documents all error codes, path and
+interruption guarantees, public CLI use, and direct hash-checked library import.
+CLI JSON uses the existing envelope: output_version=1, command=runtime.export,
+success, result, error and process_exit_code. On success result
+holds the fields above (path as a string, warnings as an array) and error is null.
+On failure result is null; error retains kind/message/patchharbor_error_code/emergency_diagnostics_path and adds
+code, unavailable_reason and published_path. Local exports do not invent Git
+provenance. [Release metadata](release-runtime.md) binds the actual source commit
+without changing runtime bytes.

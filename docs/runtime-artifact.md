@@ -52,6 +52,10 @@ kompatibel. Kandidat und installierte Rezeptmaterialisierung müssen bytegleich 
 Die gemeinsame Core-Parität, eigene Ressourcen und produktive Result-Erzeugung
 werden ab PP-06B einschließlich Erstnutzung und drei Generationen geprüft.
 
+Ab 1.8.0 liefert der öffentliche [Runtime-Export](runtime-export.md) dieselben
+Bytes ohne Result-Voraussetzung. Die [Release-Anleitung](release-runtime.md)
+bindet die tatsächlichen Downloadassets, Commit, Manifest und Prüfsummen.
+
 ## Herkunftsgebundene Ressourcen
 
 `runtime_sources.py` bindet Ressourcen an das tatsächlich geladene Modul. Für
