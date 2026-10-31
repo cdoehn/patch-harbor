@@ -21,6 +21,7 @@ from patchharbor.patch_inspection import (
     PatchValidationResult, PatchValidationScope,
 )
 from patchharbor.apply_admission import AdmissionCallback, PatchAdmission
+from patchharbor.safe_export_types import SafeExportPlan, SafeExportError, SafeExportErrorCode
 from patchharbor.result_reader import ReferenceContext
 from patchharbor.snapshot_types import (
     IntegrationCapabilities, ResultSnapshot, ResultSnapshotError, SnapshotErrorCode,

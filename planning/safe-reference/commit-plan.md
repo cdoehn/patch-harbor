@@ -33,7 +33,7 @@ parallel, Apply vollständig parallel vor jedem Commit. CI ausschließlich Chris
 | Commit | Fachlicher Zustand | Status |
 | --- | --- | --- |
 | SAFE-01 `docs(spec): define source-safe reference export` | §43, diese Schrittfolge und Abnahmematrix; keine Runtimebehauptung | vorbereitet |
-| SAFE-02 `feat(api): add bound source-safe reference export` | Version 1.7.0, Erfassung, sichere Deltas, API/Capability, Grenzen und Fehler samt Verhaltenstests | offen |
+| SAFE-02 `feat(api): add bound source-safe reference export` | Version 1.7.0, Erfassung, sichere Deltas, API/Capability, Grenzen und Fehler samt Verhaltenstests | vorbereitet |
 | SAFE-03 `test(integration): deliver verified safe reference runtimes` | Gebaute Modul/PYZ-Durchstiche, Beispiel, manuelle Linux-3.10–3.14-Matrix und Lieferdokumentation | offen |
 
 ## Entscheidungen und Kompatibilität
@@ -90,3 +90,47 @@ Quelldigest vor Apply und danach der tatsächlich bestätigte Commit werden
 abgeglichen. Vorbereitete Lieferungen sind kein Apply-Erfolg. Native CI und die
 eigenständige SpecRoad-Abnahme werden nicht erfunden oder automatisch gestartet.
 Keine Änderung an SpecRoad; 15.n.W bleibt dort bis zur eigenen Abnahme offen.
+
+## SAFE-02 – vorbereiteter Implementierungsstand
+
+Der Modus und seine API sind implementiert. Eindeutiges `-text` muss in beiden
+Attributsichten gelten; widersprüchliche Index-/Worktree-EOL-Regeln werden verweigert.
+Bestehende Ablehnung von assume-unchanged/skip-worktree bleibt bestehen; racy
+Indexstatwerte werden unabhängig mit Rohbytes geprüft. Neue Dateien sind privat;
+Pfadtausch bei Diagnosestart/Publikation und bestehende Locklinks werden geprüft.
+Die Zwischenläufe dienten Fehlerfindung und sind keine Commit-Gates. Das gebundene
+ausgewählte SAFE-02-Gate liegt im Exchange-Bericht `patchharbor-safe-reference-073-SAFE-02.json`.
+Sein Ergebnis ist vor Übergabe zu prüfen; tatsächliche Apply-Gates folgen erst
+im Watcher. CI und SpecRoad-Abnahme bleiben getrennt offen.
+
+## Tatsächlicher Teilabschluss und Korrekturbundle 074
+
+Bundle 073 wurde tatsächlich angewendet, brach aber im vollständigen SAFE-02-
+Gate ab: 3 failed, 3.503 passed, 15 skips. Alle drei Fehler gehören zu
+`tests/test_packaging_e2e.py`: feste Releaseversion noch 1.6.0 und sechs fehlende
+Module in der expliziten Runtime-Allowlist. Die ursprüngliche lokale Auswahl
+hatte diese Packaging-Prüfungen ausgelassen. Es wird keine Prüfung abgeschwächt:
+Version und einzeln aufgeführtes Modulinventar werden auf 1.7.0 fortgeschrieben.
+
+SAFE-01 ist durch 3.416 passed / 15 skips und Commit
+`3d8a7aa9ea0323093dd5dc067781cb7fe9afb77b` bestätigt. Origin/dev steht noch auf
+`a5e2cf68067084f962190217a8cc7af138c896cf`; ein Push fand nicht statt.
+SAFE-02 liegt vollständig uncommitted vor, sein Index ist unverändert.
+Result `patchharbor-apply_Result_195805_1031_ff651a.zip`, SHA-256
+`7bbe684557ccadda01e037b55439b686b8012474c6c0b2071710e68abf9a7dc8`,
+Fingerprint `eb7b69344c090c50`, ist die alleinige Basis von Bundle 074.
+
+Es bleiben zwei echte Commitzustände: korrigiertes SAFE-02, danach SAFE-03.
+Die vorhandenen Änderungen werden erhalten und vollständig geprüft; kein Reset,
+kein erneuter SAFE-01-Commit. Jedes Commit erhält sein vollständiges paralleles
+Apply-Gate, danach genau ein normaler Push. Lokal laufen ausgewählte Tests
+einschließlich des kompletten Packaging-E2E-Moduls parallel. CI startet Christian.
+Fachliche Arbeitsschritte bleiben fünf; wegen dieses nachgewiesenen Testfehlers
+sind jetzt insgesamt zwei Übergabebundles statt eines erforderlich.
+
+The corrected packaging gate also exposed the unchanged 384 KiB wheel budget:
+the default-compressed SAFE-02 wheel was 394,080 bytes. Build wheel members with
+DEFLATE level 9; member bytes, RECORD contents and the budget remain unchanged.
+The final original candidate recompresses from 394,272 to 393,146 bytes with
+identical members. Installation and runtime behavior are rechecked on rebuilt
+artifacts, not inferred from this compression-only diagnostic.

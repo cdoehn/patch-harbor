@@ -23,6 +23,7 @@ import patchharbor.application as _application
 from patchharbor.api_types import (
     ActivityEvent, BundleResult, CandidateSelector, ConfigurationResult,
     AdmissionCallback, PatchAdmission,
+    SafeExportPlan, SafeExportError, SafeExportErrorCode,
     DirectoryCandidate, GitObjectFormat, GitObjectId, OutputStreams, PackageFile,
     PrimaryResult, PrimaryResultKind, ProgressEvent, ProgressObserver,
     RegistryListResult, RegistryRepository, RegistryStatus, RepositoryContext,
@@ -40,6 +41,7 @@ from patchharbor.api_types import (
 from patchharbor.errors import ErrorKind, FailureReason, PatchHarborError
 from patchharbor.output import OutputTargets as _OutputTargets
 from patchharbor.progress import observe_activity as _observe_activity
+from patchharbor.safe_export_types import capture_mode as _capture_mode, supported_host as _safe_host
 
 
 DEFAULT_TIMEOUT_SECONDS = _application.DEFAULT_TIMEOUT_SECONDS
@@ -48,6 +50,7 @@ PathInput = str | os.PathLike[str]
 __all__ = [
     "ActivityEvent", "BundleResult", "CandidateSelector", "ConfigurationResult",
     "AdmissionCallback", "PatchAdmission", "apply_guarded",
+    "SafeExportPlan", "SafeExportError", "SafeExportErrorCode", "prepare_reference_export",
     "DEFAULT_TIMEOUT_SECONDS", "DirectoryCandidate", "ErrorKind", "FailureReason",
     "GitObjectFormat", "GitObjectId", "OutputStreams", "PackageFile", "PathInput",
     "PatchHarborError", "PrimaryResult", "PrimaryResultKind", "ProgressEvent",
@@ -72,7 +75,7 @@ __all__ = [
 
 def integration_capabilities() -> IntegrationCapabilities:
     """Versioned contracts of this loaded API, separate from artifact metadata."""
-    return IntegrationCapabilities(1, 1, 1)
+    return IntegrationCapabilities(1, 1, 1, 1 if _safe_host() else None)
 
 
 def _sha256_argument(value: str, name: str) -> str:
@@ -242,12 +245,28 @@ def register(
 
 
 def context(
-    repository: PathInput = ".", *, observer: ProgressObserver | None = None,
+    repository: PathInput = ".", *, capture_mode: str = "git", observer: ProgressObserver | None = None,
 ) -> RepositoryContext:
     """Return full binding values and current dirty state of a registered repo."""
     path = _path(repository, "repository")
+    mode = _capture_mode(capture_mode)
     with _observe_activity(_observer(observer)):
+        if mode == 'safe':
+            from patchharbor.safe_export_plan import safe_context
+            return safe_context(path)
         return _application.repository_context(path)
+
+
+def prepare_reference_export(
+    repository: PathInput, *, output_directory: PathInput | None = None,
+    expected_context: RepositoryContext | None = None, observer: ProgressObserver | None = None,
+) -> SafeExportPlan:
+    """Inspect source and safe operating boundaries without creating any files."""
+    path = _path(repository, 'repository')
+    destination = _optional_path(output_directory, 'output_directory')
+    from patchharbor.safe_export_plan import prepare_plan
+    with _observe_activity(_observer(observer)):
+        return prepare_plan(path, output_directory=destination, expected_context=expected_context)
 
 
 def repositories(*, observer: ProgressObserver | None = None) -> RegistryListResult:
@@ -277,13 +296,23 @@ def unregister(
 
 def bundle(
     repository: PathInput = ".", *, output_directory: PathInput | None = None,
+    capture_mode: str = "git", export_plan: SafeExportPlan | None = None,
     observer: ProgressObserver | None = None,
 ) -> BundleResult:
     """Publish a manual Result Bundle, using Exchange unless output is explicit."""
     path = _path(repository, "repository")
     destination = _optional_path(output_directory, "output_directory")
+    mode = _capture_mode(capture_mode)
+    if mode == 'safe' and not isinstance(export_plan, SafeExportPlan):
+        raise TypeError('safe bundle requires a SafeExportPlan')
+    if mode == 'git' and export_plan is not None:
+        raise ValueError('export_plan requires capture_mode=safe')
     with _observe_activity(_observer(observer)):
-        result = _application.bundle_repository(path, output_directory=destination)
+        if mode == 'safe':
+            from patchharbor.safe_export import export_reference
+            result = export_reference(path, plan=export_plan, output_directory=destination)
+        else:
+            result = _application.bundle_repository(path, output_directory=destination)
         return BundleResult(result.report)
 
 

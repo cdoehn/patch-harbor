@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import os
+from contextlib import contextmanager
+from contextvars import ContextVar
 from pathlib import Path
 import subprocess
 
@@ -51,6 +53,18 @@ CANONICAL_DIFF_ARGUMENTS = (
     "--no-color",
 )
 
+_SAFE_QUERIES = ContextVar('patchharbor_safe_git_queries', default=False)
+
+
+@contextmanager
+def safe_git_queries():
+    """Request-local additional protections; never relax caller-environment cleanup."""
+    token = _SAFE_QUERIES.set(True)
+    try:
+        yield
+    finally:
+        _SAFE_QUERIES.reset(token)
+
 
 def _error(message: str) -> PatchHarborError:
     return repository_resolution_error(message)
@@ -74,6 +88,8 @@ def _controlled_environment() -> dict[str, str]:
             "LC_ALL": "C",
         }
     )
+    if _SAFE_QUERIES.get():
+        environment['GIT_NO_LAZY_FETCH'] = '1'
     return environment
 
 
@@ -90,7 +106,10 @@ def run_git_bytes(
             and all(character in "0123456789abcdef" for character in head))
     )
     activity("GIT", "Query: git " + " ".join(arguments), "detail", identifiers=identifiers)
-    command = [*_CANONICAL_GIT_PREFIX, *arguments]
+    safe_options = ('-c', 'protocol.allow=never', '-c', 'core.hooksPath=/dev/null',
+                    '-c', 'core.preloadIndex=false', '-c', 'core.untrackedCache=false',
+                    '-c', 'gc.auto=0', '-c', 'maintenance.auto=false') if _SAFE_QUERIES.get() else ()
+    command = [*_CANONICAL_GIT_PREFIX, *safe_options, *arguments]
     try:
         completed = subprocess.run(
             command,

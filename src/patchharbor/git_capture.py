@@ -700,9 +700,11 @@ def _require_no_content_conversion(
     eol_conversion = autocrlf.lower() not in (b"", b"false\0", b"no\0", b"off\0", b"0\0")
     for path, content in changed.items():
         names = attributes[path]
-        if (b"filter" in names or b"working-tree-encoding" in names
-            or (b"ident" in names and b"$Id:" in content)
-            or (b"\r\n" in content and (eol_conversion or b"text" in names or b"eol" in names))):
+        active = lambda key: names.get(key, b"unspecified") not in (b"unspecified", b"unset")
+        if (active(b"filter") or active(b"working-tree-encoding")
+            or (active(b"ident") and b"$Id:" in content)
+            or (b"\r\n" in content and names.get(b"text") != b"unset"
+                and (eol_conversion or active(b"text") or active(b"eol")))):
             raise unsupported_repository_state_error(
                 "read-only validation cannot establish state-v1 binding across Git content conversions"
             )

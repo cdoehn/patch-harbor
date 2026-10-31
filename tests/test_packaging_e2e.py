@@ -26,8 +26,14 @@ from tests.registration_support import isolated_user_environment
 pytestmark = pytest.mark.packaging
 
 MAX_WHEEL_BYTES = 384 * 1024
-RELEASE_VERSION = "1.6.0"
+RELEASE_VERSION = "1.7.0"
 EXPECTED_RUNTIME_FILES = {
+    "patchharbor/safe_capture.py",
+    "patchharbor/safe_export.py",
+    "patchharbor/safe_export_paths.py",
+    "patchharbor/safe_export_plan.py",
+    "patchharbor/safe_export_types.py",
+    "patchharbor/safe_git_patch.py",
     "patchharbor/apply_admission.py",
     "patchharbor/result_snapshot.py",
     "patchharbor/snapshot_types.py",

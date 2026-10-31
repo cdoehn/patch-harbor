@@ -1,4 +1,4 @@
-# PatchHarbor 1.6.0
+# PatchHarbor 1.7.0
 
 **A bridge between AI coding assistants and local Git repositories.**
 
@@ -26,31 +26,21 @@ It bridges these separate environments using verified ZIP packages, allowing AI 
 - Result Bundles normally include an installation-free **Core-PYZ (without the watcher)**, allowing compatible AI Linux environments to work with PatchHarbor without installing it separately.
 - CLI and Python integrations share the same public API.
 
-This source uses version **1.6.0**. It adds verified, read-only Result snapshots
-and an explicit host admission boundary for Apply. Both are public Python APIs
-in the normal distribution and the Core-PYZ. See the
-[integration contracts and example](docs/python-api.md#verified-result-snapshots-integration-contract-1).
-A version string does not establish a published release, a tag or an upgraded
-local installation. The [1.5.0 refactoring record](planning/1.5.0/commit-plan.md)
-and its [external acceptance](planning/1.5.0/release-acceptance.md) are preserved.
+This source uses version **1.7.0**. It adds an explicit source-safe reference
+export through the public Python API on Linux x86-64 with CPython 3.10–3.14.
+The safe mode refuses unsupported Git conversions before running any helper,
+binds the approved source and output boundary, and suppresses Exchange maintenance.
+See [safe reference export](docs/python-api.md#source-safe-reference-export-contract-1)
+and the [implementation and evidence plan](planning/safe-reference/commit-plan.md).
+Normal CLI, watcher and default API behavior retain their existing contracts.
 
-**This source requires CPython 3.10 or newer.** The public API, Core-PYZ, CLI
-and installed watcher retain the 3.10/3.11 contract and the existing 3.12/3.14
-acceptance lanes. Exact interpreter, native CI and release evidence remain in
-the [CPython plan](planning/python-compatibility/commit-plan.md) and active plan;
-a historical successful run does not certify a later checkout.
-
-## Integration delivery and acceptance (1.6.0)
-
-The [integration plan](planning/specroad-integration/commit-plan.md) adds a
-read-only public Result snapshot API and a guarded host Apply boundary.
-Its [requirement matrix](planning/specroad-integration/test-matrix.md) separates
-specified contracts, local tests, actual Apply and external acceptance.
-The 1.5.0 implementation is confirmed at
-`312e8a3c003c0f9421587b92941ecea7917b5d3f`; its external release acceptance remains
-open. The four prepared stages include both APIs and an isolated built-artifact
-transport proof. Actual Apply, native CI and SpecRoad integration remain separate
-acceptance items; see the [delivery record](planning/specroad-integration/delivery.md).
+**CPython 3.10 or newer is required.** Core-PYZ has no watcher; the normal
+wheel and sdist include it. A version string establishes neither a published
+release/tag nor an upgraded installation. Native CI and downstream acceptance
+remain separate from local tests and actual Apply. Historical
+[1.5.0 refactoring](planning/1.5.0/commit-plan.md) and
+[1.6.0 integration](planning/specroad-integration/commit-plan.md) records remain
+available; their original artifacts and evidence are unchanged.
 
 ## Requirements and installation
 
@@ -63,13 +53,13 @@ For the normal CLI **and watcher**, install a reviewed wheel or source checkout.
 For example, with an existing Python 3.10+ and pipx:
 
 ```bash
-pipx install --python python3 /absolute/path/patchharbor-1.6.0-py3-none-any.whl
+pipx install --python python3 /absolute/path/patchharbor-1.7.0-py3-none-any.whl
 patchharbor --version
 patchharbor --help
 ```
 
 The wheel path is an artifact you obtain and verify; this command does not assume
-that version 1.6.0 has been published on a package index. **pipx is optional**:
+that version 1.7.0 has been published on a package index. **pipx is optional**:
 a dedicated virtual environment is another installation route. Wheel and sdist
 remain supported for normal installations; the PYZ replaces the runtime embedded
 in new Results, not the installed watcher. See

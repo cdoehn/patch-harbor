@@ -86,3 +86,4 @@ class IntegrationCapabilities:
     contract_version: int
     snapshot_contract_version: int | None
     guarded_apply_contract_version: int | None
+    safe_reference_contract_version: int | None = None

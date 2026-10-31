@@ -219,6 +219,7 @@ def _verify_result_bundle(path: Path, *, execution_present: bool,
 @contextmanager
 def _publication_destination(
     publication: ResultBundlePublication,
+    directory_guard=None,
 ) -> Iterator[tuple[BinaryIO, os.stat_result]]:
     stream: BinaryIO | None = None
     descriptor: int | None = None
@@ -228,7 +229,10 @@ def _publication_destination(
                 raise result_bundle_error(
                     "Result Bundle temporary path already exists"
                 )
-            stream = publication.temporary_path.open("xb")
+            if directory_guard is None:
+                stream = publication.temporary_path.open("xb")
+            else:
+                stream = os.fdopen(directory_guard.create(publication.temporary_path.name), "w+b")
             owned_stat = os.fstat(stream.fileno())
         else:
             descriptor = open_regular_nofollow(publication.temporary_path, writable=True)
@@ -277,16 +281,22 @@ def publish_result_bundle(
     execution_log: bytes | None = None,
     before_publish: Callable[[str], None] | None = None,
     runtime: ResultRuntimePayload | None = None,
+    directory_guard=None,
+    before_atomic_publish: Callable[[], None] | None = None,
 ) -> PublishedResultBundle:
     """Write, verify, best-effort sync, and atomically publish one bundle."""
     activity("PUBLISH", f"Prepare atomic Result publication: {publication.final_path}", "heading")
     owned_stat = publication.reservation_stat
     owned_token = publication.reservation_token
+    pinned_descriptor = None
+    published_path = None
     try:
+        if directory_guard is not None:
+            directory_guard.verify()
         if path_kind(publication.final_path) is not PathKind.MISSING:
             raise result_bundle_error("Result Bundle destination already exists")
 
-        with _publication_destination(publication) as (
+        with _publication_destination(publication, directory_guard) as (
             destination,
             destination_stat,
         ):
@@ -302,8 +312,12 @@ def publish_result_bundle(
                 execution_log=execution_log,
                 runtime=runtime,
             )
+            if directory_guard is not None:
+                pinned_descriptor = os.dup(destination.fileno())
 
         def require_owned() -> None:
+            if directory_guard is not None:
+                directory_guard.verify()
             _require_owned_temporary_file(publication.temporary_path, owned_stat)
 
         def synchronize() -> tuple[MetadataSyncStatus, MetadataSyncStatus]:
@@ -336,11 +350,16 @@ def publish_result_bundle(
         )
         if final_digest != digest:
             raise result_bundle_error("Result Bundle bytes changed before publication")
+        if before_atomic_publish is not None:
+            before_atomic_publish()
+            require_owned()
         activity("PUBLISH", f"Publish verified Result atomically: {publication.final_path}")
-        replace_path(
-            publication.temporary_path,
-            publication.final_path,
-        )
+        if directory_guard is None:
+            replace_path(publication.temporary_path, publication.final_path)
+        else:
+            directory_guard.publish(pinned_descriptor, publication.final_path.name)
+            published_path = directory_guard.path / publication.final_path.name
+            directory_guard.verify()
         directory_after_replace = sync_directory_best_effort(
             publication.final_path.parent
         )
@@ -353,13 +372,26 @@ def publish_result_bundle(
                 directory_after_replace=directory_after_replace,
             ),
         )
-    except PatchHarborError:
+    except PatchHarborError as exc:
+        if directory_guard is not None and published_path is not None:
+            exc.published_path = published_path
         raise
     except OSError as exc:
-        raise result_bundle_error("cannot publish the Result Bundle") from exc
+        error = result_bundle_error("cannot publish the Result Bundle")
+        if directory_guard is not None:
+            error.published_path = published_path
+        raise error from exc
     finally:
-        _remove_owned_temporary_file(
-            publication.temporary_path,
-            owned_stat,
-            owned_token,
-        )
+        try:
+            if directory_guard is None:
+                _remove_owned_temporary_file(publication.temporary_path, owned_stat, owned_token)
+            elif owned_stat is not None:
+                try:
+                    directory_guard.remove_owned(publication.temporary_path.name, owned_stat)
+                except (OSError, PatchHarborError) as exc:
+                    from patchharbor.safe_export_types import SafeExportError, SafeExportErrorCode
+                    raise SafeExportError(SafeExportErrorCode.CLEANUP, 'cannot remove safe Result staging file',
+                                          published_path=published_path) from exc
+        finally:
+            if pinned_descriptor is not None:
+                os.close(pinned_descriptor)

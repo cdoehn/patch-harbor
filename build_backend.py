@@ -157,7 +157,7 @@ def build_wheel(wheel_directory, config_settings=None, metadata_directory=None):
                 info.create_system = 3
                 info.external_attr = 0o100644 << 16
                 info.compress_type = ZIP_DEFLATED
-                wheel.writestr(info, raw)
+                wheel.writestr(info, raw, compresslevel=9)
         # Frontends own the output directory; only this build's named artifact.
         (output / filename).write_bytes(staged.read_bytes())
     return filename

@@ -42,11 +42,11 @@ print(report.success, report.result_bundle.status)
 | `register(repository=".", new_id=False)` | `register` | `RepositoryContext` |
 | `unregister(selector, cwd=".")` | `unregister` | `UnregisterResult` |
 | `repositories()` | `registry list` | `RegistryListResult` |
-| `context(repository=".")` | `context` | `RepositoryContext` |
+| `context(repository=".", capture_mode="git")` | `context` | `RepositoryContext` |
 | `inspect_patch(patch)` | `inspect PATCH_ZIP` | `PatchInspection` |
 | `validate_patch(patch, repository=None, reference_bundle=None)` | `validate PATCH_ZIP` | `PatchValidationResult` |
 | `pack_patch(content_directory, reference_bundle=..., entrypoint=..., output=None, output_directory=None, modes=None)` | `pack CONTENT_DIRECTORY` | `PatchPackResult` |
-| `bundle(repository=".", output_directory=None)` | `bundle` | `BundleResult` |
+| `bundle(repository=".", output_directory=None, capture_mode="git", export_plan=None)` | `bundle` | `BundleResult` |
 | `apply(patch=None, repository=None, dry_run=False, ...)` | manual `apply` | `RunReport` |
 | `dry_run(patch=None, repository=None, ...)` | `apply --dry-run` | `RunReport` |
 | `apply_next(dry_run=False, ...)` | automatic global Apply | `RunReport` |
@@ -669,3 +669,110 @@ independent end-to-end acceptance. Exact local artifact hashes/source binding
 and unconfirmed platform checks are recorded in the integration delivery report.
 The `timeout` argument limits entrypoint execution, not arbitrary trusted Python
 callback work; callbacks should perform bounded local policy checks.
+
+## Source-safe reference export (contract 1)
+
+Added in 1.7.0. Use only the public `patchharbor.api` namespace. Before any
+producing call, require `integration_capabilities().safe_reference_contract_version`
+to be the integer `1`. Missing fields/functions, `None`, booleans or unknown
+versions are unsupported; do not retry with the default mode. The existing
+integration, snapshot and guarded-Apply capability versions remain `1`.
+The host capability is advertised on Linux x86-64, CPython 3.10–3.14 only.
+Git and `/proc/self/fd` are required for production; the existing Python-only
+snapshot reader remains available without Git, a shell or network.
+
+```python
+from patchharbor import api
+
+capabilities = api.integration_capabilities()
+contract = getattr(capabilities, "safe_reference_contract_version", None)
+if type(contract) is not int or contract != 1:
+    raise RuntimeError("source-safe reference contract 1 is required")
+context = api.context(repository, capture_mode="safe")
+plan = api.prepare_reference_export(
+    repository, output_directory=existing_external_output,
+    expected_context=context,
+)
+# The host authorizes plan.context, output_directory, diagnostics_parent and
+# lock_paths before proceeding. Persisting a plan does not reserve its validity.
+result = api.bundle(repository, capture_mode="safe", export_plan=plan)
+```
+
+Signatures (all accept `observer=None`):
+
+- `context(repository=".", *, capture_mode="git") -> RepositoryContext`
+- `prepare_reference_export(repository, *, output_directory=None, expected_context=None) -> SafeExportPlan`
+- `bundle(repository=".", *, output_directory=None, capture_mode="git", export_plan=None) -> BundleResult`
+
+`capture_mode` accepts exactly `"git"` or `"safe"`; wrong types raise `TypeError`,
+unknown values raise `ValueError` before operating effects. Safe bundle requires
+a `SafeExportPlan`; a plan with `"git"` or an explicit output different from its
+plan is invalid. The optional expected context must be a `RepositoryContext`.
+Existing calls keep their Git capture and maintenance behavior. CLI and watcher
+continue to use that default; they do not implicitly acquire this new guarantee.
+
+`context(..., capture_mode="safe")` and preparation read existing registration,
+HEAD, index, raw file bytes and configuration. They resolve a supplied subdirectory
+to its uniquely registered root. They create neither registrations, defaults,
+locks nor directories. Missing or inconsistent state is refused, never repaired.
+The frozen plan exposes:
+
+| Field | Meaning |
+| --- | --- |
+| `context` | Exact repository root, dirty state and complete four-part binding |
+| `output_directory` | Existing, approved physical directory; configured Exchange if omitted |
+| `diagnostics_parent` | Same directory; unique private `.patchharbor-safe-<run_id>` child on export |
+| `lock_paths` | Existing PH registry/repository lock namespace; these files may be created/acquired |
+| `configured_exchange` | Observed configured Exchange, even for a different explicit output |
+| `maintenance_enabled` | Always `False` for this contract |
+| `binding_sha256` | Digest of the observed state and operating boundary; not a signature or trust grant |
+
+Treat the plan as opaque and in-process. Do not construct, edit, deserialize or
+rebind it. Export recomputes its facts before operating writes, after acquiring
+locks and immediately before publication. Changed registry/configuration/source
+or operating directory identity refuses the export. Each approved capture is
+single-state; there is no automatic retry against a newer source.
+
+Allowed operating writes are only the two PH lock files, an exclusive temporary
+ZIP in the approved output, its completed Result name, and the private diagnostic
+child. Output must not overlap any registered repository or PH configuration/state
+directory. All operating directory components must be real directories without
+symlinks, owned by the current user and not world-writable. Existing group modes
+are preserved. New private files are 0600 and diagnostic directories 0700.
+An existing valid lock directory is required. Output files are never overwritten;
+publication needs same-directory hardlink support and is exclusive and atomic.
+A filesystem lacking that capability fails safely. There is no global temp fallback,
+Exchange scan, archive, replay write, recovery, Apply, watcher or service start.
+
+The source and its index/refs/history/configuration are never written. Index
+objects and raw files are compared without conversion helpers or stat-cache
+trust. Active filter, working-tree-encoding and ident attributes are refused even
+on currently clean tracked paths, using both index and worktree attributes plus
+Git's global/info sources. Potential CRLF normalization is refused; consistent
+`-text` allows raw CRLF. Existing unsupported index states (including
+assume-unchanged and skip-worktree), symlinks, submodules and incomplete/promisor
+object stores remain unsupported. These checks do not execute a helper to test
+whether it is harmless. Ordinary clean/staged/unstaged/mixed/untracked states,
+binary/empty files, rename/deletion and file modes retain state-v1 and native
+Result-3 semantics. Ignored files are preserved in place and excluded by policy.
+
+`SafeExportError` extends `PatchHarborError`. Its enum `code` is one of
+`unsupported_host`, `unsupported_conversion`, `repository`, `configuration`,
+`unsafe_path`, `stale`, `resource_limit`, `io`, `interrupted`, `cleanup`.
+Do not map PatchHarbor's CLI exit numbers blindly into another application's
+status contract. Lock contention retains the existing `LockBusyError` contract.
+Invalid arguments and preflight refusals precede operating writes. Later errors
+can leave owned lock, temporary or diagnostic files inside the advertised scope.
+`emergency_diagnostics_path` identifies preserved owned diagnostics when locatable;
+`emergency_diagnostics_failed` marks inability to write them. A hard process kill
+cannot return an exception: incomplete bytes retain a hidden `.tmp` name and must
+not be treated as a finished Result. No automatic cleanup claims are made for it.
+
+If publication succeeds but cleanup fails, `SafeExportError.published_path`
+identifies the complete published Result while the call still fails. Inspect that
+partial outcome before retrying. Success returns the existing `BundleResult`
+(`context`, `path`, `report`, `run_id`, `publication_durability`). Hash the actual
+Result bytes externally and call `read_result_snapshot(path, expected_sha256=...)`;
+compare all four binding fields with the approved context. The reader verifies
+all native inventories, hashes, sizes, paths, file types and runtime metadata.
+A self-declared hash inside the ZIP does not replace that external binding.
