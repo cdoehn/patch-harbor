@@ -101,3 +101,31 @@ bundle follows a demonstrated full-Apply failure; no new feature or phase.
 Development remains selected parallel; Apply repeats the full parallel suite
 before both remaining commits and performs one final normal push. Tag, native
 CI and release publication remain open, in that explicitly authorized order.
+
+REL-180-CI01 / bundle 077 follows native CI run `41254937421` on confirmed
+Apply commit `c225967c8cdc726ca350f2973c8ca4cb668cda17`. All seven Linux/Docker
+lanes passed. All six Windows lanes failed the same distribution probe: its
+own host-metadata lookup called `socket.gethostname()` after the strict export
+audit hook was installed. Capture those verifier facts before the guard; keep
+all export network/process prohibitions. The failure occurs on the first wheel
+route, so later Windows distribution routes still require native verification.
+
+The build records also exposed differing Windows PYZ bytes. Converting only
+the unpinned Core Python sources, API documentation and license from LF to
+CRLF exactly reproduces the native Windows hash
+`6626ac389c39163588f37b82d062c0b61b0b61c77a8bbe3258ecc363a5d2a7da`.
+Pin those canonical inputs to LF in Git attributes. Use the existing builder;
+do not normalize bytes after runtime identity/hash capture or introduce a new
+materializer. A real Git checkout with `core.autocrlf=true` and a built PYZ
+comparison cover this regression.
+
+The new selected parallel regression run reproduced both failures before the
+fix (two failures, two successful network/process rejection cases). Final
+selected Development gates cover distribution/export, resources, release policy,
+historical byte-pinned fixtures and handoff behavior. One corrective commit,
+one complete parallel Apply gate and one final normal push; no serial gate.
+The own unchanged v1.8.0 tag was removed after the failed CI and its absence
+was verified; no release was published. Rebuild and verify the new final commit,
+create its new tag, then require complete exact-commit native CI and downloaded
+release evidence before completion. Original W/R/C commits and all failed
+evidence remain preserved in Exchange/reports.

@@ -13,6 +13,12 @@ parallel selection. Apply must complete its full parallel suite before each
 actual commit. The Apply entrypoint never tags, runs CI or publishes a release.
 Historical releases are not rebuilt or relabeled.
 
+Preserve the repository's LF attributes for canonical Core sources, packaged
+API documentation and license. Native Windows checkouts must produce the same
+PYZ bytes as Linux. The distribution probe captures its own host metadata before
+installing the export audit hook; the public export remains guarded against
+network and subprocess operations on every platform.
+
 1. Dispatch `prepare` on `dev` with `release_version`, `expected_commit` (full
    40-character SHA) and a unique `handoff_id`. The job refuses a different or
    dirty checkout or an existing conflicting tag. It builds once, installs

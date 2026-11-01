@@ -1,5 +1,9 @@
 /CHAT_INSTRUCTIONS.md text eol=lf
 /README.md text eol=lf
+# Canonical Core-PYZ input bytes must survive native Windows checkouts.
+/src/patchharbor/**/*.py text eol=lf
+/docs/python-api.md text eol=lf
+/LICENSE text eol=lf
 # Immutable fixture provenance and its byte-pinned capture program.
 /tests/fixtures/compatibility_140/provenance.json text eol=lf
 /tests/produce_compatibility_140.py text eol=lf

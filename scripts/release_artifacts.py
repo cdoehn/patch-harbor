@@ -34,13 +34,17 @@ PROBE = r'''
 from dataclasses import asdict
 from hashlib import sha256
 from io import StringIO
-import json, os, sys
+import json, os, platform, sys
 from pathlib import Path
 selected, expected_sha, output, version, route = sys.argv[1:]
 if route == 'pyz':
     assert sha256(Path(selected).read_bytes()).hexdigest() == expected_sha
 if selected:
     sys.path.insert(0, selected)
+# Capture the verifier's own host facts before guarding runtime operations.
+# Windows platform.uname() performs a local socket.gethostname() lookup.
+host = {'system': platform.system(), 'machine': platform.machine(),
+        'python': platform.python_version(), 'implementation': platform.python_implementation()}
 def audit(event, args):
     if event.startswith(('socket.', 'subprocess.', 'os.exec', 'os.spawn')) or event == 'os.system':
         raise AssertionError('export attempted external work: '+event)
@@ -66,10 +70,8 @@ assert document['result']['distribution_version'] == result.distribution_version
 assert result.requires_python == '>=3.10' and result.profile == 'patchharbor-core-no-watcher-v1'
 assert 'patchharbor_watcher' not in sys.modules
 facts = asdict(result); facts['path'] = str(result.path)
-import platform
 print(json.dumps({'runtime': facts, 'capabilities': asdict(api.integration_capabilities()),
-                 'host': {'system': platform.system(), 'machine': platform.machine(),
-                          'python': platform.python_version(), 'implementation': platform.python_implementation()}}))
+                 'host': host}))
 '''
 
 
