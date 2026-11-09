@@ -27,7 +27,7 @@ class MonitorDetails:
             source['future'] = self.pool.submit(query_api, method, args, self.timeout)
         if key != source['key']:
             return {'artifacts': [], 'text': '', 'refreshing': True}
-        return {**(source['value'] or {}), 'stale': bool(source['error']),
+        return {**(source['value'] or {}), 'stale': bool(source['error']) or (source['value'] or {}).get('stale', False),
                 'error': source['error'], 'refreshing': source['future'] is not None}
 
     def attach(self, document, session, *, force=False):

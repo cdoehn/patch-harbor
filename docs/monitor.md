@@ -46,3 +46,11 @@ repository is refreshed no more often than every 10 seconds by default.
 
 Live watcher status remains the later VIEW-03 step; unknown watcher status
 in this stage does not assert a stopped watcher.
+
+Replay and repository state are rechecked after artifact scans. Concurrent
+changes mark the observation stale. An unreadable/oversized artifact makes
+candidate selection incomplete. Archived packages retain processing evidence
+only through the original Exchange path plus the exact hash and binding.
+Copies of one Result count as one source identity; different Results claiming
+one run ID are explicitly ambiguous. History shows only the selected repository
+and indicates attempts whose Result is absent from the observed inventory.

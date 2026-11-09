@@ -52,7 +52,8 @@ class MonitorSession:
         return sorted((r for r in rows if self.artifact_match.casefold() in
                        ' '.join(str(r.get(k) or '') for k in ('name', 'sha256', 'repo_id', 'run_id')).casefold()
                        and (self.view != 'logs' or r['kind'] == 'result_bundle')
-                       and (self.view != 'history' or r.get('run_id') or r.get('attempt_run_id'))),
+                       and (self.view != 'history' or (r.get('repo_id') == self.repository_id
+                            and (r.get('run_id') or r.get('attempt_result_missing'))))),
                       key=lambda r: (r.get('mtime_ns', 0), r['path']), reverse=not self.descending)
 
     def selected_artifact(self, document):

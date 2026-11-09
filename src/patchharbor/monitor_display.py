@@ -82,7 +82,13 @@ def artifact_lines(document, session, *, height):
             status = primary.get('kind') or row.get('replay_status') or row['kind']
             exit_code = primary.get('entrypoint_exit_code')
             lines.append((f"{'>' if row is selected else ' '} {row['name']} · {status} · Exit {exit_code if exit_code is not None else '—'} · {'ARCHIV' if row['archived'] else 'Exchange'}", 'unknown' if view.get('stale') else result_semantic(row)))
+    if session.view == 'history':
+        lines.insert(1, ('Verlauf aus vorhandenen Nachweisen · nicht vollständig', 'warning'))
     if selected:
+        if selected.get('ambiguous_run'):
+            lines.insert(1, ('MEHRDEUTIG: mehrere unterschiedliche Results derselben Run-ID', 'warning'))
+        if selected.get('attempt_result_missing'):
+            lines.insert(1, ('Result des letzten gespeicherten Versuchs fehlt im beobachteten Bestand.', 'warning'))
         if session.view == 'logs':
             log = document.get('log_view', {})
             lines.append((selected['name'] + ' · Run ' + str(selected.get('run_id')), 'title'))

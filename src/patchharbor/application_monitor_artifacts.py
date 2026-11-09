@@ -10,7 +10,7 @@ from patchharbor.exchange import classify_exchange_artifact
 from patchharbor.exchange_state import ExchangeFileIdentity, ExchangeStateSnapshot, _parse_state
 from patchharbor.models import RepositoryId, GitObjectId, GitObjectFormat
 from patchharbor.monitor_types import observed_at
-from patchharbor.platform.filesystem import PathKind, path_kind, read_stable_regular_file_bounded
+from patchharbor.platform.filesystem import PathKind, path_kind, read_stable_regular_file_bounded, regular_file_state
 from patchharbor.resource_policy import ResourcePolicy
 from patchharbor.result_reader import capture_result_payloads, ReferenceContext
 from patchharbor.user_paths import registration_user_paths
@@ -38,6 +38,7 @@ def artifact_fact(path, archived, state):
     row = {'path': str(path), 'name': path.name, 'archived': archived, 'kind': 'unknown',
            'sha256': None, 'repo_id': None, 'error': None}
     try:
+        before = regular_file_state(path)
         if path_kind(path) is not PathKind.REGULAR_FILE:
             raise ValueError('not a regular file; not followed')
         if path.stat().st_size > POLICY.max_input_artifact_bytes:
@@ -47,7 +48,14 @@ def artifact_fact(path, archived, state):
                    mtime_ns=artifact.mtime_ns, size=path.stat().st_size)
         if artifact.selection is not None:
             expected = binding(artifact.selection)
-            record = state.record_for(artifact.identity)
+            identity = artifact.identity
+            record = state.record_for(identity)
+            if archived and record is None:
+                identity = ExchangeFileIdentity(path.parent.parent / path.name, artifact.identity.sha256)
+                record = state.record_for(identity)
+            if record and (record.kind != 'patch_package' or record.manifest != artifact.selection):
+                raise ValueError('replay classification disagrees with validated package')
+            row['replay_source_path'] = str(identity.path) if record else None
             row.update(repo_id=expected['repo_id'], expected=expected,
                        replay_status=record.apply_status.value if record and record.apply_status else None,
                        attempt_run_id=record.attempt_run_id if record else None,
@@ -63,8 +71,11 @@ def artifact_fact(path, archived, state):
                        dry_run=facts.dry_run, primary_result=facts.primary_result.as_document(),
                        result_status='created', patch_sha256=facts.patch_sha256,
                        completed_commit=str(facts.completed_commit) if facts.completed_commit else None)
+        if regular_file_state(path) != before:
+            raise ValueError('artifact changed during observation')
         return row, artifact
     except ERRORS as exc:
+        row.pop('primary_result', None)
         row['error'] = str(exc)
         return row, None
 
@@ -104,12 +115,23 @@ def monitor_artifacts(repository, *, include_archive=False):
                                   repo.git_status == 'dirty', repo.fingerprint, 'patchharbor-state-v1')
     for parent, archived in directories:
         try:
-            paths = sorted(parent.iterdir(), key=lambda p: p.name)
+            paths = []
+            for path in parent.iterdir():
+                paths.append(path)
+                if len(paths) > 1024:
+                    result['incomplete'] = True
+                    result['errors'].append('directory exceeds 1024 entry observation limit')
+                    break
+            paths.sort(key=lambda p: p.name)
         except OSError as exc:
             result['errors'].append(str(exc))
             continue
         for path in paths:
-            if path_kind(path) is PathKind.DIRECTORY:
+            try:
+                if path_kind(path) is PathKind.DIRECTORY:
+                    continue
+            except OSError as exc:
+                result['errors'].append(str(exc))
                 continue
             count += 1
             try:
@@ -121,6 +143,8 @@ def monitor_artifacts(repository, *, include_archive=False):
                 result['errors'].append('Exchange observation limit reached; history and candidate selection incomplete')
                 break
             row, artifact = artifact_fact(path, archived, state)
+            if row['error']:
+                result['incomplete'] = True
             row['eligibility'] = 'not a patch'
             if artifact is not None and artifact.selection is not None:
                 if archived:
@@ -139,16 +163,38 @@ def monitor_artifacts(repository, *, include_archive=False):
                     reason = 'eligible (observation, not reserved)'
                     candidates.append(artifact)
                 row['eligibility'] = reason
-                row['manual_retry_possible'] = row['replay_status'] == 'failed'
+                row['manual_retry_possible'] = (state_known and not archived and context is not None
+                                                and artifact.selection.matches_context(context)
+                                                and row['replay_status'] == 'failed')
             result['artifacts'].append(row)
+    try:
+        if replay_snapshot() != state:
+            raise ValueError('replay state changed during observation')
+        after = monitor_snapshot(repository=repository).repositories
+        if len(after) != 1 or any(getattr(after[0], k) != getattr(repo, k) for k in
+                                  ('repo_id', 'path', 'exchange', 'archive', 'commit', 'fingerprint', 'error')):
+            raise ValueError('repository context changed during artifact observation')
+    except ERRORS as exc:
+        result['errors'].append(str(exc))
+        result['stale'] = True
     if candidates and not result['incomplete'] and not result['errors']:
         result['selected_candidate'] = str(_select_exchange_candidate(candidates).path)
     rows = result['artifacts']
     for patch in (r for r in rows if r['kind'] == 'patch_package' and not r['error']):
-        patch['source_candidates'] = [r['sha256'] for r in rows if r.get('context') == patch['expected'] and not r['error']]
-        patch['result_links'] = [r['sha256'] for r in rows if r.get('patch_sha256') == patch['sha256']
-                                 and r.get('expected') == patch['expected'] and not r['error']]
+        patch['source_candidates'] = sorted({r['sha256'] for r in rows if r.get('context') == patch['expected'] and not r['error']})
+        patch['result_links'] = sorted({r['sha256'] for r in rows if r.get('patch_sha256') == patch['sha256']
+                                 and r.get('expected') == patch['expected'] and not r['error']})
         patch['source_relation'] = 'matching states only; source ZIP not uniquely recorded'
+    runs = {}
+    for row in rows:
+        if row.get('run_id') and not row.get('error'):
+            runs.setdefault(row['run_id'], set()).add(row['sha256'])
+    for row in rows:
+        row['ambiguous_run'] = len(runs.get(row.get('run_id'), ())) > 1
+        if row.get('attempt_run_id'):
+            row['attempt_result_missing'] = not any(r.get('run_id') == row['attempt_run_id']
+                and r.get('patch_sha256') == row['sha256'] and r.get('expected') == row['expected']
+                and not r['error'] for r in rows)
     return result
 
 

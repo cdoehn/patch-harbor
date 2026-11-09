@@ -111,3 +111,83 @@ def test_once_artifacts_json_uses_native_queries(tmp_path, monkeypatch):
                 stdin=StringIO(), stdout=stdout, stderr=stderr)
     assert code == 0, stderr.getvalue() + stdout.getvalue()
     assert json.loads(stdout.getvalue())['bundle_view']['selected_candidate']
+
+
+def test_changed_file_is_not_reused_as_a_candidate(tmp_path, monkeypatch):
+    import patchharbor.application_monitor_artifacts as monitor
+    (root, context), = registered(tmp_path, monkeypatch)
+    path = patch(root, context)
+    native = monitor.classify_exchange_artifact
+    def replace_after_read(path, **kwargs):
+        result = native(path, **kwargs)
+        path.write_bytes(b'replaced')
+        return result
+    monkeypatch.setattr(monitor, 'classify_exchange_artifact', replace_after_read)
+    result = api.monitor_artifacts(str(root))
+    assert result['incomplete'] and result['selected_candidate'] is None
+    assert result['artifacts'][0]['error']
+
+
+def test_changed_replay_during_scan_marks_observation_stale(tmp_path, monkeypatch):
+    import patchharbor.application_monitor_artifacts as monitor
+    from patchharbor.exchange_state import ExchangeStateSnapshot
+    (root, context), = registered(tmp_path, monkeypatch)
+    path = patch(root, context)
+    artifact = classify_exchange_artifact(path)
+    states = iter((ExchangeStateSnapshot(), ExchangeStateSnapshot((ExchangeStateRecord(
+        artifact.identity, artifact.kind.value, artifact.selection, ExchangeApplyStatus.ATTEMPTED),))))
+    monkeypatch.setattr(monitor, 'replay_snapshot', lambda: next(states))
+    result = api.monitor_artifacts(str(root))
+    assert result['stale'] and result['selected_candidate'] is None
+    assert 'replay state changed' in result['errors'][0]
+
+
+def test_archived_patch_retains_original_replay_provenance(tmp_path, monkeypatch):
+    (root, context), = registered(tmp_path, monkeypatch)
+    path = patch(root, context)
+    artifact = classify_exchange_artifact(path)
+    paths = registration_user_paths()
+    merge_exchange_classifications(paths, (ExchangeStateRecord(artifact.identity, artifact.kind.value, artifact.selection),))
+    mark_exchange_apply_started(paths, artifact.identity, artifact.selection, verify_identity=lambda: None)
+    mark_exchange_apply_finished(paths, artifact.identity, artifact.selection, ExchangeApplyStatus.FAILED)
+    archive = path.parent / 'PatchHarbor-Archive'
+    archive.mkdir()
+    path.rename(archive / path.name)
+    row, = api.monitor_artifacts(str(root), include_archive=True)['artifacts']
+    assert row['replay_status'] == 'failed' and row['replay_source_path'] == str(path)
+    assert row['archived'] and not row['manual_retry_possible']
+
+
+def test_duplicate_result_copy_is_one_source_identity(tmp_path, monkeypatch):
+    (root, context), = registered(tmp_path, monkeypatch)
+    reference = api.bundle(root).path
+    (reference.parent / 'copy.bin').write_bytes(reference.read_bytes())
+    patch(root, context)
+    rows = api.monitor_artifacts(str(root))['artifacts']
+    assert len(next(r for r in rows if r['kind'] == 'patch_package')['source_candidates']) == 1
+    assert not any(r['ambiguous_run'] for r in rows)
+
+
+def test_dry_run_receipt_links_to_exact_patch_and_stays_validation(tmp_path, monkeypatch):
+    (root, context), = registered(tmp_path, monkeypatch)
+    path = patch(root, context)
+    report = api.apply(path, dry_run=True)
+    assert report.success
+    rows = api.monitor_artifacts(str(root))['artifacts']
+    receipt = next(r for r in rows if r['kind'] == 'result_bundle')
+    package = next(r for r in rows if r['kind'] == 'patch_package')
+    assert receipt['dry_run'] and receipt['primary_result']['kind'] == 'dry_run_success'
+    # A validation-only receipt must not imply an executed patch or success replay.
+    assert package['replay_status'] is None
+    assert receipt['primary_result']['entrypoint_exit_code'] is None
+
+
+def test_corrupt_result_and_symlink_do_not_hide_other_artifacts(tmp_path, monkeypatch):
+    import zipfile
+    (root, context), = registered(tmp_path, monkeypatch)
+    path = patch(root, context)
+    with zipfile.ZipFile(path.parent / 'broken.zip', 'w') as archive:
+        archive.writestr('manifest.json', '{"marker":"patch-harbor-result-bundle"}')
+    result = api.monitor_artifacts(str(root))
+    assert any(r.get('error') or r['kind'] == 'other' for r in result['artifacts'])
+    assert any(r['kind'] == 'patch_package' for r in result['artifacts'])
