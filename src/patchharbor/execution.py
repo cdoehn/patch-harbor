@@ -352,7 +352,7 @@ def _control_process(
             result = process_tree.run(timeout_seconds=timeout_seconds)
             capture.finish()
             if publication is not None:
-                publication.update(entrypoint_exit_code=result.return_code, process_state=result.state.value)
+                publication.update(entrypoint_exit_code=result.return_code, process_state=result.state.name.lower())
             targets.write_visible_lines(capture.visible_lines)
 
             if result.state is ProcessState.TIMED_OUT:

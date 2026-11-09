@@ -94,3 +94,167 @@ def test_uninitialized_live_read_creates_nothing(tmp_path, monkeypatch):
         monkeypatch.setenv(key, value)
     assert not api.monitor_live()['instances']
     assert list(tmp_path.iterdir()) == []
+
+
+def test_pid_reuse_and_expired_heartbeat_never_become_active(tmp_path, monkeypatch):
+    import json
+    from datetime import datetime, timezone, timedelta
+    registered(tmp_path, monkeypatch)
+    publication = api.watcher_observation()
+    wait_for(lambda: instance(publication.instance_id))
+    publication.close()
+    publication.thread.join(timeout=3)
+    path = publication.paths.state_directory / 'monitor-v1' / ('watcher-' + publication.instance_id + '.json')
+    row = json.loads(path.read_bytes())
+    row['completed'] = False
+    row['updated_at'] = datetime.now(timezone.utc).isoformat()
+    path.write_text(json.dumps(row))
+    native = monitor_live.process_identity
+    monkeypatch.setattr(monitor_live, 'process_identity', lambda pid: 'different-process-birth')
+    assert instance(publication.instance_id)['stale'] and not instance(publication.instance_id)['live']
+    monkeypatch.setattr(monitor_live, 'process_identity', native)
+    row['updated_at'] = (datetime.now(timezone.utc) - timedelta(seconds=60)).isoformat()
+    path.write_text(json.dumps(row))
+    assert instance(publication.instance_id)['stale']
+
+
+def test_slow_writer_does_not_block_producer_and_close_is_eventually_published(tmp_path, monkeypatch):
+    from threading import Event
+    registered(tmp_path, monkeypatch)
+    entered, release = Event(), Event()
+    original = monitor_live.atomic_replace_bytes
+    def slow(*args, **kwargs):
+        entered.set()
+        release.wait(5)
+        return original(*args, **kwargs)
+    monkeypatch.setattr(monitor_live, 'atomic_replace_bytes', slow)
+    publication = api.watcher_observation()
+    assert entered.wait(3)
+    start = time.monotonic()
+    for _ in range(100):
+        publication.append(b'x' * 65536)
+        publication.update(phase='watching')
+    publication.close()
+    assert time.monotonic() - start < .5
+    assert len(publication.tail) == 32768
+    release.set()
+    publication.thread.join(timeout=3)
+    assert not publication.thread.is_alive()
+    assert instance(publication.instance_id)['completed']
+
+
+def test_malformed_live_source_is_isolated_from_valid_peer(tmp_path, monkeypatch):
+    import json
+    registered(tmp_path, monkeypatch)
+    publication = api.watcher_observation()
+    wait_for(lambda: instance(publication.instance_id))
+    try:
+        directory = publication.paths.state_directory / 'monitor-v1'
+        (directory / 'apply-bad.json').write_text('{"format_version":1,"pid":-1}')
+        result = api.monitor_live()
+        assert result['errors']
+        assert any(r['instance_id'] == publication.instance_id for r in result['instances'])
+        source = directory / ('watcher-' + publication.instance_id + '.json')
+        row = json.loads(source.read_bytes())
+        row['data'] = {'targets': [{'directory': 'x', 'quiet_until': 'NaN'}]}
+        with pytest.raises(ValueError):
+            monitor_live.parse_live(json.dumps(row).encode(), source.name)
+    finally:
+        publication.close()
+
+
+def test_concurrent_real_applies_keep_run_and_repository_identity(tmp_path, monkeypatch):
+    entries = registered(tmp_path, monkeypatch, ('one', 'two'))
+    paths = []
+    for root, context in entries:
+        path = tmp_path / 'exchange' / (root.name + '.zip')
+        _write_custom_package(path, {k: str(getattr(context, k)) for k in ('repo_id', 'base_commit', 'state_fingerprint')},
+            posix_entrypoint='sleep .6; exit 0', powershell_entrypoint='Start-Sleep -Milliseconds 600; exit 0')
+        paths.append(path)
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        futures = [pool.submit(api.apply, p) for p in paths]
+        reports = [future.result(timeout=15) for future in futures]
+    # Existing Core locks may reject one concurrent admission; observation must
+    # preserve both actual outcomes and never merge their identities.
+    assert any(r.success for r in reports)
+    rows = wait_for(lambda: (rows if len(rows) == 2 and all(r['completed'] for r in rows) else None)
+                    if (rows := api.monitor_live()['instances']) else None)
+    assert {r['data']['run_id'] for r in rows} == {str(r.run_id) for r in reports}
+    assert {r['data'].get('repo_id') for r in rows if r['data'].get('repo_id')} <= {str(c.repo_id) for _, c in entries}
+    by_run = {str(r.run_id): r for r in reports}
+    for row in rows:
+        assert row['data']['primary_result'] == by_run[row['data']['run_id']].primary_result.as_document()
+    assert len({r['instance_id'] for r in rows}) == 2
+
+
+def test_live_distinguishes_exit_zero_from_failed_result_publication(tmp_path, monkeypatch):
+    import patchharbor.result_bundle_publication as publication
+    from patchharbor.monitor_session import result_semantic
+    (root, context), = registered(tmp_path, monkeypatch)
+    path = tmp_path / 'exchange' / 'success.zip'
+    _write_custom_package(path, {k: str(getattr(context, k)) for k in ('repo_id', 'base_commit', 'state_fingerprint')},
+        posix_entrypoint='exit 0', powershell_entrypoint='exit 0')
+    def fail(*args, **kwargs):
+        raise OSError('injected Result publication failure')
+    monkeypatch.setattr(publication, '_verify_result_bundle', fail)
+    report = api.apply(path)
+    assert report.primary_result.entrypoint_exit_code == 0 and not report.success
+    row = wait_for(lambda: next((r for r in api.monitor_live()['instances'] if r['completed']), None))
+    assert row['data']['result_status'] == 'failed'
+    assert result_semantic(row['data']) == 'dirty'
+
+
+def test_observation_directory_cannot_be_an_exchange(tmp_path, monkeypatch):
+    (root, _), = registered(tmp_path, monkeypatch)
+    from patchharbor.user_paths import raw_registration_user_paths
+    paths = raw_registration_user_paths()
+    api.configure_exchange_directory(paths.state_directory, repository=root)
+    publication = api.watcher_observation()
+    publication.thread.join(timeout=3)
+    publication.close()
+    assert not (paths.state_directory / 'monitor-v1').exists()
+
+
+def test_retention_only_removes_old_completed_observations(tmp_path, monkeypatch):
+    import json
+    from uuid import uuid4
+    registered(tmp_path, monkeypatch)
+    publication = api.watcher_observation()
+    wait_for(lambda: instance(publication.instance_id))
+    publication.close()
+    publication.thread.join(timeout=3)
+    directory = publication.paths.state_directory / 'monitor-v1'
+    original = directory / ('watcher-' + publication.instance_id + '.json')
+    template = json.loads(original.read_bytes())
+    for index in range(132):
+        identity = str(uuid4())
+        row = {**template, 'instance_id': identity, 'completed': index != 0}
+        (directory / ('watcher-' + identity + '.json')).write_text(json.dumps(row))
+    protected = directory / 'do-not-touch.txt'
+    protected.write_text('other state')
+    monitor_live.prune_completed(directory)
+    documents = [json.loads(path.read_bytes()) for path in directory.glob('watcher-*.json')]
+    assert sum(row['completed'] for row in documents) == 128
+    assert sum(not row['completed'] for row in documents) == 1
+    assert protected.read_text() == 'other state'
+
+
+def test_watcher_publishes_observed_targets_and_quiet_deadlines(tmp_path):
+    from patchharbor_watcher.loop import run_repository_watcher
+    from tests.test_watcher_scheduling import Harness, InlineWorker
+    h = Harness(tmp_path)
+    updates = []
+    class Recorder:
+        def update(self, **value): updates.append(value)
+        def close(self): updates.append({'closed': True})
+    h.at(3)
+    run_repository_watcher(delegate=h.delegate, log_stream=h.log, error_stream=h.errors,
+        stop_requested=h.controller.stop_requested, bind_wake=h.controller.bind_wake,
+        target_provider=h.provider, control_provider=lambda: h.controls,
+        readiness=h.readiness, source_factory=h.factory, clock=h.clock,
+        worker_factory=InlineWorker, publication_factory=Recorder)
+    assert any(row.get('phase') == 'applying' for row in updates)
+    target = next(row['targets'][0] for row in updates if row.get('targets'))
+    assert target['directory'] == str(h.a) and target['quiet_until'] > 0
+    assert target['blocked_on'] is None
+    assert updates[-2:] == [{'phase': 'stopped'}, {'closed': True}]

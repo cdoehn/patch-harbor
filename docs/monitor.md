@@ -76,3 +76,15 @@ within a scan; ZIP contents are not cached. Each viewer retains at most eight
 64 KiB log tails for 60 seconds, keyed by full path and hash. `r` bypasses the
 log cache. Artifact and log timestamps describe the observed data, not freshness
 of the screen redraw.
+
+The reader validates the versioned envelope, identities, timestamps, outcomes
+and bounded watcher data. Invalid records are isolated. PID reuse, missing birth
+identity, expired heartbeat and clock discontinuities are unknown/stale, never
+active. Fact timestamps and heartbeat timestamps are distinct. Concurrent runs
+have independent files even when existing Core locks reject one admission.
+A bounded final flush cannot hold up execution; if observation completion is
+lost, readers retain unknown/stale evidence rather than inventing success.
+Publishers retain the newest 128 completed records; active/unknown records and
+unrelated files are untouched. Readers cap directory entries at 512 and returned
+instances at 64, with an explicit incomplete flag. A selected instance is queried
+directly. The viewer never performs retention or recovery.

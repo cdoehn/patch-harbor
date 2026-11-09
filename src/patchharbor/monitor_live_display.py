@@ -19,13 +19,13 @@ def live_lines(document, session, *, height):
         index = rows.index(selected) if selected else 0
         first = max(0, index - 2)
         for row in rows[first:first+3]:
-            status = 'AKTIV' if row.get('live') else 'VERALTET / unbekannt' if row.get('stale') else 'beendet'
+            status = 'VERALTET / unbekannt' if view.get('stale') else 'AKTIV' if row.get('live') else 'VERALTET / unbekannt' if row.get('stale') else 'beendet'
             lines.append((f"{'>' if row is selected else ' '} {row['kind']} {row['instance_id']} · {row['phase']} · {status}",
-                          'warning' if row.get('live') else 'unknown'))
+                          'warning' if row.get('live') and not view.get('stale') else 'unknown'))
     if selected:
         data = selected['data']
         lines += [('Instanz: ' + selected['instance_id'], 'title'),
-                  (f"Phase: {selected['phase']} · PID {selected['pid']} · Stand {selected['updated_at']}", '')]
+                  (f"Phase: {selected['phase']} · PID {selected['pid']} · Stand {selected['facts_updated_at']}", '')]
         if session.view == 'live-logs':
             detail = document.get('live_log_view', {})
             row = next(iter(detail.get('instances', [])), {})
@@ -39,8 +39,9 @@ def live_lines(document, session, *, height):
             for target in targets:
                 lock = target.get('blocked_on')
                 lines.append((target['directory'] + ' · ' + (str(lock) if lock else 'kein gespeicherter Sperrhinweis'), ''))
-                remaining = max(0, target.get('quiet_until', 0) - datetime.now(timezone.utc).timestamp())
-                lines.append((f"Ruhefrist: {remaining:.1f}s · Änderung vorgemerkt: {target.get('dirty')}", ''))
+                deadline = target.get('quiet_until')
+                remaining = 'unbekannt' if deadline is None else f'{max(0, deadline - datetime.now(timezone.utc).timestamp()):.1f}s'
+                lines.append((f"Ruhefrist: {remaining} · Änderung vorgemerkt: {target.get('dirty')}", ''))
             if data.get('last_error'):
                 lines.insert(0, (data['last_error'], 'dirty'))
         else:
@@ -49,8 +50,8 @@ def live_lines(document, session, *, height):
                       (f"Ursprung: {data.get('origin')} · {'DRY-RUN' if data.get('dry_run') else 'Apply'}", '')]
             timeout = data.get('effective_timeout_seconds')
             lines.append(('Wirksamer Entrypoint-Timeout: ' + (f'{timeout:g}s' if timeout is not None else 'noch nicht gestartet'), ''))
-            if selected.get('live') and timeout is not None and data.get('process_state') is None:
-                started = datetime.fromisoformat(data['entrypoint_started_at'])
+            if selected.get('live') and not view.get('stale') and timeout is not None and data.get('process_state') is None:
+                started = datetime.fromisoformat(data['entrypoint_started_at'].replace('Z', '+00:00'))
                 remaining = max(0, timeout - (datetime.now(timezone.utc) - started).total_seconds())
                 lines.append((f"Bis Timeout höchstens {remaining:.1f}s · keine Fertigstellungsprognose", 'warning'))
             primary = data.get('primary_result') or {}
