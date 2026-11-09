@@ -106,3 +106,32 @@ committet erst danach. Bei Fehler stoppt die Folge; erfolgreiche Vorgänger und
 der tatsächliche Arbeitsstand bleiben erhalten. Erst nach allen enthaltenen
 Commits, sauberem Ziel und normalem Push erscheint der Bundle-Erfolgsmarker.
 Keine rekursiven Apply-/Bundle-Aufrufe und keine Dienststeuerung.
+
+## Vorbereitete erste Lieferung 078
+
+Enthalten: VIEW-00 und alle neun W/R/C-Positionen VIEW-01.W bis VIEW-03.C,
+in der oben festgelegten Reihenfolge. Fachlich passen damit alle drei Gruppen
+in die erste ZIP. Die Zwischenstände sind als echte aufeinander aufbauende
+Git-Deltas vorbereitet, mit vollständigen Datei- und Modus-Inventaren.
+
+Stand vor Übergabe: PREPARED, nicht APPLIED. Entwicklung und native Linux-
+Abnahmen sind in `planning/viewer/delivery-078.md` dokumentiert. Jeder Commit,
+einschließlich dieses ursprünglichen Plan-Zustands, erhält im Apply seine eigene
+vollständige parallele Suite. Erst die Result-Ausgabe belegt ausgeführte Commits.
+Es gibt keine künstlichen Klärungscommits: die notwendigen Detailentscheidungen
+standen bereits in VIEW-00; die drei C-Schritte enthalten reale Strukturarbeit.
+
+## Wiederaufnahme mit Bundle 079
+
+Bundle 078 wurde am 9. November 2026 mit Exitcode 1 beendet. VIEW-00 ist
+bestaetigt committed als `26b3bf4bf9b17c825b604cad1a180e3d6c64fe1d`; die
+Vollsuite dieser Stufe bestand. VIEW-01.W blieb vor seinem Commit stehen,
+weil die explizite Release-Dateiliste die neuen Viewer-Module noch nicht
+enthielt. Der reale dirty Zwischenstand bleibt erhalten.
+
+Bundle 079 ist an genau diesen geprueften Result-Snapshot gebunden. Es
+vervollstaendigt VIEW-01.W und setzt alle weiteren W/R/C-Stufen in der
+urspruenglichen Reihenfolge fort. Jede Stufe hat ihre eigene explizite
+Paketdateiliste; das gemessene Wheel mit allen Viewer-Modulen erhaelt ein
+begrenztes 432-KiB-Releasebudget. Kein Runtime-/Eingabelimit wird geaendert.
+Details und noch ausstehender Apply-Nachweis: `delivery-079.md`.

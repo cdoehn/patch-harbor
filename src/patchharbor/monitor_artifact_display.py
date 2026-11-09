@@ -7,6 +7,8 @@ def artifact_lines(document, session, *, height):
     rows = session.artifacts(document)
     selected = session.selected_artifact(document)
     lines = [(f"Pakete: {len(rows)} · Archiv: {'an' if session.include_archive else 'aus'} (a) · Suche: {session.artifact_match or '—'}", 'title')]
+    if view.get('incomplete'):
+        lines.append(('UNVOLLSTÄNDIG: beschädigte, ältere oder begrenzte Quellen; Auswahl nicht bewiesen.', 'warning'))
     if session.view != 'logs':
         index = rows.index(selected) if selected else 0
         visible = max(1, min(5, height // 6))
@@ -34,13 +36,20 @@ def artifact_lines(document, session, *, height):
             lines.append(('SHA-256: ' + str(selected.get('sha256')), ''))
             expected = selected.get('expected') or selected.get('context') or {}
             lines.append(('Repo: ' + str(selected.get('repo_id')), ''))
-            lines.append(('Bindung: ' + str(expected.get('base_commit')) + ' / ' + str(expected.get('state_fingerprint')), ''))
+            lines.append(('Erwarteter Ausgang: ' + str(expected.get('base_commit')) + ' / ' + str(expected.get('state_fingerprint')), ''))
             if selected['kind'] == 'patch_package':
                 lines.append((selected['eligibility'], 'warning'))
+                for digest in selected.get('source_candidates', []):
+                    lines.append(('Passender Ausgangs-Result-Hash: ' + digest, ''))
+                for digest in selected.get('result_links', []):
+                    lines.append(('Zugehöriger Result-Hash: ' + digest, ''))
                 lines.append((f"Passende Ausgangszustände: {len(selected.get('source_candidates', []))} (kein eindeutiger Ursprung) · Result-Nachweise: {len(selected.get('result_links', []))}", ''))
                 if selected.get('attempt_run_id'):
                     lines.append(('Letzter Versuch: ' + selected['attempt_run_id'] + ' · kein Live-Nachweis', ''))
             else:
+                context = selected.get('context', {})
+                if context:
+                    lines.append(('Result-Zustand: ' + context['base_commit'] + ' / ' + context['state_fingerprint'], ''))
                 lines.append((f"Run: {selected.get('run_id')} · {'DRY-RUN / Validierung' if selected.get('dry_run') else selected.get('operation', '—')} · Result: {selected.get('result_status', 'unbekannt')}", result_semantic({**selected, 'stale': view.get('stale')})))
                 if selected.get('patch_sha256'):
                     lines.append(('Patch: ' + selected['patch_sha256'], ''))
@@ -52,4 +61,7 @@ def artifact_lines(document, session, *, height):
         lines.append((error, 'warning'))
     if view.get('stale'):
         lines.insert(1, ('VERALTET: ' + str(view.get('error')), 'warning'))
+    if session.focus == 'content':
+        offset = min(session.offsets.get(session.view, 0), max(0, len(lines) - 1))
+        lines = lines[offset:]
     return lines

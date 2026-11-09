@@ -63,4 +63,9 @@ def live_lines(document, session, *, height):
         lines.insert(0, (error, 'warning'))
     if view.get('stale'):
         lines.insert(0, ('VERALTET: ' + str(view.get('error')), 'warning'))
+    if view.get('incomplete'):
+        lines.insert(0, ('UNVOLLSTÄNDIG: begrenzter Beobachtungsbestand.', 'warning'))
+    if session.focus == 'content':
+        offset = min(session.offsets.get(session.view, 0), max(0, len(lines) - 1))
+        lines = lines[offset:]
     return lines

@@ -41,8 +41,8 @@ def lines(document, session, *, width=100, height=35):
         result.append((f"{marker}{row['name']:<23.23} {LABELS[semantic]:<10} {count:<12} {row.get('exchange') or 'kein Exchange'}", semantic))
     if not repos:
         result.append(('Keine registrierten Ziele im Filter.', 'warning'))
-    result += [('', ''), (f"1 Übersicht · 2 Exchanges · 3 Bundles · 4 Verlauf · 5 Logs · 6 Live · 7 Live-Log   Ansicht: {session.view} · Fokus: {session.focus}", 'title'),
-               (f"Suche: {session.match or '—'} · Sortierung {'↓' if session.descending else '↑'} · staged / unstaged / untracked", 'title')]
+    result += [('', ''), (f"1 Übersicht · 2 Exchanges · 3 Bundles · 4 Verlauf · 5 Logs · 6 Live · 7 Live-Log", 'title'),
+               (f"Ansicht: {session.view} · Fokus: {session.focus} · Suche: {session.match or '—'} · Sortierung {'↓' if session.descending else '↑'} · staged / unstaged / untracked", 'title')]
     if session.view == 'exchanges':
         for row in document.get('exchanges', [])[session.offsets.get('exchanges', 0):]:
             result.append((f"{row['path']} · {len(row['repository_ids'])} Repository(s) · {'erreichbar' if row['available'] else 'FEHLT'}", 'title' if row['available'] else 'warning'))

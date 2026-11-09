@@ -570,7 +570,7 @@ def monitor_live(*, instance_id: str | None = None) -> dict:
         from uuid import UUID
         if not isinstance(instance_id, str) or str(UUID(instance_id)) != instance_id:
             raise ValueError('instance_id must be a canonical UUID')
-    from patchharbor.monitor_live import monitor_live as observe
+    from patchharbor.monitor_live_storage import monitor_live as observe
     return observe(instance_id=instance_id)
 
 

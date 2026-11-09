@@ -88,3 +88,15 @@ Publishers retain the newest 128 completed records; active/unknown records and
 unrelated files are untouched. Readers cap directory entries at 512 and returned
 instances at 64, with an explicit incomplete flag. A selected instance is queried
 directly. The viewer never performs retention or recovery.
+
+Tab cycles repository selection, artifact/instance list and scrollable detail
+text in the corresponding views. Long relation lists remain readable in the
+detail focus. Unchanged screens are not redrawn. The display separates the
+expected starting state from a Result's captured resulting state, and exposes
+incomplete inventories even when the selected Result itself is valid.
+
+Implementation boundaries: `monitor_live_schema` owns the closed data contract,
+`monitor_live_storage` owns bounded reads/retention, and `monitor_live` owns the
+optional asynchronous publisher. The watcher supplies facts from its scheduling
+state through its existing observation module. Neither presentation nor readers
+control execution or infer lock ownership from files.

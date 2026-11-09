@@ -14,7 +14,7 @@ from threading import Thread
 import patchharbor.api as api
 from patchharbor_watcher.events import EventKind
 from patchharbor_watcher.platform import open_event_source
-from patchharbor_watcher.observation import Observation
+from patchharbor_watcher.observation import Observation, live_observation
 from patchharbor_watcher.protocol import LockReference
 from patchharbor_watcher.scheduling import QUIET_SECONDS, Schedule
 
@@ -226,18 +226,8 @@ def run_repository_watcher(
     subscribed = ()
 
     def publish_status():
-        now, wall = clock(), time.time()
-        roots = list(schedule.roots.values())
-        publication.update(phase='applying' if worker is not None else 'watching',
-            subscriptions=[str(p) for p in subscribed],
-            targets=[{'directory': str(root.target.directory),
-                      'repository_ids': [str(v) for v in root.target.repository_ids],
-                      'dirty': root.dirty, 'quiet_until': wall + max(0, root.due - now),
-                      'blocked_on': None if root.lock is None else {'kind': root.lock.kind, 'repo_id': root.lock.repo_id},
-                      'probe_at': None if root.probe_at is None else wall + max(0, root.probe_at - now)}
-                     for root in roots[:128]], targets_truncated=len(roots) > 128,
-            control_lock=None if control_lock is None else {'kind': control_lock.kind, 'repo_id': control_lock.repo_id},
-            control_probe_at=None if control_probe is None else wall + max(0, control_probe-now))
+        publication.update(**live_observation(schedule, subscribed, applying=worker is not None,
+            control_lock=control_lock, control_probe=control_probe, now=clock(), wall=time.time()))
 
     def wake():
         if source is not None:
@@ -334,6 +324,9 @@ def run_repository_watcher(
                     control_timeout = max(0.0, control_probe - clock())
                     timeout = control_timeout if timeout is None else min(timeout, control_timeout)
                 accept(source.read(timeout))
+    except BaseException as exc:
+        publication.update(last_error=str(exc)[:1024] or type(exc).__name__)
+        raise
     finally:
         bind_wake(None)
         # Keep the wake target alive until the completion thread has returned.

@@ -6,7 +6,7 @@ import time
 import pytest
 
 from patchharbor import api
-from patchharbor import monitor_live
+from patchharbor import monitor_live, monitor_live_storage, monitor_live_schema
 from patchharbor.output import ProcessOutputCapture
 from tests.test_monitor import registered
 from tests.exchange_support import _write_custom_package
@@ -109,10 +109,10 @@ def test_pid_reuse_and_expired_heartbeat_never_become_active(tmp_path, monkeypat
     row['completed'] = False
     row['updated_at'] = datetime.now(timezone.utc).isoformat()
     path.write_text(json.dumps(row))
-    native = monitor_live.process_identity
-    monkeypatch.setattr(monitor_live, 'process_identity', lambda pid: 'different-process-birth')
+    native = monitor_live_storage.process_identity
+    monkeypatch.setattr(monitor_live_storage, 'process_identity', lambda pid: 'different-process-birth')
     assert instance(publication.instance_id)['stale'] and not instance(publication.instance_id)['live']
-    monkeypatch.setattr(monitor_live, 'process_identity', native)
+    monkeypatch.setattr(monitor_live_storage, 'process_identity', native)
     row['updated_at'] = (datetime.now(timezone.utc) - timedelta(seconds=60)).isoformat()
     path.write_text(json.dumps(row))
     assert instance(publication.instance_id)['stale']
@@ -158,7 +158,7 @@ def test_malformed_live_source_is_isolated_from_valid_peer(tmp_path, monkeypatch
         row = json.loads(source.read_bytes())
         row['data'] = {'targets': [{'directory': 'x', 'quiet_until': 'NaN'}]}
         with pytest.raises(ValueError):
-            monitor_live.parse_live(json.dumps(row).encode(), source.name)
+            monitor_live_schema.parse_live(json.dumps(row).encode(), source.name)
     finally:
         publication.close()
 
@@ -232,7 +232,7 @@ def test_retention_only_removes_old_completed_observations(tmp_path, monkeypatch
         (directory / ('watcher-' + identity + '.json')).write_text(json.dumps(row))
     protected = directory / 'do-not-touch.txt'
     protected.write_text('other state')
-    monitor_live.prune_completed(directory)
+    monitor_live_storage.prune_completed(directory)
     documents = [json.loads(path.read_bytes()) for path in directory.glob('watcher-*.json')]
     assert sum(row['completed'] for row in documents) == 128
     assert sum(not row['completed'] for row in documents) == 1

@@ -32,6 +32,7 @@ def monitor_command(args, *, stdin, stdout, stderr):
     details = MonitorDetails(timeout=args.query_timeout, interval=max(10, args.interval))
     search = None
     help_open = False
+    last_screen = None
     try:
         with terminal_mode(stdin, stdout):
             while True:
@@ -42,7 +43,7 @@ def monitor_command(args, *, stdin, stdout, stderr):
                 if width < 60 or height < 15:
                     display = 'Terminal mindestens 60×15; q beendet.'
                 if help_open:
-                    display = ('PATCHHARBOR MONITOR\n\nTab: Fokus wechseln\nPfeile / j k: Auswahl\n'
+                    display = ('PATCHHARBOR MONITOR\n\nTab: Repository / Liste / Detailtext\nPfeile / j k: Auswahl\n'
                                '1 Übersicht / 2 Exchanges / 3 Bundles / 4 Verlauf / 5 Logs\n'
                                '6 Live-Status / 7 Live-Log\n'
                                'a Archiv ein/aus · / Suche im Fokus · Enter / Esc\n'
@@ -50,12 +51,15 @@ def monitor_command(args, *, stdin, stdout, stderr):
                                '? Hilfe schließen\n\nBeobachtungen sind keine Reservierungen.')
                 if search is not None:
                     display += '\n/ ' + safe_text(search) + '  [Enter / Esc]'
-                stdout.write('\x1b[H\x1b[2J' + display)
-                stdout.flush()
+                screen = (width, height, display)
+                if screen != last_screen:
+                    stdout.write('\x1b[H\x1b[2J' + display)
+                    stdout.flush()
+                    last_screen = screen
                 key = read_key(stdin)
                 if search is not None:
                     if key in ('\r', '\n'):
-                        setattr(state, 'artifact_match' if state.focus == 'details' and state.view in ('bundles', 'history', 'logs') else 'match', search)
+                        setattr(state, 'artifact_match' if state.focus != 'repositories' and state.view in ('bundles', 'history', 'logs') else 'match', search)
                         search = None
                     elif key == '\x1b':
                         search = None
@@ -69,13 +73,14 @@ def monitor_command(args, *, stdin, stdout, stderr):
                 if key == '?':
                     help_open = not help_open
                 elif key == '\t':
-                    state.focus = 'details' if state.focus == 'repositories' else 'repositories'
+                    focuses = ('repositories', 'details', 'content') if state.view in ('bundles', 'history', 'live') else ('repositories', 'details')
+                    state.focus = focuses[(focuses.index(state.focus) + 1) % len(focuses)] if state.focus in focuses else focuses[0]
                 elif key in ('up', 'k', 'down', 'j', 'pageup', 'pagedown'):
                     state.move(document, {'up': -1, 'k': -1, 'down': 1, 'j': 1, 'pageup': -8, 'pagedown': 8}[key])
                 elif key in ('1', '2', '3', '4', '5', '6', '7'):
                     state.view = VIEWS[int(key) - 1]
                 elif key == '/':
-                    search = state.artifact_match if state.focus == 'details' and state.view in ('bundles', 'history', 'logs') else state.match
+                    search = state.artifact_match if state.focus != 'repositories' and state.view in ('bundles', 'history', 'logs') else state.match
                 elif key == 'a':
                     state.include_archive = not state.include_archive
                 elif key == 's':

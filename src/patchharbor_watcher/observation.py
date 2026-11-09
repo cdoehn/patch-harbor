@@ -60,3 +60,21 @@ class Observation:
         return any(touches(path, event.directory, event.name)
                    for path in (*self.controls, *self.exchange_paths)
                    if path != event.directory)
+
+
+
+def live_observation(schedule, subscribed, *, applying, control_lock, control_probe, now, wall):
+    """Describe the event loop's own facts without acquiring/probing any lock."""
+    def lock_fact(lock):
+        return None if lock is None else {'kind': lock.kind, 'repo_id': lock.repo_id}
+    def deadline(value):
+        return None if value is None else wall + max(0, value - now)
+    roots = list(schedule.roots.values())
+    return dict(phase='applying' if applying else 'watching',
+        subscriptions=[str(p) for p in subscribed],
+        targets=[{'directory': str(root.target.directory),
+                  'repository_ids': [str(v) for v in root.target.repository_ids],
+                  'dirty': root.dirty, 'quiet_until': deadline(root.due),
+                  'blocked_on': lock_fact(root.lock), 'probe_at': deadline(root.probe_at)}
+                 for root in roots[:128]], targets_truncated=len(roots) > 128,
+        control_lock=lock_fact(control_lock), control_probe_at=deadline(control_probe))
