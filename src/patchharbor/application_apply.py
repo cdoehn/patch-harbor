@@ -303,6 +303,31 @@ def run_apply_path(
     exchanges: tuple[ExchangeWatchTarget, ...] | None = None,
     admission_policy: ApplyAdmissionPolicy | None = None,
 ) -> RunReport:
+    """Observe the existing Apply workflow without changing its admission rules."""
+    from patchharbor.monitor_live import apply_observation
+    actual_session = session or RunSession.start()
+    with apply_observation(actual_session, automatic=automatic, dry_run=dry_run, timeout=timeout_seconds) as publication:
+        report = _run_apply_path(path, dry_run=dry_run, output_directory=output_directory,
+            timeout_seconds=timeout_seconds, output=output, session=actual_session,
+            automatic=automatic, current_directory=current_directory, exchanges=exchanges,
+            admission_policy=admission_policy)
+        publication.finish(report)
+        return report
+
+
+def _run_apply_path(
+    path: Path | None,
+    *,
+    dry_run: bool,
+    output_directory: Path | None = None,
+    timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
+    output: OutputTargets | None = None,
+    session: RunSession | None = None,
+    automatic: bool = False,
+    current_directory: Path | None = None,
+    exchanges: tuple[ExchangeWatchTarget, ...] | None = None,
+    admission_policy: ApplyAdmissionPolicy | None = None,
+) -> RunReport:
     """Run one Apply request through a single public application boundary."""
     actual_session = session or RunSession.start()
     if exchanges is not None and (not automatic or path is not None):
@@ -374,6 +399,10 @@ def run_apply_path(
             error=error,
         ), error)
 
+    from patchharbor.monitor_live import current_publication
+    publication = current_publication()
+    if publication is not None:
+        publication.update(patch_sha256=package.package_sha256)
     emit(RequestStarted(
         source_name=str(selected_path),
         requested_repo_id=str(package.manifest.repo_id),

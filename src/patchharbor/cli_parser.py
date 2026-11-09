@@ -507,7 +507,7 @@ def _build_parser() -> argparse.ArgumentParser:
     monitor = commands.add_parser('monitor', help='observe repositories and exchanges without changing them')
     monitor.add_argument('--repo', help='full registered repository ID or path')
     monitor.add_argument('--exchange', help='filter by configured Exchange directory')
-    monitor.add_argument('--view', choices=('overview', 'exchanges', 'bundles', 'history', 'logs'), default='overview')
+    monitor.add_argument('--view', choices=('overview', 'exchanges', 'bundles', 'history', 'logs', 'live', 'live-logs'), default='overview')
     monitor.add_argument('--archive', action='store_true', help='include the configured archive')
     monitor.add_argument('--artifact-match', default='', help='filter artifact names, full hashes and run IDs')
     monitor.add_argument('--match', default='', help='filter repository names, paths and IDs')

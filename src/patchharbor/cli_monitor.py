@@ -44,6 +44,7 @@ def monitor_command(args, *, stdin, stdout, stderr):
                 if help_open:
                     display = ('PATCHHARBOR MONITOR\n\nTab: Fokus wechseln\nPfeile / j k: Auswahl\n'
                                '1 Übersicht / 2 Exchanges / 3 Bundles / 4 Verlauf / 5 Logs\n'
+                               '6 Live-Status / 7 Live-Log\n'
                                'a Archiv ein/aus · / Suche im Fokus · Enter / Esc\n'
                                's Sortierung umkehren\nr Quellen aktualisieren\nq nur diesen Viewer schließen\n'
                                '? Hilfe schließen\n\nBeobachtungen sind keine Reservierungen.')
@@ -71,7 +72,7 @@ def monitor_command(args, *, stdin, stdout, stderr):
                     state.focus = 'details' if state.focus == 'repositories' else 'repositories'
                 elif key in ('up', 'k', 'down', 'j', 'pageup', 'pagedown'):
                     state.move(document, {'up': -1, 'k': -1, 'down': 1, 'j': 1, 'pageup': -8, 'pagedown': 8}[key])
-                elif key in ('1', '2', '3', '4', '5'):
+                elif key in ('1', '2', '3', '4', '5', '6', '7'):
                     state.view = VIEWS[int(key) - 1]
                 elif key == '/':
                     search = state.artifact_match if state.focus == 'details' and state.view in ('bundles', 'history', 'logs') else state.match

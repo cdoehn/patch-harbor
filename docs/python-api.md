@@ -823,3 +823,9 @@ content capture. Each source has its own freshness in the CLI snapshot.
 read-only Exchange facts for one registered ID/path. `api.monitor_log(path,
 expected_sha256=...)` reads a bounded log from exactly that validated Result.
 Both return JSON-compatible dictionaries and never acquire execution locks.
+
+`api.monitor_live(instance_id=None)` reads optional version-1 watcher/Apply
+observations. A canonical instance ID requests that instance's bounded log tail.
+`api.watcher_observation()` creates a best-effort publisher for a watcher; call
+`update(phase=..., **facts)` with observed facts and `close()` on exit. Each
+Apply request publishes independently through the existing application boundary.

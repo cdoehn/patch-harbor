@@ -12,7 +12,7 @@ class MonitorDetails:
         self.pool = ThreadPoolExecutor(max_workers=2, thread_name_prefix='patchharbor-details')
         self.logs = OrderedDict()
         self.sources = {name: {'key': None, 'value': None, 'future': None, 'error': None, 'due': 0}
-                        for name in ('artifacts', 'log')}
+                        for name in ('artifacts', 'log', 'live', 'live_log')}
 
     def _tick(self, name, key, method, args, force):
         source = self.sources[name]
@@ -27,7 +27,7 @@ class MonitorDetails:
                         self.logs.popitem(last=False)
             except Exception as exc:
                 source['error'] = str(exc)
-            source.update(future=None, due=time.monotonic() + self.interval)
+            source.update(future=None, due=time.monotonic() + (2 if name.startswith('live') else self.interval))
         if key != source['key'] and source['future'] is None:
             cached = self.logs.get(key) if name == 'log' else None
             if cached and time.monotonic() - cached[0] < 60:
@@ -43,7 +43,15 @@ class MonitorDetails:
                 'error': source['error'], 'refreshing': source['future'] is not None}
 
     def attach(self, document, session, *, force=False):
+        live = self._tick('live', 'all', 'monitor_live', {}, force)
+        document = {**document, 'live_view': live}
         selected = session.selected(document)
+        if session.view in ('live', 'live-logs'):
+            row = session.selected_live(document)
+            if row:
+                document['live_log_view'] = self._tick('live_log', row['instance_id'], 'monitor_live',
+                    {'instance_id': row['instance_id']}, force)
+            return document
         if not selected or session.view not in ('bundles', 'history', 'logs'):
             return document
         key = (selected['repo_id'], session.include_archive)
@@ -62,6 +70,14 @@ class MonitorDetails:
 
 
 def attach_once(document, session, timeout):
+    try:
+        document['live_view'] = query_api('monitor_live', {}, timeout)
+    except Exception as exc:
+        document['live_view'] = {'instances': [], 'errors': [str(exc)], 'stale': True}
+    if session.view in ('live', 'live-logs'):
+        row = session.selected_live(document)
+        if row:
+            document['live_log_view'] = query_api('monitor_live', {'instance_id': row['instance_id']}, timeout)
     selected = session.selected(document)
     if selected and session.view in ('bundles', 'history', 'logs'):
         document['bundle_view'] = query_api('monitor_artifacts',

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import unicodedata
 
+from patchharbor.monitor_live_display import live_lines, watcher_summary
 from patchharbor.monitor_artifact_display import artifact_lines
 from patchharbor.monitor_session import git_semantic
 
@@ -27,7 +28,7 @@ def crop(value, width):
 
 def lines(document, session, *, width=100, height=35):
     result = [('PATCHHARBOR / MONITOR', 'title'),
-              (f"Stand: {document.get('observed_at', 'lädt')} · Watcher: unbekannt", 'title'), ('', '')]
+              (f"Stand: {document.get('observed_at', 'lädt')} · Watcher: {watcher_summary(document)}", 'title'), ('', '')]
     repos = session.repositories(document)
     selected = session.selected(document)
     visible = max(1, min(8, height // 3))
@@ -40,11 +41,13 @@ def lines(document, session, *, width=100, height=35):
         result.append((f"{marker}{row['name']:<23.23} {LABELS[semantic]:<10} {count:<12} {row.get('exchange') or 'kein Exchange'}", semantic))
     if not repos:
         result.append(('Keine registrierten Ziele im Filter.', 'warning'))
-    result += [('', ''), (f"1 Übersicht · 2 Exchanges · 3 Bundles · 4 Verlauf · 5 Logs   Ansicht: {session.view} · Fokus: {session.focus}", 'title'),
+    result += [('', ''), (f"1 Übersicht · 2 Exchanges · 3 Bundles · 4 Verlauf · 5 Logs · 6 Live · 7 Live-Log   Ansicht: {session.view} · Fokus: {session.focus}", 'title'),
                (f"Suche: {session.match or '—'} · Sortierung {'↓' if session.descending else '↑'} · staged / unstaged / untracked", 'title')]
     if session.view == 'exchanges':
         for row in document.get('exchanges', [])[session.offsets.get('exchanges', 0):]:
             result.append((f"{row['path']} · {len(row['repository_ids'])} Repository(s) · {'erreichbar' if row['available'] else 'FEHLT'}", 'title' if row['available'] else 'warning'))
+    elif session.view in ('live', 'live-logs'):
+        result += live_lines(document, session, height=height)
     elif session.view in ('bundles', 'history', 'logs'):
         result += artifact_lines(document, session, height=height)
     elif selected:
@@ -59,7 +62,7 @@ def lines(document, session, *, width=100, height=35):
     if document.get('stale'):
         result.append(('VERALTET: ' + document.get('error', 'Quelle nicht aktuell'), 'warning'))
     result = result[:max(1, height - 3)]
-    result += [('', ''), ('Tab Fokus · ↑↓ j/k · 1–5 Ansicht · / Suche · s Sortierung · r Aktualisieren · ? Hilfe · q', 'title'),
+    result += [('', ''), ('Tab Fokus · ↑↓ j/k · 1–7 Ansicht · / Suche · s Sortierung · r Aktualisieren · ? Hilfe · q', 'title'),
                ('Momentaufnahme · keine Reservierung · unbekannt ist nicht sauber', 'warning')]
     return [(crop(text, max(1, width - 1)), style) for text, style in result]
 

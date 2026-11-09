@@ -51,7 +51,7 @@ DEFAULT_TIMEOUT_SECONDS = _application.DEFAULT_TIMEOUT_SECONDS
 PathInput = str | os.PathLike[str]
 
 __all__ = [
-    "monitor_artifacts", "monitor_log", "monitor_snapshot", "MonitorSnapshot", "MonitorRepository", "MonitorExchange",
+    "monitor_live", "watcher_observation", "monitor_artifacts", "monitor_log", "monitor_snapshot", "MonitorSnapshot", "MonitorRepository", "MonitorExchange",
     "ActivityEvent", "BundleResult", "CandidateSelector", "ConfigurationResult",
     "AdmissionCallback", "PatchAdmission", "apply_guarded",
     "SafeExportPlan", "SafeExportError", "SafeExportErrorCode", "prepare_reference_export",
@@ -562,3 +562,19 @@ def monitor_log(path: PathInput, *, expected_sha256: str) -> dict:
     from patchharbor.application_monitor_artifacts import monitor_log as observe
     with _observe_activity(None):
         return observe(_path(path, 'path'), expected_sha256)
+
+
+def monitor_live(*, instance_id: str | None = None) -> dict:
+    """Read optional instance observations; absence is unknown, never stopped/free."""
+    if instance_id is not None:
+        from uuid import UUID
+        if not isinstance(instance_id, str) or str(UUID(instance_id)) != instance_id:
+            raise ValueError('instance_id must be a canonical UUID')
+    from patchharbor.monitor_live import monitor_live as observe
+    return observe(instance_id=instance_id)
+
+
+def watcher_observation():
+    """Create an optional publisher owned by one watcher instance; close on exit."""
+    from patchharbor.monitor_live import start_publication
+    return start_publication('watcher')

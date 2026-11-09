@@ -22,7 +22,7 @@ Registry responses and child output are limited to four MiB and 256 targets. Uns
 filters. The existing safe capture primitives are reused; the separate source-safe
 export host contract is not extended by this viewer.
 
-Tab switches focus, arrows/j/k select a target, 1–5 switch views, / searches,
+Tab switches focus, arrows/j/k select a target, 1–7 switch views, / searches,
 s reverses order, r requests refresh, ? shows help, q closes this viewer.
 `--plain`, `--no-color` and NO_COLOR disable colors. JSON requires --once.
 Views 3/4/5 show packages, retained history and Result logs. Tab focuses the
@@ -44,8 +44,23 @@ Artifact observations are limited to 256 files / 256 MiB total, 64 MiB per input
 are explicit, and terminal control characters are neutralized. Each selected
 repository is refreshed no more often than every 10 seconds by default.
 
-Live watcher status remains the later VIEW-03 step; unknown watcher status
-in this stage does not assert a stopped watcher.
+Views 6/7 show watcher/Apply instances and their live log tails. Each instance
+has its own UUID, PID plus native process birth identity, timestamps and actual
+phase. The Apply detail shows requested and effective timeout separately; the
+effective value appears only when the interpreter really starts. Remaining time
+is a timeout budget, never a completion estimate. Watcher targets, subscriptions,
+quiet deadlines and observed lock/backoff state come from its event loop.
+Absence of a current observation is unknown, never stopped or unlocked.
+
+Producers publish optional version-1 observations under the user state directory
+in `monitor-v1`, outside configured Exchanges. They update bounded memory and
+one background thread coalesces disk writes; failures never change Apply or
+watcher results. No viewer is needed. Each Apply retains at most 32 KiB of live
+output; its required execution log remains byte-exact and unbounded by this view.
+Heartbeat freshness is 15 seconds, checked against a native process birth token
+on Linux and Windows. Viewers only read these files. Existing running processes
+begin publishing after their normal next start with the updated code; this
+feature does not restart or install services.
 
 Replay and repository state are rechecked after artifact scans. Concurrent
 changes mark the observation stale. An unreadable/oversized artifact makes

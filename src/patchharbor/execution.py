@@ -317,6 +317,8 @@ def _control_process(
     output: OutputTargets | None = None,
 ) -> int:
     """Run one staged script through the configured output targets."""
+    from patchharbor.monitor_live import current_publication
+    publication = current_publication()
     command = build_interpreter_command(
         interpreter,
         executable_path,
@@ -338,14 +340,19 @@ def _control_process(
         live_text_stream=targets.live_text_stream,
         raw_output_stream=targets.raw_output_stream,
         line_observer=targets.line_observer,
+        chunk_observer=publication.append if publication is not None else None,
     )
 
     try:
         with process_tree:
             activity("EXEC", "Interpreter started; drain complete merged stdout/stderr live", "success")
+            if publication is not None:
+                publication.execution_started(timeout_seconds)
             capture.start()
             result = process_tree.run(timeout_seconds=timeout_seconds)
             capture.finish()
+            if publication is not None:
+                publication.update(entrypoint_exit_code=result.return_code, process_state=result.state.value)
             targets.write_visible_lines(capture.visible_lines)
 
             if result.state is ProcessState.TIMED_OUT:

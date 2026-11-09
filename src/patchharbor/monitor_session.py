@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-VIEWS = ('overview', 'exchanges', 'bundles', 'history', 'logs')
+VIEWS = ('overview', 'exchanges', 'bundles', 'history', 'logs', 'live', 'live-logs')
 
 
 @dataclass
@@ -31,6 +31,12 @@ class MonitorSession:
         return selected
 
     def move(self, document, delta):
+        if self.focus == 'details' and self.view == 'live':
+            rows, selected = self.live_instances(document), self.selected_live(document)
+            if selected:
+                index = max(0, min(len(rows) - 1, rows.index(selected) + delta))
+                self.selections['live:' + str(self.repository_id)] = rows[index]['instance_id']
+            return
         if self.focus == 'details' and self.view in ('bundles', 'history'):
             rows = self.artifacts(document)
             selected = self.selected_artifact(document)
@@ -63,6 +69,21 @@ class MonitorSession:
         if row:
             self.selections[key] = artifact_key(row)
         return row
+
+    def live_instances(self, document):
+        self.selected(document)
+        return sorted((r for r in document.get('live_view', {}).get('instances', [])
+                       if r['kind'] == 'watcher' or not self.repository_id
+                       or r.get('data', {}).get('repo_id') in (None, self.repository_id)),
+                      key=lambda r: (r.get('live', False), r['updated_at']), reverse=True)
+
+    def selected_live(self, document):
+        rows = self.live_instances(document)
+        key = 'live:' + str(self.repository_id)
+        selected = next((r for r in rows if r['instance_id'] == self.selections.get(key)), rows[0] if rows else None)
+        if selected:
+            self.selections[key] = selected['instance_id']
+        return selected
 
 
 def artifact_key(row):

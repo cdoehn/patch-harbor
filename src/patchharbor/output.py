@@ -93,11 +93,13 @@ class _RawOutputTee(RawIOBase):
         source: BinaryIO,
         destination: BinaryIO | None,
         remember_error: Callable[[str, Exception], None],
+        chunk_observer: Callable[[bytes], None] | None = None,
     ) -> None:
         super().__init__()
         self._source = source
         self._destination = destination
         self._remember_error = remember_error
+        self._chunk_observer = chunk_observer
 
     def readable(self) -> bool:
         return True
@@ -122,6 +124,11 @@ class _RawOutputTee(RawIOBase):
             except Exception as exc:
                 self._remember_error("cannot write raw script output", exc)
                 self._destination = None
+        if self._chunk_observer is not None:
+            try:
+                self._chunk_observer(chunk)
+            except Exception:
+                pass
         return len(chunk)
 
     def close(self) -> None:
@@ -143,12 +150,14 @@ class ProcessOutputCapture:
         live_text_stream: TextIO | None = None,
         raw_output_stream: BinaryIO | None = None,
         line_observer: Callable[[tuple[str, ...], int], None] | None = None,
+        chunk_observer: Callable[[bytes], None] | None = None,
     ) -> None:
         self._buffer = _RollingLineBuffer()
         self._stream = stream
         self._live_text_stream = live_text_stream
         self._raw_output_stream = raw_output_stream
         self._line_observer = line_observer
+        self._chunk_observer = chunk_observer
         self._error: tuple[str, Exception] | None = None
         self._thread = Thread(
             target=self._drain,
@@ -242,7 +251,7 @@ class ProcessOutputCapture:
         # Decode available byte chunks instead of waiting for a newline. This
         # also forwards pytest dots and final unterminated output immediately.
         raw_tee = _RawOutputTee(
-            self._stream, self._raw_output_stream, self._remember_error,
+            self._stream, self._raw_output_stream, self._remember_error, self._chunk_observer,
         )
         decoder = IncrementalNewlineDecoder(
             getincrementaldecoder("utf-8")(errors="replace"), translate=True,

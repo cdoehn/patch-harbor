@@ -62,30 +62,8 @@ def _user_paths(
     create_configuration_directory: bool = True,
     create_lock_directory: bool = True,
 ) -> RegistrationUserPaths:
-    if is_windows():
-        app_data = os.environ.get("APPDATA")
-        local_app_data = os.environ.get("LOCALAPPDATA")
-        if not app_data or not local_app_data:
-            raise error_factory(
-                f"APPDATA and LOCALAPPDATA are required for {purpose}"
-            )
-        configuration = Path(app_data) / "PatchHarbor"
-        locks = Path(local_app_data) / "PatchHarbor" / "locks"
-    else:
-        home_value = os.environ.get("HOME")
-        if not home_value:
-            raise error_factory(f"HOME is required for {purpose}")
-        home = Path(home_value)
-        configuration = Path(
-            os.environ.get("XDG_CONFIG_HOME", str(home / ".config"))
-        ) / "patchharbor"
-        state = Path(
-            os.environ.get(
-                "XDG_STATE_HOME",
-                str(home / ".local" / "state"),
-            )
-        ) / "patchharbor"
-        locks = state / "locks"
+    raw = raw_registration_user_paths(error_factory=error_factory, purpose=purpose)
+    configuration, locks = raw.configuration_directory, raw.lock_directory
 
     try:
         if create_configuration_directory:
@@ -125,3 +103,33 @@ def configuration_user_paths() -> RegistrationUserPaths:
         error_factory=configuration_error,
         purpose="configuration",
     )
+
+
+def raw_registration_user_paths(*, error_factory=registry_error, purpose="registration") -> RegistrationUserPaths:
+    """Capture path configuration without filesystem work; background observers resolve it."""
+    if is_windows():
+        app_data = os.environ.get("APPDATA")
+        local_app_data = os.environ.get("LOCALAPPDATA")
+        if not app_data or not local_app_data:
+            raise error_factory(
+                f"APPDATA and LOCALAPPDATA are required for {purpose}"
+            )
+        configuration = Path(app_data) / "PatchHarbor"
+        locks = Path(local_app_data) / "PatchHarbor" / "locks"
+    else:
+        home_value = os.environ.get("HOME")
+        if not home_value:
+            raise error_factory(f"HOME is required for {purpose}")
+        home = Path(home_value)
+        configuration = Path(
+            os.environ.get("XDG_CONFIG_HOME", str(home / ".config"))
+        ) / "patchharbor"
+        state = Path(
+            os.environ.get(
+                "XDG_STATE_HOME",
+                str(home / ".local" / "state"),
+            )
+        ) / "patchharbor"
+        locks = state / "locks"
+
+    return RegistrationUserPaths(configuration.absolute(), locks.absolute())

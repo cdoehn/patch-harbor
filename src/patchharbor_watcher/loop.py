@@ -208,7 +208,7 @@ def run_repository_watcher(
     stop_requested=_never_stop, bind_wake=lambda callback: None,
     target_provider=api.watch_targets, control_provider=api.watch_control_paths,
     readiness=_readiness, source_factory=open_event_source, clock=time.monotonic,
-    worker_factory=Thread,
+    worker_factory=Thread, publication_factory=api.watcher_observation,
 ) -> None:
     """Block on events/deadlines; keep receiving while one isolated Apply runs.
 
@@ -222,15 +222,32 @@ def run_repository_watcher(
     completed = Queue(maxsize=1)
     source, worker, snapshot = None, None, None
     control_lock, control_probe, control_backoff = None, None, 5.0
+    publication = publication_factory()
+    subscribed = ()
+
+    def publish_status():
+        now, wall = clock(), time.time()
+        roots = list(schedule.roots.values())
+        publication.update(phase='applying' if worker is not None else 'watching',
+            subscriptions=[str(p) for p in subscribed],
+            targets=[{'directory': str(root.target.directory),
+                      'repository_ids': [str(v) for v in root.target.repository_ids],
+                      'dirty': root.dirty, 'quiet_until': wall + max(0, root.due - now),
+                      'blocked_on': None if root.lock is None else {'kind': root.lock.kind, 'repo_id': root.lock.repo_id},
+                      'probe_at': None if root.probe_at is None else wall + max(0, root.probe_at - now)}
+                     for root in roots[:128]], targets_truncated=len(roots) > 128,
+            control_lock=None if control_lock is None else {'kind': control_lock.kind, 'repo_id': control_lock.repo_id},
+            control_probe_at=None if control_probe is None else wall + max(0, control_probe-now))
 
     def wake():
         if source is not None:
             source.wake()
 
     def refresh():
-        nonlocal source, control_lock, control_probe, control_backoff
+        nonlocal source, control_lock, control_probe, control_backoff, subscribed
         directories, failure = observation.refresh(target_provider, control_provider)
         fresh = source_factory(directories)
+        subscribed = directories
         previous, source = source, fresh
         if previous is not None:
             previous.close()
@@ -240,6 +257,8 @@ def run_repository_watcher(
             blocked.kind.value, None if blocked.repo_id is None else str(blocked.repo_id))
         control_backoff = 5.0
         control_probe = None if control_lock is None else clock() + control_backoff
+        publication.update(last_error=str(failure) if failure is not None else None)
+        publish_status()
         if failure is not None:
             error_stream.write(f'patchharbor-watcher: {failure}\n')
             error_stream.flush()
@@ -308,6 +327,7 @@ def run_repository_watcher(
                     snapshot = schedule.begin(targets)
                     worker = worker_factory(target=invoke, args=(targets,), name='patchharbor-apply')
                     worker.start()
+            publish_status()
             if not stop_requested():
                 timeout = None if worker is not None else schedule.timeout(clock())
                 if worker is None and control_probe is not None:
@@ -321,4 +341,6 @@ def run_repository_watcher(
             worker.join()
         if source is not None:
             source.close()
+        publication.update(phase='stopped')
+        publication.close()
         _write_lifecycle_record('watcher_stopped', QUIET_SECONDS, log_stream)

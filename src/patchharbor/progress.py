@@ -86,3 +86,18 @@ def activity(phase: str, message: str, level: str = "info", *,
              identifiers: tuple[str, ...] = ()) -> None:
     """Report a real operation; shortening belongs only to its UI consumer."""
     emit(ActivityEvent(phase, message, level, identifiers))
+
+
+@contextmanager
+def observe_additional(observer: ActivityObserver) -> Iterator[None]:
+    """Add optional observation without replacing the caller's existing observer."""
+    previous = _observer.get()
+    def combined(event):
+        for callback in (previous, observer):
+            if callback is not None:
+                try:
+                    callback(event)
+                except Exception:
+                    pass
+    with observe_activity(combined):
+        yield
