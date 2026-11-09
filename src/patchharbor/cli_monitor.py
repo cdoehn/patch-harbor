@@ -5,7 +5,7 @@ import json
 import os
 
 from patchharbor.monitor_display import render, safe_text
-from patchharbor.monitor_query import MonitorRefresh, snapshot_once
+from patchharbor.monitor_refresh import MonitorRefresh, snapshot_once
 from patchharbor.monitor_session import MonitorSession, VIEWS
 from patchharbor.platform.monitor_terminal import terminal_mode, read_key, size
 
@@ -45,7 +45,7 @@ def monitor_command(args, *, stdin, stdout, stderr):
                                '? Hilfe schließen\n\nBeobachtungen sind keine Reservierungen.')
                 if search is not None:
                     display += '\n/ ' + safe_text(search) + '  [Enter / Esc]'
-                stdout.write('\x1b[H\x1b[2J' + display.replace('\n', '\r\n'))
+                stdout.write('\x1b[H\x1b[2J' + display)
                 stdout.flush()
                 key = read_key(stdin)
                 if search is not None:

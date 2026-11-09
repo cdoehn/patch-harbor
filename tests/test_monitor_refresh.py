@@ -8,7 +8,8 @@ import pytest
 
 from patchharbor import api
 from patchharbor import monitor_query
-from patchharbor.monitor_query import MonitorRefresh, query
+from patchharbor.monitor_query import query
+from patchharbor.monitor_refresh import MonitorRefresh
 from patchharbor.monitor_session import MonitorSession, git_semantic
 from patchharbor.user_paths import registration_user_paths
 from tests.test_monitor import registered

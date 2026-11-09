@@ -14,8 +14,11 @@ Git state is green when clean, red when dirty and unknown when unavailable.
 Staged, unstaged and untracked counts are separate; ignored files do not count.
 A clean observation is not a reservation. Old data are marked stale.
 The monitor neither executes a patch nor changes registry, replay or Git state.
-Queries run in a bounded isolated child; default interval 5 seconds, query budget
-10 seconds. Unsupported Git conversions are reported as unknown without running
+Discovery and each repository have independent bounded child queries. One slow
+repository cannot delay a healthy peer. At most four queries run per viewer,
+and repeated refresh requests never duplicate an in-flight source. Default
+interval is 5 seconds, query budget 10 seconds (0.1–60 configurable).
+Registry responses and child output are limited to four MiB and 256 targets. Unsupported Git conversions are reported as unknown without running
 filters. The existing safe capture primitives are reused; the separate source-safe
 export host contract is not extended by this viewer.
 

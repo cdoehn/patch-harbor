@@ -808,10 +808,13 @@ without changing runtime bytes.
 
 ## Read-only monitor observations
 
-`monitor_snapshot(repository=None, exchange=None) -> MonitorSnapshot` reads the
+`monitor_snapshot(repository=None, exchange=None, include_state=True) -> MonitorSnapshot` reads the
 registry and independently observes repository/configuration/Git facts. Select a
 full repository ID or path; optional Exchange is a path. The frozen snapshot has
 `observed_at`, `repositories`, `exchanges`, `errors`; `document()` returns format 1
 JSON-compatible data (`kind: patchharbor-monitor`). Observations neither acquire
 Apply locks nor change source files or replay state. Unknown facts remain null.
 `MonitorRepository` and `MonitorExchange` are exported through the facade.
+
+`include_state=False` discovers registration/configuration without expensive Git
+content capture. Each source has its own freshness in the CLI snapshot.

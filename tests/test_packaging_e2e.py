@@ -32,6 +32,7 @@ EXPECTED_RUNTIME_FILES = {
     'patchharbor/cli_monitor.py',
     'patchharbor/monitor_display.py',
     'patchharbor/monitor_query.py',
+    'patchharbor/monitor_refresh.py',
     'patchharbor/monitor_session.py',
     'patchharbor/monitor_types.py',
     'patchharbor/platform/monitor_terminal.py',
