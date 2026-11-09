@@ -1,5 +1,6 @@
 """On-demand, per-viewer artifact and log refresh; no shared UI state."""
 from concurrent.futures import ThreadPoolExecutor
+from collections import OrderedDict
 import time
 
 from patchharbor.monitor_query import query_api
@@ -9,6 +10,7 @@ class MonitorDetails:
     def __init__(self, *, timeout=10, interval=10):
         self.timeout, self.interval = timeout, interval
         self.pool = ThreadPoolExecutor(max_workers=2, thread_name_prefix='patchharbor-details')
+        self.logs = OrderedDict()
         self.sources = {name: {'key': None, 'value': None, 'future': None, 'error': None, 'due': 0}
                         for name in ('artifacts', 'log')}
 
@@ -18,11 +20,21 @@ class MonitorDetails:
         if future is not None and future.done():
             try:
                 source.update(value=future.result(), error=None)
+                if name == 'log':
+                    self.logs[source['key']] = (time.monotonic(), source['value'])
+                    self.logs.move_to_end(source['key'])
+                    while len(self.logs) > 8:
+                        self.logs.popitem(last=False)
             except Exception as exc:
                 source['error'] = str(exc)
             source.update(future=None, due=time.monotonic() + self.interval)
         if key != source['key'] and source['future'] is None:
-            source.update(key=key, value=None, error=None, due=0)
+            cached = self.logs.get(key) if name == 'log' else None
+            if cached and time.monotonic() - cached[0] < 60:
+                self.logs.move_to_end(key)
+                source.update(key=key, value=cached[1], error=None, due=cached[0] + 60)
+            else:
+                source.update(key=key, value=None, error=None, due=0)
         if key == source['key'] and source['future'] is None and (force or time.monotonic() >= source['due']):
             source['future'] = self.pool.submit(query_api, method, args, self.timeout)
         if key != source['key']:

@@ -54,3 +54,10 @@ only through the original Exchange path plus the exact hash and binding.
 Copies of one Result count as one source identity; different Results claiming
 one run ID are explicitly ambiguous. History shows only the selected repository
 and indicates attempts whose Result is absent from the observed inventory.
+
+Content is read and hashed once per artifact observation; native parsers share
+that byte capture. At most 32 small fact records are reused for duplicate hashes
+within a scan; ZIP contents are not cached. Each viewer retains at most eight
+64 KiB log tails for 60 seconds, keyed by full path and hash. `r` bypasses the
+log cache. Artifact and log timestamps describe the observed data, not freshness
+of the screen redraw.

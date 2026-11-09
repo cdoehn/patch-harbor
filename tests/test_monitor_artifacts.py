@@ -114,15 +114,15 @@ def test_once_artifacts_json_uses_native_queries(tmp_path, monkeypatch):
 
 
 def test_changed_file_is_not_reused_as_a_candidate(tmp_path, monkeypatch):
-    import patchharbor.application_monitor_artifacts as monitor
+    import patchharbor.monitor_artifact_facts as facts
     (root, context), = registered(tmp_path, monkeypatch)
     path = patch(root, context)
-    native = monitor.classify_exchange_artifact
-    def replace_after_read(path, **kwargs):
-        result = native(path, **kwargs)
+    native = facts.ArtifactCache.capture
+    def replace_after_read(self, path):
+        result = native(self, path)
         path.write_bytes(b'replaced')
         return result
-    monkeypatch.setattr(monitor, 'classify_exchange_artifact', replace_after_read)
+    monkeypatch.setattr(facts.ArtifactCache, 'capture', replace_after_read)
     result = api.monitor_artifacts(str(root))
     assert result['incomplete'] and result['selected_candidate'] is None
     assert result['artifacts'][0]['error']
@@ -182,7 +182,7 @@ def test_dry_run_receipt_links_to_exact_patch_and_stays_validation(tmp_path, mon
     assert receipt['primary_result']['entrypoint_exit_code'] is None
 
 
-def test_corrupt_result_and_symlink_do_not_hide_other_artifacts(tmp_path, monkeypatch):
+def test_corrupt_result_does_not_hide_other_artifacts(tmp_path, monkeypatch):
     import zipfile
     (root, context), = registered(tmp_path, monkeypatch)
     path = patch(root, context)
@@ -191,3 +191,28 @@ def test_corrupt_result_and_symlink_do_not_hide_other_artifacts(tmp_path, monkey
     result = api.monitor_artifacts(str(root))
     assert any(r.get('error') or r['kind'] == 'other' for r in result['artifacts'])
     assert any(r['kind'] == 'patch_package' for r in result['artifacts'])
+
+
+def test_equal_bytes_are_parsed_once_but_changed_bytes_never_reuse_facts(tmp_path, monkeypatch):
+    from patchharbor.monitor_artifact_facts import ArtifactCache
+    (root, context), = registered(tmp_path, monkeypatch)
+    original = patch(root, context)
+    copy = original.parent / 'copy'
+    copy.write_bytes(original.read_bytes())
+    cache = ArtifactCache()
+    native = cache._parse
+    parsed = []
+    def parse(path, captured):
+        parsed.append(captured.sha256)
+        return native(path, captured)
+    monkeypatch.setattr(cache, '_parse', parse)
+    cache.capture(original)
+    cache.capture(copy)
+    assert len(parsed) == 1
+    copy.write_bytes(b'other bytes')
+    row, _, _ = cache.capture(copy)
+    assert row['kind'] == 'other' and len(parsed) == 2
+    for index in range(40):
+        copy.write_text(str(index))
+        cache.capture(copy)
+    assert len(cache.entries) == 32

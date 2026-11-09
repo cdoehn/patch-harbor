@@ -31,6 +31,8 @@ EXPECTED_RUNTIME_FILES = {
     'patchharbor/application_monitor.py',
     'patchharbor/application_monitor_artifacts.py',
     'patchharbor/cli_monitor.py',
+    'patchharbor/monitor_artifact_display.py',
+    'patchharbor/monitor_artifact_facts.py',
     'patchharbor/monitor_details.py',
     'patchharbor/monitor_display.py',
     'patchharbor/monitor_query.py',
