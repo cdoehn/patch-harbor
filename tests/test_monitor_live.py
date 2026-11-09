@@ -1,6 +1,7 @@
 """Live observations follow actual native execution and remain optional."""
 from concurrent.futures import ThreadPoolExecutor
 from io import BytesIO
+import shlex
 import time
 
 import pytest
@@ -44,21 +45,53 @@ def test_watcher_instances_have_independent_files_and_shutdown(tmp_path, monkeyp
         second.close()
 
 
-def test_actual_apply_publishes_effective_timeout_output_and_result(tmp_path, monkeypatch):
+@pytest.mark.parametrize('startup_delay', [0, 8.5], ids=['native-start', 'delayed-start'])
+def test_actual_apply_publishes_effective_timeout_output_and_result(tmp_path, monkeypatch, startup_delay):
+    if startup_delay:
+        from patchharbor import execution
+        create_process_tree = execution.create_process_tree
+        def delayed_start(*args, **kwargs):
+            # Reproduce startup taking longer than the old observation deadline.
+            time.sleep(startup_delay)
+            return create_process_tree(*args, **kwargs)
+        monkeypatch.setattr(execution, 'create_process_tree', delayed_start)
     (root, context), = registered(tmp_path, monkeypatch)
     path = tmp_path / 'exchange' / 'live.zip'
+    ready, release = tmp_path / 'entrypoint-ready', tmp_path / 'entrypoint-release'
+    powershell_ready = str(ready).replace("'", "''")
+    powershell_release = str(release).replace("'", "''")
+    requested_timeout = 30
     _write_custom_package(path, {k: str(getattr(context, k)) for k in ('repo_id', 'base_commit', 'state_fingerprint')},
-        posix_entrypoint="printf 'live-start'; sleep 1; printf '\\nlive-end\\n'",
-        powershell_entrypoint="[Console]::Out.Write('live-start'); Start-Sleep -Milliseconds 1000; [Console]::Out.WriteLine('live-end')")
+        posix_entrypoint=(
+            f"printf 'live-start'; : > {shlex.quote(str(ready))}\n"
+            f"while [ ! -f {shlex.quote(str(release))} ]; do sleep .03; done\n"
+            "printf '\\nlive-end\\n'"),
+        powershell_entrypoint=(
+            "[Console]::Out.Write('live-start'); [Console]::Out.Flush()\n"
+            f"[System.IO.File]::WriteAllText('{powershell_ready}', 'ready')\n"
+            f"while (-not (Test-Path -LiteralPath '{powershell_release}')) {{ Start-Sleep -Milliseconds 30 }}\n"
+            "[Console]::Out.WriteLine('live-end')"))
     events = []
     with ThreadPoolExecutor(max_workers=1) as pool:
-        future = pool.submit(api.apply, path, timeout=7, observer=events.append)
-        row = wait_for(lambda: next((r for r in api.monitor_live()['instances']
-            if r['kind'] == 'apply' and r['data'].get('effective_timeout_seconds') == 7), None))
-        observed = wait_for(lambda: (r if 'live-start' in r.get('log_tail', '') else None)
-                            if (r := instance(row['instance_id'])) else None)
-        assert observed['live'] and not observed['completed']
-        report = future.result(timeout=10)
+        future = pool.submit(api.apply, path, timeout=requested_timeout, observer=events.append)
+        try:
+            # Preflight and native interpreter startup have no test performance
+            # deadline. Once ready, the real entrypoint stays alive until observed.
+            while not ready.exists():
+                if future.done():
+                    report = future.result()
+                    pytest.fail(f'Apply ended before entrypoint readiness: {report.primary_result.as_document()}')
+                time.sleep(.03)
+            row = wait_for(lambda: next((r for r in api.monitor_live()['instances']
+                if r['kind'] == 'apply' and r['data'].get('effective_timeout_seconds') == requested_timeout), None))
+            observed = wait_for(lambda: (r if 'live-start' in r.get('log_tail', '') else None)
+                                if (r := instance(row['instance_id'])) else None)
+            assert observed['live'] and not observed['completed']
+            assert 'live-end' not in observed['log_tail'] and not future.done()
+        finally:
+            release.touch()
+        # Result publication is functional work, not part of the observation budget.
+        report = future.result()
     assert report.success and events
     final = wait_for(lambda: (r if r.get('completed') else None) if (r := instance(row['instance_id'])) else None)
     assert final['data']['primary_result']['entrypoint_exit_code'] == 0
