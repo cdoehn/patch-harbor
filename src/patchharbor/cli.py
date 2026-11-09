@@ -115,6 +115,10 @@ def main(
     if args.command == "context":
         return _context_command(args.repository, json_output=args.json_output, **presentation)
 
+    if args.command == 'monitor':
+        from patchharbor.cli_monitor import monitor_command
+        return monitor_command(args, stdin=actual_stdin, stdout=actual_stdout, stderr=actual_stderr)
+
     if args.command == 'runtime':
         return _runtime_export_command(args, stdout=actual_stdout, stderr=actual_stderr)
 

@@ -342,3 +342,5 @@ The public Python API is `api.export_runtime(output_directory)`.
 Every release from 1.8.0 requires PYZ, wheel, built sdist, runtime-manifest.json
 and SHA256SUMS. Version strings alone are not a publication or platform proof.
 See [the release plan](planning/runtime-release/commit-plan.md) and main spec §44.
+
+The read-only [Monitor](docs/monitor.md) observes registered repositories and Exchanges; run `patchharbor monitor`.

@@ -44,10 +44,14 @@ from patchharbor.progress import observe_activity as _observe_activity
 from patchharbor.safe_export_types import capture_mode as _capture_mode, supported_host as _safe_host
 
 
+from patchharbor.monitor_types import MonitorSnapshot, MonitorRepository, MonitorExchange
+
+
 DEFAULT_TIMEOUT_SECONDS = _application.DEFAULT_TIMEOUT_SECONDS
 PathInput = str | os.PathLike[str]
 
 __all__ = [
+    "monitor_snapshot", "MonitorSnapshot", "MonitorRepository", "MonitorExchange",
     "ActivityEvent", "BundleResult", "CandidateSelector", "ConfigurationResult",
     "AdmissionCallback", "PatchAdmission", "apply_guarded",
     "SafeExportPlan", "SafeExportError", "SafeExportErrorCode", "prepare_reference_export",
@@ -526,3 +530,13 @@ def export_runtime(output_directory: PathInput, *, observer: ProgressObserver | 
     from patchharbor.runtime_export import export_runtime as _export_runtime
     with _observe_activity(selected_observer):
         return _export_runtime(directory)
+
+
+def monitor_snapshot(*, repository: str | None = None, exchange: PathInput | None = None) -> MonitorSnapshot:
+    """Observe registered repositories without locks, mutation, recovery or Apply."""
+    if repository is not None and (not isinstance(repository, str) or not repository or '\x00' in repository):
+        raise ValueError('repository must be a nonempty full ID or path')
+    directory = _optional_path(exchange, 'exchange')
+    from patchharbor.application_monitor import monitor_snapshot as observe
+    with _observe_activity(None):
+        return observe(repository=repository, exchange=directory)
