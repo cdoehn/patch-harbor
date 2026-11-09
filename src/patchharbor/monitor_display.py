@@ -42,7 +42,7 @@ def lines(document, session, *, width=100, height=35):
     result += [('', ''), (f"[1 Übersicht]  2 Exchanges     Ansicht: {session.view} · Fokus: {session.focus}", 'title'),
                (f"Suche: {session.match or '—'} · Sortierung {'↓' if session.descending else '↑'} · staged / unstaged / untracked", 'title')]
     if session.view == 'exchanges':
-        for row in document.get('exchanges', []):
+        for row in document.get('exchanges', [])[session.offsets.get('exchanges', 0):]:
             result.append((f"{row['path']} · {len(row['repository_ids'])} Repository(s) · {'erreichbar' if row['available'] else 'FEHLT'}", 'title' if row['available'] else 'warning'))
     elif selected:
         result += [(selected['path'], ''), ('Repository-ID: ' + selected['repo_id'], ''),

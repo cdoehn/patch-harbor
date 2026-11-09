@@ -65,6 +65,8 @@ def read_key(stdin, wait=0.2):
     if key == b'\x1b':
         while select.select([stdin], [], [], 0.015)[0] and len(key) < 8:
             key += os.read(stdin.fileno(), 1)
+            if len(key) >= 3 and 64 <= key[-1] <= 126:
+                break
         return {b'\x1b[A': 'up', b'\x1b[B': 'down', b'\x1b[5~': 'pageup', b'\x1b[6~': 'pagedown'}.get(key, '\x1b')
     length = 1 if key[0] < 128 else 2 if key[0] < 224 else 3 if key[0] < 240 else 4
     while len(key) < length and select.select([stdin], [], [], 0.05)[0]:

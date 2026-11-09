@@ -29,6 +29,9 @@ class MonitorSession:
         return selected
 
     def move(self, document, delta):
+        if self.focus == 'details':
+            self.offsets[self.view] = max(0, self.offsets.get(self.view, 0) + delta)
+            return
         rows = self.repositories(document)
         selected = self.selected(document)
         if selected:

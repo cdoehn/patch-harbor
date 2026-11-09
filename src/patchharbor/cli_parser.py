@@ -41,6 +41,20 @@ def _positive_seconds(value: str) -> float:
     return seconds
 
 
+def _monitor_interval(value):
+    seconds = _positive_seconds(value)
+    if not 1 <= seconds <= 3600:
+        raise argparse.ArgumentTypeError('monitor interval must be between 1 and 3600 seconds')
+    return seconds
+
+
+def _monitor_timeout(value):
+    seconds = _positive_seconds(value)
+    if not 0.1 <= seconds <= 60:
+        raise argparse.ArgumentTypeError('query timeout must be between 0.1 and 60 seconds')
+    return seconds
+
+
 def _explicit_package_path(value: str) -> Path:
     if not value or "\x00" in value:
         raise argparse.ArgumentTypeError("must be a nonempty file path without NUL")
@@ -495,8 +509,8 @@ def _build_parser() -> argparse.ArgumentParser:
     monitor.add_argument('--exchange', help='filter by configured Exchange directory')
     monitor.add_argument('--view', choices=('overview', 'exchanges'), default='overview')
     monitor.add_argument('--match', default='', help='filter repository names, paths and IDs')
-    monitor.add_argument('--interval', type=_positive_seconds, default=5.0)
-    monitor.add_argument('--query-timeout', type=_positive_seconds, default=10.0)
+    monitor.add_argument('--interval', type=_monitor_interval, default=5.0)
+    monitor.add_argument('--query-timeout', type=_monitor_timeout, default=10.0)
     monitor.add_argument('--once', action='store_true')
     monitor.add_argument('--json', action='store_true', dest='json_output')
     _add_fs_commands(commands)

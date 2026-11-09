@@ -532,11 +532,13 @@ def export_runtime(output_directory: PathInput, *, observer: ProgressObserver | 
         return _export_runtime(directory)
 
 
-def monitor_snapshot(*, repository: str | None = None, exchange: PathInput | None = None) -> MonitorSnapshot:
+def monitor_snapshot(*, repository: str | None = None, exchange: PathInput | None = None, include_state: bool = True) -> MonitorSnapshot:
     """Observe registered repositories without locks, mutation, recovery or Apply."""
     if repository is not None and (not isinstance(repository, str) or not repository or '\x00' in repository):
         raise ValueError('repository must be a nonempty full ID or path')
+    if type(include_state) is not bool:
+        raise TypeError('include_state must be boolean')
     directory = _optional_path(exchange, 'exchange')
     from patchharbor.application_monitor import monitor_snapshot as observe
     with _observe_activity(None):
-        return observe(repository=repository, exchange=directory)
+        return observe(repository=repository, exchange=directory, include_state=include_state)

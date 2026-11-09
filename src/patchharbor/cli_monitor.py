@@ -5,7 +5,7 @@ import json
 import os
 
 from patchharbor.monitor_display import render, safe_text
-from patchharbor.monitor_query import MonitorRefresh, query
+from patchharbor.monitor_query import MonitorRefresh, snapshot_once
 from patchharbor.monitor_session import MonitorSession, VIEWS
 from patchharbor.platform.monitor_terminal import terminal_mode, read_key, size
 
@@ -17,7 +17,7 @@ def monitor_command(args, *, stdin, stdout, stderr):
     state = MonitorSession(view=args.view, match=args.match)
     if args.once:
         try:
-            document = query(args.repo, args.exchange, args.query_timeout)
+            document = snapshot_once(args.repo, args.exchange, args.query_timeout)
         except (OSError, ValueError, RuntimeError) as exc:
             document = {'format_version': 1, 'kind': 'patchharbor-monitor', 'repositories': [],
                         'exchanges': [], 'errors': [str(exc)], 'stale': True}
