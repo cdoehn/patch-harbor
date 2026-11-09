@@ -818,3 +818,8 @@ Apply locks nor change source files or replay state. Unknown facts remain null.
 
 `include_state=False` discovers registration/configuration without expensive Git
 content capture. Each source has its own freshness in the CLI snapshot.
+
+`api.monitor_artifacts(repository, include_archive=False)` returns versioned
+read-only Exchange facts for one registered ID/path. `api.monitor_log(path,
+expected_sha256=...)` reads a bounded log from exactly that validated Result.
+Both return JSON-compatible dictionaries and never acquire execution locks.

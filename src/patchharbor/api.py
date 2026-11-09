@@ -51,7 +51,7 @@ DEFAULT_TIMEOUT_SECONDS = _application.DEFAULT_TIMEOUT_SECONDS
 PathInput = str | os.PathLike[str]
 
 __all__ = [
-    "monitor_snapshot", "MonitorSnapshot", "MonitorRepository", "MonitorExchange",
+    "monitor_artifacts", "monitor_log", "monitor_snapshot", "MonitorSnapshot", "MonitorRepository", "MonitorExchange",
     "ActivityEvent", "BundleResult", "CandidateSelector", "ConfigurationResult",
     "AdmissionCallback", "PatchAdmission", "apply_guarded",
     "SafeExportPlan", "SafeExportError", "SafeExportErrorCode", "prepare_reference_export",
@@ -542,3 +542,23 @@ def monitor_snapshot(*, repository: str | None = None, exchange: PathInput | Non
     from patchharbor.application_monitor import monitor_snapshot as observe
     with _observe_activity(None):
         return observe(repository=repository, exchange=directory, include_state=include_state)
+
+
+def monitor_artifacts(repository: str, *, include_archive: bool = False) -> dict:
+    """Observe a registered target's Exchange and optional archive, without writes."""
+    if not isinstance(repository, str) or not repository or '\x00' in repository:
+        raise ValueError('repository must be a nonempty full ID or path')
+    if type(include_archive) is not bool:
+        raise TypeError('include_archive must be boolean')
+    from patchharbor.application_monitor_artifacts import monitor_artifacts as observe
+    with _observe_activity(None):
+        return observe(repository, include_archive=include_archive)
+
+
+def monitor_log(path: PathInput, *, expected_sha256: str) -> dict:
+    """Read a bounded log from the exact, fully validated selected Result identity."""
+    if not isinstance(expected_sha256, str) or len(expected_sha256) != 64 or any(c not in '0123456789abcdef' for c in expected_sha256):
+        raise ValueError('expected_sha256 must be a lowercase SHA-256 digest')
+    from patchharbor.application_monitor_artifacts import monitor_log as observe
+    with _observe_activity(None):
+        return observe(_path(path, 'path'), expected_sha256)

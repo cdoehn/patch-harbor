@@ -29,7 +29,9 @@ MAX_WHEEL_BYTES = 432 * 1024  # Export + monitor (measured 429657 B); runtime re
 RELEASE_VERSION = "1.8.0"
 EXPECTED_RUNTIME_FILES = {
     'patchharbor/application_monitor.py',
+    'patchharbor/application_monitor_artifacts.py',
     'patchharbor/cli_monitor.py',
+    'patchharbor/monitor_details.py',
     'patchharbor/monitor_display.py',
     'patchharbor/monitor_query.py',
     'patchharbor/monitor_refresh.py',
