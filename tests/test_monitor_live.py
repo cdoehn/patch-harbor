@@ -29,17 +29,32 @@ def instance(identity):
 
 def test_watcher_instances_have_independent_files_and_shutdown(tmp_path, monkeypatch):
     registered(tmp_path, monkeypatch)
+
+    def updated(publication, phase, directory):
+        row = instance(publication.instance_id)
+        if row and row['phase'] == phase and row['data'].get('targets') == [{'directory': directory}]:
+            return row
+        return None
+
     first, second = api.watcher_observation(), api.watcher_observation()
     try:
+        # A valid initial observation exists before any target update is published.
+        for publication in (first, second):
+            initial = wait_for(lambda: instance(publication.instance_id))
+            assert initial['phase'] == 'starting' and 'targets' not in initial['data']
         first.update(phase='watching', targets=[{'directory': '/one'}])
         second.update(phase='applying', targets=[{'directory': '/two'}])
-        wait_for(lambda: instance(first.instance_id))
-        wait_for(lambda: instance(second.instance_id))
-        assert instance(first.instance_id)['data']['targets'] != instance(second.instance_id)['data']['targets']
-        assert instance(first.instance_id)['live']
+        first_row = wait_for(lambda: updated(first, 'watching', '/one'))
+        second_row = wait_for(lambda: updated(second, 'applying', '/two'))
+        assert first_row['instance_id'] != second_row['instance_id']
+        assert first_row['live'] and second_row['live']
+        assert not first_row['completed'] and not second_row['completed']
         first.close()
-        wait_for(lambda: instance(first.instance_id)['completed'])
-        assert instance(second.instance_id)['live']
+        final = wait_for(lambda: (row if row['completed'] else None)
+                         if (row := instance(first.instance_id)) else None)
+        assert not final['live'] and final['data']['targets'] == first_row['data']['targets']
+        remaining = wait_for(lambda: updated(second, 'applying', '/two'))
+        assert remaining['live'] and not remaining['completed']
     finally:
         first.close()
         second.close()
