@@ -26,7 +26,7 @@ from tests.registration_support import isolated_user_environment
 pytestmark = pytest.mark.packaging
 
 MAX_WHEEL_BYTES = 448 * 1024  # Operational monitor/history (measured 444591 B); runtime limits unchanged.
-RELEASE_VERSION = "1.8.0"
+RELEASE_VERSION = "1.9.0"
 EXPECTED_RUNTIME_FILES = {
     'patchharbor/application_monitor.py',
     'patchharbor/application_monitor_artifacts.py',

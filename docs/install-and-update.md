@@ -18,7 +18,7 @@ With an existing pipx and Python 3.10+ on POSIX:
 
 ```bash
 python3 --version
-pipx install --python python3 /absolute/path/patchharbor-1.8.0-py3-none-any.whl
+pipx install --python python3 /absolute/path/patchharbor-1.9.0-py3-none-any.whl
 patchharbor --version
 patchharbor-watcher --help
 ```
@@ -76,7 +76,7 @@ Do not use `python -m patchharbor`: the installed module entrypoint is
    new wheel. For pipx, a newer local wheel can replace the managed package:
 
    ```bash
-   pipx install --force /absolute/path/patchharbor-1.8.0-py3-none-any.whl
+   pipx install --force /absolute/path/patchharbor-1.9.0-py3-none-any.whl
    patchharbor --version
    ```
 
@@ -129,5 +129,5 @@ a release, create a tag, install the artifacts, or replace a running watcher.
 Development runs the documented change-focused parallel selection; Apply runs
 the full parallel suite before every commit, including the final commit.
 Retain artifact hashes and evidence for the actual source state. CI is explicitly dispatched under the applicable user authorization; the
-1.8.0 release task authorizes its own required CI. See the
+1.9.0 release task authorizes its own required CI. See the
 [release procedure](release-runtime.md) and [test policy](test-parallelism.md).

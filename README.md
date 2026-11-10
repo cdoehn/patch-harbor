@@ -1,4 +1,4 @@
-# PatchHarbor 1.8.0
+# PatchHarbor 1.9.0
 
 **A bridge between AI coding assistants and local Git repositories.**
 
@@ -23,17 +23,20 @@ It bridges these separate environments using verified ZIP packages, allowing AI 
 - `api.apply_guarded` requires explicit package/target binding and trusted host approval before payloads.
 - `inspect` and `validate` examine packages without executing their code.
 - An optional watcher automatically applies incoming patches after filesystem activity in the Exchange directory has settled for five seconds.
+- `monitor` shows repository and Exchange activity, a persistent five-line event history, active entrypoints and optional bundle numbers in a read-only TUI.
 - Result Bundles normally include an installation-free **Core-PYZ (without the watcher)**, allowing compatible AI Linux environments to work with PatchHarbor without installing it separately.
 - `runtime export` supplies the installed canonical Core-PYZ without a Result or Git.
 - CLI and Python integrations share the same public API.
 
-This source uses version **1.8.0**. It adds the public
+This source uses version **1.9.0**. Its [monitor](docs/monitor.md) shows live
+watcher activity, operational repository states, readable times and switchable
+short/full identifiers. It retains the public
 `patchharbor runtime export --output-dir ...` command and `api.export_runtime`.
 Every official build emits the canonical Core-PYZ alongside wheel and sdist;
 complete releases include these files, a runtime manifest and checksums.
 See [runtime export and direct library use](docs/runtime-export.md),
 [the release procedure](docs/release-runtime.md) and
-[the implementation plan](planning/runtime-release/commit-plan.md).
+[the 1.9.0 release plan](planning/1.9.0/commit-plan.md).
 The existing [safe reference export](docs/safe-reference-integration.md) and
 public integration contracts remain unchanged. Safe export remains limited to
 Linux x86-64 with CPython 3.10–3.14.
@@ -57,13 +60,13 @@ For the normal CLI **and watcher**, install a reviewed wheel or source checkout.
 For example, with an existing Python 3.10+ and pipx:
 
 ```bash
-pipx install --python python3 /absolute/path/patchharbor-1.8.0-py3-none-any.whl
+pipx install --python python3 /absolute/path/patchharbor-1.9.0-py3-none-any.whl
 patchharbor --version
 patchharbor --help
 ```
 
 The wheel path is an artifact you obtain and verify; this command does not assume
-that version 1.8.0 has been published on a package index. **pipx is optional**:
+that version 1.9.0 has been published on a package index. **pipx is optional**:
 a dedicated virtual environment is another installation route. Wheel and sdist
 remain supported for normal installations; the PYZ replaces the runtime embedded
 in new Results, not the installed watcher. See
@@ -331,7 +334,7 @@ source, actual Apply and external acceptance.
 
 ```sh
 patchharbor runtime export --output-dir /absolute/existing/output --json
-python -I -S -B patchharbor-1.8.0.pyz runtime export --output-dir /another/existing/output --json
+python -I -S -B patchharbor-1.9.0.pyz runtime export --output-dir /another/existing/output --json
 ```
 
 This exports the running distribution's canonical PYZ without Git, a Result,
