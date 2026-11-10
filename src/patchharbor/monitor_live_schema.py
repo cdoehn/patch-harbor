@@ -72,8 +72,18 @@ def parse_live(content, name):
         'targets_truncated', 'control_lock', 'control_probe_at', 'last_error', 'completion_unknown'}
     if version == 2:
         allowed |= {'entrypoint_name', 'bundle_number', 'active_exchanges', 'automatic_status'}
+        allowed |= {'watcher_mode', 'poll_interval_seconds', 'next_poll_at'}
     if type(data) is not dict or set(data) - allowed:
         raise ValueError('unknown live observation data')
+    if 'watcher_mode' in data and (row['kind'] != 'watcher' or data['watcher_mode'] not in ('events', 'poll')):
+        raise ValueError('invalid watcher mode')
+    if data.get('watcher_mode') == 'poll' or any(key in data for key in ('poll_interval_seconds', 'next_poll_at')):
+        interval = data.get('poll_interval_seconds')
+        if row['kind'] != 'watcher' or data.get('watcher_mode') != 'poll' or not _finite(interval) or interval <= 0:
+            raise ValueError('invalid polling interval')
+        deadline = data.get('next_poll_at')
+        if deadline is not None and (not _finite(deadline) or deadline <= 0):
+            raise ValueError('invalid polling deadline')
     if data.get('automatic_status') is not None and data['automatic_status'] not in ('no_candidate', 'attempted', 'locked', 'dry_run', 'error'):
         raise ValueError('invalid automatic outcome')
     if data.get('entrypoint_name') is not None and (type(data['entrypoint_name']) is not str or len(data['entrypoint_name']) > 512):

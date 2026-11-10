@@ -25,10 +25,59 @@ Fertigmeldung eines Downloads: vollständige Bundles außerhalb des Exchange-Roo
 bereitstellen und atomar hineinverschieben. Paketintegrität und stabilen
 Dateizustand prüft Core bei jeder Verarbeitung erneut.
 
-Die bisherige Option `--poll-interval` wird abgewiesen. Unveränderte systemd-
+Die bisherige nackte Option `patchharbor-watcher --poll-interval` wird abgewiesen.
+Der explizite Unterbefehl `poll` wird weiter unten beschrieben. Unveränderte systemd-
 Units benötigen keine neuen Parameter. Nach Installation des neuen Stands den
 Watcher neu starten, sobald ein laufender Apply beendet ist. Die Bundle-
 Auslieferung selbst ersetzt keine global installierte Engine.
+
+## Explizites Polling, etwa für CIFS
+
+```bash
+patchharbor watcher poll
+patchharbor watcher poll --interval 10
+patchharbor watcher poll --interval 0.5
+```
+
+`patchharbor-watcher poll` ist gleichwertig. `--interval`, `-i` und
+`--poll-interval` sind Optionen dieses Unterbefehls; erlaubt sind positive,
+endliche Sekundenwerte einschließlich Bruchteilen. Standard: vier Sekunden.
+Die erste Prüfung erfolgt sofort. Nach jedem abgeschlossenen Prüflauf oder
+Apply wartet der Watcher das gewählte Intervall. Lange Applies führen weder
+zu überlappenden Workern noch zu nachgeholten Timer-Serien. Ctrl+C/SIGTERM
+unterbrechen auch sehr lange Warteintervalle. Ein aktiver Worker behält die
+bisherige Prozessgruppen- und Signalbehandlung; ein weiterer startet nach Stop
+nicht mehr.
+
+Dieser Modus richtet keine nativen Ereignisabonnements ein. Core ermittelt bei
+jedem Poll die aktuellen registrierten Repositories und Exchanges neu und
+revalidiert den daraus gebildeten Scope im isolierten automatischen Apply.
+Neue Registrierungen, Konfigurationsänderungen und wieder verfügbare Mounts
+werden dadurch bei einem folgenden Poll berücksichtigt. Fehlerhafte
+Konfigurationen werden angezeigt und später erneut geprüft. Core behält
+Kandidatenwahl, Pfad-/Inhaltsprüfung, Fingerprint, Sperren und Replay; ein
+gescheiterter unveränderter Patch wird nicht zu einem manuellen Retry.
+
+Anders als im Ereignismodus gibt es hier keine aus Ereignissen abgeleitete
+Fünf-Sekunden-Ruhefrist. Vollständige ZIPs weiterhin außerhalb des Exchange-Roots
+bereitstellen und atomar hineinverschieben. Polling umgeht keine Mount-Caches,
+fehlenden Leserechte oder Core-Prüfungen. Die Linux-Dokumentation nennt Polling
+als Vorgehen für Änderungen auf Netzwerkdateisystemen, die inotify nicht
+beobachtet: [inotify(7), Limitations and caveats](https://man7.org/linux/man-pages/man7/inotify.7.html).
+
+Im Monitor stehen Modus, Intervall und nächster geplanter Scan. Die optionale
+Live-Beobachtung ergänzt Version 2 um `watcher_mode: "poll"`, positive
+`poll_interval_seconds` und `next_poll_at` (Unix-Zeit oder `null` während Prüfung
+und nach Stop). Sie ist kein Ausführungsrecht und keine Garantie für einen
+zukünftigen Apply. Der Core-PYZ enthält weiterhin keinen Watcher; der neue
+CLI-Einstieg lädt ihn nur beim ausdrücklichen Aufruf aus der Vollinstallation.
+
+Vor einem Wechsel den bestehenden Watcher nach seinem aktiven Apply stoppen.
+Die bisherigen systemd-Units bleiben im Ereignismodus. Für einen bewusst
+angepassten Dienst kann dessen ExecStart die Vollinstallation mit
+`-m patchharbor.cli watcher poll --interval 4` aufrufen; vorhandene lokale
+Wrapper und weitere Dienstparameter müssen dabei erhalten bleiben. Dieser
+Befehl installiert, aktiviert oder verändert selbst keinen Dienst.
 
 ## Ablauf und Zuständigkeit
 
@@ -77,7 +126,7 @@ passend gewordenes Bundle sind ein neues Exchange-Ereignis, Watcher-Neustart
 oder bewusster manueller Apply möglich. Manuelle Verarbeitung und der vorhandene
 sichere Übergabeweg bei technisch unbenutzbarer PYZ bleiben erhalten; alte
 Runtime-Wheels sind ab der 1.4.0-Kompatibilitätsbasis keine Supportpflicht mehr. Netzwerk-/virtuelle
-Dateisysteme erhalten keine weitergehende Garantie als ihre nativen Ereignisse.
+Dateisysteme können den oben beschriebenen expliziten Polling-Modus verwenden.
 
 ## Nachweise
 

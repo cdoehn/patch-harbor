@@ -241,4 +241,8 @@ def test_built_pyz_entrypoint_imports_shared_cli_without_install_or_watcher(buil
     child = subprocess.run([sys.executable,*flags,str(candidate),'--version'],cwd=outside,env=env,
                            capture_output=True,text=True,timeout=60)
     assert child.returncode == 0, child.stderr
+    if isolated:
+        watcher = subprocess.run([sys.executable,*flags,str(candidate),'watcher','poll'],
+            cwd=outside,env=env,capture_output=True,text=True,timeout=60)
+        assert watcher.returncode == 1
     assert candidate.read_bytes() == raw and not list(outside.iterdir())

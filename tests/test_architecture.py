@@ -22,7 +22,6 @@ ENTRYPOINT_MODULES = {
     # PP-04A stages a data-only build profile, consumed by the PP-04B provider.
     "patchharbor.cli",
     "patchharbor_watcher",
-    "patchharbor_watcher.cli",
     "patchharbor_watcher.worker",
 }
 FORBIDDEN_SCOPE_MODULE_PARTS = {
@@ -125,6 +124,7 @@ def test_runtime_has_no_dead_or_generic_scope_modules() -> None:
     assert {module for module, users in inbound.items() if not users} == (
         ENTRYPOINT_MODULES
     )
+    assert inbound['patchharbor_watcher.cli'] == {'patchharbor.cli_watcher'}
     for module in graph:
         assert set(module.split(".")).isdisjoint(
             FORBIDDEN_SCOPE_MODULE_PARTS
@@ -326,8 +326,10 @@ def test_watcher_uses_public_api_with_an_isolated_worker_boundary() -> None:
     allowed = {"patchharbor", "patchharbor.api", "patchharbor.platform.paths", "patchharbor.platform.filesystem"}
     for module, dependencies in graph.items():
         if module == "patchharbor" or module.startswith("patchharbor."):
-            assert not any(name == "patchharbor_watcher" or name.startswith("patchharbor_watcher.")
-                           for name in dependencies), module
+            watcher = {name for name in dependencies if name == "patchharbor_watcher" or name.startswith("patchharbor_watcher.")}
+            # The explicit CLI command lazily enters the optional watcher;
+            # Core/API/application and ordinary CLI imports remain independent.
+            assert watcher <= ({'patchharbor_watcher.cli'} if module == 'patchharbor.cli_watcher' else set()), module
         else:
             core = {name for name in dependencies if name == "patchharbor" or name.startswith("patchharbor.")}
             assert core <= allowed, module

@@ -43,13 +43,21 @@ def live_lines(document, session, *, height):
             lines += [(line, '') for line in row.get('log_tail', '').splitlines()]
         elif selected['kind'] == 'watcher':
             targets = data.get('targets', [])
-            lines.append((f"{len(targets)} Exchange(s) · {len(data.get('subscriptions', []))} tatsächliche Abonnements", ''))
+            polling = data.get('watcher_mode') == 'poll'
+            if polling:
+                lines.append((f"Polling · Intervall {data['poll_interval_seconds']:g} s · {len(targets)} Exchange(s)", ''))
+                due = data.get('next_poll_at')
+                if due is not None:
+                    lines.append(('Nächster Scan in ' + duration(max(0, due - datetime.now(timezone.utc).timestamp())), 'waiting'))
+            else:
+                lines.append((f"{len(targets)} Exchange(s) · {len(data.get('subscriptions', []))} tatsächliche Abonnements", ''))
             for target in targets:
                 lock = target.get('blocked_on')
                 lines.append((target['directory'] + ' · ' + (str(lock) if lock else 'kein gespeicherter Sperrhinweis'), ''))
                 deadline = target.get('quiet_until')
                 remaining = 'unbekannt' if deadline is None else duration(max(0, deadline - datetime.now(timezone.utc).timestamp()))
-                lines.append((f"Ruhefrist: {remaining} · Änderung vorgemerkt: {target.get('dirty')}", ''))
+                if not polling:
+                    lines.append((f"Ruhefrist: {remaining} · Änderung vorgemerkt: {target.get('dirty')}", ''))
             if data.get('last_error'):
                 lines.insert(0, (data['last_error'], 'dirty'))
         else:

@@ -10,6 +10,7 @@ WATCH_LABELS = {
     'configuration': 'Konfigurationen werden gelesen', 'targets': 'Exchanges werden ermittelt',
     'subscribing': 'Verzeichnisüberwachung wird eingerichtet',
     'watching': 'Wartet auf Änderungen', 'no-targets': 'Keine überwachbaren Exchanges',
+    'polling': 'Polling · Exchanges werden geprüft', 'poll-wait': 'Polling · wartet auf nächsten Scan',
     'refreshing': 'Überwachungsziele werden aktualisiert',
     'changed': 'Änderung im Exchange erkannt', 'quiet': 'Wartet auf Ruhe im Exchange',
     'ready': 'Exchange-Prüfung bereit', 'overflow': 'Ereignisüberlauf; erneute Prüfung',

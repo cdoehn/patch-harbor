@@ -31,6 +31,7 @@ EXPECTED_RUNTIME_FILES = {
     'patchharbor/application_monitor.py',
     'patchharbor/application_monitor_artifacts.py',
     'patchharbor/cli_monitor.py',
+    'patchharbor/cli_watcher.py',
     'patchharbor/monitor_activity.py',
     'patchharbor/monitor_format.py',
     'patchharbor/monitor_overview.py',
@@ -162,6 +163,7 @@ EXPECTED_RUNTIME_FILES = {
     "patchharbor_watcher/__init__.py",
     "patchharbor_watcher/loop.py",
     "patchharbor_watcher/cli.py",
+    "patchharbor_watcher/polling.py",
     "patchharbor_watcher/lifecycle.py",
     "patchharbor_watcher/apply_boundary.py",
     "patchharbor_watcher/systemd_linux.py",
@@ -697,7 +699,6 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
         "ssh",
         "save",
         "plugins",
-        "watcher",
     ):
         excluded = _run(
             [str(executable), excluded_command, "--help"],
@@ -744,6 +745,8 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
     )
 
     invalid_core_invocations = (
+        ("watcher", "poll", "--interval", "0"),
+        ("watcher", "poll", "--int", "4"),
         ("register", "--new", str(tmp_path / "missing-repository")),
         ("registry", "list", "--js"),
         ("context", "--js", str(tmp_path / "missing-repository")),

@@ -22,7 +22,7 @@ It bridges these separate environments using verified ZIP packages, allowing AI 
 - `api.read_result_snapshot` returns complete verified file layers without Git or writes.
 - `api.apply_guarded` requires explicit package/target binding and trusted host approval before payloads.
 - `inspect` and `validate` examine packages without executing their code.
-- An optional watcher automatically applies incoming patches after filesystem activity in the Exchange directory has settled for five seconds.
+- An optional watcher automatically applies incoming patches after five seconds of filesystem quiet, or polls explicitly every four seconds when native notifications are unavailable.
 - `monitor` shows repository and Exchange activity, a persistent five-line event history, active entrypoints and optional bundle numbers in a read-only TUI.
 - Result Bundles normally include an installation-free **Core-PYZ (without the watcher)**, allowing compatible AI Linux environments to work with PatchHarbor without installing it separately.
 - `runtime export` supplies the installed canonical Core-PYZ without a Result or Git.
@@ -216,12 +216,28 @@ systemctl --user enable --now patchharbor-watcher.service
 Each Exchange root is scanned after five seconds without a relevant change.
 Existing files receive an initial quiet period on startup. Reads and changes
 inside existing subdirectories do not trigger scans. There is no idle
-one-second polling; `--poll-interval` is obsolete. Results may trigger a scan
+one-second polling in event mode; its old bare `--poll-interval` option remains invalid. Results may trigger a scan
 but are never executed as patches. Repeated identical `no_candidate` messages
 are suppressed. Failed unchanged packages are not automatically retried.
 
 Native event delivery on network/virtual filesystems depends on that filesystem;
-there is no silent polling fallback. See [watcher behavior](docs/watcher-events.md).
+select polling explicitly for CIFS or other mounts without reliable notifications:
+
+```bash
+patchharbor watcher poll                 # default: 4 seconds
+patchharbor watcher poll --interval 10   # custom interval, in seconds
+patchharbor watcher poll --interval 0.5  # fractions are supported
+```
+
+The equivalent standalone command is `patchharbor-watcher poll`. Polling checks
+immediately, then waits the configured interval after each completed check or
+Apply. It refreshes registered Exchanges every cycle, runs one worker at a time,
+and retains Core's binding, integrity, locking and replay checks. Stop it with
+Ctrl+C. The monitor shows polling mode, interval and the next planned scan.
+Use one watcher mode for a deployment; stop an existing watcher after its active
+Apply finishes before switching. Polling needs the full wheel/source installation;
+the Core-PYZ still excludes the watcher. There is no silent polling fallback.
+See [watcher behavior](docs/watcher-events.md).
 Termux/Android should use manual Apply; a reliable Android background service
 is not part of the supported watcher contract. Windows supports the foreground
 watcher; the systemd unit is Linux-specific.

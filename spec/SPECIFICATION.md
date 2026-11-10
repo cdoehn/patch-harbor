@@ -284,6 +284,39 @@ fehlende Roots erhalten nur unverbindliche Beobachtungshinweise über
 Ereignis-/Apply- und installierte Wheel-Prüfungen. [Betrieb und Abnahme](../docs/watcher-events.md)
 unterscheiden lokale Nachweise von noch ausstehendem Apply und nativer Windows-CI.
 
+### 3.2.2 Expliziter Polling-Modus – Nutzerauftrag vom 10. November 2026
+
+Als ausdrücklich gewählte Alternative zum Ereignismodus bietet die
+Vollinstallation `patchharbor watcher poll`, gleichwertig mit
+`patchharbor-watcher poll`. Standardintervall sind vier Sekunden;
+`--interval SEKUNDEN` (auch `-i`/`--poll-interval`) akzeptiert beliebige positive,
+endliche Sekundenwerte einschließlich Bruchteilen. Null, negative Werte,
+NaN und Unendlich sind Aufruffehler vor Registry-Zugriff oder Workerstart.
+
+Die erste Prüfung erfolgt unmittelbar. Anschließend liegt das Intervall jeweils
+zwischen abgeschlossenem Prüflauf/Apply und nächster Prüfung. Keine überlappenden
+Worker und keine nachgeholten Poll-Serien. Jeder Poll fragt Core nach den aktuellen
+Zielen und delegiert nur den erneut durch Core zu prüfenden Scope. Registry-
+oder Exchange-Änderungen benötigen hier kein OS-Ereignis. Konfigurationsfehler
+verhindern diesen Apply und werden beim nächsten Poll erneut geprüft.
+
+Polling öffnet keine nativen Ereignisquellen und setzt keine fünfsekündige
+Ereignis-Ruhefrist voraus. Die Vorgaben zum unveränderten Leerlauf, zu
+Ereignisgenerationen und Sperr-Backoff in 3.2/3.2.1 gelten für den Ereignismodus.
+Im Polling-Modus bleiben Core-Klassifikation, Integrität, Repositorybindung,
+Locks, Replay und automatische Archivierung vollständig maßgeblich. Es gibt
+keinen stillen Wechsel des Modus und keine neue Service-/Termux-Zusage.
+
+Warten ist sofort durch die bisherigen Stoppsignale unterbrechbar. Bereits
+laufende Worker behalten ihre Prozessgruppen-/Signalbehandlung; Stop startet
+keinen weiteren. Live-Beobachtungen zeigen Modus, Intervall und nächste geplante
+Prüfung mit validierten optionalen Version-2-Feldern `watcher_mode`,
+`poll_interval_seconds` und `next_poll_at`. Ihre Angaben sind rein beobachtend.
+Nur der dünne CLI-Adapter `patchharbor.cli_watcher` darf die optionale
+Watcher-CLI verzögert importieren. Core/API/Anwendung importieren den Watcher
+nicht; Core-PYZ bleibt watcherfrei und meldet beim ausdrücklichen Aufruf das
+fehlende optionale Modul. Betrieb und Grenzen: `docs/watcher-events.md`.
+
 ### 3.3 Repo Assist
 
 Repo Assist ist ein separates Werkzeug für den nachvollziehbaren Entwicklungsprozess eines Repositorys. Es ist nicht zwingend der oberste Orchestrator; über Repo Assist, PatchHarbor, PromptBridge und weitere Werkzeuge kann später ein zusätzlicher Orchestrator liegen.

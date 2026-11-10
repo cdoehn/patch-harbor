@@ -499,6 +499,11 @@ def _build_parser() -> argparse.ArgumentParser:
     _add_repository_commands(commands)
     _add_package_commands(commands)
     _add_bundle_apply_commands(commands)
+    watcher = commands.add_parser('watcher', help='run the optional Exchange watcher')
+    watcher_commands = watcher.add_subparsers(dest='watcher_command', required=True)
+    poll = watcher_commands.add_parser('poll', help='poll registered Exchanges without filesystem events')
+    poll.add_argument('-i', '--interval', '--poll-interval', type=_positive_seconds, default=4.0,
+                      metavar='SECONDS', help='wait between completed checks; positive seconds, fractions allowed (default: 4)')
     runtime = commands.add_parser('runtime', help='export the installed Core runtime')
     runtime_commands = runtime.add_subparsers(dest='runtime_command', required=True)
     export = runtime_commands.add_parser('export', help='export own canonical PYZ without installing or downloading')

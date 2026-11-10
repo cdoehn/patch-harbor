@@ -119,6 +119,10 @@ def main(
         from patchharbor.cli_monitor import monitor_command
         return monitor_command(args, stdin=actual_stdin, stdout=actual_stdout, stderr=actual_stderr)
 
+    if args.command == 'watcher':
+        from patchharbor.cli_watcher import watcher_command
+        return watcher_command(args, stdout=actual_stdout, stderr=actual_stderr)
+
     if args.command == 'runtime':
         return _runtime_export_command(args, stdout=actual_stdout, stderr=actual_stderr)
 

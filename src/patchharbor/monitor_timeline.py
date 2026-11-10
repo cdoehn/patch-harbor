@@ -43,6 +43,8 @@ def forecast(row, document, now=None):
     if item['status'] == 'failure' and code != 'entrypoint':
         return [unknown, unknown]
     if row['kind'] == 'watcher':
+        if data.get('watcher_mode') == 'poll' and code not in ('stopped', 'stopping', 'draining'):
+            return [('Voraussichtlich: Exchanges beim nächsten Poll erneut prüfen', 'future'), unknown]
         if code.endswith('-lock') or code in ('lock-held', 'lock-probe'):
             labels = ('Erneut prüfen, ob Sperre frei ist', 'Bei freier Sperre: Exchange prüfen')
         elif code in ('quiet', 'ready', 'pending', 'changed', 'refreshing', 'subscribing'):

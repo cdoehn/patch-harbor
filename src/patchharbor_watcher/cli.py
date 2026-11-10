@@ -15,6 +15,14 @@ from patchharbor_watcher.lifecycle import (
     installed_stop_signals,
 )
 from patchharbor_watcher.loop import run_repository_watcher
+from patchharbor_watcher.polling import DEFAULT_POLL_INTERVAL, poll_interval, run_polling_watcher
+
+
+def _poll_seconds(value):
+    try:
+        return poll_interval(float(value))
+    except (TypeError, ValueError) as exc:
+        raise argparse.ArgumentTypeError(str(exc)) from exc
 
 
 def _install_systemd_user_unit() -> Path:
@@ -34,7 +42,8 @@ def _build_parser() -> argparse.ArgumentParser:
         allow_abbrev=False,
         description=(
             "Watch filesystem events and request scoped automatic Apply "
-            "after five seconds of quiet across the Exchange directories of all registered repositories."
+            "after five seconds of quiet across the Exchange directories of all registered repositories. "
+            "Use 'poll' for filesystems without reliable notifications, such as CIFS."
         ),
         epilog=(
             "Register each repository and configure its Exchange with 'patchharbor configure "
@@ -52,6 +61,12 @@ def _build_parser() -> argparse.ArgumentParser:
             "do not enable or start it"
         ),
     )
+    commands = parser.add_subparsers(dest='mode')
+    poll = commands.add_parser('poll', allow_abbrev=False,
+                               help='poll registered Exchanges without filesystem events')
+    poll.add_argument('-i', '--interval', '--poll-interval', type=_poll_seconds,
+                      default=DEFAULT_POLL_INTERVAL, metavar='SECONDS',
+                      help='wait between completed checks; positive seconds, fractions allowed (default: 4)')
     return parser
 
 
@@ -64,6 +79,8 @@ def main(
     """Install or run the global trigger for repository-local Exchange settings."""
     parser = _build_parser()
     arguments = parser.parse_args(argv)
+    if arguments.mode == 'poll' and arguments.install_systemd_user_unit:
+        parser.error('poll runs in the foreground; the systemd installer creates the event-mode unit')
     actual_stdout = sys.stdout if stdout is None else stdout
     actual_stderr = sys.stderr if stderr is None else stderr
     stop_controller = WatcherStopController()
@@ -76,13 +93,21 @@ def main(
             return 0
 
         with installed_stop_signals(stop_controller):
-            run_repository_watcher(
-                delegate=delegate_to_automatic_apply,
-                log_stream=actual_stdout,
-                error_stream=actual_stderr,
-                stop_requested=stop_controller.stop_requested,
-                bind_wake=stop_controller.bind_wake,
-            )
+            if arguments.mode == 'poll':
+                run_polling_watcher(
+                    delegate=delegate_to_automatic_apply,
+                    log_stream=actual_stdout, error_stream=actual_stderr,
+                    stop_requested=stop_controller.stop_requested, wait=stop_controller.wait,
+                    interval=arguments.interval,
+                )
+            else:
+                run_repository_watcher(
+                    delegate=delegate_to_automatic_apply,
+                    log_stream=actual_stdout,
+                    error_stream=actual_stderr,
+                    stop_requested=stop_controller.stop_requested,
+                    bind_wake=stop_controller.bind_wake,
+                )
     except KeyboardInterrupt:
         return 130
     except (api.PatchHarborError, OSError, RuntimeError, ValueError) as exc:
