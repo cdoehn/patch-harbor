@@ -63,14 +63,21 @@ class Observation:
 
 
 
-def live_observation(schedule, subscribed, *, applying, control_lock, control_probe, now, wall):
+def live_observation(schedule, subscribed, *, applying, control_lock, control_probe, now, wall, active_exchanges=()):
     """Describe the event loop's own facts without acquiring/probing any lock."""
     def lock_fact(lock):
         return None if lock is None else {'kind': lock.kind, 'repo_id': lock.repo_id}
     def deadline(value):
         return None if value is None else wall + max(0, value - now)
     roots = list(schedule.roots.values())
+    pending = [root for root in roots if root.dirty]
+    lock = control_lock or next((root.lock for root in pending if root.lock is not None), None)
+    code = ('applying' if applying else lock.kind + '-lock' if lock else
+            'no-targets' if not roots else 'quiet' if any(root.due > now for root in pending) else
+            'ready' if pending else 'watching')
     return dict(phase='applying' if applying else 'watching',
+        activity_code=code, activity_status='running' if applying else 'waiting',
+        active_exchanges=[str(p) for p in active_exchanges][:128],
         subscriptions=[str(p) for p in subscribed],
         targets=[{'directory': str(root.target.directory),
                   'repository_ids': [str(v) for v in root.target.repository_ids],

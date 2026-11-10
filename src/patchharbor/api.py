@@ -51,7 +51,7 @@ DEFAULT_TIMEOUT_SECONDS = _application.DEFAULT_TIMEOUT_SECONDS
 PathInput = str | os.PathLike[str]
 
 __all__ = [
-    "monitor_live", "watcher_observation", "monitor_artifacts", "monitor_log", "monitor_snapshot", "MonitorSnapshot", "MonitorRepository", "MonitorExchange",
+    "monitor_live", "watcher_observation", "monitor_artifacts", "monitor_overview", "monitor_log", "monitor_snapshot", "MonitorSnapshot", "MonitorRepository", "MonitorExchange",
     "ActivityEvent", "BundleResult", "CandidateSelector", "ConfigurationResult",
     "AdmissionCallback", "PatchAdmission", "apply_guarded",
     "SafeExportPlan", "SafeExportError", "SafeExportErrorCode", "prepare_reference_export",
@@ -562,6 +562,15 @@ def monitor_log(path: PathInput, *, expected_sha256: str) -> dict:
     from patchharbor.application_monitor_artifacts import monitor_log as observe
     with _observe_activity(None):
         return observe(_path(path, 'path'), expected_sha256)
+
+
+def monitor_overview(repository: str) -> dict:
+    """Observe candidate and latest retained Apply evidence without mutating sources."""
+    if not isinstance(repository, str) or not repository or '\x00' in repository:
+        raise ValueError('repository must be a nonempty full ID or path')
+    from patchharbor.application_monitor_artifacts import monitor_overview as observe
+    with _observe_activity(None):
+        return observe(repository)
 
 
 def monitor_live(*, instance_id: str | None = None) -> dict:

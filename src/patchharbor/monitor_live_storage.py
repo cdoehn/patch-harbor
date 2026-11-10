@@ -37,7 +37,7 @@ def prune_completed(directory):
         for index, path in enumerate(directory.iterdir()):
             if index >= 512:
                 break
-            if path_kind(path) is PathKind.REGULAR_FILE and path.name.startswith(('apply-', 'watcher-')) and path.suffix == '.json':
+            if path_kind(path) is PathKind.REGULAR_FILE and path.name.startswith(('apply-', 'watcher-', 'bundle-')) and path.suffix == '.json':
                 paths.append(path)
         if len(paths) <= 128:
             return
@@ -67,14 +67,14 @@ def monitor_live(*, instance_id=None):
             raise ValueError('observation directory is not a regular directory')
         candidates = []
         if instance_id is not None:
-            candidates = [directory / (kind + '-' + instance_id + '.json') for kind in ('apply', 'watcher')]
+            candidates = [directory / (kind + '-' + instance_id + '.json') for kind in ('apply', 'watcher', 'bundle')]
             candidates = [path for path in candidates if path.exists()]
         else:
             for index, path in enumerate(directory.iterdir()):
                 if index >= 512:
                     result['incomplete'] = True
                     break
-                if path.name.endswith('.json') and path.name.startswith(('apply-', 'watcher-')):
+                if path.name.endswith('.json') and path.name.startswith(('apply-', 'watcher-', 'bundle-')):
                     candidates.append(path)
             candidates.sort(key=lambda p: p.lstat().st_mtime_ns, reverse=True)
         if len(candidates) > 64:

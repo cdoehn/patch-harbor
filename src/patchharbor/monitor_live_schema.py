@@ -5,6 +5,7 @@ from uuid import UUID
 
 from patchharbor.json_document import parse_json_document
 from patchharbor.result_reader import _primary
+from patchharbor.monitor_activity import HISTORY_LIMIT, STATUSES
 
 MAX_DOCUMENT = 256 * 1024
 
@@ -31,10 +32,13 @@ def parse_live(content, name):
     row = parse_json_document(content)
     fields = {'format_version', 'kind', 'instance_id', 'pid', 'process_identity',
               'started_at', 'updated_at', 'facts_updated_at', 'completed', 'phase', 'data', 'log_tail'}
-    if set(row) != fields or type(row['format_version']) is not int or row['format_version'] != 1:
+    version = row.get('format_version')
+    if version == 2:
+        fields |= {'activity', 'history'}
+    if set(row) != fields or type(version) is not int or version not in (1, 2):
         raise ValueError('unsupported live observation schema')
     _uuid(row['instance_id'])
-    if row['kind'] not in ('apply', 'watcher') or name != row['kind'] + '-' + row['instance_id'] + '.json':
+    if row['kind'] not in (('apply', 'watcher', 'bundle') if version == 2 else ('apply', 'watcher')) or name != row['kind'] + '-' + row['instance_id'] + '.json':
         raise ValueError('live filename and identity disagree')
     if type(row['pid']) is not int or not 0 < row['pid'] <= 2**32-1:
         raise ValueError('invalid publisher PID')
@@ -45,14 +49,39 @@ def parse_live(content, name):
         raise ValueError('invalid publisher lifecycle')
     if type(row['log_tail']) is not str or len(row['log_tail'].encode('utf-8')) > 3*32768:
         raise ValueError('invalid bounded log tail')
+    if version == 2:
+        if type(row['history']) is not list or len(row['history']) > HISTORY_LIMIT:
+            raise ValueError('invalid bounded activity history')
+        sequence = 0
+        for event in [*row['history'], row['activity']]:
+            if type(event) is not dict or set(event) != {'sequence', 'at', 'since', 'code', 'status', 'message'}:
+                raise ValueError('invalid activity record')
+            if type(event['sequence']) is not int or not sequence < event['sequence']:
+                raise ValueError('invalid activity sequence')
+            sequence = event['sequence']
+            _stamp(event['at']); _stamp(event['since'])
+            if type(event['code']) is not str or not 0 < len(event['code']) <= 64 or type(event['status']) is not str or event['status'] not in STATUSES:
+                raise ValueError('invalid activity identity/status')
+            if type(event['message']) is not str or len(event['message']) > 512:
+                raise ValueError('invalid activity message')
     data = row['data']
     allowed = {'message', 'patch_path', 'repo_id', 'repository_path', 'base_commit', 'fingerprint',
         'run_id', 'origin', 'dry_run', 'requested_timeout_seconds', 'effective_timeout_seconds',
         'entrypoint_started_at', 'entrypoint_exit_code', 'process_state', 'primary_result',
         'result_status', 'result_path', 'patch_sha256', 'subscriptions', 'targets',
         'targets_truncated', 'control_lock', 'control_probe_at', 'last_error', 'completion_unknown'}
+    if version == 2:
+        allowed |= {'entrypoint_name', 'bundle_number', 'active_exchanges', 'automatic_status'}
     if type(data) is not dict or set(data) - allowed:
         raise ValueError('unknown live observation data')
+    if data.get('automatic_status') is not None and data['automatic_status'] not in ('no_candidate', 'attempted', 'locked', 'dry_run', 'error'):
+        raise ValueError('invalid automatic outcome')
+    if data.get('entrypoint_name') is not None and (type(data['entrypoint_name']) is not str or len(data['entrypoint_name']) > 512):
+        raise ValueError('invalid entrypoint name')
+    if data.get('bundle_number') is not None and (type(data['bundle_number']) is not str or len(data['bundle_number']) != 3 or any(c not in '0123456789' for c in data['bundle_number'])):
+        raise ValueError('invalid declared bundle number')
+    if 'active_exchanges' in data and (type(data['active_exchanges']) is not list or len(data['active_exchanges']) > 128 or any(type(p) is not str for p in data['active_exchanges'])):
+        raise ValueError('invalid active Exchange scope')
     for key in ('message', 'patch_path', 'repository_path', 'base_commit', 'fingerprint',
                 'result_path', 'last_error', 'process_state'):
         if data.get(key) is not None and type(data[key]) is not str:

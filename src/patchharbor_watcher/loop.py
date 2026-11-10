@@ -227,7 +227,8 @@ def run_repository_watcher(
 
     def publish_status():
         publication.update(**live_observation(schedule, subscribed, applying=worker is not None,
-            control_lock=control_lock, control_probe=control_probe, now=clock(), wall=time.time()))
+            control_lock=control_lock, control_probe=control_probe, now=clock(), wall=time.time(),
+            active_exchanges=tuple(snapshot or ()) if worker is not None else ()))
 
     def wake():
         if source is not None:
@@ -235,7 +236,9 @@ def run_repository_watcher(
 
     def refresh():
         nonlocal source, control_lock, control_probe, control_backoff, subscribed
+        publication.update(activity_code='refreshing')
         directories, failure = observation.refresh(target_provider, control_provider)
+        publication.update(activity_code='subscribing')
         fresh = source_factory(directories)
         subscribed = directories
         previous, source = source, fresh
@@ -248,6 +251,8 @@ def run_repository_watcher(
         control_backoff = 5.0
         control_probe = None if control_lock is None else clock() + control_backoff
         publication.update(last_error=str(failure) if failure is not None else None)
+        if failure is not None:
+            publication.update(activity_code='configuration-error', activity_status='failure')
         publish_status()
         if failure is not None:
             error_stream.write(f'patchharbor-watcher: {failure}\n')
@@ -255,12 +260,16 @@ def run_repository_watcher(
 
     def accept(events):
         if any(observation.needs_refresh(event) for event in events):
+            publication.update(activity_code='overflow' if any(e.kind is EventKind.OVERFLOW for e in events)
+                               else 'replaced', activity_status='unknown')
             refresh()
             return
         now = clock()
         for event in events:
             if event.kind is EventKind.CHANGED:
                 schedule.changed(event.directory, now)
+                publication.update(activity_code='changed', activity_status='success',
+                                   activity_message='Änderung erkannt · ' + str(event.directory))
 
     def invoke(targets):
         try:
@@ -292,13 +301,26 @@ def run_repository_watcher(
                 else:
                     worker.join()
                     worker = None
+                    publication.update(activity_code='completion')
                     if isinstance(result, BaseException):
                         raise result
+                    progress = result.progress
+                    if progress.status == 'attempted':
+                        publication.update(activity_code='apply-completed',
+                                           activity_status='success' if result.process_exit_code == 0 else 'failure',
+                                           activity_message='Apply abgeschlossen · Exit ' + str(result.process_exit_code))
+                    code = ('no-candidate' if progress.status == 'no_candidate' else
+                            'pending' if progress.status == 'attempted' else
+                            progress.blocked_on.kind + '-lock' if progress.status == 'locked' else 'waiting-change')
+                    publication.update(activity_code=code, activity_status='waiting')
                     publish_completion(event_state, result, log_stream, error_stream)
                     schedule.finish(snapshot, result.progress, clock())
             if worker is None:
                 if control_lock is not None and control_probe <= clock():
+                    publication.update(activity_code='lock-probe')
                     blocked = readiness(control_lock)
+                    publication.update(activity_code='lock-free' if blocked is None else 'lock-held',
+                                       activity_status='success' if blocked is None else 'waiting')
                     if blocked is None:
                         refresh()
                     else:
@@ -307,14 +329,20 @@ def run_repository_watcher(
                         control_probe = clock() + control_backoff
                 for lock in schedule.probes(clock()):
                     try:
-                        schedule.probed(lock, readiness(lock), clock())
+                        publication.update(activity_code='lock-probe')
+                        blocked = readiness(lock)
+                        publication.update(activity_code='lock-free' if blocked is None else 'lock-held',
+                                           activity_status='success' if blocked is None else 'waiting')
+                        schedule.probed(lock, blocked, clock())
                     except api.PatchHarborError as exc:
+                        publication.update(activity_code='probe-failed', activity_status='failure', last_error=str(exc)[:1024])
                         schedule.probe_failed(lock)
                         error_stream.write(f'patchharbor-watcher: {exc}\n')
                         error_stream.flush()
                 targets = schedule.ready(clock())
                 if targets and not stop_requested():
                     snapshot = schedule.begin(targets)
+                    publication.update(activity_code='worker-start')
                     worker = worker_factory(target=invoke, args=(targets,), name='patchharbor-apply')
                     worker.start()
             publish_status()
@@ -325,12 +353,15 @@ def run_repository_watcher(
                     timeout = control_timeout if timeout is None else min(timeout, control_timeout)
                 accept(source.read(timeout))
     except BaseException as exc:
-        publication.update(last_error=str(exc)[:1024] or type(exc).__name__)
+        publication.update(last_error=str(exc)[:1024] or type(exc).__name__,
+                           activity_code='watcher-error', activity_status='failure')
         raise
     finally:
         bind_wake(None)
+        publication.update(activity_code='stopping', activity_status='waiting')
         # Keep the wake target alive until the completion thread has returned.
         if worker is not None:
+            publication.update(activity_code='draining', activity_status='waiting')
             worker.join()
         if source is not None:
             source.close()

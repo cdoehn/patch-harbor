@@ -31,7 +31,7 @@ def artifact_lines(document, session, *, height):
                 lines.append(('Log gekürzt: letzte 64 KiB; Original unverändert.', 'warning'))
             if log.get('error'):
                 lines.append(('VERALTET: ' + log['error'], 'warning'))
-            lines += [(line, '') for line in log.get('text', '').splitlines()[session.offsets.get('logs', 0):]]
+            lines += [(line, '') for line in log.get('text', '').splitlines()]
         else:
             lines.append(('SHA-256: ' + str(selected.get('sha256')), ''))
             expected = selected.get('expected') or selected.get('context') or {}
@@ -61,7 +61,4 @@ def artifact_lines(document, session, *, height):
         lines.append((error, 'warning'))
     if view.get('stale'):
         lines.insert(1, ('VERALTET: ' + str(view.get('error')), 'warning'))
-    if session.focus == 'content':
-        offset = min(session.offsets.get(session.view, 0), max(0, len(lines) - 1))
-        lines = lines[offset:]
     return lines

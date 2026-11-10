@@ -15,6 +15,8 @@ from patchharbor.result_reader import (capture_result_payloads, read_result_or_p
     has_result_marker, parse_result_payloads)
 from patchharbor.zip_payloads import ZipPayloadError
 from patchharbor.monitor_types import observed_at
+from patchharbor.monitor_activity import declared_bundle_number
+from patchharbor.json_document import parse_json_document
 
 POLICY = ResourcePolicy(max_input_artifact_bytes=64*1024*1024,
                         max_content_bytes=64*1024*1024, max_zip_total_bytes=128*1024*1024)
@@ -48,17 +50,20 @@ class ArtifactCache:
             return {'kind': 'other'}, None
         if has_result_marker(payloads):
             facts = parse_result_payloads(payloads, resource_policy=POLICY)
+            run = parse_json_document(next(p.content for p in payloads if p.relative_path == 'logs/run.json'))
             return dict(kind='result_bundle', repo_id=str(facts.context.repo_id), context=binding(facts.context),
                 expected=binding(facts.expected), run_id=facts.run_id, operation=facts.operation,
                 dry_run=facts.dry_run, primary_result=facts.primary_result.as_document(),
                 result_status='created', patch_sha256=facts.patch_sha256,
+                started_at=run['started_at'], ended_at=run['ended_at'],
                 completed_commit=str(facts.completed_commit) if facts.completed_commit else None), None
         try:
             package = resolve_patch_payloads(payloads, resource_policy=POLICY, package_path=path,
                 package_sha256=captured.sha256, package_size=captured.size)
         except PatchHarborError:
             return {'kind': 'other'}, None
-        return {'kind': 'patch_package'}, ExchangePatchSelection.from_manifest(package.manifest)
+        return {'kind': 'patch_package', 'bundle_number': declared_bundle_number(package.entrypoint.content),
+                'entrypoint_name': package.entrypoint.relative_path}, ExchangePatchSelection.from_manifest(package.manifest)
 
 
 def binding(value):

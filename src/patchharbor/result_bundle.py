@@ -508,7 +508,16 @@ def create_manual_result_bundle(
     output_directory: Path | None = None,
 ) -> ManualResultBundle:
     """Create one Result Bundle for a registered supported repository."""
+    from patchharbor.monitor_live import bundle_observation
     session = RunSession.start()
+    with bundle_observation(session, path) as observation:
+        result = _create_manual_result_bundle(path, output_directory=output_directory,
+                                              session=session, observation=observation)
+        observation.finish(result.report)
+        return result
+
+
+def _create_manual_result_bundle(path, *, output_directory, session, observation):
     try:
         run_directory = _create_private_run_directory(session.run_id)
     except (OSError, RuntimeError) as exc:
@@ -529,6 +538,7 @@ def create_manual_result_bundle(
                 repo_id = _registered_identity(registry_snapshot, repository)
                 resolved_repository = repository
                 resolved_repo_id = repo_id
+                observation.update(repo_id=str(repo_id), repository_path=str(repository.value))
                 filename = result_bundle_filename(
                     session,
                     repository_name=repository.value.name,

@@ -22,7 +22,7 @@ def query(repository, exchange, timeout, *, include_state=True):
 
 
 def query_api(method, arguments, timeout):
-    if method not in ('monitor_snapshot', 'monitor_artifacts', 'monitor_log', 'monitor_live'):
+    if method not in ('monitor_snapshot', 'monitor_artifacts', 'monitor_overview', 'monitor_log', 'monitor_live'):
         raise ValueError('unsupported observation')
     code = ('import json,sys; from patchharbor import api; '
             'method,args=json.loads(sys.argv[1]); value=getattr(api,method)(**args); '

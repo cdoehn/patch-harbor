@@ -135,3 +135,19 @@ urspruenglichen Reihenfolge fort. Jede Stufe hat ihre eigene explizite
 Paketdateiliste; das gemessene Wheel mit allen Viewer-Modulen erhaelt ein
 begrenztes 432-KiB-Releasebudget. Kein Runtime-/Eingabelimit wird geaendert.
 Details und noch ausstehender Apply-Nachweis: `delivery-079.md`.
+
+## Folgeauftrag: Bedienbarkeit und betriebliche Übersicht
+
+Am 10. November 2026 autorisiert der Nutzer die gemeinsam ausgearbeitete TUI:
+fünf persistente Verlaufszeilen, aussagekräftiger Watcher-Zustand, echte
+Aktivitätsgeschichte, bedingte Vorschau, dezente Symbole/Farben, lokale Zeiten,
+kürzbare IDs und eine PatchHarbor-/Exchange-zentrierte Repositoryübersicht.
+Vorhandene Bundle-Nummer, Kennung, Vorgangsart und Repository sind sichtbar.
+Die ausdrückliche neue Gestaltung ersetzt die frühere Git-Priorität.
+
+Bundle 082 liefert dies als einen zusammenhängenden OFF-PLAN-Commit VIEW-UX:
+`feat(monitor): show persistent activity and operational repository status [VIEW-UX]`.
+Kein weiterer nomineller W/R/C-Zwischenstand; ursprünglicher Planzähler unverändert.
+Der verifizierte Ausgang ist `023e08a47eb30bd88a7440533e4f45ab8add54b8`.
+Vor dem Commit vollständige parallele Apply-Suite, danach genau ein normaler
+Push. Entwicklungsprüfungen und Übergabevertrag stehen in `delivery-082.md`.

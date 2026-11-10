@@ -4,6 +4,7 @@ from collections import OrderedDict
 import time
 
 from patchharbor.monitor_query import query_api
+from patchharbor.monitor_overview import OverviewRefresh, attach_overview_once
 
 
 class MonitorDetails:
@@ -11,6 +12,7 @@ class MonitorDetails:
         self.timeout, self.interval = timeout, interval
         self.pool = ThreadPoolExecutor(max_workers=2, thread_name_prefix='patchharbor-details')
         self.logs = OrderedDict()
+        self.overview = OverviewRefresh(timeout, max(15, interval))
         self.sources = {name: {'key': None, 'value': None, 'future': None, 'error': None, 'due': 0}
                         for name in ('artifacts', 'log', 'live', 'live_log')}
 
@@ -43,6 +45,7 @@ class MonitorDetails:
                 'error': source['error'], 'refreshing': source['future'] is not None}
 
     def attach(self, document, session, *, force=False):
+        document = self.overview.attach(document, force=force)
         live = self._tick('live', 'all', 'monitor_live', {}, force)
         document = {**document, 'live_view': live}
         selected = session.selected(document)
@@ -66,10 +69,12 @@ class MonitorDetails:
         return document
 
     def close(self):
+        self.overview.close()
         self.pool.shutdown(wait=False, cancel_futures=True)
 
 
 def attach_once(document, session, timeout):
+    document = attach_overview_once(document, timeout)
     try:
         document['live_view'] = query_api('monitor_live', {}, timeout)
     except Exception as exc:

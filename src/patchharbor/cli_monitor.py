@@ -8,6 +8,7 @@ from patchharbor.monitor_details import MonitorDetails, attach_once
 from patchharbor.monitor_display import render, safe_text
 from patchharbor.monitor_refresh import MonitorRefresh, snapshot_once
 from patchharbor.monitor_session import MonitorSession, VIEWS
+from patchharbor.monitor_status import active_runs
 from patchharbor.platform.monitor_terminal import terminal_mode, read_key, size
 
 
@@ -39,16 +40,9 @@ def monitor_command(args, *, stdin, stdout, stderr):
                 refresh.tick()
                 width, height = size()
                 document = details.attach(refresh.document, state)
-                display = render(document, state, width=width, height=height, color=color)
+                display = render(document, state, width=width, height=height, color=color, help_open=help_open)
                 if width < 60 or height < 15:
                     display = 'Terminal mindestens 60×15; q beendet.'
-                if help_open:
-                    display = ('PATCHHARBOR MONITOR\n\nTab: Repository / Liste / Detailtext\nPfeile / j k: Auswahl\n'
-                               '1 Übersicht / 2 Exchanges / 3 Bundles / 4 Verlauf / 5 Logs\n'
-                               '6 Live-Status / 7 Live-Log\n'
-                               'a Archiv ein/aus · / Suche im Fokus · Enter / Esc\n'
-                               's Sortierung umkehren\nr Quellen aktualisieren\nq nur diesen Viewer schließen\n'
-                               '? Hilfe schließen\n\nBeobachtungen sind keine Reservierungen.')
                 if search is not None:
                     display += '\n/ ' + safe_text(search) + '  [Enter / Esc]'
                 screen = (width, height, display)
@@ -85,6 +79,19 @@ def monitor_command(args, *, stdin, stdout, stderr):
                     state.include_archive = not state.include_archive
                 elif key == 's':
                     state.descending = not state.descending
+                elif key == 'v':
+                    state.full_identifiers = not state.full_identifiers
+                elif key == 'g':
+                    state.show_git = not state.show_git
+                elif key == 'l':
+                    runs = active_runs(document)
+                    if runs:
+                        row = runs[0]
+                        state.match = ''
+                        state.repository_id = row['data'].get('repo_id')
+                        state.view, state.focus = 'live', 'details'
+                        state.live_focus_id = row['instance_id']
+                        state.selections['live:' + str(state.repository_id)] = row['instance_id']
                 elif key == 'r':
                     refresh.tick(force=True)
                     details.attach(refresh.document, state, force=True)

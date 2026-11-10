@@ -402,7 +402,9 @@ def _run_apply_path(
     from patchharbor.monitor_live import current_publication
     publication = current_publication()
     if publication is not None:
-        publication.update(patch_sha256=package.package_sha256)
+        from patchharbor.monitor_activity import declared_bundle_number
+        publication.update(patch_sha256=package.package_sha256,
+                           bundle_number=declared_bundle_number(package.entrypoint.content))
     emit(RequestStarted(
         source_name=str(selected_path),
         requested_repo_id=str(package.manifest.repo_id),

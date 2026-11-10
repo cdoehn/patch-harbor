@@ -30,7 +30,10 @@ def observe_repository(mapping, *, include_state=True) -> MonitorRepository:
         configuration = load_configuration(RepositoryConfigurationPaths(mapping.repository_path, mapping.repo_id),
                                            validate_directory=False)
         result = replace(result, exchange=None if configuration.exchange_directory is None else str(configuration.exchange_directory),
-                         archive=configuration.archive_directory)
+                         archive=configuration.archive_directory, configuration_status='ok')
+    except (PatchHarborError, OSError, ValueError, RuntimeError) as exc:
+        return replace(result, configuration_status='invalid', error=str(exc))
+    try:
         if not include_state:
             return result
         with safe_git_queries():

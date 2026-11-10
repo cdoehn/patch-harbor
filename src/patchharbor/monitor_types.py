@@ -25,6 +25,7 @@ class MonitorRepository:
     exchange: str | None = None
     archive: str | None = None
     error: str | None = None
+    configuration_status: str = 'unknown'
 
 
 @dataclass(frozen=True, slots=True)

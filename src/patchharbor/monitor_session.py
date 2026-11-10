@@ -17,6 +17,9 @@ class MonitorSession:
     selections: dict[str, str] = field(default_factory=dict)
     offsets: dict[str, int] = field(default_factory=dict)
     descending: bool = False
+    full_identifiers: bool = False
+    show_git: bool = False
+    live_focus_id: str | None = None
 
     def repositories(self, document):
         return sorted((r for r in document.get('repositories', [])
@@ -39,6 +42,7 @@ class MonitorSession:
             if selected:
                 index = max(0, min(len(rows) - 1, rows.index(selected) + delta))
                 self.selections['live:' + str(self.repository_id)] = rows[index]['instance_id']
+                self.live_focus_id = rows[index]['instance_id']
             return
         if self.focus == 'details' and self.view in ('bundles', 'history'):
             rows = self.artifacts(document)
@@ -51,6 +55,7 @@ class MonitorSession:
             self.offsets[self.view] = max(0, self.offsets.get(self.view, 0) + delta)
             return
         rows = self.repositories(document)
+        self.live_focus_id = None
         selected = self.selected(document)
         if selected:
             index = rows.index(selected)
@@ -76,14 +81,15 @@ class MonitorSession:
     def live_instances(self, document):
         self.selected(document)
         return sorted((r for r in document.get('live_view', {}).get('instances', [])
-                       if r['kind'] == 'watcher' or not self.repository_id
+                       if r['instance_id'] == self.live_focus_id or r['kind'] == 'watcher' or not self.repository_id
                        or r.get('data', {}).get('repo_id') in (None, self.repository_id)),
                       key=lambda r: (r.get('live', False), r['updated_at']), reverse=True)
 
     def selected_live(self, document):
         rows = self.live_instances(document)
         key = 'live:' + str(self.repository_id)
-        selected = next((r for r in rows if r['instance_id'] == self.selections.get(key)), rows[0] if rows else None)
+        identity = self.live_focus_id or self.selections.get(key)
+        selected = next((r for r in rows if r['instance_id'] == identity), rows[0] if rows else None)
         if selected:
             self.selections[key] = selected['instance_id']
         return selected

@@ -824,8 +824,22 @@ read-only Exchange facts for one registered ID/path. `api.monitor_log(path,
 expected_sha256=...)` reads a bounded log from exactly that validated Result.
 Both return JSON-compatible dictionaries and never acquire execution locks.
 
-`api.monitor_live(instance_id=None)` reads optional version-1 watcher/Apply
+`api.monitor_overview(repository)` returns a compact, read-only summary using
+the same native artifact checks: candidate, latest retained Apply Result,
+per-repository counts, observation timestamp, errors and completeness. It never
+reserves a candidate. Result ordering uses the validated run's end timestamp;
+an incomplete inventory cannot prove the absence of eligible patches.
+
+`api.monitor_live(instance_id=None)` reads optional version-1/2 watcher/Apply
 observations. A canonical instance ID requests that instance's bounded log tail.
 `api.watcher_observation()` creates a best-effort publisher for a watcher; call
 `update(phase=..., **facts)` with observed facts and `close()` on exit. Each
 Apply request publishes independently through the existing application boundary.
+Version 2 also observes manual Git-mode Result-bundle capture and retains up to
+32 preceding activity records plus the current activity. Optional
+`activity_code`, `activity_status` and `activity_message` keywords to `update`
+publish factual transitions. The closed schema validates ordered sequences,
+timestamps, statuses and size bounds; the reader preserves version-1 support.
+Apply data may include `entrypoint_name` and an unambiguous declared
+`bundle_number`. These are display metadata; full hashes and bindings still
+govern identity and all Core decisions.

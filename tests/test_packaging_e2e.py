@@ -25,12 +25,17 @@ from tests.registration_support import isolated_user_environment
 
 pytestmark = pytest.mark.packaging
 
-MAX_WHEEL_BYTES = 432 * 1024  # Export + monitor (measured 429657 B); runtime resource limits unchanged.
+MAX_WHEEL_BYTES = 448 * 1024  # Operational monitor/history (measured 444591 B); runtime limits unchanged.
 RELEASE_VERSION = "1.8.0"
 EXPECTED_RUNTIME_FILES = {
     'patchharbor/application_monitor.py',
     'patchharbor/application_monitor_artifacts.py',
     'patchharbor/cli_monitor.py',
+    'patchharbor/monitor_activity.py',
+    'patchharbor/monitor_format.py',
+    'patchharbor/monitor_overview.py',
+    'patchharbor/monitor_status.py',
+    'patchharbor/monitor_timeline.py',
     'patchharbor/monitor_artifact_display.py',
     'patchharbor/monitor_artifact_facts.py',
     'patchharbor/monitor_details.py',

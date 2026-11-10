@@ -33,7 +33,7 @@ def monitor_artifacts(repository, *, include_archive=False):
         result['errors'] = list(snapshot.errors) or ['select one registered repository']
         return result
     repo = snapshot.repositories[0]
-    result.update(repo_id=repo.repo_id, repository_path=repo.path, exchange=repo.exchange)
+    result.update(repo_id=repo.repo_id, repository_path=repo.path, exchange=repo.exchange, repository_error=repo.error)
     if not repo.exchange:
         result['errors'] = [repo.error or 'no configured Exchange']
         return result
@@ -141,3 +141,22 @@ def monitor_artifacts(repository, *, include_archive=False):
                 and r.get('patch_sha256') == row['sha256'] and r.get('expected') == row['expected']
                 and not r['error'] for r in rows)
     return result
+
+
+def monitor_overview(repository):
+    """Small per-repository summary using the exact native candidate proof."""
+    view = monitor_artifacts(repository)
+    rows = view['artifacts']
+    own = [r for r in rows if r.get('repo_id') == view.get('repo_id')]
+    outcomes = [r for r in own if r['kind'] == 'result_bundle' and r.get('operation') == 'apply'
+                and not r.get('dry_run') and not r.get('error')]
+    outcomes.sort(key=lambda r: (r.get('ended_at', ''), r['run_id']), reverse=True)
+    candidate = next((r for r in own if r['path'] == view['selected_candidate']), None)
+    return {**{k: view.get(k) for k in ('observed_at', 'repo_id', 'repository_path', 'exchange',
+                                      'errors', 'incomplete', 'stale', 'repository_error')},
+            'kind': 'patchharbor-monitor-overview', 'format_version': 1,
+            'candidate': candidate, 'latest_result': outcomes[0] if outcomes else None,
+            'history_complete': False,
+            'eligible_count': sum(r.get('eligibility', '').startswith('eligible') for r in own),
+            'patch_count': sum(r['kind'] == 'patch_package' for r in own),
+            'unreadable_count': sum(bool(r.get('error')) for r in rows)}
