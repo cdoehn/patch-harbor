@@ -10,7 +10,7 @@ import pytest
 import patchharbor.application as script_application
 import patchharbor.temporary_resources as temporary_resources
 from patchharbor.application import run_script_path
-from patchharbor.bundles import resolve_patch_bundle
+from patchharbor.bundles import resolve_script_bundle
 from patchharbor.exit_status import ExitCode, exit_code_for_error
 from patchharbor.errors import PatchHarborError
 from patchharbor.output import OutputTargets
@@ -25,12 +25,12 @@ def test_file_and_stdin_resolve_through_the_same_bundle_semantics(
     script_path = tmp_path / "example.sh"
     script_path.write_bytes(script_text.encode("utf-8"))
 
-    file_bundle = resolve_patch_bundle(file_input_artifact(script_path))
+    file_bundle = resolve_script_bundle(file_input_artifact(script_path))
 
     with stdin_input_artifact(StringIO(script_text)) as stdin_artifact:
         temporary_path = stdin_artifact.path
         assert temporary_path.exists()
-        stdin_bundle = resolve_patch_bundle(stdin_artifact)
+        stdin_bundle = resolve_script_bundle(stdin_artifact)
 
     assert not temporary_path.exists()
     assert len(file_bundle.scripts) == 1
@@ -54,7 +54,7 @@ def test_direct_file_resolution_rejects_hard_budget(
     )
 
     with pytest.raises(PatchHarborError) as raised:
-        resolve_patch_bundle(file_input_artifact(source), policy=policy)
+        resolve_script_bundle(file_input_artifact(source), policy=policy)
 
     assert exit_code_for_error(raised.value) is ExitCode.SOURCE_ERROR
     assert "resource limit exceeded" in str(raised.value)
@@ -147,7 +147,7 @@ def test_direct_reader_rechecks_budget_after_artifact_creation(
     )
 
     with pytest.raises(PatchHarborError) as raised:
-        resolve_patch_bundle(artifact, policy=policy)
+        resolve_script_bundle(artifact, policy=policy)
 
     assert exit_code_for_error(raised.value) is ExitCode.SOURCE_ERROR
     assert "resource limit exceeded" in str(raised.value)

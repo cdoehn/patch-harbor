@@ -42,7 +42,7 @@ assert all(hasattr(api, name) for name in api.__all__)
 
 
 @pytest.mark.parametrize("timeout", [0, -1, float("nan"), float("inf"), -float("inf")])
-@pytest.mark.parametrize("method", [api.apply, api.apply_next, api.run])
+@pytest.mark.parametrize("method", [api.apply, api.apply_next, api.run_scripts])
 def test_nonfinite_or_nonpositive_timeout_is_rejected_before_core(
     timeout: float, method, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -51,7 +51,7 @@ def test_nonfinite_or_nonpositive_timeout_is_rejected_before_core(
     monkeypatch.setattr(application, "run_apply_path", forbidden)
     monkeypatch.setattr(application, "run_script_path", forbidden)
     with pytest.raises(ValueError):
-        if method is api.run:
+        if method is api.run_scripts:
             method("source.sh", timeout=timeout)
         else:
             method(timeout=timeout)
@@ -187,7 +187,7 @@ def test_relative_source_uses_explicit_cwd_without_chdir(monkeypatch, tmp_path) 
         observed.append((path, kwargs))
         return 124
     monkeypatch.setattr(application, "run_script_path", fake)
-    result = api.run("job.sh", cwd=tmp_path)
+    result = api.run_scripts("job.sh", cwd=tmp_path)
     assert observed[-1][0] == tmp_path / "job.sh"
     assert observed[-1][1]["cwd"] == tmp_path
     assert Path.cwd() == before
@@ -202,8 +202,8 @@ def test_explicit_stream_uses_same_application_runner(monkeypatch, tmp_path) -> 
         seen.append((source, kwargs))
         return 0
     monkeypatch.setattr(application, "run_standard_input", fake)
-    result = api.run(stream, cwd=tmp_path)
+    result = api.run_scripts(stream, cwd=tmp_path)
     assert result.success and seen[0][0] is stream
     assert not stream.closed
     with pytest.raises(TypeError):
-        api.run(None)
+        api.run_scripts(None)

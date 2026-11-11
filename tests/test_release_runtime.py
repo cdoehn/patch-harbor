@@ -54,9 +54,33 @@ def test_incomplete_or_conflicting_assets_are_rejected(candidate,fault):
     with pytest.raises(ValueError):assets.verify_assets(c.root,c.version,COMMIT)
 
 
-@pytest.mark.parametrize('value',['1.8','v1.8.0','../1.8.0','1.8.0\n','1.8.0;run',None])
+@pytest.mark.parametrize('value',['1.8','v1.8.0','../1.8.0','1.8.0\n','1.8.0;run',None,
+                                 '2.0.0.dev0','2.0.0.dev17','2.0.0rc1'])
 def test_release_version_cannot_select_paths_or_commands(value):
     with pytest.raises(ValueError):assets.names(value)
+
+
+@pytest.mark.parametrize('value',['../2.0.0.dev0','2.0.0.dev0/other','2.0.0.dev0\n',
+                                 '2.0.0.dev0;run','2.0.0.dev','2.0.0.dev-1',None])
+def test_invalid_distribution_version_stops_before_io(tmp_path,monkeypatch,value):
+    workspace=tmp_path/'installation'
+    monkeypatch.setattr(assets,'run',lambda *a:pytest.fail('invalid version reached process execution'))
+    with pytest.raises(ValueError):
+        assets.verify_distributions(tmp_path/'absent-artifacts',value,workspace)
+    assert not workspace.exists()
+
+
+@pytest.mark.parametrize('operation',['prepare','publish'])
+def test_development_version_cannot_enter_release_pipeline(tmp_path,monkeypatch,operation):
+    monkeypatch.setattr(release,'github',lambda *a,**k:pytest.fail('development release reached GitHub'))
+    monkeypatch.setattr(release.subprocess,'check_output',lambda *a,**k:pytest.fail('development release reached Git'))
+    output,workspace=tmp_path/'assets',tmp_path/'work'
+    with pytest.raises(ValueError):
+        if operation=='prepare':
+            release.prepare('2.0.0.dev0',COMMIT,output,workspace)
+        else:
+            release.publish('2.0.0.dev0',COMMIT,123,output,workspace)
+    assert not output.exists() and not workspace.exists()
 
 
 def test_exact_commit_ci_and_every_lane_required(monkeypatch):

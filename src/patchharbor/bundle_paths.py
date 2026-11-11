@@ -1,4 +1,4 @@
-"""Portable validation for relative paths stored in ZIP PatchBundles."""
+"""Portable validation for relative paths stored in ZIP bundles."""
 
 from __future__ import annotations
 

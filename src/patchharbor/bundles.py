@@ -9,7 +9,7 @@ from patchharbor.models import (
     BundlePayload,
     BundleScript,
     InputArtifact,
-    PatchBundle,
+    ScriptBundle,
 )
 from patchharbor.parser import ScriptFormatError, validate_required_marker
 from patchharbor.platform.errors import describe_os_error
@@ -51,7 +51,7 @@ def _invalid_zip_bundle(
     artifact: InputArtifact,
     detail: object,
 ) -> PatchHarborError:
-    return _zip_source_error(artifact, f"invalid PatchBundle ({detail})")
+    return _zip_source_error(artifact, f"invalid ScriptBundle ({detail})")
 
 
 def _zip_limit_error(
@@ -188,11 +188,11 @@ def _resolve_zip_bundle(
     policy: ResourcePolicy,
     artifact_warnings: tuple[str, ...],
     raw_payloads: tuple[BundlePayload, ...],
-) -> PatchBundle:
+) -> ScriptBundle:
     scripts, payloads = _classify_zip_payloads(raw_payloads)
     if not scripts:
         raise _no_valid_zip_script(artifact)
-    return PatchBundle(
+    return ScriptBundle(
         scripts=scripts,
         payloads=payloads,
         warnings=(
@@ -202,12 +202,12 @@ def _resolve_zip_bundle(
     )
 
 
-def resolve_patch_bundle(
+def resolve_script_bundle(
     artifact: InputArtifact,
     *,
     policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY,
-) -> PatchBundle:
-    """Resolve one source-neutral artifact to an ordered PatchBundle."""
+) -> ScriptBundle:
+    """Resolve one source-neutral artifact to an ordered ScriptBundle."""
     activity("IDENTIFY", f"Check input size and ZIP content: {artifact.display_name}")
     artifact_warnings = _artifact_warnings(artifact, policy)
     raw_payloads = _read_zip_payloads(artifact, policy)
@@ -226,7 +226,7 @@ def resolve_patch_bundle(
     )
     if direct_script is not None:
         activity("SCRIPT", f"Validated direct script: {artifact.display_name}", "success")
-        return PatchBundle(
+        return ScriptBundle(
             scripts=(direct_script,),
             warnings=artifact_warnings,
         )

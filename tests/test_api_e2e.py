@@ -185,7 +185,7 @@ def test_fs_runner_accepts_stream_directory_selector_and_never_prompts(tmp_path,
     cwd.mkdir()
     body = native_script("exit 0", "exit 0")
     stream = StringIO(body)
-    assert api.run(stream, cwd=cwd).success
+    assert api.run_scripts(stream, cwd=cwd).success
     assert not stream.closed
     directory = tmp_path / "scripts"
     directory.mkdir()
@@ -194,16 +194,16 @@ def test_fs_runner_accepts_stream_directory_selector_and_never_prompts(tmp_path,
     first.write_text(body, encoding="utf-8")
     second.write_text(native_script("exit 17", "exit 17"), encoding="utf-8")
     with pytest.raises(api.PatchHarborError) as caught:
-        api.run(directory, cwd=cwd)
+        api.run_scripts(directory, cwd=cwd)
     assert caught.value.reason is api.FailureReason.USAGE_ERROR
-    result = api.run(directory, cwd=cwd,
+    result = api.run_scripts(directory, cwd=cwd,
                      select_candidate=lambda candidates: next(c for c in candidates if c.path == first))
     assert result.success
     selected = api.DirectoryCandidate(cwd / "unoffered.sh", 0)
     with pytest.raises(api.PatchHarborError) as caught:
-        api.run(directory, cwd=cwd, select_candidate=lambda candidates: selected)
+        api.run_scripts(directory, cwd=cwd, select_candidate=lambda candidates: selected)
     assert caught.value.reason is api.FailureReason.USAGE_ERROR
-    result = api.run(second, cwd=cwd)
+    result = api.run_scripts(second, cwd=cwd)
     assert not result.success and result.exit_code == 17
     assert not any(cwd.iterdir())
     captured = capfd.readouterr()

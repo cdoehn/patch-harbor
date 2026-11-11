@@ -1,4 +1,4 @@
-"""Release-only checks of actual built bytes; no publication and no second PYZ builder."""
+"""Check built distributions and stable release assets without publishing them."""
 from __future__ import annotations
 
 from hashlib import sha256
@@ -17,11 +17,18 @@ def require(value, message):
         raise ValueError(message)
 
 
+def distribution_names(version):
+    """Name local stable or development builds without granting release eligibility."""
+    require(isinstance(version, str) and re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+(?:\.dev[0-9]+)?', version),
+            'distribution verification requires a stable or development package version')
+    return (f'patchharbor-{version}.pyz', f'patchharbor-{version}-py3-none-any.whl',
+            f'patchharbor-{version}.tar.gz')
+
+
 def names(version):
     require(isinstance(version, str) and re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+', version),
             'release requires an explicit stable package version')
-    return (f'patchharbor-{version}.pyz', f'patchharbor-{version}-py3-none-any.whl',
-            f'patchharbor-{version}.tar.gz', 'runtime-manifest.json', 'SHA256SUMS')
+    return (*distribution_names(version), 'runtime-manifest.json', 'SHA256SUMS')
 
 
 def run(command, cwd, env=None):
@@ -77,7 +84,7 @@ print(json.dumps({'runtime': facts, 'capabilities': asdict(api.integration_capab
 
 def verify_distributions(directory: Path, version: str, workspace: Path) -> dict:
     """Install actual wheel and sdist offline; exercise the public API and CLI."""
-    pyz_name, wheel_name, sdist_name, _, _ = names(version)
+    pyz_name, wheel_name, sdist_name = distribution_names(version)
     directory = directory.resolve()
     workspace.mkdir(parents=True, exist_ok=False)
     pyz, wheel, sdist = (directory/n for n in (pyz_name, wheel_name, sdist_name))

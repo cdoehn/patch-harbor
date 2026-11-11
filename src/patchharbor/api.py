@@ -1,7 +1,8 @@
 """Synchronous Python facade for PatchHarbor (public since 1.2.0).
 
 Import with ``from patchharbor import api``. Library requests are silent unless
-an observer or output sinks are supplied. No CLI invocation, process-wide chdir,
+an observer or output sinks are supplied; the deprecated ``run_scripts`` also
+emits a caller-local FutureWarning. No CLI invocation, process-wide chdir,
 implicit stdin, sys.exit, signal-handler installation or console rendering occurs
 here. Git and trusted entrypoint subprocesses are still run by the existing Core.
 
@@ -39,6 +40,7 @@ from patchharbor.api_types import (
     AutomaticApplyStatus, ExchangeWatchTarget, WatchControlPaths, WatchTargets,
 )
 from patchharbor.errors import ErrorKind, FailureReason, PatchHarborError
+from patchharbor.script_deprecation import warn_script_api as _warn_script_api
 from patchharbor.output import OutputTargets as _OutputTargets
 from patchharbor.progress import observe_activity as _observe_activity
 from patchharbor.safe_export_types import capture_mode as _capture_mode, supported_host as _safe_host
@@ -64,7 +66,7 @@ __all__ = [
     "RunReport", "RunTiming", "RunToolError", "ScriptPrepared", "ScriptResult",
     "UnregisterResult", "apply", "apply_next", "bundle", "configure_archive_directory",
     "configure_bundle_suffix", "configure_exchange_directory", "configuration",
-    "context", "dry_run", "register", "repositories", "run", "unregister",
+    "context", "dry_run", "register", "repositories", "run_scripts", "unregister",
     "PatchEntry", "PatchEntryRole", "PatchInspection", "PatchManifest", "PatchMessage",
     "PatchValidationResult", "PatchValidationScope", "ReferenceContext", "inspect_patch", "validate_patch",
     "ApplyLock", "ApplyLockKind", "ApplyReadiness", "AutomaticApplyResult",
@@ -485,19 +487,23 @@ errors still raise PatchHarborError. Clients must reenter normal Apply gates.
         return _application.apply_readiness(lock)
 
 
-def run(
+def run_scripts(
     source: PathInput | TextIO, *, cwd: PathInput = ".",
     timeout: float = DEFAULT_TIMEOUT_SECONDS,
     select_candidate: CandidateSelector | None = None,
     output: OutputStreams | None = None, observer: ProgressObserver | None = None,
 ) -> ScriptResult:
-    """Execute the legacy fs-run path: script, ZIP, directory or explicit stream.
+    """Deprecated independent runner: script, ScriptBundle, directory or stream.
+
+Emits FutureWarning at the caller. Prefer a repository-bound Task Bundle;
+this independent path does not provide repository binding or a Result Bundle.
 
 A directory with several candidates requires the caller's selector; the library
 never prompts. For a relative source path, cwd is its base as well as the child's
 working directory. Streams stay caller-owned. Tool failures raise PatchHarborError;
 normal nonzero script exits are returned as ScriptResult(success=False).
     """
+    _warn_script_api()
     directory = _path(cwd, "cwd").absolute()
     seconds, targets = _timeout(timeout), _output(output)
     actual_observer = _observer(observer)

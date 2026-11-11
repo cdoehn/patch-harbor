@@ -183,7 +183,7 @@ def test_zip_rejects_unsafe_member_paths_before_execution(
         _run_path(archive_path, tmp_path)
 
     assert exit_code_for_error(raised.value) is ExitCode.SOURCE_ERROR
-    assert "invalid PatchBundle" in str(raised.value)
+    assert "invalid ScriptBundle" in str(raised.value)
     assert executed == []
     assert not (tmp_path / "safe.bin").exists()
 
@@ -211,7 +211,7 @@ def test_zip_rejects_original_backslash_name_after_host_normalization(
         _run_path(archive_path, tmp_path)
 
     assert exit_code_for_error(raised.value) is ExitCode.SOURCE_ERROR
-    assert "invalid PatchBundle" in str(raised.value)
+    assert "invalid ScriptBundle" in str(raised.value)
 
 
 @pytest.mark.parametrize(
@@ -241,7 +241,7 @@ def test_zip_rejects_duplicate_and_ambiguous_member_trees(
         _run_path(archive_path, tmp_path)
 
     assert exit_code_for_error(raised.value) is ExitCode.SOURCE_ERROR
-    assert "invalid PatchBundle" in str(raised.value)
+    assert "invalid ScriptBundle" in str(raised.value)
 
 
 def test_bundle_write_failure_prevents_every_script_execution(
@@ -456,7 +456,7 @@ def test_zip_large_entry_warning_is_preserved_on_bundle(
         max_zip_total_bytes=2048,
     )
 
-    bundle = script_bundles.resolve_patch_bundle(
+    bundle = script_bundles.resolve_script_bundle(
         file_input_artifact(archive_path),
         policy=policy,
     )
@@ -556,7 +556,7 @@ def test_zip_bundle_preserves_script_entry_names_for_presentation(
         ],
     )
 
-    bundle = script_bundles.resolve_patch_bundle(
+    bundle = script_bundles.resolve_script_bundle(
         file_input_artifact(archive_path)
     )
 

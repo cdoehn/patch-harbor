@@ -34,7 +34,7 @@ class BundlePayload:
 
 
 @dataclass(frozen=True)
-class PatchBundle:
+class ScriptBundle:
     """Ordered scripts plus files made available before execution."""
 
     scripts: tuple[BundleScript, ...]

@@ -1034,26 +1034,32 @@ verdrängen. Ein im Plan ausdrücklich als gemeinsam geltend erklärter
 Spezifikationssatz wird vollständig gelesen; seine Bestandteile sind keine
 konkurrierenden Alternativen. Echte unaufgelöste Konkurrenz bleibt ein STOP.
 
-Für die Entwicklung von **PatchHarbor selbst** gilt seit dem ausdrücklichen
-Folgeauftrag für Version 1.6.0 der Integrationsplan für öffentliche Snapshots
-und gebundene Hostfreigabe:
+Für die Entwicklung von **PatchHarbor selbst** gilt der ausdrücklich
+beauftragte 2.0.0-WRC-Plan:
 
 ```text
-Plan: planning/specroad-integration/commit-plan.md
+Plan: planning/2.0.0/commit-plan.md
+Detail: planning/2.0.0/test-profiling.md
 Normsatz: spec/SPECIFICATION.md
-          spec/SPECIFICATION_EXTENSION_PYZ_PACK.md (Revision 8)
-          spec/SPECIFICATION_EXTENSION_CPYTHON_310_311.md (Revision 5)
+          spec/SPECIFICATION_EXTENSION_PYZ_PACK.md
+          spec/SPECIFICATION_EXTENSION_CPYTHON_310_311.md
 ```
 
-Die drei Normdateien bleiben getrennt. Der neue Auftrag ergänzt gezielt die
-öffentlichen Integrationsverträge; er ist kein Teil des abgeschlossenen
-Refactoring-Umfangs. Dessen Bereinigung der Altformatpflichten bleibt erhalten. Gültige 1.4.0-Artefakte bleiben die Basis
-zukünftiger Abwärtskompatibilität; Patchformat 1 bleibt erhalten. RF-06 hat
-Result-1/2-Leser und Runtime-Wheel-Pfade entfernt. RF-07 erzeugt den ausführbaren
-Bootstrapblock aus genau einer gepflegten Quelle; nicht manuell im Block ändern.
-Fortschritt und offene Abnahmen stehen im Integrationsplan. Die neue
-Quellversion ist 1.6.0; die Kompatibilitätsbasis bleibt 1.4.0. Die aktuellen
-Testregeln und tatsächlichen Apply-Nachweise stehen weiter unten.
+Aktueller vorbereiteter Schritt ist `200-01.W` / Bundle 088. Er benennt den
+ungebundenen Skripttyp in `ScriptBundle` und dessen API in `run_scripts` um;
+`api.run` entfällt ohne Alias. `fs run` und `run_scripts` sind deprecated.
+Quellversion `2.0.0.dev0` bezeichnet keinen produktiven Zwischenrelease.
+Der repositorygebundene Task-/Execute-/Result-Wechsel folgt erst in `200-02`;
+für diese erste Übergabe bleiben Patchformat 1, Resultformat 3 und die vorhandene
+native Pack-/Apply-Grenze maßgeblich. Eine neue Produktversion darf nicht
+vortäuschen, dass die folgenden Planfähigkeiten schon implementiert sind.
+
+Python-API-Rückwärtskompatibilität ist ausdrücklich nicht verlangt. Die im Plan
+vorgesehenen CLI-Ausnahmen sind davon getrennt. Profiling startet später nur
+per lokalem Befehl; SQLite, Profile und Traces bleiben lokal. Vorbereitung,
+Testkörper und Aufräumen sind getrennt zu messen. Bestehende Sicherheits- und
+Testregeln bleiben erhalten. Tatsächlicher Fortschritt wird ausschließlich aus
+den Resultnachweisen abgeleitet. Frühere SRI-/SAFE-/Releasepläne bleiben Historie.
 
 Der frühere PYZ/PACK-Plan ist mit 16/16 Positionen, Korrektur 046 und grüner
 manueller CI auf `30e5de1d67a2d725ff192a0b97e50c2b0336bfcb` abgeschlossen.

@@ -31,8 +31,8 @@ class RoutedToApi(RuntimeError):
     (["apply", "--json", "some.zip"], "apply"),
     (["apply", "--dry-run", "--json"], "apply"),
     (["apply", "--json", "--automatic"], "apply_next"),
-    (["fs", "run", "script.sh"], "run"),
-    (["fs", "run"], "run"),
+    (["fs", "run", "script.sh"], "run_scripts"),
+    (["fs", "run"], "run_scripts"),
 ])
 def test_every_cli_operation_uses_public_api(monkeypatch, arguments, function) -> None:
     observed = []

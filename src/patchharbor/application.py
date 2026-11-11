@@ -17,7 +17,7 @@ from patchharbor.progress import (
     activity,
     emit,
 )
-from patchharbor.bundles import resolve_patch_bundle
+from patchharbor.bundles import resolve_script_bundle
 from patchharbor.configuration import RepositoryConfiguration
 from patchharbor.errors import FailureReason, PatchHarborError
 from patchharbor.execution import DEFAULT_TIMEOUT_SECONDS, execute_script_text
@@ -124,7 +124,7 @@ def run_input_artifact(
     resource_policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY,
 ) -> int:
     """Resolve and execute every script in one input artifact."""
-    bundle = resolve_patch_bundle(artifact, policy=resource_policy)
+    bundle = resolve_script_bundle(artifact, policy=resource_policy)
     emit(RequestStarted(
         source_name=artifact.display_name,
         files=tuple(PackageFile(payload.relative_path, len(payload.content), "bundle")
@@ -174,7 +174,7 @@ def _is_directory_candidate(
     resource_policy: ResourcePolicy,
 ) -> bool:
     try:
-        resolve_patch_bundle(
+        resolve_script_bundle(
             file_input_artifact(path),
             policy=resource_policy,
         )
@@ -190,7 +190,7 @@ def discover_directory_candidates(
     *,
     resource_policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY,
 ) -> tuple[DirectoryCandidate, ...]:
-    """Return sorted regular files that resolve to a PatchBundle."""
+    """Return sorted regular files that resolve to a ScriptBundle."""
     return tuple(
         candidate
         for candidate in list_directory_entries(directory)

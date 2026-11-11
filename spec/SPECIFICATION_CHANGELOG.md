@@ -1,5 +1,21 @@
 # PatchHarbor – Spezifikations-Changelog
 
+## 2026-11-11 – 200-01.W / Bundle 088: ScriptBundle und 2.0.0-Entwicklung
+
+- Aktiver W/R/C-Plan für 2.0.0 mit 36 echten Commitpositionen; dieser erste
+  Stand bereitet genau Position 1 vor. Tatsächlicher Apply und Commit sind offen.
+- Der generische Skriptcontainer heißt `ScriptBundle`, der Resolver
+  `resolve_script_bundle`. Die Python-API bietet `run_scripts` ohne `run`-Alias.
+- Der eigenständige Runner bleibt deprecated: CLI-Hinweis auf dem übergebenen
+  stderr, direkter Python-Aufruf mit `FutureWarning` beim Aufrufer. Reihenfolge,
+  Payloads, Exitcodes und bestehende Sicherheitsgrenzen bleiben erhalten.
+- Entwicklungskennung `2.0.0.dev0`, keine Zwischenreleases und keine
+  API-Rückwärtskompatibilität. Der Task-/Execute-Protokollwechsel folgt in 200-02.
+- Profiling wird später ausschließlich durch einen lokalen Befehl gestartet;
+  lokale Datensammlung und getrennte Vorbereitungs-/Test-/Abbauzeiten sind geplant.
+- Development prüft ausgewählt parallel; der Entrypoint verlangt die gesamte
+  parallele Suite vor seinem einzigen Commit und abschließenden normalen Push.
+
 ## 2026-10-31 – REL-180: öffentlicher Runtime-Export und vollständige Releases
 
 +- Version 1.8.0, öffentliche CLI/API und dauerhafter Vertrag in Hauptspec §44.

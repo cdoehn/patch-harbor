@@ -149,7 +149,7 @@ def test_keyboard_interrupt_returns_130(
     ) -> int:
         raise KeyboardInterrupt
 
-    monkeypatch.setattr(cli.api, "run", fake_run_script_path)
+    monkeypatch.setattr(cli.api, "run_scripts", fake_run_script_path)
 
     result = main(
         ["fs", "run", "--no-color", str(tmp_path / "script.sh")],
@@ -159,7 +159,7 @@ def test_keyboard_interrupt_returns_130(
     )
 
     assert result == 130
-    assert stderr.getvalue() == ""
+    assert stderr.getvalue()  # the deprecated runner reports its notice on stderr
 
 
 def test_unexpected_application_exception_propagates(
@@ -174,7 +174,7 @@ def test_unexpected_application_exception_propagates(
     ) -> int:
         raise RuntimeError("unexpected")
 
-    monkeypatch.setattr(cli.api, "run", fake_run_script_path)
+    monkeypatch.setattr(cli.api, "run_scripts", fake_run_script_path)
 
     with pytest.raises(RuntimeError, match="unexpected"):
         main(
@@ -197,7 +197,7 @@ def test_output_os_error_returns_execution_error(
     ) -> int:
         raise PermissionError("native platform wording")
 
-    monkeypatch.setattr(cli.api, "run", fake_run_script_path)
+    monkeypatch.setattr(cli.api, "run_scripts", fake_run_script_path)
 
     result = main(
         ["fs", "run", "--plain", str(tmp_path / "script.sh")],

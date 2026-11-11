@@ -9,6 +9,7 @@ from typing import TextIO
 import patchharbor.api as api
 from patchharbor.errors import format_tool_message
 from patchharbor.exit_status import ExitCode
+from patchharbor.script_deprecation import script_cli_notice
 from patchharbor.cli_parser import (
     _build_parser,
 )
@@ -150,10 +151,11 @@ def main(
         )
 
     if args.command == "fs" and args.fs_command == "run":
-        return _run_command(
-            args.path, args.timeout, log_enabled=args.log, parser=parser,
-            stdin=actual_stdin, **presentation,
-        )
+        with script_cli_notice(actual_stderr):
+            return _run_command(
+                args.path, args.timeout, log_enabled=args.log, parser=parser,
+                stdin=actual_stdin, **presentation,
+            )
 
     parser.error("unsupported command")
 

@@ -1,4 +1,13 @@
-# PatchHarbor 1.9.1
+# PatchHarbor 2.0.0 development
+
+The active [2.0.0 WRC plan](planning/2.0.0/commit-plan.md) starts with
+`200-01.W`: the independent script/ZIP model is `ScriptBundle`, and its Python
+entrypoint is `api.run_scripts`. The old `api.run` name is removed. This script
+path and `fs run` are deprecated; they retain their execution semantics.
+This source is `2.0.0.dev0`, an unpublished development state. The Task/Execute/
+Result protocol switch follows in `200-02`; the repository commands below still
+describe the currently implemented protocol. The latest published baseline is
+1.9.1. These intermediate states are not intended for production use.
 
 **A bridge between AI coding assistants and local Git repositories.**
 
@@ -28,7 +37,7 @@ It bridges these separate environments using verified ZIP packages, allowing AI 
 - `runtime export` supplies the installed canonical Core-PYZ without a Result or Git.
 - CLI and Python integrations share the same public API.
 
-This source uses version **1.9.1**. Its [monitor](docs/monitor.md) shows live
+The existing [monitor](docs/monitor.md) shows live
 watcher activity, operational repository states, readable times and switchable
 short/full identifiers. It retains the public
 `patchharbor runtime export --output-dir ...` command and `api.export_runtime`.
@@ -36,7 +45,7 @@ Every official build emits the canonical Core-PYZ alongside wheel and sdist;
 complete releases include these files, a runtime manifest and checksums.
 See [runtime export and direct library use](docs/runtime-export.md),
 [the release procedure](docs/release-runtime.md) and
-[the 1.9.1 release plan](planning/1.9.1/commit-plan.md).
+[the historical 1.9.1 release plan](planning/1.9.1/commit-plan.md).
 The existing [safe reference export](docs/safe-reference-integration.md) and
 public integration contracts remain unchanged. Safe export remains limited to
 Linux x86-64 with CPython 3.10–3.14.

@@ -1,4 +1,4 @@
-"""Compatibility of the public Python contract, not console presentation."""
+"""Current public Python contract, not console presentation."""
 from __future__ import annotations
 
 from dataclasses import fields, is_dataclass
@@ -25,7 +25,7 @@ OPERATIONS = {
     "apply": ("patch",),
     "dry_run": ("patch",),
     "apply_next": (),
-    "run": ("source",),
+    "run_scripts": ("source",),
 }
 PUBLIC_TYPES = {
     "ActivityEvent", "BundleResult", "CandidateSelector", "ConfigurationResult",
@@ -39,7 +39,7 @@ PUBLIC_TYPES = {
 }
 
 
-def test_v120_exports_remain_available_with_compatible_additions_allowed() -> None:
+def test_current_public_exports_are_available() -> None:
     required = set(OPERATIONS) | PUBLIC_TYPES | {"DEFAULT_TIMEOUT_SECONDS"}
     assert required <= set(api.__all__)
     assert len(api.__all__) == len(set(api.__all__))
@@ -65,13 +65,13 @@ def test_public_operation_call_shapes_and_annotations(name, positional) -> None:
 
 
 def test_execution_and_configuration_defaults_are_explicit_and_stable() -> None:
-    for function in (api.apply, api.apply_next, api.run):
+    for function in (api.apply, api.apply_next, api.run_scripts):
         parameters = inspect.signature(function).parameters
         assert parameters["timeout"].default == api.DEFAULT_TIMEOUT_SECONDS
         assert parameters["output"].default is None
     assert inspect.signature(api.configuration).parameters["revalidate"].default is False
     assert inspect.signature(api.apply).parameters["repository"].default is None
-    assert inspect.signature(api.run).parameters["select_candidate"].default is None
+    assert inspect.signature(api.run_scripts).parameters["select_candidate"].default is None
     assert inspect.signature(api.dry_run).parameters["output"].default is None
 
 

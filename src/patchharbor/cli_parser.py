@@ -407,12 +407,12 @@ def _add_fs_commands(commands) -> None:
     run_parser = fs_commands.add_parser(
         "run",
         help=(
-            "run scripts from a file, ZIP PatchBundle, directory, "
+            "deprecated: run scripts from a file, ZIP ScriptBundle, directory, "
             "or standard input"
         ),
         description=(
-            "Run generated Bash or PowerShell scripts from a file, "
-            "ZIP PatchBundle, directory, or standard input."
+            "Deprecated: run generated Bash or PowerShell scripts from a file, "
+            "ZIP ScriptBundle, directory, or standard input."
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
@@ -421,16 +421,16 @@ def _add_fs_commands(commands) -> None:
             "'# PATCHHARBOR'.\n"
             "\n"
             "Input behavior:\n"
-            "  PATH may name one script, a ZIP PatchBundle, or a "
+            "  PATH may name one script, a ZIP ScriptBundle, or a "
             "directory.\n"
-            "  Omit PATH to read one script or ZIP PatchBundle from "
+            "  Omit PATH to read one script or ZIP ScriptBundle from "
             "standard input.\n"
-            "  ZIP PatchBundles may contain ordered scripts and byte-exact "
+            "  ZIP ScriptBundles may contain ordered scripts and byte-exact "
             "payload files.\n"
             "\n"
             "Execution behavior:\n"
             "  Scripts run in the current working directory.\n"
-            "  Oversized inputs and unsafe ZIP PatchBundles are rejected "
+            "  Oversized inputs and unsafe ZIP ScriptBundles are rejected "
             "before any script starts."
         ),
     )
@@ -460,7 +460,7 @@ def _add_fs_commands(commands) -> None:
         nargs="?",
         metavar="PATH",
         help=(
-            "script or ZIP PatchBundle file, or directory; "
+            "script or ZIP ScriptBundle file, or directory; "
             "omit to read standard input"
         ),
     )
@@ -474,7 +474,7 @@ def _build_parser() -> argparse.ArgumentParser:
             "Register local Git repository instances, exchange complete "
             "Result Bundles, and validate or apply repository-bound ZIP "
             "patch packages. The separate 'fs run' command executes "
-            "explicit scripts and ZIP PatchBundles."
+            "explicit scripts and ZIP ScriptBundles."
         ),
         epilog=(
             "Configure the repository Exchange directory once with "

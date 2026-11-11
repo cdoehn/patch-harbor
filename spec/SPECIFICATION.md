@@ -3,9 +3,9 @@
 **Dateiname:** `SPECIFICATION.md`<br>
 **Historischer Basisvertrag – Versionsangabe nur für dessen ursprünglichen Stand:**<br>
 **Produktversion:** `1.2.1`<br>
-**Aktuelle Produktversion:** `1.9.1`; Kompatibilitätsbasis ab `1.4.0`, gemeinsam mit beiden Ergänzungen.<br>
-**Spezifikationsstand:** 2026-11-11 · REL-191: Explizites Watcher-Polling und vollständige Runtime-Veröffentlichung<br>
-**Status:** Verbindlicher Bestands- und Zielvertrag mit den unten erklärten Ergänzungen. RF-01 korrigierte die Vertragsgrundlage; aktueller Integrationsfortschritt steht im SRI-Plan; historische Nachweise bleiben erhalten.<br>
+**Aktuelle Quellversion:** `2.0.0.dev0`; unveröffentlichter Entwicklungsstand `200-01.W`, Ziel 2.0.0.<br>
+**Spezifikationsstand:** 2026-11-11 · PH-200: ScriptBundle und eigenständiger deprecated Skriptaufruf.<br>
+**Status:** Verbindlicher Bestands- und Zielvertrag mit den unten erklärten Ergänzungen. Aktueller Fortschritt steht im Plan PH-200; historische Nachweise bleiben erhalten.<br>
 **RIV-Status:** 18/18 Umsetzungsschritte samt Abschlusskorrektur durch Bundle 015 und CI-Run 37306630290 auf `a02391dc045d42e317b3e766f0b1e9fa8dfadec1` bestätigt; Plan abgeschlossen.<br>
 **Watcher-Ereignisse:** Ereignisgesteuerter Watcher Bestandteil der bestätigten Basis; historische WE-Zwischenstände aktivieren keinen neuen Watcher-Plan.<br>
 **Projektname:** `PatchHarbor`<br>
@@ -13,15 +13,24 @@
 **Skriptmarker:** `# PATCHHARBOR`<br>
 **Patch-Paketmarker:** `patch-harbor`
 
-Der aktuelle Auftrag und Plan stehen in
-[`planning/1.9.1/commit-plan.md`](../planning/1.9.1/commit-plan.md),
-Zielversion **1.9.1**, verbindlicher Export-/Releasevertrag §44 und die
-[Monitor-Erweiterung](../planning/viewer/specification.md). Dieser Auftrag
-autorisiert ausdrücklich CI, normalen Push und nach den Gates die Integration
-von `dev` nach `main`, danach Tag und Release. Der
-[REL-190-Plan](../planning/1.9.0/commit-plan.md) bleibt historischer Nachweis. Der frühere
-[REL-180-Plan](../planning/runtime-release/commit-plan.md) bleibt historischer Nachweis.
-Die folgenden SAFE-/SRI-Hinweise beschreiben deren historischen Auftrag.
+Der aktive Auftrag steht in
+[`planning/2.0.0/commit-plan.md`](../planning/2.0.0/commit-plan.md), Ziel **2.0.0**.
+`200-01.W` trennt den eigenständigen `ScriptBundle`-Runner und benennt dessen
+öffentliche Python-Funktion direkt in `api.run_scripts` um. `api.run` entfällt;
+es gibt keine Python-API-Kompatibilitätspflicht. `fs run` und `run_scripts`
+bleiben funktional erhalten, sind jedoch deprecated. Die CLI gibt pro Aufruf
+auf stderr einen Ersatzhinweis aus; direkte Python-Aufrufe geben `FutureWarning`
+mit Aufruferbezug aus. Globale Warning-Filter werden nicht verändert.
+
+Der Task-/Execute-/Result-Formatwechsel ist der folgende Schritt `200-02`.
+Bis dahin bleiben die unten beschriebenen repositorygebundenen Format-1/3-
+Verträge der tatsächlich implementierte Entwicklungsstand. Zwischenstände
+werden nicht produktiv eingesetzt und sind keine Zwischenreleases. Die
+[1.9.1-Releaseunterlagen](../planning/1.9.1/commit-plan.md) und die
+[Monitor-Erweiterung](../planning/viewer/specification.md) bleiben Basisnachweise.
+Dieser Entwicklungsauftrag startet keine CI und autorisiert kein neues Tag,
+Release, Main-Merge oder Hostupdate. Die folgenden SAFE-/SRI-Hinweise beschreiben
+historische Aufträge.
 
 Der zuvor ausdrücklich beauftragte Entwicklungsplan liegt unter
 [`planning/safe-reference/commit-plan.md`](../planning/safe-reference/commit-plan.md),
@@ -958,7 +967,7 @@ Ist kein Pfad angegeben und STDIN eine Pipe, wird der vollständige Byte-Strom e
 STDIN kann übertragen:
 
 - ein direktes UTF-8-Skript,
-- ein binäres ZIP-PatchBundle.
+- ein binäres ZIP-ScriptBundle.
 
 Es gibt keinen Streaming-Befehlsdialog und kein interaktives Protokoll.
 
@@ -1015,27 +1024,27 @@ Ein unvollständiger, falsch benannter oder beschädigter Message-Block wird vol
 
 ---
 
-## 9. Manueller Runner: PatchBundle-Auflösung
+## 9. Manueller Runner: ScriptBundle-Auflösung
 
 ### 9.1 Begriff
 
-Jedes Eingabeartefakt des manuellen Runners wird genau einmal zu einem `PatchBundle` aufgelöst.
+Jedes Eingabeartefakt des manuellen Runners wird genau einmal zu einem `ScriptBundle` aufgelöst.
 
-Ein PatchBundle enthält:
+Ein ScriptBundle enthält:
 
 - mindestens ein PatchHarbor-Skript in definierter Reihenfolge,
 - null oder mehr geordnete reguläre Nutzdateien mit relativem Zielpfad und bytegenauem Inhalt.
 
-Ein einzelnes direktes Skript ist fachlich ein PatchBundle mit genau einem Skript und ohne Nutzdateien.
+Ein einzelnes direktes Skript ist fachlich ein ScriptBundle mit genau einem Skript und ohne Nutzdateien.
 
 ### 9.2 Auflösungsreihenfolge
 
-- Ein vollständig als UTF-8 lesbares direktes Skript mit exaktem Pflichtmarker ergibt ein PatchBundle mit genau einem Skript.
-- Ist das Artefakt kein gültiges direktes Skript, wird es als ZIP-basiertes PatchBundle geprüft.
+- Ein vollständig als UTF-8 lesbares direktes Skript mit exaktem Pflichtmarker ergibt ein ScriptBundle mit genau einem Skript.
+- Ist das Artefakt kein gültiges direktes Skript, wird es als ZIP-basiertes ScriptBundle geprüft.
 - Ist es weder ein gültiges direktes Skript noch ein gültiges ZIP-Bundle mit mindestens einem PatchHarbor-Skript, endet der Auftrag mit einem klaren Tool-Fehler.
 - Quelle, Dateiname und Dateiendung bestimmen weder Skripttyp noch Bundletyp.
 
-### 9.3 ZIP-PatchBundle
+### 9.3 ZIP-ScriptBundle
 
 ZIP ist die Codierung für mehrere geordnete Skripte und zusätzliche Text- oder Binärdateien. Es ist kein eigener Ausführungsmodus.
 
@@ -1061,7 +1070,7 @@ Regeln:
 
 ## 10. Sichere ZIP-Nutzdateien
 
-Die Regeln dieses Abschnitts gelten sowohl für den manuellen ZIP-PatchBundle-Pfad als auch für sichere `patchharbor apply`-Pakete.
+Die Regeln dieses Abschnitts gelten sowohl für den manuellen ZIP-ScriptBundle-Pfad als auch für sichere `patchharbor apply`-Pakete.
 
 ### 10.1 Erlaubte relative Pfade
 
@@ -1213,7 +1222,7 @@ Nicht unterstützt sind insbesondere:
 - Strg+C beendet Skript und Kindprozesse und liefert Exit-Code 130.
 - Timeout liefert Exit-Code 124.
 
-### 11.5 Reihenfolge im manuellen PatchBundle
+### 11.5 Reihenfolge im manuellen ScriptBundle
 
 1. Eingabeartefakt vollständig auflösen.
 2. Gesamtes Bundle validieren.
@@ -2861,7 +2870,7 @@ Wenn ein Entrypoint oder manuelles Skript gestartet wurde, bestimmt grundsätzli
 | `124` | Timeout |
 | `130` | Abbruch durch Strg+C |
 
-Bei mehreren Skripten im manuellen ZIP-PatchBundle gilt:
+Bei mehreren Skripten im manuellen ZIP-ScriptBundle gilt:
 
 - alle erfolgreich: Exit-Code des letzten Skripts, normalerweise 0,
 - erstes fehlerhaftes Skript: dessen Exit-Code,
@@ -2886,7 +2895,7 @@ Empfohlene Verantwortlichkeiten:
 - `api_types.py` – wiederverwendete öffentliche Ergebnis-, Stream- und Ereignistypen,
 - `application.py` – Orchestrierung genau eines Auftrags einschließlich manueller beziehungsweise automatischer Repository-Scope-Wahl und deterministischer Kandidatenauswahl,
 - `sources.py` – Datei, Ordner und STDIN als neutrales `InputArtifact`,
-- `bundles.py` – manuelle direkte Skripte und ZIP-Container zu `PatchBundle`s auflösen,
+- `bundles.py` – manuelle direkte Skripte und ZIP-Container zu `ScriptBundle`s auflösen,
 - `bundle_paths.py` – gemeinsame sichere ZIP-Pfadregeln,
 - `payload_files.py` – sichere ZIP-Nutzdateien und atomisches Schreiben,
 - `parser.py` – Pflichtmarker, META und MESSAGE,
@@ -2968,7 +2977,7 @@ Mindestens zu erhalten und weiter zu testen sind:
 - exakter Pflichtmarker,
 - META- und MESSAGE-Warnings,
 - STDIN und Pipe mit direktem Skript,
-- STDIN und Pipe mit binärem ZIP-PatchBundle,
+- STDIN und Pipe mit binärem ZIP-ScriptBundle,
 - einmaliger nicht rekursiver Ordnerscan und Auswahl,
 - mehrere ZIP-Skripte in Archiv-Reihenfolge,
 - Binärdateien einschließlich Nullbytes,
@@ -3582,7 +3591,8 @@ Operationen, Rückgabefakten und Fehlersemantik bleiben grundsätzlich innerhalb
 1.2.0-Entwicklung ersetzt jedoch die frühere globale Konfigurationssemantik ohne
 Fallback. Private Module und diagnostische Texte sind kein öffentlicher
 Erweiterungsvertrag.
-Standardaufrufe sind still. Fachliche Resultate und Exceptions werden wiederverwendet;
+Standardaufrufe sind still; der ausdrücklich deprecated Skriptaufruf `run_scripts`
+gibt seit `200-01.W` eine Python-Warnung aus. Fachliche Resultate und Exceptions werden wiederverwendet;
 explizite OutputStreams und request-lokale Beobachter sind unabhängig von der CLI.
 
 `configuration(repository=".", *, revalidate=False)` liest die ausgewählte

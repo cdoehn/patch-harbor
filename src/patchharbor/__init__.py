@@ -1,6 +1,6 @@
 """PatchHarbor package."""
 
-__version__ = "1.9.1"
+__version__ = "2.0.0.dev0"
 
 # Bind the executing PYZ producer at package import. Source/editable use has
 # no prepared identity. Do not read recipes or materialize archives here.

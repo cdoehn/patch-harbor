@@ -1,14 +1,13 @@
 # PatchHarbor – public Python API
 
 Use `from patchharbor import api`. This is the only supported public Python
-namespace; implementation modules remain internal. The documented names and
-value fields form the supported compatibility surface introduced in 1.2.0 and
-extended by the joint PYZ/PACK specification. Within the 1.x series, fixes and
-compatible additions preserve documented calls and result
-semantics. Exception: this explicitly approved repository-local configuration
-revision of the 1.2.0 development line supersedes the earlier global-setting
-semantics. It has no migration or compatibility fallback; the method names stay,
-but configuration calls now require a registered target repository.
+namespace; implementation modules remain internal. This is the 2.0.0 development
+line, with no Python API backwards-compatibility requirement. The first step
+(`200-01.W`) replaces `api.run` with `api.run_scripts` without an alias and
+renames the independent script container to `ScriptBundle`. Repository-bound
+Task/Execute/Result APIs follow in `200-02`; the operations below describe the
+currently implemented state, not the final 2.0.0 API. See the
+[implementation plan](../planning/2.0.0/commit-plan.md).
 Additional enum values or diagnostic event wording must not be treated as an
 exhaustive state machine. Private modules and undocumented helpers remain free
 to evolve.
@@ -53,17 +52,17 @@ print(report.success, report.result_bundle.status)
 | `watch_targets()` | validated Exchange roots and control paths, without bundle scanning | `WatchTargets` |
 | `watch_control_paths()` | registry/local config paths even with invalid local config | `WatchControlPaths` |
 | `apply_readiness(lock)` | probe and release a known technical lock conflict | `ApplyReadiness` |
-| `run(source, cwd=".", ...)` | `fs run` | `ScriptResult` |
+| `run_scripts(source, cwd=".", ...)` (deprecated) | `fs run` (deprecated) | `ScriptResult` |
 
 All operations accept `observer=None`. Execution operations accept
-`output=None`; `apply`, `apply_next`, and `run` accept `timeout=10800.0` seconds.
+`output=None`; `apply`, `apply_next`, and `run_scripts` accept `timeout=10800.0` seconds.
 Timeouts must be finite and positive; booleans and numeric strings are invalid.
 The public default is `api.DEFAULT_TIMEOUT_SECONDS`.
 
 Path parameters accept `str` and `os.PathLike[str]`. Tildes are expanded; bytes,
 empty paths and NUL are rejected. Symlinks are not resolved away by the facade:
 the existing Core file checks decide whether a link is permitted. Most relative
-paths use the caller's current working directory. A relative `run(source)` path
+paths use the caller's current working directory. A relative `run_scripts(source)` path
 is relative to its explicit `cwd`, which is also the child's working directory.
 The library never changes the process-wide current directory or environment.
 For concurrent callers use explicit absolute paths and do not change shared
@@ -369,7 +368,7 @@ if not report.success:
 Other operations raise `api.PatchHarborError` for known tool failures. Its
 `reason: FailureReason` and `error_kind: ErrorKind` are machine-readable; its
 optional `run_report` and emergency-diagnostics fields retain diagnostic data.
-No string-parsed console output is needed. Normal nonzero `run()` exits instead
+No string-parsed console output is needed. Normal nonzero `run_scripts()` exits instead
 return `ScriptResult(success=False, exit_code=...)` (success is a property).
 Invalid Python arguments raise `TypeError`/`ValueError` before Core work. Native
 I/O failures and unexpected exceptions are not broadly caught/disguised. An
@@ -383,7 +382,8 @@ No new error-class hierarchy reinterprets existing categories.
 
 ## Output and observation
 
-No output is sent to `sys.stdout` or `sys.stderr` by default. No implicit stdin
+Except for the deprecated `run_scripts` warning handled by Python's warning
+machinery, no output is sent to `sys.stdout` or `sys.stderr` by default. No implicit stdin
 is read. Raw execution logs in Apply Result Bundles remain complete even without
 an output consumer. Callers request streaming explicitly:
 
@@ -421,21 +421,32 @@ the previous scope is restored. Observer `Exception`s are best effort and do not
 replace an operation; `BaseException` is not swallowed. Observers must not mutate
 the repositories, files, or configuration they are observing.
 
-## Explicit script runner
+## Deprecated independent script runner
+
+The current development API uses `run_scripts`; `api.run` has been removed
+without a compatibility alias. Each direct call emits `FutureWarning` at its
+caller. It does not change global warning filters. `fs run` routes its own
+deprecation notice to the supplied stderr and does not duplicate the Python
+warning. The preferred 2.0 workflow is Task Bundle / `execute` / Result Bundle;
+that repository protocol is implemented in the subsequent `200-02` step.
+
+Internally, `ScriptBundle` represents ordered scripts and byte-exact payloads.
+It is distinct from a repository-bound task and never provides task validation
+or a fallback after rejected repository execution.
 
 ```python
 from io import StringIO
 from patchharbor import api
 
 # On Ubuntu/Bash. Windows source must be a valid native PowerShell script.
-result = api.run(StringIO("# PATCHHARBOR\nprintf 'hello\\n'\n"), cwd=repo)
+result = api.run_scripts(StringIO("# PATCHHARBOR\nprintf 'hello\\n'\n"), cwd=repo)
 assert result.success
 ```
 
 `source` can also be a script/ZIP file or a directory. Multiple valid directory
 candidates require `select_candidate(candidates)` returning one of the supplied
 `DirectoryCandidate` objects; no input prompt is created by the library. The
-Core still validates the selection and input. `run` retains the legacy fs-run
+Core still validates the selection and input. `run_scripts` retains the deprecated fs-run
 contract: no automatic repository Result Bundle and no registration requirement.
 The CLI owns human directory selection, `--log` formatting and temporary log
 lifecycle; a Python caller uses explicit `OutputStreams` instead.

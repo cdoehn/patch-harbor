@@ -444,7 +444,7 @@ def _execute_request(
     console: StreamingConsole | None,
 ) -> tuple[int, str | None]:
     try:
-        result = api.run(
+        result = api.run_scripts(
             path if path is not None else stdin,
             cwd=cwd, timeout=timeout_seconds,
             select_candidate=lambda candidates: select_directory_candidate(

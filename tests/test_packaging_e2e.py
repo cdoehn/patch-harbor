@@ -26,7 +26,7 @@ from tests.registration_support import isolated_user_environment
 pytestmark = pytest.mark.packaging
 
 MAX_WHEEL_BYTES = 448 * 1024  # Operational monitor/history (measured 444591 B); runtime limits unchanged.
-RELEASE_VERSION = "1.9.1"
+RELEASE_VERSION = "2.0.0.dev0"
 EXPECTED_RUNTIME_FILES = {
     'patchharbor/application_monitor.py',
     'patchharbor/application_monitor_artifacts.py',
@@ -153,6 +153,7 @@ EXPECTED_RUNTIME_FILES = {
     "patchharbor/result_bundle_writer.py",
     "patchharbor/locks.py",
     "patchharbor/resource_policy.py",
+    "patchharbor/script_deprecation.py",
     "patchharbor/run_log.py",
     "patchharbor/run_report.py",
     "patchharbor/sources.py",
@@ -381,7 +382,7 @@ def test_release_metadata_is_complete_and_runtime_has_no_dependencies() -> None:
         "patchharbor": "patchharbor.cli:main",
         "patchharbor-watcher": "patchharbor_watcher.cli:main",
     }
-    assert "Development Status :: 5 - Production/Stable" in project["classifiers"]
+    assert "Development Status :: 3 - Alpha" in project["classifiers"]
     assert (PROJECT_ROOT / "LICENSE").is_file()
 
 
