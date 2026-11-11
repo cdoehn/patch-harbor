@@ -57,3 +57,34 @@ The release is complete only after actual publication, downloaded-byte proof
 and confirmed main integration. A transient user task may execute these exact
 authorized steps so that a chat interruption does not terminate Apply. It must
 stop on a failed gate, conflicting ref, mismatched artifact or changed dev head.
+
+## Observed acceptance failure and bounded correction
+
+Bundle 086 completed on `ae8ae899fc9a200129941a62e05581cf631dab90`:
+3722 passed, 15 skipped, four Apply workers. Preparation run `42966564411`
+succeeded. Acceptance run `42966680535` had 11 successful lanes and two failed
+Windows native core lanes (Python 3.11 and 3.12). Both failures were in live
+observation: an expected update or output tail never arrived. The CI logs do
+not retain the optional publisher's underlying write exception.
+
+Source inspection identifies a relevant deterministic failure: one transient
+Windows replacement conflict permanently terminates the optional publisher.
+A concurrent CRT reader can prevent replacement. Controlled error injection
+reproduces frozen updates before the correction; a native Windows test also
+holds an actual reader over replacement. This is not a reason to increase
+test deadlines or rerun the failed CI without a correction.
+
+Bundle 087, OFF-PLAN `REL-191-MONITOR`:
+`fix(monitor): recover from transient Windows publication conflicts [REL-191-MONITOR]`.
+Retry only optional observation replacement failures with Windows codes 5,
+32 or 33, at most four retries, with a 250 ms background delay. Capture the
+latest observation on every retry. Staging failures and other errors retain
+their existing failure behavior. Persistent conflicts still stop boundedly;
+Core execution, locking, publication gates and test timeouts are unchanged.
+
+Development runs the focused monitor selection in parallel. Apply runs the
+full parallel suite before one commit and normal dev push. Since the source
+changes, prepare fresh 1.9.1 assets and run all 13 acceptance lanes on the new
+commit. The failed candidate's prepared bytes and CI are historical evidence,
+not approval for the corrected source. Main, v1.9.1 and publication remain
+pending until those new exact-commit checks pass.

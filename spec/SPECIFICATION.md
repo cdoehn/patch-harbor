@@ -318,6 +318,18 @@ Watcher-CLI verzögert importieren. Core/API/Anwendung importieren den Watcher
 nicht; Core-PYZ bleibt watcherfrei und meldet beim ausdrücklichen Aufruf das
 fehlende optionale Modul. Betrieb und Grenzen: `docs/watcher-events.md`.
 
+### 3.2.3 Begrenzte Wiederholung optionaler Live-Publikation – REL-191-MONITOR
+
+Ein gleichzeitiger Windows-Leser kann das atomare Ersetzen einer Statusdatei
+kurzzeitig verhindern. Ausschließlich bei diesem Ersetzungsschritt und den
+Windows-Fehlercodes 5, 32 oder 33 darf der Hintergrund-Publisher höchstens viermal
+mit je 250 ms Abstand erneut versuchen. Jeder Versuch nimmt den aktuellen
+Speicherstand einschließlich eines zwischenzeitlichen Abschlusses auf.
+Stagingfehler und andere Fehler werden dadurch nicht wiederholt. Bleibt der
+Konflikt bestehen, beendet sich die optionale Publikation begrenzt; bestehende
+Statusdateien werden nicht gelöscht. Diese Beobachtungsschicht darf den
+Core-Auftrag, seine Locks oder dessen tatsächliches Ergebnis nicht verändern.
+
 ### 3.3 Repo Assist
 
 Repo Assist ist ein separates Werkzeug für den nachvollziehbaren Entwicklungsprozess eines Repositorys. Es ist nicht zwingend der oberste Orchestrator; über Repo Assist, PatchHarbor, PromptBridge und weitere Werkzeuge kann später ein zusätzlicher Orchestrator liegen.

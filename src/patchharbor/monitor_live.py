@@ -6,13 +6,14 @@ from contextvars import ContextVar
 import json
 import os
 from threading import Event, Lock, Thread
+from time import sleep
 from uuid import uuid4
 
 from patchharbor.monitor_live_schema import MAX_DOCUMENT
 from patchharbor.monitor_activity import record_activity, activity_event, WATCH_LABELS
 from patchharbor.monitor_live_storage import observation_directory, prune_completed
 from patchharbor.monitor_types import observed_at
-from patchharbor.platform.filesystem import PathKind, path_kind, atomic_replace_bytes
+from patchharbor.platform.filesystem import FileSystemOperationError, PathKind, path_kind, atomic_replace_bytes
 from patchharbor.platform.monitor_process import process_identity
 from patchharbor.progress import ActivityEvent, RequestStarted, RepositoryResolved, ScriptPrepared, observe_additional
 from patchharbor.user_paths import raw_registration_user_paths
@@ -128,6 +129,7 @@ class Publication:
             with self.lock:
                 self.document['process_identity'] = identity
             path = directory / (self.document['kind'] + '-' + self.instance_id + '.json')
+            replacement_conflicts = 0
             while True:
                 with self.lock:
                     document = {**self.document, 'updated_at': observed_at(), 'data': dict(self.data),
@@ -135,7 +137,20 @@ class Publication:
                                 'log_tail': self.tail.decode('utf-8', errors='replace')}
                 content = json.dumps(document, ensure_ascii=False, allow_nan=False).encode('utf-8')
                 if len(content) <= MAX_DOCUMENT:
-                    atomic_replace_bytes(path, content, mode=0o600)
+                    try:
+                        atomic_replace_bytes(path, content, mode=0o600)
+                    except FileSystemOperationError as exc:
+                        # A concurrent Windows reader may briefly deny replacement.
+                        # Retry only this optional publication, with bounded work;
+                        # every retry captures the latest state, including shutdown.
+                        if (exc.operation != 'cannot replace target'
+                                or getattr(exc.cause, 'winerror', None) not in (5, 32, 33)
+                                or replacement_conflicts >= 4):
+                            raise
+                        replacement_conflicts += 1
+                        sleep(.25)
+                        continue
+                    replacement_conflicts = 0
                 if document['completed']:
                     prune_completed(directory)
                     return
