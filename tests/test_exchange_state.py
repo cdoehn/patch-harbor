@@ -384,3 +384,63 @@ def test_inconsistent_completion_receipts_are_rejected(tmp_path, monkeypatch, st
     paths.exchange_state_path.write_text(json.dumps(document))
     with pytest.raises(PatchHarborError):
         load_exchange_state(paths)
+
+
+@pytest.mark.parametrize("old_kind", ["patch_package", "task_package"])
+@pytest.mark.parametrize("status", [None, "attempted", "failed", "succeeded"])
+def test_v4_ledger_preserves_identity_status_and_receipts_on_v5_write(
+    tmp_path, monkeypatch, old_kind, status,
+):
+    set_isolated_user_environment(monkeypatch, tmp_path / "user")
+    paths = registration_user_paths()
+    paths.exchange_state_directory.mkdir()
+    path = (tmp_path / "task.zip").resolve()
+    run_id = "84c316e6-2710-4b9c-9232-229bc02aa8c4" if status else None
+    completed = "e" * 40 if status == "succeeded" else None
+    result_sha = "f" * 64 if status == "succeeded" else None
+    old = dict(path=str(path), sha256="a" * 64, kind=old_kind,
+        manifest=dict(repo_id="a3f9c2e1-7b4d-4a91-9d2e-5c6f8a1b2c3d",
+            base_commit="b" * 40, state_fingerprint="c" * 16,
+            fingerprint_algorithm=FINGERPRINT_ALGORITHM),
+        apply_status=status, completed_commit=completed,
+        attempt_run_id=run_id, result_sha256=result_sha)
+    before = json.dumps(dict(format_version=4, entries=[old])).encode()
+    paths.exchange_state_path.write_bytes(before)
+
+    record = load_exchange_state(paths).record_for(_identity(path, "a"))
+    assert record.kind == "task_bundle"
+    assert record.manifest == _selection()
+    assert (record.execute_status.value if record.execute_status else None) == status
+    assert record.attempt_run_id == run_id and record.result_sha256 == result_sha
+    assert (str(record.completed_commit) if record.completed_commit else None) == completed
+    assert paths.exchange_state_path.read_bytes() == before
+
+    merge_exchange_classifications(paths, (_record(tmp_path / "other.zip", "d"),))
+    document = json.loads(paths.exchange_state_path.read_bytes())
+    assert document["format_version"] == 5
+    migrated = next(row for row in document["entries"] if row["sha256"] == "a" * 64)
+    expected = {key: value for key, value in old.items() if key not in {"kind", "apply_status"}}
+    assert migrated == dict(expected, kind="task_bundle", execute_status=status)
+    assert load_exchange_state(paths).record_for(record.identity) == record
+
+
+@pytest.mark.parametrize("mutation", ["old-status", "mixed-status", "old-kind", "future"])
+def test_v5_ledger_rejects_mixed_or_unknown_generations(tmp_path, monkeypatch, mutation):
+    set_isolated_user_environment(monkeypatch, tmp_path / "user")
+    paths = registration_user_paths()
+    merge_exchange_classifications(paths, (_record(tmp_path / "task.zip"),))
+    document = json.loads(paths.exchange_state_path.read_bytes())
+    row = document["entries"][0]
+    if mutation == "old-status":
+        row["apply_status"] = row.pop("execute_status")
+    elif mutation == "mixed-status":
+        row["apply_status"] = row["execute_status"]
+    elif mutation == "old-kind":
+        row["kind"] = "patch_package"
+    else:
+        document["format_version"] = 6
+    before = json.dumps(document).encode()
+    paths.exchange_state_path.write_bytes(before)
+    with pytest.raises(PatchHarborError):
+        load_exchange_state(paths)
+    assert paths.exchange_state_path.read_bytes() == before
