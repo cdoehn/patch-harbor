@@ -27,15 +27,17 @@ network and subprocess operations on every platform.
    previous CI. The `patchharbor-prepared-release` artifact holds the exact
    candidate assets and evidence for 14 days. Record its Run-ID and download it.
 2. Check the candidate manifest and full hashes, and record whether the release
-   tag already exists. For the authorized 1.9.0 delivery, create a new tag only
+   tag already exists. For the authorized 1.9.1 delivery, create a new tag only
    after the complete acceptance run succeeds. Never move an existing tag or
    overwrite its assets.
 3. Dispatch `none` with the same full `expected_commit` and another unique
    `handoff_id`. This runs the existing 13 native Python/Linux/Windows/shell and
    Docker lanes. Wait for the complete run and retain its Run-ID. On failure,
    correct the proved failure through Apply before trying a new candidate.
-   Never treat a green run at another HEAD as release approval. After success,
-   create and push the new tag at exactly the confirmed commit, recording its
+   Never treat a green run at another HEAD as release approval. For 1.9.1, the
+   user requests dev-to-main integration before the tag: after successful
+   acceptance, verify both heads and fast-forward/push main to this exact dev
+   commit. Then create and push the new tag at exactly the confirmed commit, recording its
    full ref/object identity. A conflicting or preexisting tag is never moved.
 4. Dispatch `publish` on the same commit with `release_version`,
    `expected_commit`, `acceptance_run_id` and `prepared_run_id`. It verifies the
@@ -49,11 +51,12 @@ network and subprocess operations on every platform.
    assets again and saves `published.json`. An already identical published
    release is verified and recorded without rewriting it. Conflicts stop the
    operation. GitHub has no atomic multi-asset publication transaction.
-6. When explicitly authorized, integrate `dev` into `main` after successful
-   publication and downloaded-asset verification. Prefer a normal fast-forward
-   when `main` is an ancestor of the released commit; verify both branch heads
-   immediately before updating. Keep the release tag on its original tested
-   commit and never force a branch or tag update.
+6. Verify the requested `dev`/`main` integration and tag after publication and
+   downloaded-asset verification. For 1.9.1 the integration already occurs in
+   step 3, following the explicit requested order. Prefer a normal fast-forward
+   when `main` is an ancestor; verify both branch heads immediately before any
+   update. Keep the release tag on its original tested commit and never force a
+   branch or tag update.
 
 Example preparation and acceptance dispatches (set the actual full values):
 

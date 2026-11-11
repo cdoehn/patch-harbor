@@ -11,13 +11,13 @@ mkdir /absolute/path/runtime-output
 patchharbor runtime export --output-dir /absolute/path/runtime-output --json
 ```
 
-For 1.9.0 the output is `patchharbor-1.9.0.pyz`. A different installed version
+For 1.9.1 the output is `patchharbor-1.9.1.pyz`. A different installed version
 exports its own version. The PYZ includes the public API and CLI, without the
 watcher or third-party runtime dependencies. The normal installation retains
 the watcher. The PYZ can export itself into another existing fresh directory:
 
 ```bash
-python /absolute/path/patchharbor-1.9.0.pyz runtime export --output-dir /absolute/path/another-output --json
+python /absolute/path/patchharbor-1.9.1.pyz runtime export --output-dir /absolute/path/another-output --json
 ```
 
 The public API from the installed environment is:
@@ -77,7 +77,7 @@ from hashlib import sha256
 from pathlib import Path
 import sys
 
-runtime = Path('/absolute/path/patchharbor-1.9.0.pyz')
+runtime = Path('/absolute/path/patchharbor-1.9.1.pyz')
 expected = 'FULL_SHA256_FROM_TRUSTED_RELEASE_APPROVAL'
 if sha256(runtime.read_bytes()).hexdigest() != expected:
     raise ValueError('runtime hash mismatch')
@@ -103,8 +103,8 @@ It is a demonstration of the consumer's policy decision, not authorization to
 export an arbitrary real repository.
 
 ```bash
-python -I -S -B docs/examples/verify_release_runtime.py --runtime /absolute/path/patchharbor-1.9.0.pyz --sha256 FULL_APPROVED_SHA256 --fixture-root /absolute/path/new-clean-fixture --case clean
-python -I -S -B docs/examples/verify_release_runtime.py --runtime /absolute/path/patchharbor-1.9.0.pyz --sha256 FULL_APPROVED_SHA256 --fixture-root /absolute/path/new-dirty-fixture --case dirty
+python -I -S -B docs/examples/verify_release_runtime.py --runtime /absolute/path/patchharbor-1.9.1.pyz --sha256 FULL_APPROVED_SHA256 --fixture-root /absolute/path/new-clean-fixture --case clean
+python -I -S -B docs/examples/verify_release_runtime.py --runtime /absolute/path/patchharbor-1.9.1.pyz --sha256 FULL_APPROVED_SHA256 --fixture-root /absolute/path/new-dirty-fixture --case dirty
 ```
 
 Keep both example files together. Each invocation prints a JSON proof containing

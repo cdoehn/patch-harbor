@@ -3,8 +3,8 @@
 **Dateiname:** `SPECIFICATION.md`<br>
 **Historischer Basisvertrag – Versionsangabe nur für dessen ursprünglichen Stand:**<br>
 **Produktversion:** `1.2.1`<br>
-**Aktuelle Produktversion:** `1.9.0`; Kompatibilitätsbasis ab `1.4.0`, gemeinsam mit beiden Ergänzungen.<br>
-**Spezifikationsstand:** 2026-11-10 · REL-190: Monitor und vollständige Runtime-Veröffentlichung<br>
+**Aktuelle Produktversion:** `1.9.1`; Kompatibilitätsbasis ab `1.4.0`, gemeinsam mit beiden Ergänzungen.<br>
+**Spezifikationsstand:** 2026-11-11 · REL-191: Explizites Watcher-Polling und vollständige Runtime-Veröffentlichung<br>
 **Status:** Verbindlicher Bestands- und Zielvertrag mit den unten erklärten Ergänzungen. RF-01 korrigierte die Vertragsgrundlage; aktueller Integrationsfortschritt steht im SRI-Plan; historische Nachweise bleiben erhalten.<br>
 **RIV-Status:** 18/18 Umsetzungsschritte samt Abschlusskorrektur durch Bundle 015 und CI-Run 37306630290 auf `a02391dc045d42e317b3e766f0b1e9fa8dfadec1` bestätigt; Plan abgeschlossen.<br>
 **Watcher-Ereignisse:** Ereignisgesteuerter Watcher Bestandteil der bestätigten Basis; historische WE-Zwischenstände aktivieren keinen neuen Watcher-Plan.<br>
@@ -14,11 +14,12 @@
 **Patch-Paketmarker:** `patch-harbor`
 
 Der aktuelle Auftrag und Plan stehen in
-[`planning/1.9.0/commit-plan.md`](../planning/1.9.0/commit-plan.md),
-Zielversion **1.9.0**, verbindlicher Export-/Releasevertrag §44 und die
+[`planning/1.9.1/commit-plan.md`](../planning/1.9.1/commit-plan.md),
+Zielversion **1.9.1**, verbindlicher Export-/Releasevertrag §44 und die
 [Monitor-Erweiterung](../planning/viewer/specification.md). Dieser Auftrag
-autorisiert ausdrücklich CI, normalen Push, Tag, Release und anschließend die
-Integration von `dev` nach `main` nach den Gates. Der frühere
+autorisiert ausdrücklich CI, normalen Push und nach den Gates die Integration
+von `dev` nach `main`, danach Tag und Release. Der
+[REL-190-Plan](../planning/1.9.0/commit-plan.md) bleibt historischer Nachweis. Der frühere
 [REL-180-Plan](../planning/runtime-release/commit-plan.md) bleibt historischer Nachweis.
 Die folgenden SAFE-/SRI-Hinweise beschreiben deren historischen Auftrag.
 
