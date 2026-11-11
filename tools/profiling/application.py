@@ -52,6 +52,8 @@ def validate_database(connection):
         raise ValueError('unsupported profiling schema; existing history left untouched')
     if connection.execute('SELECT identity FROM schema_meta').fetchall() != [('patchharbor-local-profile',)]:
         raise ValueError('invalid profiling schema identity')
+    if connection.execute('PRAGMA quick_check').fetchall() != [('ok',)]:
+        raise ValueError('damaged profiling database')
 
 
 @contextmanager
@@ -97,6 +99,7 @@ def database(path, *, writable=False):
 
 def selection_facts(selection):
     files = {}
+    total = 0
     for selector in selection:
         path = Path(selector.split('::', 1)[0]).resolve()
         if not path.exists():
@@ -105,6 +108,11 @@ def selection_facts(selection):
         for candidate in candidates:
             if candidate.is_symlink() or not candidate.is_file():
                 raise ValueError('selected source must be a regular file')
+            if candidate.stat().st_size > 32 * 1024 * 1024:
+                raise ValueError('selected source file is too large')
+            total += candidate.stat().st_size
+            if total > 256 * 1024 * 1024:
+                raise ValueError('selected source bytes exceed the inventory budget')
             files[str(candidate)] = hashlib.sha256(candidate.read_bytes()).hexdigest()
             if len(files) > 100_000:
                 raise ValueError('selected source inventory is too large')
@@ -112,6 +120,8 @@ def selection_facts(selection):
             for name in ('conftest.py', 'pytest.ini', 'pyproject.toml'):
                 candidate = parent / name
                 if candidate.is_file():
+                    if candidate.is_symlink() or candidate.stat().st_size > 32 * 1024 * 1024:
+                        raise ValueError('unsafe or oversized adjacent test configuration')
                     files[str(candidate)] = hashlib.sha256(candidate.read_bytes()).hexdigest()
             if parent == PROJECT_ROOT or parent.parent == parent:
                 break
@@ -235,9 +245,10 @@ def capture(connection, run_id, mode, iteration, warmup, directory, metadata, ar
     environment['PH_TEST_PROCESS_START_NS'] = str(time.perf_counter_ns())
     environment['PH_TEST_PROCESS_START_UTC'] = utc()
     code, status, reason, elapsed = wait_child(command, environment, output, args.timeout, args.max_bytes)
-    details = {'reason': reason, 'command': command, 'collector': mode,
+    details = {'reason': reason, 'command': command, 'collector': mode, 'process_exit_code': code,
                'scope': 'pytest phases; subprocess CPU and native memory are not measured',
                'artifact_directory': str(output)}
+    test_exit = None
     try:
         from tools.test_evidence import input_binding
         if input_binding() != metadata['binding'] or selection_facts(metadata['selection']) != metadata['selection_sources']:
@@ -245,6 +256,9 @@ def capture(connection, run_id, mode, iteration, warmup, directory, metadata, ar
         if not report_path.is_file() or report_path.stat().st_size > min(args.max_bytes, 64 * 1024 * 1024):
             raise ValueError('missing or oversized test report')
         report = json.loads(report_path.read_text(encoding='utf-8'))
+        if type(report.get('exitstatus')) is not int:
+            raise ValueError('test exit status is unknown')
+        test_exit = report['exitstatus']
         if code == 0:
             from tools.test_results import validate
             validate(report)
@@ -267,8 +281,8 @@ def capture(connection, run_id, mode, iteration, warmup, directory, metadata, ar
                     (identity, path.relative_to(directory.parent.parent).as_posix(), path.name,
                      digest.hexdigest(), path.stat().st_size, status))
         connection.execute('UPDATE measurements SET status=?,test_exit_code=?,elapsed_s=?,details=? WHERE id=?',
-                           (status, code, elapsed, encoded(details), identity))
-    return code, status
+                           (status, test_exit, elapsed, encoded(details), identity))
+    return (code if status == 'complete' else 130 if status == 'interrupted' else 2), status
 
 
 def run(args):
