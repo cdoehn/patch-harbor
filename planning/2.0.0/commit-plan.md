@@ -2,8 +2,8 @@
 
 **Plan-ID:** `PH-200` · **Revision:** 2 · **Stand:** 11. November 2026<br>
 **Zielversion:** **2.0.0**<br>
-**Status:** Bundle 095 bestätigt den Monitor-Abschluss 200-03.C; Bundle 096 repariert den Testaufbau von 200-04.W und setzt die sechs verbleibenden Positionen 12–17 fort.<br>
-**Fortschritt:** **11 / 38 Umsetzungscommits**, zwölf WRC-Schritte; die Protokoll-Work-Phase besteht aus drei Teilcommits.<br>
+**Status:** 15 Schritte bleiben bestätigt. Bundle 098 repariert zusätzlich die Übertragung der Subtest-Nachweise und setzt Positionen 16–17 fort.<br>
+**Fortschritt:** **15 / 38 Umsetzungscommits**, zwölf WRC-Schritte; die Protokoll-Work-Phase besteht aus drei Teilcommits.<br>
 **Aktiver Planpfad:** `planning/2.0.0/commit-plan.md`<br>
 **Zugehöriger Detailentwurf:** [Lokale Testmessung und Profiling](test-profiling.md).
 Dieser Detailentwurf gehört zu diesem Plan; er ist kein konkurrierender Plan.
@@ -215,8 +215,9 @@ anschließend erfolgreich übernommen: Result `38b6e72e-c15f-4273-817f-c37a3b5cd
 Endcommit `5ff1e71c5c5f0854554633493393b5e85fa5e4c3`. Alle sechs vollständigen
 Apply-Gates waren erfolgreich; im letzten Lauf 3.814 bestandene Tests und
 16 Skips. Bundle 095 hat anschließend Position 11 (`200-03.C`) erfolgreich
-committed. Die übrigen 27 Positionen bleiben **OFFEN**; Reparaturbundle 096
-setzt bei Position 12 an und übernimmt Positionen 12–17.
+committed. Bundle 096 bestätigt anschließend die Positionen 12–15. Die übrigen
+23 Positionen bleiben **OFFEN**; Reparaturbundle 098 setzt bei Position 16 an
+und übernimmt die beiden verbleibenden Positionen 16–17 dieses Pakets.
 Die Commit-Subjects sind verbindliche
 Planvorlagen; Fortschritt wird erst mit tatsächlichem Commit und Result eingetragen.
 
@@ -837,3 +838,58 @@ Reparaturen aus 095 bleiben in allen Folgeständen erhalten. Jeder weitere
 Commit benötigt die vollständige parallele Testsuite in Apply mit Workern
 `auto` ohne zusätzliche Obergrenze. Dev prüft nur statisch; Push, Tag und CI
 bleiben bis zum vereinbarten Abschluss aus.
+
+## Apply 096 und Reparaturbundle 097
+
+Result `394651b8-6e1a-41cd-8aae-f13f7c565387` bestätigt vier weitere Commits
+nach jeweils vollständigem parallelem Apply-Gate: `200-04.W`, `200-04.R`,
+`200-04.C` und `200-05.W`. Letzter bestätigter Commit ist
+`d49e6e92da8bae95b3296d18951ef92964f3b64a`; damit sind 15/38 Schritte belegt.
+Die installierten Rundreisen einschließlich Dirty-Zuständen sind erfolgreich.
+`200-05.R` blieb uncommitted: 3.878 bestandene Tests, ein Fehler, 16 Skips,
+zwölf automatisch gewählte Worker. Der Subtest-Bericht zeigt ein vorzeitig
+entferntes Elternintervall und dadurch unvollständige Telemetrie.
+
+Bundle 097 lässt das Elternintervall bis zum tatsächlichen Phasenende aktiv;
+Subtest-Berichte übernehmen oder entfernen es nicht. Regressionen prüfen
+mehrere erfolgreiche und fehlgeschlagene Subtests, vollständige Elternphasen,
+unveränderte Fehlernachweise und genau einen Eintrag in der Call-Rangliste.
+Zusätzlich wird die Startmessung an den direkten Launcher gebunden. Ein
+verschachtelter Pytest-Prozess darf geerbte Startmarken eines fremden Launchers
+nicht als seine eigene Vorbereitungszeit ausgeben. Die beiden Fälle sind
+durch Prozess-Regressionen abgedeckt; fehlende Messwerte bleiben unbekannt.
+
+Beide Reparaturen gelten in `200-05.R` und im anschließenden `200-05.C`,
+einschließlich des dort getrennten Timing-Adapters. Frühere Korrekturen bleiben
+erhalten. Die vier bestätigten Commits werden nicht wiederholt. Jeder der
+beiden verbleibenden Commits benötigt ein vollständiges paralleles Apply-Gate
+mit Workern `auto` ohne zusätzliche Obergrenze. Dev prüft ausschließlich
+statisch; Push, Tag und CI bleiben bis zum vereinbarten Abschluss aus.
+
+## Apply 097 und Reparaturbundle 098
+
+Result `55736373-b730-42b9-b58b-0296d4bf19a9` bestätigt den Abbruch von
+`200-05.R` vor seinem Commit: 3.884 bestandene Tests, ein Fehler und 16 Skips
+mit zwölf automatisch gewählten Workern. HEAD bleibt
+`d49e6e92da8bae95b3296d18951ef92964f3b64a`, damit weiter 15/38 Schritte.
+Die Subtest-Zeitmessung ist im betroffenen Unterlauf vollständig; der neue
+Erfolgsfall deckt einen vorhandenen Fehler der Nachweisübertragung auf.
+
+Pytest stellt die Subtest-Kontextwerte beim Einlesen im Controller erneut dar.
+Deshalb unterscheiden sich bei gleicher Anzahl eingegangener Berichte deren
+Hashes vom Worker. Das Entfernen genau dieser zusätzlichen Darstellungsebene
+erklärt den gespeicherten Worker-Hash vollständig; es dient nur der Diagnose.
+
+Bundle 098 erzeugt die Subtest-Kennung einmal vor der xdist-Serialisierung und
+überträgt sie als unveränderte Berichtseigenschaft. Der Controller benötigt
+diese Kennung ausdrücklich. Es gibt keine heuristische Reparatur eingehender
+Werte und keine Lockerung des Validators, der Berichtszahl oder der Hashprüfung.
+Regressionen vergleichen vollständige serielle und parallele Nachweise samt
+unterschiedlich typisierten Kontextwerten. Fehlende, veränderte oder falsch
+typisierte Transportkennungen müssen weiterhin einen Fehllauf ergeben.
+
+Die Korrektur gilt in beiden verbleibenden Ständen `200-05.R` und `200-05.C`.
+Die Zeitmessungs-, Launcher-, Packaging- und Dirty-Rundreise-Reparaturen bleiben
+erhalten. Vor jedem der zwei Commits läuft die vollständige parallele Testsuite
+in Apply mit Workern `auto` ohne zusätzliche Obergrenze. Dev prüft nur statisch;
+Push, Tag und CI bleiben bis zum vereinbarten Abschluss aus.

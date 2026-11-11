@@ -134,17 +134,27 @@ class Capture:
             if row not in self.document["collection_reports"]:
                 self.document["collection_reports"].append(row)
 
+    @pytest.hookimpl(hookwrapper=True, tryfirst=True)
     def pytest_runtest_logreport(self, report):
+        node = getattr(report, "node", None)
         context = getattr(report, "context", None)
         subtest = None
         if context is not None:
-            subtest = json.dumps({"msg": repr(context.msg), "kwargs": {str(k): repr(v) for k, v in context.kwargs.items()}}, sort_keys=True)
-        node = getattr(report, "node", None)
+            if node is None:
+                subtest = json.dumps({"msg": repr(context.msg), "kwargs": {str(k): repr(v) for k, v in context.kwargs.items()}}, sort_keys=True)
+                # Capture before xdist serializes the report. Context values may
+                # acquire another representation layer during deserialization.
+                report.ph_evidence_subtest = subtest
+            else:
+                subtest = getattr(report, "ph_evidence_subtest", None)
+                if not isinstance(subtest, str):
+                    self.document["errors"].append("Missing or invalid transported subtest identity")
         worker = node.gateway.id if node is not None else self.worker_key
         self.document["reports"].append({"nodeid": report.nodeid, "when": report.when,
                                          "outcome": report.outcome, "reason": _reason(report),
                                          "xfail": bool(getattr(report, "wasxfail", False)),
                                          "subtest": subtest, "worker": worker})
+        yield
 
     @pytest.hookimpl(optionalhook=True)
     def pytest_testnodedown(self, node, error):

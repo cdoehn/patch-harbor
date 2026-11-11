@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
+from collections import Counter
 from datetime import datetime, timezone
 import math
 import os
@@ -23,6 +24,42 @@ def duration(value):
     return float(value)
 
 
+def _stamp(value, *, optional=False):
+    if optional and value is None:
+        return
+    if type(value) is not int or value < 0:
+        raise ValueError('invalid monotone timestamp')
+
+
+def _worker_summary(value, worker, report):
+    if (not isinstance(value, dict) or value.get('worker') != worker
+            or value.get('run_id') != report.get('run_id') or value.get('binding') != report.get('binding')):
+        raise ValueError('foreign worker timing')
+    _stamp(value.get('observed_elapsed_ns'))
+    _stamp(value.get('session_start_ns'), optional=True)
+    fixtures = value.get('fixtures')
+    if not isinstance(fixtures, list) or len(fixtures) > MAX_EVENTS:
+        raise ValueError('invalid fixture inventory')
+    seen = set()
+    for fixture in fixtures:
+        if (not isinstance(fixture, dict) or not isinstance(fixture.get('id'), str)
+                or fixture['id'] in seen or fixture.get('worker') != worker
+                or fixture.get('scope') not in ('session', 'package', 'module', 'class', 'function')
+                or not isinstance(fixture.get('consumers'), list)
+                or any(not isinstance(n, str) for n in fixture['consumers'])):
+            raise ValueError('invalid fixture lifecycle')
+        seen.add(fixture['id'])
+        _stamp(fixture.get('setup_start_ns'))
+        for key in ('setup_end_ns', 'finalized_ns'):
+            _stamp(fixture.get(key), optional=True)
+            if fixture.get(key) is not None and fixture[key] < fixture['setup_start_ns']:
+                raise ValueError('reversed fixture lifecycle')
+        if fixture.get('teardown_s') is not None:
+            duration(fixture['teardown_s'])
+        elif not fixture.get('teardown_reason'):
+            raise ValueError('unknown fixture teardown lacks reason')
+
+
 def read_telemetry(report):
     """Read timing independently of the strict successful-run validator."""
     data = report.get('telemetry')
@@ -35,13 +72,34 @@ def read_telemetry(report):
         raise ValueError('invalid timing completeness')
     if not isinstance(data.get('phases'), list) or len(data['phases']) > MAX_EVENTS:
         raise ValueError('invalid timing event inventory')
+    workers, missing = data.get('workers'), data.get('missing_workers')
+    if not isinstance(workers, dict) or not isinstance(missing, list):
+        raise ValueError('invalid timing worker inventory')
+    if (set(workers) | set(missing) != set(report.get('started', []))
+            or set(workers) & set(missing) or len(missing) != len(set(missing))):
+        raise ValueError('timing worker inventory differs from observed workers')
+    for worker, summary in workers.items():
+        _worker_summary(summary, worker, report)
+    if data.get('controller') is not None:
+        _worker_summary(data['controller'], 'serial', report)
+    elif data['status'] == 'complete':
+        raise ValueError('complete timing lacks controller observation')
+    if data['status'] == 'complete' and (missing or data['errors']):
+        raise ValueError('complete timing contains missing data')
     seen = set()
+    observed = Counter((r['worker'], r['nodeid'], r['when'], r['outcome'], r.get('subtest') is not None)
+                       for r in report.get('reports', []))
+    timings = Counter()
     for row in data['phases']:
         if (not isinstance(row, dict) or row.get('phase') not in PHASES
                 or not isinstance(row.get('nodeid'), str) or not isinstance(row.get('worker'), str)
                 or type(row.get('subtest')) is not bool
                 or row.get('outcome') not in ('passed', 'failed', 'skipped')):
             raise ValueError('invalid timing phase')
+        key = (row['worker'], row['nodeid'], row['phase'], row['outcome'], row['subtest'])
+        timings[key] += 1
+        if timings[key] > observed[key]:
+            raise ValueError('timing has no matching observed phase')
         if row.get('duration_s') is not None:
             duration(row['duration_s'])
         elif not row.get('missing_reason'):
@@ -56,6 +114,8 @@ def read_telemetry(report):
             raise ValueError('partial timing interval')
         if start is not None and (type(start) is not int or type(end) is not int or start < 0 or end < start):
             raise ValueError('invalid timing interval')
+    if data['status'] == 'complete' and timings != observed:
+        raise ValueError('complete timing omits observed phases')
     return data
 
 
@@ -190,7 +250,13 @@ class TimingCapture:
         outcome = yield
         with self.observing('phase report'):
             report = outcome.get_result()
-            span = self.active_spans.pop((item.nodeid, call.when), None)
+            key = item.nodeid, call.when
+            candidate = self.active_spans.get(key)
+            span = None
+            # Subtests request reports while the parent phase is still running.
+            # Its interval belongs to the final parent report, after phase end.
+            if candidate is not None and candidate['end_ns'] is not None:
+                span = self.active_spans.pop(key)
             # Extra report attributes are carried by pytest/xdist serialization.
             # Do not modify duration, outcome, longrepr or strict evidence rows.
             report.ph_timing = {'run_id': self.run_id, 'worker': self.worker_key, 'span': span}
@@ -286,13 +352,29 @@ class TimingCapture:
                 self.error(worker + ': ' + issue)
 
     def local_summary(self, exitstatus):
+        launch, launched_utc = None, None
+        # Inherited markers in nested pytest processes belong to another launch.
+        if (not self.worker
+                and os.environ.get('PH_TEST_PROCESS_PARENT_PID') == str(os.getppid())):
+            launch = os.environ.get('PH_TEST_PROCESS_START_NS')
+            launched_utc = os.environ.get('PH_TEST_PROCESS_START_UTC')
+        startup = None
+        if launch is not None:
+            try:
+                start = int(launch)
+                if 0 <= start <= self.origin_ns:
+                    startup = (self.origin_ns - start) / 1_000_000_000
+            except ValueError:
+                self.error('invalid launcher start timestamp')
         return {'run_id': self.run_id, 'binding': self.binding, 'worker': self.worker_key,
                 'pid': os.getpid(), 'started_utc': self.started_utc,
                 'clock': 'perf_counter_ns, origin at observer registration, local to this process',
                 'observed_elapsed_ns': self.now(), 'session_start_ns': self.session_start_ns,
                 'collection': self.collection, 'fixtures': self.fixtures,
                 'exitstatus': int(exitstatus), 'errors': list(self.errors),
-                'process_start_utc': None if self.worker else os.environ.get('PH_TEST_PROCESS_START_UTC'),
+                'process_start_utc': launched_utc,
+                'launch_to_registration_s': startup,
+                'startup_scope': 'local launcher before process creation; absent for direct pytest and workers',
                 'session_end_s': None, 'session_end_reason': 'remaining session hooks and report publication unmeasured'}
 
     def finish(self, evidence, exitstatus):

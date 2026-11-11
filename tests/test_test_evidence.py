@@ -3,7 +3,6 @@ from __future__ import annotations
 
 from copy import deepcopy
 import json
-from pathlib import Path
 
 import pytest
 
@@ -213,3 +212,58 @@ def test_crashed_worker_without_output_still_has_a_rejected_completion():
     capture.pytest_testnodedown(node, "worker terminated")
     assert capture.document["errors"]
     assert capture.document["finished"] == {}
+
+
+def test_real_successful_subtests_match_serial_reference_after_transport(tmp_path):
+    suite = make_suite(tmp_path, """
+        import unittest
+        class TestSub(unittest.TestCase):
+            def test_values(self):
+                for value in (1, '1', {'label': 'quoted "value"', 'items': [None, True]}):
+                    with self.subTest(msg='context', value=value):
+                        self.assertIsNotNone(value)
+    """)
+    reference = tmp_path / 'serial.json'
+    parallel = tmp_path / 'parallel.json'
+    serial_run = invoke(suite, reference)
+    assert serial_run.returncode == 0, serial_run.stdout + serial_run.stderr
+    parallel_run = invoke(suite, parallel, workers='2', reference=reference)
+    assert parallel_run.returncode == 0, parallel_run.stdout + parallel_run.stderr
+    serial_report = json.loads(reference.read_text())
+    parallel_report = json.loads(parallel.read_text())
+    equivalent(serial_report, parallel_report)
+    for report in (serial_report, parallel_report):
+        subtests = [r for r in report['reports'] if r['subtest'] is not None]
+        assert len(subtests) == 3
+        identities = [json.loads(row['subtest']) for row in subtests]
+        assert len({identity['kwargs']['value'] for identity in identities}) == 3
+        assert len({identity['msg'] for identity in identities}) == 1
+
+
+@pytest.mark.parametrize('fault', ['missing', 'changed', 'nonstring'])
+def test_corrupt_subtest_identity_transport_is_rejected(tmp_path, fault):
+    config = """
+        import pytest
+        @pytest.hookimpl(hookwrapper=True)
+        def pytest_report_to_serializable(config, report):
+            outcome = yield
+            data = outcome.get_result()
+            if hasattr(config, 'workerinput') and getattr(report, 'context', None) is not None:
+                if FAULT == 'missing':
+                    data.pop('ph_evidence_subtest', None)
+                else:
+                    data['ph_evidence_subtest'] = 'changed' if FAULT == 'changed' else 3
+    """.replace('FAULT', repr(fault))
+    suite = make_suite(tmp_path, """
+        import unittest
+        class TestSub(unittest.TestCase):
+            def test_good(self):
+                with self.subTest(value=1):
+                    self.assertEqual(1, 1)
+    """, config)
+    path = tmp_path / 'report.json'
+    result = invoke(suite, path, workers='2')
+    assert result.returncode != 0, result.stdout + result.stderr
+    report = json.loads(path.read_text())
+    assert report['errors']
+    with pytest.raises(EvidenceError): validate(report)

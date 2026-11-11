@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+from time import perf_counter_ns
 
 if __package__:
     from .test_policy import PROJECT_ROOT, DEFAULT_WORKERS, EVIDENCE_PLUGIN, SUITES, process_exit_code
@@ -98,7 +99,9 @@ def prepare_invocation(
 
 def main(argv: Sequence[str] | None = None) -> int:
     command, environment = prepare_invocation(argv, environment=os.environ)
+    environment['PH_TEST_PROCESS_PARENT_PID'] = str(os.getpid())
     environment['PH_TEST_PROCESS_START_UTC'] = datetime.now(timezone.utc).isoformat()
+    environment['PH_TEST_PROCESS_START_NS'] = str(perf_counter_ns())
     try:
         result = subprocess.run(command, cwd=PROJECT_ROOT, env=environment, check=False)
     except KeyboardInterrupt:
