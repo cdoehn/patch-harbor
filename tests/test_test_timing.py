@@ -8,7 +8,7 @@ import pytest
 
 from tests.runner_support import example, invoke, make_suite
 from tools.test_results import EvidenceError, equivalent, report_digest, validate
-from tools.test_timing import case_timings, rank, read_telemetry
+from tools.timing_model import case_timings, rank, read_telemetry
 
 
 def measured_example():
@@ -168,7 +168,7 @@ def test_real_failed_or_skipped_phases_retain_outcomes(tmp_path, scenario):
         with pytest.raises(EvidenceError): validate(report)
 
 
-@pytest.mark.parametrize('fault', ['crash', 'missing_timing', 'observer'])
+@pytest.mark.parametrize('fault', ['crash', 'missing_timing', 'observer', 'publication'])
 def test_partial_observation_never_changes_the_test_exit_status(tmp_path, fault):
     body = "def test_probe(): pass\n"
     config = ''
@@ -184,18 +184,20 @@ def test_partial_observation_never_changes_the_test_exit_status(tmp_path, fault)
         """
     else:
         config = """
-            from tools.test_timing import TimingCapture
-            def broken(self): raise OSError('observer unavailable')
+            from tools.timing_capture import TimingCapture
+            def broken(*args, **kwargs): raise OSError('observer unavailable')
             TimingCapture.now = broken
         """
+        if fault == 'publication':
+            config = config.replace('TimingCapture.now = broken', 'TimingCapture.finish = broken')
     suite = make_suite(tmp_path, body, config)
     path = tmp_path / 'report.json'
-    result = invoke(suite, path, workers='0' if fault == 'observer' else '2')
+    result = invoke(suite, path, workers='0' if fault in ('observer', 'publication') else '2')
     assert (result.returncode == 0) == (fault != 'crash'), result.stdout + result.stderr
     report = json.loads(path.read_text())
     data = read_telemetry(report)
     assert data['status'] == 'partial' and data['errors']
-    if fault != 'observer': assert data['missing_workers']
+    if fault in ('crash', 'missing_timing'): assert data['missing_workers']
     if fault != 'crash': assert validate(report)
 
 

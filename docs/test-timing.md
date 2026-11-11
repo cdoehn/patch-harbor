@@ -11,7 +11,7 @@ dynamisch angeforderte Fixtures und einen kleinen Frameworkanteil. Fehlende
 Phasen sind unbekannt; nach fehlgeschlagenem/übersprungenem Setup ist call
 `not_run`. Nur tatsächlich gemessene Null ist eine Nullzeit.
 
-`case_timings(report)` liefert die drei Phasen und eine Testgesamtzeit, soweit
+`tools.timing_model.case_timings(report)` liefert die drei Phasen und eine Testgesamtzeit, soweit
 alle benötigten Beobachtungen vorliegen. `rank(report)` sortiert standardmäßig
 nach call; `phase='setup'` und `phase='teardown'` liefern getrennte Ranglisten.
 Subtests bleiben zusätzliche Beobachtungen und werden nicht noch einmal zur
@@ -35,6 +35,11 @@ Messfehler und fehlende Worker ergeben partielle Telemetrie. Der gesonderte
 Reader prüft Run-/Quellbindung und Messwerte, kann aber auch rote Testreports
 lesen. Er bestätigt keine erfolgreiche Abnahme. Die strenge Abnahme bleibt
 ausschließlich Aufgabe von `test_results.validate()`.
+
+`tools/timing_capture.py` enthält ausschließlich den Pytest-Messadapter und
+seine Fehlergrenze. `tools/timing_model.py` liest und bewertet die Messdaten
+ohne Pytest-/Core-Import oder Dateizugriff. `tools/test_evidence.py` übernimmt
+nur das additive Feld in seinen bestehenden atomaren Report-Schreibpfad.
 
 Das ist normale Zeitbeobachtung, kein Profiling: cProfile, tracemalloc, strace
 und die lokale Datenbank gehören zum folgenden, ausdrücklich gestarteten

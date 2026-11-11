@@ -1,7 +1,10 @@
 # PatchHarbor 2.0.0 – lokale Testmessung und Profiling
 
 **Status:** verbindlicher Detailentwurf zum [WRC-Plan](commit-plan.md), noch nicht
-implementiert. **Schritte:** `200-05` bis `200-09`; normale CI-Zeitdarstellung
+vollständig implementiert. Die normale Phasenbeobachtung `200-05.W/R/C` ist in
+Bundle 094 vorbereitet; Ausführung und Bestätigung durch Apply stehen aus.
+Profiling-Startbefehl, Collector und Datenbank folgen weiterhin in `200-06`
+bis `200-09`. **Schritte:** `200-05` bis `200-09`; normale CI-Zeitdarstellung
 zusätzlich `200-10`. **Stand:** 11. November 2026.
 
 ## 1. Lokale Bedienung und Abgrenzung

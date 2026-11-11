@@ -14,7 +14,7 @@ import pytest
 from tools.test_results import EvidenceError, equivalent, report_digest, validate
 from tools.result_io import write_report
 from tools.acceptance_catalog import PROOFS
-from tools.test_timing import TimingCapture
+from tools.timing_capture import install_timing, finish_timing
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -56,7 +56,9 @@ def pytest_configure(config):
     if config.getoption("--ph-reference") and not config.getoption("--ph-report"):
         raise pytest.UsageError("--ph-reference requires --ph-report")
     if config.getoption("--ph-report") or config.getoption("--ph-check"):
-        config.pluginmanager.register(Capture(config), "patchharbor-development-capture")
+        capture = Capture(config)
+        config.pluginmanager.register(capture, "patchharbor-development-capture")
+        install_timing(config, capture.document)
 
 
 def _reason(report) -> str:
@@ -107,8 +109,6 @@ class Capture:
         self.worker_key = config.workerinput["workerid"] if self.worker else "serial"
         if self.worker:
             self.document["run_id"] = config.workerinput["ph_evidence_run_id"]
-        self.timing = TimingCapture(config, run_id=self.document['run_id'], binding=self.document['binding'])
-        config.pluginmanager.register(self.timing, 'patchharbor-development-timing')
 
     @pytest.hookimpl(optionalhook=True)
     def pytest_xdist_setupnodes(self, config, specs):
@@ -173,7 +173,7 @@ class Capture:
 
     @pytest.hookimpl(trylast=True)
     def pytest_sessionfinish(self, session, exitstatus):
-        timing = self.timing.finish(self.document, session.exitstatus)
+        timing = finish_timing(self.config, self.document, session.exitstatus)
         if not self.worker:
             self.document['telemetry'] = timing
         if self.worker:
