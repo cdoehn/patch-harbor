@@ -2,8 +2,8 @@
 
 **Plan-ID:** `PH-200` · **Revision:** 2 · **Stand:** 11. November 2026<br>
 **Zielversion:** **2.0.0**<br>
-**Status:** Bundle 094 scheiterte vor seinem ersten Commit am Packaging-Dateiinventar. Bundle 095 repariert den erhaltenen Stand und übernimmt weiterhin Positionen 11–17.<br>
-**Fortschritt:** **10 / 38 Umsetzungscommits**, zwölf WRC-Schritte; die Protokoll-Work-Phase besteht aus drei Teilcommits.<br>
+**Status:** Bundle 095 bestätigt den Monitor-Abschluss 200-03.C; Bundle 096 repariert den Testaufbau von 200-04.W und setzt die sechs verbleibenden Positionen 12–17 fort.<br>
+**Fortschritt:** **11 / 38 Umsetzungscommits**, zwölf WRC-Schritte; die Protokoll-Work-Phase besteht aus drei Teilcommits.<br>
 **Aktiver Planpfad:** `planning/2.0.0/commit-plan.md`<br>
 **Zugehöriger Detailentwurf:** [Lokale Testmessung und Profiling](test-profiling.md).
 Dieser Detailentwurf gehört zu diesem Plan; er ist kein konkurrierender Plan.
@@ -214,8 +214,9 @@ scheiterte vor dem Commit. Bundle 093 hat die reparierten Positionen 5–10
 anschließend erfolgreich übernommen: Result `38b6e72e-c15f-4273-817f-c37a3b5cd914`,
 Endcommit `5ff1e71c5c5f0854554633493393b5e85fa5e4c3`. Alle sechs vollständigen
 Apply-Gates waren erfolgreich; im letzten Lauf 3.814 bestandene Tests und
-16 Skips. Die übrigen 28 Positionen bleiben **OFFEN**; das Reparaturbundle 095 übernimmt
-Positionen 11–17.
+16 Skips. Bundle 095 hat anschließend Position 11 (`200-03.C`) erfolgreich
+committed. Die übrigen 27 Positionen bleiben **OFFEN**; Reparaturbundle 096
+setzt bei Position 12 an und übernimmt Positionen 12–17.
 Die Commit-Subjects sind verbindliche
 Planvorlagen; Fortschritt wird erst mit tatsächlichem Commit und Result eingetragen.
 
@@ -812,3 +813,27 @@ Bundle 095 bindet das neue Result einschließlich seines Dirty-Fingerprints
 und führt dieselben sieben Schritte mit jeweils vollständigem Apply-Gate
 vor dem Commit weiter. Worker bleiben `auto` ohne zusätzliche Obergrenze.
 In Dev erfolgt nur statische Analyse. Push, Tag und CI bleiben aus.
+
+## Apply 095 und Reparaturbundle 096
+
+Result `509a819d-0c5b-4fab-bb7a-2dc5ad606263` bestätigt den Monitor-Abschluss
+`200-03.C` mit Commit `f34f967995c1ba0222ba7bbfaed53845dca57bd8` nach
+erfolgreichem vollständigem Apply-Gate. Damit sind 11/38 Schritte bestätigt.
+Der folgende Schritt `200-04.W` blieb uncommitted: 3.824 bestandene Tests,
+drei Fehler und 16 Skips mit zwölf automatisch gewählten Workern.
+
+Alle drei Fehler betreffen die Dirty-Variante der installierten Wheel-,
+Sdist- und PYZ-Rundreisen. Ihr Testaufbau veränderte das Repository bereits
+vor seiner Erstregistrierung. Bundle 096 registriert zuerst das saubere
+Repository und erzeugt erst danach Index-, Arbeitskopie- und unversionierte
+Änderungen vor dem ersten Result-Bundle. Die Prüfung bestätigt nach beiden
+Execute-Runden weiterhin diese drei unveränderten Inhalte und den HEAD.
+Der Registrierungsschutz und sämtliche Produktprüfungen bleiben unverändert.
+
+Die Korrektur gilt für alle sechs verbleibenden Stände `200-04.W` bis
+`200-05.C`. Das neue Bundle bindet den Dirty-Fingerprint des Results und
+wiederholt den bereits bestätigten Monitor-Commit nicht. Die Packaging-
+Reparaturen aus 095 bleiben in allen Folgeständen erhalten. Jeder weitere
+Commit benötigt die vollständige parallele Testsuite in Apply mit Workern
+`auto` ohne zusätzliche Obergrenze. Dev prüft nur statisch; Push, Tag und CI
+bleiben bis zum vereinbarten Abschluss aus.
