@@ -2,8 +2,8 @@
 
 **Plan-ID:** `PH-200` · **Revision:** 2 · **Stand:** 11. November 2026<br>
 **Zielversion:** **2.0.0**<br>
-**Status:** 15 Schritte bleiben bestätigt. Bundle 098 repariert zusätzlich die Übertragung der Subtest-Nachweise und setzt Positionen 16–17 fort.<br>
-**Fortschritt:** **15 / 38 Umsetzungscommits**, zwölf WRC-Schritte; die Protokoll-Work-Phase besteht aus drei Teilcommits.<br>
+**Status:** Apply 098 bestätigt Positionen 16–17. Bundle 099 bereitet die zwölf Profiling-Schritte 18–29 vor; Bestätigung ausschließlich durch Apply.<br>
+**Fortschritt:** **17 / 38 Umsetzungscommits**, zwölf WRC-Schritte; die Protokoll-Work-Phase besteht aus drei Teilcommits.<br>
 **Aktiver Planpfad:** `planning/2.0.0/commit-plan.md`<br>
 **Zugehöriger Detailentwurf:** [Lokale Testmessung und Profiling](test-profiling.md).
 Dieser Detailentwurf gehört zu diesem Plan; er ist kein konkurrierender Plan.
@@ -246,12 +246,12 @@ Planvorlagen; Fortschritt wird erst mit tatsächlichem Commit und Result eingetr
 | 21 / 38 | `200-07.W` | `feat(profiling): record phase-specific Python time and memory [200-07.W]` |
 | 22 / 38 | `200-07.R` | `test(profiling): expose process coverage and measurement overhead [200-07.R]` |
 | 23 / 38 | `200-07.C` | `refactor(profiling): normalize Python profile evidence [200-07.C]` |
-| 24 / 38 | `200-08.W` | `feat(profiling): collect local strace process evidence [200-08.W]` |
-| 25 / 38 | `200-08.R` | `test(profiling): harden syscall attribution and trace limits [200-08.R]` |
-| 26 / 38 | `200-08.C` | `refactor(profiling): separate syscall parsing and correlation [200-08.C]` |
-| 27 / 38 | `200-09.W` | `feat(profiling): rank evidence-backed optimization candidates [200-09.W]` |
-| 28 / 38 | `200-09.R` | `test(profiling): reject incomparable runs and uncertain conclusions [200-09.R]` |
-| 29 / 38 | `200-09.C` | `refactor(profiling): share phase-aware report queries [200-09.C]` |
+| 24 / 38 | `200-08.W` | `feat(profiling): collect local strace process and phase evidence [200-08.W]` |
+| 25 / 38 | `200-08.R` | `test(profiling): reject ambiguous incomplete and unavailable traces [200-08.R]` |
+| 26 / 38 | `200-08.C` | `refactor(profiling): separate trace parsing correlation and persistence [200-08.C]` |
+| 27 / 38 | `200-09.W` | `feat(profiling): persist evidence-backed findings and phase rankings [200-09.W]` |
+| 28 / 38 | `200-09.R` | `test(profiling): enforce comparison provenance and separate measurement modes [200-09.R]` |
+| 29 / 38 | `200-09.C` | `refactor(profiling): share bounded reporting and document local commands [200-09.C]` |
 | 30 / 38 | `200-10.W` | `feat(ci): summarize existing test reports in Actions [200-10.W]` |
 | 31 / 38 | `200-10.R` | `test(ci): preserve gates with failed and missing summaries [200-10.R]` |
 | 32 / 38 | `200-10.C` | `refactor(ci): reuse bounded report rendering [200-10.C]` |
@@ -893,3 +893,14 @@ Die Zeitmessungs-, Launcher-, Packaging- und Dirty-Rundreise-Reparaturen bleiben
 erhalten. Vor jedem der zwei Commits läuft die vollständige parallele Testsuite
 in Apply mit Workern `auto` ohne zusätzliche Obergrenze. Dev prüft nur statisch;
 Push, Tag und CI bleiben bis zum vereinbarten Abschluss aus.
+
+## Apply 098 und Bundle 099
+
+Result `1490b188-c1e4-4070-8d2a-95e79b12e6ec` bestätigt beide letzten
+Zeitmessungs-Commits. Endstand `57f1e9e702cb9d2f80e6fa835cc0cea36dbb5c5f`:
+3.890 bestandene Tests, 16 Skips, zwölf automatisch gewählte Worker, saubere
+Arbeitskopie. Damit sind 17/38 Schritte bestätigt. Bundle 099 bündelt die
+zwölf echten WRC-Stände `200-06.W` bis `200-09.C`. Vollständiges paralleles
+Apply-Gate vor jedem Commit; Dev ausschließlich statisch. Workerstandard
+bleibt auf Nutzerwunsch `auto`, auch beim expliziten Diagnosebefehl. Push,
+Tag und CI bleiben aus. Das Folgepaket wird nur als Draft vorbereitet.

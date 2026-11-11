@@ -1,8 +1,8 @@
 # PatchHarbor 2.0.0 – lokale Testmessung und Profiling
 
 **Status:** verbindlicher Detailentwurf zum [WRC-Plan](commit-plan.md), noch nicht
-vollständig implementiert. Die normale Phasenbeobachtung `200-05.W/R/C` ist in
-Bundle 094 vorbereitet; Ausführung und Bestätigung durch Apply stehen aus.
+vollständig implementiert. Die normale Phasenbeobachtung `200-05.W/R/C` ist durch
+Apply 098 bestätigt.
 Profiling-Startbefehl, Collector und Datenbank folgen weiterhin in `200-06`
 bis `200-09`. **Schritte:** `200-05` bis `200-09`; normale CI-Zeitdarstellung
 zusätzlich `200-10`. **Stand:** 11. November 2026.
@@ -51,8 +51,8 @@ von Produktbundles, Runtime-Ressourcen und GitHub-Artefaktglobs. Ein expliziter
 alternativer Pfad wird angezeigt und genau benutzt. Das Werkzeug bietet keinen
 Remote-Speicheradapter und keinen Hintergrundmodus.
 
-Für Diagnosezuordnung wird die gewählte Auswahl standardmäßig mit einem
-xdist-Worker gemessen. Das ist ein ausdrücklich gestarteter Diagnosemodus,
+Auf späteren Nutzerauftrag wird die gewählte Auswahl standardmäßig mit
+`auto`-Workern gemessen; `--workers` erlaubt eine explizite Diagnoseauswahl. Das ist ein ausdrücklich gestarteter Diagnosemodus,
 kein neues serielles Commit-Gate. Der bestehende Testlauncher, seine Isolation,
 Suiteauswahl und xdist bleiben maßgeblich; kein eigener Scheduler. Parallelität
 kann ausdrücklich gewählt und dokumentiert werden, unsichere Zuordnungen bleiben
