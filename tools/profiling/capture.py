@@ -17,7 +17,7 @@ from tools.profiling.storage import database, store_report
 from tools.test_policy import PROJECT_ROOT, process_exit_code
 from tools.test_runner import prepare_invocation
 
-MODES = ('baseline',)
+MODES = ('baseline', 'cprofile', 'memory')
 
 
 def selection_facts(selection):
@@ -141,6 +141,9 @@ def capture(connection, run_id, mode, iteration, warmup, directory, metadata, ar
     environment['PH_TEST_PROCESS_PARENT_PID'] = str(os.getpid())
     environment['PH_TEST_PROCESS_START_NS'] = str(time.perf_counter_ns())
     environment['PH_TEST_PROCESS_START_UTC'] = utc()
+    if mode in ('cprofile', 'memory'):
+        command.extend(['-p', 'tools.profiling.collector'])
+        environment.update(PH_PROFILE_MODE=mode, PH_PROFILE_DIRECTORY=str(output), PH_PROFILE_MEASUREMENT=identity)
     code, status, reason, elapsed = wait_child(command, environment, output, args.timeout, args.max_bytes)
     details = {'reason': reason, 'command': command, 'collector': mode, 'process_exit_code': code,
                'scope': 'pytest phases; subprocess CPU and native memory are not measured',
@@ -161,6 +164,9 @@ def capture(connection, run_id, mode, iteration, warmup, directory, metadata, ar
             validate(report)
         with connection:
             observed = store_report(connection, identity, report, metadata['binding'])
+            if mode in ('cprofile', 'memory') and status == 'complete':
+                from tools.profiling.python_data import import_python
+                details['python_collector'] = import_python(connection, identity, output, mode, max_bytes=args.max_bytes)
         if observed != 'complete' and status == 'complete':
             status, details['reason'] = 'partial', 'incomplete phase telemetry'
     except (OSError, ValueError, KeyError, TypeError) as exc:
