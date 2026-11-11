@@ -14,6 +14,7 @@ import pytest
 from tools.test_results import EvidenceError, equivalent, report_digest, validate
 from tools.result_io import write_report
 from tools.acceptance_catalog import PROOFS
+from tools.test_timing import TimingCapture
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -106,6 +107,8 @@ class Capture:
         self.worker_key = config.workerinput["workerid"] if self.worker else "serial"
         if self.worker:
             self.document["run_id"] = config.workerinput["ph_evidence_run_id"]
+        self.timing = TimingCapture(config, run_id=self.document['run_id'], binding=self.document['binding'])
+        config.pluginmanager.register(self.timing, 'patchharbor-development-timing')
 
     @pytest.hookimpl(optionalhook=True)
     def pytest_xdist_setupnodes(self, config, specs):
@@ -160,6 +163,9 @@ class Capture:
 
     @pytest.hookimpl(trylast=True)
     def pytest_sessionfinish(self, session, exitstatus):
+        timing = self.timing.finish(self.document, session.exitstatus)
+        if not self.worker:
+            self.document['telemetry'] = timing
         if self.worker:
             self.config.workeroutput["ph_evidence"] = {
                 "run_id": self.document["run_id"], "binding": self.document["binding"],

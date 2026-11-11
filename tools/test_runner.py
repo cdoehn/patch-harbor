@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 from collections.abc import Mapping, Sequence
+from datetime import datetime, timezone
 import os
 from pathlib import Path
 import subprocess
@@ -97,6 +98,7 @@ def prepare_invocation(
 
 def main(argv: Sequence[str] | None = None) -> int:
     command, environment = prepare_invocation(argv, environment=os.environ)
+    environment['PH_TEST_PROCESS_START_UTC'] = datetime.now(timezone.utc).isoformat()
     try:
         result = subprocess.run(command, cwd=PROJECT_ROOT, env=environment, check=False)
     except KeyboardInterrupt:
