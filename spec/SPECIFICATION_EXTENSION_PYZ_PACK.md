@@ -8,7 +8,7 @@
 **Status:** Fortgeltender PYZ/PACK-Vertrag; Revision 8 ergänzt die öffentlichen Integrationsverträge für 1.6.0 bei unveränderter Kompatibilitätsbasis. Historische Ausführungsnachweise bleiben in ihren bisherigen Plänen.
 **Produktversion:** 1.8.0; Kompatibilitätsbasis ab 1.4.0. Aktueller Folgeplan: `planning/safe-reference/commit-plan.md`; historische Abnahmen bleiben erhalten.
 
-> **Ziel:** Neue Result-Bundles liefern PatchHarbor als direkt mit Python aufrufbare PYZ statt als zu installierendes Runtime-Wheel. Die PYZ enthält den PatchHarbor-Core mit dessen CLI und öffentlicher Python-API, **aber keinen Watcher**. Zusätzlich erhält PatchHarbor das reguläre Unterkommando `pack` und die öffentliche Funktion `api.pack_patch(...)`, um vorbereitete Inhalte als referenzgebundenes, abschließend validiertes Patch-Paket zu erzeugen.
+> **Ziel:** Neue Result-Bundles liefern PatchHarbor als direkt mit Python aufrufbare PYZ statt als zu installierendes Runtime-Wheel. Die PYZ enthält den PatchHarbor-Core mit dessen CLI und öffentlicher Python-API, **aber keinen Watcher**. Zusätzlich erhält PatchHarbor das reguläre Unterkommando `pack` und die öffentliche Funktion `api.pack_task(...)`, um vorbereitete Inhalte als referenzgebundenes, abschließend validiertes Patch-Paket zu erzeugen.
 
 ---
 
@@ -113,7 +113,7 @@ PP-00 muss diese Angaben mit den dann tatsächlich verfügbaren Result-, Commit-
 
 | Basisbereich | Änderung durch diese Ergänzung und ihre Grenze |
 |---|---|
-| §§ 4 und 32: Installation und öffentliche API | Normale Installation bleibt erhalten; PYZ als zusätzliche Distribution; `pack_patch` wird ergänzt. |
+| §§ 4 und 32: Installation und öffentliche API | Normale Installation bleibt erhalten; PYZ als zusätzliche Distribution; `pack_task` wird ergänzt. |
 | § 5 und § 36: CLI | Neues Unterkommando `pack`; vorhandene Core-Kommandos bleiben erhalten. |
 | §§ 10, 15–17 und 34: Paket, Apply und Modi | Werden wiederverwendet, nicht durch eine neue Einspielstrategie ersetzt. |
 | § 19.6a: „Der Core erzeugt keine Patch-Pakete.“ | Ausschließlich für die ausdrücklich aufgerufene neue Pack-Operation aufgehoben; kein automatisches Packen durch `bundle`, `apply` oder den Watcher. |
@@ -290,7 +290,7 @@ Für `inspect`, referenzbasiertes `validate` und die Vorlagenverwendung von `pac
 
 ### 5.5 Python-only-Aufruf
 
-**PYZ-05.** Ein Aufruf der öffentlichen API aus einer Python-Sitzung ohne Terminal-Unterprozess ist unterstützt. Nach kontrollierter Aufnahme des **zuvor geprüften** PYZ-Pfads in den Importpfad müssen `api.inspect_patch`, `api.validate_patch` und `api.pack_patch` verwendbar sein. ZIP-Import wird vom Python-Importsystem unterstützt. [Q2]
+**PYZ-05.** Ein Aufruf der öffentlichen API aus einer Python-Sitzung ohne Terminal-Unterprozess ist unterstützt. Nach kontrollierter Aufnahme des **zuvor geprüften** PYZ-Pfads in den Importpfad müssen `api.inspect_task`, `api.validate_task` und `api.pack_task` verwendbar sein. ZIP-Import wird vom Python-Importsystem unterstützt. [Q2]
 
 Dabei gelten folgende Grenzen:
 
@@ -481,7 +481,7 @@ Für unveränderte 1.4.0-Artefakte lautet `capabilities` weiterhin:
 
 ```json
 {
-  "operations": ["inspect_patch", "validate_patch", "pack_patch"],
+  "operations": ["inspect_task", "validate_task", "pack_task"],
   "patch_formats": [1],
   "result_formats": [1, 2, 3]
 }
@@ -663,7 +663,7 @@ Ein Dateisystempfad zum Inhalts- oder Ausgabeordner kann normale plattformeigene
 **PACK-03.** Im unterstützten Import-Namensraum `patchharbor.api` wird ergänzt:
 
 ```python
-def pack_patch(
+def pack_task(
     content_directory: str | os.PathLike[str],
     *,
     reference_bundle: str | os.PathLike[str],
@@ -1071,7 +1071,7 @@ Ein kleines Beispiel für den eigentlichen API-Schritt, **nach abgeschlossener B
 ```python
 from patchharbor import api
 
-result = api.pack_patch(
+result = api.pack_task(
     "patch-inhalt",
     reference_bundle="result.zip",
     entrypoint="apply.sh",
@@ -1129,7 +1129,7 @@ Ein noch unveränderter Versionsstring darf keinen abgeschlossenen Plan reaktivi
 | Spezifikations-/Planverweise | Beide Dateien nach `GOV-03` gemeinsam referenzieren; Featureplan ausdrücklich auswählen, echte Konkurrenz weiterhin erkennen und keine zweite Vollkopie erzeugen. |
 | `README.md` | Manuelles `pack`, Inhaltsordner, PYZ-Start, normale Installation weiterhin über Wheel, klare Watcher-Abgrenzung. |
 | CLI-Hilfe | Eingaben, Ausgabealternativen, Suffix, Modusoptionen und fehlende Ausführung durch `pack` erklären. |
-| `docs/python-api.md` | `pack_patch`, `PatchPackResult`, phasenunabhängige Bestandsfehler, Erfolg trotz Cleanup-Warnung, stille Standardaufrufe und In-Process-Verwendung. |
+| `docs/python-api.md` | `pack_task`, `PatchPackResult`, phasenunabhängige Bestandsfehler, Erfolg trotz Cleanup-Warnung, stille Standardaufrufe und In-Process-Verwendung. |
 | `docs/runtime-artifact.md` | PYZ-Profil, neues Rezept, Hashverfahren, Normalinstallation versus portable Runtime, Watcher-Ausschluss. |
 | `docs/runtime-bootstrap.md` und `scripts/pyz_bootstrap.py` | Installationsfreien Bootstrap und sicheren Runtime-Ausfall-Fallback für die unterstützte Basis nutzbar halten; die tatsächlich mitgelieferte Vorlage einbeziehen, keine blind ausgeführte Runtime. |
 | `docs/result-format-2.md` | Historischen Format-2-Vertrag erhalten und auf den Nachfolger verweisen; nicht nachträglich zu Format 3 umdeuten. |
@@ -1306,7 +1306,7 @@ Die Tabelle legt **Arbeitspakete, nicht eine künstlich feste Anzahl Git-Commits
 | **PP-07 – Chat-Vertrag und Dokumentationsabschluss** | Bereits funktionsfähigen Bootstrap übergreifend abgleichen; gemeinsame Spezifikationsauswahl, Legacy-/Fehler-Fallback, Pack-Auslieferung und alle betroffenen Dokumente abschließen. **Keine erstmalige Bereitstellung des für PP-06 nötigen Startwegs.** | PP-03 bis PP-06 | Nutzbare Beispiele, E-07/E-08/E-09 und fachlicher Anweisungsreview; kein Widerspruch zwischen Normsatz, Plan und eingebetteter Anleitung. |
 | **PP-08 – Gesamtregression und Release-Nachweis** | Finale Installationsartefakte und finale PYZ auf unterstützten Plattformen prüfen; Last-/Fault-Fälle, Bestands-Watcher-/Result-Publikationsregression und tatsächliche CIFS-Nachweise getrennt erfassen; Architekturreview und Bericht. | PP-00 bis PP-07 | Gesamte Definition of Done erfüllt; Nachweise an konkrete Commits und Artefakthashes gebunden, offene native/CIFS-Abnahmen nicht durch lokale Tests ersetzt. |
 
-PP-04 und PP-05 können vorbereitet werden, während `pack` entsteht. Der Writer darf jedoch erst in einem auslieferbaren Stand umgestellt werden, wenn Reader, Provider, eingebettete Anweisung und PYZ die gemeinsam deklarierten Fähigkeiten tatsächlich besitzen. Insbesondere darf `pack_patch` nicht in Capability-Daten angekündigt werden, obwohl der ausgelieferte Code die Operation noch nicht enthält.
+PP-04 und PP-05 können vorbereitet werden, während `pack` entsteht. Der Writer darf jedoch erst in einem auslieferbaren Stand umgestellt werden, wenn Reader, Provider, eingebettete Anweisung und PYZ die gemeinsam deklarierten Fähigkeiten tatsächlich besitzen. Insbesondere darf `pack_task` nicht in Capability-Daten angekündigt werden, obwohl der ausgelieferte Code die Operation noch nicht enthält.
 
 Das Bootstrap-/Writer-Gate ist eine **funktionale Abhängigkeit**, kein zusätzlicher Nutzerarbeitsschritt und keine zwingend zusätzliche Commit- oder Bundle-Grenze. Eng gekoppelte Vorbereitung und Writerwechsel dürfen gemeinsam umgesetzt werden, wenn kein kaputter Zwischenstand ausgeliefert wird und der Durchstich vor der Freigabe besteht.
 

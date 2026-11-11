@@ -22,7 +22,7 @@ from patchharbor.models import (
     RepositoryId,
     RepositoryPath,
 )
-from patchharbor.patch_manifest import PatchManifest
+from patchharbor.task_manifest import TaskManifest
 from patchharbor.registry import load_registry
 from patchharbor.repository import (
     inspect_repository,
@@ -74,7 +74,7 @@ class SafeResolvedRepository:
         if not self.result_publication.reserved:
             raise ValueError("apply Result Bundle publication must be reserved")
 
-    def matches_manifest_state(self, manifest: PatchManifest) -> bool:
+    def matches_manifest_state(self, manifest: TaskManifest) -> bool:
         """Whether the manifest names this exact resolved repository state."""
         return (
             manifest.repo_id == self.repo_id
@@ -126,7 +126,7 @@ def _inspect_repository_identity(
 
 @contextmanager
 def safely_resolved_repository(
-    manifest: PatchManifest,
+    manifest: TaskManifest,
     *,
     session: RunSession,
     output_directory: Path | None = None,

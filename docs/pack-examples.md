@@ -21,11 +21,11 @@ Die API einer vorhandenen passenden Installation lautet:
 ```python
 from patchharbor import api
 
-packed = api.pack_patch(
+packed = api.pack_task(
     "/work/contents", reference_bundle="/work/result.zip",
     entrypoint="run.sh", output_directory="/work/output",
 )
-checked = api.validate_patch(packed.path, reference_bundle="/work/result.zip")
+checked = api.validate_task(packed.path, reference_bundle="/work/result.zip")
 assert checked.scope == "reference" and checked.binding_matches
 print(packed.path, packed.package_sha256)
 ```

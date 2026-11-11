@@ -2,8 +2,8 @@
 
 **Plan-ID:** `PH-200` · **Revision:** 2 · **Stand:** 11. November 2026<br>
 **Zielversion:** **2.0.0**<br>
-**Status:** `200-01.R` durch Apply 090 bestätigt; Bundle 091 bereitet sechs Folgestände vor.<br>
-**Fortschritt:** **2 / 38 Umsetzungscommits**, zwölf WRC-Schritte; die Protokoll-Work-Phase besteht aus drei Teilcommits.<br>
+**Status:** `200-01.C` durch Apply 091 bestätigt; Bundle 092 repariert `200-02.W1` und setzt die Folgephasen fort.<br>
+**Fortschritt:** **3 / 38 Umsetzungscommits**, zwölf WRC-Schritte; die Protokoll-Work-Phase besteht aus drei Teilcommits.<br>
 **Aktiver Planpfad:** `planning/2.0.0/commit-plan.md`<br>
 **Zugehöriger Detailentwurf:** [Lokale Testmessung und Profiling](test-profiling.md).
 Dieser Detailentwurf gehört zu diesem Plan; er ist kein konkurrierender Plan.
@@ -206,7 +206,12 @@ wenn dafür tatsächliche Informationen vorliegen.
 `3670347923c107c8ae2b76d0d4c65ce2516fa63c` und
 `bdba905c4cb982bca0e2f86384c3b97ea729a886` bestätigt. Result
 `930a7e0d-497e-4009-9462-df7ea75a0d57` belegt den sauberen letzten Stand.
-Die übrigen 36 Positionen sind **OFFEN**; Bundle 091 bereitet Positionen 3–8 vor.
+`200-01.C` ist zusätzlich durch Commit
+`682b042407048f5e0b6da23f70aad5c845ce0f37` und Result
+`5bc9a539-ef0a-40d8-a6af-5d672407cac0` bestätigt. Dessen folgender W1-Lauf
+scheiterte vor dem Commit; der tatsächliche uncommittete Zustand bleibt die
+gebundene Ausgangsbasis. Die übrigen 35 Positionen sind **OFFEN**;
+Bundle 092 bereitet die reparierten Positionen 4–9 vor.
 Die Commit-Subjects sind verbindliche
 Planvorlagen; Fortschritt wird erst mit tatsächlichem Commit und Result eingetragen.
 
@@ -683,3 +688,20 @@ Im Script-Cleanup wird der bereits validierte Parserwert im `BundleScript`
 weitergereicht; Ausführung und Beobachtung verwenden dieselben geparsten Daten.
 Die notwendige erneute Prüfung eines ausgewählten Dateikandidaten bleibt bestehen.
 Die sechs tatsächlichen Ergebnisse sind vor dem neuen Result weiterhin offen.
+
+## Apply 091 und Reparaturbundle 092
+
+Result `patchharbor-apply_Result_123041_1111_5bc9a5.zip`, SHA-256
+`de237a9f95d45bfe4de1df1dd4a2c36d79aca648ca76d9aaa33597eb6f268f4f`,
+bestätigt `200-01.C` auf `682b042407048f5e0b6da23f70aad5c845ce0f37`:
+3.760 bestandene Tests und 16 Skips. Der folgende W1-Testlauf scheiterte vor
+seinem Commit mit 44 Fehlern bei 3.716 bestandenen Tests und 16 Skips. Vier
+dynamisch zusammengesetzte Testaufrufe verwendeten noch `_patch` statt `_task`.
+
+Bundle 092 bindet exakt den erhaltenen uncommitteten W1-Zustand. Die Reparatur
+gilt auch für W2, W3, R und C; umbenannte spätere Testdateien übernehmen sie.
+Die bereits bestätigte Script-C-Phase wird nicht erneut committed. Es folgen
+W1, W2, W3, R, C und der Work-Schritt `200-03.W` mit jeweils vollständigem
+parallelem Apply-Gate. Statische Nachprüfung gleicht zusätzlich gekoppelte
+Artefakttypen und die versionierte Replay-Ablage ab. Keine dieser Vorbereitungen
+ist ein Erfolgsnachweis für die noch offenen Commits.

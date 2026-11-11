@@ -55,8 +55,8 @@ def test_workflow_layer_rejects_reverse_and_presentation_dependencies(caller, de
 
 def test_orchestration_cannot_hide_in_a_domain_service():
     services = frozenset({'patchharbor.registration', 'patchharbor.exchange', 'patchharbor.execution'})
-    assert workflow_violations({'patchharbor.patch_manifest': services}) == {
-        ('patchharbor.patch_manifest', service) for service in services}
+    assert workflow_violations({'patchharbor.task_manifest': services}) == {
+        ('patchharbor.task_manifest', service) for service in services}
 
 
 @pytest.mark.parametrize('source', ['from . import application_exchange as hidden',

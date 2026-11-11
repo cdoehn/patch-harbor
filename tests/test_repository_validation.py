@@ -52,7 +52,7 @@ def test_checkout_conversion_retains_legacy_context_but_readonly_rejects_ambigui
     assert api.context(repo) == context
     before = files(tmp_path)
     with pytest.raises(api.PatchHarborError) as caught:
-        api.validate_patch(patch, repository=repo)
+        api.validate_task(patch, repository=repo)
     assert int(exit_code_for_error(caught.value)) == 13
     assert files(tmp_path) == before
 
@@ -70,7 +70,7 @@ def test_readonly_content_conversion_is_explicitly_unsupported(
     (repo / 'tracked.txt').write_bytes(content)
     before = files(tmp_path)
     with pytest.raises(api.PatchHarborError) as caught:
-        api.validate_patch(patch, repository=repo)
+        api.validate_task(patch, repository=repo)
     assert int(exit_code_for_error(caught.value)) == 13
     assert files(tmp_path) == before
 
@@ -84,7 +84,7 @@ def test_dirty_lf_text_keeps_the_same_binding_in_both_capture_modes(tmp_path, mo
     bound_package(patch, {key: str(getattr(context, key)) for key in (
         'repo_id', 'base_commit', 'state_fingerprint', 'fingerprint_algorithm',
     )})
-    assert api.validate_patch(patch, repository=repo).context == context
+    assert api.validate_task(patch, repository=repo).context == context
 
 
 @pytest.mark.parametrize('outcome',['success','mismatch','unregistered','unsupported','busy'])
@@ -104,10 +104,10 @@ def test_validation_preserves_index_registry_config_replay_and_contents(tmp_path
         else:yield
     with maybe_busy():
         if outcome=='success':
-            result=api.validate_patch(patch,repository=repo)
+            result=api.validate_task(patch,repository=repo)
             assert result.context==context and result.binding_matches
         else:
-            with pytest.raises(api.PatchHarborError) as caught:api.validate_patch(patch,repository=repo)
+            with pytest.raises(api.PatchHarborError) as caught:api.validate_task(patch,repository=repo)
             assert int(exit_code_for_error(caught.value))=={'mismatch':9,'unregistered':8,'unsupported':13,'busy':12}[outcome]
     assert files(tmp_path)==before
     # A failed request releases every lock it acquired.
@@ -130,7 +130,7 @@ def test_changes_during_capture_do_not_return_the_old_context(tmp_path,monkeypat
             else:git(repo,'commit','--allow-empty','-m','concurrent head')
         return snapshot
     monkeypatch.setattr(state,'capture_repository_snapshot',changing)
-    with pytest.raises(api.PatchHarborError) as caught:api.validate_patch(patch,repository=repo)
+    with pytest.raises(api.PatchHarborError) as caught:api.validate_task(patch,repository=repo)
     assert int(exit_code_for_error(caught.value))==8
 
 
@@ -142,7 +142,7 @@ def test_registry_change_after_snapshot_is_rechecked(tmp_path,monkeypatch):
         registration_user_paths().registry_path.write_text('{"format_version":1,"repositories":{}}')
         return snapshot
     monkeypatch.setattr(state,'capture_consistent_repository_snapshot',changed_after_capture)
-    with pytest.raises(api.PatchHarborError) as caught:api.validate_patch(patch,repository=repo)
+    with pytest.raises(api.PatchHarborError) as caught:api.validate_task(patch,repository=repo)
     assert int(exit_code_for_error(caught.value))==8
 
 
@@ -155,7 +155,7 @@ def test_missing_registration_creates_no_configuration_directory(tmp_path,monkey
     _,binding=reference_entries();patch=tmp_path/'patch.zip';bound_package(patch,binding)
     configuration=Path(env['APPDATA'])/'PatchHarbor' if os.name=='nt' else Path(env['XDG_CONFIG_HOME'])/'patchharbor'
     assert not configuration.exists()
-    with pytest.raises(api.PatchHarborError) as caught:api.validate_patch(patch,repository=repo)
+    with pytest.raises(api.PatchHarborError) as caught:api.validate_task(patch,repository=repo)
     assert int(exit_code_for_error(caught.value))==8
     assert not configuration.exists() and not (repo/'.patchharbor').exists()
 
@@ -193,17 +193,17 @@ def test_read_queries_do_not_start_fsmonitor_filters_textconv_or_hooks(tmp_path,
     before=files(tmp_path)
     if changed:
         with pytest.raises(api.PatchHarborError) as caught:
-            api.validate_patch(patch,repository=repo)
+            api.validate_task(patch,repository=repo)
         assert int(exit_code_for_error(caught.value)) == 13
     else:
-        assert api.validate_patch(patch,repository=repo).binding_matches
+        assert api.validate_task(patch,repository=repo).binding_matches
     assert not sentinel.exists(), unexpected_queries
     assert files(tmp_path)==before
 
 
 def test_validate_does_not_authorize_later_apply_of_changed_state(tmp_path,monkeypatch):
     repo,patch,_=world(tmp_path,monkeypatch)
-    assert api.validate_patch(patch,repository=repo).binding_matches
+    assert api.validate_task(patch,repository=repo).binding_matches
     (repo/'later.txt').write_bytes(b'user change after validation')
     report=api.dry_run(patch,output_directory=tmp_path/'results')
     assert not report.success and report.primary_result.kind is api.PrimaryResultKind.STATE_MISMATCH
@@ -214,11 +214,11 @@ def test_validate_does_not_authorize_later_apply_of_changed_state(tmp_path,monke
 def test_repository_option_does_not_substitute_a_different_identity(tmp_path,monkeypatch):
     repo,patch,_=world(tmp_path,monkeypatch)
     other=create_repository(tmp_path/'other');api.register(other)
-    with pytest.raises(api.PatchHarborError) as caught:api.validate_patch(patch,repository=other)
+    with pytest.raises(api.PatchHarborError) as caught:api.validate_task(patch,repository=other)
     assert int(exit_code_for_error(caught.value))==9
 
 
 def test_repository_path_encoding_failure_is_a_controlled_error(tmp_path,monkeypatch):
     _,patch,_=world(tmp_path,monkeypatch)
-    with pytest.raises(api.PatchHarborError) as caught:api.validate_patch(patch,repository='bad\ud800path')
+    with pytest.raises(api.PatchHarborError) as caught:api.validate_task(patch,repository='bad\ud800path')
     assert int(exit_code_for_error(caught.value))==8

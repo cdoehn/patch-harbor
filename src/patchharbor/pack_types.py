@@ -4,15 +4,15 @@ from datetime import datetime
 from pathlib import Path
 from uuid import UUID
 
-from patchharbor.patch_inspection import PatchValidationResult, PatchValidationScope
+from patchharbor.task_inspection import TaskValidationResult, TaskValidationScope
 
 
 @dataclass(frozen=True, slots=True)
-class PatchPackResult:
+class TaskPackResult:
     path: Path
     package_id: UUID
     created_at: datetime
-    validation: PatchValidationResult
+    validation: TaskValidationResult
     warnings: tuple[str, ...]
 
     def __post_init__(self) -> None:
@@ -22,7 +22,7 @@ class PatchPackResult:
             raise ValueError('pack result requires UUID v4')
         if self.created_at.tzinfo is None or self.created_at.utcoffset().total_seconds() != 0:
             raise ValueError('pack result requires a timezone-aware UTC timestamp')
-        if (self.validation.scope is not PatchValidationScope.REFERENCE
+        if (self.validation.scope is not TaskValidationScope.REFERENCE
                 or self.validation.binding_matches is not True
                 or not self.validation.reference_sha256 or self.validation.inspection.manifest is None):
             raise ValueError('pack result requires complete successful reference validation')

@@ -50,7 +50,7 @@ def test_complete_immutable_admission_under_actual_lock(host):
     repo,_=host;path,digest,contents=package(host);calls=[]
     def admit(facts):
         calls.append(facts)
-        assert isinstance(facts,api.PatchAdmission)
+        assert isinstance(facts,api.TaskAdmission)
         assert dict(facts.contents)==contents
         assert {e.path for e in facts.inspection.entries}==set(contents)
         assert facts.inspection.package_sha256==digest
@@ -116,7 +116,7 @@ def test_wrong_explicit_repository_rejects_under_registered_binding(host,tmp_pat
 
 def test_swap_after_external_inspection_cannot_change_expected_package(host):
     repo,_=host;path,digest,_=package(host)
-    inspected=api.inspect_patch(path);assert inspected.package_sha256==digest
+    inspected=api.inspect_task(path);assert inspected.package_sha256==digest
     package(host,path=path,payloads={'stage/item':b'swapped'})
     report=guarded(host,path,digest,lambda _:pytest.fail('replaced package admitted'))
     no_execution(repo,report)

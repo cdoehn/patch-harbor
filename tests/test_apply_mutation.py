@@ -6,7 +6,7 @@ import pytest
 
 import patchharbor.apply_mutation as mutation_module
 from patchharbor.application import (
-    preflight_patch_package_repository,
+    preflight_task_bundle_repository,
     register_repository,
 )
 from patchharbor.apply_mutation import (
@@ -18,12 +18,12 @@ from patchharbor.exit_status import ExitCode, exit_code_for_error
 from patchharbor.errors import FailureReason
 from patchharbor.errors import PatchHarborError, patch_package_error
 from patchharbor.models import BundlePayload, RepositoryContext
-from patchharbor.patch_manifest import (
-    PATCH_FORMAT_VERSION,
-    PATCH_MARKER,
-    PatchManifest,
+from patchharbor.task_manifest import (
+    TASK_FORMAT_VERSION,
+    TASK_MARKER,
+    TaskManifest,
 )
-from patchharbor.patch_package import ValidatedPatchPackage
+from patchharbor.task_package import ValidatedTaskBundle
 from patchharbor.payload_files import PayloadTargetError, PayloadWriteError
 from patchharbor.user_paths import registration_user_paths
 from tests.platform_support import project_environment
@@ -41,17 +41,17 @@ def _package(
     context: RepositoryContext,
     *,
     payloads: tuple[BundlePayload, ...],
-) -> ValidatedPatchPackage:
-    manifest = PatchManifest(
-        marker=PATCH_MARKER,
-        format_version=PATCH_FORMAT_VERSION,
+) -> ValidatedTaskBundle:
+    manifest = TaskManifest(
+        marker=TASK_MARKER,
+        format_version=TASK_FORMAT_VERSION,
         repo_id=context.repo_id,
         base_commit=context.base_commit,
         state_fingerprint=context.state_fingerprint,
         fingerprint_algorithm=context.fingerprint_algorithm,
         entrypoint="run.sh",
     )
-    return ValidatedPatchPackage(
+    return ValidatedTaskBundle(
         manifest=manifest,
         entrypoint=BundlePayload("run.sh", b"# PATCHHARBOR\n"),
         payloads=payloads,
@@ -94,7 +94,7 @@ def test_mutation_boundary_rechecks_and_writes_while_repository_is_locked(
         write_while_observing_lock,
     )
 
-    with preflight_patch_package_repository(package, dry_run=False) as gate:
+    with preflight_task_bundle_repository(package, dry_run=False) as gate:
         result = apply_payload_mutation(gate)
 
     assert result.success is True
@@ -119,7 +119,7 @@ def test_mutation_boundary_reports_changed_state_without_payload_write(
         payloads=(BundlePayload("payload.bin", b"payload"),),
     )
 
-    with preflight_patch_package_repository(package, dry_run=False) as gate:
+    with preflight_task_bundle_repository(package, dry_run=False) as gate:
         (repository / "external.txt").write_bytes(b"external")
         result = apply_payload_mutation(gate)
 
@@ -167,7 +167,7 @@ def test_mutation_boundary_keeps_target_and_write_failures_distinct(
 
     monkeypatch.setattr(mutation_module, "write_bundle_payloads", fail_write)
 
-    with preflight_patch_package_repository(package, dry_run=False) as gate:
+    with preflight_task_bundle_repository(package, dry_run=False) as gate:
         result = apply_payload_mutation(gate)
 
     assert result.success is False
@@ -204,7 +204,7 @@ def test_attempt_publication_runs_after_state_check_and_before_payload_write(
         context,
         payloads=(BundlePayload("payload.bin", b"payload"),),
     )
-    with preflight_patch_package_repository(
+    with preflight_task_bundle_repository(
         package,
         dry_run=False,
         before_mutation=publish_attempt,
@@ -234,7 +234,7 @@ def test_failed_attempt_publication_prevents_every_repository_write(
         context,
         payloads=(BundlePayload("payload.bin", b"payload"),),
     )
-    with preflight_patch_package_repository(
+    with preflight_task_bundle_repository(
         package,
         dry_run=False,
         before_mutation=fail_attempt_publication,
@@ -262,7 +262,7 @@ def test_state_mismatch_prevents_attempt_publication(
         payloads=(BundlePayload("payload.bin", b"payload"),),
     )
 
-    with preflight_patch_package_repository(
+    with preflight_task_bundle_repository(
         package,
         dry_run=False,
         before_mutation=lambda: publications.append(True),

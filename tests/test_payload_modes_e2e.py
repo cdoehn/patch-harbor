@@ -11,10 +11,10 @@ import zipfile
 
 import pytest
 
-from patchharbor.application import apply_patch_package, dry_run_patch_package, register_repository
+from patchharbor.application import apply_task_bundle, dry_run_task_bundle, register_repository
 from patchharbor.errors import PatchHarborError
 from patchharbor.exit_status import ExitCode, exit_code_for_error
-from patchharbor.patch_package import resolve_patch_package
+from patchharbor.task_package import resolve_task_bundle
 from tests.registration_support import create_repository, git
 
 pytestmark = [pytest.mark.e2e, pytest.mark.skipif(os.name != "posix", reason="native POSIX modes")]
@@ -48,7 +48,7 @@ test "$(tools/new.sh)" = executed
             info.create_system = 3
             info.external_attr = (stat.S_IFREG | mode) << 16
             archive.writestr(info, data)
-    return resolve_patch_package(path)
+    return resolve_task_bundle(path)
 
 
 @pytest.mark.parametrize("mode", (0o644, 0o664, 0o666, 0o755, 0o775, 0o777))
@@ -60,7 +60,7 @@ def test_entrypoint_observes_correct_modes_after_core_mutation(tmp_path: Path, m
     git(repo, "commit", "--quiet", "--allow-empty", "-m", "fixture permissions")
     context = register_repository(repo)
     package = package_for(tmp_path / "patch.zip", context, existing_mode=mode)
-    report = apply_patch_package(package, output_directory=tmp_path / "results")
+    report = apply_task_bundle(package, output_directory=tmp_path / "results")
     assert report.process_exit_code == 0
     assert report.primary_result.entrypoint_started
     assert stat.S_IMODE(target.stat().st_mode) == mode
@@ -77,7 +77,7 @@ def test_dry_run_preserves_bytes_modes_and_missing_directories(tmp_path: Path, m
     git(repo, "commit", "--quiet", "--allow-empty", "-m", "fixture permissions")
     context = register_repository(repo)
     package = package_for(tmp_path / "patch.zip", context)
-    report = dry_run_patch_package(package, output_directory=tmp_path / "results")
+    report = dry_run_task_bundle(package, output_directory=tmp_path / "results")
     assert report.process_exit_code == 0
     assert not report.primary_result.entrypoint_started
     assert target.read_bytes() == b"base\n"
@@ -95,7 +95,7 @@ def test_special_existing_target_rejected_without_entrypoint(tmp_path: Path, dry
     git(repo, "commit", "--quiet", "--allow-empty", "-m", "fixture permissions")
     context = register_repository(repo)
     package = package_for(tmp_path / "patch.zip", context)
-    operation = dry_run_patch_package if dry_run else apply_patch_package
+    operation = dry_run_task_bundle if dry_run else apply_task_bundle
     with pytest.raises(PatchHarborError) as raised:
         operation(package, output_directory=tmp_path / "results")
     assert exit_code_for_error(raised.value) == ExitCode.PAYLOAD_PREPARATION_ERROR

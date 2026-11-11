@@ -27,7 +27,7 @@ def test_automatic_exchange_consumer_ignores_partial_then_applies_complete_pack(
         return original(self,name)
     monkeypatch.setattr(OwnedPackFile,'publish',pause)
     with ThreadPoolExecutor(max_workers=1) as pool:
-        task=pool.submit(api.pack_patch,contents,reference_bundle=reference,entrypoint=entry,output_directory=exchange)
+        task=pool.submit(api.pack_task,contents,reference_bundle=reference,entrypoint=entry,output_directory=exchange)
         try:
             assert before_publish.wait(60),'pack did not reach publication'
             assert len(list(exchange.glob('.patchharbor-pack-*.partial')))==1

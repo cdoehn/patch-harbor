@@ -17,7 +17,7 @@ import patchharbor.application as application
 from patchharbor import application_apply, application_configuration, application_exchange
 from patchharbor.cli import main
 from patchharbor.exit_status import exit_code_for_error
-from patchharbor.patch_inspection import inspect_patch
+from patchharbor.task_inspection import inspect_task
 from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY
 from tests.patch_inspection_support import MANIFEST, write_package
 
@@ -25,7 +25,7 @@ from tests.patch_inspection_support import MANIFEST, write_package
 def test_inspection_reports_all_roles_and_exact_bytes_without_payload_copies(tmp_path, capsys):
     path = tmp_path / "patch.zip"
     entries = write_package(path, handoff=True)
-    info = api.inspect_patch(path)
+    info = api.inspect_task(path)
     assert info.package_sha256 == hashlib.sha256(path.read_bytes()).hexdigest()
     assert info.package_size == path.stat().st_size
     assert str(info.manifest.repo_id) == MANIFEST["repo_id"]
@@ -42,7 +42,7 @@ def test_inspection_reports_all_roles_and_exact_bytes_without_payload_copies(tmp
         assert entry.sha256 == hashlib.sha256(entries[entry.path]).hexdigest()
         assert entry.unix_mode == (0o755 if entry.path == "run.sh" else 0o644)
         assert not hasattr(entry, "content")
-    assert info.messages == (api.PatchMessage("Notice", "Facts only"),)
+    assert info.messages == (api.TaskMessage("Notice", "Facts only"),)
     assert info.warnings == ()
     assert capsys.readouterr() == ("", "")
 
@@ -51,16 +51,16 @@ def test_validation_separates_static_validity_binding_and_authenticity(tmp_path)
     path = tmp_path / "patch.zip"
     write_package(path)
     before = datetime.now(timezone.utc)
-    result = api.validate_patch(path)
-    assert result.inspection == api.inspect_patch(path)
-    assert result.scope is api.PatchValidationScope.PACKAGE
+    result = api.validate_task(path)
+    assert result.inspection == api.inspect_task(path)
+    assert result.scope is api.TaskValidationScope.PACKAGE
     assert result.binding_matches is None and result.context is None
     assert result.reference_sha256 is None
     assert before <= result.checked_at <= datetime.now(timezone.utc)
     assert {"authenticity", "execution", "repository_binding", "tests", "ci", "replay"} <= set(result.not_checked)
 
 
-@pytest.mark.parametrize("operation", [api.inspect_patch, api.validate_patch])
+@pytest.mark.parametrize("operation", [api.inspect_task, api.validate_task])
 def test_package_mode_performs_no_writes_lookup_subprocess_or_apply(tmp_path, monkeypatch, operation):
     path = tmp_path / "patch.zip"
     write_package(path, handoff=True)
@@ -72,7 +72,7 @@ def test_package_mode_performs_no_writes_lookup_subprocess_or_apply(tmp_path, mo
         monkeypatch.setattr(subprocess, name, forbidden)
     for name in ("run_apply_path",):
         monkeypatch.setattr(application, name, forbidden)
-    for name in ("prepare_patch_package", "RunSession"):
+    for name in ("prepare_task_bundle", "RunSession"):
         monkeypatch.setattr(application_apply, name, forbidden)
     for workflow in (application_configuration, application_exchange):
         monkeypatch.setattr(workflow, "configuration_user_paths", forbidden)
@@ -91,7 +91,7 @@ def test_package_mode_performs_no_writes_lookup_subprocess_or_apply(tmp_path, mo
 def test_public_inspection_graph_is_immutable(tmp_path):
     path = tmp_path / "patch.zip"
     write_package(path)
-    result = api.validate_patch(path)
+    result = api.validate_task(path)
     for obj, name in ((result, "scope"), (result.inspection, "package_size"),
                       (result.inspection.manifest, "base_commit"),
                       (result.inspection.entries[0], "path"), (result.inspection.messages[0], "text")):
@@ -101,24 +101,24 @@ def test_public_inspection_graph_is_immutable(tmp_path):
     assert isinstance(result.inspection.messages, tuple)
     assert isinstance(result.inspection.warnings, tuple)
     assert isinstance(result.not_checked, tuple)
-    for name in ("PatchInspection", "PatchValidationResult", "PatchEntry", "PatchEntryRole",
-                 "PatchManifest", "PatchMessage", "PatchValidationScope", "inspect_patch", "validate_patch"):
+    for name in ("TaskInspection", "TaskValidationResult", "TaskEntry", "TaskEntryRole",
+                 "TaskManifest", "TaskMessage", "TaskValidationScope", "inspect_task", "validate_task"):
         assert name in api.__all__ and hasattr(api, name)
 
 
-@pytest.mark.parametrize("operation", [api.inspect_patch, api.validate_patch])
+@pytest.mark.parametrize("operation", [api.inspect_task, api.validate_task])
 @pytest.mark.parametrize("value,error", [(b"patch.zip", TypeError), (None, TypeError),
                                         (7, TypeError), ("", ValueError), ("bad\x00path", ValueError)])
 def test_invalid_path_arguments_fail_before_core(value, error, operation, monkeypatch):
     def forbidden(*args, **kwargs):
         pytest.fail("invalid argument reached Core")
-    monkeypatch.setattr(application, "inspect_patch", forbidden)
-    monkeypatch.setattr(application, "validate_patch", forbidden)
+    monkeypatch.setattr(application, "inspect_task", forbidden)
+    monkeypatch.setattr(application, "validate_task", forbidden)
     with pytest.raises(error):
         operation(value)
 
 
-@pytest.mark.parametrize("operation", [api.inspect_patch, api.validate_patch])
+@pytest.mark.parametrize("operation", [api.inspect_task, api.validate_task])
 def test_invalid_observer_is_rejected(operation):
     with pytest.raises(TypeError):
         operation("missing.zip", observer=42)
@@ -138,7 +138,7 @@ def test_api_and_json_cli_share_security_errors(tmp_path, changes, code, command
     path = tmp_path / "patch.zip"
     write_package(path, changes=changes)
     with pytest.raises(api.PatchHarborError) as caught:
-        getattr(api, command + "_patch")(path)
+        getattr(api, command + "_task")(path)
     assert int(exit_code_for_error(caught.value)) == code
     stdout, stderr = StringIO(), StringIO()
     assert main([command, str(path), "--json", "--verbose"], stdout=stdout, stderr=stderr) == code
@@ -153,12 +153,12 @@ def test_api_and_json_cli_share_security_errors(tmp_path, changes, code, command
 def test_json_cli_uses_public_api_and_complete_typed_facts(tmp_path, monkeypatch, command):
     path = tmp_path / "patch.zip"
     write_package(path, handoff=True)
-    real = getattr(api, command + "_patch")
+    real = getattr(api, command + "_task")
     calls = []
     def observed(patch, *, observer=None):
         calls.append(patch)
         return real(patch, observer=observer)
-    monkeypatch.setattr(api, command + "_patch", observed)
+    monkeypatch.setattr(api, command + "_task", observed)
     stdout, stderr = StringIO(), StringIO()
     assert main([command, str(path), "--json", "-v", "--no-color"], stdout=stdout, stderr=stderr) == 0
     assert calls == [path]
@@ -193,7 +193,7 @@ def test_explicit_file_required_and_binding_options_are_scoped(command, tmp_path
             main(arguments, stdout=StringIO(), stderr=StringIO())
         assert caught.value.code == 2
     with pytest.raises(ValueError):
-        api.validate_patch("patch.zip", repository=tmp_path, reference_bundle="result.zip")
+        api.validate_task("patch.zip", repository=tmp_path, reference_bundle="result.zip")
 
 
 def test_package_resource_limit_is_the_existing_core_limit(tmp_path):
@@ -202,7 +202,7 @@ def test_package_resource_limit_is_the_existing_core_limit(tmp_path):
     policy = replace(DEFAULT_RESOURCE_POLICY, warning_bytes=1,
                      max_input_artifact_bytes=path.stat().st_size - 1)
     with pytest.raises(api.PatchHarborError) as caught:
-        inspect_patch(path, resource_policy=policy)
+        inspect_task(path, resource_policy=policy)
     assert caught.value.reason is api.FailureReason.SOURCE_ERROR
 
 

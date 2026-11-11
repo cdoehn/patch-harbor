@@ -6,12 +6,12 @@ from copy import deepcopy
 
 from patchharbor.errors import PatchHarborError
 from patchharbor.exchange import ExchangeArtifact, ExchangeArtifactKind
-from patchharbor.exchange_state import ExchangeFileIdentity, ExchangePatchSelection
-from patchharbor.patch_package import resolve_patch_payloads
+from patchharbor.exchange_state import ExchangeFileIdentity, ExchangeTaskSelection
+from patchharbor.task_package import resolve_task_payloads
 from patchharbor.platform.filesystem import (PathKind, path_kind, regular_file_state,
     read_stable_regular_file_with_sha256)
 from patchharbor.resource_policy import ResourcePolicy
-from patchharbor.result_reader import (capture_result_payloads, read_result_or_patch_payloads,
+from patchharbor.result_reader import (capture_result_payloads, read_result_or_task_payloads,
     has_result_marker, parse_result_payloads)
 from patchharbor.zip_payloads import ZipPayloadError
 from patchharbor.monitor_types import observed_at
@@ -45,7 +45,7 @@ class ArtifactCache:
 
     def _parse(self, path, captured):
         try:
-            payloads = read_result_or_patch_payloads(captured.content, policy=POLICY)
+            payloads = read_result_or_task_payloads(captured.content, policy=POLICY)
         except ZipPayloadError:
             return {'kind': 'other'}, None
         if has_result_marker(payloads):
@@ -58,12 +58,12 @@ class ArtifactCache:
                 started_at=run['started_at'], ended_at=run['ended_at'],
                 completed_commit=str(facts.completed_commit) if facts.completed_commit else None), None
         try:
-            package = resolve_patch_payloads(payloads, resource_policy=POLICY, package_path=path,
+            package = resolve_task_payloads(payloads, resource_policy=POLICY, package_path=path,
                 package_sha256=captured.sha256, package_size=captured.size)
         except PatchHarborError:
             return {'kind': 'other'}, None
-        return {'kind': 'patch_package', 'bundle_number': declared_bundle_number(package.entrypoint.content),
-                'entrypoint_name': package.entrypoint.relative_path}, ExchangePatchSelection.from_manifest(package.manifest)
+        return {'kind': 'task_package', 'bundle_number': declared_bundle_number(package.entrypoint.content),
+                'entrypoint_name': package.entrypoint.relative_path}, ExchangeTaskSelection.from_manifest(package.manifest)
 
 
 def binding(value):
@@ -95,7 +95,7 @@ def artifact_fact(path, archived, state, cache):
             if archived and record is None:
                 identity = ExchangeFileIdentity(path.parent.parent / path.name, artifact.identity.sha256)
                 record = state.record_for(identity)
-            if record and (record.kind != 'patch_package' or record.manifest != artifact.selection):
+            if record and (record.kind != 'task_package' or record.manifest != artifact.selection):
                 raise ValueError('replay classification disagrees with validated package')
             row['replay_source_path'] = str(identity.path) if record else None
             row.update(repo_id=expected['repo_id'], expected=expected,

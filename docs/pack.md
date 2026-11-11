@@ -29,7 +29,7 @@ kein zweiter Fehler-Envelope an eine teilweise geschriebene Erfolgsantwort gehä
 ```python
 from patchharbor import api
 
-result = api.pack_patch(
+result = api.pack_task(
     "patch-inhalt",
     reference_bundle="result.zip",
     entrypoint="apply.sh",

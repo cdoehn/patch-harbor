@@ -16,8 +16,8 @@ import pytest
 
 from patchharbor import api
 from patchharbor.cli import main
-from patchharbor.patch_inspection import inspect_patch
-import patchharbor.patch_package as packages
+from patchharbor.task_inspection import inspect_task
+import patchharbor.task_package as packages
 from patchharbor.platform.filesystem import FileChangedDuringRead
 from patchharbor.progress import activity, observe_activity
 from patchharbor.resource_policy import ResourcePolicy
@@ -110,7 +110,7 @@ def test_archive_failures_are_input_errors_without_partial_results(tmp_path, cas
     path = tmp_path / 'bad.zip'
     path.write_bytes(broken_archive(case))
     with pytest.raises(api.PatchHarborError) as caught:
-        getattr(api, command + '_patch')(path)
+        getattr(api, command + '_task')(path)
     assert caught.value.reason is api.FailureReason.SOURCE_ERROR
     json_cli_failure(path, command, 4)
 
@@ -148,14 +148,14 @@ def test_bad_handoff_is_rejected_as_package_error(tmp_path, content):
 
 def test_json_backend_recursion_limit_is_a_manifest_error(tmp_path, monkeypatch):
     # Python versions differ in how deeply nested JSON is decoded internally.
-    import patchharbor.patch_manifest as manifests
+    import patchharbor.task_manifest as manifests
     path = tmp_path / 'patch.zip'
     write_package(path)
     def recursion_limited(*args, **kwargs):
         raise RecursionError('decoder limit')
     monkeypatch.setattr(manifests.json, 'loads', recursion_limited)
     with pytest.raises(api.PatchHarborError) as caught:
-        api.inspect_patch(path)
+        api.inspect_task(path)
     assert caught.value.reason is api.FailureReason.PATCH_PACKAGE_ERROR
 
 
@@ -166,10 +166,10 @@ def test_unexpected_programming_failure_is_not_disguised_as_package_rejection(tm
         raise AssertionError('internal bug')
     monkeypatch.setattr(packages, 'read_stable_regular_file_with_sha256', broken)
     with pytest.raises(AssertionError):
-        api.inspect_patch(path)
+        api.inspect_task(path)
 
 
-@pytest.mark.parametrize('operation', [api.inspect_patch, api.validate_patch])
+@pytest.mark.parametrize('operation', [api.inspect_task, api.validate_task])
 def test_inspection_uses_one_capture_even_if_name_is_replaced_after_read(tmp_path, monkeypatch, operation):
     path = tmp_path / 'patch.zip'
     original_entries = write_package(path)
@@ -183,14 +183,14 @@ def test_inspection_uses_one_capture_even_if_name_is_replaced_after_read(tmp_pat
         return captured
     monkeypatch.setattr(packages, 'read_stable_regular_file_with_sha256', replace_after_capture)
     result = operation(path)
-    info = result.inspection if isinstance(result, api.PatchValidationResult) else result
+    info = result.inspection if isinstance(result, api.TaskValidationResult) else result
     assert calls == [path]
     assert info.package_sha256 == hashlib.sha256(original).hexdigest()
     assert info.package_size == len(original) != path.stat().st_size
     payload = next(entry for entry in info.entries if entry.path == 'docs/data.bin')
     assert payload.sha256 == hashlib.sha256(original_entries[payload.path]).hexdigest()
     monkeypatch.setattr(packages, 'read_stable_regular_file_with_sha256', read)
-    assert api.inspect_patch(path).package_sha256 != info.package_sha256
+    assert api.inspect_task(path).package_sha256 != info.package_sha256
 
 
 @pytest.mark.parametrize('error', [FileChangedDuringRead('changed'), PermissionError('denied'),
@@ -219,12 +219,12 @@ def test_resource_boundaries_include_directories_and_all_payload_bytes(tmp_path)
     boundary = ResourcePolicy(warning_bytes=max(sizes), max_input_artifact_bytes=path.stat().st_size,
                               max_content_bytes=max(sizes), max_zip_total_bytes=sum(sizes),
                               max_zip_entries=len(entries) + 1)
-    assert inspect_patch(path, resource_policy=boundary).package_size == path.stat().st_size
+    assert inspect_task(path, resource_policy=boundary).package_size == path.stat().st_size
     for policy in (replace(boundary, warning_bytes=1, max_content_bytes=max(sizes) - 1),
                    replace(boundary, max_zip_total_bytes=sum(sizes) - 1),
                    replace(boundary, max_zip_entries=len(entries))):
         with pytest.raises(api.PatchHarborError) as caught:
-            inspect_patch(path, resource_policy=policy)
+            inspect_task(path, resource_policy=policy)
         assert caught.value.reason is api.FailureReason.SOURCE_ERROR
 
 
@@ -233,18 +233,18 @@ def test_relative_path_is_bound_before_caller_observer_changes_directory(tmp_pat
     first.mkdir(); second.mkdir()
     write_package(first / 'patch.zip')
     write_package(second / 'patch.zip', changes={'docs/data.bin': b'different'})
-    expected = api.inspect_patch(first / 'patch.zip')
+    expected = api.inspect_task(first / 'patch.zip')
     monkeypatch.chdir(first)
     def observer(event):
         monkeypatch.chdir(second)
-    assert api.inspect_patch('patch.zip', observer=observer) == expected
+    assert api.inspect_task('patch.zip', observer=observer) == expected
 
 
 def test_argument_errors_precede_filesystem_resolution(monkeypatch):
     def no_resolution(path):
         pytest.fail('filesystem path resolution happened before argument validation')
     monkeypatch.setattr(Path, 'absolute', no_resolution)
-    for operation in (api.inspect_patch, api.validate_patch):
+    for operation in (api.inspect_task, api.validate_task):
         with pytest.raises(TypeError):
             operation('patch.zip', observer=42)
 
@@ -276,7 +276,7 @@ def test_pathlike_is_evaluated_once(tmp_path):
             assert self.count == 1
             return str(path)
     value = Once()
-    api.inspect_patch(value)
+    api.inspect_task(value)
     assert value.count == 1
 
 
@@ -297,9 +297,9 @@ def test_parallel_observers_and_nested_calls_are_request_local(tmp_path):
                 barrier.wait(timeout=15)
                 # No observer means silent even inside the caller's active request.
                 count = len(events)
-                api.validate_patch(path)
+                api.validate_task(path)
                 nested_delivery.append(len(events) - count)
-        info = api.inspect_patch(path, observer=observer)
+        info = api.inspect_task(path, observer=observer)
         return info, events, nested_delivery
     with ThreadPoolExecutor(max_workers=2) as pool:
         results = list(pool.map(inspect, paths))
@@ -309,10 +309,10 @@ def test_parallel_observers_and_nested_calls_are_request_local(tmp_path):
         assert nested_delivery == [0]
     outer = []
     with observe_activity(outer.append):
-        api.inspect_patch(paths[0])
+        api.inspect_task(paths[0])
         assert outer == []
         with pytest.raises(api.PatchHarborError):
-            api.inspect_patch(tmp_path / 'missing')
+            api.inspect_task(tmp_path / 'missing')
         activity('OUTER', 'restored')
     assert len(outer) == 1 and outer[0].phase == 'OUTER'
 
@@ -322,11 +322,11 @@ def test_observer_error_does_not_turn_validity_into_failure_but_interrupt_propag
     write_package(path)
     def broken(event):
         raise RuntimeError('caller callback')
-    assert api.inspect_patch(path, observer=broken) == api.inspect_patch(path)
+    assert api.inspect_task(path, observer=broken) == api.inspect_task(path)
     def interrupted(event):
         raise KeyboardInterrupt
     with pytest.raises(KeyboardInterrupt):
-        api.inspect_patch(path, observer=interrupted)
+        api.inspect_task(path, observer=interrupted)
 
 
 def test_supported_shebang_does_not_require_installed_interpreter(tmp_path, monkeypatch):
@@ -336,4 +336,4 @@ def test_supported_shebang_does_not_require_installed_interpreter(tmp_path, monk
     def forbidden(*args):
         pytest.fail('inspection attempted interpreter lookup')
     monkeypatch.setattr(interpreters, 'find_executable', forbidden)
-    assert api.validate_patch(path).scope is api.PatchValidationScope.PACKAGE
+    assert api.validate_task(path).scope is api.TaskValidationScope.PACKAGE

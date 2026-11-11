@@ -117,7 +117,7 @@ def recover_exchange_artifacts(
                         read_exchange_artifact_content(patch, directory=configuration.exchange_directory),
                         patch.path,
                     )
-                    if package_evidence.kind != "patch_package" or package_evidence.selection != record.manifest:
+                    if package_evidence.kind != "task_package" or package_evidence.selection != record.manifest:
                         activity("KEEP", f"{patch.path.name}: patch proof does not match the recorded binding", "detail")
                         continue
                     evidence = parse_archive_evidence(

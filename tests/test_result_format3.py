@@ -34,7 +34,7 @@ def test_new_reference_keeps_actual_state_and_explicit_full_runtime_facts(canoni
     assert capture_result_reference(path).facts==facts
     for key,value in binding.items(): assert str(getattr(facts.context,key))==value
     patch=tmp_path/'patch.zip';bound_package(patch,binding)
-    checked=api.validate_patch(patch,reference_bundle=path)
+    checked=api.validate_task(patch,reference_bundle=path)
     assert checked.binding_matches and checked.reference_sha256==digest
     assert checked.context.base_commit==facts.context.base_commit
     with pytest.raises(FrozenInstanceError):facts.runtime.status='forged'
@@ -113,7 +113,7 @@ def test_corrupt_format3_never_becomes_a_full_native_reference(canonical,tmp_pat
         edit_metadata(files,lambda d:d.update(changes[fault]))
     path=tmp_path/'result.zip';write_reference(path,files)
     patch=tmp_path/'patch.zip';bound_package(patch,binding)
-    with pytest.raises(api.PatchHarborError) as caught:api.validate_patch(patch,reference_bundle=path)
+    with pytest.raises(api.PatchHarborError) as caught:api.validate_task(patch,reference_bundle=path)
     assert int(exit_code_for_error(caught.value))==4
 
 
@@ -161,8 +161,8 @@ def test_pack_uses_full_reader_and_never_the_private_diagnostic_fallback(canonic
     contents=tmp_path/'contents';contents.mkdir();(contents/'run.sh').write_bytes(b'#!/usr/bin/env bash\n# PATCHHARBOR\nexit 0\n')
     output=tmp_path/'output';output.mkdir()
     monkeypatch.setattr(result_reader,'_parse_repository_payloads',lambda *a,**k:pytest.fail('pack used weak fallback'))
-    packed=api.pack_patch(contents,reference_bundle=path,entrypoint='run.sh',output_directory=output)
+    packed=api.pack_task(contents,reference_bundle=path,entrypoint='run.sh',output_directory=output)
     assert packed.validation.binding_matches
     files['runtime/runtime.json'] += b' ';write_reference(path,files)
-    with pytest.raises(api.PatchHarborError):api.pack_patch(contents,reference_bundle=path,entrypoint='run.sh',output_directory=output)
+    with pytest.raises(api.PatchHarborError):api.pack_task(contents,reference_bundle=path,entrypoint='run.sh',output_directory=output)
     assert list(output.iterdir())==[packed.path]

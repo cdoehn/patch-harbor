@@ -38,7 +38,7 @@ def test_both_closed_variants_pass_static_reference_and_bootstrap_without_import
     path, _, binding = result_file(tmp_path, raw)
     patch = tmp_path / 'patch.zip'; bound_package(patch, binding)
     monkeypatch.setattr(bootstrap.importlib, 'import_module', lambda *a, **k: pytest.fail('data imported'))
-    assert api.validate_patch(patch, reference_bundle=path).binding_matches
+    assert api.validate_task(patch, reference_bundle=path).binding_matches
     assert parse_archive_evidence(path.read_bytes(), path).kind == 'result_bundle'
     assessment = bootstrap.assess(path)
     assert assessment.requires_python == requirement and assessment.pyz_bytes == raw
@@ -53,7 +53,7 @@ def test_unknown_python_contract_is_rejected_even_with_recomputed_ids(tmp_path, 
     with pytest.raises(pyz.RuntimeDataError): read(raw)
     path, _, binding = result_file(tmp_path, raw)
     patch = tmp_path / 'patch.zip'; bound_package(patch, binding)
-    with pytest.raises(api.PatchHarborError) as caught: api.validate_patch(patch, reference_bundle=path)
+    with pytest.raises(api.PatchHarborError) as caught: api.validate_task(patch, reference_bundle=path)
     assert int(exit_code_for_error(caught.value)) == 4
     with pytest.raises(ValueError): bootstrap.assess(path)
 
@@ -83,7 +83,7 @@ def test_rehashed_variant_disagreements_never_become_valid_references(tmp_path, 
     elif fault == 'metadata_commit': edit_metadata(files, lambda d: d['provenance'].update(source_commit='a' * 40))
     write_reference(path, files)
     patch = tmp_path / 'patch.zip'; bound_package(patch, binding)
-    with pytest.raises(api.PatchHarborError): api.validate_patch(patch, reference_bundle=path)
+    with pytest.raises(api.PatchHarborError): api.validate_task(patch, reference_bundle=path)
     with pytest.raises((ValueError, KeyError)): bootstrap.assess(path)
 
 
@@ -112,12 +112,12 @@ def test_frozen_reference_formats_remain_byte_exact_and_readable(tmp_path, versi
     patch = tmp_path / 'bound.zip'; bound_package(patch, provenance['binding'])
     if version in (1, 2):
         with pytest.raises(api.PatchHarborError): read_result_reference(path)
-        with pytest.raises(api.PatchHarborError): api.validate_patch(patch, reference_bundle=path)
+        with pytest.raises(api.PatchHarborError): api.validate_task(patch, reference_bundle=path)
         with pytest.raises(ValueError): bootstrap.assess(path)
     else:
         facts, digest = read_result_reference(path)
         assert facts.format_version == version and digest == record['sha256']
-        assert api.validate_patch(patch, reference_bundle=path).binding_matches
+        assert api.validate_task(patch, reference_bundle=path).binding_matches
     assert path.read_bytes() == original
     if version == 3:
         with ZipFile(path) as archive: raw = archive.read('runtime/patchharbor-1.3.0.pyz')
@@ -231,9 +231,9 @@ assert not any(n == 'patchharbor' or n.startswith('patchharbor.') for n in sys.m
 assessment = module.assess(reference, trusted_source_sha256=hashlib.sha256(reference.read_bytes()).hexdigest())
 prepared = module.prepare(assessment, workspace)
 api = module.import_api(prepared)
-packed = api.pack_patch(contents, reference_bundle=reference, entrypoint='run.sh', output_directory=output)
-assert api.inspect_patch(packed.path).package_sha256 == packed.package_sha256
-assert api.validate_patch(packed.path, reference_bundle=reference).binding_matches
+packed = api.pack_task(contents, reference_bundle=reference, entrypoint='run.sh', output_directory=output)
+assert api.inspect_task(packed.path).package_sha256 == packed.package_sha256
+assert api.validate_task(packed.path, reference_bundle=reference).binding_matches
 assert not any(n == 'patchharbor_watcher' or n.startswith('patchharbor_watcher.') for n in sys.modules)
 print(json.dumps({'requirement': assessment.requires_python, 'path': str(packed.path), 'origin': api.__file__}))
 '''
@@ -243,4 +243,4 @@ print(json.dumps({'requirement': assessment.requires_python, 'path': str(packed.
     assert outcome.returncode == 0, outcome.stdout + outcome.stderr
     report = json.loads(outcome.stdout)
     assert report['requirement'] == requirement and str(tmp_path / 'runtime') in report['origin']
-    assert api.validate_patch(report['path'], reference_bundle=reference).binding_matches
+    assert api.validate_task(report['path'], reference_bundle=reference).binding_matches

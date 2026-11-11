@@ -13,7 +13,7 @@ from patchharbor import api
 
 def prepare_transport(reference: Path, *, expected_result_sha256: str,
                       trusted_entrypoint: Path, workspace: Path,
-                      output_directory: Path) -> tuple[api.ResultSnapshot, api.PatchPackResult]:
+                      output_directory: Path) -> tuple[api.ResultSnapshot, api.TaskPackResult]:
     capabilities = api.integration_capabilities()
     if capabilities.contract_version != 1 or capabilities.snapshot_contract_version != 1:
         raise RuntimeError('snapshot integration contract 1 is required')
@@ -34,7 +34,7 @@ def prepare_transport(reference: Path, *, expected_result_sha256: str,
             archive.writestr(info, file.content)
     entrypoint = trusted_entrypoint.name
     (contents / entrypoint).write_bytes(trusted_entrypoint.read_bytes())
-    packed = api.pack_patch(contents, reference_bundle=reference, entrypoint=entrypoint,
+    packed = api.pack_task(contents, reference_bundle=reference, entrypoint=entrypoint,
                             output_directory=output_directory, modes={entrypoint: 0o755})
     if packed.reference_sha256 != snapshot.sha256:
         raise RuntimeError('reference changed between operations; do not publish the staged package')

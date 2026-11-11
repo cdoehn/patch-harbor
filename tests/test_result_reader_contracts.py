@@ -37,7 +37,7 @@ def test_categorized_tool_failure_remains_a_reference_and_can_be_published(canon
     patch = tmp_path / "patch.zip"; bound_package(patch, binding)
     facts, _ = read_result_reference(ref)
     assert facts.format_version == 3 and facts.primary_result == primary
-    assert api.validate_patch(patch, reference_bundle=ref).binding_matches
+    assert api.validate_task(patch, reference_bundle=ref).binding_matches
     publication._verify_result_bundle(ref, execution_present=False)
     with pytest.raises(ValueError):
         parse_archive_evidence(ref.read_bytes(), ref)
@@ -59,7 +59,7 @@ def test_format3_reference_preserves_binding_and_separates_success_policy(canoni
     assert facts.format_version == 3 and facts.runtime.status == status
     assert facts.context.dirty is dirty and facts.operation == ("bundle" if kind == "bundle" else "apply")
     assert digest == hashlib.sha256(ref.read_bytes()).hexdigest()
-    report = api.validate_patch(patch, reference_bundle=ref)
+    report = api.validate_task(patch, reference_bundle=ref)
     assert report.binding_matches and report.context.base_commit == facts.context.base_commit
     assert report.context.state_fingerprint == facts.context.state_fingerprint
     with pytest.raises(FrozenInstanceError):
@@ -119,10 +119,10 @@ def test_repository_runtime_path_is_not_the_embedded_namespace(canonical, tmp_pa
     edit_document(files, "manifest.json", lambda doc: doc["base_entries"][0].update(path="runtime/runtime.json"))
     ref = tmp_path / "result.zip"; write_reference(ref, files)
     patch = tmp_path / "patch.zip"; bound_package(patch, binding)
-    assert api.validate_patch(patch, reference_bundle=ref).binding_matches
+    assert api.validate_task(patch, reference_bundle=ref).binding_matches
 
 def test_snapshot_unicode_paths_work_for_classifier_and_archive_without_relaxing_patches(canonical, tmp_path):
-    from patchharbor.result_reader import read_result_or_patch_payloads
+    from patchharbor.result_reader import read_result_or_task_payloads
     from patchharbor.zip_payloads import ZipPayloadError
     files, binding = format3(canonical)
     name = "base/runtime/Grüße dir/Datei.py"
@@ -136,7 +136,7 @@ def test_snapshot_unicode_paths_work_for_classifier_and_archive_without_relaxing
     with ZipFile(patch, "a") as archive:
         archive.writestr(name, b"not a permitted patch payload path")
     assert _classify_content(patch, patch.read_bytes(), resource_policy=DEFAULT_RESOURCE_POLICY).kind is ExchangeArtifactKind.OTHER
-    with pytest.raises(ZipPayloadError): read_result_or_patch_payloads(patch.read_bytes())
+    with pytest.raises(ZipPayloadError): read_result_or_task_payloads(patch.read_bytes())
 
 def test_reader_does_not_import_execute_or_write_runtime(tmp_path, monkeypatch):
     files, binding = format3(reference_runtime())
@@ -150,7 +150,7 @@ def test_reader_does_not_import_execute_or_write_runtime(tmp_path, monkeypatch):
         assert not flags & (os.O_CREAT | os.O_TRUNC | os.O_RDWR | os.O_WRONLY)
         return original_open(path, flags, *args, **kwargs)
     monkeypatch.setattr(os, "open", readonly)
-    assert api.validate_patch(patch, reference_bundle=ref).binding_matches
+    assert api.validate_task(patch, reference_bundle=ref).binding_matches
     assert before == {p: p.read_bytes() for p in tmp_path.iterdir()}
 
 @pytest.mark.parametrize("version", [1, 2, 3, True])

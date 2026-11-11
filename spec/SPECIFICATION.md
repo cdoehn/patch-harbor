@@ -3759,11 +3759,11 @@ Die öffentliche Schnittstelle wird um folgende Aufrufe ergänzt:
 ```python
 from patchharbor import api
 
-info = api.inspect_patch("patch.zip")
+info = api.inspect_task("patch.zip")
 
-report = api.validate_patch("patch.zip")
-report = api.validate_patch("patch.zip", repository="/workspace/repository")
-report = api.validate_patch("patch.zip", reference_bundle="result.zip")
+report = api.validate_task("patch.zip")
+report = api.validate_task("patch.zip", repository="/workspace/repository")
+report = api.validate_task("patch.zip", reference_bundle="result.zip")
 ```
 
 `repository` und `reference_bundle` schließen sich gegenseitig aus. Ohne beide Parameter erfolgt ausschließlich eine Paketprüfung. Es gibt keine implizite Zielwahl über CWD, Registry oder Exchange. Die Eingabe muss eine ausdrücklich benannte Datei sein.
@@ -3772,9 +3772,9 @@ Beide Funktionen akzeptieren wie die bestehende API Textpfade beziehungsweise `P
 
 Fachlich gleiche Prüfungen in `inspect`, `validate` und `apply` müssen dieselben Core-Funktionen und Ressourcenregeln verwenden. `apply` behält darüber hinaus seine eigenen zeitnahen Zustands-, Sperr- und Mutationsprüfungen.
 
-### 36.2 `inspect_patch`
+### 36.2 `inspect_task`
 
-`inspect_patch` liest das Paket kontrolliert, bestimmt die vollständige SHA-256 der tatsächlich gelesenen Bytes und liefert ein unveränderliches, typisiertes `PatchInspection`-Ergebnis.
+`inspect_task` liest das Paket kontrolliert, bestimmt die vollständige SHA-256 der tatsächlich gelesenen Bytes und liefert ein unveränderliches, typisiertes `PatchInspection`-Ergebnis.
 
 Der öffentliche Ergebnisvertrag umfasst `package_sha256`, `package_size`, das typisierte `manifest`, den Entrypoint-Pfad, `entries`, `messages` und `warnings`. Das Manifest enthält die vollständigen Bindungswerte. Jeder Eintrag in `entries` besitzt normalisierten Pfad, Rolle, unkomprimierte Größe und Inhalts-SHA-256. Rollen sind Manifest, Entrypoint, Nutzdatei und passive Handoff-Metadaten. `messages` enthält die statisch auslesbaren Namen und Texte der MESSAGE-Blöcke des Entrypoints.
 
@@ -3782,7 +3782,7 @@ Die Funktion prüft bereits die sichere Lesbarkeit und die statische Gültigkeit
 
 Anzahl und Namen geplanter Git-Commits, tatsächliche Dateimutationen und spätere Testergebnisse werden nicht aus beliebigem Skriptcode erraten. Berechnete Inhaltsprüfsummen sind Beobachtungsdaten; sie sind kein zusätzlicher, im bestehenden `patch.json` behaupteter Prüfsummenvertrag.
 
-### 36.3 `validate_patch`
+### 36.3 `validate_task`
 
 Ein erfolgreiches `PatchValidationResult` enthält die geprüfte Paketinspektion, `scope`, `binding_matches`, den gegebenenfalls beobachteten beziehungsweise referenzierten Kontext, die SHA-256 einer verwendeten Referenzdatei, den Prüfzeitpunkt und ausdrücklich nicht geprüfte Aspekte.
 
@@ -4100,7 +4100,7 @@ CLI und API werden anschließend über genau diese Umgebung verwendet. Ein Impor
 ### 40.3 Werkzeugnutzung und verpflichtender Fallback
 
 Bei vorhandener geeigneter Runtime verwendet der Chat bevorzugt
-`inspect_patch`/`inspect` und `validate_patch`/`validate`. Für die Bindungsprüfung
+`inspect_task`/`inspect` und `validate_task`/`validate`. Für die Bindungsprüfung
 im Chat dient normalerweise das gelieferte Result-Bundle als Referenz.
 
 **Fehlt die eingebettete PYZ oder scheitern Vorbereitung, Import oder Nutzung,
@@ -4136,7 +4136,7 @@ Run-Konsistenz sowie die vollständige Bindung nach dem bisherigen Vertrag
 prüfbar und konsistent sein. Der Defekt wird auf den Runtime-Namensraum begrenzt
 und dokumentiert; das Original-ZIP wird weder repariert noch still umdeklariert.
 Seine vollständige SHA bleibt die Quellenidentität. Dies ist kein erfolgreiches
-vollständiges `validate_patch(reference_bundle=...)` für ein beschädigtes
+vollständiges `validate_task(reference_bundle=...)` für ein beschädigtes
 Result. Kann die Repositorybasis nicht sicher geprüft werden, bleibt
 dieser eigenständige Fehler blockierend. Ein fehlender Runtime-Prüfer allein ist
 kein fehlender Repositorynachweis.

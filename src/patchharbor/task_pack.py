@@ -15,8 +15,8 @@ from patchharbor.bundle_handoff import CHAT_INSTRUCTIONS_NAME, MAX_HANDOFF_ENTRY
 from patchharbor.errors import FailureReason, PatchHarborError
 from patchharbor.pack_candidate import prepare_metadata, prepare_candidate, write_prepared_candidate
 from patchharbor.pack_sources import capture_sources, resolve_content_root, resolve_output_target
-from patchharbor.pack_types import PatchPackResult
-from patchharbor.patch_inspection import validate_patch_against_reference
+from patchharbor.pack_types import TaskPackResult
+from patchharbor.task_inspection import validate_task_against_reference
 from patchharbor.platform.file_handles import open_regular_nofollow
 from patchharbor.platform.filesystem import (
     FileChangedDuringRead, FileReadLimitExceeded, UnsupportedFileTypeError,
@@ -65,9 +65,9 @@ def capture_pack_template() -> str:
         raise _error('cannot capture own pack template',FailureReason.PAYLOAD_PREPARATION_ERROR,exc) from exc
 
 
-def pack_patch(content_directory: Path, *, reference_bundle: Path, entrypoint: str,
+def pack_task(content_directory: Path, *, reference_bundle: Path, entrypoint: str,
                output: Path | None, output_directory: Path | None,
-               modes: dict[str, int]) -> PatchPackResult:
+               modes: dict[str, int]) -> TaskPackResult:
     """Pack one request; cleanup happens while its output directory is pinned."""
     package_id, created_at = uuid4(), datetime.now(timezone.utc)
     reference_descriptor = None
@@ -113,7 +113,7 @@ def pack_patch(content_directory: Path, *, reference_bundle: Path, entrypoint: s
                     except OSError as exc:
                         raise _error('cannot synchronize pack ZIP', FailureReason.PAYLOAD_PREPARATION_ERROR, exc) from exc
                     activity('VERIFY', 'Validate actual pack ZIP bytes against captured reference')
-                    validation = validate_patch_against_reference(
+                    validation = validate_task_against_reference(
                         owned.path, reference, expected_identity=owned.identity,
                     )
                     expected_entries = {name: (len(data), sha256(data).hexdigest(), mode)
@@ -137,7 +137,7 @@ def pack_patch(content_directory: Path, *, reference_bundle: Path, entrypoint: s
                     except (OSError, ValueError, FileChangedDuringRead, UnsupportedFileTypeError) as exc:
                         raise _error('pack final identity/hash verification failed', FailureReason.SOURCE_ERROR, exc) from exc
                     warnings = tuple(dict.fromkeys((*candidate.warnings, *validation.inspection.warnings)))
-                    result = PatchPackResult(target, package_id, created_at, validation, warnings)
+                    result = TaskPackResult(target, package_id, created_at, validation, warnings)
                     try:
                         owned.publish(target.name)
                     except FileChangedDuringRead as exc:

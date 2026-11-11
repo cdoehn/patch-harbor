@@ -18,7 +18,7 @@ from patchharbor.interpreters import (
 )
 from patchharbor.models import BundlePayload
 from patchharbor.parser import ParsedScript
-from patchharbor.patch_package import ValidatedPatchPackage, parse_package_entrypoint
+from patchharbor.task_package import ValidatedTaskBundle, parse_task_entrypoint
 from patchharbor.platform.paths import is_physically_within
 from patchharbor.platform.errors import describe_os_error
 from patchharbor.temporary_resources import (
@@ -38,7 +38,7 @@ class PreparedEntrypoint:
 
 
 @dataclass(frozen=True, slots=True)
-class PreparedPatchPackage:
+class PreparedTaskBundle:
     """Immutable checked inputs ready for a later mutation boundary."""
 
     entrypoint: PreparedEntrypoint
@@ -87,15 +87,15 @@ def _verified_private_resource(
 
 
 def _validated_entrypoint(
-    package: ValidatedPatchPackage,
+    package: ValidatedTaskBundle,
 ) -> tuple[ParsedScript, ResolvedInterpreter]:
-    script = parse_package_entrypoint(package.entrypoint)
+    script = parse_task_entrypoint(package.entrypoint)
     activity("SCRIPT", "Resolve the required Bash/PowerShell interpreter")
     return script, resolve_script_interpreter(script.text)
 
 
 def _prepare_entrypoint(
-    package: ValidatedPatchPackage,
+    package: ValidatedTaskBundle,
     private_root: Path,
 ) -> PreparedEntrypoint:
     script, interpreter = _validated_entrypoint(package)
@@ -113,11 +113,11 @@ def _prepare_entrypoint(
 
 
 @contextmanager
-def prepare_patch_package(
-    package: ValidatedPatchPackage,
+def prepare_task_bundle(
+    package: ValidatedTaskBundle,
     *,
     repository: Path,
-) -> Iterator[PreparedPatchPackage]:
+) -> Iterator[PreparedTaskBundle]:
     """Yield checked private resources and own their complete cleanup."""
     try:
         temporary_root = system_temporary_directory()
@@ -141,7 +141,7 @@ def prepare_patch_package(
     try:
         with private_request_directory(prefix="patchharbor-apply-") as private_root:
             entrypoint = _prepare_entrypoint(package, private_root)
-            yield PreparedPatchPackage(
+            yield PreparedTaskBundle(
                 entrypoint=entrypoint,
                 payloads=package.payloads,
                 execution_log_path=private_root / "execution.log",

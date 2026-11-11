@@ -11,7 +11,7 @@ import pytest
 
 from patchharbor.exit_status import ExitCode
 
-from patchharbor.patch_manifest import PATCH_FORMAT_VERSION, PATCH_MARKER
+from patchharbor.task_manifest import TASK_FORMAT_VERSION, TASK_MARKER
 from patchharbor.state_fingerprint import FINGERPRINT_ALGORITHM
 from patchharbor_watcher.loop import (
     SharedWatcherEventState,
@@ -46,8 +46,8 @@ def _write_lock_protected_package(
 ) -> None:
     entrypoint_name = native_value("run.sh", "run.ps1")
     manifest = {
-        "marker": PATCH_MARKER,
-        "format_version": PATCH_FORMAT_VERSION,
+        "marker": TASK_MARKER,
+        "format_version": TASK_FORMAT_VERSION,
         "repo_id": context["repo_id"],
         "base_commit": context["base_commit"],
         "state_fingerprint": context["state_fingerprint"],
@@ -154,8 +154,8 @@ def _write_automatic_watcher_package(
 ) -> None:
     entrypoint_name = native_value("run.sh", "run.ps1")
     manifest = {
-        "marker": PATCH_MARKER,
-        "format_version": PATCH_FORMAT_VERSION,
+        "marker": TASK_MARKER,
+        "format_version": TASK_FORMAT_VERSION,
         "repo_id": context["repo_id"],
         "base_commit": context["base_commit"],
         "state_fingerprint": context["state_fingerprint"],
@@ -324,8 +324,8 @@ def test_watcher_does_not_loop_after_a_failed_entrypoint(
     package = exchange / "failing-watcher-patch.zip"
     entrypoint_name = native_value("run.sh", "run.ps1")
     manifest = {
-        "marker": PATCH_MARKER,
-        "format_version": PATCH_FORMAT_VERSION,
+        "marker": TASK_MARKER,
+        "format_version": TASK_FORMAT_VERSION,
         "repo_id": context["repo_id"],
         "base_commit": context["base_commit"],
         "state_fingerprint": context["state_fingerprint"],

@@ -72,7 +72,7 @@ def is_proven_obsolete(
     if context.dirty or selection.repo_id != context.repo_id:
         return False
     # Cheap negative decisions keep files in place. They need no Git proof.
-    if evidence.kind == "patch_package":
+    if evidence.kind == "task_package":
         if (
             record is None or record.kind != evidence.kind
             or record.manifest != selection

@@ -43,4 +43,4 @@ def pack(files, **kwargs):
     options.update(kwargs)
     if 'output' in kwargs:
         options.pop('output_directory')
-    return api.pack_patch(contents, **options)
+    return api.pack_task(contents, **options)

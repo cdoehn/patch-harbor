@@ -19,9 +19,9 @@ import patchharbor.payload_files as payload_files_module
 import patchharbor.result_bundle_publication as publication_module
 from patchharbor.cli import main as cli_main
 from patchharbor.application import (
-    apply_patch_package,
-    dry_run_patch_package,
-    preflight_patch_package_repository,
+    apply_task_bundle,
+    dry_run_task_bundle,
+    preflight_task_bundle_repository,
     register_repository,
 )
 from patchharbor.apply_mutation import ApplyMutationGate
@@ -41,12 +41,12 @@ from patchharbor.models import (
     RepositorySnapshot,
 )
 from patchharbor.platform.filesystem import FileSystemOperationError
-from patchharbor.patch_manifest import (
-    PATCH_FORMAT_VERSION,
-    PATCH_MARKER,
-    PatchManifest,
+from patchharbor.task_manifest import (
+    TASK_FORMAT_VERSION,
+    TASK_MARKER,
+    TaskManifest,
 )
-from patchharbor.patch_package import ValidatedPatchPackage
+from patchharbor.task_package import ValidatedTaskBundle
 from patchharbor.run_report import (
     PrimaryResultKind,
     ResultBundleStatus,
@@ -65,10 +65,10 @@ from tests.registration_support import (
 pytestmark = pytest.mark.e2e
 
 
-def _manifest(context: RepositoryContext) -> PatchManifest:
-    return PatchManifest(
-        marker=PATCH_MARKER,
-        format_version=PATCH_FORMAT_VERSION,
+def _manifest(context: RepositoryContext) -> TaskManifest:
+    return TaskManifest(
+        marker=TASK_MARKER,
+        format_version=TASK_FORMAT_VERSION,
         repo_id=context.repo_id,
         base_commit=context.base_commit,
         state_fingerprint=context.state_fingerprint,
@@ -78,12 +78,12 @@ def _manifest(context: RepositoryContext) -> PatchManifest:
 
 
 def _package(
-    manifest: PatchManifest,
+    manifest: TaskManifest,
     *,
     entrypoint: bytes = b"# PATCHHARBOR\n",
     payloads: tuple[BundlePayload, ...] = (),
-) -> ValidatedPatchPackage:
-    return ValidatedPatchPackage(
+) -> ValidatedTaskBundle:
+    return ValidatedTaskBundle(
         manifest=manifest,
         entrypoint=BundlePayload(
             relative_path="run.sh",
@@ -133,11 +133,11 @@ def _set_private_temp(
 
 
 def _complete_preflight(
-    package: ValidatedPatchPackage,
+    package: ValidatedTaskBundle,
     *,
     output_directory: Path | None = None,
 ) -> None:
-    with preflight_patch_package_repository(
+    with preflight_task_bundle_repository(
         package,
         output_directory=output_directory,
     ):
@@ -273,7 +273,7 @@ def test_dry_run_publishes_before_releasing_repository_lock(
         replace_while_observing_lock,
     )
 
-    report = dry_run_patch_package(
+    report = dry_run_task_bundle(
         _package(_manifest(context)),
         output_directory=tmp_path / "results",
     )
@@ -301,7 +301,7 @@ def test_successful_primary_outcome_becomes_exit_eleven_when_bundle_fails(
     )
 
     with pytest.raises(PatchHarborError) as captured:
-        dry_run_patch_package(
+        dry_run_task_bundle(
             _package(_manifest(context)),
             output_directory=tmp_path / "results",
         )
@@ -332,7 +332,7 @@ def test_primary_failure_keeps_its_exit_code_when_bundle_also_fails(
     )
 
     with pytest.raises(PatchHarborError) as captured:
-        dry_run_patch_package(
+        dry_run_task_bundle(
             _package(
                 _manifest(context),
                 entrypoint=b"#!/usr/bin/env python3\n# PATCHHARBOR\n",
@@ -412,7 +412,7 @@ def test_apply_result_matrix_preserves_emergency_execution_diagnostics(
 
     captured_error: PatchHarborError | None = None
     try:
-        report = apply_patch_package(
+        report = apply_task_bundle(
             _package(_manifest(context)),
             output_directory=output_directory,
         )
@@ -480,7 +480,7 @@ def test_apply_removes_private_resources_after_every_process_outcome(
     )
 
     try:
-        apply_patch_package(
+        apply_task_bundle(
             _package(_manifest(context)),
             output_directory=tmp_path / "results",
         )
@@ -602,7 +602,7 @@ def test_preflight_failure_bundles_before_releasing_repository_lock(
     )
 
     with pytest.raises(PatchHarborError) as captured:
-        dry_run_patch_package(
+        dry_run_task_bundle(
             _package(
                 _manifest(context),
                 entrypoint=b"#!/usr/bin/env python3\n# PATCHHARBOR\n",
@@ -665,7 +665,7 @@ def test_repository_change_after_preflight_is_bundled_without_payload_write(
     )
 
     with pytest.raises(PatchHarborError) as captured:
-        apply_patch_package(package, output_directory=output_directory)
+        apply_task_bundle(package, output_directory=output_directory)
 
     report = captured.value.run_report
     assert exit_code_for_error(captured.value) is ExitCode.STATE_MISMATCH
@@ -735,7 +735,7 @@ def test_second_capture_failure_is_bundled_before_releasing_repository_lock(
     )
 
     with pytest.raises(PatchHarborError) as captured:
-        apply_patch_package(
+        apply_task_bundle(
             _package(_manifest(context)),
             output_directory=tmp_path / "results",
         )
@@ -790,7 +790,7 @@ def test_parent_replaced_after_second_context_is_rejected_before_staging(
     )
 
     with pytest.raises(PatchHarborError) as captured:
-        apply_patch_package(package, output_directory=output_directory)
+        apply_task_bundle(package, output_directory=output_directory)
 
     report = captured.value.run_report
     assert exit_code_for_error(captured.value) is ExitCode.PAYLOAD_PREPARATION_ERROR
@@ -857,7 +857,7 @@ def test_payload_write_failure_keeps_partial_files_without_starting_entrypoint(
     )
 
     with pytest.raises(PatchHarborError) as captured:
-        apply_patch_package(
+        apply_task_bundle(
             package,
             output_directory=output_directory,
         )
@@ -928,7 +928,7 @@ def test_process_start_failure_bundles_without_claiming_entrypoint_start(
     )
 
     with pytest.raises(PatchHarborError) as captured:
-        apply_patch_package(
+        apply_task_bundle(
             _package(_manifest(context)),
             output_directory=output_directory,
         )
@@ -977,7 +977,7 @@ def test_matching_package_preflights_private_entrypoint_and_payload_bytes(
         entrypoint=entrypoint,
         payloads=(payload,),
     )
-    with preflight_patch_package_repository(
+    with preflight_task_bundle_repository(
         package,
         output_directory=tmp_path / "results",
     ) as mutation_gate:
@@ -1033,7 +1033,7 @@ def test_private_entrypoint_uses_the_resolved_interpreter_suffix(
         lambda _script_text: resolved,
     )
 
-    with preflight_patch_package_repository(
+    with preflight_task_bundle_repository(
         _package(_manifest(context)),
         output_directory=tmp_path / "results",
     ) as mutation_gate:
@@ -1154,7 +1154,7 @@ def test_preflight_emits_full_repository_and_script_facts(tmp_path: Path, monkey
                   b"# Exact data for an observer\n# PATCHHARBOR MESSAGE plan.one END\n")
     events = []
     with observe_activity(events.append):
-        with preflight_patch_package_repository(
+        with preflight_task_bundle_repository(
             _package(_manifest(context), entrypoint=entrypoint),
             output_directory=tmp_path / "results",
         ):

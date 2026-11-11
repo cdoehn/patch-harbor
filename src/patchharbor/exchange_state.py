@@ -20,7 +20,7 @@ from patchharbor.models import (
     GitObjectId,
     RepositoryId,
 )
-from patchharbor.patch_manifest import PatchManifest
+from patchharbor.task_manifest import TaskManifest
 from patchharbor.platform.errors import describe_os_error
 from patchharbor.platform.filesystem import (
     FileChangedDuringRead,
@@ -59,7 +59,7 @@ _MANIFEST_FIELDS = frozenset(
         "state_fingerprint",
     }
 )
-_ALLOWED_KINDS = frozenset({"other", "patch_package", "result_bundle"})
+_ALLOWED_KINDS = frozenset({"other", "task_package", "result_bundle"})
 
 
 class ExchangeApplyStatus(str, Enum):
@@ -101,7 +101,7 @@ class _BindingContext(Protocol):
 
 
 @dataclass(frozen=True, slots=True)
-class ExchangePatchSelection:
+class ExchangeTaskSelection:
     """Manifest fields needed to match one package to a repository state."""
 
     repo_id: RepositoryId
@@ -123,7 +123,7 @@ class ExchangePatchSelection:
             raise ValueError("exchange selection algorithm is invalid")
 
     @classmethod
-    def from_manifest(cls, manifest: PatchManifest) -> ExchangePatchSelection:
+    def from_manifest(cls, manifest: TaskManifest) -> ExchangeTaskSelection:
         return cls(
             repo_id=manifest.repo_id,
             base_commit=manifest.base_commit,
@@ -146,7 +146,7 @@ class ExchangeStateRecord:
 
     identity: ExchangeFileIdentity
     kind: str
-    manifest: ExchangePatchSelection | None
+    manifest: ExchangeTaskSelection | None
     apply_status: ExchangeApplyStatus | None = None
     completed_commit: GitObjectId | None = None
     attempt_run_id: str | None = None
@@ -160,9 +160,9 @@ class ExchangeStateRecord:
             ExchangeApplyStatus,
         ):
             raise ValueError("exchange apply status is invalid")
-        if (self.manifest is not None) != (self.kind == "patch_package"):
+        if (self.manifest is not None) != (self.kind == "task_package"):
             raise ValueError("only patch-package state may contain a manifest")
-        if self.apply_status is not None and self.kind != "patch_package":
+        if self.apply_status is not None and self.kind != "task_package":
             raise ValueError("only patch-package state may have an apply status")
 
         if self.attempt_run_id is not None:
@@ -267,7 +267,7 @@ def _require_string(document: dict[str, object], field: str) -> str:
     return value
 
 
-def _parse_selection(value: object) -> ExchangePatchSelection | None:
+def _parse_selection(value: object) -> ExchangeTaskSelection | None:
     if value is None:
         return None
     if type(value) is not dict or set(value) != _MANIFEST_FIELDS:
@@ -281,7 +281,7 @@ def _parse_selection(value: object) -> ExchangePatchSelection | None:
         repo_id = RepositoryId(repo_id_text)
         object_format = GitObjectFormat.for_hex_length(len(base_commit_text))
         base_commit = GitObjectId(base_commit_text, object_format)
-        return ExchangePatchSelection(
+        return ExchangeTaskSelection(
             repo_id=repo_id,
             base_commit=base_commit,
             state_fingerprint=state_fingerprint,
@@ -382,7 +382,7 @@ def _parse_state(content: bytes) -> ExchangeStateSnapshot:
 
 
 def _selection_document(
-    selection: ExchangePatchSelection | None,
+    selection: ExchangeTaskSelection | None,
 ) -> dict[str, object] | None:
     if selection is None:
         return None
@@ -548,7 +548,7 @@ def merge_exchange_classifications(
 def mark_exchange_apply_started(
     paths: RegistrationUserPaths,
     identity: ExchangeFileIdentity,
-    selection: ExchangePatchSelection,
+    selection: ExchangeTaskSelection,
     *,
     verify_identity: Callable[[], None],
     retry_failed: bool = False,
@@ -562,7 +562,7 @@ def mark_exchange_apply_started(
         record = current.record_for(identity)
         if (
             record is None
-            or record.kind != "patch_package"
+            or record.kind != "task_package"
             or record.manifest != selection
         ):
             raise _error(
@@ -587,7 +587,7 @@ def mark_exchange_apply_started(
 def mark_exchange_apply_finished(
     paths: RegistrationUserPaths,
     identity: ExchangeFileIdentity,
-    selection: ExchangePatchSelection,
+    selection: ExchangeTaskSelection,
     status: ExchangeApplyStatus,
     *,
     completed_commit: GitObjectId | None = None,
@@ -604,7 +604,7 @@ def mark_exchange_apply_finished(
         record = current.record_for(identity)
         if (
             record is None
-            or record.kind != "patch_package"
+            or record.kind != "task_package"
             or record.manifest != selection
         ):
             raise _error(
@@ -625,7 +625,7 @@ def mark_exchange_apply_finished(
 def mark_exchange_attempted(
     paths: RegistrationUserPaths,
     identity: ExchangeFileIdentity,
-    selection: ExchangePatchSelection,
+    selection: ExchangeTaskSelection,
     *,
     verify_identity: Callable[[], None],
 ) -> None:
@@ -641,7 +641,7 @@ def mark_exchange_attempted(
 def record_exchange_result_digest(
     paths: RegistrationUserPaths,
     identity: ExchangeFileIdentity,
-    selection: ExchangePatchSelection,
+    selection: ExchangeTaskSelection,
     *,
     run_id: str,
     result_sha256: str,

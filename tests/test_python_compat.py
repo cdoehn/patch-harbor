@@ -17,7 +17,7 @@ from patchharbor.exit_status import exit_code_for_error
 from patchharbor.platform import file_times, filesystem, private_directory
 from patchharbor.platform.file_times import WindowsFileTimes, WindowsDescriptorMetadata
 from patchharbor.platform.pack_output import OwnedPackFile
-from patchharbor import patch_pack as core
+from patchharbor import task_pack as core
 from tests.pack_support import request_files, pack
 from tests.windows_creation_support import assert_private_creation
 
@@ -40,7 +40,7 @@ hints = typing.get_type_hints(ProcessTree.__enter__)
 assert hints['self'] is hints['return']
 for name in api.__all__:
     getattr(api, name)
-assert typing.get_type_hints(api.pack_patch)['return'] is api.PatchPackResult
+assert typing.get_type_hints(api.pack_task)['return'] is api.TaskPackResult
 assert callable(cli.main) and callable(watcher_cli.main) and callable(open_event_source)
 """
     result = subprocess.run([sys.executable, "-I", "-S", "-B", "-c", program, str(source)],

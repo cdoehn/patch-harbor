@@ -12,7 +12,7 @@ import subprocess
 import pytest
 
 from patchharbor import api
-from patchharbor import patch_inspection as inspection
+from patchharbor import task_inspection as inspection
 from patchharbor import result_reader as reader
 from patchharbor.errors import FailureReason, PatchHarborError
 from patchharbor.exit_status import exit_code_for_error
@@ -125,7 +125,7 @@ def test_one_capture_keeps_handoff_and_hash_when_path_is_replaced(tmp_path, monk
     patch = tmp_path / "patch.zip"
     bound_package(patch, binding)
     path.unlink()
-    report = inspection.validate_patch_against_reference(patch, captured)
+    report = inspection.validate_task_against_reference(patch, captured)
     assert calls == [path]  # no later reference-path read for end validation
     assert report.reference_sha256 == captured.sha256
     assert report.binding_matches is True
@@ -180,8 +180,8 @@ def test_internal_and_public_reference_validation_have_identical_facts(tmp_path)
     captured = reader.capture_result_reference(path)
     patch = tmp_path / "patch.zip"
     bound_package(patch, binding)
-    public = api.validate_patch(patch, reference_bundle=path)
-    internal = inspection.validate_patch_against_reference(patch, captured)
+    public = api.validate_task(patch, reference_bundle=path)
+    internal = inspection.validate_task_against_reference(patch, captured)
     assert replace(internal, checked_at=public.checked_at) == public
 
 
@@ -193,7 +193,7 @@ def test_internal_validation_does_not_skip_any_binding_comparison(tmp_path, fiel
     patch = tmp_path / "patch.zip"
     bound_package(patch, {**binding, field: value})
     with pytest.raises(PatchHarborError) as caught:
-        inspection.validate_patch_against_reference(patch, captured)
+        inspection.validate_task_against_reference(patch, captured)
     assert int(exit_code_for_error(caught.value)) == 9
 
 
@@ -203,17 +203,17 @@ def test_internal_validation_uses_actual_package_bytes_and_original_error_catego
     captured = reader.capture_result_reference(path)
     patch = tmp_path / "patch.zip"
     bound_package(patch, binding)
-    first = inspection.validate_patch_against_reference(patch, captured)
+    first = inspection.validate_task_against_reference(patch, captured)
     write_package(patch, changes={"patch.json": json.dumps({**MANIFEST, **binding}).encode(),
                                   "docs/data.bin": b"new payload"})
-    second = inspection.validate_patch_against_reference(patch, captured)
+    second = inspection.validate_task_against_reference(patch, captured)
     assert second.inspection.package_sha256 == hashlib.sha256(patch.read_bytes()).hexdigest()
     assert first.inspection.package_sha256 != second.inspection.package_sha256
     assert first.reference_sha256 == second.reference_sha256
     write_package(patch, changes={"patch.json": json.dumps({**MANIFEST, **binding}).encode(),
                                   "run.sh": b"#!/usr/bin/env bash\ntrue\n"})
     with pytest.raises(PatchHarborError) as caught:
-        inspection.validate_patch_against_reference(patch, captured)
+        inspection.validate_task_against_reference(patch, captured)
     assert int(exit_code_for_error(caught.value)) == 3
 
 
@@ -224,7 +224,7 @@ def test_internal_end_validation_honours_package_budget(tmp_path):
     bound_package(patch, binding)
     policy = replace(DEFAULT_RESOURCE_POLICY, warning_bytes=1, max_input_artifact_bytes=1)
     with pytest.raises(PatchHarborError) as caught:
-        inspection.validate_patch_against_reference(patch, captured, resource_policy=policy)
+        inspection.validate_task_against_reference(patch, captured, resource_policy=policy)
     assert int(exit_code_for_error(caught.value)) == 4
 
 
@@ -253,5 +253,5 @@ def test_capture_and_internal_validation_are_read_only_without_git_registry_or_n
         return original_resolve(target, *args, **kwargs)
     monkeypatch.setattr(Path, "resolve", no_foreign_resolution)
     captured = reader.capture_result_reference(path)
-    assert inspection.validate_patch_against_reference(patch, captured).binding_matches
+    assert inspection.validate_task_against_reference(patch, captured).binding_matches
     assert {item.name: item.read_bytes() for item in tmp_path.iterdir()} == before

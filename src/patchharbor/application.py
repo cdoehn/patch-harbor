@@ -23,14 +23,14 @@ from patchharbor.errors import FailureReason, PatchHarborError
 from patchharbor.execution import DEFAULT_TIMEOUT_SECONDS, execute_script_text
 from patchharbor.models import BundleScript, InputArtifact
 from patchharbor.output import OutputTargets
-from patchharbor.patch_manifest import PatchManifest
-from patchharbor.patch_inspection import (
-    PatchInspection,
-    PatchValidationResult,
-    inspect_patch as _inspect_patch,
-    validate_patch as _validate_patch,
+from patchharbor.task_manifest import TaskManifest
+from patchharbor.task_inspection import (
+    TaskInspection,
+    TaskValidationResult,
+    inspect_task as _inspect_task,
+    validate_task as _validate_task,
 )
-from patchharbor.patch_package import validate_patch_package as _validate_patch_package
+from patchharbor.task_package import validate_task_bundle as _validate_task_bundle
 from patchharbor.payload_files import write_bundle_payloads
 from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY, ResourcePolicy
 from patchharbor.sources import (
@@ -55,10 +55,10 @@ from patchharbor.application_exchange import (
     watch_targets,
 )
 from patchharbor.application_apply import (
-    apply_patch_package,
-    dry_run_patch_package,
-    preflight_patch_package_repository,
-    resolve_patch_package,
+    apply_task_bundle,
+    dry_run_task_bundle,
+    preflight_task_bundle_repository,
+    resolve_task_bundle,
     run_apply_path,
     run_guarded_apply_path,
 )
@@ -67,24 +67,24 @@ from patchharbor.application_results import (
 )
 
 
-def validate_patch_package(
+def validate_task_bundle(
     path: Path,
     *,
     resource_policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY,
-) -> PatchManifest:
+) -> TaskManifest:
     """Validate one complete patch package through the package boundary."""
-    return _validate_patch_package(path, resource_policy=resource_policy)
+    return _validate_task_bundle(path, resource_policy=resource_policy)
 
 
-def inspect_patch(path: Path) -> PatchInspection:
+def inspect_task(path: Path) -> TaskInspection:
     """Read package facts without entering the Apply lifecycle."""
-    return _inspect_patch(path)
+    return _inspect_task(path)
 
 
-def validate_patch(path: Path, *, repository: Path | None = None,
-                   reference_bundle: Path | None = None) -> PatchValidationResult:
+def validate_task(path: Path, *, repository: Path | None = None,
+                   reference_bundle: Path | None = None) -> TaskValidationResult:
     """Validate an explicitly supplied package; no implicit repository selection."""
-    return _validate_patch(path, repository=repository, reference_bundle=reference_bundle)
+    return _validate_task(path, repository=repository, reference_bundle=reference_bundle)
 
 
 def _execute_bundle_script(

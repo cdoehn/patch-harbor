@@ -123,7 +123,7 @@ def test_automatic_discovery_never_routes_a_patch_from_the_wrong_exchange(repos,
     write_package(right, cb)
     os.utime(wrong, ns=(3000000000, 3000000000))
     os.utime(right, ns=(1000000000, 1000000000))
-    selected = application.discover_exchange_patch(application._automatic_exchange_discovery_scope(), archive=False)
+    selected = application.discover_exchange_task(application._automatic_exchange_discovery_scope(), archive=False)
     assert selected.artifact.path == right
     assert selected.configuration_paths.repository.value == b
     right.unlink()

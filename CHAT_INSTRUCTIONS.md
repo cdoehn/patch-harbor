@@ -285,8 +285,8 @@ Modul über `importlib.util.spec_from_file_location`, registriere dieses Modul v
 `exec_module` in `sys.modules`, rufe `assess`, `prepare` und ausdrücklich
 `import_api(prepared)` auf. Vorhandene fremde `patchharbor`-Module führen zum
 Herkunftskonflikt; verwende dann einen frischen Prozess. `sys.path` behält die
-geprüfte PYZ für spätere Imports. `api.pack_patch`, `api.inspect_patch` und
-`api.validate_patch` sind dieselben öffentlichen Fachoperationen wie die CLI.
+geprüfte PYZ für spätere Imports. `api.pack_task`, `api.inspect_task` und
+`api.validate_task` sind dieselben öffentlichen Fachoperationen wie die CLI.
 
 Fehlen geeignetes Python, Vertrauen oder Ausführungsmöglichkeiten, ist die Runtime
 `unavailable`, oder scheitert der technische Start, benenne den konkreten Grund
@@ -949,7 +949,7 @@ def import_api(prepared):
     package = sys.modules['patchharbor']
     _require(package.__version__ == assessment.version, 'imported runtime version differs')
     _require(all(callable(getattr(api, name, None)) for name in
-                 ('inspect_patch','validate_patch','pack_patch')), 'missing required public API')
+                 ('inspect_task','validate_task','pack_task')), 'missing required public API')
     from patchharbor.pyz_artifact import PyzProvider
     # The imported Core now checks its complete canonical resources. This still
     # does not declare the original repository snapshot fully validated.
@@ -1213,7 +1213,7 @@ Default.
 ## 7. Genau ein sicheres Patch-Paket erzeugen
 
 Verwende mit einer nutzbaren aktuellen Runtime `pack` beziehungsweise
-`api.pack_patch` für den bewusst vorbereiteten Inhaltsordner, genau das geprüfte
+`api.pack_task` für den bewusst vorbereiteten Inhaltsordner, genau das geprüfte
 Result, einen Entrypoint und einen expliziten vorhandenen Ausgabeordner außerhalb
 der Inhalte. Pack erzeugt Manifest und frische Begleitdaten selbst und validiert
 die tatsächlich geschriebenen Bytes gegen diese Referenz. Es führt keine Tests,

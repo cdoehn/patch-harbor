@@ -69,9 +69,9 @@ expected=json.loads((root/'expected.json').read_bytes())
 for name,values in expected.items():
     observed={p:{'mode':f.mode,'sha256':f.sha256,'size':f.size} for p,f in getattr(snapshot,name).files.items()}
     assert observed==values,(name,observed,values)
-validated=api.validate_patch(packed.path,reference_bundle=root/'reference.zip')
+validated=api.validate_task(packed.path,reference_bundle=root/'reference.zip')
 assert validated.binding_matches and validated.reference_sha256==snapshot.sha256==expected_sha
-assert api.inspect_patch(packed.path)==validated.inspection
+assert api.inspect_task(packed.path)==validated.inspection
 with ZipFile(packed.path) as archive:
     with ZipFile(BytesIO(archive.read('captured-project.zip'))) as project:
         assert set(project.namelist())==set(snapshot.effective.files)
@@ -118,7 +118,7 @@ import hashlib,json,sys
 from pathlib import Path
 sys.path.insert(0,sys.argv[1])
 from patchharbor import api
-packed=api.pack_patch(sys.argv[2],reference_bundle=sys.argv[3],entrypoint=sys.argv[7],output_directory=sys.argv[6])
+packed=api.pack_task(sys.argv[2],reference_bundle=sys.argv[3],entrypoint=sys.argv[7],output_directory=sys.argv[6])
 called=[]
 def accept(facts):
     called.append(facts)
@@ -153,12 +153,12 @@ def test_public_example_refuses_a_rebound_reference(tmp_path,monkeypatch):
     expected=hashlib.sha256(reference.read_bytes()).hexdigest()
     script=tmp_path/'run.sh';script.write_text('#!/usr/bin/env bash\n# PATCHHARBOR\nexit 0\n')
     output=tmp_path/'unwatched';output.mkdir()
-    original=api.pack_patch;observed=[]
+    original=api.pack_task;observed=[]
     def exchange_reference(*args,**kwargs):
         changed,_=reference_entries(dirty=True);changed['changes/unstaged.patch']=b''
         write_reference(reference,changed)
         result=original(*args,**kwargs);observed.append(result);return result
-    monkeypatch.setattr(api,'pack_patch',exchange_reference)
+    monkeypatch.setattr(api,'pack_task',exchange_reference)
     with pytest.raises(RuntimeError):
         module['prepare_transport'](reference,expected_result_sha256=expected,
             trusted_entrypoint=script,workspace=tmp_path/'fresh',output_directory=output)

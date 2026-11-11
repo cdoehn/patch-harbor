@@ -63,7 +63,7 @@ def test_native_result_and_log_are_observed_by_full_hash(tmp_path, monkeypatch):
     assert reference['repo_id'] == str(context.repo_id)
     assert reference['result_status'] == 'created'
     assert reference['primary_result']['success'] is True
-    assert next(r for r in rows if r['kind'] == 'patch_package')['source_candidates'] == [reference['sha256']]
+    assert next(r for r in rows if r['kind'] == 'task_package')['source_candidates'] == [reference['sha256']]
     log = api.monitor_log(result_path, expected_sha256=reference['sha256'])
     assert log['run_id'] == reference['run_id'] and log['text']
     with pytest.raises(ValueError, match='identity changed'):
@@ -164,7 +164,7 @@ def test_duplicate_result_copy_is_one_source_identity(tmp_path, monkeypatch):
     (reference.parent / 'copy.bin').write_bytes(reference.read_bytes())
     patch(root, context)
     rows = api.monitor_artifacts(str(root))['artifacts']
-    assert len(next(r for r in rows if r['kind'] == 'patch_package')['source_candidates']) == 1
+    assert len(next(r for r in rows if r['kind'] == 'task_package')['source_candidates']) == 1
     assert not any(r['ambiguous_run'] for r in rows)
 
 
@@ -175,7 +175,7 @@ def test_dry_run_receipt_links_to_exact_patch_and_stays_validation(tmp_path, mon
     assert report.success
     rows = api.monitor_artifacts(str(root))['artifacts']
     receipt = next(r for r in rows if r['kind'] == 'result_bundle')
-    package = next(r for r in rows if r['kind'] == 'patch_package')
+    package = next(r for r in rows if r['kind'] == 'task_package')
     assert receipt['dry_run'] and receipt['primary_result']['kind'] == 'dry_run_success'
     # A validation-only receipt must not imply an executed patch or success replay.
     assert package['replay_status'] is None
@@ -190,7 +190,7 @@ def test_corrupt_result_does_not_hide_other_artifacts(tmp_path, monkeypatch):
         archive.writestr('manifest.json', '{"marker":"patch-harbor-result-bundle"}')
     result = api.monitor_artifacts(str(root))
     assert any(r.get('error') or r['kind'] == 'other' for r in result['artifacts'])
-    assert any(r['kind'] == 'patch_package' for r in result['artifacts'])
+    assert any(r['kind'] == 'task_package' for r in result['artifacts'])
 
 
 def test_equal_bytes_are_parsed_once_but_changed_bytes_never_reuse_facts(tmp_path, monkeypatch):

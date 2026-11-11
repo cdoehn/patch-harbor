@@ -84,21 +84,21 @@ def _package_command(
     verbose: bool = False, force_plain: bool = False, no_color: bool = False,
     repository: Path | None = None, reference_bundle: Path | None = None,
 ) -> int:
-    report: api.PatchValidationResult | None = None
+    report: api.TaskValidationResult | None = None
     try:
         with _console_scope(
             stdout, stderr=stderr, enabled=not json_output,
             color_enabled=not no_color, plain=force_plain, verbose=verbose,
         ) as console:
             if command == "inspect":
-                info = api.inspect_patch(path, observer=_progress_observer(console))
+                info = api.inspect_task(path, observer=_progress_observer(console))
             else:
                 options = {}
                 if repository is not None:
                     options["repository"] = repository
                 if reference_bundle is not None:
                     options["reference_bundle"] = reference_bundle
-                report = api.validate_patch(path, **options, observer=_progress_observer(console))
+                report = api.validate_task(path, **options, observer=_progress_observer(console))
                 info = report.inspection
     except PatchHarborError as exc:
         return _write_command_error(
@@ -123,7 +123,7 @@ def _package_command(
     return 0
 
 
-def _pack_output_diagnostic(stderr: TextIO, error: BaseException, packed: api.PatchPackResult | None) -> None:
+def _pack_output_diagnostic(stderr: TextIO, error: BaseException, packed: api.TaskPackResult | None) -> None:
     detail = 'pack output could not be delivered: ' + str(error)
     if packed is not None:
         detail += f'; already published: {packed.path}; sha256: {packed.package_sha256}'
@@ -139,7 +139,7 @@ def _pack_command(args: argparse.Namespace, *, stdout: TextIO, stderr: TextIO) -
     packed = None
     error = None
     try:
-        packed = api.pack_patch(
+        packed = api.pack_task(
             args.content_directory, reference_bundle=args.reference_bundle,
             entrypoint=args.entrypoint, output=args.output,
             output_directory=args.output_dir, modes=args.modes, observer=None,

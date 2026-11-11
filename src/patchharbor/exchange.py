@@ -16,15 +16,15 @@ from patchharbor.errors import PatchHarborError, patch_package_error
 from patchharbor.exchange_state import (
     ExchangeApplyStatus,
     ExchangeFileIdentity,
-    ExchangePatchSelection,
+    ExchangeTaskSelection,
     ExchangeStateRecord,
     load_exchange_state,
     merge_exchange_classifications,
 )
 from patchharbor.models import BundlePayload
-from patchharbor.patch_package import (
-    ValidatedPatchPackage,
-    resolve_patch_payloads,
+from patchharbor.task_package import (
+    ValidatedTaskBundle,
+    resolve_task_payloads,
 )
 from patchharbor.platform.filesystem import (
     FileChangedDuringRead,
@@ -35,7 +35,7 @@ from patchharbor.platform.filesystem import (
 from patchharbor.platform.paths import physically_canonicalize
 from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY, ResourcePolicy
 from patchharbor.user_paths import RegistrationUserPaths
-from patchharbor.result_reader import has_result_marker, read_result_or_patch_payloads
+from patchharbor.result_reader import has_result_marker, read_result_or_task_payloads
 from patchharbor.zip_payloads import ZipPayloadError
 
 
@@ -48,7 +48,7 @@ class ExchangeScanError(RuntimeError):
 class ExchangeArtifactKind(str, Enum):
     """Content class relevant to automatic Exchange selection."""
 
-    PATCH_PACKAGE = "patch_package"
+    PATCH_PACKAGE = "task_package"
     RESULT_BUNDLE = "result_bundle"
     OTHER = "other"
 
@@ -61,9 +61,9 @@ class ExchangeArtifact:
     identity: ExchangeFileIdentity
     mtime_ns: int
     kind: ExchangeArtifactKind
-    selection: ExchangePatchSelection | None = None
+    selection: ExchangeTaskSelection | None = None
     apply_status: ExchangeApplyStatus | None = None
-    package: ValidatedPatchPackage | None = None
+    package: ValidatedTaskBundle | None = None
 
     def __post_init__(self) -> None:
         if isinstance(self.mtime_ns, bool) or not isinstance(self.mtime_ns, int):
@@ -75,7 +75,7 @@ class ExchangeArtifact:
             if not is_patch or self.selection is None:
                 raise ValueError("only Patch Package artifacts may carry a package")
             if (
-                ExchangePatchSelection.from_manifest(self.package.manifest)
+                ExchangeTaskSelection.from_manifest(self.package.manifest)
                 != self.selection
             ):
                 raise ValueError("Patch Package selection data is inconsistent")
@@ -100,8 +100,8 @@ class _ExchangeFileSnapshot:
 @dataclass(frozen=True, slots=True)
 class _ContentClassification:
     kind: ExchangeArtifactKind
-    selection: ExchangePatchSelection | None = None
-    package: ValidatedPatchPackage | None = None
+    selection: ExchangeTaskSelection | None = None
+    package: ValidatedTaskBundle | None = None
 
 
 def _read_exchange_file(
@@ -166,7 +166,7 @@ def _classify_content(
         activity("SKIP", f"{path.name}: exceeds retained parsing limit", "detail")
         return _ContentClassification(kind=ExchangeArtifactKind.OTHER)
     try:
-        payloads = read_result_or_patch_payloads(content, policy=resource_policy)
+        payloads = read_result_or_task_payloads(content, policy=resource_policy)
     except ZipPayloadError as exc:
         activity("SKIP", f"{path.name}: not a supported safe ZIP ({exc})", "detail")
         return _ContentClassification(kind=ExchangeArtifactKind.OTHER)
@@ -177,7 +177,7 @@ def _classify_content(
         return _ContentClassification(kind=ExchangeArtifactKind.RESULT_BUNDLE)
 
     try:
-        package = resolve_patch_payloads(
+        package = resolve_task_payloads(
             payloads,
             resource_policy=resource_policy,
             package_path=path,
@@ -191,7 +191,7 @@ def _classify_content(
     activity("PATCH", f"{path.name}: validated PatchHarbor package", "success")
     return _ContentClassification(
         kind=ExchangeArtifactKind.PATCH_PACKAGE,
-        selection=ExchangePatchSelection.from_manifest(package.manifest),
+        selection=ExchangeTaskSelection.from_manifest(package.manifest),
         package=package,
     )
 
@@ -201,7 +201,7 @@ def _artifact_from_record(
     record: ExchangeStateRecord,
     *,
     mtime_ns: int,
-    package: ValidatedPatchPackage | None = None,
+    package: ValidatedTaskBundle | None = None,
 ) -> ExchangeArtifact:
     return ExchangeArtifact(
         path=path,
@@ -370,12 +370,12 @@ def _record_from_artifact(artifact: ExchangeArtifact) -> ExchangeStateRecord:
     )
 
 
-def materialize_exchange_patch(
+def materialize_exchange_task(
     artifact: ExchangeArtifact,
     *,
     directory: Path,
     resource_policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY,
-) -> ValidatedPatchPackage:
+) -> ValidatedTaskBundle:
     """Reopen the unique selected identity and require the same valid package."""
     activity("RECHECK", f"Reopen selected package and verify identical content: {artifact.path.name}")
     if (

@@ -12,7 +12,7 @@ import pytest
 
 from patchharbor.exit_status import ExitCode
 
-from patchharbor.patch_manifest import PATCH_FORMAT_VERSION, PATCH_MARKER
+from patchharbor.task_manifest import TASK_FORMAT_VERSION, TASK_MARKER
 from patchharbor.state_fingerprint import FINGERPRINT_ALGORITHM
 from tests.platform_support import (
     native_script,
@@ -72,8 +72,8 @@ def _register_context(
 
 def _manifest(context: dict[str, object]) -> dict[str, object]:
     return {
-        "marker": PATCH_MARKER,
-        "format_version": PATCH_FORMAT_VERSION,
+        "marker": TASK_MARKER,
+        "format_version": TASK_FORMAT_VERSION,
         "repo_id": context["repo_id"],
         "base_commit": context["base_commit"],
         "state_fingerprint": context["state_fingerprint"],
@@ -276,7 +276,7 @@ def test_apply_timeout_preserves_output_after_entrypoint_ready(tmp_path, monkeyp
     import io
     import threading
 
-    from patchharbor.application import apply_patch_package, resolve_patch_package
+    from patchharbor.application import apply_task_bundle, resolve_task_bundle
     from patchharbor.errors import FailureReason, PatchHarborError
     from patchharbor.output import OutputTargets
     from patchharbor.platform.lifecycle import ProcessTree
@@ -303,7 +303,7 @@ def test_apply_timeout_preserves_output_after_entrypoint_ready(tmp_path, monkeyp
         return real_run(tree, timeout_seconds=timeout_seconds)
     monkeypatch.setattr(ProcessTree, "run", run_after_output)
     with pytest.raises(PatchHarborError) as failure:
-        apply_patch_package(resolve_patch_package(package), output_directory=tmp_path / "results",
+        apply_task_bundle(resolve_task_bundle(package), output_directory=tmp_path / "results",
                             timeout_seconds=1.0,
                             output=OutputTargets(visible_text_stream=io.StringIO(), line_observer=observe))
     assert failure.value.reason is FailureReason.TIMEOUT
@@ -348,7 +348,7 @@ from pathlib import Path
 import sys
 import threading
 
-from patchharbor.application import apply_patch_package, resolve_patch_package
+from patchharbor.application import apply_task_bundle, resolve_task_bundle
 from patchharbor.exit_status import ExitCode
 from patchharbor.errors import PatchHarborError
 from patchharbor.output import OutputTargets
@@ -369,8 +369,8 @@ def interrupt_on_ready(lines: tuple[str, ...], _discarded: int) -> None:
 
 
 try:
-    report = apply_patch_package(
-        resolve_patch_package(package),
+    report = apply_task_bundle(
+        resolve_task_bundle(package),
         output_directory=output_directory,
         timeout_seconds=30,
         output=OutputTargets(

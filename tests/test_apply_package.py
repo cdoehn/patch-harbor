@@ -7,20 +7,20 @@ import zipfile
 
 import pytest
 
-from patchharbor.patch_package import (
-    resolve_patch_package,
-    validate_patch_package,
+from patchharbor.task_package import (
+    resolve_task_bundle,
+    validate_task_bundle,
 )
 from patchharbor.exit_status import ExitCode, exit_code_for_error
 from patchharbor.errors import PatchHarborError
-from patchharbor.patch_manifest import PATCH_FORMAT_VERSION, PATCH_MARKER
+from patchharbor.task_manifest import TASK_FORMAT_VERSION, TASK_MARKER
 from patchharbor.resource_policy import ResourcePolicy
 from patchharbor.state_fingerprint import FINGERPRINT_ALGORITHM
 
 
 _VALID_MANIFEST: dict[str, object] = {
-    "marker": PATCH_MARKER,
-    "format_version": PATCH_FORMAT_VERSION,
+    "marker": TASK_MARKER,
+    "format_version": TASK_FORMAT_VERSION,
     "repo_id": "a3f9c2e1-7b4d-4a91-9d2e-5c6f8a1b2c3d",
     "base_commit": "f4e9c2a7b8c9d01234567890abcdef1234567890",
     "state_fingerprint": "a1b2c3d4e5f67890",
@@ -73,7 +73,7 @@ def _write_package(
 
 def _assert_source_error(path: Path, policy: ResourcePolicy | None = None) -> None:
     with pytest.raises(PatchHarborError) as captured:
-        resolve_patch_package(
+        resolve_task_bundle(
             path,
             resource_policy=policy or ResourcePolicy(),
         )
@@ -93,7 +93,7 @@ def test_manifest_validation_retains_the_typed_manifest_result(
     package_path = tmp_path / "patch.zip"
     _write_package(package_path)
 
-    manifest = validate_patch_package(package_path)
+    manifest = validate_task_bundle(package_path)
 
     assert manifest.entrypoint == "run.sh"
     assert manifest.repo_id.value == _VALID_MANIFEST["repo_id"]
@@ -114,7 +114,7 @@ def test_package_classifies_only_the_manifest_entrypoint_as_executable(
         ),
     )
 
-    package = resolve_patch_package(package_path)
+    package = resolve_task_bundle(package_path)
 
     assert package.entrypoint.relative_path == "run.sh"
     assert package.entrypoint.content == _ENTRYPOINT
@@ -173,7 +173,7 @@ def test_archive_safety_is_checked_before_manifest_roles(
         archive.writestr("../escape.bin", b"payload")
 
     with pytest.raises(PatchHarborError) as captured:
-        resolve_patch_package(package_path)
+        resolve_task_bundle(package_path)
 
     assert exit_code_for_error(captured.value) is ExitCode.SOURCE_ERROR
 
@@ -215,7 +215,7 @@ def test_manifest_entrypoint_must_reference_one_regular_entry(
             archive.writestr("scripts/run.sh/", b"")
 
     with pytest.raises(PatchHarborError) as captured:
-        resolve_patch_package(package_path)
+        resolve_task_bundle(package_path)
 
     assert exit_code_for_error(captured.value) is ExitCode.PATCH_PACKAGE_ERROR
 
@@ -236,7 +236,7 @@ def test_package_accepts_exact_resource_boundaries(tmp_path: Path) -> None:
         max_zip_entries=3,
     )
 
-    package = resolve_patch_package(package_path, resource_policy=policy)
+    package = resolve_task_bundle(package_path, resource_policy=policy)
 
     assert package.entrypoint.content == _ENTRYPOINT
     assert package.payloads[0].content == payload
@@ -254,7 +254,7 @@ def test_large_entry_warnings_are_preserved_on_the_classified_package(
         max_zip_total_bytes=4096,
     )
 
-    package = resolve_patch_package(package_path, resource_policy=policy)
+    package = resolve_task_bundle(package_path, resource_policy=policy)
 
     assert len(package.warnings) == 2
     assert any("run.sh" in warning for warning in package.warnings)
@@ -265,20 +265,20 @@ def test_patch_digest_covers_exact_zip_bytes_and_not_only_manifest(tmp_path: Pat
     from hashlib import sha256
     first = tmp_path / "first.zip"
     _write_package(first, entries=(("payload.txt", b"original"),))
-    initial = resolve_patch_package(first)
+    initial = resolve_task_bundle(first)
     assert initial.package_sha256 == sha256(first.read_bytes()).hexdigest()
     renamed = tmp_path / "renamed.zip.txt"
     renamed.write_bytes(first.read_bytes())
-    assert resolve_patch_package(renamed) == initial
+    assert resolve_task_bundle(renamed) == initial
     _write_package(first, entries=(("payload.txt", b"changed!"),))
-    changed = resolve_patch_package(first)
+    changed = resolve_task_bundle(first)
     assert changed.manifest == initial.manifest
     assert changed.package_sha256 != initial.package_sha256
 
 
 def test_parser_and_digest_use_the_same_immutable_package_capture(tmp_path: Path, monkeypatch) -> None:
     from hashlib import sha256
-    import patchharbor.patch_package as package_module
+    import patchharbor.task_package as package_module
     first = tmp_path / "patch.zip"
     _write_package(first, entries=(("payload.txt", b"original"),))
     original_bytes = first.read_bytes()
@@ -288,7 +288,7 @@ def test_parser_and_digest_use_the_same_immutable_package_capture(tmp_path: Path
         _write_package(first, entries=(("payload.txt", b"changed!"),))
         return captured
     monkeypatch.setattr(package_module, "read_stable_regular_file_with_sha256", captured_then_changed)
-    package = resolve_patch_package(first)
+    package = resolve_task_bundle(first)
     assert package.package_sha256 == sha256(original_bytes).hexdigest()
     assert package.payloads[0].content == b"original"
     # Revalidation before mutation, not a second uncorrelated hash here, rejects

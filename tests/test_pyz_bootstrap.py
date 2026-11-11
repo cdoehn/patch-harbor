@@ -227,9 +227,9 @@ assert assessment.scope=='runtime_descriptor_precheck' and not assessment.full_r
 runtime=bootstrap.prepare(assessment,workspace)
 api=bootstrap.import_api(runtime)
 assert bootstrap.import_api(runtime) is api
-packed=api.pack_patch(contents,reference_bundle=original,entrypoint='run.sh',output_directory=output)
-assert api.inspect_patch(packed.path).package_sha256==packed.package_sha256
-assert api.validate_patch(packed.path,reference_bundle=original).binding_matches
+packed=api.pack_task(contents,reference_bundle=original,entrypoint='run.sh',output_directory=output)
+assert api.inspect_task(packed.path).package_sha256==packed.package_sha256
+assert api.validate_task(packed.path,reference_bundle=original).binding_matches
 assert str(runtime.path) in sys.path
 assert 'patchharbor_watcher' not in sys.modules
 print(json.dumps({'package_sha256':packed.package_sha256,'path':str(packed.path),
@@ -241,7 +241,7 @@ print(json.dumps({'package_sha256':packed.package_sha256,'path':str(packed.path)
     assert result.returncode==0,result.stdout+result.stderr
     report=json.loads(result.stdout)
     assert report['pyz_sha256']==hashlib.sha256(raw).hexdigest()
-    assert api.validate_patch(report['path'],reference_bundle=request_files[1]).binding_matches
+    assert api.validate_task(report['path'],reference_bundle=request_files[1]).binding_matches
 
 
 @pytest.mark.packaging

@@ -16,7 +16,7 @@ from patchharbor.bundle_handoff import (
 from patchharbor.bundle_names import validate_bundle_suffix
 from patchharbor.bundle_paths import BundlePathError, normalize_bundle_path
 from patchharbor.errors import ErrorKind, FailureReason, PatchHarborError
-from patchharbor.exchange_state import ExchangePatchSelection
+from patchharbor.exchange_state import ExchangeTaskSelection
 from patchharbor.exit_status import reason_for_exit_code
 from patchharbor.json_document import parse_json_document as _document
 from patchharbor.result_pyz import ResultPyzRuntime, read_result_pyz
@@ -55,11 +55,11 @@ _RUN_FIELDS = _BINDING_FIELDS | {
 }
 
 
-def _selection(document: dict[str, object]) -> ExchangePatchSelection:
+def _selection(document: dict[str, object]) -> ExchangeTaskSelection:
     if any(type(document.get(key)) is not str for key in _BINDING_FIELDS):
         raise ValueError("incomplete bundle binding")
     base = document["base_commit"]
-    return ExchangePatchSelection(
+    return ExchangeTaskSelection(
         repo_id=RepositoryId(document["repo_id"]),
         base_commit=GitObjectId(base, GitObjectFormat.for_hex_length(len(base))),
         state_fingerprint=document["state_fingerprint"],
@@ -97,7 +97,7 @@ class ResultFacts:
     primary_result: PrimaryResult
     warnings: tuple[str, ...]
     base_entries: tuple[tuple[str, str, str], ...]
-    expected: ExchangePatchSelection | None
+    expected: ExchangeTaskSelection | None
     patch_sha256: str | None
     completed_commit: GitObjectId | None
     format_version: int = 3
@@ -216,7 +216,7 @@ def has_result_marker(payloads: tuple[BundlePayload, ...]) -> bool:
         return False
 
 
-def read_result_or_patch_payloads(content: bytes, *,
+def read_result_or_task_payloads(content: bytes, *,
                                   policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY) -> tuple[BundlePayload, ...]:
     """Keep the patch profile strict; allow snapshot paths only for Result hints.
 

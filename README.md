@@ -152,7 +152,7 @@ The same operation is available to Python callers:
 ```python
 from patchharbor import api
 
-packed = api.pack_patch(
+packed = api.pack_task(
     "/work/contents",
     reference_bundle="/work/result.zip",
     entrypoint="run.sh",

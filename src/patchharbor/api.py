@@ -23,7 +23,7 @@ from typing import TextIO
 import patchharbor.application as _application
 from patchharbor.api_types import (
     ActivityEvent, BundleResult, CandidateSelector, ConfigurationResult,
-    AdmissionCallback, PatchAdmission,
+    AdmissionCallback, TaskAdmission,
     SafeExportPlan, SafeExportError, SafeExportErrorCode,
     DirectoryCandidate, GitObjectFormat, GitObjectId, OutputStreams, PackageFile,
     PrimaryResult, PrimaryResultKind, ProgressEvent, ProgressObserver,
@@ -31,9 +31,9 @@ from patchharbor.api_types import (
     RepositoryId, RepositoryPath, RepositoryResolved, RequestStarted,
     ResultBundleResult, ResultBundleStatus, RunOperation, RunReport, RunTiming,
     RunToolError, ScriptPrepared, ScriptResult, UnregisterResult,
-    PatchEntry, PatchEntryRole, PatchInspection, PatchManifest, PatchMessage,
-    PatchValidationResult, PatchValidationScope, ReferenceContext,
-    PatchPackResult, RuntimeExportResult, RuntimeExportError, RuntimeExportErrorCode,
+    TaskEntry, TaskEntryRole, TaskInspection, TaskManifest, TaskMessage,
+    TaskValidationResult, TaskValidationScope, ReferenceContext,
+    TaskPackResult, RuntimeExportResult, RuntimeExportError, RuntimeExportErrorCode,
     IntegrationCapabilities, ResultSnapshot, ResultSnapshotError, SnapshotErrorCode,
     SnapshotFile, SnapshotLayer, SnapshotRuntime,
     ApplyLock, ApplyLockKind, ApplyReadiness, AutomaticApplyResult,
@@ -55,7 +55,7 @@ PathInput = str | os.PathLike[str]
 __all__ = [
     "monitor_live", "watcher_observation", "monitor_artifacts", "monitor_overview", "monitor_log", "monitor_snapshot", "MonitorSnapshot", "MonitorRepository", "MonitorExchange",
     "ActivityEvent", "BundleResult", "CandidateSelector", "ConfigurationResult",
-    "AdmissionCallback", "PatchAdmission", "apply_guarded",
+    "AdmissionCallback", "TaskAdmission", "apply_guarded",
     "SafeExportPlan", "SafeExportError", "SafeExportErrorCode", "prepare_reference_export",
     "DEFAULT_TIMEOUT_SECONDS", "DirectoryCandidate", "ErrorKind", "FailureReason",
     "GitObjectFormat", "GitObjectId", "OutputStreams", "PackageFile", "PathInput",
@@ -67,12 +67,12 @@ __all__ = [
     "UnregisterResult", "apply", "apply_next", "bundle", "configure_archive_directory",
     "configure_bundle_suffix", "configure_exchange_directory", "configuration",
     "context", "dry_run", "register", "repositories", "run_scripts", "unregister",
-    "PatchEntry", "PatchEntryRole", "PatchInspection", "PatchManifest", "PatchMessage",
-    "PatchValidationResult", "PatchValidationScope", "ReferenceContext", "inspect_patch", "validate_patch",
+    "TaskEntry", "TaskEntryRole", "TaskInspection", "TaskManifest", "TaskMessage",
+    "TaskValidationResult", "TaskValidationScope", "ReferenceContext", "inspect_task", "validate_task",
     "ApplyLock", "ApplyLockKind", "ApplyReadiness", "AutomaticApplyResult",
     "AutomaticApplyStatus", "ExchangeWatchTarget", "WatchControlPaths", "WatchTargets",
     "watch_targets", "watch_control_paths", "apply_readiness",
-    "pack_patch", "PatchPackResult",
+    "pack_task", "TaskPackResult",
     "export_runtime", "RuntimeExportResult", "RuntimeExportError", "RuntimeExportErrorCode",
     "IntegrationCapabilities", "ResultSnapshot", "ResultSnapshotError", "SnapshotErrorCode",
     "SnapshotFile", "SnapshotLayer", "SnapshotRuntime", "integration_capabilities", "read_result_snapshot",
@@ -105,11 +105,11 @@ def read_result_snapshot(
         return _read_result_snapshot(path, expected_sha256=digest)
 
 
-def pack_patch(
+def pack_task(
     content_directory: PathInput, *, reference_bundle: PathInput, entrypoint: str,
     output: PathInput | None = None, output_directory: PathInput | None = None,
     modes: Mapping[str,int] | None = None, observer: ProgressObserver | None = None,
-) -> PatchPackResult:
+) -> TaskPackResult:
     """Pack explicit contents and a verified Result without applying or replacing.
 
     Exactly one output choice is required. Success retains its complete evidence
@@ -131,9 +131,9 @@ def pack_patch(
     if any(not isinstance(key,str) or type(value) is not int for key,value in requested.items()):
         raise TypeError('modes require string paths and integer values, not bool')
     selected_observer=_observer(observer)
-    from patchharbor.patch_pack import pack_patch as _pack_patch
+    from patchharbor.task_pack import pack_task as _pack_task
     with _observe_activity(selected_observer):
-        return _pack_patch(contents,reference_bundle=reference,entrypoint=entrypoint,
+        return _pack_task(contents,reference_bundle=reference,entrypoint=entrypoint,
                            output=destination,output_directory=directory,modes=requested)
 
 
@@ -335,19 +335,19 @@ def _inspection_arguments(
                                FailureReason.SOURCE_ERROR) from exc
 
 
-def inspect_patch(
+def inspect_task(
     patch: PathInput, *, observer: ProgressObserver | None = None,
-) -> PatchInspection:
+) -> TaskInspection:
     """Inspect one explicit package without Git, registration, shell lookup or writes."""
     path, actual_observer = _inspection_arguments(patch, observer)
     with _observe_activity(actual_observer):
-        return _application.inspect_patch(path)
+        return _application.inspect_task(path)
 
 
-def validate_patch(
+def validate_task(
     patch: PathInput, *, repository: PathInput | None = None,
     reference_bundle: PathInput | None = None, observer: ProgressObserver | None = None,
-) -> PatchValidationResult:
+) -> TaskValidationResult:
     """Validate a package, optionally bound to one explicit repository or Result."""
     if repository is not None and reference_bundle is not None:
         raise ValueError("repository and reference_bundle are mutually exclusive")
@@ -362,7 +362,7 @@ def validate_patch(
     except (OSError, UnicodeError) as exc:
         raise PatchHarborError("cannot anchor validation input paths: " + str(exc), FailureReason.SOURCE_ERROR) from exc
     with _observe_activity(actual_observer):
-        return _application.validate_patch(path, repository=target, reference_bundle=reference)
+        return _application.validate_task(path, repository=target, reference_bundle=reference)
 
 
 def apply(

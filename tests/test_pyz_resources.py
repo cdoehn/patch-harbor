@@ -160,7 +160,7 @@ import patchharbor
 from patchharbor import api
 from patchharbor.chat_instructions import load_chat_template
 from patchharbor.pyz_artifact import PyzProvider
-from patchharbor.patch_pack import capture_pack_template
+from patchharbor.task_pack import capture_pack_template
 assert str(patchharbor.__file__).startswith(str(root) + os.sep)
 assert patchharbor._pyz_resource_id is not None
 def forbidden(*a, **k): raise AssertionError('runtime attempted external work')
@@ -174,11 +174,11 @@ assert artifact.chat_template.decode() == capture_pack_template()
 normalized_template = artifact.chat_template.decode().replace('\\r\\n', '\\n').replace('\\r', '\\n')
 assert normalized_template == load_chat_template()
 assert artifact.api_documentation and artifact.license
-result = api.pack_patch(sys.argv[2], reference_bundle=sys.argv[3], entrypoint='run.sh',
+result = api.pack_task(sys.argv[2], reference_bundle=sys.argv[3], entrypoint='run.sh',
                         output_directory=sys.argv[4])
 assert result.validation.binding_matches
-assert api.inspect_patch(result.path).package_sha256 == result.package_sha256
-assert api.validate_patch(result.path, reference_bundle=sys.argv[3]).binding_matches
+assert api.inspect_task(result.path).package_sha256 == result.package_sha256
+assert api.validate_task(result.path, reference_bundle=sys.argv[3]).binding_matches
 assert provider.capture() is pinned
 assert 'patchharbor_watcher' not in sys.modules
 with ZipFile(result.path) as package:
@@ -209,11 +209,11 @@ def test_template_rejects_linked_resource_directory(tmp_path, monkeypatch):
 
 @pytest.mark.parametrize('kind', ['directory', 'zip'])
 def test_missing_loaded_pyz_identity_cannot_select_the_legacy_pack_provider(monkeypatch, tmp_path, kind):
-    from patchharbor import patch_pack
+    from patchharbor import task_pack
     from patchharbor.errors import FailureReason, PatchHarborError
     provider_for(monkeypatch, tmp_path, kind=kind)
     monkeypatch.setattr(provider_module, '_pyz_resource_id', None)
     def forbidden(): pytest.fail('defective own PYZ silently selected legacy runtime')
-    monkeypatch.setattr(patch_pack, 'read_stable_regular_file_bounded', forbidden)
-    with pytest.raises(PatchHarborError) as caught: patch_pack.capture_pack_template()
+    monkeypatch.setattr(task_pack, 'read_stable_regular_file_bounded', forbidden)
+    with pytest.raises(PatchHarborError) as caught: task_pack.capture_pack_template()
     assert caught.value.reason is FailureReason.PAYLOAD_PREPARATION_ERROR

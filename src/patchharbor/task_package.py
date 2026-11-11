@@ -9,14 +9,14 @@ from pathlib import Path
 from patchharbor.progress import activity
 
 from patchharbor.bundle_paths import BundlePathError, normalize_bundle_path
-from patchharbor.bundle_handoff import BundleHandoff, split_patch_handoff
+from patchharbor.bundle_handoff import BundleHandoff, split_task_handoff
 from patchharbor.errors import FailureReason, PatchHarborError, patch_package_error
 from patchharbor.models import BundlePayload
 from patchharbor.parser import ParsedScript, ScriptFormatError, parse_script
-from patchharbor.patch_manifest import (
-    PATCH_MANIFEST_NAME,
-    PatchManifest,
-    parse_patch_manifest,
+from patchharbor.task_manifest import (
+    TASK_MANIFEST_NAME,
+    TaskManifest,
+    parse_task_manifest,
 )
 from patchharbor.platform.filesystem import (
     FileChangedDuringRead, FileReadLimitExceeded, FileSystemOperationError, UnsupportedFileTypeError,
@@ -32,10 +32,10 @@ from patchharbor.zip_payloads import (
 
 
 @dataclass(frozen=True, slots=True)
-class ValidatedPatchPackage:
+class ValidatedTaskBundle:
     """One fully read and classified format-1 patch package."""
 
-    manifest: PatchManifest
+    manifest: TaskManifest
     entrypoint: BundlePayload
     payloads: tuple[BundlePayload, ...]
     warnings: tuple[str, ...] = ()
@@ -59,7 +59,7 @@ def _unsafe_patch_zip(path: Path, detail: object) -> PatchHarborError:
     )
 
 
-def parse_package_entrypoint(entrypoint: BundlePayload) -> ParsedScript:
+def parse_task_entrypoint(entrypoint: BundlePayload) -> ParsedScript:
     """Shared static contract; no interpreter lookup or temporary resources."""
     activity("SCRIPT", f"Parse marker, metadata and MESSAGE blocks: {entrypoint.relative_path}")
     try:
@@ -71,20 +71,20 @@ def parse_package_entrypoint(entrypoint: BundlePayload) -> ParsedScript:
         ) from exc
 
 
-def resolve_patch_payloads(
+def resolve_task_payloads(
     payloads: tuple[BundlePayload, ...],
     *,
     resource_policy: ResourcePolicy,
     package_path: Path,
     package_sha256: str | None = None,
     package_size: int | None = None,
-) -> ValidatedPatchPackage:
+) -> ValidatedTaskBundle:
     activity("MANIFEST", "Locate regular root patch.json")
     manifest_payload = next(
         (
             payload
             for payload in payloads
-            if payload.relative_path == PATCH_MANIFEST_NAME
+            if payload.relative_path == TASK_MANIFEST_NAME
         ),
         None,
     )
@@ -94,10 +94,10 @@ def resolve_patch_payloads(
         )
 
     activity("MANIFEST", "Validate exact schema, marker and full repository binding")
-    manifest = parse_patch_manifest(manifest_payload.content)
+    manifest = parse_task_manifest(manifest_payload.content)
     all_payloads = payloads
     activity("HANDOFF", "Validate passive chat/environment metadata separately from payloads")
-    payloads, handoff = split_patch_handoff(payloads, manifest)
+    payloads, handoff = split_task_handoff(payloads, manifest)
     try:
         entrypoint_path = normalize_bundle_path(manifest.entrypoint)
     except BundlePathError as exc:
@@ -124,7 +124,7 @@ def resolve_patch_payloads(
         policy=resource_policy,
     )
     activity("MANIFEST", f"Validated entrypoint {entrypoint.relative_path} and {len(payload_tuple)} payload(s)", "success")
-    return ValidatedPatchPackage(
+    return ValidatedTaskBundle(
         manifest=manifest,
         entrypoint=entrypoint,
         payloads=payload_tuple,
@@ -136,12 +136,12 @@ def resolve_patch_payloads(
     )
 
 
-def resolve_patch_package(
+def resolve_task_bundle(
     path: Path,
     *,
     resource_policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY,
     expected_identity: os.stat_result | None = None,
-) -> ValidatedPatchPackage:
+) -> ValidatedTaskBundle:
     """Read every ZIP member, then apply format-1 package roles."""
     activity("OPEN", f"Open explicit patch and capture stable content with SHA-256: {path}")
     try:
@@ -163,7 +163,7 @@ def resolve_patch_package(
             UnsupportedFileTypeError, OSError, RuntimeError, UnicodeError) as exc:
         raise _unsafe_patch_zip(path, exc) from exc
 
-    return resolve_patch_payloads(
+    return resolve_task_payloads(
         payloads,
         resource_policy=resource_policy,
         package_path=path,
@@ -172,13 +172,13 @@ def resolve_patch_package(
     )
 
 
-def validate_patch_package(
+def validate_task_bundle(
     path: Path,
     *,
     resource_policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY,
-) -> PatchManifest:
+) -> TaskManifest:
     """Validate one complete package and return its typed manifest."""
-    return resolve_patch_package(
+    return resolve_task_bundle(
         path,
         resource_policy=resource_policy,
     ).manifest

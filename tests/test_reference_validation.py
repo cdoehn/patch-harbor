@@ -23,8 +23,8 @@ def test_valid_reference_is_independent_of_clean_success_policy(tmp_path, kind, 
     files, binding = reference_entries(kind=kind, dirty=dirty, handoff=True)
     reference = tmp_path / "result.zip"; write_reference(reference, files)
     patch = tmp_path / "patch.zip"; bound_package(patch, binding)
-    report = api.validate_patch(patch, reference_bundle=reference)
-    assert report.scope is api.PatchValidationScope.REFERENCE and report.binding_matches is True
+    report = api.validate_task(patch, reference_bundle=reference)
+    assert report.scope is api.TaskValidationScope.REFERENCE and report.binding_matches is True
     assert report.reference_sha256 == hashlib.sha256(reference.read_bytes()).hexdigest()
     assert report.context.dirty is dirty and report.context.repository_path == "/foreign/missing/repository"
     assert str(report.context.base_commit) == binding["base_commit"]
@@ -49,7 +49,7 @@ def test_reference_checks_blob_object_format_and_portable_snapshot_names(tmp_pat
     edit_document(files, "manifest.json", change)
     reference = tmp_path / "result.zip"; write_reference(reference, files, executable=("base/Grüße dir/script.sh",))
     patch = tmp_path / "patch.zip"; bound_package(patch, binding)
-    assert api.validate_patch(patch, reference_bundle=reference).context.base_commit.object_format.value == object_format
+    assert api.validate_task(patch, reference_bundle=reference).context.base_commit.object_format.value == object_format
 
 
 def test_reference_does_not_read_registry_run_git_or_write_files(tmp_path, monkeypatch):
@@ -70,7 +70,7 @@ def test_reference_does_not_read_registry_run_git_or_write_files(tmp_path, monke
         assert not flags & (os.O_WRONLY | os.O_RDWR | os.O_CREAT | os.O_TRUNC)
         return original_open(path, flags, *args, **kwargs)
     monkeypatch.setattr(os, "open", read_only)
-    assert api.validate_patch(patch, reference_bundle=reference).binding_matches
+    assert api.validate_task(patch, reference_bundle=reference).binding_matches
     assert {p.name: p.read_bytes() for p in tmp_path.iterdir()} == before
 
 
@@ -81,7 +81,7 @@ def test_reference_binding_mismatch_is_error_nine_in_api_and_cli(tmp_path, field
     reference = tmp_path / "result.zip"; write_reference(reference, files)
     patch = tmp_path / "patch.zip"; bound_package(patch, {**binding, field: value})
     with pytest.raises(api.PatchHarborError) as caught:
-        api.validate_patch(patch, reference_bundle=reference)
+        api.validate_task(patch, reference_bundle=reference)
     assert int(exit_code_for_error(caught.value)) == 9
     out = StringIO()
     assert main(["validate", str(patch), "--reference-bundle", str(reference), "--json"], stdout=out, stderr=StringIO()) == 9
@@ -93,7 +93,7 @@ def test_expected_context_is_never_used_as_actual_binding(tmp_path):
     reference = tmp_path / "result.zip"; write_reference(reference, files)
     patch = tmp_path / "patch.zip"; bound_package(patch, {**binding, "base_commit": "34" * 20})
     with pytest.raises(api.PatchHarborError) as caught:
-        api.validate_patch(patch, reference_bundle=reference)
+        api.validate_task(patch, reference_bundle=reference)
     assert int(exit_code_for_error(caught.value)) == 9
 
 
@@ -101,9 +101,9 @@ def test_expected_context_is_never_used_as_actual_binding(tmp_path):
 @pytest.mark.parametrize("value,error", [(b"bad", TypeError), (42, TypeError), ("", ValueError), ("nul\0", ValueError)])
 def test_binding_arguments_fail_before_io(monkeypatch, field, value, error):
     import patchharbor.application as app
-    monkeypatch.setattr(app, "validate_patch", lambda *a, **k: pytest.fail("invalid arguments reached Core"))
+    monkeypatch.setattr(app, "validate_task", lambda *a, **k: pytest.fail("invalid arguments reached Core"))
     with pytest.raises(error):
-        api.validate_patch("missing.zip", **{field: value})
+        api.validate_task("missing.zip", **{field: value})
 
 
 def test_json_reference_uses_public_api_and_foreign_windows_path(tmp_path, monkeypatch):
@@ -112,10 +112,10 @@ def test_json_reference_uses_public_api_and_foreign_windows_path(tmp_path, monke
     reference = tmp_path / "result.zip"; write_reference(reference, files)
     patch = tmp_path / "patch.zip"; bound_package(patch, binding)
     calls = []
-    original = api.validate_patch
+    original = api.validate_task
     def observed(*args, **kwargs):
         calls.append(kwargs.get("reference_bundle")); return original(*args, **kwargs)
-    monkeypatch.setattr(api, "validate_patch", observed)
+    monkeypatch.setattr(api, "validate_task", observed)
     out, err = StringIO(), StringIO()
     assert main(["validate", str(patch), "--reference-bundle", str(reference), "--json", "-v"], stdout=out, stderr=err) == 0
     result = json.loads(out.getvalue())
@@ -140,7 +140,7 @@ def test_corrupt_reference_never_produces_success(tmp_path, fault):
     reference = tmp_path / "result.zip"; write_reference(reference, files)
     patch = tmp_path / "patch.zip"; bound_package(patch, binding)
     with pytest.raises(api.PatchHarborError) as caught:
-        api.validate_patch(patch, reference_bundle=reference)
+        api.validate_task(patch, reference_bundle=reference)
     assert int(exit_code_for_error(caught.value)) == 4
 
 
@@ -159,16 +159,16 @@ def test_real_registered_repository_and_real_generated_result_agree(tmp_path, mo
     binding = {k: str(getattr(context, k)) for k in ("repo_id", "base_commit", "state_fingerprint", "fingerprint_algorithm")}
     patch = tmp_path / "patch.zip"; bound_package(patch, binding)
     before = {p.relative_to(repo): p.read_bytes() for p in repo.rglob("*") if p.is_file()}
-    report = api.validate_patch(patch, repository=repo)
-    assert report.scope is api.PatchValidationScope.REPOSITORY and report.context == context
+    report = api.validate_task(patch, repository=repo)
+    assert report.scope is api.TaskValidationScope.REPOSITORY and report.context == context
     assert report.reference_sha256 is None and report.binding_matches
     assert {p.relative_to(repo): p.read_bytes() for p in repo.rglob("*") if p.is_file()} == before
     generated = api.bundle(repo, output_directory=tmp_path / "results")
-    ref = api.validate_patch(patch, reference_bundle=generated.report.result_bundle.path)
+    ref = api.validate_task(patch, reference_bundle=generated.report.result_bundle.path)
     assert ref.context.dirty == context.dirty
     assert ref.context.base_commit == context.base_commit
     assert ref.context.state_fingerprint == context.state_fingerprint
     (repo / "later.txt").write_text("different state")
     with pytest.raises(api.PatchHarborError) as caught:
-        api.validate_patch(patch, repository=repo)
+        api.validate_task(patch, repository=repo)
     assert int(exit_code_for_error(caught.value)) == 9

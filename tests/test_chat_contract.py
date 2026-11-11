@@ -53,9 +53,9 @@ def test_documented_patch_manifest_validates_against_a_real_reference(tmp_path, 
         pytest.fail("example validation attempted execution or network activity")
     monkeypatch.setattr(subprocess, "Popen", forbidden)
     monkeypatch.setattr(socket, "socket", forbidden)
-    checked = api.validate_patch(package, reference_bundle=reference)
+    checked = api.validate_task(package, reference_bundle=reference)
     assert checked.binding_matches is True
-    assert checked.scope is api.PatchValidationScope.REFERENCE
+    assert checked.scope is api.TaskValidationScope.REFERENCE
     assert checked.reference_sha256 == expected["sha256"]
     assert "execution" in checked.not_checked
 

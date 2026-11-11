@@ -88,9 +88,9 @@ artifact=provision.artifact
 assert artifact is not None and artifact.recipe.source_commit is None
 assert provider.capture() is provision
 assert artifact.chat_template.decode().replace('\r\n','\n')==load_chat_template()
-patch=Path(sys.argv[2]);inspection=api.inspect_patch(patch)
+patch=Path(sys.argv[2]);inspection=api.inspect_task(patch)
 assert inspection.package_sha256==hashlib.sha256(patch.read_bytes()).hexdigest()
-assert api.validate_patch(patch).inspection==inspection
+assert api.validate_task(patch).inspection==inspection
 assert 'patchharbor_watcher' not in sys.modules
 if sys.argv[3]!='-':assert api.__file__.startswith(sys.argv[3]+os.sep)
 target=Path(sys.argv[1])/artifact.recipe.pyz_name;target.write_bytes(artifact.pyz_bytes)

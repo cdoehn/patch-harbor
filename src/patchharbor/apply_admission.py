@@ -9,18 +9,18 @@ from types import MappingProxyType
 from patchharbor.apply_repository import SafeResolvedRepository, _inspect_repository_identity
 from patchharbor.errors import ErrorKind, FailureReason, PatchHarborError, state_mismatch_error
 from patchharbor.models import RepositoryContext
-from patchharbor.patch_inspection import PatchInspection, inspect_captured_patch
-from patchharbor.patch_package import ValidatedPatchPackage
+from patchharbor.task_inspection import TaskInspection, inspect_captured_task
+from patchharbor.task_package import ValidatedTaskBundle
 
 
 @dataclass(frozen=True, slots=True)
-class PatchAdmission:
-    inspection: PatchInspection
+class TaskAdmission:
+    inspection: TaskInspection
     contents: Mapping[str, bytes]
     context: RepositoryContext
 
 
-AdmissionCallback = Callable[[PatchAdmission], bool]
+AdmissionCallback = Callable[[TaskAdmission], bool]
 
 
 @dataclass(frozen=True, slots=True)
@@ -39,11 +39,11 @@ class ApplyAdmissionPolicy:
         if actual != resolved.repository:
             raise state_mismatch_error('expected repository path changed')
 
-    def authorize(self, package: ValidatedPatchPackage, resolved: SafeResolvedRepository) -> None:
+    def authorize(self, package: ValidatedTaskBundle, resolved: SafeResolvedRepository) -> None:
         self.check_target(resolved)
         if package.package_sha256 != self.expected_sha256:
             raise PatchHarborError('captured package SHA-256 differs from expected bytes', FailureReason.SOURCE_ERROR)
-        facts = PatchAdmission(inspect_captured_patch(package),
+        facts = TaskAdmission(inspect_captured_task(package),
             MappingProxyType({p.relative_path: p.content for p in package.entries}), resolved.context)
         try:
             decision = self.admission(facts)

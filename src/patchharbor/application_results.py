@@ -15,7 +15,7 @@ from patchharbor.archive_git import completed_commit_for_context
 from patchharbor.errors import PatchHarborError
 from patchharbor.execution import ScriptExecutionResult
 from patchharbor.models import GitObjectId, RepositoryContext
-from patchharbor.patch_package import ValidatedPatchPackage
+from patchharbor.task_package import ValidatedTaskBundle
 from patchharbor.repository_state import (
     capture_consistent_repository_snapshot,
     repository_context_from_snapshot,
@@ -32,7 +32,7 @@ from patchharbor.application_exchange import _maintain_bundle_exchange
 
 def _complete_apply_result_bundle(
     resolved: SafeResolvedRepository,
-    package: ValidatedPatchPackage,
+    package: ValidatedTaskBundle,
     *,
     session: RunSession,
     resources: PinnedResultResources,

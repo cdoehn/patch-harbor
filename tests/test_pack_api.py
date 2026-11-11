@@ -13,7 +13,7 @@ from zipfile import ZipFile
 import pytest
 
 from patchharbor import api
-from patchharbor import patch_pack as core
+from patchharbor import task_pack as core
 from patchharbor.errors import FailureReason, PatchHarborError
 from patchharbor.platform.filesystem import FileChangedDuringRead
 from patchharbor.platform.pack_output import OwnedPackFile, OutputDirectory
@@ -29,31 +29,31 @@ def fail(reason, call):
 
 
 def test_pack_api_has_exact_typed_signature():
-    signature = inspect.signature(api.pack_patch)
+    signature = inspect.signature(api.pack_task)
     assert list(signature.parameters) == ['content_directory', 'reference_bundle', 'entrypoint',
                                           'output', 'output_directory', 'modes', 'observer']
     assert signature.parameters['content_directory'].kind is inspect.Parameter.POSITIONAL_OR_KEYWORD
     assert all(p.kind is inspect.Parameter.KEYWORD_ONLY for p in list(signature.parameters.values())[1:])
-    assert set(typing.get_type_hints(api.pack_patch)) == set(signature.parameters) | {'return'}
-    assert {'pack_patch', 'PatchPackResult'} <= set(api.__all__)
+    assert set(typing.get_type_hints(api.pack_task)) == set(signature.parameters) | {'return'}
+    assert {'pack_task', 'TaskPackResult'} <= set(api.__all__)
 
 
 def test_public_pack_is_silent_preserves_inputs_and_returns_actual_validated_bytes(request_files, capfd):
     contents, reference, output = request_files
     originals = {p: p.read_bytes() for p in (reference, *(contents.iterdir()))}
     result = pack(request_files, modes={'binary': 0o755})
-    assert isinstance(result, api.PatchPackResult)
+    assert isinstance(result, api.TaskPackResult)
     assert result.path.is_absolute() and result.path.parent == output
     assert set(output.iterdir()) == {result.path}
     assert result.package_id.version == 4 and result.created_at.utcoffset().total_seconds() == 0
     assert result.package_sha256 == hashlib.sha256(result.path.read_bytes()).hexdigest()
     assert result.package_size == result.path.stat().st_size
     assert result.reference_sha256 == hashlib.sha256(reference.read_bytes()).hexdigest()
-    assert result.validation.scope is api.PatchValidationScope.REFERENCE
+    assert result.validation.scope is api.TaskValidationScope.REFERENCE
     assert result.validation.binding_matches is True and result.validation.inspection.manifest is not None
     assert result.validation.not_checked
-    assert result.validation.inspection == api.inspect_patch(result.path)
-    assert result.validation.reference_sha256 == api.validate_patch(result.path, reference_bundle=reference).reference_sha256
+    assert result.validation.inspection == api.inspect_task(result.path)
+    assert result.validation.reference_sha256 == api.validate_task(result.path, reference_bundle=reference).reference_sha256
     assert type(result.warnings) is tuple
     with pytest.raises(FrozenInstanceError): result.path = output / 'other.zip'
     assert all(p.read_bytes() == raw for p, raw in originals.items())
@@ -90,7 +90,7 @@ def test_formal_argument_errors_precede_any_capture(request_files, monkeypatch, 
     options[option] = value
     if option == 'output': options.pop('output_directory')
     monkeypatch.setattr(core, 'capture_result_reference', lambda *a, **k: pytest.fail('capture on invalid arguments'))
-    with pytest.raises(error): api.pack_patch(**options)
+    with pytest.raises(error): api.pack_task(**options)
     assert not list(output.iterdir())
 
 
@@ -99,7 +99,7 @@ def test_exactly_one_explicit_output_choice(request_files, both):
     contents, reference, output = request_files
     kwargs = {'output': output/'manual.zip.txt', 'output_directory': output} if both else {}
     with pytest.raises(ValueError):
-        api.pack_patch(contents, reference_bundle=reference, entrypoint='run.sh', **kwargs)
+        api.pack_task(contents, reference_bundle=reference, entrypoint='run.sh', **kwargs)
 
 
 def test_mutable_mode_mapping_is_copied_before_observer_runs(request_files):
@@ -148,7 +148,7 @@ def test_pack_does_not_run_tools_or_change_process_state(request_files, monkeypa
 @pytest.mark.parametrize('reason', [FailureReason.SOURCE_ERROR, FailureReason.PATCH_PACKAGE_ERROR, FailureReason.STATE_MISMATCH])
 def test_mandatory_written_archive_validation_cannot_be_skipped_or_reclassified(request_files, monkeypatch, reason):
     calls = []
-    original = core.validate_patch_against_reference
+    original = core.validate_task_against_reference
     def rejected(path, reference, **kwargs):
         calls.append(path)
         assert path.is_file() and path.name.endswith('.partial')
@@ -161,7 +161,7 @@ def test_mandatory_written_archive_validation_cannot_be_skipped_or_reclassified(
         assert entry.size == len(SCRIPT) and entry.sha256 == hashlib.sha256(SCRIPT).hexdigest()
         assert not any(p.name.endswith('.zip.txt') for p in request_files[2].iterdir())
         raise PatchHarborError('controlled validator rejection', reason)
-    monkeypatch.setattr(core, 'validate_patch_against_reference', rejected)
+    monkeypatch.setattr(core, 'validate_task_against_reference', rejected)
     fail(reason, lambda: pack(request_files))
     assert len(calls) == 1 and not list(request_files[2].iterdir())
 
@@ -178,7 +178,7 @@ def test_required_sync_and_unsupported_publication_are_output_failures(request_f
 def test_interrupt_before_publication_has_130_and_no_partial_final(request_files, monkeypatch, stage):
     def interrupted(*a, **k): raise KeyboardInterrupt()
     target, name = {'capture': (core, 'capture_sources'), 'write': (core, 'write_prepared_candidate'),
-                    'validate': (core, 'validate_patch_against_reference'), 'publish': (OwnedPackFile, 'publish')}[stage]
+                    'validate': (core, 'validate_task_against_reference'), 'publish': (OwnedPackFile, 'publish')}[stage]
     monkeypatch.setattr(target, name, interrupted)
     fail(FailureReason.INTERRUPTED, lambda: pack(request_files))
     assert not list(request_files[2].iterdir())
@@ -186,7 +186,7 @@ def test_interrupt_before_publication_has_130_and_no_partial_final(request_files
 
 @pytest.mark.parametrize('kind', ['add_source', 'change_source', 'change_reference'])
 def test_known_input_change_after_validation_fails_without_retry(request_files, monkeypatch, kind):
-    original = core.validate_patch_against_reference
+    original = core.validate_task_against_reference
     def mutate(*a, **k):
         validated = original(*a, **k)
         contents, reference, _ = request_files
@@ -197,7 +197,7 @@ def test_known_input_change_after_validation_fails_without_retry(request_files, 
             path.write_bytes(bytes([raw[0] ^ 1]) + raw[1:])
             os.utime(path, ns=(metadata.st_atime_ns, metadata.st_mtime_ns))
         return validated
-    monkeypatch.setattr(core, 'validate_patch_against_reference', mutate)
+    monkeypatch.setattr(core, 'validate_task_against_reference', mutate)
     fail(FailureReason.SOURCE_ERROR, lambda: pack(request_files))
     assert not list(request_files[2].iterdir())
 
@@ -205,7 +205,7 @@ def test_known_input_change_after_validation_fails_without_retry(request_files, 
 @pytest.mark.skipif(os.name == 'nt', reason='Windows publication handle prevents deliberate file writes/swaps')
 @pytest.mark.parametrize('kind', ['bytes', 'replace', 'symlink', 'hardlink'])
 def test_output_mutation_after_validation_never_publishes_or_deletes_foreign_file(request_files, monkeypatch, kind):
-    original = core.validate_patch_against_reference
+    original = core.validate_task_against_reference
     alien = request_files[2].parent / 'alien'; alien.write_bytes(b'foreign data')
     def mutate(path, *a, **k):
         validated = original(path, *a, **k)
@@ -219,7 +219,7 @@ def test_output_mutation_after_validation_never_publishes_or_deletes_foreign_fil
             if kind == 'replace': path.write_bytes(b'foreign data')
             else: path.symlink_to(alien)
         return validated
-    monkeypatch.setattr(core, 'validate_patch_against_reference', mutate)
+    monkeypatch.setattr(core, 'validate_task_against_reference', mutate)
     error = fail(FailureReason.SOURCE_ERROR, lambda: pack(request_files))
     assert alien.read_bytes() == b'foreign data'
     assert not any(p.name.endswith('.zip.txt') for p in request_files[2].iterdir())
@@ -254,7 +254,7 @@ def test_two_concurrent_requests_publish_exactly_one_complete_package(request_fi
         except PatchHarborError as error: return error
     with ThreadPoolExecutor(2) as executor:
         results = list(executor.map(lambda _: attempt(), range(2)))
-    winners = [r for r in results if isinstance(r, api.PatchPackResult)]
+    winners = [r for r in results if isinstance(r, api.TaskPackResult)]
     losers = [r for r in results if isinstance(r, PatchHarborError)]
     assert len(winners) == len(losers) == 1
     assert losers[0].reason is FailureReason.PAYLOAD_PREPARATION_ERROR

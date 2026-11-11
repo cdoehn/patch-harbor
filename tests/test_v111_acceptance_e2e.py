@@ -12,7 +12,7 @@ import pytest
 
 from patchharbor.exit_status import ExitCode
 
-from patchharbor.patch_manifest import PATCH_FORMAT_VERSION, PATCH_MARKER
+from patchharbor.task_manifest import TASK_FORMAT_VERSION, TASK_MARKER
 from patchharbor.state_fingerprint import FINGERPRINT_ALGORITHM
 from patchharbor_watcher.apply_boundary import delegate_to_automatic_apply
 from patchharbor_watcher.loop import (
@@ -82,8 +82,8 @@ def _write_patch_package(
 ) -> str:
     entrypoint_name = native_value("run.sh", "run.ps1")
     manifest = {
-        "marker": PATCH_MARKER,
-        "format_version": PATCH_FORMAT_VERSION,
+        "marker": TASK_MARKER,
+        "format_version": TASK_FORMAT_VERSION,
         "repo_id": context["repo_id"],
         "base_commit": context["base_commit"],
         "state_fingerprint": context["state_fingerprint"],

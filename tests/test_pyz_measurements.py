@@ -35,7 +35,7 @@ import json,sys,time,tracemalloc
 sys.path.insert(0,sys.argv[1])
 from patchharbor import api
 tracemalloc.start();start=time.perf_counter()
-p=api.pack_patch(sys.argv[2],reference_bundle=sys.argv[3],entrypoint='run.sh',output_directory=sys.argv[4])
+p=api.pack_task(sys.argv[2],reference_bundle=sys.argv[3],entrypoint='run.sh',output_directory=sys.argv[4])
 elapsed=time.perf_counter()-start;peak=tracemalloc.get_traced_memory()[1];tracemalloc.stop()
 assert p.validation.binding_matches and p.validation.scope=='reference'
 print(json.dumps({'pack_seconds':elapsed,'peak_python_bytes':peak,'package_bytes':p.package_size,

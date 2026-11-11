@@ -206,7 +206,7 @@ Reads and writes accept only the complete repository-local Format 1. The global
 Format-4 replay ledger is separate from this configuration schema and remains
 intact. Upgrade all installed PatchHarbor entrypoints together.
 
-A developer or development chat prepares the contents and entrypoint. `patchharbor pack` or `api.pack_patch` creates and validates the package; see the [pack guide](pack.md).
+A developer or development chat prepares the contents and entrypoint. `patchharbor pack` or `api.pack_task` creates and validates the package; see the [pack guide](pack.md).
 The new Result Bundle's `context.json` carries `bundle_suffix` as optional
 filename metadata. The matching chat instructions require the same suffix on
 `<Repository>_Patch_<HHMMSS>_<MMDD>_<ID6>.zip`. Missing metadata in older bundles

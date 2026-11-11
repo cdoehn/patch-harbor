@@ -125,7 +125,7 @@ def monitor_artifacts(repository, *, include_archive=False):
     if candidates and not result['incomplete'] and not result['errors']:
         result['selected_candidate'] = str(_select_exchange_candidate(candidates).path)
     rows = result['artifacts']
-    for patch in (r for r in rows if r['kind'] == 'patch_package' and not r['error']):
+    for patch in (r for r in rows if r['kind'] == 'task_package' and not r['error']):
         patch['source_candidates'] = sorted({r['sha256'] for r in rows if r.get('context') == patch['expected'] and not r['error']})
         patch['result_links'] = sorted({r['sha256'] for r in rows if r.get('patch_sha256') == patch['sha256']
                                  and r.get('expected') == patch['expected'] and not r['error']})
@@ -158,5 +158,5 @@ def monitor_overview(repository):
             'candidate': candidate, 'latest_result': outcomes[0] if outcomes else None,
             'history_complete': False,
             'eligible_count': sum(r.get('eligibility', '').startswith('eligible') for r in own),
-            'patch_count': sum(r['kind'] == 'patch_package' for r in own),
+            'patch_count': sum(r['kind'] == 'task_package' for r in own),
             'unreadable_count': sum(bool(r.get('error')) for r in rows)}

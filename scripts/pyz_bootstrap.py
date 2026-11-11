@@ -646,7 +646,7 @@ def import_api(prepared):
     package = sys.modules['patchharbor']
     _require(package.__version__ == assessment.version, 'imported runtime version differs')
     _require(all(callable(getattr(api, name, None)) for name in
-                 ('inspect_patch','validate_patch','pack_patch')), 'missing required public API')
+                 ('inspect_task','validate_task','pack_task')), 'missing required public API')
     from patchharbor.pyz_artifact import PyzProvider
     # The imported Core now checks its complete canonical resources. This still
     # does not declare the original repository snapshot fully validated.

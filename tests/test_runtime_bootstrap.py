@@ -52,11 +52,11 @@ else:assert Path(api.__file__).resolve().is_relative_to(Path(sys.prefix))
 def forbidden(*a,**k):raise AssertionError('installed runtime attempted external work')
 socket.socket=subprocess.Popen=subprocess.run=forbidden
 os.environ['PATH']=''
-checked=api.validate_patch(patch,reference_bundle=reference)
+checked=api.validate_task(patch,reference_bundle=reference)
 assert checked.binding_matches and checked.reference_sha256==hashlib.sha256(reference.read_bytes()).hexdigest()
 output=Path('pyz-output' if selected.is_file() else 'installed-output');output.mkdir()
-packed=api.pack_patch(contents,reference_bundle=reference,entrypoint='run.sh',output_directory=output)
-assert api.validate_patch(packed.path,reference_bundle=reference).binding_matches
+packed=api.pack_task(contents,reference_bundle=reference,entrypoint='run.sh',output_directory=output)
+assert api.validate_task(packed.path,reference_bundle=reference).binding_matches
 artifact=PyzProvider().capture().artifact
 assert artifact is not None and artifact.recipe.requires_python=='>=3.10'
 if selected.is_file():assert selected.read_bytes()==artifact.pyz_bytes

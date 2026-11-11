@@ -42,9 +42,9 @@ print(report.success, report.result_bundle.status)
 | `unregister(selector, cwd=".")` | `unregister` | `UnregisterResult` |
 | `repositories()` | `registry list` | `RegistryListResult` |
 | `context(repository=".", capture_mode="git")` | `context` | `RepositoryContext` |
-| `inspect_patch(patch)` | `inspect PATCH_ZIP` | `PatchInspection` |
-| `validate_patch(patch, repository=None, reference_bundle=None)` | `validate PATCH_ZIP` | `PatchValidationResult` |
-| `pack_patch(content_directory, reference_bundle=..., entrypoint=..., output=None, output_directory=None, modes=None)` | `pack CONTENT_DIRECTORY` | `PatchPackResult` |
+| `inspect_task(patch)` | `inspect PATCH_ZIP` | `PatchInspection` |
+| `validate_task(patch, repository=None, reference_bundle=None)` | `validate PATCH_ZIP` | `PatchValidationResult` |
+| `pack_task(content_directory, reference_bundle=..., entrypoint=..., output=None, output_directory=None, modes=None)` | `pack CONTENT_DIRECTORY` | `PatchPackResult` |
 | `bundle(repository=".", output_directory=None, capture_mode="git", export_plan=None)` | `bundle` | `BundleResult` |
 | `apply(patch=None, repository=None, dry_run=False, ...)` | manual `apply` | `RunReport` |
 | `dry_run(patch=None, repository=None, ...)` | `apply --dry-run` | `RunReport` |
@@ -76,17 +76,17 @@ repositories.
 ## Static package inspection (RIV development addition)
 
 This development line implements package/binding validation, portable offline
-runtime, `pack_patch` and Result Format 3; no release is implied. The existing
+runtime, `pack_task` and Result Format 3; no release is implied. The existing
 `dry_run` keeps its Apply semantics and still creates a Result Bundle.
 
 ```python
 from patchharbor import api
 
-info = api.inspect_patch("patch.zip")
+info = api.inspect_task("patch.zip")
 print(info.package_sha256, info.package_size, info.entrypoint)
 for entry in info.entries:
     print(entry.path, entry.role.value, entry.size, entry.sha256, entry.unix_mode)
-report = api.validate_patch("patch.zip")
+report = api.validate_task("patch.zip")
 assert report.scope is api.PatchValidationScope.PACKAGE
 assert report.binding_matches is None
 ```
@@ -121,7 +121,7 @@ For `package` scope, binding/context/reference are `None`.
 does not establish sender trust or approve a later Apply. Content hashes are
 computed observations, not new declared hashes in format-1 `patch.json`.
 
-`validate_patch(patch, reference_bundle="result.zip")` returns scope `reference`,
+`validate_task(patch, reference_bundle="result.zip")` returns scope `reference`,
 `binding_matches=True`, the full SHA-256 of the captured reference bytes and a
 frozen `ReferenceContext`. Its fields are `repo_id`, `base_commit` (the existing
 typed IDs), `state_fingerprint`, `fingerprint_algorithm`, `dirty` and
@@ -147,7 +147,7 @@ reviewed [bootstrap and previous handoff procedure](runtime-bootstrap.md) can
 check repository evidence independently when only that optional addition fails.
 Such a receipt is explicitly distinct from native full reference validation.
 
-`validate_patch(patch, repository="/workspace/repository")` returns scope
+`validate_task(patch, repository="/workspace/repository")` returns scope
 `repository`, `binding_matches=True`, the existing `RepositoryContext` and no
 reference SHA. The explicit repository must already be registered. Both keywords
 together raise `ValueError`; there is no implicit CWD, registry or Exchange target.
@@ -537,7 +537,7 @@ Weitere Betriebs- und Abnahmedetails: [Ereignis-Watcher](watcher-events.md).
 ```python
 from patchharbor import api
 
-packed = api.pack_patch(
+packed = api.pack_task(
     "prepared-contents", reference_bundle="received-result.zip",
     entrypoint="run.sh", output_directory="existing-output",
     modes={"scripts/new-tool.sh": 0o755},
@@ -575,15 +575,15 @@ perform the stdlib descriptor/trust precheck described in
 artifact. `scripts/pyz_bootstrap.py` supplies the reviewed example
 `import_api(prepared)`: it retains the checked path, rejects preloaded foreign
 PatchHarbor modules, and never clears module caches to fake a version switch.
-Afterwards use the returned `api.inspect_patch`, `api.validate_patch` and
-`api.pack_patch` normally. Full native reference validation remains separate
+Afterwards use the returned `api.inspect_task`, `api.validate_task` and
+`api.pack_task` normally. Full native reference validation remains separate
 from bootstrap checks; no installation or subprocess is needed for these calls.
 Result-3 production uses the same shared Core and request-local resource capture.
 
 
 ## Historical reader-first introduction of Result 3 (PP-05A)
 
-At PP-05A, `validate_patch(..., reference_bundle=...)` and `pack_patch` began using the same
+At PP-05A, `validate_task(..., reference_bundle=...)` and `pack_task` began using the same
 full reader for Result formats 1, 2 and 3. The new format verifies its PYZ as
 strict data, without importing it. Public signatures/scopes are unchanged;
 corrupt references retain source-error category 4. A private repository-only
@@ -665,7 +665,7 @@ supplied trusted entrypoint. This is necessary because Patch payload paths keep
 their narrower portable namespace; arbitrary repository names stay inside the
 opaque project ZIP. The example never rescans the live original repository.
 
-Use a fresh workspace and an unwatched output directory. `pack_patch` is a
+Use a fresh workspace and an unwatched output directory. `pack_task` is a
 separate operation and captures its Result independently; the example requires
 its `reference_sha256` to equal the snapshot SHA before returning a deliverable.
 A changed reference is an error, with the staged package retained for diagnosis.

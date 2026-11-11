@@ -15,7 +15,7 @@ from patchharbor.bundle_paths import normalize_bundle_path, validate_bundle_memb
 from patchharbor.errors import FailureReason, PatchHarborError, patch_package_error
 from patchharbor.models import BundlePayload
 from patchharbor.interpreters import select_interpreter
-from patchharbor.patch_package import parse_package_entrypoint
+from patchharbor.task_package import parse_task_entrypoint
 from patchharbor.payload_modes import DEFAULT_PAYLOAD_MODE, validate_payload_mode
 from patchharbor.platform.filesystem import FileChangedDuringRead, UnsupportedFileTypeError
 from patchharbor.platform.source_tree import SourceDirectory, metadata_signature, open_source_root
@@ -191,7 +191,7 @@ def capture_sources(contents: Path, entrypoint: str, *, modes: Mapping[str,int] 
                         payloads.append(BundlePayload(entry.path,content,requested.get(entry.path,DEFAULT_PAYLOAD_MODE)))
             capture(directory,'')
             ordered=tuple(sorted(payloads,key=lambda p:p.relative_path))
-            parsed=parse_package_entrypoint(next(p for p in ordered if p.relative_path==entrypoint))
+            parsed=parse_task_entrypoint(next(p for p in ordered if p.relative_path==entrypoint))
             select_interpreter(parsed.text)
             warnings=tuple(w for p in ordered if (w:=resource_policy.large_content_warning(p.relative_path,len(p.content))))
             warnings+=parsed.warnings

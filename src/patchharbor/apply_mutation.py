@@ -8,7 +8,7 @@ from enum import Enum
 
 from patchharbor.progress import activity
 
-from patchharbor.apply_preflight import PreparedPatchPackage
+from patchharbor.apply_preflight import PreparedTaskBundle
 from patchharbor.apply_repository import SafeResolvedRepository
 from patchharbor.errors import (
     FailureReason,
@@ -16,7 +16,7 @@ from patchharbor.errors import (
     state_mismatch_error,
 )
 from patchharbor.models import RepositoryContext
-from patchharbor.patch_package import ValidatedPatchPackage
+from patchharbor.task_package import ValidatedTaskBundle
 from patchharbor.payload_files import (
     PayloadTargetError,
     PayloadWriteError,
@@ -44,8 +44,8 @@ class ApplyMutationGate:
 
     session: RunSession
     resolved: SafeResolvedRepository
-    package: ValidatedPatchPackage
-    prepared_package: PreparedPatchPackage
+    package: ValidatedTaskBundle
+    prepared_package: PreparedTaskBundle
     dry_run: bool
     result_resources: PinnedResultResources
     before_mutation: Callable[[], None] | None = None

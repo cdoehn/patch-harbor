@@ -32,7 +32,7 @@ def test_cli_uses_public_api_once_with_exact_mode_mapping(request_files, monkeyp
     class Routed(RuntimeError): pass
     def routed(*a, **k):
         seen.append((a, k)); raise Routed()
-    monkeypatch.setattr(api, 'pack_patch', routed)
+    monkeypatch.setattr(api, 'pack_task', routed)
     with pytest.raises(Routed): invoke(arguments(request_files, '--mode', 'binary=0755', '--json'))
     assert len(seen) == 1
     positional, options = seen[0]
@@ -60,7 +60,7 @@ def test_actual_cli_json_has_complete_reference_validation_and_published_hash(re
     validation = result['validation']
     assert validation['scope'] == 'reference' and validation['binding_matches'] is True
     assert validation['checked_at'].endswith('Z') and validation['not_checked']
-    fresh = validation_json_result(api.validate_patch(path, reference_bundle=request_files[1]))
+    fresh = validation_json_result(api.validate_task(path, reference_bundle=request_files[1]))
     fresh['checked_at'] = validation['checked_at']
     assert validation == fresh
     with ZipFile(path) as archive:
@@ -76,7 +76,7 @@ def test_missing_and_conflicting_arguments_are_usage_errors(request_files, edit,
     elif edit == 'both': args += ['--output', str(request_files[2] / 'name.zip.txt')]
     elif edit == 'content': del args[1]
     else: args[args.index('--entrypoint')+1] = ''
-    monkeypatch.setattr(api, 'pack_patch', lambda *a, **k: pytest.fail('invalid usage reached API'))
+    monkeypatch.setattr(api, 'pack_task', lambda *a, **k: pytest.fail('invalid usage reached API'))
     with pytest.raises(SystemExit) as caught: invoke(args)
     assert caught.value.code == 2
 
@@ -84,7 +84,7 @@ def test_missing_and_conflicting_arguments_are_usage_errors(request_files, edit,
 @pytest.mark.parametrize('mode', ['binary=755', 'binary=0o755', 'binary=8888', '=0644',
                                   'binary=-644', 'binary=', 'binary=06440', 'binary= 0644'])
 def test_malformed_mode_is_usage_before_api(request_files, mode, monkeypatch):
-    monkeypatch.setattr(api, 'pack_patch', lambda *a, **k: pytest.fail('invalid mode reached API'))
+    monkeypatch.setattr(api, 'pack_task', lambda *a, **k: pytest.fail('invalid mode reached API'))
     with pytest.raises(SystemExit) as caught: invoke(arguments(request_files, '--mode', mode))
     assert caught.value.code == 2
 
@@ -107,7 +107,7 @@ def test_no_unsafe_or_implicit_pack_options(request_files, option):
     api.FailureReason.STATE_MISMATCH, api.FailureReason.PATCH_PACKAGE_ERROR, api.FailureReason.INTERRUPTED])
 def test_error_envelope_preserves_existing_failure_categories(request_files, monkeypatch, reason):
     def refused(*a, **k): raise api.PatchHarborError('controlled shared error', reason)
-    monkeypatch.setattr(api, 'pack_patch', refused)
+    monkeypatch.setattr(api, 'pack_task', refused)
     code, stdout, _ = invoke(arguments(request_files, '--json'))
     document = json.loads(stdout.getvalue())
     assert code == int(exit_code_for_reason(reason)) == document['process_exit_code']
@@ -131,10 +131,10 @@ def test_output_failure_after_publication_never_rebuilds_or_emits_second_envelop
     request_files, monkeypatch, json_output, stage, failure, expected,
 ):
     calls = []
-    original = api.pack_patch
+    original = api.pack_task
     def packed(*a, **k):
         result = original(*a, **k); calls.append(result); return result
-    monkeypatch.setattr(api, 'pack_patch', packed)
+    monkeypatch.setattr(api, 'pack_task', packed)
     class BrokenOutput(StringIO):
         writes = 0
         def write(self, text):
@@ -160,13 +160,13 @@ def test_output_failure_after_publication_never_rebuilds_or_emits_second_envelop
 
 
 def test_cleanup_warnings_are_full_json_success_without_observer(request_files, monkeypatch):
-    original = api.pack_patch
+    original = api.pack_task
     from dataclasses import replace
     results = []
     def cleanup_warning(*a, **k):
         result = replace(original(*a, **k), warnings=('remaining owned temporary path',))
         results.append(result); return result
-    monkeypatch.setattr(api, 'pack_patch', cleanup_warning)
+    monkeypatch.setattr(api, 'pack_task', cleanup_warning)
     code, stdout, _ = invoke(arguments(request_files, '--json'))
     document = json.loads(stdout.getvalue())
     assert code == 0 and document['success'] and document['error'] is None
@@ -209,7 +209,7 @@ raise SystemExit(main(sys.argv[1:]))
     result = json.loads(child.stdout)['result']
     final = Path(result['path'])
     assert hashlib.sha256(final.read_bytes()).hexdigest() == result['package_sha256']
-    assert api.validate_patch(final, reference_bundle=reference).binding_matches
+    assert api.validate_task(final, reference_bundle=reference).binding_matches
 
 
 @pytest.mark.e2e
@@ -228,7 +228,7 @@ def test_packed_payload_uses_regular_apply_and_rechecks_later_repository_state(t
     (contents/entrypoint).write_text(native_script('test "$(cat payload.txt)" = desired',
                                                  'if ((Get-Content payload.txt -Raw) -ne "desired") { exit 31 }'))
     (contents/'payload.txt').write_bytes(b'desired')
-    packed = api.pack_patch(contents,reference_bundle=reference,entrypoint=entrypoint,output_directory=exchange)
+    packed = api.pack_task(contents,reference_bundle=reference,entrypoint=entrypoint,output_directory=exchange)
     if change_target:(repo/'tracked.txt').write_text('later change\n')
     report = api.apply(packed.path)
     if change_target:

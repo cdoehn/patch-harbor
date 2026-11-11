@@ -10,7 +10,7 @@ import pytest
 from patchharbor import api
 from patchharbor.cli import main
 from patchharbor.exit_status import exit_code_for_error
-from patchharbor.patch_inspection import validate_patch
+from patchharbor.task_inspection import validate_task
 from patchharbor.platform.filesystem import FileChangedDuringRead
 from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY
 import patchharbor.result_reader as reader
@@ -44,7 +44,7 @@ def test_invalid_metadata_is_an_input_error(tmp_path, name, field, value):
     ref = tmp_path / 'result.zip'; write_reference(ref, files)
     patch = tmp_path / 'patch.zip'; bound_package(patch, binding)
     with pytest.raises(api.PatchHarborError) as caught:
-        api.validate_patch(patch, reference_bundle=ref)
+        api.validate_task(patch, reference_bundle=ref)
     assert int(exit_code_for_error(caught.value)) == 4
 
 
@@ -137,7 +137,7 @@ def test_reference_is_one_stable_capture_not_a_second_hash_read(tmp_path, monkey
     def replace_after_read(*args,**kwargs):
         captured=original(*args,**kwargs);calls.append(args[0]);ref.write_bytes(b'replaced');return captured
     monkeypatch.setattr(reader,'read_stable_regular_file_with_sha256',replace_after_read)
-    result=api.validate_patch(patch,reference_bundle=ref)
+    result=api.validate_task(patch,reference_bundle=ref)
     assert result.reference_sha256==hashlib.sha256(original_bytes).hexdigest() and calls==[ref]
 
 
@@ -146,7 +146,7 @@ def test_unstable_reference_cannot_pass(tmp_path,monkeypatch):
     patch=tmp_path/'patch.zip';bound_package(patch,binding)
     def unstable(*a,**k):raise FileChangedDuringRead('changed')
     monkeypatch.setattr(reader,'read_stable_regular_file_with_sha256',unstable)
-    with pytest.raises(api.PatchHarborError) as caught:api.validate_patch(patch,reference_bundle=ref)
+    with pytest.raises(api.PatchHarborError) as caught:api.validate_task(patch,reference_bundle=ref)
     assert caught.value.reason is api.FailureReason.SOURCE_ERROR
 
 
@@ -157,7 +157,7 @@ def test_reference_uses_existing_zip_budget(tmp_path):
     patch=tmp_path/'patch.zip';bound_package(patch,binding)
     policy=replace(DEFAULT_RESOURCE_POLICY,warning_bytes=1024,max_input_artifact_bytes=4096)
     assert patch.stat().st_size<4096<ref.stat().st_size
-    with pytest.raises(api.PatchHarborError) as caught:validate_patch(patch,reference_bundle=ref,resource_policy=policy)
+    with pytest.raises(api.PatchHarborError) as caught:validate_task(patch,reference_bundle=ref,resource_policy=policy)
     assert caught.value.reason is api.FailureReason.SOURCE_ERROR
 
 
@@ -166,7 +166,7 @@ def test_path_arguments_are_anchored_before_observer_changes_cwd(tmp_path,monkey
     files,binding=reference_entries();write_reference(original/'result.zip',files);bound_package(original/'patch.zip',binding)
     monkeypatch.chdir(original)
     def observer(event):monkeypatch.chdir(other)
-    assert api.validate_patch('patch.zip',reference_bundle='result.zip',observer=observer).binding_matches
+    assert api.validate_task('patch.zip',reference_bundle='result.zip',observer=observer).binding_matches
 
 
 def test_unexpected_programmer_exception_is_not_disguised(tmp_path,monkeypatch):

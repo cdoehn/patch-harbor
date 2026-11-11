@@ -51,15 +51,15 @@ assert not assessment.full_reference_valid and assessment.scope=='runtime_descri
 prepared=bootstrap.prepare(assessment,workspace)
 api=bootstrap.import_api(prepared)
 if corrupt:
-    try:api.pack_patch(contents,reference_bundle=reference,entrypoint='run.sh',output_directory=output)
+    try:api.pack_task(contents,reference_bundle=reference,entrypoint='run.sh',output_directory=output)
     except api.PatchHarborError as exc:assert exc.reason is api.FailureReason.SOURCE_ERROR
     else:raise AssertionError('descriptor precheck bypassed native snapshot validation')
     assert not list(output.iterdir())
     print(json.dumps({'native_reference_rejected':True}))
 else:
-    packed=api.pack_patch(contents,reference_bundle=reference,entrypoint='run.sh',output_directory=output)
-    inspected=api.inspect_patch(packed.path)
-    checked=api.validate_patch(packed.path,reference_bundle=reference)
+    packed=api.pack_task(contents,reference_bundle=reference,entrypoint='run.sh',output_directory=output)
+    inspected=api.inspect_task(packed.path)
+    checked=api.validate_task(packed.path,reference_bundle=reference)
     assert checked.binding_matches and checked.scope=='reference'
     assert checked.reference_sha256==assessment.reference_sha256
     assert inspected.package_sha256==packed.package_sha256

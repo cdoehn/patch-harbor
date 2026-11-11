@@ -16,18 +16,18 @@ from patchharbor.models import (
     RegistryRepository, RegistryStatus, RepositoryContext, RepositoryId,
     RepositoryPath,
 )
-from patchharbor.patch_inspection import (
-    PatchEntry, PatchEntryRole, PatchInspection, PatchManifest, PatchMessage,
-    PatchValidationResult, PatchValidationScope,
+from patchharbor.task_inspection import (
+    TaskEntry, TaskEntryRole, TaskInspection, TaskManifest, TaskMessage,
+    TaskValidationResult, TaskValidationScope,
 )
-from patchharbor.apply_admission import AdmissionCallback, PatchAdmission
+from patchharbor.apply_admission import AdmissionCallback, TaskAdmission
 from patchharbor.safe_export_types import SafeExportPlan, SafeExportError, SafeExportErrorCode
 from patchharbor.result_reader import ReferenceContext
 from patchharbor.snapshot_types import (
     IntegrationCapabilities, ResultSnapshot, ResultSnapshotError, SnapshotErrorCode,
     SnapshotFile, SnapshotLayer, SnapshotRuntime,
 )
-from patchharbor.pack_types import PatchPackResult
+from patchharbor.pack_types import TaskPackResult
 from patchharbor.runtime_export_types import RuntimeExportResult, RuntimeExportError, RuntimeExportErrorCode
 from patchharbor.watch_contract import (
     ApplyLock, ApplyLockKind, ApplyReadiness, AutomaticApplyResult,

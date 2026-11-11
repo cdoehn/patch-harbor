@@ -7,7 +7,7 @@ import zipfile
 import pytest
 
 from patchharbor import __version__
-from patchharbor.bundle_handoff import CHAT_INSTRUCTIONS_NAME, ENVIRONMENT_NAME, PATCH_HANDOFF_DIRECTORY
+from patchharbor.bundle_handoff import CHAT_INSTRUCTIONS_NAME, ENVIRONMENT_NAME, TASK_HANDOFF_DIRECTORY
 from patchharbor.chat_instructions import render_chat_handoff
 from patchharbor.errors import PatchHarborError
 import patchharbor.result_bundle_handoff as result_handoff_module
@@ -82,7 +82,7 @@ def test_manual_bundle_embeds_current_environment_without_touching_repository(tm
     assert git(repository, "status", "--porcelain").stdout == ""
     assert not (repository / CHAT_INSTRUCTIONS_NAME).exists()
     assert not (repository / ENVIRONMENT_NAME).exists()
-    assert not (repository / PATCH_HANDOFF_DIRECTORY).exists()
+    assert not (repository / TASK_HANDOFF_DIRECTORY).exists()
 
 
 def test_fresh_configuration_and_explicit_output_are_not_confused(tmp_path: Path) -> None:
@@ -151,7 +151,7 @@ def test_apply_failure_retry_and_dry_run_all_embed_fresh_handoff(tmp_path: Path,
     assert result_data["repository_path"] == str(repository.resolve())
     assert result_data["repository_context"] == initial["repository_context"]
     assert git(repository, "status", "--porcelain").stdout == ""
-    assert not (repository / PATCH_HANDOFF_DIRECTORY).exists()
+    assert not (repository / TASK_HANDOFF_DIRECTORY).exists()
     if automatic:
         repeated = run_cli(cwd, "apply", "--json", *origin, environment_overrides=environment)
         assert repeated.returncode == 10
@@ -178,7 +178,7 @@ def test_explicit_foreign_repo_uses_target_facts_and_metadata_is_not_payload(tmp
     actual = _read_result(Path(json.loads(completed.stdout)["result"]["result_bundle"]["path"]))
     assert actual["repository_path"] == str(repo_b.resolve())
     assert (repo_b / CHAT_INSTRUCTIONS_NAME).read_text() == "actual project documentation\n"
-    assert not (repo_b / PATCH_HANDOFF_DIRECTORY).exists()
+    assert not (repo_b / TASK_HANDOFF_DIRECTORY).exists()
     assert not (repo_a / CHAT_INSTRUCTIONS_NAME).exists()
     assert git(repo_a, "status", "--porcelain").stdout == ""
 

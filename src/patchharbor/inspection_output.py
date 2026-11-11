@@ -1,12 +1,12 @@
 """Pure version-2 JSON projections of checked immutable package facts."""
 from __future__ import annotations
 
-from patchharbor.patch_inspection import PatchInspection, PatchValidationResult
+from patchharbor.task_inspection import TaskInspection, TaskValidationResult
 from patchharbor.context_output import context_json_result
-from patchharbor.pack_types import PatchPackResult
+from patchharbor.pack_types import TaskPackResult
 
 
-def inspection_json_result(info: PatchInspection) -> dict[str, object]:
+def inspection_json_result(info: TaskInspection) -> dict[str, object]:
     manifest = info.manifest
     return {
         "package_sha256": info.package_sha256,
@@ -29,7 +29,7 @@ def inspection_json_result(info: PatchInspection) -> dict[str, object]:
     }
 
 
-def validation_json_result(report: PatchValidationResult) -> dict[str, object]:
+def validation_json_result(report: TaskValidationResult) -> dict[str, object]:
     return {
         "inspection": inspection_json_result(report.inspection), "scope": report.scope.value,
         "binding_matches": report.binding_matches,
@@ -40,7 +40,7 @@ def validation_json_result(report: PatchValidationResult) -> dict[str, object]:
     }
 
 
-def pack_json_result(report: PatchPackResult) -> dict[str, object]:
+def pack_json_result(report: TaskPackResult) -> dict[str, object]:
     return {
         'path': str(report.path), 'package_id': str(report.package_id),
         'created_at': report.created_at.isoformat().replace('+00:00', 'Z'),

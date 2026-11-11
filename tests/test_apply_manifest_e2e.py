@@ -11,7 +11,7 @@ import pytest
 
 from patchharbor.exit_status import ExitCode
 
-from patchharbor.patch_manifest import PATCH_FORMAT_VERSION, PATCH_MARKER
+from patchharbor.task_manifest import TASK_FORMAT_VERSION, TASK_MARKER
 from patchharbor.state_fingerprint import FINGERPRINT_ALGORITHM
 from tests.platform_support import run_cli
 from tests.registration_support import (
@@ -23,8 +23,8 @@ from tests.registration_support import (
 pytestmark = pytest.mark.e2e
 
 _VALID_MANIFEST = {
-    "marker": PATCH_MARKER,
-    "format_version": PATCH_FORMAT_VERSION,
+    "marker": TASK_MARKER,
+    "format_version": TASK_FORMAT_VERSION,
     "repo_id": "a3f9c2e1-7b4d-4a91-9d2e-5c6f8a1b2c3d",
     "base_commit": "f4e9c2a7b8c9d01234567890abcdef1234567890",
     "state_fingerprint": "a1b2c3d4e5f67890",
@@ -371,7 +371,7 @@ def test_dry_run_rejects_duplicate_root_manifests(tmp_path: Path) -> None:
 def test_dry_run_propagates_invalid_manifest_documents(tmp_path: Path) -> None:
     package = tmp_path / "invalid-document.zip"
     duplicate_marker = (
-        f'{{"marker":"{PATCH_MARKER}","marker":"{PATCH_MARKER}"}}'
+        f'{{"marker":"{TASK_MARKER}","marker":"{TASK_MARKER}"}}'
     ).encode("utf-8")
     _write_package(package, manifest=duplicate_marker)
 

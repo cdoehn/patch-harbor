@@ -49,7 +49,7 @@ def test_candidate_preserves_exact_binding_and_is_natively_valid(tmp_path,kind,d
     source=inputs(tmp_path)
     metadata,raw,warnings=build(tmp_path,reference,source)
     output=tmp_path/metadata.filename;output.write_bytes(raw)
-    validated=api.validate_patch(output,reference_bundle=path)
+    validated=api.validate_task(output,reference_bundle=path)
     assert validated.binding_matches and validated.reference_sha256==reference.sha256
     with ZipFile(BytesIO(raw)) as archive:
         manifest=json.loads(archive.read('patch.json'))

@@ -10,10 +10,10 @@ from patchharbor.models import GitObjectFormat, GitObjectId, RepositoryId
 from patchharbor.state_fingerprint import FINGERPRINT_ALGORITHM
 
 
-PATCH_MANIFEST_NAME = "patch.json"
-PATCH_MARKER = "patch-harbor"
-PATCH_FORMAT_VERSION = 1
-_PATCH_MANIFEST_FIELDS = frozenset(
+TASK_MANIFEST_NAME = "patch.json"
+TASK_MARKER = "patch-harbor"
+TASK_FORMAT_VERSION = 1
+_TASK_MANIFEST_FIELDS = frozenset(
     {
         "marker",
         "format_version",
@@ -27,7 +27,7 @@ _PATCH_MANIFEST_FIELDS = frozenset(
 
 
 @dataclass(frozen=True)
-class PatchManifest:
+class TaskManifest:
     """One validated closed format-1 patch manifest."""
 
     marker: str
@@ -85,20 +85,20 @@ def _require_string(document: dict[str, object], field: str) -> str:
     return value
 
 
-def parse_patch_manifest(payload: bytes) -> PatchManifest:
+def parse_task_manifest(payload: bytes) -> TaskManifest:
     """Parse manifest bytes without performing I/O or repository access."""
     document = _parse_json_object(payload)
-    if set(document) != _PATCH_MANIFEST_FIELDS:
+    if set(document) != _TASK_MANIFEST_FIELDS:
         raise patch_package_error(
             "patch.json must contain exactly the seven format-1 fields"
         )
 
     marker = _require_string(document, "marker")
-    if marker != PATCH_MARKER:
+    if marker != TASK_MARKER:
         raise patch_package_error("patch.json marker is invalid")
 
     format_version = document["format_version"]
-    if type(format_version) is not int or format_version != PATCH_FORMAT_VERSION:
+    if type(format_version) is not int or format_version != TASK_FORMAT_VERSION:
         raise patch_package_error("patch.json format_version is invalid")
 
     repo_id_text = _require_string(document, "repo_id")
@@ -135,10 +135,10 @@ def parse_patch_manifest(payload: bytes) -> PatchManifest:
         )
 
     entrypoint = _require_string(document, "entrypoint")
-    if not entrypoint or entrypoint == PATCH_MANIFEST_NAME:
+    if not entrypoint or entrypoint == TASK_MANIFEST_NAME:
         raise patch_package_error("patch.json entrypoint is invalid")
 
-    return PatchManifest(
+    return TaskManifest(
         marker=marker,
         format_version=format_version,
         repo_id=repo_id,

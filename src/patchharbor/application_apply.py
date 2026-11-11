@@ -25,12 +25,12 @@ from patchharbor.apply_mutation import (
     MutationFailureKind,
     apply_payload_mutation,
 )
-from patchharbor.apply_preflight import prepare_patch_package
+from patchharbor.apply_preflight import prepare_task_bundle
 from patchharbor.apply_repository import safely_resolved_repository
 from patchharbor.errors import (
     PatchHarborError,
     LockBusyError,
-    NoEligiblePatchError,
+    NoEligibleTaskError,
     state_mismatch_error,
 )
 from patchharbor.execution import (
@@ -39,9 +39,9 @@ from patchharbor.execution import (
 )
 from patchharbor.models import GitObjectId
 from patchharbor.output import OutputTargets
-from patchharbor.patch_package import (
-    ValidatedPatchPackage,
-    resolve_patch_package as _resolve_patch_package,
+from patchharbor.task_package import (
+    ValidatedTaskBundle,
+    resolve_task_bundle as _resolve_task_bundle,
 )
 from patchharbor.payload_files import validate_bundle_payload_targets
 from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY, ResourcePolicy
@@ -58,11 +58,11 @@ from patchharbor.watch_contract import (
     ExchangeWatchTarget,
 )
 from patchharbor.application_exchange import (
-    DiscoveredExchangePatch,
+    DiscoveredExchangeTask,
     _automatic_exchange_discovery_scope,
     _maintain_explicit_exchange,
     _manual_exchange_discovery_scope,
-    discover_exchange_patch,
+    discover_exchange_task,
 )
 from patchharbor.application_results import (
     _complete_apply_result_bundle,
@@ -72,18 +72,18 @@ from patchharbor.application_results import (
 )
 
 
-def resolve_patch_package(
+def resolve_task_bundle(
     path: Path,
     *,
     resource_policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY,
-) -> ValidatedPatchPackage:
+) -> ValidatedTaskBundle:
     """Resolve one complete patch package through the package boundary."""
-    return _resolve_patch_package(path, resource_policy=resource_policy)
+    return _resolve_task_bundle(path, resource_policy=resource_policy)
 
 
 @contextmanager
-def preflight_patch_package_repository(
-    package: ValidatedPatchPackage,
+def preflight_task_bundle_repository(
+    package: ValidatedTaskBundle,
     *,
     output_directory: Path | None = None,
     session: RunSession | None = None,
@@ -147,7 +147,7 @@ def preflight_patch_package_repository(
                 if admission_policy is not None:
                     admission_policy.check_target(resolved)
                 prepared_package = private_resources.enter_context(
-                    prepare_patch_package(
+                    prepare_task_bundle(
                         package,
                         repository=resolved.repository.value,
                     )
@@ -185,8 +185,8 @@ def preflight_patch_package_repository(
             )
 
 
-def dry_run_patch_package(
-    package: ValidatedPatchPackage,
+def dry_run_task_bundle(
+    package: ValidatedTaskBundle,
     *,
     output_directory: Path | None = None,
     output: OutputTargets | None = None,
@@ -194,7 +194,7 @@ def dry_run_patch_package(
 ) -> RunReport:
     """Complete one safe dry-run and publish its unchanged Result Bundle."""
     actual_session = session or RunSession.start()
-    with preflight_patch_package_repository(
+    with preflight_task_bundle_repository(
         package,
         output_directory=output_directory,
         session=actual_session,
@@ -246,8 +246,8 @@ def _require_payload_mutation(
     raise report.reported_error()
 
 
-def apply_patch_package(
-    package: ValidatedPatchPackage,
+def apply_task_bundle(
+    package: ValidatedTaskBundle,
     *,
     output_directory: Path | None = None,
     timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
@@ -260,7 +260,7 @@ def apply_patch_package(
 ) -> RunReport:
     """Write one validated package, run its private entrypoint, and bundle it."""
     actual_session = session or RunSession.start()
-    with preflight_patch_package_repository(
+    with preflight_task_bundle_repository(
         package,
         output_directory=output_directory,
         session=actual_session,
@@ -343,7 +343,7 @@ def _run_apply_path(
         blocked_on = None
         if attempted:
             status = AutomaticApplyStatus.ATTEMPTED
-        elif isinstance(error, NoEligiblePatchError):
+        elif isinstance(error, NoEligibleTaskError):
             status = AutomaticApplyStatus.NO_CANDIDATE
         elif dry_run and report.success:
             status = AutomaticApplyStatus.DRY_RUN
@@ -367,7 +367,7 @@ def _run_apply_path(
         attempted = True
 
     try:
-        discovered: DiscoveredExchangePatch | None = None
+        discovered: DiscoveredExchangeTask | None = None
         if admission_policy is not None:
             try:
                 target = admission_policy.expected_repository.resolve(strict=True)
@@ -382,12 +382,12 @@ def _run_apply_path(
                     Path.cwd() if current_directory is None else current_directory
                 )
             )
-            discovered = discover_exchange_patch(scope, archive=not dry_run, output=output)
+            discovered = discover_exchange_task(scope, archive=not dry_run, output=output)
             selected_path = discovered.artifact.path
             package = discovered.package
         else:
             selected_path = path
-            package = resolve_patch_package(selected_path)
+            package = resolve_task_bundle(selected_path)
             if admission_policy is not None and package.package_sha256 != admission_policy.expected_sha256:
                 raise PatchHarborError("captured package SHA-256 differs from expected bytes", FailureReason.SOURCE_ERROR)
             if not dry_run:
@@ -422,13 +422,13 @@ def _run_apply_path(
 
     try:
         if dry_run:
-            return finish(dry_run_patch_package(
+            return finish(dry_run_task_bundle(
                 package,
                 output_directory=output_directory,
                 output=output,
                 session=actual_session,
             ))
-        return finish(apply_patch_package(
+        return finish(apply_task_bundle(
             package,
             output_directory=output_directory,
             timeout_seconds=timeout_seconds,

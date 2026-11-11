@@ -54,9 +54,9 @@ def test_closed_capabilities_keep_reference_bytes_binding_and_static_pack(
     assert assessment.pyz_bytes == canonical
 
     contents, _, output = request_files
-    packed = api.pack_patch(contents, reference_bundle=reference, entrypoint='run.sh',
+    packed = api.pack_task(contents, reference_bundle=reference, entrypoint='run.sh',
                             output_directory=output)
-    checked = api.validate_patch(packed.path, reference_bundle=reference)
+    checked = api.validate_task(packed.path, reference_bundle=reference)
     assert checked.binding_matches and checked.reference_sha256 == digest
     assert checked.scope == 'reference'
     for key, expected in binding.items():
@@ -72,11 +72,11 @@ def assert_invalid_reference(files, binding, request_files, tmp_path):
     patch = tmp_path / 'patch.zip'
     bound_package(patch, binding)
     with pytest.raises(api.PatchHarborError) as caught:
-        api.validate_patch(patch, reference_bundle=reference)
+        api.validate_task(patch, reference_bundle=reference)
     assert caught.value.reason is api.FailureReason.SOURCE_ERROR
     contents, _, output = request_files
     with pytest.raises(api.PatchHarborError) as caught:
-        api.pack_patch(contents, reference_bundle=reference, entrypoint='run.sh',
+        api.pack_task(contents, reference_bundle=reference, entrypoint='run.sh',
                        output_directory=output)
     assert caught.value.reason is api.FailureReason.SOURCE_ERROR
     with pytest.raises(ValueError):

@@ -77,11 +77,11 @@ subprocess.run=subprocess.Popen=socket.socket=forbidden;os.environ['PATH']=''
 assessment=bootstrap.assess(reference,trusted_source_sha256=hashlib.sha256(reference.read_bytes()).hexdigest())
 assert not assessment.full_reference_valid and assessment.requires_python == '>=3.10'
 prepared=bootstrap.prepare(assessment,workspace);api=bootstrap.import_api(prepared)
-packed=api.pack_patch(contents,reference_bundle=reference,entrypoint=entrypoint,output_directory=output)
-checked=api.validate_patch(packed.path,reference_bundle=reference)
+packed=api.pack_task(contents,reference_bundle=reference,entrypoint=entrypoint,output_directory=output)
+checked=api.validate_task(packed.path,reference_bundle=reference)
 assert checked.binding_matches and checked.scope=='reference'
 assert checked.reference_sha256==assessment.reference_sha256
-assert api.inspect_patch(packed.path).package_sha256==packed.package_sha256
+assert api.inspect_task(packed.path).package_sha256==packed.package_sha256
 assert 'patchharbor_watcher' not in sys.modules
 print(json.dumps({'patch':str(packed.path),'pyz':str(prepared.path),'sha256':packed.package_sha256,
                   'reference_sha256':checked.reference_sha256,'api_origin':api.__file__}))

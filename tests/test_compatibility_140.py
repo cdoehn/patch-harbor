@@ -98,12 +98,12 @@ def test_current_pack_inspect_validate_use_actual_frozen_binding_without_executi
         pytest.fail('static pack/reference work attempted a process or network operation')
     monkeypatch.setattr(subprocess, 'Popen', forbidden)
     monkeypatch.setattr(socket, 'socket', forbidden)
-    packed = api.pack_patch(contents, reference_bundle=reference, entrypoint='run.sh',
+    packed = api.pack_task(contents, reference_bundle=reference, entrypoint='run.sh',
                             output=tmp_path / 'packed.zip', modes={'run.sh': 0o755, 'payload.bin': 0o644})
-    checked = api.validate_patch(packed.path, reference_bundle=reference)
-    inspected = api.inspect_patch(packed.path)
+    checked = api.validate_task(packed.path, reference_bundle=reference)
+    inspected = api.inspect_task(packed.path)
     assert checked.inspection == inspected and checked.binding_matches is True
-    assert checked.scope is api.PatchValidationScope.REFERENCE
+    assert checked.scope is api.TaskValidationScope.REFERENCE
     assert packed.reference_sha256 == checked.reference_sha256 == expected['sha256']
     assert {'authenticity', 'execution', 'tests', 'ci', 'replay'} <= set(checked.not_checked)
     assert str(checked.context.base_commit) == expected['after_commit']
@@ -129,8 +129,8 @@ def test_original_patches_retain_payload_modes_and_full_binding(case, monkeypatc
         pytest.fail('static reader imported a ZIP runtime or started a process')
     monkeypatch.setattr(zipimport, 'zipimporter', forbidden)
     monkeypatch.setattr(subprocess, 'Popen', forbidden)
-    inspected = api.inspect_patch(path)
-    validated = api.validate_patch(path, reference_bundle=reference)
+    inspected = api.inspect_task(path)
+    validated = api.validate_task(path, reference_bundle=reference)
     assert validated.binding_matches and validated.inspection == inspected
     assert inspected.package_sha256 == expected['sha256']
     assert next(e for e in inspected.entries if e.path == 'run.sh').unix_mode == 0o755
@@ -198,7 +198,7 @@ def test_all_four_binding_components_remain_required(tmp_path, field, value, cod
     changed = tmp_path / 'changed.zip'
     rewrite_zip(patch, changed, changes)
     with pytest.raises(api.PatchHarborError) as error:
-        api.validate_patch(changed, reference_bundle=reference)
+        api.validate_task(changed, reference_bundle=reference)
     assert int(exit_code_for_error(error.value)) == code
 
 
@@ -209,7 +209,7 @@ def test_invalid_and_future_copies_never_become_reference_or_success_proofs(tmp_
     corrupt_reference(original, bad, fault)
     patch, _ = artifact('patch', 'diagnostic')
     with pytest.raises(api.PatchHarborError) as error:
-        api.validate_patch(patch, reference_bundle=bad)
+        api.validate_task(patch, reference_bundle=bad)
     assert int(exit_code_for_error(error.value)) == 4
     with pytest.raises(ValueError):
         parse_archive_evidence(bad.read_bytes(), bad)
@@ -217,7 +217,7 @@ def test_invalid_and_future_copies_never_become_reference_or_success_proofs(tmp_
     contents = pack_contents(tmp_path / 'contents')
     output = tmp_path / 'must-not-publish.zip'
     with pytest.raises(api.PatchHarborError) as error:
-        api.pack_patch(contents, reference_bundle=bad, entrypoint='run.sh', output=output)
+        api.pack_task(contents, reference_bundle=bad, entrypoint='run.sh', output=output)
     assert int(exit_code_for_error(error.value)) == 4 and not output.exists()
     assert sha256(original.read_bytes()) == original_facts['sha256']
 
@@ -267,7 +267,7 @@ def test_pinned_original_pyz_operates_in_fresh_stdlib_process(tmp_path, mode):
                                     env=environment, capture_output=True, text=True)
             assert result.returncode == 0, result.stdout + result.stderr
             assert json.loads(result.stdout)['success'] is True
-        checked = api.validate_patch(tmp_path / 'cli.zip', reference_bundle=reference)
+        checked = api.validate_task(tmp_path / 'cli.zip', reference_bundle=reference)
         assert checked.binding_matches and checked.reference_sha256 == expected['sha256']
     else:
         program = '''
@@ -293,7 +293,7 @@ print(json.dumps({'reference':checked.reference_sha256,'patch':packed.package_sh
         assert result.returncode == 0, result.stdout + result.stderr
         proof = json.loads(result.stdout)
         assert proof['reference'] == expected['sha256'] and proof['patch'] == sha256(output.read_bytes())
-        assert api.validate_patch(output, reference_bundle=reference).binding_matches
+        assert api.validate_task(output, reference_bundle=reference).binding_matches
     assert sha256(runtime.read_bytes()) == PYZ_SHA256
 
 

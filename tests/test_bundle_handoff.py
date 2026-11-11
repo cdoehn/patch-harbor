@@ -13,11 +13,11 @@ import patchharbor.chat_instructions as instructions_module
 import patchharbor.platform.environment as environment_module
 from patchharbor.bundle_handoff import (
     BundleHandoff, CHAT_INSTRUCTIONS_NAME, ENVIRONMENT_NAME, ENVIRONMENT_MARKER,
-    MAX_HANDOFF_ENTRY_BYTES, PATCH_HANDOFF_DIRECTORY,
+    MAX_HANDOFF_ENTRY_BYTES, TASK_HANDOFF_DIRECTORY,
 )
 from patchharbor.chat_instructions import load_chat_template, render_chat_handoff
 from patchharbor.errors import PatchHarborError
-from patchharbor.patch_package import resolve_patch_package
+from patchharbor.task_package import resolve_task_bundle
 from patchharbor.platform.environment import capture_runtime_environment
 from tests.platform_support import PROJECT_ROOT, native_script, native_value
 
@@ -330,24 +330,24 @@ def test_patch_handoff_is_not_payload_and_root_instructions_stay_payload(tmp_pat
     handoff = render_chat_handoff(patch_environment())
     path = tmp_path / "patch.zip"
     write_handoff_patch(path, dict(handoff.entries(patch=True)))
-    package = resolve_patch_package(path)
+    package = resolve_task_bundle(path)
     assert package.handoff == handoff
     assert {payload.relative_path for payload in package.payloads} == {"actual-payload.txt", "CHAT_INSTRUCTIONS.md"}
     write_handoff_patch(path, {})
-    assert resolve_patch_package(path).handoff is None
+    assert resolve_task_bundle(path).handoff is None
 
 
 @pytest.mark.parametrize("fault", ["missing", "extra", "binding", "type", "version", "duplicate", "nan", "bom", "encoding", "size", "entrypoint", "case"])
 def test_invalid_reserved_metadata_is_rejected_before_mutation(tmp_path: Path, fault: str) -> None:
     entries = dict(render_chat_handoff(patch_environment()).entries(patch=True))
-    env_name = f"{PATCH_HANDOFF_DIRECTORY}/{ENVIRONMENT_NAME}"
-    chat_name = f"{PATCH_HANDOFF_DIRECTORY}/{CHAT_INSTRUCTIONS_NAME}"
+    env_name = f"{TASK_HANDOFF_DIRECTORY}/{ENVIRONMENT_NAME}"
+    chat_name = f"{TASK_HANDOFF_DIRECTORY}/{CHAT_INSTRUCTIONS_NAME}"
     doc = json.loads(entries[env_name])
     entrypoint = None
     if fault == "missing":
         del entries[chat_name]
     elif fault == "extra":
-        entries[f"{PATCH_HANDOFF_DIRECTORY}/payload.txt"] = b"not metadata"
+        entries[f"{TASK_HANDOFF_DIRECTORY}/payload.txt"] = b"not metadata"
     elif fault in {"binding", "type", "version"}:
         if fault == "binding":
             doc["repository_context"]["base_commit"] = "b" * 40
@@ -373,4 +373,4 @@ def test_invalid_reserved_metadata_is_rejected_before_mutation(tmp_path: Path, f
     path = tmp_path / "patch.zip"
     write_handoff_patch(path, entries, entrypoint=entrypoint)
     with pytest.raises(PatchHarborError):
-        resolve_patch_package(path)
+        resolve_task_bundle(path)

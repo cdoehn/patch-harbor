@@ -7,9 +7,9 @@ import os
 from pathlib import Path
 import zipfile
 
-from patchharbor.patch_manifest import PATCH_FORMAT_VERSION, PATCH_MARKER
+from patchharbor.task_manifest import TASK_FORMAT_VERSION, TASK_MARKER
 from patchharbor.state_fingerprint import FINGERPRINT_ALGORITHM
-from patchharbor.exchange_state import ExchangeFileIdentity, ExchangePatchSelection, ExchangeStateRecord
+from patchharbor.exchange_state import ExchangeFileIdentity, ExchangeTaskSelection, ExchangeStateRecord
 from patchharbor.models import GitObjectFormat, GitObjectId, RepositoryId
 
 from tests.platform_support import native_script, native_value, run_cli
@@ -54,8 +54,8 @@ def _register_context(
 
 def _manifest(context: dict[str, object]) -> dict[str, object]:
     return {
-        "marker": PATCH_MARKER,
-        "format_version": PATCH_FORMAT_VERSION,
+        "marker": TASK_MARKER,
+        "format_version": TASK_FORMAT_VERSION,
         "repo_id": context["repo_id"],
         "base_commit": context["base_commit"],
         "state_fingerprint": context["state_fingerprint"],
@@ -147,8 +147,8 @@ def _identity(path: Path, character: str = "a") -> ExchangeFileIdentity:
     return ExchangeFileIdentity(path=path.resolve(), sha256=character * 64)
 
 
-def _selection() -> ExchangePatchSelection:
-    return ExchangePatchSelection(
+def _selection() -> ExchangeTaskSelection:
+    return ExchangeTaskSelection(
         repo_id=RepositoryId("a3f9c2e1-7b4d-4a91-9d2e-5c6f8a1b2c3d"),
         base_commit=GitObjectId("b" * 40, GitObjectFormat.SHA1),
         state_fingerprint="c" * 16,
@@ -159,6 +159,6 @@ def _selection() -> ExchangePatchSelection:
 def _record(path: Path, character: str = "a") -> ExchangeStateRecord:
     return ExchangeStateRecord(
         identity=_identity(path, character),
-        kind="patch_package",
+        kind="task_package",
         manifest=_selection(),
     )

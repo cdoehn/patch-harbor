@@ -4,11 +4,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from patchharbor.exchange_state import ExchangePatchSelection
+from patchharbor.exchange_state import ExchangeTaskSelection
 from patchharbor.models import BundlePayload, GitObjectId
-from patchharbor.patch_package import resolve_patch_payloads
+from patchharbor.task_package import resolve_task_payloads
 from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY
-from patchharbor.result_reader import CLEAN_FINGERPRINT, parse_result_payloads, read_result_or_patch_payloads
+from patchharbor.result_reader import CLEAN_FINGERPRINT, parse_result_payloads, read_result_or_task_payloads
 from patchharbor.run_report import PrimaryResultKind
 
 
@@ -18,7 +18,7 @@ class ApplyReceipt:
 
     patch_sha256: str
     run_id: str
-    expected: ExchangePatchSelection
+    expected: ExchangeTaskSelection
     completed_commit: GitObjectId
 
 
@@ -27,7 +27,7 @@ class ArchiveEvidence:
     """Validated manifest binding and, for clean results, the full blob inventory."""
 
     kind: str
-    selection: ExchangePatchSelection
+    selection: ExchangeTaskSelection
     base_entries: tuple[tuple[str, str, str], ...] = ()  # path, mode, object ID
     receipt: ApplyReceipt | None = None
 
@@ -46,7 +46,7 @@ def _result_evidence(payloads: tuple[BundlePayload, ...]) -> ArchiveEvidence:
         or facts.primary_result.kind is not PrimaryResultKind.SUCCESS
         or (facts.operation == "apply") != (facts.expected is not None)):
         raise ValueError("result is not a clean, completed archival success")
-    selection = ExchangePatchSelection(context.repo_id, context.base_commit,
+    selection = ExchangeTaskSelection(context.repo_id, context.base_commit,
                                        context.state_fingerprint, context.fingerprint_algorithm)
     receipt = None
     if facts.completed_commit is not None:
@@ -58,11 +58,11 @@ def _result_evidence(payloads: tuple[BundlePayload, ...]) -> ArchiveEvidence:
 
 def parse_archive_evidence(content: bytes, path: Path) -> ArchiveEvidence:
     """Validate complete bytes; errors mean 'keep', never an archival decision."""
-    payloads = read_result_or_patch_payloads(content)
+    payloads = read_result_or_task_payloads(content)
     files = {item.relative_path: item.content for item in payloads}
     if "manifest.json" in files and "patch.json" in files:
         raise ValueError("ambiguous bundle kind")
     if "manifest.json" in files:
         return _result_evidence(payloads)
-    package = resolve_patch_payloads(payloads, package_path=path, resource_policy=DEFAULT_RESOURCE_POLICY)
-    return ArchiveEvidence("patch_package", ExchangePatchSelection.from_manifest(package.manifest))
+    package = resolve_task_payloads(payloads, package_path=path, resource_policy=DEFAULT_RESOURCE_POLICY)
+    return ArchiveEvidence("task_package", ExchangeTaskSelection.from_manifest(package.manifest))

@@ -55,8 +55,8 @@ print(json.dumps(str(api.bundle(sys.argv[1]).path)))
 import json,sys
 sys.path.insert(0,sys.argv[1])
 from patchharbor import api
-p=api.pack_patch(sys.argv[2],reference_bundle=sys.argv[3],entrypoint=sys.argv[4],output_directory=sys.argv[5])
-v=api.validate_patch(p.path,reference_bundle=sys.argv[3])
+p=api.pack_task(sys.argv[2],reference_bundle=sys.argv[3],entrypoint=sys.argv[4],output_directory=sys.argv[5])
+v=api.validate_task(p.path,reference_bundle=sys.argv[3])
 assert v.binding_matches and v.scope=='reference'
 print(json.dumps({'path':str(p.path),'package_sha256':p.package_sha256,'reference_sha256':v.reference_sha256}))
 ''',str(runtime),str(contents),str(reference),entry,str(output)],tmp_path,environment))
@@ -68,7 +68,7 @@ print(json.dumps({'path':str(p.path),'package_sha256':p.package_sha256,'referenc
     patch = Path(packed['path'])
     assert packed['reference_sha256'] == reference_sha
     assert hashlib.sha256(patch.read_bytes()).hexdigest() == packed['package_sha256']
-    assert api.validate_patch(patch,reference_bundle=reference).binding_matches
+    assert api.validate_task(patch,reference_bundle=reference).binding_matches
     with ZipFile(patch) as archive: assert archive.read(entry) == (contents/entry).read_bytes()
     # Static success is true even for broken shell syntax; no entrypoint ran.
     assert (repo/'tracked.txt').read_bytes() == b'base\n'

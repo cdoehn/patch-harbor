@@ -169,8 +169,8 @@ def test_cli_composes_public_boundaries_without_domain_orchestration() -> None:
         "patchharbor.exchange",
         "patchharbor.git_*",
         "patchharbor.locks",
-        "patchharbor.patch_manifest",
-        "patchharbor.patch_package",
+        "patchharbor.task_manifest",
+        "patchharbor.task_package",
         "patchharbor.payload_files",
         "patchharbor.registration",
         "patchharbor.registry",
@@ -225,7 +225,7 @@ def test_runtime_responsibilities_follow_the_specified_boundaries() -> None:
             "patchharbor.repository_state",
             "patchharbor.result_bundle*",
         },
-        "patchharbor.patch_manifest": {
+        "patchharbor.task_manifest": {
             "patchharbor.application*",
             "patchharbor.execution",
             "patchharbor.git_*",
@@ -237,7 +237,7 @@ def test_runtime_responsibilities_follow_the_specified_boundaries() -> None:
             "patchharbor.application*",
             "patchharbor.bundles",
             "patchharbor.execution",
-            "patchharbor.patch_package",
+            "patchharbor.task_package",
             "patchharbor.presentation",
             "patchharbor.repository_state",
             "patchharbor.result_bundle*",
@@ -245,7 +245,7 @@ def test_runtime_responsibilities_follow_the_specified_boundaries() -> None:
         "patchharbor.repository_state": {
             "patchharbor.application*",
             "patchharbor.execution",
-            "patchharbor.patch_package",
+            "patchharbor.task_package",
             "patchharbor.presentation",
             "patchharbor.result_bundle*",
             "patchharbor_watcher*",
@@ -254,8 +254,8 @@ def test_runtime_responsibilities_follow_the_specified_boundaries() -> None:
             "patchharbor.application*",
             "patchharbor.bundles",
             "patchharbor.execution",
-            "patchharbor.patch_manifest",
-            "patchharbor.patch_package",
+            "patchharbor.task_manifest",
+            "patchharbor.task_package",
             "patchharbor.presentation",
             "patchharbor.repository_state",
             "patchharbor.result_bundle*",
@@ -263,8 +263,8 @@ def test_runtime_responsibilities_follow_the_specified_boundaries() -> None:
         "patchharbor.execution": {
             "patchharbor.application*",
             "patchharbor.git_*",
-            "patchharbor.patch_manifest",
-            "patchharbor.patch_package",
+            "patchharbor.task_manifest",
+            "patchharbor.task_package",
             "patchharbor.presentation",
             "patchharbor.registry",
             "patchharbor.repository_state",
@@ -366,7 +366,7 @@ def test_bundle_handoff_is_passive_output_not_chat_or_commit_orchestration() -> 
             "patchharbor.application*", "patchharbor.execution", "patchharbor.apply_*",
             "patchharbor.git_*", "patchharbor.registry", "patchharbor_watcher*",
         })
-    assert "patchharbor.chat_instructions" not in graph["patchharbor.patch_package"]
+    assert "patchharbor.chat_instructions" not in graph["patchharbor.task_package"]
     for module in ("patchharbor.chat_instructions", "patchharbor.bundle_handoff"):
         assert "subprocess" not in _import_roots(_runtime_modules()[module])
 

@@ -77,7 +77,7 @@ class LockBusyError(PatchHarborError):
         self.lock = lock
 
 
-class NoEligiblePatchError(PatchHarborError):
+class NoEligibleTaskError(PatchHarborError):
     """Completed automatic discovery found no eligible candidate."""
 
 

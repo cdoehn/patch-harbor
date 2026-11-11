@@ -8,12 +8,12 @@ import json
 from patchharbor.errors import patch_package_error
 from patchharbor.json_document import serialize_json_document
 from patchharbor.models import BundlePayload
-from patchharbor.patch_manifest import PatchManifest
+from patchharbor.task_manifest import TaskManifest
 
 
 CHAT_INSTRUCTIONS_NAME = "CHAT_INSTRUCTIONS.md"
 ENVIRONMENT_NAME = "environment.json"
-PATCH_HANDOFF_DIRECTORY = "PATCHHARBOR_META"
+TASK_HANDOFF_DIRECTORY = "PATCHHARBOR_META"
 ENVIRONMENT_MARKER = "patch-harbor-environment"
 ENVIRONMENT_FORMAT_VERSION = 1
 MAX_HANDOFF_ENTRY_BYTES = 128 * 1024
@@ -29,7 +29,7 @@ class BundleHandoff:
     environment: bytes
 
     def entries(self, *, patch: bool = False) -> tuple[tuple[str, bytes], ...]:
-        prefix = f"{PATCH_HANDOFF_DIRECTORY}/" if patch else ""
+        prefix = f"{TASK_HANDOFF_DIRECTORY}/" if patch else ""
         return (
             (prefix + CHAT_INSTRUCTIONS_NAME, self.instructions),
             (prefix + ENVIRONMENT_NAME, self.environment),
@@ -53,15 +53,15 @@ def _invalid_constant(_value: str) -> object:
     raise ValueError("non-finite handoff JSON number")
 
 
-def split_patch_handoff(
+def split_task_handoff(
     payloads: tuple[BundlePayload, ...],
-    manifest: PatchManifest,
+    manifest: TaskManifest,
 ) -> tuple[tuple[BundlePayload, ...], BundleHandoff | None]:
     """Remove only a complete, validated reserved metadata pair, never execute it."""
-    prefix = PATCH_HANDOFF_DIRECTORY + "/"
+    prefix = TASK_HANDOFF_DIRECTORY + "/"
     metadata = tuple(
         payload for payload in payloads
-        if payload.relative_path.split("/", 1)[0].casefold() == PATCH_HANDOFF_DIRECTORY.casefold()
+        if payload.relative_path.split("/", 1)[0].casefold() == TASK_HANDOFF_DIRECTORY.casefold()
     )
     if not metadata:
         return payloads, None  # Existing format-1 packages remain unchanged.

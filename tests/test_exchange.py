@@ -15,10 +15,10 @@ from patchharbor.exchange import (
     ExchangeArtifactKind,
     ExchangeScanError,
     classify_exchange_artifact,
-    materialize_exchange_patch,
+    materialize_exchange_task,
     scan_exchange_directory,
 )
-from patchharbor.patch_manifest import PATCH_FORMAT_VERSION, PATCH_MARKER
+from patchharbor.task_manifest import TASK_FORMAT_VERSION, TASK_MARKER
 from patchharbor.resource_policy import ResourcePolicy
 from patchharbor.state_fingerprint import FINGERPRINT_ALGORITHM
 from patchharbor.user_paths import registration_user_paths
@@ -26,8 +26,8 @@ from tests.registration_support import set_isolated_user_environment
 
 
 _MANIFEST = {
-    "marker": PATCH_MARKER,
-    "format_version": PATCH_FORMAT_VERSION,
+    "marker": TASK_MARKER,
+    "format_version": TASK_FORMAT_VERSION,
     "repo_id": "a3f9c2e1-7b4d-4a91-9d2e-5c6f8a1b2c3d",
     "base_commit": "f4e9c2a7b8c9d01234567890abcdef1234567890",
     "state_fingerprint": "a1b2c3d4e5f67890",
@@ -235,7 +235,7 @@ def test_selected_patch_is_reopened_and_rejected_after_byte_replacement(
         PatchHarborError,
         match="selected exchange patch changed during automatic discovery",
     ):
-        materialize_exchange_patch(selected, directory=tmp_path.resolve())
+        materialize_exchange_task(selected, directory=tmp_path.resolve())
 
     assert patch.is_file()
     state = exchange_module.load_exchange_state(paths)

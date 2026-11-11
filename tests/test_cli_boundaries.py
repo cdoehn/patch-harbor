@@ -70,8 +70,8 @@ def test_configuration_error_keeps_status_and_emits_no_success_result(
     (['registry', 'list'], 'repositories', 'registry.list', 1),
     (['context', 'repo'], 'context', 'context', 1),
     (['bundle', 'repo'], 'bundle', 'bundle', 1),
-    (['inspect', 'patch.zip'], 'inspect_patch', 'inspect', 2),
-    (['validate', 'patch.zip'], 'validate_patch', 'validate', 2),
+    (['inspect', 'patch.zip'], 'inspect_task', 'inspect', 2),
+    (['validate', 'patch.zip'], 'validate_task', 'validate', 2),
 ])
 def test_query_failure_preserves_json_version_error_category_and_output_channel(
     monkeypatch, json_output, arguments, function, command, version,

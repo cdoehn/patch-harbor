@@ -38,7 +38,7 @@ def test_classification_and_apply_lifecycle_are_persisted_in_closed_v4_state(
                 "completed_commit": None,
                 "attempt_run_id": None,
                 "result_sha256": None,
-                "kind": "patch_package",
+                "kind": "task_package",
                 "manifest": {
                     "base_commit": "b" * 40,
                     "fingerprint_algorithm": FINGERPRINT_ALGORITHM,
@@ -180,7 +180,7 @@ def test_legacy_attempt_flags_load_conservatively_and_migrate_on_next_write(
         legacy_entries.append(
             {
                 "attempted": attempted,
-                "kind": "patch_package",
+                "kind": "task_package",
                 "manifest": {
                     "base_commit": "b" * 40,
                     "fingerprint_algorithm": FINGERPRINT_ALGORITHM,

@@ -47,7 +47,7 @@ Pflicht; die bisherige optionale Legacy-Paarung in Format 1 bleibt lesbar.
 (vollständiger belegter Commit oder `null`, exakt wie im Rezept) und
 `recipe_format_version=1` (Integer, nicht Bool).
 
-`capabilities` besitzt genau `operations=["inspect_patch","validate_patch"]`,
+`capabilities` besitzt genau `operations=["inspect_task","validate_task"]`,
 `patch_formats=[1]` und `result_formats=[1]` oder `[1,2]`. Die geordneten
 Formatlisten enthalten ausschließlich Integer. Angaben beschreiben den
 Produzenten; der Leser gewährt dadurch weder Ausführungsrechte noch einen

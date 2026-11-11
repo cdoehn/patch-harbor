@@ -28,7 +28,7 @@ from patchharbor.errors import (
     FailureReason,
     PatchHarborError,
     LockBusyError,
-    NoEligiblePatchError,
+    NoEligibleTaskError,
     configuration_error,
     patch_package_error,
     registry_error,
@@ -38,14 +38,14 @@ from patchharbor.exchange import (
     ExchangeArtifact,
     ExchangeArtifactKind,
     ExchangeScanError,
-    materialize_exchange_patch,
+    materialize_exchange_task,
     require_exchange_identity_unchanged,
     scan_exchange_directory,
 )
 from patchharbor.exchange_state import (
     _state_lock,
     ExchangeApplyStatus,
-    ExchangePatchSelection,
+    ExchangeTaskSelection,
     mark_exchange_apply_finished,
     mark_exchange_apply_started,
     record_exchange_result_digest,
@@ -59,8 +59,8 @@ from patchharbor.models import (
     RepositoryId,
 )
 from patchharbor.output import OutputTargets
-from patchharbor.patch_manifest import PatchManifest
-from patchharbor.patch_package import ValidatedPatchPackage
+from patchharbor.task_manifest import TaskManifest
+from patchharbor.task_package import ValidatedTaskBundle
 from patchharbor.registry import load_registry
 from patchharbor.repository import registered_repository_status
 from patchharbor.repository_state import (
@@ -86,7 +86,7 @@ from patchharbor.application_configuration import (
 
 
 def _manifest_matches_context(
-    manifest: PatchManifest,
+    manifest: TaskManifest,
     context: RepositoryContext,
 ) -> bool:
     return (
@@ -98,11 +98,11 @@ def _manifest_matches_context(
 
 
 @dataclass(frozen=True, slots=True)
-class DiscoveredExchangePatch:
+class DiscoveredExchangeTask:
     """One selected package plus its persistent attempt boundary."""
 
     artifact: ExchangeArtifact
-    package: ValidatedPatchPackage
+    package: ValidatedTaskBundle
     paths: RegistrationUserPaths
     configuration: RepositoryConfiguration
     configuration_paths: RepositoryConfigurationPaths
@@ -122,7 +122,7 @@ class DiscoveredExchangePatch:
             )
         if (
             self.artifact.selection
-            != ExchangePatchSelection.from_manifest(self.package.manifest)
+            != ExchangeTaskSelection.from_manifest(self.package.manifest)
         ):
             raise ValueError("discovered Exchange package changed after selection")
 
@@ -402,7 +402,7 @@ def _select_exchange_candidate(
 
 
 def _context_for_exchange_candidate(
-    selection: ExchangePatchSelection,
+    selection: ExchangeTaskSelection,
     scope: ExchangeDiscoveryScope,
     contexts: dict[RepositoryId, RepositoryContext | None],
 ) -> RepositoryContext | None:
@@ -419,12 +419,12 @@ def _context_for_exchange_candidate(
     return contexts[repo_id]
 
 
-def discover_exchange_patch(
+def discover_exchange_task(
     scope: ExchangeDiscoveryScope,
     *,
     archive: bool = True,
     output: OutputTargets | None = None,
-) -> DiscoveredExchangePatch:
+) -> DiscoveredExchangeTask:
     """Return the newest eligible package inside one selection scope."""
     activity("DISCOVER", "Load Exchange configuration and repository registry", "heading")
     paths = configuration_user_paths()
@@ -506,7 +506,7 @@ def discover_exchange_patch(
             else "no state-bound patch package matches a registered repository"
         )
         if not scope.is_repository_scoped:
-            raise NoEligiblePatchError(
+            raise NoEligibleTaskError(
                 message, FailureReason.PATCH_PACKAGE_ERROR, error_kind=ErrorKind.PATCH_PACKAGE_ERROR,
             )
         raise patch_package_error(message)
@@ -516,7 +516,7 @@ def discover_exchange_patch(
              f"from {len(matches)} match(es); mtime_ns={artifact.mtime_ns}", "success")
     assert artifact.selection is not None
     local, configuration = settings[artifact.selection.repo_id]
-    package = materialize_exchange_patch(
+    package = materialize_exchange_task(
         artifact, directory=configuration.exchange_directory,
     )
     _revalidate_exchange_discovery(paths, settings, registry)
@@ -527,7 +527,7 @@ def discover_exchange_patch(
         raise patch_package_error(
             "selected exchange patch changed during automatic discovery"
         )
-    return DiscoveredExchangePatch(
+    return DiscoveredExchangeTask(
         artifact=artifact,
         package=package,
         paths=paths,
@@ -539,8 +539,8 @@ def discover_exchange_patch(
 
 
 def _maintain_explicit_exchange(
-    package: ValidatedPatchPackage, path: Path, *, output: OutputTargets | None,
-) -> DiscoveredExchangePatch | None:
+    package: ValidatedTaskBundle, path: Path, *, output: OutputTargets | None,
+) -> DiscoveredExchangeTask | None:
     """Optional maintenance for the manifest's repository, never for the CWD."""
     try:
         paths = configuration_user_paths()
@@ -565,11 +565,11 @@ def _maintain_explicit_exchange(
         if output is not None:
             output.write_warnings(maintenance.warnings)
         for artifact in maintenance.remaining:
-            if artifact.path == selected and artifact.selection == ExchangePatchSelection.from_manifest(package.manifest):
-                materialized = materialize_exchange_patch(artifact, directory=configuration.exchange_directory)
+            if artifact.path == selected and artifact.selection == ExchangeTaskSelection.from_manifest(package.manifest):
+                materialized = materialize_exchange_task(artifact, directory=configuration.exchange_directory)
                 if materialized != package:
                     return None
-                return DiscoveredExchangePatch(
+                return DiscoveredExchangeTask(
                     artifact, package, paths, configuration, local, explicitly_selected=True,
                 )
     except (PatchHarborError, ExchangeScanError, OSError, ValueError):

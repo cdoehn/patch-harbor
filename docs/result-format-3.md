@@ -35,7 +35,7 @@ distribution `patchharbor`. Its closed fields additionally describe `status`,
 - No runtime dependencies, no wheel tags or additional runtime files.
 - Provenance `canonical_resources`, full source commit or null matching the recipe,
   recipe version 1 (an integer, not a boolean).
-- Chat-tool operations `inspect_patch`, `validate_patch`, `pack_patch`, patch
+- Chat-tool operations `inspect_task`, `validate_task`, `pack_task`, patch
   formats `[1]`, result formats `[1, 2, 3]` for unchanged 1.4.0 producers or `[3]`
   for the current producer. The new reader accepts exactly those two lists.
   Capabilities describe the embedded producer, not the current reader's support
@@ -57,7 +57,7 @@ are retained: `source_not_prepared`, `source_changed`, `artifact_missing`,
 must contain a warning. This never permits deleting mandatory snapshot or log data.
 
 Result-PYZ facts have `artifact`; the historical Result-2 `wheel` field is not
-repurposed and does not require keeping its old reader. Public `validate_patch` signatures, scopes and categories are
+repurposed and does not require keeping its old reader. Public `validate_task` signatures, scopes and categories are
 unchanged. Corrupt full references still fail with source error 4. The deliberately
 private repository-only diagnostic reader can exclude only the reserved runtime
 namespace; it retains all other integrity checks and is never used by `pack` or

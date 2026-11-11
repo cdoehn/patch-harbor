@@ -27,7 +27,7 @@ from patchharbor.models import (
     RepositoryId,
     RepositoryPath,
 )
-from patchharbor.patch_manifest import PatchManifest
+from patchharbor.task_manifest import TaskManifest
 from patchharbor.registry import load_registry
 from patchharbor.repository import inspect_local_registration, inspect_repository_root
 from patchharbor.result_bundle_handoff import create_result_handoff
@@ -181,7 +181,7 @@ def _manifest_document(
     report: RunReport,
     snapshot: ResultBundleSnapshot,
     runtime: ResultRuntimePayload,
-    expected_manifest: PatchManifest | None = None,
+    expected_manifest: TaskManifest | None = None,
 ) -> dict[str, object]:
     context = report.context
     if context is None:
@@ -235,7 +235,7 @@ class _ResultDocuments:
 
 def _publication_documents(
     report: RunReport, target: ResultBundleTarget, snapshot: ResultBundleSnapshot,
-    resources: PinnedResultResources, *, expected_manifest: PatchManifest | None = None,
+    resources: PinnedResultResources, *, expected_manifest: TaskManifest | None = None,
     receipt: dict[str, object] | None = None, execution_log: bytes | None = None,
 ) -> _ResultDocuments:
     """Choose a complete runtime payload before opening the publication ZIP."""
@@ -385,7 +385,7 @@ def create_apply_result_bundle(
     repo_id: RepositoryId,
     registry_snapshot: RegistrySnapshot,
     actual_context: RepositoryContext,
-    expected_manifest: PatchManifest,
+    expected_manifest: TaskManifest,
     *,
     target: ResultBundleTarget,
     publication: ResultBundlePublication,
