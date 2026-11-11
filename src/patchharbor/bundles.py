@@ -1,4 +1,4 @@
-"""Resolve neutral input artifacts to ordered PatchHarbor bundles."""
+"""Resolve independent script inputs to ordered ScriptBundle values."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from patchharbor.models import (
     InputArtifact,
     ScriptBundle,
 )
-from patchharbor.parser import ScriptFormatError, validate_required_marker
+from patchharbor.parser import ScriptFormatError, parse_script
 from patchharbor.platform.errors import describe_os_error
 from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY, ResourcePolicy
 from patchharbor.zip_payloads import (
@@ -115,7 +115,7 @@ def _classify_zip_payloads(
         activity("IDENTIFY", f"Check script marker: {payload.relative_path}")
         try:
             script_text = payload.content.decode("utf-8")
-            validate_required_marker(script_text)
+            parsed = parse_script(script_text)
         except (UnicodeError, ScriptFormatError):
             activity("FILE", f"{payload.relative_path}: data payload, not an executable script", "detail")
             files.append(payload)
@@ -123,7 +123,7 @@ def _classify_zip_payloads(
 
         scripts.append(
             BundleScript(
-                text=script_text,
+                parsed=parsed,
                 display_name=payload.relative_path,
             )
         )
@@ -149,7 +149,7 @@ def _try_direct_script(
         return None, _artifact_source_error(artifact, exc), False
 
     try:
-        validate_required_marker(script_text)
+        parsed = parse_script(script_text)
     except ScriptFormatError as exc:
         return (
             None,
@@ -159,7 +159,7 @@ def _try_direct_script(
 
     return (
         BundleScript(
-            text=script_text,
+            parsed=parsed,
             display_name=artifact.display_name,
         ),
         None,

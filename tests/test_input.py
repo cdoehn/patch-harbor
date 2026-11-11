@@ -21,7 +21,11 @@ from patchharbor.sources import file_input_artifact, stdin_input_artifact
 def test_file_and_stdin_resolve_through_the_same_bundle_semantics(
     tmp_path: Path,
 ) -> None:
-    script_text = "# PATCHHARBOR\n"
+    script_text = (
+        "# PATCHHARBOR\n# PATCHHARBOR META purpose=check\n"
+        "# PATCHHARBOR MESSAGE note START\n# Parsed once\n"
+        "# PATCHHARBOR MESSAGE note END\n"
+    )
     script_path = tmp_path / "example.sh"
     script_path.write_bytes(script_text.encode("utf-8"))
 
@@ -35,8 +39,10 @@ def test_file_and_stdin_resolve_through_the_same_bundle_semantics(
     assert not temporary_path.exists()
     assert len(file_bundle.scripts) == 1
     assert len(stdin_bundle.scripts) == 1
-    assert file_bundle.scripts[0].text == script_text
-    assert stdin_bundle.scripts[0].text == script_text
+    assert file_bundle.scripts[0].parsed.text == script_text
+    assert stdin_bundle.scripts[0].parsed == file_bundle.scripts[0].parsed
+    assert [(item.name, item.value) for item in file_bundle.scripts[0].parsed.metadata] == [("purpose", "check")]
+    assert [(item.name, item.text) for item in file_bundle.scripts[0].parsed.messages] == [("note", "Parsed once")]
     assert file_bundle.scripts[0].display_name == str(script_path)
     assert stdin_bundle.scripts[0].display_name == "standard input"
 

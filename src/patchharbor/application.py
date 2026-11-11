@@ -23,7 +23,6 @@ from patchharbor.errors import FailureReason, PatchHarborError
 from patchharbor.execution import DEFAULT_TIMEOUT_SECONDS, execute_script_text
 from patchharbor.models import BundleScript, InputArtifact
 from patchharbor.output import OutputTargets
-from patchharbor.parser import parse_script
 from patchharbor.patch_manifest import PatchManifest
 from patchharbor.patch_inspection import (
     PatchInspection,
@@ -97,7 +96,7 @@ def _execute_bundle_script(
     timeout_seconds: float,
     output: OutputTargets | None = None,
 ) -> int:
-    parsed_script = parse_script(bundle_script.text)
+    parsed_script = bundle_script.parsed
     script_warnings = parsed_script.warnings
     emit(ScriptPrepared(
         name=bundle_script.display_name,

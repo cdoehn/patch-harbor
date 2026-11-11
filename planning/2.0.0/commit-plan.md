@@ -1,9 +1,9 @@
 # PatchHarbor 2.0.0 – WRC-Implementierungsplan
 
-**Plan-ID:** `PH-200` · **Revision:** 1 · **Stand:** 11. November 2026<br>
+**Plan-ID:** `PH-200` · **Revision:** 2 · **Stand:** 11. November 2026<br>
 **Zielversion:** **2.0.0**<br>
-**Status:** `200-01.W` durch Apply 089 bestätigt; Bundle 090 für `200-01.R` vorbereitet.<br>
-**Fortschritt:** **1 / 36 Umsetzungscommits**, zwölf Schritte mit je W, R und C.<br>
+**Status:** `200-01.R` durch Apply 090 bestätigt; Bundle 091 bereitet sechs Folgestände vor.<br>
+**Fortschritt:** **2 / 38 Umsetzungscommits**, zwölf WRC-Schritte; die Protokoll-Work-Phase besteht aus drei Teilcommits.<br>
 **Aktiver Planpfad:** `planning/2.0.0/commit-plan.md`<br>
 **Zugehöriger Detailentwurf:** [Lokale Testmessung und Profiling](test-profiling.md).
 Dieser Detailentwurf gehört zu diesem Plan; er ist kein konkurrierender Plan.
@@ -202,50 +202,54 @@ wenn dafür tatsächliche Informationen vorliegen.
 | 200-11 | README, Badges, aktuelle Anleitungen und Integrationshinweise | 200-10.C |
 | 200-12 | Finalen 2.0.0-Stand herstellen und vollständig abnehmen | 200-11.C |
 
-`200-01.W` ist durch Commit `3670347923c107c8ae2b76d0d4c65ce2516fa63c`
-und Result `fd6fce0a-0f4f-46e9-ab51-3cfdd8591c28` bestätigt. Die übrigen
-35 Positionen sind **OFFEN**; `200-01.R` ist mit Bundle 090 vorbereitet.
+`200-01.W` und `200-01.R` sind durch die Commits
+`3670347923c107c8ae2b76d0d4c65ce2516fa63c` und
+`bdba905c4cb982bca0e2f86384c3b97ea729a886` bestätigt. Result
+`930a7e0d-497e-4009-9462-df7ea75a0d57` belegt den sauberen letzten Stand.
+Die übrigen 36 Positionen sind **OFFEN**; Bundle 091 bereitet Positionen 3–8 vor.
 Die Commit-Subjects sind verbindliche
 Planvorlagen; Fortschritt wird erst mit tatsächlichem Commit und Result eingetragen.
 
 | Position | Kennung | Commit-Subject |
 | ---: | --- | --- |
-| 1 / 36 | `200-01.W` | `refactor(scripts)!: separate ScriptBundle and explicit script execution [200-01.W]` |
-| 2 / 36 | `200-01.R` | `test(scripts): preserve deprecated runner boundaries [200-01.R]` |
-| 3 / 36 | `200-01.C` | `refactor(scripts): remove ambiguous script bundle terminology [200-01.C]` |
-| 4 / 36 | `200-02.W` | `feat(protocol)!: switch to Task 2 Execute and Result 4 [200-02.W]` |
-| 5 / 36 | `200-02.R` | `test(protocol): harden task result and execution contracts [200-02.R]` |
-| 6 / 36 | `200-02.C` | `refactor(protocol): remove obsolete readers and public API names [200-02.C]` |
-| 7 / 36 | `200-03.W` | `feat(monitor): expose task execution across watcher views [200-03.W]` |
-| 8 / 36 | `200-03.R` | `test(watcher): preserve polling locks and live observation [200-03.R]` |
-| 9 / 36 | `200-03.C` | `refactor(monitor): consolidate task activity projections [200-03.C]` |
-| 10 / 36 | `200-04.W` | `feat(handoff): verify installed version 2 bundle roundtrips [200-04.W]` |
-| 11 / 36 | `200-04.R` | `test(runtime): verify offline bootstrap and isolated cutover [200-04.R]` |
-| 12 / 36 | `200-04.C` | `refactor(handoff): consolidate generation and capability sources [200-04.C]` |
-| 13 / 36 | `200-05.W` | `feat(tests): capture separate setup call and teardown timings [200-05.W]` |
-| 14 / 36 | `200-05.R` | `test(tests): verify phase attribution and incomplete timings [200-05.R]` |
-| 15 / 36 | `200-05.C` | `refactor(tests): isolate telemetry from acceptance evidence [200-05.C]` |
-| 16 / 36 | `200-06.W` | `feat(profiling): add local command and SQLite run history [200-06.W]` |
-| 17 / 36 | `200-06.R` | `test(profiling): preserve local data across interruption [200-06.R]` |
-| 18 / 36 | `200-06.C` | `refactor(profiling): separate capture storage and reporting [200-06.C]` |
-| 19 / 36 | `200-07.W` | `feat(profiling): record phase-specific Python time and memory [200-07.W]` |
-| 20 / 36 | `200-07.R` | `test(profiling): expose process coverage and measurement overhead [200-07.R]` |
-| 21 / 36 | `200-07.C` | `refactor(profiling): normalize Python profile evidence [200-07.C]` |
-| 22 / 36 | `200-08.W` | `feat(profiling): collect local strace process evidence [200-08.W]` |
-| 23 / 36 | `200-08.R` | `test(profiling): harden syscall attribution and trace limits [200-08.R]` |
-| 24 / 36 | `200-08.C` | `refactor(profiling): separate syscall parsing and correlation [200-08.C]` |
-| 25 / 36 | `200-09.W` | `feat(profiling): rank evidence-backed optimization candidates [200-09.W]` |
-| 26 / 36 | `200-09.R` | `test(profiling): reject incomparable runs and uncertain conclusions [200-09.R]` |
-| 27 / 36 | `200-09.C` | `refactor(profiling): share phase-aware report queries [200-09.C]` |
-| 28 / 36 | `200-10.W` | `feat(ci): summarize existing test reports in Actions [200-10.W]` |
-| 29 / 36 | `200-10.R` | `test(ci): preserve gates with failed and missing summaries [200-10.R]` |
-| 30 / 36 | `200-10.C` | `refactor(ci): reuse bounded report rendering [200-10.C]` |
-| 31 / 36 | `200-11.W` | `docs: explain the Task Execute Result workflow and release badges [200-11.W]` |
-| 32 / 36 | `200-11.R` | `test(docs): exercise current commands and upgrade examples [200-11.R]` |
-| 33 / 36 | `200-11.C` | `docs: remove conflicting active terminology and duplicate guidance [200-11.C]` |
-| 34 / 36 | `200-12.W` | `chore(release): prepare the complete 2.0.0 candidate [200-12.W]` |
-| 35 / 36 | `200-12.R` | `test(release): verify version 2 end-to-end acceptance [200-12.R]` |
-| 36 / 36 | `200-12.C` | `refactor(release): remove remaining development scaffolding [200-12.C]` |
+| 1 / 38 | `200-01.W` | `refactor(scripts)!: separate ScriptBundle and explicit script execution [200-01.W]` |
+| 2 / 38 | `200-01.R` | `test(scripts): preserve deprecated runner boundaries [200-01.R]` |
+| 3 / 38 | `200-01.C` | `refactor(scripts): remove ambiguous script bundle terminology [200-01.C]` |
+| 4 / 38 | `200-02.W1` | `refactor(protocol)!: name task models and Python boundaries explicitly [200-02.W1]` |
+| 5 / 38 | `200-02.W2` | `feat(protocol)!: switch producers and consumers to Task 2 and Result 4 [200-02.W2]` |
+| 6 / 38 | `200-02.W3` | `feat(execute)!: expose execution reports and deprecated CLI alias [200-02.W3]` |
+| 7 / 38 | `200-02.R` | `test(protocol): harden task result and execution contracts [200-02.R]` |
+| 8 / 38 | `200-02.C` | `refactor(protocol): remove obsolete readers and public API names [200-02.C]` |
+| 9 / 38 | `200-03.W` | `feat(monitor): expose task execution across watcher views [200-03.W]` |
+| 10 / 38 | `200-03.R` | `test(watcher): preserve polling locks and live observation [200-03.R]` |
+| 11 / 38 | `200-03.C` | `refactor(monitor): consolidate task activity projections [200-03.C]` |
+| 12 / 38 | `200-04.W` | `feat(handoff): verify installed version 2 bundle roundtrips [200-04.W]` |
+| 13 / 38 | `200-04.R` | `test(runtime): verify offline bootstrap and isolated cutover [200-04.R]` |
+| 14 / 38 | `200-04.C` | `refactor(handoff): consolidate generation and capability sources [200-04.C]` |
+| 15 / 38 | `200-05.W` | `feat(tests): capture separate setup call and teardown timings [200-05.W]` |
+| 16 / 38 | `200-05.R` | `test(tests): verify phase attribution and incomplete timings [200-05.R]` |
+| 17 / 38 | `200-05.C` | `refactor(tests): isolate telemetry from acceptance evidence [200-05.C]` |
+| 18 / 38 | `200-06.W` | `feat(profiling): add local command and SQLite run history [200-06.W]` |
+| 19 / 38 | `200-06.R` | `test(profiling): preserve local data across interruption [200-06.R]` |
+| 20 / 38 | `200-06.C` | `refactor(profiling): separate capture storage and reporting [200-06.C]` |
+| 21 / 38 | `200-07.W` | `feat(profiling): record phase-specific Python time and memory [200-07.W]` |
+| 22 / 38 | `200-07.R` | `test(profiling): expose process coverage and measurement overhead [200-07.R]` |
+| 23 / 38 | `200-07.C` | `refactor(profiling): normalize Python profile evidence [200-07.C]` |
+| 24 / 38 | `200-08.W` | `feat(profiling): collect local strace process evidence [200-08.W]` |
+| 25 / 38 | `200-08.R` | `test(profiling): harden syscall attribution and trace limits [200-08.R]` |
+| 26 / 38 | `200-08.C` | `refactor(profiling): separate syscall parsing and correlation [200-08.C]` |
+| 27 / 38 | `200-09.W` | `feat(profiling): rank evidence-backed optimization candidates [200-09.W]` |
+| 28 / 38 | `200-09.R` | `test(profiling): reject incomparable runs and uncertain conclusions [200-09.R]` |
+| 29 / 38 | `200-09.C` | `refactor(profiling): share phase-aware report queries [200-09.C]` |
+| 30 / 38 | `200-10.W` | `feat(ci): summarize existing test reports in Actions [200-10.W]` |
+| 31 / 38 | `200-10.R` | `test(ci): preserve gates with failed and missing summaries [200-10.R]` |
+| 32 / 38 | `200-10.C` | `refactor(ci): reuse bounded report rendering [200-10.C]` |
+| 33 / 38 | `200-11.W` | `docs: explain the Task Execute Result workflow and release badges [200-11.W]` |
+| 34 / 38 | `200-11.R` | `test(docs): exercise current commands and upgrade examples [200-11.R]` |
+| 35 / 38 | `200-11.C` | `docs: remove conflicting active terminology and duplicate guidance [200-11.C]` |
+| 36 / 38 | `200-12.W` | `chore(release): prepare the complete 2.0.0 candidate [200-12.W]` |
+| 37 / 38 | `200-12.R` | `test(release): verify version 2 end-to-end acceptance [200-12.R]` |
+| 38 / 38 | `200-12.C` | `refactor(release): remove remaining development scaffolding [200-12.C]` |
 
 ### 200-01 – ScriptBundle und vorbereitende Entflechtung
 
@@ -267,6 +271,15 @@ vorhandenes Runnerverhalten bleibt belegt. Fokus: `models.py`, `bundles.py`,
 Runner, API/CLI und zugehörige Directory-/ZIP-/Interpretertests.
 
 ### 200-02 – Kohärenter Protokollwechsel
+
+**Revision 2:** Der große Work-Schritt wird in drei aufeinanderfolgende, jeweils
+vollständig im Apply geprüfte Teilstände gegliedert: W1 benennt Task-Modelle,
+Module und Python-Grenzen um; W2 stellt die gekoppelten Erzeuger, Leser und
+Runtime-Metadaten auf Task 2 / Result 4 um; W3 schließt Execute-Berichte, CLI-Alias
+und aktuelle ausführbare Hinweise ab. Dies sind unveröffentlichte interne
+Zwischenstände ohne Kompatibilitätsbrücken. W ist erst nach W3 abgeschlossen.
+Die zwei zusätzlichen Teilcommits erhöhen die Gesamtzahl auf 38; es entstehen
+keine leeren Commits und keine Zwischenreleases.
 
 **W:** Task-2-Erzeuger/Leser, Execute inklusive guarded/automatic/dry-run,
 Result-4-Erzeuger/Leser, öffentliche API, CLI-Alias, neue Dateinamen,
@@ -652,3 +665,21 @@ Der Entrypoint verlangt die vollständige parallele Apply-Suite vor genau einem
 lokalen Commit mit dem geplanten Subject für `200-01.R`. Push, Tag und CI bleiben
 aus. Vor dessen tatsächlichem Result bleibt der Fortschritt 1/36; als Nächstes
 folgt nach erfolgreichem Right-Stand `200-01.C`.
+
+## Lieferung 091 – sechs aufeinanderfolgende Commitstände
+
+Result 090 bestätigt `200-01.R` auf `bdba905c4cb982bca0e2f86384c3b97ea729a886`:
+3.760 bestandene Tests, 16 Skips, vier Worker und sauberer Worktree. Push und Tag
+bleiben bis zum Abschluss aus. Revision 2 zählt damit 2/38 bestätigte Commits.
+
+Dieses Bundle umfasst `200-01.C`, `200-02.W1`, `200-02.W2`, `200-02.W3`,
+`200-02.R` und `200-02.C`. Jeder Stand wird erst nach dem vorherigen erfolgreichen
+Commit hergestellt und vollständig parallel im Apply geprüft. Ein Fehler stoppt
+vor dem betreffenden Commit; bereits bestätigte Commits bleiben erhalten.
+Reparaturen werden in alle betroffenen späteren vorbereiteten Stände übernommen.
+Development führt ausschließlich statische Analyse und Paketvalidierung durch.
+
+Im Script-Cleanup wird der bereits validierte Parserwert im `BundleScript`
+weitergereicht; Ausführung und Beobachtung verwenden dieselben geparsten Daten.
+Die notwendige erneute Prüfung eines ausgewählten Dateikandidaten bleibt bestehen.
+Die sechs tatsächlichen Ergebnisse sind vor dem neuen Result weiterhin offen.

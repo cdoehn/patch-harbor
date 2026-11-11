@@ -7,6 +7,8 @@ from enum import Enum
 from pathlib import Path
 from uuid import UUID, uuid4
 
+from patchharbor.parser import ParsedScript
+
 
 @dataclass(frozen=True)
 class InputArtifact:
@@ -20,7 +22,7 @@ class InputArtifact:
 class BundleScript:
     """One named script in its bundle order."""
 
-    text: str
+    parsed: ParsedScript
     display_name: str
 
 
