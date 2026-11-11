@@ -14,7 +14,8 @@ from patchharbor.bundle_handoff import MAX_HANDOFF_ENTRY_BYTES
 from patchharbor.chat_instructions import load_chat_template, render_chat_handoff
 from patchharbor.cli import _build_parser as build_core_parser
 from patchharbor_watcher.cli import _build_parser as build_watcher_parser
-from tests.compatibility_140_support import artifact
+from tests.reference_support import reference_entries, write_reference
+import hashlib
 from tests.platform_support import PROJECT_ROOT
 
 
@@ -34,7 +35,10 @@ def test_canonical_contract_can_be_loaded_and_rendered_without_execution(monkeyp
 
 
 def test_documented_patch_manifest_validates_against_a_real_reference(tmp_path, monkeypatch) -> None:
-    reference, expected = artifact("result", "clean")
+    files, binding = reference_entries()
+    reference = tmp_path / 'reference.zip'
+    write_reference(reference, files)
+    expected = {'binding': binding, 'sha256': hashlib.sha256(reference.read_bytes()).hexdigest()}
     document = load_chat_template()
     examples = [json.loads(block) for block in re.findall(
         r"^```json\s*\n(.*?)\n```$", document, flags=re.MULTILINE | re.DOTALL)]
@@ -47,7 +51,7 @@ def test_documented_patch_manifest_validates_against_a_real_reference(tmp_path, 
         manifest[field] = expected["binding"][field]
     package = tmp_path / "documented.zip"
     with ZipFile(package, "w") as archive:
-        archive.writestr("patch.json", json.dumps(manifest))
+        archive.writestr("task.json", json.dumps(manifest))
         archive.writestr("run.sh", "#!/usr/bin/env bash\n# PATCHHARBOR\nexit 23\n")
     def forbidden(*args, **kwargs):
         pytest.fail("example validation attempted execution or network activity")

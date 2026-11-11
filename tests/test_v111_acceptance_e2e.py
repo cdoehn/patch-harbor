@@ -92,7 +92,7 @@ def _write_patch_package(
     }
     with zipfile.ZipFile(path, "w") as archive:
         archive.writestr(
-            "patch.json",
+            "task.json",
             json.dumps(
                 manifest,
                 ensure_ascii=False,

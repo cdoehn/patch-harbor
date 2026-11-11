@@ -142,12 +142,12 @@ fehlgeschlagene Ausführung bewirkt keine globale automatische Rückabwicklung.
 
 Lokale Repository- und Exchange-Pfade aus `environment.json` dienen passenden
 Kommandozeilenbeispielen für den Entwicklungsrechner, nicht der Chat-Laufzeit.
-Verwende sie niemals als Repository-Zuordnung oder in `patch.json`. Dafür gelten
+Verwende sie niemals als Repository-Zuordnung oder in `task.json`. Dafür gelten
 weiterhin ausschließlich die vollständigen Bindungswerte aus `context.json`.
 
 ### Unterbrochene Attempts und Erfolgsnachweis
 
-Neue Apply-Result-Manifeste verknüpfen `patch_sha256`, `run_id`, `repo_id`, die
+Neue Apply-Result-Manifeste verknüpfen `task_sha256`, `run_id`, `repo_id`, die
 vollständige erwartete Bindung und optional `completed_commit`. Replay-Format 4
 speichert außerdem `attempt_run_id` und eine vor Veröffentlichung lokal verankerte
 `result_sha256`. Nur ein vollständig passendes erfolgreiches Result und sauberer
@@ -175,7 +175,7 @@ Für einen Entwicklungsauftrag benötigst du mindestens:
 
 Eine menschenlesbare `register`-, `context`- oder `registry list`-Kurzansicht
 mit `…` ist kein maschinenlesbarer Eingabevertrag und darf niemals als Quelle
-für `patch.json` dienen. Das aktuelle Result Bundle ist im normalen
+für `task.json` dienen. Das aktuelle Result Bundle ist im normalen
 Entwicklungsworkflow die Quelle der vollständigen Bindungswerte. Wird
 ausnahmsweise ein separater Kontext übergeben, muss er aus
 `patchharbor context --json` stammen. Rekonstruiere niemals vollständige
@@ -739,7 +739,7 @@ class PyzAssessment:
 
 
 def assess(reference, *, trusted_source_sha256=None):
-    """Check the selected Result-3 runtime descriptors before any code import."""
+    """Check the selected Result-4 runtime descriptors before any code import."""
     path = Path(reference).absolute()
     raw = _capture(path, MAX_INPUT)
     digest = sha256(raw).hexdigest()
@@ -752,7 +752,7 @@ def assess(reference, *, trusted_source_sha256=None):
         manifest = _json(_read(archive, 'manifest.json', MAX_INPUT))
         _require(manifest.get('marker') == 'patch-harbor-result-bundle'
                  and type(manifest.get('format_version')) is int, 'not a supported Result')
-        _require(manifest['format_version'] == 3, 'unsupported Result version')
+        _require(manifest['format_version'] == 4, 'unsupported Result version')
         runtime = manifest.get('runtime')
         _require(type(runtime) is dict and set(runtime) == {'status','reason','metadata','artifact'},
                  'outer runtime schema')
@@ -760,7 +760,7 @@ def assess(reference, *, trusted_source_sha256=None):
         _require(metadata_descriptor['path'] == 'runtime/runtime.json', 'runtime metadata path')
         metadata = _json(_checked(archive, metadata_descriptor, MAX_METADATA))
         _require(set(metadata) == METADATA_FIELDS and metadata.get('marker') == 'patch-harbor-runtime'
-                 and type(metadata.get('format_version')) is int and metadata['format_version'] == 2
+                 and type(metadata.get('format_version')) is int and metadata['format_version'] == 3
                  and metadata.get('distribution') == 'patchharbor', 'runtime metadata identity')
         _require(metadata.get('status') == runtime['status'] and metadata.get('reason') == runtime['reason']
                  and metadata.get('artifact') == runtime['artifact'], 'runtime descriptor disagreement')
@@ -792,10 +792,10 @@ def assess(reference, *, trusted_source_sha256=None):
                  and type(metadata.get('content_id')) is str and HEX.fullmatch(metadata['content_id']),
                  'unsupported PYZ profile or Python requirement')
         capabilities = metadata['capabilities']
-        _require(type(capabilities) is dict and set(capabilities) == {'operations','patch_formats','result_formats'}
-                 and capabilities['operations'] == ['inspect_patch','validate_patch','pack_patch'],
+        _require(type(capabilities) is dict and set(capabilities) == {'operations','task_formats','result_formats'}
+                 and capabilities['operations'] == ['inspect_task','validate_task','pack_task'],
                  'unsupported runtime capabilities')
-        for key, choices in (('patch_formats',([1],)), ('result_formats',([1,2,3],[3]))):
+        for key, choices in (('task_formats',([2],)), ('result_formats',([4],))):
             values = capabilities[key]
             _require(type(values) is list and all(type(v) is int for v in values)
                      and values in choices, 'unsupported runtime read versions')
@@ -1083,10 +1083,10 @@ Die neue Kompatibilitätsbasis steht im 1.5.0-Plan; Sicherheitsverträge bleiben
 
 **Historie:** Die einmalige CI-only-Ausnahme für PP-00 / Bundles 024/025
 ist mit dessen erfolgreichem Abschluss erfüllt. Result
-`patch-harbor_Result_141601_1007_ef9735.zip` belegt Commit
+`patch-harbor_Result_Bundle_141601_1007_ef9735.zip` belegt Commit
 `7a28bbc2189cdb2a78590e62a45e4d96b0ff893d` und sechs grüne Jobs in CI-Run
 `37635401106`. Bundle 026 startete danach lokale PP-01-Tests. Diese wurden laut
-`patch-harbor_Result_160403_1007_ee4cb0.zip` vor Staging/Commit/Push/CI
+`patch-harbor_Result_Bundle_160403_1007_ee4cb0.zip` vor Staging/Commit/Push/CI
 unterbrochen; damals waren die PP-01-Dateien vorhanden und uncommitted. Das ist kein
 bestandener PP-01-Testlauf. Bundle 027 / PP-01-FIX1 setzt diese Änderungen fort.
 
@@ -1223,15 +1223,15 @@ technischen Altweg verbindlich; fachliche Ablehnungen sind kein Fallbackgrund.
 Erzeuge genau eine herunterladbare ZIP-Datei im sicheren PatchHarbor-Format.
 Liefere keine parallele Shell-Datei, keinen zweiten Patch und keine alternative
 manuelle Änderungsanleitung. Der Dateiname folgt exakt
-`<Repository>_Patch_<HHMMSS>_<MMDD>_<ID6>.zip`: Repository-Name zuerst,
+`<Repository>_Task_Bundle_<HHMMSS>_<MMDD>_<ID6>.zip`: Repository-Name zuerst,
 dann `Patch`, UTC-Uhrzeit, Monat/Tag ohne Jahr und die ersten sechs Zeichen
 einer Paket-UUID ohne `…`. Für Result Bundles gilt exakt
-`<Repository>_Result_<HHMMSS>_<MMDD>_<ID6>.zip`; dessen ID6 stammt aus der
+`<Repository>_Result_Bundle_<HHMMSS>_<MMDD>_<ID6>.zip`; dessen ID6 stammt aus der
 vollständigen Run-ID.
 
 Hänge das optionale `bundle_suffix` aus der Result-`context.json` unverändert
 an den Basisdateinamen an: `.txt` ergibt beispielsweise
-`patch-harbor_Patch_181530_0908_abcdef.zip.txt`. Fehlendes Feld in älteren Bundles
+`patch-harbor_Task_Bundle_181530_0908_abcdef.zip.txt`. Fehlendes Feld in älteren Bundles
 oder leerer String bedeutet kein Suffix. Maßgeblich sind diese Metadaten,
 nicht die Endung einer möglicherweise umbenannten Upload-Datei.
 
@@ -1240,17 +1240,17 @@ löscht es per `patchharbor configure bundle-suffix --clear` und erzeugt danach
 ein frisches Result Bundle. `apply` und `bundle` benötigen keinen Schalter.
 Der Core erzeugt Result Bundles; du benennst externe Patch-Pakete entsprechend.
 ZIP-Inhalt und State-Bindung bleiben unverändert. Füge `bundle_suffix` niemals
-in `patch.json` ein. Das geschlossene `context --json`-Schema bleibt unverändert;
+in `task.json` ein. Das geschlossene `context --json`-Schema bleibt unverändert;
 bei separater Kontextübergabe muss die Suffixpräferenz zusätzlich genannt werden.
 Ohne diese Information gilt kein Suffix.
 
-Das ZIP enthält genau eine Root-Datei `patch.json`. Für Format 1 sind dort
+Das ZIP enthält genau eine Root-Datei `task.json`. Für Format 1 sind dort
 exakt diese sieben Felder erlaubt:
 
 ```json
 {
-  "marker": "patch-harbor",
-  "format_version": 1,
+  "marker": "patch-harbor-task-bundle",
+  "format_version": 2,
   "repo_id": "<unverändert aus context.json>",
   "base_commit": "<unverändert aus context.json>",
   "state_fingerprint": "<unverändert aus context.json>",
@@ -1259,12 +1259,12 @@ exakt diese sieben Felder erlaubt:
 }
 ```
 
-`patch.json` ist UTF-8 ohne BOM und enthält genau ein JSON-Objekt. Doppelte
+`task.json` ist UTF-8 ohne BOM und enthält genau ein JSON-Objekt. Doppelte
 Schlüssel, Kommentare, nachgestellte Daten und nicht endliche Zahlen sind
 ungültig. Verwende `repo_id`, `base_commit`, `state_fingerprint` und
 `fingerprint_algorithm` unverändert und vollständig aus dem aktuellen Result
 Bundle. Die Terminal-UI darf diese Werte als sechs Zeichen plus `…` darstellen;
-für `patch.json` gelten ausschließlich die vollständigen JSON-Werte. Ergänze
+für `task.json` gelten ausschließlich die vollständigen JSON-Werte. Ergänze
 keine unbekannten Felder.
 
 Beachte zusätzlich:
@@ -1274,9 +1274,9 @@ Beachte zusätzlich:
   64-stellige Git-Objekt-ID,
 - `state_fingerprint` besteht aus exakt 16 kleingeschriebenen Hex-Zeichen,
 - `entrypoint` bezeichnet genau einen vorhandenen regulären ZIP-Eintrag und ist
-  nicht `patch.json`.
+  nicht `task.json`.
 
-Das Paket enthält genau einen in `patch.json` referenzierten Entrypoint. Dieser:
+Das Paket enthält genau einen in `task.json` referenzierten Entrypoint. Dieser:
 
 - ist eine sichere relative Paketdatei,
 - enthält als exakten Skriptmarker `# PATCHHARBOR`,
@@ -1292,7 +1292,7 @@ Erzeuge die Anleitung für jedes Paket neu aus der statischen Vorlage plus dem
 Umgebungssnapshot des jüngsten Result Bundles, nicht aus deiner Chat-Laufzeit.
 Übernimm die bekannten Zielrechnerdaten und deren `captured_at`, setze
 `bundle_type` auf `Patch` und `bundle_filename` auf den neuen Namen. Die vier
-Werte in `repository_context` müssen exakt zu `patch.json` passen. Unbekannte
+Werte in `repository_context` müssen exakt zu `task.json` passen. Unbekannte
 Werte bleiben `null`; die Erfassungszeit darf nicht als neue Rechnerprüfung
 umgedeutet werden. Der reine Renderer `render_chat_handoff` kann mit einer
 expliziten statischen Vorlage und diesen Daten auch extern verwendet werden.

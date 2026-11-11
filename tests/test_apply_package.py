@@ -63,7 +63,7 @@ def _write_package(
 ) -> None:
     with zipfile.ZipFile(path, "w") as archive:
         archive.writestr(
-            "patch.json",
+            "task.json",
             _manifest_bytes() if manifest is None else manifest,
         )
         archive.writestr("run.sh", _ENTRYPOINT)
@@ -168,7 +168,7 @@ def test_archive_safety_is_checked_before_manifest_roles(
 ) -> None:
     package_path = tmp_path / "unsafe-before-manifest.zip"
     with zipfile.ZipFile(package_path, "w") as archive:
-        archive.writestr("patch.json", b"not-json")
+        archive.writestr("task.json", b"not-json")
         archive.writestr("run.sh", _ENTRYPOINT)
         archive.writestr("../escape.bin", b"payload")
 
@@ -210,14 +210,14 @@ def test_manifest_entrypoint_must_reference_one_regular_entry(
     document["entrypoint"] = "scripts/run.sh"
     package_path = tmp_path / "entrypoint.zip"
     with zipfile.ZipFile(package_path, "w") as archive:
-        archive.writestr("patch.json", _manifest_bytes(document))
+        archive.writestr("task.json", _manifest_bytes(document))
         if directory_entrypoint:
             archive.writestr("scripts/run.sh/", b"")
 
     with pytest.raises(PatchHarborError) as captured:
         resolve_task_bundle(package_path)
 
-    assert exit_code_for_error(captured.value) is ExitCode.PATCH_PACKAGE_ERROR
+    assert exit_code_for_error(captured.value) is ExitCode.TASK_BUNDLE_ERROR
 
 
 def test_package_accepts_exact_resource_boundaries(tmp_path: Path) -> None:

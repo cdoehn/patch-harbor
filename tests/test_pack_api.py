@@ -116,9 +116,9 @@ def test_mutable_mode_mapping_is_copied_before_observer_runs(request_files):
 @pytest.mark.parametrize('contents,mode,entrypoint,reason', [
     ({'run.sh': b'#!/bin/bash\nexit 0\n'}, {}, 'run.sh', FailureReason.NO_VALID_SCRIPT),
     ({'run.sh': b'#!/usr/bin/python3\n# PATCHHARBOR\n'}, {}, 'run.sh', FailureReason.INTERPRETER_ERROR),
-    ({}, {}, 'missing.sh', FailureReason.PATCH_PACKAGE_ERROR),
-    ({'patch.json': b'{}'}, {}, 'run.sh', FailureReason.PATCH_PACKAGE_ERROR),
-    ({}, {'missing': 0o644}, 'run.sh', FailureReason.PATCH_PACKAGE_ERROR),
+    ({}, {}, 'missing.sh', FailureReason.TASK_BUNDLE_ERROR),
+    ({'task.json': b'{}'}, {}, 'run.sh', FailureReason.TASK_BUNDLE_ERROR),
+    ({}, {'missing': 0o644}, 'run.sh', FailureReason.TASK_BUNDLE_ERROR),
     ({}, {'binary': 0o777}, 'run.sh', FailureReason.SOURCE_ERROR),
     ({}, {}, '../run.sh', FailureReason.SOURCE_ERROR),
 ])
@@ -145,7 +145,7 @@ def test_pack_does_not_run_tools_or_change_process_state(request_files, monkeypa
     assert Path.cwd() == cwd and dict(os.environ) == environment
 
 
-@pytest.mark.parametrize('reason', [FailureReason.SOURCE_ERROR, FailureReason.PATCH_PACKAGE_ERROR, FailureReason.STATE_MISMATCH])
+@pytest.mark.parametrize('reason', [FailureReason.SOURCE_ERROR, FailureReason.TASK_BUNDLE_ERROR, FailureReason.STATE_MISMATCH])
 def test_mandatory_written_archive_validation_cannot_be_skipped_or_reclassified(request_files, monkeypatch, reason):
     calls = []
     original = core.validate_task_against_reference

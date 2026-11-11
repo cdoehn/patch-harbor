@@ -90,7 +90,7 @@ Die Bestandsanalyse dieses Dokuments beruht auf dem bereitgestellten Result:
 
 | Merkmal | Wert |
 |---|---|
-| Result-Datei | `patch-harbor_Result_055059_1007_b463c4.zip` |
+| Result-Datei | `patch-harbor_Result_Bundle_055059_1007_b463c4.zip` |
 | SHA-256 des gesamten Uploads | `7f400edeee9dcd3369b1ab82a46527cb6f80062cf1a1699018d66f4eafe26dda` |
 | Base-Commit des Repository-Snapshots | `bf0b82e5de1eaf3afb2d645d77cd7799e7b6e0b7` |
 | Result-Format | `2` |
@@ -163,7 +163,7 @@ Es werden kein neuer Python-Interpreter, keine virtuelle Umgebung, keine externe
 | Begriff | Bedeutung |
 |---|---|
 | **Result-Bundle** | Vom Core erzeugter Repositorykontext samt Snapshot, Änderungen, Logs und Begleitinformationen; Übergabe zur Bearbeitung. |
-| **Patch-Paket** | Sicheres PatchHarbor-ZIP mit `patch.json`, genau einem referenzierten Entrypoint sowie optionalen Nutzdateien; Rückgabe zur späteren Anwendung. |
+| **Patch-Paket** | Sicheres PatchHarbor-ZIP mit `task.json`, genau einem referenzierten Entrypoint sowie optionalen Nutzdateien; Rückgabe zur späteren Anwendung. |
 | **Inhaltsordner** | Vom Ersteller bewusst vorbereitetes Verzeichnis mit Entrypoint und den einzupackenden Nutzdateien. Der Ordnername ist frei wählbar. |
 | **PYZ** | Direkt mit einem geeigneten Python-Interpreter aufrufbare ZIP-Anwendung, kein Installations-Wheel. |
 | **Handoff-Metadaten** | Passive Begleitdateien unter `PATCHHARBOR_META/`; sie werden nicht angewendet oder ausgeführt. |
@@ -201,7 +201,7 @@ patch-inhalt/
     └── neuer_helfer.sh
 ```
 
-Nach `pack` enthält das ZIP zusätzlich das generierte `patch.json` und die beiden Handoff-Dateien. `src/geaenderte_datei.py` und `scripts/neuer_helfer.sh` sind Nutzdateien; `apply.sh` ist in diesem Beispiel der private Entrypoint. Dieses Beispiel ist keine Vorschrift für die Benennung des Inhaltsordners oder Entrypoints.
+Nach `pack` enthält das ZIP zusätzlich das generierte `task.json` und die beiden Handoff-Dateien. `src/geaenderte_datei.py` und `scripts/neuer_helfer.sh` sind Nutzdateien; `apply.sh` ist in diesem Beispiel der private Entrypoint. Dieses Beispiel ist keine Vorschrift für die Benennung des Inhaltsordners oder Entrypoints.
 
 ## 4. Gemeinsame Architektur und Funktionsumfang
 
@@ -473,7 +473,7 @@ Die Zahlen und Winkelklammerwerte in diesem Schema-Beispiel sind Platzhalter, ke
 | `artifact` | Mit dem äußeren Manifest identischer Artefaktdeskriptor. |
 | `runtime_dependencies` | Leere Liste. |
 | `provenance` | Objekt mit genau `mode`, `source_commit`, `recipe_format_version`. |
-| `capabilities` | Objekt mit genau `operations`, `patch_formats`, `result_formats`. |
+| `capabilities` | Objekt mit genau `operations`, `task_formats`, `result_formats`. |
 
 `provenance.mode` lautet `canonical_resources`, `source_commit` entspricht dem Rezept, `recipe_format_version` ist `1` für das neue ausdrücklich durch seinen Marker identifizierte PYZ-Rezept.
 
@@ -482,7 +482,7 @@ Für unveränderte 1.4.0-Artefakte lautet `capabilities` weiterhin:
 ```json
 {
   "operations": ["inspect_task", "validate_task", "pack_task"],
-  "patch_formats": [1],
+  "task_formats": [1],
   "result_formats": [1, 2, 3]
 }
 ```
@@ -699,7 +699,7 @@ Insbesondere sind Bytepfade, leere Pfade, `bool` als Dateimodus und fremde Obser
 | `package_size` | Abgeleitete Property aus `validation.inspection.package_size`. |
 | `reference_sha256` | Abgeleitete vollständige Referenz-SHA-256 aus der Validierung. |
 
-Für ein erfolgreiches Pack-Resultat sind `binding_matches == True`, ein nichtleerer Referenzhash und ein geprüftes Manifest obligatorisch. Doppelt abgeleitete Werte dürfen keine abweichende zweite Wahrheit erhalten. `package_id` und `created_at` werden nicht als neue Felder in das geschlossene `patch.json` geschrieben.
+Für ein erfolgreiches Pack-Resultat sind `binding_matches == True`, ein nichtleerer Referenzhash und ein geprüftes Manifest obligatorisch. Doppelt abgeleitete Werte dürfen keine abweichende zweite Wahrheit erhalten. `package_id` und `created_at` werden nicht als neue Felder in das geschlossene `task.json` geschrieben.
 
 Dieses Ergebnis ist auch dann vollständig zurückzugeben, wenn nach bestätigter Veröffentlichung lediglich ein eigener temporärer Zweitname nicht entfernt werden konnte. Die Warnung benennt den verbleibenden eigenen Pfad; sie behauptet nicht, das Paket sei unveröffentlicht. Dafür wird kein zusätzlicher dauerhafter Statusspeicher oder Recovery-Dienst eingeführt.
 
@@ -774,7 +774,7 @@ Alle zulässigen regulären Dateien unterhalb dieses Ordners werden genau einmal
 
 Folgende Inhalte werden nicht still verworfen, sondern führen zur Ablehnung:
 
-- Root-`patch.json`, einschließlich case-ambiger Schreibweisen; diese Datei erzeugt ausschließlich `pack`.
+- Root-`task.json`, einschließlich case-ambiger Schreibweisen; diese Datei erzeugt ausschließlich `pack`.
 - Der reservierte Root-Namensraum `PATCHHARBOR_META` in beliebiger Groß-/Kleinschreibung; die beiden Dateien darin erzeugt ausschließlich `pack`.
 - Verbotene interne Pfadsegmente, unzulässige Dateitypen, unsichere Pfade oder Kollisionen nach dem bestehenden Paketvertrag.
 
@@ -843,12 +843,12 @@ Referenz und Ausgabepaket behalten ihre jeweiligen gemeinsamen Reader-Budgets. B
 
 ### 12.1 Manifest
 
-**PACK-14.** `pack` erzeugt genau eine Root-Datei `patch.json` in UTF-8 ohne BOM und mit exakt den sieben Feldern des bestehenden geschlossenen Formats:
+**PACK-14.** `pack` erzeugt genau eine Root-Datei `task.json` in UTF-8 ohne BOM und mit exakt den sieben Feldern des bestehenden geschlossenen Formats:
 
 ```json
 {
-  "marker": "patch-harbor",
-  "format_version": 1,
+  "marker": "patch-harbor-task-bundle",
+  "format_version": 2,
   "repo_id": "<full value from the verified reference>",
   "base_commit": "<full value from the verified reference>",
   "state_fingerprint": "<full value from the verified reference>",
@@ -866,7 +866,7 @@ UUID-/Git-ID-/Fingerprintformate und der unterstützte Algorithmus werden durch 
 Nur bei `--output-dir` dienen diese Werte zusätzlich zur automatischen Namensbildung. Der Name lautet nach dem bestehenden Chat-Vertrag:
 
 ```text
-<Repository>_Patch_<HHMMSS>_<MMDD>_<ID6>.zip<bundle_suffix>
+<Repository>_Task_Bundle_<HHMMSS>_<MMDD>_<ID6>.zip<bundle_suffix>
 ```
 
 `ID6` sind die ersten sechs Zeichen der vollständigen Paket-UUID, ohne Auslassungszeichen. Der Bezug ist die Paket-ID, nicht die Run-ID des Referenz-Results. `bundle_suffix` stammt aus dem geprüften `context.json`; leer bedeutet kein Suffix. Die frühere Ausnahme für fehlende Angaben in Result 1 gehört nicht zur aktuellen Supportpflicht. Die existierende Suffixvalidierung wird wiederverwendet.
@@ -991,7 +991,7 @@ Die reinen Argumentgrenzen aus `PACK-03` sind davon getrennt. Beispielsweise sin
 | Unsicherer Paketpfad, unzulässiger Dateityp, Pfadkollision oder semantisch verbotener angeforderter Modus | `SOURCE_ERROR` / Exit `4`, auch bei früher Pack-Inventarisierung. |
 | Überschrittenes Eingabe-, ZIP-, Inhalts-, Handoff- oder Pack-Scan-Ressourcenbudget | `SOURCE_ERROR` / Exit `4`; kein Budgetfehler wird durch eine Renderer- oder Publikationshülle zu Code 6 oder 10. |
 | Manifest-/Paketformatfehler; referenzierter Entrypoint fehlt im vollständigen Inventar | `PATCH_PACKAGE_ERROR` / Exit `10`, wie im vorhandenen Paketprüfer. |
-| Nur bei `pack` verbotene Vorgaben für generierte Inhalte: mitgeliefertes Root-`patch.json` oder reserviertes Handoff; Modusschlüssel benennt keinen übergebenen Entrypoint-/Nutzdateipfad | Neue Pack-Eingabefälle: `PATCH_PACKAGE_ERROR` / Exit `10`. Ein zusätzlich vorliegender Sicherheitsmangel behält dagegen seine gemeinsame Kategorie. |
+| Nur bei `pack` verbotene Vorgaben für generierte Inhalte: mitgeliefertes Root-`task.json` oder reserviertes Handoff; Modusschlüssel benennt keinen übergebenen Entrypoint-/Nutzdateipfad | Neue Pack-Eingabefälle: `PATCH_PACKAGE_ERROR` / Exit `10`. Ein zusätzlich vorliegender Sicherheitsmangel behält dagegen seine gemeinsame Kategorie. |
 | Pflichtvorlage fehlt oder Renderer scheitert ohne spezifischeren gemeinsamen Prüfgrund; Ziel ungeeignet/existiert; Schreiben, notwendiger Datei-Sync oder No-replace-Publikation scheitert | `PAYLOAD_PREPARATION_ERROR` / Exit `6`. |
 | Fehler des geschriebenen Archivs bei gemeinsamer Endvalidierung oder abschließendem sicheren Hash-Read | Dessen vorhandene Kategorie bleibt erhalten; unsicheres/verändertes/unlesbares Artefakt insbesondere `SOURCE_ERROR / 4`, tatsächlicher Paketformatfehler `PATCH_PACKAGE_ERROR / 10`. Nicht pauschal „Schreiben gescheitert“ melden. |
 | Bindungsabweichung in der abschließenden gemeinsamen Prüfung | Bestehender `STATE_MISMATCH` / Exit `9`; nicht zur Warnung abschwächen. |

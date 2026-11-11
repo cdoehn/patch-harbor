@@ -33,12 +33,12 @@ def parse_live(content, name):
     fields = {'format_version', 'kind', 'instance_id', 'pid', 'process_identity',
               'started_at', 'updated_at', 'facts_updated_at', 'completed', 'phase', 'data', 'log_tail'}
     version = row.get('format_version')
-    if version == 2:
+    if version == 3:
         fields |= {'activity', 'history'}
-    if set(row) != fields or type(version) is not int or version not in (1, 2):
+    if set(row) != fields or type(version) is not int or version != 3:
         raise ValueError('unsupported live observation schema')
     _uuid(row['instance_id'])
-    if row['kind'] not in (('apply', 'watcher', 'bundle') if version == 2 else ('apply', 'watcher')) or name != row['kind'] + '-' + row['instance_id'] + '.json':
+    if row['kind'] not in (('apply', 'watcher', 'bundle') if version == 3 else ('apply', 'watcher')) or name != row['kind'] + '-' + row['instance_id'] + '.json':
         raise ValueError('live filename and identity disagree')
     if type(row['pid']) is not int or not 0 < row['pid'] <= 2**32-1:
         raise ValueError('invalid publisher PID')
@@ -49,7 +49,7 @@ def parse_live(content, name):
         raise ValueError('invalid publisher lifecycle')
     if type(row['log_tail']) is not str or len(row['log_tail'].encode('utf-8')) > 3*32768:
         raise ValueError('invalid bounded log tail')
-    if version == 2:
+    if version == 3:
         if type(row['history']) is not list or len(row['history']) > HISTORY_LIMIT:
             raise ValueError('invalid bounded activity history')
         sequence = 0
@@ -68,9 +68,9 @@ def parse_live(content, name):
     allowed = {'message', 'patch_path', 'repo_id', 'repository_path', 'base_commit', 'fingerprint',
         'run_id', 'origin', 'dry_run', 'requested_timeout_seconds', 'effective_timeout_seconds',
         'entrypoint_started_at', 'entrypoint_exit_code', 'process_state', 'primary_result',
-        'result_status', 'result_path', 'patch_sha256', 'subscriptions', 'targets',
+        'result_status', 'result_path', 'task_sha256', 'subscriptions', 'targets',
         'targets_truncated', 'control_lock', 'control_probe_at', 'last_error', 'completion_unknown'}
-    if version == 2:
+    if version == 3:
         allowed |= {'entrypoint_name', 'bundle_number', 'active_exchanges', 'automatic_status'}
         allowed |= {'watcher_mode', 'poll_interval_seconds', 'next_poll_at'}
     if type(data) is not dict or set(data) - allowed:
@@ -99,8 +99,8 @@ def parse_live(content, name):
     for key in ('run_id', 'repo_id'):
         if data.get(key) is not None:
             _uuid(data[key])
-    if data.get('patch_sha256') is not None and (type(data['patch_sha256']) is not str or
-            len(data['patch_sha256']) != 64 or any(c not in '0123456789abcdef' for c in data['patch_sha256'])):
+    if data.get('task_sha256') is not None and (type(data['task_sha256']) is not str or
+            len(data['task_sha256']) != 64 or any(c not in '0123456789abcdef' for c in data['task_sha256'])):
         raise ValueError('invalid patch digest')
     for key in ('dry_run', 'targets_truncated', 'completion_unknown'):
         if key in data and type(data[key]) is not bool:

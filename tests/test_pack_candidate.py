@@ -52,13 +52,13 @@ def test_candidate_preserves_exact_binding_and_is_natively_valid(tmp_path,kind,d
     validated=api.validate_task(output,reference_bundle=path)
     assert validated.binding_matches and validated.reference_sha256==reference.sha256
     with ZipFile(BytesIO(raw)) as archive:
-        manifest=json.loads(archive.read('patch.json'))
-        assert manifest=={'marker':'patch-harbor','format_version':1,**binding,'entrypoint':'run.sh'}
+        manifest=json.loads(archive.read('task.json'))
+        assert manifest=={'marker':'patch-harbor-task-bundle','format_version':2,**binding,'entrypoint':'run.sh'}
         assert archive.read('run.sh')==SCRIPT
         assert archive.read('binary')==b'\x00\xff\r\n'
         env=json.loads(archive.read('PATCHHARBOR_META/environment.json'))
         assert env['repository_context']==binding
-        assert env['bundle_type']=='Patch' and env['bundle_filename']==metadata.filename
+        assert env['bundle_type']=='Task' and env['bundle_filename']==metadata.filename
         assert env['bundle_suffix']=='.txt'
         assert env['run_id']==reference.facts.run_id
         assert env['captured_at']=='2026-10-03T12:00:00Z'
@@ -95,7 +95,7 @@ def test_automatic_name_uses_own_uuid_utc_and_portable_display_prefix(tmp_path,n
     edit_document(files,'environment.json',lambda d:d.update(repository_name=name))
     write_reference(path,files);reference=capture_result_reference(path)
     metadata=prepare_metadata(reference,PACKAGE_ID,STAMP)
-    assert metadata.filename==expected+'_Patch_172839_1007_be14e6.zip.txt'
+    assert metadata.filename==expected+'_Task_Bundle_172839_1007_be14e6.zip.txt'
     assert metadata.package_id==PACKAGE_ID and metadata.created_at==STAMP
     assert json.loads(metadata.environment)['repository_name']==name
     assert bool(metadata.warnings)==(name!=expected)
@@ -110,7 +110,7 @@ def test_legacy_name_uses_recorded_path_syntax_without_local_resolution(tmp_path
     write_reference(path,files);reference=capture_result_reference(path)
     monkeypatch.setattr(Path,'resolve',lambda *a,**k:pytest.fail('foreign path resolution'))
     metadata=prepare_metadata(reference,PACKAGE_ID,STAMP)
-    assert metadata.filename.startswith(expected+'_Patch_')
+    assert metadata.filename.startswith(expected+'_Task_Bundle_')
 
 
 @pytest.mark.parametrize('suffix',['','.txt','.upload'])

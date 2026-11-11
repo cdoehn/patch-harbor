@@ -9,7 +9,7 @@ from patchharbor.bundle_handoff import (
     BundleHandoff,
     ENVIRONMENT_MARKER,
     ENVIRONMENT_FORMAT_VERSION,
-    PATCH_FILENAME_SCHEMA,
+    TASK_FILENAME_SCHEMA,
     RESULT_FILENAME_SCHEMA,
 )
 from patchharbor.chat_instructions import render_chat_handoff
@@ -42,7 +42,7 @@ def create_result_handoff(report: RunReport, target: ResultBundleTarget, *,
         "exchange_directory": str(target.exchange_directory) if target.exchange_directory is not None else None,
         "output_directory": str(target.directory),
         "bundle_suffix": target.bundle_suffix,
-        "filename_schemas": {"Patch": PATCH_FILENAME_SCHEMA, "Result": RESULT_FILENAME_SCHEMA},
+        "filename_schemas": {"Task": TASK_FILENAME_SCHEMA, "Result": RESULT_FILENAME_SCHEMA},
         "filename_timezone": "UTC",
         "runtime": {**capture_runtime_environment(), "patchharbor_version": __version__},
     }

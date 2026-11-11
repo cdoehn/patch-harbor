@@ -19,7 +19,7 @@ def candidate(tmp_path,monkeypatch):
     raw=(root/required[0]).read_bytes()
     proof={'runtime':{'distribution_version':version,'size':len(raw),'sha256':sha256(raw).hexdigest(),
         'profile':'patchharbor-core-no-watcher-v1','requires_python':'>=3.10','content_id':'b'*64},
-        'capabilities':{'contract_version':1,'snapshot_contract_version':1,'guarded_apply_contract_version':1,
+        'capabilities':{'contract_version':2,'snapshot_contract_version':2,'guarded_apply_contract_version':1,
                         'safe_reference_contract_version':1},
         'host':{'system':'Linux','machine':'x86_64','python':'3.14.4','implementation':'CPython'}}
     monkeypatch.setattr(assets,'_audit_release_artifacts',lambda *a:None)

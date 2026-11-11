@@ -12,7 +12,7 @@ import pytest
 
 from patchharbor import api, application_apply, application_exchange, application_results
 from patchharbor import exchange_state
-from patchharbor.errors import configuration_error, patch_package_error
+from patchharbor.errors import configuration_error, task_bundle_error
 from patchharbor.locks import registry_lock, repository_lock
 from patchharbor.user_paths import registration_user_paths
 from tests.platform_support import create_symlink_or_skip, project_environment
@@ -246,7 +246,7 @@ def test_actual_attempt_progress_does_not_allow_automatic_retry(pair, exit_code)
         assert manual.execution_present and manual.automatic is None
 
 
-@pytest.mark.parametrize("factory", [configuration_error, patch_package_error])
+@pytest.mark.parametrize("factory", [configuration_error, task_bundle_error])
 def test_error_text_cannot_impersonate_empty_discovery(pair, monkeypatch, factory):
     def fail(*args, **kwargs):
         raise factory("no state-bound patch package matches a registered repository")

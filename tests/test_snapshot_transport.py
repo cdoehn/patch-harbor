@@ -60,7 +60,7 @@ sys.addaudithook(audit)
 sys.path.insert(0,selected)
 from patchharbor import api
 assert api.__file__.startswith(selected+os.sep),api.__file__
-assert api.integration_capabilities().snapshot_contract_version==1
+assert api.integration_capabilities().snapshot_contract_version==2
 assert api.integration_capabilities().guarded_apply_contract_version==1
 module=runpy.run_path(str(root/'example.py'))
 snapshot,packed=module['prepare_transport'](root/'reference.zip',expected_result_sha256=expected_sha,
@@ -81,7 +81,7 @@ with ZipFile(packed.path) as archive:
 assert 'patchharbor_watcher' not in sys.modules
 assert not any('site-packages' in p or 'dist-packages' in p for p in sys.path)
 print(json.dumps({'origin':api.__file__,'package':str(packed.path),'sha256':packed.package_sha256,
-                  'reference_sha256':snapshot.sha256,'capability_contract':1}))
+                  'reference_sha256':snapshot.sha256,'capability_contract':2}))
 ''',selected,str(source),reference_sha],cwd=outside,env=environment,capture_output=True,text=True)
     assert process.returncode==0,process.stdout+process.stderr
     proof=json.loads(process.stdout)

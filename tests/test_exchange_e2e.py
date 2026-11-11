@@ -62,7 +62,7 @@ def _write_result_bundle_marker(path: Path, *, include_patch: bool = False) -> N
             ).encode("utf-8"),
         )
         if include_patch:
-            archive.writestr("patch.json", b"{}")
+            archive.writestr("task.json", b"{}")
 
 
 def _parameterless_apply(
@@ -91,14 +91,14 @@ def _assert_unresolved_selection_failure(
     *,
     message: str,
 ) -> None:
-    assert completed.returncode == int(ExitCode.PATCH_PACKAGE_ERROR)
+    assert completed.returncode == int(ExitCode.TASK_BUNDLE_ERROR)
     envelope = json.loads(completed.stdout)
     assert envelope["command"] == "apply"
     assert envelope["success"] is False
     assert envelope["error"] == {
-        "kind": "patch_package_error",
+        "kind": "task_bundle_error",
         "message": message,
-        "patchharbor_error_code": int(ExitCode.PATCH_PACKAGE_ERROR),
+        "patchharbor_error_code": int(ExitCode.TASK_BUNDLE_ERROR),
         "emergency_diagnostics_path": None,
     }
     assert envelope["result"]["repository_resolved"] is False
@@ -250,7 +250,7 @@ def test_no_matching_candidate_fails_without_repository_mutation_or_bundle(
         message=_MANUAL_NO_MATCH,
     )
     assert not (repository / "automatic-result.txt").exists()
-    assert not tuple(exchange.glob("*_Result_*.zip"))
+    assert not tuple(exchange.glob("*_Result_Bundle_*.zip"))
 
 
 def test_multiple_matching_candidates_select_the_newest_mtime_ns(
@@ -549,7 +549,7 @@ def test_manual_selection_fails_closed_when_current_repository_is_busy(
     assert envelope["success"] is False
     assert envelope["error"]["kind"] == "repository_busy"
     assert envelope["result"]["repository_resolved"] is False
-    assert not tuple(exchange.glob("*_Result_*.zip"))
+    assert not tuple(exchange.glob("*_Result_Bundle_*.zip"))
     assert not (repository / "automatic-result.txt").exists()
 
 
@@ -671,7 +671,7 @@ def test_preflight_failure_remains_retryable_without_attempt_mark(
     entrypoint_name = native_value("run.sh", "run.ps1")
     with zipfile.ZipFile(package, "w") as archive:
         archive.writestr(
-            "patch.json",
+            "task.json",
             json.dumps(_manifest(context), separators=(",", ":")).encode(
                 "utf-8"
             ),

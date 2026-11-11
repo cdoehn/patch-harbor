@@ -32,7 +32,7 @@ class Publication:
         self.paths = raw_registration_user_paths()
         self.lock, self.wake, self.stop = Lock(), Event(), Event()
         self.data, self.tail = data, b''
-        self.document = {'format_version': 2, 'kind': kind, 'instance_id': self.instance_id,
+        self.document = {'format_version': 3, 'kind': kind, 'instance_id': self.instance_id,
                          'pid': os.getpid(), 'process_identity': None, 'started_at': observed_at(),
                          'updated_at': observed_at(), 'facts_updated_at': observed_at(), 'completed': False, 'phase': 'starting',
                          'history': []}

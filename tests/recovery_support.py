@@ -30,9 +30,9 @@ elif point == "before_publish":
 elif point == "after_publish":
     exchange_app.mark_exchange_apply_finished = crash
 elif point == "persistence_error":
-    from patchharbor.errors import patch_package_error
+    from patchharbor.errors import task_bundle_error
     def fail(*args, **kwargs):
-        raise patch_package_error("simulated ledger write failure")
+        raise task_bundle_error("simulated ledger write failure")
     exchange_app.mark_exchange_apply_finished = fail
 else:
     raise AssertionError(point)

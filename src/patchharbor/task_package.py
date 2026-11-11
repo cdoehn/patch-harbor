@@ -10,7 +10,7 @@ from patchharbor.progress import activity
 
 from patchharbor.bundle_paths import BundlePathError, normalize_bundle_path
 from patchharbor.bundle_handoff import BundleHandoff, split_task_handoff
-from patchharbor.errors import FailureReason, PatchHarborError, patch_package_error
+from patchharbor.errors import FailureReason, PatchHarborError, task_bundle_error
 from patchharbor.models import BundlePayload
 from patchharbor.parser import ParsedScript, ScriptFormatError, parse_script
 from patchharbor.task_manifest import (
@@ -79,7 +79,9 @@ def resolve_task_payloads(
     package_sha256: str | None = None,
     package_size: int | None = None,
 ) -> ValidatedTaskBundle:
-    activity("MANIFEST", "Locate regular root patch.json")
+    if any(item.relative_path.casefold() in {"patch.json", "manifest.json"} for item in payloads):
+        raise task_bundle_error("legacy or mixed bundle manifest is not a Task Bundle")
+    activity("MANIFEST", "Locate regular root task.json")
     manifest_payload = next(
         (
             payload
@@ -89,8 +91,8 @@ def resolve_task_payloads(
         None,
     )
     if manifest_payload is None:
-        raise patch_package_error(
-            "patch package must contain exactly one regular root patch.json"
+        raise task_bundle_error(
+            "patch package must contain exactly one regular root task.json"
         )
 
     activity("MANIFEST", "Validate exact schema, marker and full repository binding")
@@ -114,8 +116,8 @@ def resolve_task_payloads(
             package_payloads.append(payload)
 
     if entrypoint is None:
-        raise patch_package_error(
-            "patch.json entrypoint must reference exactly one regular ZIP entry"
+        raise task_bundle_error(
+            "task.json entrypoint must reference exactly one regular ZIP entry"
         )
 
     payload_tuple = tuple(package_payloads)
@@ -158,7 +160,7 @@ def resolve_task_bundle(
             raise _unsafe_patch_zip(path, "input artifact exceeds the resource limit")
         payloads = read_zip_payload_bytes(captured.content, policy=resource_policy)
     except NotZipArchiveError as exc:
-        raise patch_package_error("patch package is not a ZIP archive") from exc
+        raise task_bundle_error("patch package is not a ZIP archive") from exc
     except (ZipPayloadError, FileChangedDuringRead, FileReadLimitExceeded, FileSystemOperationError,
             UnsupportedFileTypeError, OSError, RuntimeError, UnicodeError) as exc:
         raise _unsafe_patch_zip(path, exc) from exc

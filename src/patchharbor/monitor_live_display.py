@@ -65,7 +65,7 @@ def live_lines(document, session, *, height):
                       ('Repository: ' + str(data.get('repository_path') or data.get('repo_id') or 'noch unbekannt'), ''),
                       ('Entrypoint: ' + str(data.get('entrypoint_name') or '—'), ''),
                       ('Run: ' + str(data.get('run_id')), ''),
-                      ('Patch: ' + str(data.get('patch_sha256')), ''),
+                      ('Patch: ' + str(data.get('task_sha256')), ''),
                       (f"Ursprung: {data.get('origin')} · {'DRY-RUN' if data.get('dry_run') else 'Apply'}", '')]
             timeout = data.get('effective_timeout_seconds')
             if selected['kind'] == 'apply':

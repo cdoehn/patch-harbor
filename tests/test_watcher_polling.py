@@ -194,7 +194,7 @@ def test_polling_observation_has_validated_machine_readable_interval_and_deadlin
     from patchharbor.monitor_live_schema import parse_live
     identity = '00000000-0000-4000-8000-000000000001'
     stamp = '2026-11-10T12:00:00Z'
-    row = dict(format_version=2, kind='watcher', instance_id=identity, pid=123,
+    row = dict(format_version=3, kind='watcher', instance_id=identity, pid=123,
         process_identity=None, started_at=stamp, updated_at=stamp, facts_updated_at=stamp,
         completed=False, phase='watching', log_tail='', history=[],
         activity=dict(sequence=1, at=stamp, since=stamp, code='poll-wait', status='waiting', message='poll'),

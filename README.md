@@ -143,7 +143,7 @@ Bash/PowerShell marker contract; pack neither writes nor executes it.
 Pack copies all permitted files in the chosen directory; it does not use
 `.gitignore` to select a diff. Ordinary payloads are written into the repository
 **before** the entrypoint runs. A diff is a payload that the entrypoint must
-explicitly apply. `patch.json` and `PATCHHARBOR_META` are generated/reserved.
+explicitly apply. `task.json` and `PATCHHARBOR_META` are generated/reserved.
 Pack validates the final ZIP and its complete Result binding, but does not prove
 shell syntax, target tests, replay eligibility or a future Apply.
 
@@ -264,8 +264,8 @@ chosen output directory. If its safe filesystem primitives are unsupported,
 it fails instead of falling back to an unsafe copy. Choose one canonical final
 ZIP and preserve its bytes and full SHA-256 during handoff.
 
-Result names follow `<Repository>_Result_<HHMMSS>_<MMDD>_<ID6>.zip`; patch names
-follow `<Repository>_Patch_<HHMMSS>_<MMDD>_<ID6>.zip` (UTC). Filenames are not
+Result names follow `<Repository>_Result_Bundle_<HHMMSS>_<MMDD>_<ID6>.zip`; patch names
+follow `<Repository>_Task_Bundle_<HHMMSS>_<MMDD>_<ID6>.zip` (UTC). Filenames are not
 repository-binding evidence. To use a transport suffix such as `.zip.txt`:
 
 ```bash
@@ -275,7 +275,7 @@ patchharbor configure bundle-suffix --clear
 
 These are alternative settings, applied from the registered repository. The
 `bundle_suffix` is naming metadata in a fresh Result's `context.json`, not a field
-in `patch.json`. Content remains ZIP. Old and new names may coexist.
+in `task.json`. Content remains ZIP. Old and new names may coexist.
 
 ## Snapshots, limits and errors
 

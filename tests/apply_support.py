@@ -17,7 +17,7 @@ from tests.registration_support import create_repository
 def write_package(path: Path, context: api.RepositoryContext, *, exit_code: int = 0) -> None:
     entrypoint = native_value("run.sh", "run.ps1")
     manifest = {
-        "marker": "patch-harbor", "format_version": 1,
+        "marker": "patch-harbor-task-bundle", "format_version": 2,
         "repo_id": str(context.repo_id), "base_commit": str(context.base_commit),
         "state_fingerprint": context.state_fingerprint,
         "fingerprint_algorithm": context.fingerprint_algorithm, "entrypoint": entrypoint,
@@ -27,7 +27,7 @@ def write_package(path: Path, context: api.RepositoryContext, *, exit_code: int 
         f"[Console]::Out.WriteLine('api-child'); [Console]::Error.WriteLine('api-stderr'); exit {exit_code}",
     )
     with zipfile.ZipFile(path, "w") as archive:
-        archive.writestr("patch.json", json.dumps(manifest))
+        archive.writestr("task.json", json.dumps(manifest))
         archive.writestr(entrypoint, body)
 
 
@@ -43,12 +43,12 @@ def repository(tmp_path):
 def package(repository, exchange, *, exit_code=0):
     context = api.context(repository)
     entrypoint = native_value("run.sh", "run.ps1")
-    manifest = {"marker": "patch-harbor", "format_version": 1,
+    manifest = {"marker": "patch-harbor-task-bundle", "format_version": 2,
                 **{key: str(getattr(context, key)) for key in
                    ("repo_id", "base_commit", "state_fingerprint", "fingerprint_algorithm")},
                 "entrypoint": entrypoint}
     path = exchange / "test-patch.zip"
     with ZipFile(path, "w") as archive:
-        archive.writestr("patch.json", json.dumps(manifest))
+        archive.writestr("task.json", json.dumps(manifest))
         archive.writestr(entrypoint, native_script(f"exit {exit_code}", f"exit {exit_code}"))
     return path

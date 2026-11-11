@@ -47,7 +47,7 @@ def test_actual_cli_json_has_complete_reference_validation_and_published_hash(re
     document = json.loads(stdout.getvalue())
     assert code == 0 and stderr.getvalue() == ''
     assert set(document) == {'output_version', 'command', 'success', 'result', 'error', 'process_exit_code'}
-    assert document['output_version'] == 2 and document['command'] == 'pack'
+    assert document['output_version'] == 3 and document['command'] == 'pack'
     assert document['success'] and document['error'] is None and document['process_exit_code'] == 0
     result = document['result']; path = Path(result['path'])
     assert set(result) == {'path', 'package_id', 'created_at', 'package_sha256', 'package_size',
@@ -104,14 +104,14 @@ def test_no_unsafe_or_implicit_pack_options(request_files, option):
 
 @pytest.mark.parametrize('reason', [api.FailureReason.NO_VALID_SCRIPT, api.FailureReason.SOURCE_ERROR,
     api.FailureReason.INTERPRETER_ERROR, api.FailureReason.PAYLOAD_PREPARATION_ERROR,
-    api.FailureReason.STATE_MISMATCH, api.FailureReason.PATCH_PACKAGE_ERROR, api.FailureReason.INTERRUPTED])
+    api.FailureReason.STATE_MISMATCH, api.FailureReason.TASK_BUNDLE_ERROR, api.FailureReason.INTERRUPTED])
 def test_error_envelope_preserves_existing_failure_categories(request_files, monkeypatch, reason):
     def refused(*a, **k): raise api.PatchHarborError('controlled shared error', reason)
     monkeypatch.setattr(api, 'pack_task', refused)
     code, stdout, _ = invoke(arguments(request_files, '--json'))
     document = json.loads(stdout.getvalue())
     assert code == int(exit_code_for_reason(reason)) == document['process_exit_code']
-    assert document['output_version'] == 2 and document['command'] == 'pack'
+    assert document['output_version'] == 3 and document['command'] == 'pack'
     assert not document['success'] and document['result'] is None
     assert document['error']['patchharbor_error_code'] == code
     assert document['error']['emergency_diagnostics_path'] is None

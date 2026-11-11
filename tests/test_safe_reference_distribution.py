@@ -62,7 +62,8 @@ from patchharbor import api
 assert api.__file__.startswith(selected + os.sep), api.__file__
 caps = api.integration_capabilities()
 assert caps.safe_reference_contract_version == 1
-assert caps.contract_version == caps.snapshot_contract_version == caps.guarded_apply_contract_version == 1
+assert caps.contract_version == caps.snapshot_contract_version == 2
+assert caps.guarded_apply_contract_version == 1
 example = runpy.run_path(str(root / 'example.py'))
 authorized = []
 def authorize(plan):
@@ -90,7 +91,7 @@ else:
     for layer, files in expected.items():
         assert {name: {'mode': file.mode, 'sha256': file.sha256, 'size': file.size}
                 for name, file in getattr(snapshot, layer).files.items()} == files, layer
-    assert snapshot.format_version == 3 and snapshot.runtime.status == 'embedded'
+    assert snapshot.format_version == 4 and snapshot.runtime.status == 'embedded'
     assert snapshot.runtime.artifact_sha256 == runtime_sha
     assert snapshot.runtime.requires_python == '>=3.10'
     with ZipFile(bundle.path) as archive:

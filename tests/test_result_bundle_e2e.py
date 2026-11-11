@@ -71,7 +71,7 @@ def _result_bundles() -> tuple[Path, ...]:
     registry = load_registry(registration_user_paths())
     local = configuration_paths_for_id(registry.repositories[0].repo_id, registry)
     directory = load_configuration(local).exchange_directory
-    return tuple(sorted(directory.glob("*_Result_*.zip")))
+    return tuple(sorted(directory.glob("*_Result_Bundle_*.zip")))
 
 
 def _synchronize_after_base_capture(
@@ -203,7 +203,7 @@ def test_manual_bundle_materializes_committed_blobs_without_export_rules(
     bundles = _result_bundles()
     assert len(bundles) == 1
     assert re.fullmatch(
-        r"repository_Result_\d{6}_\d{4}_[0-9a-f]{6}\.zip",
+        r"repository_Result_Bundle_\d{6}_\d{4}_[0-9a-f]{6}\.zip",
         bundles[0].name,
     )
     with zipfile.ZipFile(bundles[0]) as archive:
@@ -241,7 +241,7 @@ def test_manual_bundle_materializes_committed_blobs_without_export_rules(
     assert run_id.version == 4
     assert str(run_id) == manifest["run_id"]
     assert manifest["marker"] == "patch-harbor-result-bundle"
-    assert manifest["format_version"] == 3
+    assert manifest["format_version"] == 4
     assert manifest["dirty"] is False
     assert manifest["execution_present"] is False
     assert manifest["primary_result"] == "success"
@@ -430,7 +430,7 @@ def test_manual_bundle_requires_valid_exchange_configuration_without_override(
     assert run["repository_resolved"] is True
     assert run["primary_result"]["kind"] == "validation_error"
     assert run["result_bundle"]["status"] == "failed"
-    assert not tuple(exchange.glob("*_Result_*.zip"))
+    assert not tuple(exchange.glob("*_Result_Bundle_*.zip"))
 
 
 @pytest.mark.parametrize("configuration_state", ("missing", "invalid"))
@@ -502,8 +502,8 @@ def test_manual_bundle_failure_returns_exit_11_and_emergency_run_report(
     assert emergency_path.is_absolute()
     assert emergency_path.is_dir()
     assert not forbidden_output.exists()
-    assert not tuple(repository.rglob(".*_Result_*.tmp"))
-    assert not tuple(repository.rglob("*_Result_*.zip"))
+    assert not tuple(repository.rglob(".*_Result_Bundle_*.tmp"))
+    assert not tuple(repository.rglob("*_Result_Bundle_*.zip"))
 
     run = json.loads((emergency_path / "run.json").read_text(encoding="utf-8"))
     assert UUID(run["run_id"]).version == 4
@@ -600,7 +600,7 @@ def test_manual_bundle_surfaces_failed_emergency_rescue(
     assert envelope["process_exit_code"] == int(ExitCode.RESULT_BUNDLE_ERROR)
     assert envelope["error"]["emergency_diagnostics_path"] is None
     assert not controlled_run_directory.exists()
-    assert not tuple(repository.rglob("*_Result_*.zip"))
+    assert not tuple(repository.rglob("*_Result_Bundle_*.zip"))
 
 
 def test_manual_bundle_captures_untracked_bytes_modes_and_hashes(
@@ -869,7 +869,7 @@ def test_manual_bundle_uses_physically_resolved_explicit_output_directory(
     )
 
     assert completed.returncode == 0
-    published = tuple(physical_output.glob("*_Result_*.zip"))
+    published = tuple(physical_output.glob("*_Result_Bundle_*.zip"))
     assert len(published) == 1
     assert tuple(
         path for path in physical_output.iterdir() if path != published[0]
@@ -952,7 +952,7 @@ def test_manual_bundle_publishes_from_verified_temporary_zip_in_result_directory
         destination_path = Path(destination)  # type: ignore[arg-type]
         assert source_path.parent == output_directory.resolve()
         assert destination_path.parent == output_directory.resolve()
-        assert source_path.name.startswith(".repository_Result_")
+        assert source_path.name.startswith(".repository_Result_Bundle_")
         assert source_path.name.endswith(".tmp")
         assert source_path.is_file()
         assert not destination_path.exists()
@@ -1177,8 +1177,8 @@ def test_manual_bundle_rejects_exchange_configuration_retargeted_during_capture(
     assert str(captured.value) == (
         "exchange directory changed during Result Bundle preparation"
     )
-    assert not tuple(original_exchange.glob("*_Result_*.zip"))
-    assert not tuple(alternate_exchange.glob("*_Result_*.zip"))
+    assert not tuple(original_exchange.glob("*_Result_Bundle_*.zip"))
+    assert not tuple(alternate_exchange.glob("*_Result_Bundle_*.zip"))
 
 
 def test_manual_bundle_rejects_output_directory_retargeted_during_capture(
@@ -1207,7 +1207,7 @@ def test_manual_bundle_rejects_output_directory_retargeted_during_capture(
         )
 
     assert exit_code_for_error(captured.value) == ExitCode.RESULT_BUNDLE_ERROR
-    assert not tuple(other.glob("*_Result_*.zip"))
+    assert not tuple(other.glob("*_Result_Bundle_*.zip"))
     assert tuple(moved_directory.iterdir()) == ()
 
 

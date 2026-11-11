@@ -163,7 +163,7 @@ PatchHarbor ist kein Testmanager, kein Commit-Manager, kein Build-System, kein C
 - konkrete lokale Git-Repository-Instanzen registrieren,
 - pro lokaler Instanz eine UUID v4 verwalten,
 - Repository-Kontext und Zustands-Fingerprint bestimmen,
-- sichere Patch-Pakete anhand einer verpflichtenden `patch.json` validieren,
+- sichere Patch-Pakete anhand einer verpflichtenden `task.json` validieren,
 - ein Patch-Paket eindeutig einem registrierten Ziel-Repository zuordnen,
 - Base-Commit und Zustands-Fingerprint strikt prüfen,
 - einen Dry-Run ohne Repository-Änderung durchführen,
@@ -539,7 +539,7 @@ Result-Veröffentlichung revalidiert.
 
 Das Suffix wird bei neuen Bundles des betreffenden Repositorys unverändert direkt
 hinter `.zip` angehängt. Es benennt keine Bestandsdatei um und ändert weder
-ZIP-Inhalt noch `patch.json`, Fingerprint oder Replay. Kein Suffix-Schalter auf
+ZIP-Inhalt noch `task.json`, Fingerprint oder Replay. Kein Suffix-Schalter auf
 `apply`/`bundle`. Bundle-Begleitdaten beschreiben das konkrete Zielrepository.
 
 Mehrere Repositorys dürfen denselben physischen Exchange verwenden; separate
@@ -787,7 +787,7 @@ Das erfolgreiche `result`-Objekt besitzt exakt:
     "state_fingerprint": "a1b2c3d4e5f67890",
     "fingerprint_algorithm": "patchharbor-state-v1",
     "result_bundle_status": "created",
-    "result_bundle_path": "/home/user/Downloads/patchharbor_Result_093000_0825_b592be.zip",
+    "result_bundle_path": "/home/user/Downloads/patchharbor_Result_Bundle_093000_0825_b592be.zip",
     "emergency_diagnostics_path": null
   },
   "error": null,
@@ -847,7 +847,7 @@ Zulässige Bundle-Statuswerte sind `created`, `failed` und `not_attempted`. `not
     "result_bundle": {
       "attempted": true,
       "status": "created",
-      "path": "/home/user/Downloads/patchharbor_Result_093000_0825_b592be.zip",
+      "path": "/home/user/Downloads/patchharbor_Result_Bundle_093000_0825_b592be.zip",
       "emergency_diagnostics_path": null
     }
   },
@@ -1496,7 +1496,7 @@ state_fingerprint: a1b2c3…
 fingerprint_algorithm: patchharbor-state-v1
 
 INSTRUCTIONS:
-- Kurzansicht nicht in patch.json oder als Chat-/Maschineninput verwenden.
+- Kurzansicht nicht in task.json oder als Chat-/Maschineninput verwenden.
 - Vollständige Werte mit patchharbor context --json [REPOSITORY] ausgeben.
 - Erzeuge bei geändertem Repository-Zustand einen neuen Kontext.
 ```
@@ -1505,7 +1505,7 @@ Menschenlesbare Terminalausgaben kürzen lange technische Kennungen zentral auf 
 
 Der Block `PATCH_HARBOR_CONTEXT` ist daher ausschließlich eine Kurzansicht zur menschlichen Kontrolle und keine kopierbare Maschinenrepräsentation. `patchharbor register` gibt denselben Block aus und besitzt bewusst keine `--json`-Option. Vollständige eigenständige Kontextwerte werden mit `patchharbor context --json [REPOSITORY]` ausgegeben.
 
-Der Chat darf Repository-ID, Base-Commit oder Fingerprint nicht erraten und verwendet für `patch.json` die vollständigen Werte aus `context.json` des aktuellen Result Bundles. Wird ausnahmsweise ein separater Kontext als JSON übergeben, muss er aus `patchharbor context --json` stammen; die verkürzte Standardausgabe ist kein zulässiger Ersatz.
+Der Chat darf Repository-ID, Base-Commit oder Fingerprint nicht erraten und verwendet für `task.json` die vollständigen Werte aus `context.json` des aktuellen Result Bundles. Wird ausnahmsweise ein separater Kontext als JSON übergeben, muss er aus `patchharbor context --json` stammen; die verkürzte Standardausgabe ist kein zulässiger Ersatz.
 
 ### 14.2 Base-Commit
 
@@ -1870,7 +1870,7 @@ Der äußere Dateiname und die Dateiendung sind keine Sicherheits- oder Zuordnun
 Im Wurzelverzeichnis des ZIP-Pakets liegt genau eine Datei mit dem Namen:
 
 ```text
-patch.json
+task.json
 ```
 
 Weitere sichere Dateien und Unterverzeichnisse sind zulässig.
@@ -1879,22 +1879,22 @@ Beispiel:
 
 ```text
 patch.zip
-├── patch.json
+├── task.json
 ├── run.sh
 └── files/
     └── configuration.bin
 ```
 
-### 15.3 `patch.json`
+### 15.3 `task.json`
 
-`patch.json` ist UTF-8 ohne Byte-Order-Mark und enthält genau ein JSON-Objekt. Doppelte Schlüssel, Kommentare, nachgestellte Daten und nicht endliche Zahlenwerte sind ungültig.
+`task.json` ist UTF-8 ohne Byte-Order-Mark und enthält genau ein JSON-Objekt. Doppelte Schlüssel, Kommentare, nachgestellte Daten und nicht endliche Zahlenwerte sind ungültig.
 
 Für Paketformat 1 sind ausschließlich die folgenden sieben Schlüssel zulässig; unbekannte oder zusätzliche Schlüssel werden abgelehnt:
 
 ```json
 {
-  "marker": "patch-harbor",
-  "format_version": 1,
+  "marker": "patch-harbor-task-bundle",
+  "format_version": 2,
   "repo_id": "a3f9c2e1-7b4d-4a91-9d2e-5c6f8a1b2c3d",
   "base_commit": "f4e9c2a7b8c9d01234567890abcdef1234567890",
   "state_fingerprint": "a1b2c3d4e5f67890",
@@ -1913,7 +1913,7 @@ Der Vertrag lautet exakt:
 | `base_commit` | JSON-String mit der vollständigen kleingeschriebenen Hex-Objekt-ID; exakt 40 Zeichen für ein SHA-1-Repository oder 64 Zeichen für ein SHA-256-Repository. Abgekürzte Objekt-IDs sind verboten. |
 | `state_fingerprint` | JSON-String aus exakt 16 kleingeschriebenen Hex-Zeichen. |
 | `fingerprint_algorithm` | JSON-String, exakt `patchharbor-state-v1`. |
-| `entrypoint` | Nicht leerer JSON-String, der nach Abschnitt 10 einen sicheren relativen ZIP-Pfad bezeichnet, nicht `patch.json` ist und exakt einen vorhandenen regulären ZIP-Eintrag referenziert. |
+| `entrypoint` | Nicht leerer JSON-String, der nach Abschnitt 10 einen sicheren relativen ZIP-Pfad bezeichnet, nicht `task.json` ist und exakt einen vorhandenen regulären ZIP-Eintrag referenziert. |
 
 Die exakte Objekt-ID-Länge wird nach Auflösung von `repo_id` gegen das Objektformat des Ziel-Repositorys geprüft. Der angegebene Commit muss zusätzlich exakt dem aktuellen `HEAD` entsprechen.
 
@@ -1937,11 +1937,11 @@ Der temporäre Speicherort ist kein Teil der öffentlichen Patch-Schnittstelle.
 
 ### 15.5 Weitere Paketdateien
 
-Jeder andere sichere reguläre ZIP-Eintrag außer `patch.json` und dem Entrypoint ist eine Nutzdatei.
+Jeder andere sichere reguläre ZIP-Eintrag außer `task.json` und dem Entrypoint ist eine Nutzdatei.
 
 Nutzdateien können Text, Binärdaten, Unterverzeichnisse oder nicht automatisch ausgeführte Hilfsskripte enthalten. Sie werden bytegenau in den entsprechenden relativen Repository-Pfad geschrieben.
 
-Nur der in `patch.json` benannte Entrypoint wird automatisch gestartet. Ein Marker in einer anderen Paketdatei macht diese Datei nicht zu einem weiteren Entrypoint.
+Nur der in `task.json` benannte Entrypoint wird automatisch gestartet. Ein Marker in einer anderen Paketdatei macht diese Datei nicht zu einem weiteren Entrypoint.
 
 ### 15.6 Keine rekursive Paketauflösung
 
@@ -2001,7 +2001,7 @@ Die anschließende gemeinsame Kandidatenklassifikation:
 5. ermittelt eine stabile Dateiaufnahme mit physisch kanonischem Pfad, vollständigem SHA-256-Inhalt und `mtime_ns`,
 6. verwendet für eine unveränderte Identität eine bereits sicher gespeicherte Inhaltsklassifikation, statt dieselbe Nichtkandidaten-Datei fortlaufend neu zu analysieren,
 7. unterscheidet anhand des tatsächlichen ZIP-Inhalts und nicht anhand von Dateiname oder Endung zwischen Patch-Paket, Result Bundle und sonstiger Datei,
-8. liest bei Patch-Kandidaten die Root-`patch.json` streng genug, um `repo_id`, Base-Commit und Fingerprint zu bestimmen,
+8. liest bei Patch-Kandidaten die Root-`task.json` streng genug, um `repo_id`, Base-Commit und Fingerprint zu bestimmen,
 9. verwirft beim manuellen Ursprung fremde `repo_id`; beim automatischen Ursprung löst sie die Manifest-ID über die Registry auf und akzeptiert das Paket nur, wenn dessen physischer Elternordner dem konfigurierten Exchange genau dieses Ziels entspricht,
 10. prüft unter der verbindlichen Registry-/Repository-Lock-Reihenfolge, ob Base-Commit, Fingerprint und Fingerprint-Algorithmus zum jeweiligen Repository-Kontext passen,
 11. berücksichtigt beim manuellen Ursprung sowohl noch nie gestartete als auch mit `failed` abgeschlossene Identitäten; beim automatischen Ursprung ausschließlich noch nie gestartete Identitäten; `attempted` und `succeeded` sind in beiden Fällen ausgeschlossen,
@@ -2121,7 +2121,7 @@ bleiben unverändert.
 
 Ein Repository gilt erst dann als sicher aufgelöst, wenn:
 
-1. `patch.json` soweit gültig gelesen wurde, dass `repo_id` verfügbar ist,
+1. `task.json` soweit gültig gelesen wurde, dass `repo_id` verfügbar ist,
 2. unter dem globalen Registry-Lock genau eine Zuordnung gefunden wurde,
 3. der kanonische Pfad existiert,
 4. der Pfad weiterhin ein gültiges Git-Repository ist,
@@ -2143,7 +2143,7 @@ Kann das Repository vorher nicht sicher aufgelöst werden, entsteht kein Reposit
 2. Eingabedatei stabil und vollständig lesbar öffnen.
 3. Tatsächliches ZIP-Format prüfen.
 4. Archivstruktur, Eintragstypen, Pfade und Ressourcenlimits vollständig prüfen.
-5. `patch.json` im ZIP-Wurzelverzeichnis finden.
+5. `task.json` im ZIP-Wurzelverzeichnis finden.
 6. Striktes JSON-Schema, Paketmarker, Fingerprint-Algorithmus und Formatversion prüfen.
 7. `repo_id` unter dem globalen Registry-Lock eindeutig auflösen.
 8. Ausgabeordner bestimmen: explizites `--output-dir`, andernfalls den Exchange-Ordner; gegen alle registrierten Repository-Pfade prüfen und dort einen temporären Ausgabepfad reservieren.
@@ -2180,11 +2180,11 @@ Die neue repositorylokale Konfiguration verwendet unabhängig davon ihr geschlos
 Die Patch-SHA entsteht aus denselben stabil eingelesenen ZIP-Bytes wie Parser,
 Entrypoint und Nutzdaten, nicht aus einem später separat geöffneten Download.
 Neue Apply-Result-Manifeste enthalten bei bekannter Paket-SHA das optionale Paar
-`patch_sha256` und `completed_commit`. `completed_commit` ist nur bei tatsächlich
+`task_sha256` und `completed_commit`. `completed_commit` ist nur bei tatsächlich
 erfolgreichem Entrypoint, sauberem konsistentem Result-Snapshot und bestätigtem
 Vorwärts-Commit gesetzt, sonst `null`. Die vorhandenen `run_id`, `repo_id`,
 `expected_*`- und `actual_*`-Felder vervollständigen die Bindung. Reine manuelle
-Bundles erfinden keine Paketzuordnung. `patch.json` bleibt unverändert.
+Bundles erfinden keine Paketzuordnung. `task.json` bleibt unverändert.
 
 Der Publisher schreibt und prüft zuerst das temporäre Result-ZIP. Vor dessen
 atomarer Veröffentlichung wird die komplette Result-SHA unter dem vorhandenen
@@ -2251,7 +2251,7 @@ PatchHarbor lehnt vor der ersten Repository-Änderung unter anderem ab:
 - Fingerprint-Mismatch,
 - geänderten Zustand zwischen erster Prüfung und Mutationsgrenze,
 - nicht unterstützten Git- oder Pfadzustand,
-- ungültige `patch.json`,
+- ungültige `task.json`,
 - unsichere ZIP-Einträge,
 - ungültigen oder fehlenden Entrypoint,
 - fehlenden Pflichtmarker,
@@ -2282,7 +2282,7 @@ patchharbor apply --dry-run PATCH_ZIP
 ### 17.1 Der Dry-Run führt aus
 
 - vollständige ZIP- und Ressourcenvalidierung,
-- `patch.json`-Validierung,
+- `task.json`-Validierung,
 - Repository-Auflösung,
 - lokale ID-Prüfung,
 - exklusive Sperre,
@@ -2552,7 +2552,7 @@ Es gibt keinen reduzierten Standardmodus, der nur den Commit-Hash enthält.
 ### 19.4 Struktur
 
 ```text
-<Repository>_Result_<HHMMSS>_<MMDD>_<ID6>.zip
+<Repository>_Result_Bundle_<HHMMSS>_<MMDD>_<ID6>.zip
 ├── manifest.json
 ├── context.json
 ├── CHAT_INSTRUCTIONS.md
@@ -2602,7 +2602,7 @@ Das vollständige Manifest enthält zusätzlich zwei nach UTF-8-Pfadbytes sortie
 
 Diese Metadaten sind die plattformunabhängige Quelle für Dateimodi. Die ZIP-Einträge tragen zusätzlich passende reguläre Dateirechte, soweit das ZIP-Format sie abbilden kann.
 
-Bei `apply` enthält das Manifest außerdem die aus `patch.json` erwarteten und die tatsächlich ermittelten Zustandswerte, sodass ein Mismatch eindeutig nachvollziehbar bleibt. Neue Apply-Resultate mit bekannter Paket-SHA ergänzen gemeinsam `patch_sha256` und `completed_commit` gemäß Abschnitt 16.4.1. Der Abschlusscommit darf `null` sein; beide Felder fehlen in alten Resultaten und manuellen Bundles. Bestehende Resultate ohne diese optionalen Felder bleiben lesbar, liefern aber keinen neuen Recovery-Beleg.
+Bei `apply` enthält das Manifest außerdem die aus `task.json` erwarteten und die tatsächlich ermittelten Zustandswerte, sodass ein Mismatch eindeutig nachvollziehbar bleibt. Neue Apply-Resultate mit bekannter Paket-SHA ergänzen gemeinsam `task_sha256` und `completed_commit` gemäß Abschnitt 16.4.1. Der Abschlusscommit darf `null` sein; beide Felder fehlen in alten Resultaten und manuellen Bundles. Bestehende Resultate ohne diese optionalen Felder bleiben lesbar, liefern aber keinen neuen Recovery-Beleg.
 
 ### 19.6 `context.json`
 
@@ -2623,7 +2623,7 @@ Bei `apply` enthält das Manifest außerdem die aus `patch.json` erwarteten und 
 `bundle_suffix` ist zusätzliche optionale Dateinamen-Präsentationsmetadaten,
 kein Teil des Repository-Zustands. Ältere Result Bundles ohne dieses Feld gelten
 als suffixlos. Der externe Entwicklungs-Chat übernimmt den Wert unverändert für
-seinen nächsten Patch-Dateinamen. Er fügt ihn niemals in `patch.json` ein und
+seinen nächsten Patch-Dateinamen. Er fügt ihn niemals in `task.json` ein und
 verwendet ihn nicht für Fingerprint, Repository-Zuordnung oder Replay. Die
 vollständigen Bindungswerte, Result-Marker und Formatversion 1 bleiben erhalten.
 Die geschlossene CLI-Antwort von `context --json` bleibt unverändert; bei einer
@@ -2705,10 +2705,10 @@ Namensraum `PATCHHARBOR_META/`. Für jedes Paket rendert der Chat die statische
 Vorlage neu mit dem letzten Zielrechner-Snapshot; er erhält dessen Erfassungszeit,
 setzt Paketart und Dateiname passend und erfindet keine Zielrechnerdaten aus
 seiner eigenen Laufzeit. Der Core erzeugt keine Patch-Pakete. Alte Pakete ohne
-Metadatenpaar bleiben gültig; das geschlossene `patch.json` bleibt Format 1 mit
+Metadatenpaar bleiben gültig; das geschlossene `task.json` bleibt Format 1 mit
 sieben Feldern. Andere/incomplete reservierte Dateien, reservierte Entrypoints,
 BOM, Nicht-UTF-8, mehr als 128 KiB je Datei, ungültiges JSON, doppelte Schlüssel,
-Nicht-Objekte, nicht endliche Zahlen und von `patch.json` abweichende Bindungen
+Nicht-Objekte, nicht endliche Zahlen und von `task.json` abweichende Bindungen
 werden abgelehnt. Normale ZIP-, Pfad- und Ressourcengrenzen gelten zusätzlich.
 Begleitdateien werden weder als Nutzdateien geschrieben noch als Code ausgeführt.
 Eine echte Root-`CHAT_INSTRUCTIONS.md` in einem Patch bleibt eine Nutzdatei.
@@ -2863,7 +2863,7 @@ Wenn ein Entrypoint oder manuelles Skript gestartet wurde, bestimmt grundsätzli
 | `7` | sonstiger interner Ausführungsfehler vor Prozessstart |
 | `8` | Repository nicht registriert, nicht mehr gültig oder Registrierung mehrdeutig |
 | `9` | Base-Commit, Fingerprint oder Fingerprint-Algorithmus stimmt nicht überein |
-| `10` | `patch.json` oder Paketformat ungültig |
+| `10` | `task.json` oder Paketformat ungültig |
 | `11` | Result Bundle ist der primäre oder einzige fehlgeschlagene Auftrag |
 | `12` | Repository ist bereits exklusiv gesperrt |
 | `13` | Repository-Zustand wird im sicheren 1.1.1-Pfad nicht unterstützt |
@@ -2916,7 +2916,7 @@ Empfohlene Verantwortlichkeiten:
 - `configuration.py` – geschlossenes lokales Format 1, Identitätsprüfung und atomare Persistenz,
 - `repository_state.py` – Base-Commit, kanonischer Fingerprint und Snapshot-Zustand,
 - `locks.py` – globale Registry-Sperre und exklusive Sperre pro Repository-ID,
-- `patch_manifest.py` – `patch.json` und Schema,
+- `patch_manifest.py` – `task.json` und Schema,
 - `result_bundle.py` – vollständiges Result Bundle und atomare Veröffentlichung,
 - `models.py` – kleine unveränderliche Datenträger,
 - `errors.py` – fachliche Tool-Fehler und semantische Fehlergründe,
@@ -3035,9 +3035,9 @@ Mindestens zu erhalten und weiter zu testen sind:
 - `core.fileMode` bestimmt den kanonischen Modus eindeutig,
 - Kontextänderung führt zur Ablehnung,
 - eine Zustandsänderung zwischen erster Prüfung und unmittelbar vor der ersten Repository-Schreiboperation führt ohne Repository-Schreibzugriff zur Ablehnung,
-- genau eine Root-`patch.json` bei weiteren erlaubten Paketdateien,
+- genau eine Root-`task.json` bei weiteren erlaubten Paketdateien,
 - ungültiger Paketmarker, Algorithmus oder Formatversion,
-- striktes `patch.json`-Schema mit verbotenen unbekannten Feldern, kanonischer UUID, vollständiger Objekt-ID und exakt 16-stelligem Fingerprint,
+- striktes `task.json`-Schema mit verbotenen unbekannten Feldern, kanonischer UUID, vollständiger Objekt-ID und exakt 16-stelligem Fingerprint,
 - unbekannte Repository-ID,
 - Base-Commit- und Fingerprint-Mismatch,
 - `.git` und `.patchharbor` in jedem Eingabepfadsegment werden abgelehnt,
@@ -3266,7 +3266,7 @@ Ein neuer Chat erhält mindestens:
 2. das aktuelle PatchHarbor Result Bundle der zu bearbeitenden registrierten Repository-Instanz,
 3. die konkrete Benutzeraufgabe oder die Anweisung, den nächsten Plan-Commit vorzubereiten.
 
-Der Chat erhält lokale Repository- und Exchange-Pfade aus `environment.json` für passende Kommandozeilen auf dem Entwicklungsrechner. Diese Pfade dienen niemals der Repository-Zuordnung und gehören nicht in `patch.json`. Dafür verwendet er weiterhin ausschließlich `repo_id`, Base-Commit und Fingerprint aus dem Result Bundle unverändert.
+Der Chat erhält lokale Repository- und Exchange-Pfade aus `environment.json` für passende Kommandozeilen auf dem Entwicklungsrechner. Diese Pfade dienen niemals der Repository-Zuordnung und gehören nicht in `task.json`. Dafür verwendet er weiterhin ausschließlich `repo_id`, Base-Commit und Fingerprint aus dem Result Bundle unverändert.
 
 Der Chat darf nicht aus Gesprächserinnerung behaupten, den Repository-Zustand zu kennen, wenn kein aktuelles Result Bundle vorliegt. Reichen die hochgeladenen Daten nicht für einen sicheren Patch aus, verwendet er eine STOP-Ausgabe nach Abschnitt 26.7.
 
@@ -3364,11 +3364,11 @@ konservative Archivierung nicht aufgeweicht.
 ### 26.6 Patch-Paket-, Prüf- und Commitfolgevertrag des Chats
 
 Der Chat erzeugt genau eine herunterladbare ZIP im bestehenden sicheren
-PatchHarbor-Paketformat mit genau einer Root-`patch.json` und genau einem
+PatchHarbor-Paketformat mit genau einer Root-`task.json` und genau einem
 manifestierten Entrypoint. Paketformat, anfängliche State-Bindung und Core-
 Sicherheitsprüfungen bleiben unverändert.
-Der Patch-Dateiname folgt `<Repository>_Patch_<HHMMSS>_<MMDD>_<ID6>.zip`;
-Result Bundles folgen `<Repository>_Result_<HHMMSS>_<MMDD>_<ID6>.zip`.
+Der Patch-Dateiname folgt `<Repository>_Task_Bundle_<HHMMSS>_<MMDD>_<ID6>.zip`;
+Result Bundles folgen `<Repository>_Result_Bundle_<HHMMSS>_<MMDD>_<ID6>.zip`.
 
 PatchHarbor Core bestimmt keine fachliche Teststrategie des Zielprojekts. Der
 Chat leitet Testbefehle und Testarten, Vollsuite oder Auswahl, parallel/seriell
@@ -3483,7 +3483,7 @@ fachliche Probleme zeigen, ohne einen nicht beauftragten Commit zu verlangen.
 - `patchharbor context` liefert Base-Commit und Fingerprint; lokale Pfade sind kein Bestandteil des Patch-Vertrags.
 - Der Fingerprint `patchharbor-state-v1` umfasst staged, unstaged und untracked Pfad, Modus und vollständigen Inhalt.
 - Nicht eindeutige oder nicht portable Git-, Datei- und Pfadzustände werden im sicheren Pfad abgelehnt.
-- Das sichere Patch-Paket ist ZIP-basiert, besitzt genau eine Root-`patch.json` und startet genau einen privat temporär bereitgestellten Entrypoint.
+- Das sichere Patch-Paket ist ZIP-basiert, besitzt genau eine Root-`task.json` und startet genau einen privat temporär bereitgestellten Entrypoint.
 - Base-Commit und Fingerprint werden vor der ersten Repository-Mutation erneut geprüft.
 - Pro Repository-ID gilt eine exklusive Sperre.
 - Dry-Run validiert vollständig, schreibt und startet aber nichts und konsumiert keine Exchange-Dateiidentität.
@@ -3719,7 +3719,7 @@ GitHub-CI verwendet ausschließlich `workflow_dispatch` gemäß Abschnitt 33.
 
 **Stand:** 4. Oktober 2026, **Repository-Integration Revision 13 auf Grundlage der
 Exchange-Revision 2**. **Basis:** PatchHarbor-Quellstand 1.2.1 aus dem Result
-`patchharbor-apply_Result_073436_1003_116272.zip`, Commit
+`patchharbor-apply_Result_Bundle_073436_1003_116272.zip`, Commit
 `68dba9216b72dc0b6441df83f49c9047b8b038b9`. **Historischer Zwischenstand:** Paketprüfung 1.a/1.b, Runtime 1.c samt
 FIX1–FIX3 und Format-2-Leser 1.d.W waren damals angewendet. Der RIV-Plan ist
 inzwischen abgeschlossen; dieser gebundene Ausgangsstand ist kein aktueller Auftrag.
@@ -3731,7 +3731,7 @@ PatchHarbor erhält lesende Funktionen zum Untersuchen und Validieren sicherer P
 
 Die bestehenden Apply-, Fingerprint-, Replay-, Recovery-, Prozess-, Archivierungs- und Auslieferungsverträge bleiben erhalten. Diese Erweiterung macht aus PatchHarbor weder eine Sandbox noch einen Paketmanager oder einen Netzwerkdienst. GitHub-, Drive- und Gmail-Zugriffe bleiben Aufgaben des externen Chats beziehungsweise ausdrücklich beauftragter Entrypoints.
 
-Diese Abschnitte ergänzen den aktuellen 1.2.1-Bestandsvertrag. Ausschließlich die ausdrücklich beschriebenen CLI-/API-Ergänzungen, Result-Format-Erweiterungen und Chat-Arbeitsabläufe ändern sich. Das Patch-Paketformat und sein geschlossenes `patch.json` bleiben unverändert.
+Diese Abschnitte ergänzen den aktuellen 1.2.1-Bestandsvertrag. Ausschließlich die ausdrücklich beschriebenen CLI-/API-Ergänzungen, Result-Format-Erweiterungen und Chat-Arbeitsabläufe ändern sich. Das Patch-Paketformat und sein geschlossenes `task.json` bleiben unverändert.
 
 **Änderungen gegenüber Revision 1:** Der Standardinstallationsweg setzt kein erhalten gebliebenes originales Wheel mehr voraus. Stattdessen wird ein kanonisches, aus vorbereiteten Paketressourcen reproduzierbares Runtime-Artefakt spezifiziert. Format-2-Leser werden vor den Format-2-Schreibern ausgeliefert. Read-only-Grenzen, Selbstupdate einschließlich Chat-Vorlage, Runtime-Ausfall und Legacy-Referenzen werden präzisiert. Der Plan enthält deshalb sechs statt vier fachliche WRC-Gruppen: voraussichtlich 18 statt 12 Commits, ohne zusätzliche Produktfeatures. Die Exchange-Revision 2 ersetzte die vorherige Erweiterungsfassung vollständig; die vorliegende Integration ergänzt die nachfolgenden Nutzerentscheidungen.
 
@@ -3780,7 +3780,7 @@ Der öffentliche Ergebnisvertrag umfasst `package_sha256`, `package_size`, das t
 
 Die Funktion prüft bereits die sichere Lesbarkeit und die statische Gültigkeit des Pakets einschließlich Entrypoint-Vertrag. Eine erfolgreiche Inspektion ist keine Aussage über ein konkretes Repository, die Vertrauenswürdigkeit des Skripts oder dessen späteren Erfolg. Bei unsicherer oder ungültiger Eingabe wird kein scheinbar erfolgreiches Teilresultat geliefert. Manifest und passive Metadaten werden nicht erneut durch einen unabhängigen, schwächeren Parser interpretiert. Verzeichniseinträge werden sicher geprüft, aber nicht als Nutzdateien im Ergebnis gezählt. Das Ergebnis enthält Größen und Prüfsummen, nicht eine zweite vollständige Kopie aller Nutzdaten.
 
-Anzahl und Namen geplanter Git-Commits, tatsächliche Dateimutationen und spätere Testergebnisse werden nicht aus beliebigem Skriptcode erraten. Berechnete Inhaltsprüfsummen sind Beobachtungsdaten; sie sind kein zusätzlicher, im bestehenden `patch.json` behaupteter Prüfsummenvertrag.
+Anzahl und Namen geplanter Git-Commits, tatsächliche Dateimutationen und spätere Testergebnisse werden nicht aus beliebigem Skriptcode erraten. Berechnete Inhaltsprüfsummen sind Beobachtungsdaten; sie sind kein zusätzlicher, im bestehenden `task.json` behaupteter Prüfsummenvertrag.
 
 ### 36.3 `validate_task`
 
@@ -3994,7 +3994,7 @@ Editable-/direkter Quellbetrieb ist keine freigegebene portable Runtime-Quelle. 
 Jeder reguläre neue Result-Lauf einer unterstützten Standardinstallation integriert die Runtime ohne Zusatzoption: manuelles `bundle`, erfolgreicher und fehlgeschlagener Apply, Dry-Run, Watcher und explizites Ausgabeziel. Das gilt für alle Fälle, in denen nach dem bestehenden Vertrag überhaupt ein Result-Bundle erstellt werden kann. Ein Fehler vor sicherer Repositoryauflösung bekommt dadurch nicht nachträglich ein erfundenes Repository-Result.
 
 ```text
-<Repository>_Result_....zip
+<Repository>_Result_Bundle_....zip
 ├── manifest.json
 ├── context.json
 ├── environment.json
@@ -4238,7 +4238,7 @@ ein gescheiterter Result-Write bleiben unterscheidbar. Erfolg setzt die
 beauftragten Diagnose- und Abschlussprüfungen voraus, keinen künstlichen Commit.
 Die Paket-, Bindungs-, Sicherheits-, Replay- und Recovery-Verträge gelten
 unverändert; Commitanzahl und Planstatus werden nicht aus beliebigem Skriptcode
-erraten. Es werden weder neue `patch.json`-Felder noch ein Core-Commitplaner oder
+erraten. Es werden weder neue `task.json`-Felder noch ein Core-Commitplaner oder
 ein automatischer Sammler beliebiger Artefakte eingeführt.
 
 ## Technische Referenzen zur Erweiterung
@@ -4255,7 +4255,7 @@ Primärquellen laut geliefertem Revision-2-Review am 2. Oktober 2026 geprüft; d
 - **[Q8]** Python: zipfile. https://docs.python.org/3/library/zipfile.html — ZIP_STORED und kontrollierte ZIP-Einträge.
 - **[Q9]** Git: git. https://git-scm.com/docs/git — GIT_OPTIONAL_LOCKS und kontrollierte Git-Umgebung.
 
-Historische Quelle der Exchange-Revision 2: `patch-harbor_Result_145659_0913_35292b.zip`,
+Historische Quelle der Exchange-Revision 2: `patch-harbor_Result_Bundle_145659_0913_35292b.zip`,
 Commit `9e3a6f9036dc681f463d2fdd6b603aee9b409598`. Die Integration verwendet die
 oben genannte aktuelle Result-Basis; ursprüngliche Dokumentgrößen und SHA-256
 sind im Plan als Herkunft erhalten. Geprüfte Ansatzpunkte sind insbesondere

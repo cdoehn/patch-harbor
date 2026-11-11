@@ -53,7 +53,7 @@ def test_scoped_worker_passes_full_physical_binding_to_public_api(monkeypatch, t
     {'version': 1, 'status': 'locked', 'blocked_on': {'kind': 'repository', 'repo_id': 'truncated'}},
     {'version': 1, 'status': 'no_candidate', 'blocked_on': None, 'extra': 1}])
 def test_invalid_progress_is_error_and_never_guessed_from_console_text(document):
-    response = {'watcher_progress': document, 'error': {'kind': 'patch_package_error',
+    response = {'watcher_progress': document, 'error': {'kind': 'task_bundle_error',
                 'message': 'no state-bound patch package matches a registered repository'}}
     assert ApplyCompletion(10, response, None, '').progress == Progress('error')
 

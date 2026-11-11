@@ -1,4 +1,4 @@
-"""Closed Result-3/PYZ metadata reader; described code is never imported."""
+"""Closed Result-4/PYZ metadata reader; described code is never imported."""
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -37,7 +37,7 @@ class ResultPyzRuntime:
     content_id: str | None
     source_commit: str | None
     operations: tuple[str, ...]
-    patch_formats: tuple[int, ...]
+    task_formats: tuple[int, ...]
     result_formats: tuple[int, ...]
 
 
@@ -51,25 +51,25 @@ def _artifact(value: object, *, version: str, files: dict[str, bytes]) -> Runtim
 
 
 def _capabilities(value: object) -> tuple[tuple[str, ...], tuple[int, ...], tuple[int, ...]]:
-    _require(type(value) is dict and set(value) == {'operations','patch_formats','result_formats'},
+    _require(type(value) is dict and set(value) == {'operations','task_formats','result_formats'},
              'invalid PYZ capabilities schema')
-    _require(value['operations'] == ['inspect_patch','validate_patch','pack_patch'],
+    _require(value['operations'] == ['inspect_task','validate_task','pack_task'],
              'unsupported PYZ operations')
-    for key, choices in (('patch_formats',([1],)), ('result_formats',([1,2,3],[3]))):
+    for key, choices in (('task_formats',([2],)), ('result_formats',([4],))):
         versions = value[key]
         _require(type(versions) is list and all(type(v) is int for v in versions)
                  and versions in choices, 'unsupported PYZ read versions')
-    return tuple(value['operations']), tuple(value['patch_formats']), tuple(value['result_formats'])
+    return tuple(value['operations']), tuple(value['task_formats']), tuple(value['result_formats'])
 
 
 def read_result_pyz(value: object, files: dict[str, bytes], *, resource_policy: ResourcePolicy) -> ResultPyzRuntime:
     """Check exact namespaces, metadata, descriptors and shared outer/inner budget."""
     _require(type(value) is dict and set(value) == {'status','reason','metadata','artifact'},
-             'invalid Result-3 runtime schema')
+             'invalid Result-4 runtime schema')
     metadata = _descriptor(value['metadata'], path=METADATA_PATH, limit=MAX_METADATA_BYTES, files=files)
     doc = parse_json_document(files[METADATA_PATH])
     _require(set(doc) == _FIELDS and doc['marker'] == 'patch-harbor-runtime'
-             and type(doc['format_version']) is int and doc['format_version'] == 2
+             and type(doc['format_version']) is int and doc['format_version'] == 3
              and doc['distribution'] == 'patchharbor', 'unsupported PYZ runtime metadata schema')
     _require(doc['status'] == value['status'] and doc['reason'] == value['reason']
              and doc['artifact'] == value['artifact'], 'inconsistent PYZ runtime metadata')

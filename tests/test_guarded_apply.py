@@ -27,7 +27,7 @@ def package(host,*,body=None,payloads=None,path=None):
     repo,exchange=host;context=api.context(repo)
     entrypoint=native_value('run.sh','run.ps1')
     body=body or native_script("printf 'approved' > execution-marker", "[IO.File]::WriteAllText('execution-marker','approved')")
-    contents={'patch.json':json.dumps({'marker':'patch-harbor','format_version':1,'entrypoint':entrypoint,
+    contents={'task.json':json.dumps({'marker':'patch-harbor-task-bundle','format_version':2,'entrypoint':entrypoint,
         **{key:str(getattr(context,key)) for key in ('repo_id','base_commit','state_fingerprint','fingerprint_algorithm')}}).encode(),
         entrypoint:body.encode()}
     contents.update({'stage/item':b'approved payload'} if payloads is None else payloads)
@@ -140,7 +140,7 @@ def test_swap_during_admission_does_not_replace_owned_bytes(host,in_exchange):
         # Existing replay admission additionally revalidates the selected Exchange
         # artifact; its fail-closed refusal must not be bypassed for this API.
         no_execution(repo,report)
-        assert report.primary_result.failure_reason is api.FailureReason.PATCH_PACKAGE_ERROR
+        assert report.primary_result.failure_reason is api.FailureReason.TASK_BUNDLE_ERROR
     else:
         assert report.success and report.primary_result.entrypoint_exit_code==0
         assert (repo/'stage/item').read_bytes()==b'approved payload'
@@ -170,7 +170,7 @@ def test_host_policy_can_require_exact_script_inventory_and_fresh_staging(host,v
     calls=[]
     def policy(facts):
         calls.append(facts)
-        allowed={'patch.json',facts.inspection.entrypoint,'stage/item'}
+        allowed={'task.json',facts.inspection.entrypoint,'stage/item'}
         return (set(facts.contents)==allowed and facts.contents[facts.inspection.entrypoint]==approved.encode()
                 and not (facts.context.repository_path.value/'stage/item').exists())
     report=guarded(host,path,digest,policy)

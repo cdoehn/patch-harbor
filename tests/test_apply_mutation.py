@@ -16,7 +16,7 @@ from patchharbor.apply_mutation import (
 from patchharbor.configuration import RepositoryConfigurationPaths, write_exchange_directory
 from patchharbor.exit_status import ExitCode, exit_code_for_error
 from patchharbor.errors import FailureReason
-from patchharbor.errors import PatchHarborError, patch_package_error
+from patchharbor.errors import PatchHarborError, task_bundle_error
 from patchharbor.models import BundlePayload, RepositoryContext
 from patchharbor.task_manifest import (
     TASK_FORMAT_VERSION,
@@ -228,7 +228,7 @@ def test_failed_attempt_publication_prevents_every_repository_write(
 
     def fail_attempt_publication() -> None:
         assert not target.exists()
-        raise patch_package_error("cannot publish automatic attempt")
+        raise task_bundle_error("cannot publish automatic attempt")
 
     package = _package(
         context,

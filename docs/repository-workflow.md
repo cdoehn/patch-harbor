@@ -184,7 +184,7 @@ patchharbor configure show
 ```
 
 All newly generated Result Bundles for this repository then use
-`<Repository>_Result_<HHMMSS>_<MMDD>_<ID6>.zip.txt`, including manual `bundle`,
+`<Repository>_Result_Bundle_<HHMMSS>_<MMDD>_<ID6>.zip.txt`, including manual `bundle`,
 automatic Apply results (success, failure, dry-run), Watcher results, and explicit
 `--output-dir` targets. There is no suffix argument on `apply` or `bundle`.
 Disable it with:
@@ -209,9 +209,9 @@ intact. Upgrade all installed PatchHarbor entrypoints together.
 A developer or development chat prepares the contents and entrypoint. `patchharbor pack` or `api.pack_task` creates and validates the package; see the [pack guide](pack.md).
 The new Result Bundle's `context.json` carries `bundle_suffix` as optional
 filename metadata. The matching chat instructions require the same suffix on
-`<Repository>_Patch_<HHMMSS>_<MMDD>_<ID6>.zip`. Missing metadata in older bundles
+`<Repository>_Task_Bundle_<HHMMSS>_<MMDD>_<ID6>.zip`. Missing metadata in older bundles
 means no suffix. After changing the setting, give the chat a fresh Result Bundle.
-Do not put this field in `patch.json`: it is not part of repository binding.
+Do not put this field in `task.json`: it is not part of repository binding.
 `patchharbor context --json` keeps its existing closed schema; a standalone
 context therefore needs the naming preference supplied separately.
 
@@ -271,7 +271,7 @@ patchharbor bundle
 `context` is an optional human-readable check. Human-facing terminal output,
 including the context printed by `patchharbor register`, shortens long technical
 identifiers to their first six characters plus `…`. This shortened text is
-presentation only: do not copy it into `patch.json` or use it as chat or machine
+presentation only: do not copy it into `task.json` or use it as chat or machine
 input. Run `patchharbor context --json` from the repository root, or
 `patchharbor context --json REPOSITORY` from elsewhere, when complete values are
 required. `register` itself deliberately has no `--json` option.
@@ -301,7 +301,7 @@ provide the version-matching `CHAT_INSTRUCTIONS.md` separately.
 
 The local repository path or Exchange path in `environment.json` helps the chat
 write commands for the development computer. These paths are informational,
-never repository selectors or additions to `patch.json`. The Result Bundle
+never repository selectors or additions to `task.json`. The Result Bundle
 supplies the repository identity and exact state, while local PatchHarbor
 resolves the registered path. The chat takes all
 repository-binding identifiers from the bundle's complete `context.json`, never
@@ -309,7 +309,7 @@ from shortened human-facing terminal output.
 
 The chat contract requires one downloadable repository-bound ZIP patch package.
 Patch filenames use
-`<Repository>_Patch_<HHMMSS>_<MMDD>_<ID6>.zip`, followed by `bundle_suffix`
+`<Repository>_Task_Bundle_<HHMMSS>_<MMDD>_<ID6>.zip`, followed by `bundle_suffix`
 from the Result Bundle when configured. After an Apply, upload the
 newly created Result Bundle back to the same chat. For a failed entrypoint or
 test run, that bundle contains the actual remaining repository state plus
@@ -354,7 +354,7 @@ absolute paths may naturally contain a user name. Review bundles before sharing.
 An explicit output directory can bypass an unset or unavailable Exchange path,
 but never a missing or invalid repository-local configuration. The environment
 records the selected repository's configured values, not a substituted Exchange
-path inferred from the output directory. `context.json`, `patch.json`,
+path inferred from the output directory. `context.json`, `task.json`,
 fingerprints and replay identities do not gain environment-dependent fields.
 
 External chat-generated Patch packages carry the same passive documents under
@@ -364,7 +364,7 @@ when a documentation change requires it. The reserved metadata pair is validated
 and excluded from mutation and execution; it cannot be an entrypoint. Existing
 packages without it still work. Each metadata file is UTF-8 without BOM, at most
 128 KiB, with the ordinary ZIP safety/resource rules still enforced. Unknown or
-incomplete reserved entries and metadata bindings that differ from `patch.json`
+incomplete reserved entries and metadata bindings that differ from `task.json`
 are rejected. This is passive documentation, not authentication or orchestration.
 
 The chat generates a fresh handoff for each Patch using the latest target
@@ -425,7 +425,7 @@ the **same exclusive repository lock** as Apply. A busy lock, dirty repository,
 missing receipt or contradiction leaves the attempt untouched. PatchHarbor does
 not infer liveness from process names and never automatically resets files.
 
-New Apply Result manifests record the full `patch_sha256` of the exact validated
+New Apply Result manifests record the full `task_sha256` of the exact validated
 ZIP bytes and an optional `completed_commit`, alongside the existing `run_id`,
 repository ID and expected/actual state binding. A completion is recorded only
 for a successful executed entrypoint and a verified clean forward commit. Dry

@@ -39,7 +39,7 @@ _MANIFEST = {
 def _write_patch(path: Path) -> None:
     with zipfile.ZipFile(path, "w") as archive:
         archive.writestr(
-            "patch.json",
+            "task.json",
             json.dumps(_MANIFEST, separators=(",", ":")).encode("utf-8"),
         )
         archive.writestr("run.sh", b"# PATCHHARBOR\nprintf ok\n")
@@ -59,7 +59,7 @@ def _write_result_bundle(path: Path, *, include_patch: bool = False) -> None:
         )
         if include_patch:
             archive.writestr(
-                "patch.json",
+                "task.json",
                 json.dumps(_MANIFEST, separators=(",", ":")).encode("utf-8"),
             )
             archive.writestr("run.sh", b"# PATCHHARBOR\nprintf unsafe\n")
@@ -96,7 +96,7 @@ def test_content_classification_does_not_depend_on_name_or_extension(
     foreign_artifact = classify_exchange_artifact(foreign_zip)
     direct_artifact = classify_exchange_artifact(direct_script)
 
-    assert patch_artifact.kind is ExchangeArtifactKind.PATCH_PACKAGE
+    assert patch_artifact.kind is ExchangeArtifactKind.TASK_BUNDLE
     assert patch_artifact.package is not None
     assert result_artifact.kind is ExchangeArtifactKind.RESULT_BUNDLE
     assert result_artifact.package is None
@@ -129,7 +129,7 @@ def test_flat_scan_skips_temporary_nonregular_and_nested_entries(
     )
     assert tuple(artifact.kind for artifact in artifacts) == (
         ExchangeArtifactKind.RESULT_BUNDLE,
-        ExchangeArtifactKind.PATCH_PACKAGE,
+        ExchangeArtifactKind.TASK_BUNDLE,
     )
 
 
@@ -154,7 +154,7 @@ def test_exchange_scan_uses_content_metadata_when_inode_identity_is_unreliable(
     artifacts = scan_exchange_directory(tmp_path)
 
     assert tuple(artifact.path for artifact in artifacts) == (patch,)
-    assert artifacts[0].kind is ExchangeArtifactKind.PATCH_PACKAGE
+    assert artifacts[0].kind is ExchangeArtifactKind.TASK_BUNDLE
     assert artifacts[0].package is not None
 
 
@@ -185,7 +185,7 @@ def test_flat_scan_skips_one_unreadable_entry_without_losing_candidates(
     artifacts = scan_exchange_directory(tmp_path)
 
     assert tuple(artifact.path for artifact in artifacts) == (patch,)
-    assert artifacts[0].kind is ExchangeArtifactKind.PATCH_PACKAGE
+    assert artifacts[0].kind is ExchangeArtifactKind.TASK_BUNDLE
 
 
 def test_scan_reports_an_unreadable_or_missing_directory(tmp_path: Path) -> None:
@@ -203,7 +203,7 @@ def test_persistent_classification_cache_is_reused_only_for_same_identity(
     _write_patch(patch)
 
     first = scan_exchange_directory(tmp_path, paths=paths)
-    assert first[0].kind is ExchangeArtifactKind.PATCH_PACKAGE
+    assert first[0].kind is ExchangeArtifactKind.TASK_BUNDLE
 
     def fail_reclassification(*_args: object, **_kwargs: object):
         raise AssertionError("unchanged identity was reclassified")

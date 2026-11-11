@@ -120,7 +120,7 @@ def _write_apply_package(
     entrypoint = "entrypoint.data"
     with zipfile.ZipFile(package, "w") as archive:
         archive.writestr(
-            "patch.json",
+            "task.json",
             json.dumps(
                 _manifest(context, entrypoint),
                 ensure_ascii=False,

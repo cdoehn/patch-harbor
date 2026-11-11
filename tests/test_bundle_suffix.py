@@ -28,7 +28,7 @@ def paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
 @pytest.mark.parametrize("suffix", ["", ".txt", ".TXT", "-copilot.txt", "_data", ".tar.txt", "x" * 32])
 def test_suffix_is_literal_and_only_changes_outer_name(suffix: str) -> None:
     assert validate_bundle_suffix(suffix) == suffix
-    for kind in ("Patch", "Result"):
+    for kind in ("Task", "Result"):
         name = f"repository_{kind}_120000_0908_abcdef.zip"
         assert append_bundle_suffix(name, suffix) == name + suffix
 

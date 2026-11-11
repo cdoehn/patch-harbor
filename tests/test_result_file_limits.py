@@ -47,7 +47,7 @@ def publication_inputs(tmp_path, count):
     runtime = runtime_payload(PyzArtifact(recipe, raw, sha256(raw).hexdigest(),
         payloads[pyz.CHAT_PATH], payloads[pyz.DOC_PATH], payloads[pyz.LICENSE_PATH]))
     context = _context_document(report)
-    environment = dict(marker='patch-harbor-environment', format_version=1, bundle_type='Result',
+    environment = dict(marker='patch-harbor-environment', format_version=2, bundle_type='Result',
         repository_context={k: context[k] for k in
             ('repo_id', 'base_commit', 'state_fingerprint', 'fingerprint_algorithm')},
         run_id=report.run_id_text, bundle_suffix='')

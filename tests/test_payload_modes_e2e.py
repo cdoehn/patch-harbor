@@ -22,7 +22,7 @@ pytestmark = [pytest.mark.e2e, pytest.mark.skipif(os.name != "posix", reason="na
 
 def package_for(path: Path, context, *, new_mode: int = 0o755, existing_mode: int = 0o644):
     document = {
-        "marker": "patch-harbor", "format_version": 1,
+        "marker": "patch-harbor-task-bundle", "format_version": 2,
         "repo_id": str(context.repo_id), "base_commit": str(context.base_commit),
         "state_fingerprint": context.state_fingerprint,
         "fingerprint_algorithm": context.fingerprint_algorithm, "entrypoint": "run.sh",
@@ -40,7 +40,7 @@ MODE_CHECK
 test "$(tools/new.sh)" = executed
 '''.encode()
     with zipfile.ZipFile(path, "w") as archive:
-        for name, data, mode in (("patch.json", json.dumps(document).encode(), 0o644),
+        for name, data, mode in (("task.json", json.dumps(document).encode(), 0o644),
                                  ("run.sh", script, 0o755),
                                  ("tracked.txt", b"changed\n", 0o600),
                                  ("tools/new.sh", b"#!/bin/sh\nprintf executed\n", new_mode)):

@@ -110,14 +110,9 @@ def test_frozen_reference_formats_remain_byte_exact_and_readable(tmp_path, versi
     original = path.read_bytes()
     assert len(original) == record['bytes'] and pyz.sha256(original) == record['sha256']
     patch = tmp_path / 'bound.zip'; bound_package(patch, provenance['binding'])
-    if version in (1, 2):
-        with pytest.raises(api.PatchHarborError): read_result_reference(path)
-        with pytest.raises(api.PatchHarborError): api.validate_task(patch, reference_bundle=path)
-        with pytest.raises(ValueError): bootstrap.assess(path)
-    else:
-        facts, digest = read_result_reference(path)
-        assert facts.format_version == version and digest == record['sha256']
-        assert api.validate_task(patch, reference_bundle=path).binding_matches
+    with pytest.raises(api.PatchHarborError): read_result_reference(path)
+    with pytest.raises(api.PatchHarborError): api.validate_task(patch, reference_bundle=path)
+    with pytest.raises(ValueError): bootstrap.assess(path)
     assert path.read_bytes() == original
     if version == 3:
         with ZipFile(path) as archive: raw = archive.read('runtime/patchharbor-1.3.0.pyz')
@@ -166,7 +161,7 @@ def test_both_canonical_entrypoints_guard_before_core_import(requirement, versio
 
 
 def test_relabelled_assessment_cannot_bypass_original_artifact_minimum(tmp_path, monkeypatch):
-    path = FIXTURES / 'result-format3.zip'
+    path, _, _ = result_file(tmp_path, variant('>=3.12'))
     assessment = bootstrap.assess(path, trusted_source_sha256=pyz.sha256(path.read_bytes()))
     monkeypatch.setattr(bootstrap, 'sys', SimpleNamespace(version_info=(3, 10)))
     assessment = replace(assessment, requires_python='>=3.10')

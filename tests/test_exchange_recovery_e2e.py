@@ -29,7 +29,7 @@ def test_real_crash_after_publication_recovers_and_archives(tmp_path, explicit, 
     with zipfile.ZipFile(result) as archive:
         manifest = json.loads(archive.read("manifest.json"))
         run = json.loads(archive.read("logs/run.json"))
-    assert manifest["patch_sha256"] == sha256(raw).hexdigest()
+    assert manifest["task_sha256"] == sha256(raw).hexdigest()
     assert manifest["completed_commit"] == completed != context["base_commit"]
     assert manifest["run_id"] == record["attempt_run_id"] == run["run_id"]
     assert run["primary_result"]["success"] is True
@@ -138,7 +138,7 @@ def test_uncertain_evidence_does_not_repair_or_rollback(tmp_path, damage):
         assert (repo / "tracked.txt").read_bytes() == b"user edits must survive\n"
 
 
-@pytest.mark.parametrize("field", ["patch_sha256", "run_id", "repo_id", "expected_base_commit", "expected_state_fingerprint", "completed_commit", "actual_base_commit", "dirty", "base-blob", "duplicate-json"])
+@pytest.mark.parametrize("field", ["task_sha256", "run_id", "repo_id", "expected_base_commit", "expected_state_fingerprint", "completed_commit", "actual_base_commit", "dirty", "base-blob", "duplicate-json"])
 def test_semantic_receipt_validation_even_with_inconsistent_local_digest(tmp_path, field):
     env, exchange, repo, _, patch, record = _pending(tmp_path)
     result = _result(exchange, record)
@@ -148,11 +148,11 @@ def test_semantic_receipt_validation_even_with_inconsistent_local_digest(tmp_pat
             key = next(name for name in files if name.startswith("base/"))
             files[key] += b"corrupted"
         elif field == "duplicate-json":
-            files["manifest.json"] = files["manifest.json"].replace(b"{", b'{"patch_sha256":"' + b"a"*64 + b'",', 1)
+            files["manifest.json"] = files["manifest.json"].replace(b"{", b'{"task_sha256":"' + b"a"*64 + b'",', 1)
         else:
             manifest[field] = (
                 True if field == "dirty" else
-                "a"*64 if field == "patch_sha256" else
+                "a"*64 if field == "task_sha256" else
                 "a"*16 if field == "expected_state_fingerprint" else
                 "a3f9c2e1-7b4d-4a91-9d2e-5c6f8a1b2c3d" if field in {"repo_id", "run_id"} else
                 "a"*40
@@ -207,5 +207,5 @@ def test_noop_and_failed_entrypoints_do_not_create_a_completion_receipt(tmp_path
         result = Path(json.loads(completed.stdout)["result"]["result_bundle"]["path"])
         with zipfile.ZipFile(result) as archive:
             manifest = json.loads(archive.read("manifest.json"))
-        assert manifest["patch_sha256"] == sha256(patch.read_bytes()).hexdigest()
+        assert manifest["task_sha256"] == sha256(patch.read_bytes()).hexdigest()
         assert manifest["completed_commit"] is None

@@ -47,7 +47,7 @@ def test_release_pyz_direct_consumer_without_result_bootstrap(tmp_path,case):
     proof=json.loads(process.stdout)
     assert proof['source_unchanged'] and proof['runtime_sha256']==digest
     assert proof['capabilities']['safe_reference_contract_version']==1
-    assert proof['capabilities']['snapshot_contract_version']==1
+    assert proof['capabilities']['snapshot_contract_version']==2
 
 
 def test_public_consumer_rejects_hash_before_import(tmp_path):

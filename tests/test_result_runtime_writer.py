@@ -1,4 +1,4 @@
-"""Result-3 producer integration through actual registered fixture repositories."""
+"""Result-4 producer integration through actual registered fixture repositories."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -36,7 +36,7 @@ def test_all_result_routes_embed_same_producer_runtime(repository, artifact, mon
     assert len(calls) == 1
     assert report.process_exit_code == (27 if route == "failure" else 0)
     facts, _ = read_result_reference(report.result_bundle.path)
-    assert facts.format_version == 3 and facts.runtime.status == "embedded"
+    assert facts.format_version == 4 and facts.runtime.status == "embedded"
     assert facts.runtime.artifact.sha256 == artifact.pyz_sha256
     assert facts.runtime.content_id == artifact.recipe.content_id
     assert facts.context.repository_path == str(root)
@@ -128,4 +128,4 @@ def test_missing_mandatory_template_remains_a_result_error(repository, monkeypat
     assert report.primary_result.entrypoint_exit_code == 27
     assert report.result_bundle.status is api.ResultBundleStatus.FAILED
     assert report.result_bundle.emergency_diagnostics_path.is_dir()
-    assert not tuple(exchange.glob("*_Result_*.zip"))
+    assert not tuple(exchange.glob("*_Result_Bundle_*.zip"))

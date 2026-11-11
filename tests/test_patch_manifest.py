@@ -51,8 +51,8 @@ def _without(field: str) -> dict[str, object]:
 def _assert_package_error(payload: bytes) -> PatchHarborError:
     with pytest.raises(PatchHarborError) as captured:
         parse_task_manifest(payload)
-    assert exit_code_for_error(captured.value) is ExitCode.PATCH_PACKAGE_ERROR
-    assert captured.value.error_kind is ErrorKind.PATCH_PACKAGE_ERROR
+    assert exit_code_for_error(captured.value) is ExitCode.TASK_BUNDLE_ERROR
+    assert captured.value.error_kind is ErrorKind.TASK_BUNDLE_ERROR
     return captured.value
 
 
@@ -96,7 +96,7 @@ def test_complete_object_ids_select_their_storage_format(
         _with("marker", 1),
         _with("marker", "PATCH-HARBOR"),
         _with("format_version", True),
-        _with("format_version", 2),
+        _with("format_version", 1),
         _with("repo_id", "a3f9c2e1-7b4d-1a91-9d2e-5c6f8a1b2c3d"),
         _with("base_commit", "a" * 39),
         _with("base_commit", "A" * 40),
@@ -105,7 +105,7 @@ def test_complete_object_ids_select_their_storage_format(
         _with("state_fingerprint", "g" * 16),
         _with("fingerprint_algorithm", "patchharbor-state-v2"),
         _with("entrypoint", ""),
-        _with("entrypoint", "patch.json"),
+        _with("entrypoint", "task.json"),
     ],
     ids=(
         "missing-field",
@@ -140,7 +140,7 @@ def test_closed_contract_rejects_distinct_schema_violations(
         (
             f'{{"marker":"{TASK_MARKER}","marker":"{TASK_MARKER}"}}'
         ).encode("utf-8"),
-        b'{"marker":"patch-harbor" // comment\n}',
+        b'{"marker":"patch-harbor-task-bundle" // comment\n}',
         _payload() + b"{}",
         b'{"marker":NaN}',
     ],

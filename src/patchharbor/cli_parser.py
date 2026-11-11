@@ -385,7 +385,7 @@ def _add_bundle_apply_commands(commands) -> None:
         nargs="?",
         metavar="PATCH_ZIP",
         help=(
-            "explicit ZIP package containing a root patch.json; when omitted, "
+            "explicit ZIP package containing a root task.json; when omitted, "
             "use the current registered repository and its newest eligible "
             "Exchange package"
         ),

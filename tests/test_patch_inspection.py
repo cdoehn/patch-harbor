@@ -33,7 +33,7 @@ def test_inspection_reports_all_roles_and_exact_bytes_without_payload_copies(tmp
     assert info.entrypoint == "run.sh"
     assert len(info.entries) == len(entries)  # Explicit directory is not a file.
     assert [entry.path for entry in info.entries] == sorted(entries)
-    expected_roles = {"patch.json": "manifest", "run.sh": "entrypoint", "docs/data.bin": "payload",
+    expected_roles = {"task.json": "manifest", "run.sh": "entrypoint", "docs/data.bin": "payload",
                       "PATCHHARBOR_META/CHAT_INSTRUCTIONS.md": "handoff",
                       "PATCHHARBOR_META/environment.json": "handoff"}
     for entry in info.entries:
@@ -128,7 +128,7 @@ def test_invalid_observer_is_rejected(operation):
     ({"run.sh": b"#!/usr/bin/env bash\nprintf missing-marker\n"}, 3),
     ({"run.sh": b"\xff# PATCHHARBOR\n"}, 3),
     ({"run.sh": b"#!/usr/bin/env python\n# PATCHHARBOR\n"}, 5),
-    ({"patch.json": b"{}"}, 10),
+    ({"task.json": b"{}"}, 10),
     ({"../outside.txt": b"unsafe"}, 4),
     ({"DOCS/data.bin": b"collision"}, 4),
     ({"PATCHHARBOR_META/environment.json": b"{}"}, 10),
@@ -143,7 +143,7 @@ def test_api_and_json_cli_share_security_errors(tmp_path, changes, code, command
     stdout, stderr = StringIO(), StringIO()
     assert main([command, str(path), "--json", "--verbose"], stdout=stdout, stderr=stderr) == code
     document = json.loads(stdout.getvalue())
-    assert document["output_version"] == 2 and document["command"] == command
+    assert document["output_version"] == 3 and document["command"] == command
     assert document["success"] is False and document["result"] is None
     assert document["process_exit_code"] == document["error"]["patchharbor_error_code"] == code
     assert stderr.getvalue() == ""
@@ -164,7 +164,7 @@ def test_json_cli_uses_public_api_and_complete_typed_facts(tmp_path, monkeypatch
     assert calls == [path]
     document = json.loads(stdout.getvalue())
     assert set(document) == {"output_version", "command", "success", "result", "error", "process_exit_code"}
-    assert document["output_version"] == 2 and document["error"] is None
+    assert document["output_version"] == 3 and document["error"] is None
     assert document["command"] == command and document["success"] is True
     result = document["result"]
     if command == "validate":

@@ -436,7 +436,7 @@ class PyzAssessment:
 
 
 def assess(reference, *, trusted_source_sha256=None):
-    """Check the selected Result-3 runtime descriptors before any code import."""
+    """Check the selected Result-4 runtime descriptors before any code import."""
     path = Path(reference).absolute()
     raw = _capture(path, MAX_INPUT)
     digest = sha256(raw).hexdigest()
@@ -449,7 +449,7 @@ def assess(reference, *, trusted_source_sha256=None):
         manifest = _json(_read(archive, 'manifest.json', MAX_INPUT))
         _require(manifest.get('marker') == 'patch-harbor-result-bundle'
                  and type(manifest.get('format_version')) is int, 'not a supported Result')
-        _require(manifest['format_version'] == 3, 'unsupported Result version')
+        _require(manifest['format_version'] == 4, 'unsupported Result version')
         runtime = manifest.get('runtime')
         _require(type(runtime) is dict and set(runtime) == {'status','reason','metadata','artifact'},
                  'outer runtime schema')
@@ -457,7 +457,7 @@ def assess(reference, *, trusted_source_sha256=None):
         _require(metadata_descriptor['path'] == 'runtime/runtime.json', 'runtime metadata path')
         metadata = _json(_checked(archive, metadata_descriptor, MAX_METADATA))
         _require(set(metadata) == METADATA_FIELDS and metadata.get('marker') == 'patch-harbor-runtime'
-                 and type(metadata.get('format_version')) is int and metadata['format_version'] == 2
+                 and type(metadata.get('format_version')) is int and metadata['format_version'] == 3
                  and metadata.get('distribution') == 'patchharbor', 'runtime metadata identity')
         _require(metadata.get('status') == runtime['status'] and metadata.get('reason') == runtime['reason']
                  and metadata.get('artifact') == runtime['artifact'], 'runtime descriptor disagreement')
@@ -489,10 +489,10 @@ def assess(reference, *, trusted_source_sha256=None):
                  and type(metadata.get('content_id')) is str and HEX.fullmatch(metadata['content_id']),
                  'unsupported PYZ profile or Python requirement')
         capabilities = metadata['capabilities']
-        _require(type(capabilities) is dict and set(capabilities) == {'operations','patch_formats','result_formats'}
-                 and capabilities['operations'] == ['inspect_patch','validate_patch','pack_patch'],
+        _require(type(capabilities) is dict and set(capabilities) == {'operations','task_formats','result_formats'}
+                 and capabilities['operations'] == ['inspect_task','validate_task','pack_task'],
                  'unsupported runtime capabilities')
-        for key, choices in (('patch_formats',([1],)), ('result_formats',([1,2,3],[3]))):
+        for key, choices in (('task_formats',([2],)), ('result_formats',([4],))):
             values = capabilities[key]
             _require(type(values) is list and all(type(v) is int for v in values)
                      and values in choices, 'unsupported runtime read versions')

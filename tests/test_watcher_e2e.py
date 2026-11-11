@@ -60,7 +60,7 @@ def _write_lock_protected_package(
     )
     with zipfile.ZipFile(path, "w") as archive:
         archive.writestr(
-            "patch.json",
+            "task.json",
             json.dumps(
                 manifest,
                 ensure_ascii=False,
@@ -168,7 +168,7 @@ def _write_automatic_watcher_package(
     )
     with zipfile.ZipFile(path, "w") as archive:
         archive.writestr(
-            "patch.json",
+            "task.json",
             json.dumps(
                 manifest,
                 ensure_ascii=False,
@@ -217,7 +217,7 @@ def test_shared_watcher_delegates_discovery_identity_and_retry_to_core(
 
     package = exchange / "chat-output.bin"
     _write_automatic_watcher_package(package, context)
-    result_bundle = exchange / "repository_Result_000000_0101_abcdef.zip"
+    result_bundle = exchange / "repository_Result_Bundle_000000_0101_abcdef.zip"
     with zipfile.ZipFile(result_bundle, "w") as archive:
         archive.writestr(
             "manifest.json",
@@ -251,7 +251,7 @@ def test_shared_watcher_delegates_discovery_identity_and_retry_to_core(
     assert (exchange / "unfinished.crdownload").is_file()
     generated_bundles = tuple(
         path
-        for path in exchange.glob("*_Result_*.zip")
+        for path in exchange.glob("*_Result_Bundle_*.zip")
         if path != result_bundle
     )
     assert len(generated_bundles) == 1
@@ -341,7 +341,7 @@ def test_watcher_does_not_loop_after_a_failed_entrypoint(
     )
     with zipfile.ZipFile(package, "w") as archive:
         archive.writestr(
-            "patch.json",
+            "task.json",
             json.dumps(
                 manifest,
                 ensure_ascii=False,

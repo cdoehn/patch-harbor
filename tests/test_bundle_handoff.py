@@ -32,8 +32,8 @@ BINDING = {
 
 def patch_environment(**overrides: object) -> dict[str, object]:
     return {
-        "marker": ENVIRONMENT_MARKER, "format_version": 1,
-        "bundle_type": "Patch", "bundle_filename": "repo_Patch_120000_0908_abcdef.zip.txt",
+        "marker": ENVIRONMENT_MARKER, "format_version": 2,
+        "bundle_type": "Task", "bundle_filename": "repo_Task_Bundle_120000_0908_abcdef.zip.txt",
         "repository_context": BINDING,
         "repository_path": "/home/example/My Project's repo",
         "exchange_directory": "/sdcard/Download",
@@ -46,9 +46,9 @@ def patch_environment(**overrides: object) -> dict[str, object]:
 
 def write_handoff_patch(path: Path, entries: dict[str, bytes], *, entrypoint: str | None = None) -> None:
     selected = entrypoint or native_value("run.sh", "run.ps1")
-    manifest = {"marker": "patch-harbor", "format_version": 1, **BINDING, "entrypoint": selected}
+    manifest = {"marker": "patch-harbor-task-bundle", "format_version": 2, **BINDING, "entrypoint": selected}
     with zipfile.ZipFile(path, "w") as archive:
-        archive.writestr("patch.json", json.dumps(manifest))
+        archive.writestr("task.json", json.dumps(manifest))
         if selected not in entries:
             archive.writestr(selected, native_script("exit 0", "exit 0"))
         archive.writestr("actual-payload.txt", "keep")
@@ -161,7 +161,7 @@ def test_template_line_endings_are_lf_without_rewriting_source(
 
 
 @pytest.mark.parametrize("text,expected", LINE_ENDING_CASES)
-@pytest.mark.parametrize("bundle_type", ["Patch", "Result"])
+@pytest.mark.parametrize("bundle_type", ["Task", "Result"])
 def test_explicit_template_line_endings_are_lf_and_environment_is_unchanged(
     monkeypatch: pytest.MonkeyPatch, text: str, expected: str, bundle_type: str,
 ) -> None:

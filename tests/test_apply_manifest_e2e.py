@@ -46,7 +46,7 @@ def _write_package(
     path: Path,
     *,
     manifest: bytes | None = None,
-    manifest_name: str = "patch.json",
+    manifest_name: str = "task.json",
     manifest_info: zipfile.ZipInfo | None = None,
     duplicate_manifest: bool = False,
     entrypoint: bytes = (
@@ -63,7 +63,7 @@ def _write_package(
         if duplicate_manifest:
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore", UserWarning)
-                archive.writestr("patch.json", payload)
+                archive.writestr("task.json", payload)
         archive.writestr("run.sh", entrypoint)
         archive.writestr("files/payload.bin", b"\x00payload\xff")
 
@@ -169,7 +169,7 @@ def test_dry_run_never_executes_entrypoint_marker_payload_or_nested_archive(
             "# PATCHHARBOR\nprintf nested > nested-ran.txt\n",
         )
     with zipfile.ZipFile(package, "w") as archive:
-        archive.writestr("patch.json", _manifest_for_context(context))
+        archive.writestr("task.json", _manifest_for_context(context))
         archive.writestr(
             "run.sh",
             "# PATCHHARBOR\nprintf entrypoint > entrypoint-ran.txt\n",
@@ -280,7 +280,7 @@ def test_dry_run_rejects_a_non_zip_with_closed_apply_result(
         json_output=True,
     )
 
-    assert completed.returncode == int(ExitCode.PATCH_PACKAGE_ERROR)
+    assert completed.returncode == int(ExitCode.TASK_BUNDLE_ERROR)
     envelope = json.loads(completed.stdout)
     assert set(envelope) == {
         "output_version",
@@ -292,7 +292,7 @@ def test_dry_run_rejects_a_non_zip_with_closed_apply_result(
     }
     assert envelope["command"] == "apply"
     assert envelope["success"] is False
-    assert envelope["process_exit_code"] == int(ExitCode.PATCH_PACKAGE_ERROR)
+    assert envelope["process_exit_code"] == int(ExitCode.TASK_BUNDLE_ERROR)
     result = envelope["result"]
     assert set(result) == {
         "run_id",
@@ -311,7 +311,7 @@ def test_dry_run_rejects_a_non_zip_with_closed_apply_result(
         "entrypoint_exit_code": None,
         "timed_out": False,
         "interrupted": False,
-        "patchharbor_error_code": int(ExitCode.PATCH_PACKAGE_ERROR),
+        "patchharbor_error_code": int(ExitCode.TASK_BUNDLE_ERROR),
     }
     assert result["result_bundle"] == {
         "attempted": False,
@@ -320,16 +320,16 @@ def test_dry_run_rejects_a_non_zip_with_closed_apply_result(
         "emergency_diagnostics_path": None,
     }
     assert envelope["error"]["patchharbor_error_code"] == int(
-        ExitCode.PATCH_PACKAGE_ERROR
+        ExitCode.TASK_BUNDLE_ERROR
     )
 
 
 @pytest.mark.parametrize(
     ("manifest_name", "manifest_info", "expected_exit"),
     [
-        ("files/patch.json", None, 10),
-        ("patch.json", zipfile.ZipInfo("patch.json/"), 10),
-        ("patch.json", zipfile.ZipInfo("patch.json"), 4),
+        ("files/task.json", None, 10),
+        ("task.json", zipfile.ZipInfo("task.json/"), 10),
+        ("task.json", zipfile.ZipInfo("task.json"), 4),
     ],
     ids=("nested", "directory", "symlink"),
 )

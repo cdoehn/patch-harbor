@@ -1,4 +1,4 @@
-"""Prepared Result-3 resources use the same pinned producer before the switch."""
+"""Prepared Result-4 resources use the same pinned producer before the switch."""
 from dataclasses import FrozenInstanceError
 from functools import partial
 from io import BytesIO
@@ -25,14 +25,14 @@ def test_prepared_payload_matches_strict_native_reader(monkeypatch,tmp_path,kind
     files,_=reference_entries(handoff=True)
     files = {name: raw for name, raw in files.items() if not name.startswith('runtime/')}
     files.update(dict(payload.entries()))
-    edit_document(files,'manifest.json',lambda d:d.update(format_version=3,runtime=payload.document()))
+    edit_document(files,'manifest.json',lambda d:d.update(format_version=4,runtime=payload.document()))
     edit_document(files,'logs/run.json',lambda d:d.update(warnings=list(payload.warnings)))
     reference=tmp_path/'result.zip';write_reference(reference,files)
     facts,_=read_result_reference(reference)
-    assert facts.format_version==3 and facts.runtime.status==payload.status
+    assert facts.format_version==4 and facts.runtime.status==payload.status
     assert 'artifact' in payload.document() and 'wheel' not in payload.document()
-    assert payload.result_format==3
-    assert payload.unavailable('resource_limit').result_format==3
+    assert payload.result_format==4
+    assert payload.unavailable('resource_limit').result_format==4
     assert len(payload.entries())==(2 if embedded else 1)
     with pytest.raises(FrozenInstanceError):payload.artifact_bytes=b'changed'
 
@@ -81,7 +81,7 @@ def test_private_format3_resources_run_through_actual_existing_writer_routes(rep
     else:report=api.apply(patch,dry_run=route=='dry_run')
     assert report.process_exit_code==(23 if route=='failure' else 0)
     facts,_=read_result_reference(report.result_bundle.path)
-    assert facts.format_version==3 and facts.runtime.status=='embedded'
+    assert facts.format_version==4 and facts.runtime.status=='embedded'
     assert facts.runtime.artifact.sha256==artifact.pyz_sha256
     with ZipFile(report.result_bundle.path) as archive:
         assert archive.read(facts.runtime.artifact.path)==artifact.pyz_bytes
@@ -97,13 +97,13 @@ def test_runtime_only_failure_keeps_snapshot_and_actual_failure_log(repository,m
     from tests.platform_support import native_script
     patch=package(root,exchange,exit_code=23)
     with ZipFile(patch) as archive:files={name:archive.read(name) for name in archive.namelist()}
-    entry=json.loads(files['patch.json'])['entrypoint']
+    entry=json.loads(files['task.json'])['entrypoint']
     files[entry]=native_script("printf 'diagnostic-bytes'\nexit 23", "[Console]::Write('diagnostic-bytes')\nexit 23")
     write_reference(patch,files)
     report=api.apply(patch)
     assert report.process_exit_code==23
     facts,_=read_result_reference(report.result_bundle.path)
-    assert facts.format_version==3 and facts.runtime.status=='unavailable'
+    assert facts.format_version==4 and facts.runtime.status=='unavailable'
     assert facts.warnings and facts.base_entries and facts.primary_result.entrypoint_exit_code==23
     with ZipFile(report.result_bundle.path) as archive:
         assert archive.read('logs/execution.log')==b'diagnostic-bytes'
@@ -116,10 +116,10 @@ def test_format3_budget_fallback_cannot_reintroduce_legacy_wheel_contract(reposi
     report=api.apply(package(*repository))
     assert report.process_exit_code==0
     facts,_=read_result_reference(report.result_bundle.path)
-    assert facts.format_version==3 and facts.runtime.reason=='resource_limit'
+    assert facts.format_version==4 and facts.runtime.reason=='resource_limit'
     with ZipFile(report.result_bundle.path) as archive:
         doc=json.loads(archive.read('runtime/runtime.json'))
-        assert doc['format_version']==2 and doc['artifact'] is None and 'wheel' not in doc
+        assert doc['format_version']==3 and doc['artifact'] is None and 'wheel' not in doc
 
 
 def test_prepared_runtime_and_template_are_frozen_before_mutation(repository,monkeypatch,tmp_path):
@@ -150,7 +150,7 @@ def test_required_template_failure_still_preserves_actual_error_diagnostics(repo
 
 def test_default_writer_retains_current_contract_until_switch(repository):
     report=api.bundle(repository[0]).report
-    assert read_result_reference(report.result_bundle.path)[0].format_version==3
+    assert read_result_reference(report.result_bundle.path)[0].format_version==4
 
 
 @pytest.mark.parametrize('fault',[RuntimeError('programming failure'),ValueError('programming failure'),KeyboardInterrupt(),SystemExit(9)])

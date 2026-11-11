@@ -80,7 +80,7 @@ def _write_package(
     )
     with zipfile.ZipFile(path, "w") as archive:
         archive.writestr(
-            "patch.json",
+            "task.json",
             json.dumps(
                 _manifest(context),
                 ensure_ascii=False,
@@ -104,7 +104,7 @@ def _write_custom_package(
     entrypoint = native_script(posix_entrypoint, powershell_entrypoint)
     with zipfile.ZipFile(path, "w") as archive:
         archive.writestr(
-            "patch.json",
+            "task.json",
             json.dumps(
                 _manifest(context),
                 ensure_ascii=False,

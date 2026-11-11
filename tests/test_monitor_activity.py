@@ -39,7 +39,7 @@ def document():
                  started_at=stamp(-140), updated_at=stamp(), facts_updated_at=stamp(-134),
                  completed=False, live=True, stale=False,
                  data=dict(repo_id=REPO, repository_path='/repos/patchharbor', run_id=RUN,
-                           patch_sha256=DIGEST, bundle_number='082', entrypoint_name='run.sh',
+                           task_sha256=DIGEST, bundle_number='082', entrypoint_name='run.sh',
                            origin='automatic', dry_run=False, effective_timeout_seconds=3600,
                            entrypoint_started_at=stamp(-134)),
                  history=[event('binding', 'success', 'Repository-Bindung stimmt überein', 1, -136),
@@ -178,7 +178,7 @@ def test_published_history_survives_late_monitor_start_and_is_bounded(tmp_path, 
     publication.update(phase='watching')
     row = wait_for(lambda: r if (r := instance(publication.instance_id)) and len(r.get('history', [])) == HISTORY_LIMIT else None)
     publication.close()
-    assert row['format_version'] == 2 and row['history'][-1]['message'] == 'Schritt 59'
+    assert row['format_version'] == 3 and row['history'][-1]['message'] == 'Schritt 59'
     assert row['history'][-1]['status'] == 'success'
     assert row['activity']['status'] == 'waiting'
 
@@ -193,7 +193,8 @@ def test_version_one_is_readable_and_malformed_history_is_rejected(tmp_path, mon
     name = 'watcher-' + row['instance_id'] + '.json'
     legacy = {k: v for k, v in row.items() if k not in ('activity', 'history')}
     legacy['format_version'] = 1
-    assert parse_live(json.dumps(legacy).encode(), name)['format_version'] == 1
+    with pytest.raises(ValueError, match='schema'):
+        parse_live(json.dumps(legacy).encode(), name)
     row['history'] = [row['activity']] * (HISTORY_LIMIT+1)
     with pytest.raises(ValueError, match='history'):
         parse_live(json.dumps(row).encode(), name)

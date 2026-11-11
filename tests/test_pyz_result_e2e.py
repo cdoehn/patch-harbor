@@ -37,7 +37,7 @@ print(json.dumps({'path':str(result.path)}))
 ''',str(repo),str(exchange)],tmp_path,environment))
     reference=Path(produced['path']);original=reference.read_bytes()
     facts,digest=read_result_reference(reference)
-    assert facts.format_version==3 and facts.runtime.status=='embedded' and not facts.warnings
+    assert facts.format_version==4 and facts.runtime.status=='embedded' and not facts.warnings
     with ZipFile(reference) as archive:
         template=archive.read('CHAT_INSTRUCTIONS.md')
         raw=archive.read(facts.runtime.artifact.path)
@@ -103,7 +103,7 @@ print(json.dumps({'patch':str(packed.path),'pyz':str(prepared.path),'sha256':pac
         outcome=command('apply',proof['patch'])
         returned=Path(outcome['result_bundle']['path'])
         returned_facts,_=read_result_reference(returned)
-        assert returned_facts.format_version==3 and returned_facts.runtime.artifact.sha256==facts.runtime.artifact.sha256
+        assert returned_facts.format_version==4 and returned_facts.runtime.artifact.sha256==facts.runtime.artifact.sha256
         assert (repo/'entrypoint-proof').read_bytes()==b'payloads-before-entrypoint'
         followup=tmp_path/'followup';followup.mkdir()
         fresh=command('bundle',repo,'--output-dir',followup)

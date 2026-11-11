@@ -31,8 +31,8 @@ def _prepare(tmp_path, monkeypatch, posix_body, windows_body):
     entrypoint = native_value("run.sh", "run.ps1")
     package = exchange / "worker-package.zip"
     with zipfile.ZipFile(package, "w") as archive:
-        archive.writestr("patch.json", json.dumps({
-            "marker": "patch-harbor", "format_version": 1,
+        archive.writestr("task.json", json.dumps({
+            "marker": "patch-harbor-task-bundle", "format_version": 2,
             "repo_id": str(context.repo_id), "base_commit": str(context.base_commit),
             "state_fingerprint": context.state_fingerprint,
             "fingerprint_algorithm": context.fingerprint_algorithm,

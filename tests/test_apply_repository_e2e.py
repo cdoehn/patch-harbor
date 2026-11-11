@@ -88,7 +88,7 @@ def _write_package(
 ) -> None:
     with zipfile.ZipFile(path, "w") as archive:
         archive.writestr(
-            "patch.json",
+            "task.json",
             json.dumps(
                 manifest,
                 ensure_ascii=False,
@@ -114,7 +114,7 @@ def _write_execution_package(
 
     with zipfile.ZipFile(path, "w") as archive:
         archive.writestr(
-            "patch.json",
+            "task.json",
             json.dumps(
                 manifest,
                 ensure_ascii=False,
@@ -149,7 +149,7 @@ def _run_dry_run(
 
 def _result_bundles(environment: dict[str, str]) -> tuple[Path, ...]:
     directory = configured_exchange_directory(environment)
-    return tuple(sorted(directory.glob("*_Result_*.zip")))
+    return tuple(sorted(directory.glob("*_Result_Bundle_*.zip")))
 
 
 def _different_hex(value: str) -> str:
@@ -186,7 +186,7 @@ def test_apply_noninteractive_output_is_sanitized_while_log_remains_raw(
     )
     with zipfile.ZipFile(package, "w") as archive:
         archive.writestr(
-            "patch.json",
+            "task.json",
             json.dumps(
                 manifest,
                 ensure_ascii=False,
@@ -210,7 +210,7 @@ def test_apply_noninteractive_output_is_sanitized_while_log_remains_raw(
     )
 
     assert completed.returncode == 0
-    bundles = tuple(output_directory.glob("*_Result_*.zip"))
+    bundles = tuple(output_directory.glob("*_Result_Bundle_*.zip"))
     assert len(bundles) == 1
     with zipfile.ZipFile(bundles[0]) as archive:
         assert archive.read("logs/execution.log") == raw_output
@@ -521,7 +521,7 @@ def test_apply_requires_valid_exchange_configuration_without_override(
         "path": None,
         "emergency_diagnostics_path": None,
     }
-    assert not tuple(exchange.glob("*_Result_*.zip"))
+    assert not tuple(exchange.glob("*_Result_Bundle_*.zip"))
     _assert_repository_unmodified(repository)
 
 
@@ -785,7 +785,7 @@ def test_state_mismatch_uses_physically_resolved_output_directory(
     )
 
     assert completed.returncode == int(ExitCode.STATE_MISMATCH)
-    assert len(tuple(physical_output.glob("*_Result_*.zip"))) == 1
+    assert len(tuple(physical_output.glob("*_Result_Bundle_*.zip"))) == 1
     assert not tuple(physical_output.glob(".*.tmp"))
     assert _result_bundles(environment) == ()
     _assert_repository_unmodified(repository)

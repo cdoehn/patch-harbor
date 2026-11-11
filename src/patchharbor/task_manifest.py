@@ -5,14 +5,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 import json
 
-from patchharbor.errors import patch_package_error
+from patchharbor.errors import task_bundle_error
 from patchharbor.models import GitObjectFormat, GitObjectId, RepositoryId
 from patchharbor.state_fingerprint import FINGERPRINT_ALGORITHM
 
 
-TASK_MANIFEST_NAME = "patch.json"
-TASK_MARKER = "patch-harbor"
-TASK_FORMAT_VERSION = 1
+TASK_MANIFEST_NAME = "task.json"
+TASK_MARKER = "patch-harbor-task-bundle"
+TASK_FORMAT_VERSION = 2
 _TASK_MANIFEST_FIELDS = frozenset(
     {
         "marker",
@@ -56,11 +56,11 @@ def _reject_non_finite_number(value: str) -> object:
 
 def _parse_json_object(payload: bytes) -> dict[str, object]:
     if payload.startswith(b"\xef\xbb\xbf"):
-        raise patch_package_error("patch.json must be UTF-8 without a BOM")
+        raise task_bundle_error("task.json must be UTF-8 without a BOM")
     try:
         text = payload.decode("utf-8")
     except UnicodeDecodeError as exc:
-        raise patch_package_error("patch.json is not valid UTF-8") from exc
+        raise task_bundle_error("task.json is not valid UTF-8") from exc
 
     try:
         document = json.loads(
@@ -69,19 +69,19 @@ def _parse_json_object(payload: bytes) -> dict[str, object]:
             parse_constant=_reject_non_finite_number,
         )
     except (json.JSONDecodeError, ValueError, RecursionError) as exc:
-        raise patch_package_error(
-            "patch.json is not one valid JSON object"
+        raise task_bundle_error(
+            "task.json is not one valid JSON object"
         ) from exc
 
     if type(document) is not dict:
-        raise patch_package_error("patch.json must contain one JSON object")
+        raise task_bundle_error("task.json must contain one JSON object")
     return document
 
 
 def _require_string(document: dict[str, object], field: str) -> str:
     value = document[field]
     if type(value) is not str:
-        raise patch_package_error(f"patch.json {field} is invalid")
+        raise task_bundle_error(f"task.json {field} is invalid")
     return value
 
 
@@ -89,30 +89,30 @@ def parse_task_manifest(payload: bytes) -> TaskManifest:
     """Parse manifest bytes without performing I/O or repository access."""
     document = _parse_json_object(payload)
     if set(document) != _TASK_MANIFEST_FIELDS:
-        raise patch_package_error(
-            "patch.json must contain exactly the seven format-1 fields"
+        raise task_bundle_error(
+            "task.json must contain exactly the seven format-1 fields"
         )
 
     marker = _require_string(document, "marker")
     if marker != TASK_MARKER:
-        raise patch_package_error("patch.json marker is invalid")
+        raise task_bundle_error("task.json marker is invalid")
 
     format_version = document["format_version"]
     if type(format_version) is not int or format_version != TASK_FORMAT_VERSION:
-        raise patch_package_error("patch.json format_version is invalid")
+        raise task_bundle_error("task.json format_version is invalid")
 
     repo_id_text = _require_string(document, "repo_id")
     try:
         repo_id = RepositoryId(repo_id_text)
     except ValueError as exc:
-        raise patch_package_error("patch.json repo_id is invalid") from exc
+        raise task_bundle_error("task.json repo_id is invalid") from exc
 
     base_commit_text = _require_string(document, "base_commit")
     try:
         object_format = GitObjectFormat.for_hex_length(len(base_commit_text))
         base_commit = GitObjectId(base_commit_text, object_format)
     except ValueError as exc:
-        raise patch_package_error("patch.json base_commit is invalid") from exc
+        raise task_bundle_error("task.json base_commit is invalid") from exc
 
     state_fingerprint = _require_string(document, "state_fingerprint")
     if (
@@ -123,20 +123,20 @@ def parse_task_manifest(payload: bytes) -> TaskManifest:
             for character in state_fingerprint
         )
     ):
-        raise patch_package_error("patch.json state_fingerprint is invalid")
+        raise task_bundle_error("task.json state_fingerprint is invalid")
 
     fingerprint_algorithm = _require_string(
         document,
         "fingerprint_algorithm",
     )
     if fingerprint_algorithm != FINGERPRINT_ALGORITHM:
-        raise patch_package_error(
-            "patch.json fingerprint_algorithm is invalid"
+        raise task_bundle_error(
+            "task.json fingerprint_algorithm is invalid"
         )
 
     entrypoint = _require_string(document, "entrypoint")
     if not entrypoint or entrypoint == TASK_MANIFEST_NAME:
-        raise patch_package_error("patch.json entrypoint is invalid")
+        raise task_bundle_error("task.json entrypoint is invalid")
 
     return TaskManifest(
         marker=marker,

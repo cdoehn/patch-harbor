@@ -12,7 +12,7 @@ from pathlib import Path
 import stat
 
 from patchharbor.bundle_paths import normalize_bundle_path, validate_bundle_member_paths
-from patchharbor.errors import FailureReason, PatchHarborError, patch_package_error
+from patchharbor.errors import FailureReason, PatchHarborError, task_bundle_error
 from patchharbor.models import BundlePayload
 from patchharbor.interpreters import select_interpreter
 from patchharbor.task_package import parse_task_entrypoint
@@ -23,7 +23,7 @@ from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY, ResourcePolicy
 
 
 MAX_SCAN_NODES=10_000
-GENERATED_ENTRIES=3  # patch.json and the two passive handoff files
+GENERATED_ENTRIES=3  # task.json and the two passive handoff files
 
 
 def resolve_output_target(output: Path, *, contents_root: Path) -> Path:
@@ -110,8 +110,8 @@ def _inventory(root: SourceDirectory, policy: ResourcePolicy,
                         or (not is_directory and metadata.st_nlink>1)):
                     raise UnsupportedFileTypeError('links and special sources are unsupported')
                 first=path.split('/',1)[0].casefold()
-                if first in ('patch.json','patchharbor_meta'):
-                    raise patch_package_error('pack source includes a generated reserved path: '+path)
+                if first in ('task.json','patch.json','manifest.json','patchharbor_meta'):
+                    raise task_bundle_error('pack source includes a generated reserved path: '+path)
                 entry=SourceEntry(path,is_directory,metadata)
                 entries.append(entry);children.append(entry)
                 if not is_directory:
@@ -164,9 +164,9 @@ def capture_sources(contents: Path, entrypoint: str, *, modes: Mapping[str,int] 
             inventory,empty=_inventory(directory,resource_policy)
             files={e.path:e for e in inventory if not e.directory}
             if entrypoint not in files:
-                raise patch_package_error('entrypoint is absent from pack contents')
+                raise task_bundle_error('entrypoint is absent from pack contents')
             if set(requested)-set(files):
-                raise patch_package_error('mode key does not name an input file')
+                raise task_bundle_error('mode key does not name an input file')
             by_parent={}
             for entry in inventory:
                 parent=entry.path.rpartition('/')[0]

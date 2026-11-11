@@ -263,7 +263,7 @@ def test_identity_verification_failure_does_not_consume_the_record(
     merge_exchange_classifications(paths, (record,))
 
     def fail_verification() -> None:
-        raise PatchHarborError("changed", FailureReason.PATCH_PACKAGE_ERROR)
+        raise PatchHarborError("changed", FailureReason.TASK_BUNDLE_ERROR)
 
     with pytest.raises(PatchHarborError, match="changed"):
         mark_exchange_apply_started(

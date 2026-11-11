@@ -23,7 +23,7 @@ class FailureReason(str, Enum):
     EXECUTION_ERROR = "execution_error"
     REPOSITORY_ERROR = "repository_error"
     STATE_MISMATCH = "state_mismatch"
-    PATCH_PACKAGE_ERROR = "patch_package_error"
+    TASK_BUNDLE_ERROR = "task_bundle_error"
     RESULT_BUNDLE_ERROR = "result_bundle_error"
     REPOSITORY_BUSY = "repository_busy"
     UNSUPPORTED_REPOSITORY_STATE = "unsupported_repository_state"
@@ -43,7 +43,7 @@ class ErrorKind(str, Enum):
     RESULT_BUNDLE_ERROR = "result_bundle_error"
     REPOSITORY_BUSY = "repository_busy"
     UNSUPPORTED_REPOSITORY_STATE = "unsupported_repository_state"
-    PATCH_PACKAGE_ERROR = "patch_package_error"
+    TASK_BUNDLE_ERROR = "task_bundle_error"
 
 
 class PatchHarborError(Exception):
@@ -126,12 +126,12 @@ def state_mismatch_error(
     )
 
 
-def patch_package_error(message: str) -> PatchHarborError:
+def task_bundle_error(message: str) -> PatchHarborError:
     """Create one centrally categorized patch-package failure."""
     return PatchHarborError(
         message,
-        FailureReason.PATCH_PACKAGE_ERROR,
-        error_kind=ErrorKind.PATCH_PACKAGE_ERROR,
+        FailureReason.TASK_BUNDLE_ERROR,
+        error_kind=ErrorKind.TASK_BUNDLE_ERROR,
     )
 
 

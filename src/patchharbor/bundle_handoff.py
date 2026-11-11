@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import json
 
-from patchharbor.errors import patch_package_error
+from patchharbor.errors import task_bundle_error
 from patchharbor.json_document import serialize_json_document
 from patchharbor.models import BundlePayload
 from patchharbor.task_manifest import TaskManifest
@@ -15,10 +15,10 @@ CHAT_INSTRUCTIONS_NAME = "CHAT_INSTRUCTIONS.md"
 ENVIRONMENT_NAME = "environment.json"
 TASK_HANDOFF_DIRECTORY = "PATCHHARBOR_META"
 ENVIRONMENT_MARKER = "patch-harbor-environment"
-ENVIRONMENT_FORMAT_VERSION = 1
+ENVIRONMENT_FORMAT_VERSION = 2
 MAX_HANDOFF_ENTRY_BYTES = 128 * 1024
-PATCH_FILENAME_SCHEMA = "<Repository>_Patch_<HHMMSS>_<MMDD>_<ID6>.zip<bundle_suffix>"
-RESULT_FILENAME_SCHEMA = "<Repository>_Result_<HHMMSS>_<MMDD>_<ID6>.zip<bundle_suffix>"
+TASK_FILENAME_SCHEMA = "<Repository>_Task_Bundle_<HHMMSS>_<MMDD>_<ID6>.zip<bundle_suffix>"
+RESULT_FILENAME_SCHEMA = "<Repository>_Result_Bundle_<HHMMSS>_<MMDD>_<ID6>.zip<bundle_suffix>"
 
 
 @dataclass(frozen=True)
@@ -67,9 +67,9 @@ def split_task_handoff(
         return payloads, None  # Existing format-1 packages remain unchanged.
     expected = {prefix + CHAT_INSTRUCTIONS_NAME, prefix + ENVIRONMENT_NAME}
     if {item.relative_path for item in metadata} != expected or len(metadata) != 2:
-        raise patch_package_error("patch handoff must contain exactly the two reserved metadata files")
+        raise task_bundle_error("patch handoff must contain exactly the two reserved metadata files")
     if manifest.entrypoint in expected:
-        raise patch_package_error("patch handoff metadata cannot be an entrypoint")
+        raise task_bundle_error("patch handoff metadata cannot be an entrypoint")
     content = {item.relative_path: item.content for item in metadata}
     try:
         for raw in content.values():
@@ -86,7 +86,7 @@ def split_task_handoff(
             or environment.get("marker") != ENVIRONMENT_MARKER
             or type(environment.get("format_version")) is not int
             or environment["format_version"] != ENVIRONMENT_FORMAT_VERSION
-            or environment.get("bundle_type") != "Patch"
+            or environment.get("bundle_type") != "Task"
         ):
             raise ValueError("invalid environment document")
         # Supplementary metadata must agree, but cannot replace the manifest.
@@ -96,9 +96,9 @@ def split_task_handoff(
             "state_fingerprint": manifest.state_fingerprint,
             "fingerprint_algorithm": manifest.fingerprint_algorithm,
         }:
-            raise ValueError("handoff does not match patch.json")
+            raise ValueError("handoff does not match task.json")
     except (UnicodeError, ValueError, RecursionError) as exc:
-        raise patch_package_error("invalid patch handoff metadata") from exc
+        raise task_bundle_error("invalid patch handoff metadata") from exc
     return (
         tuple(payload for payload in payloads if payload not in metadata),
         BundleHandoff(content[prefix + CHAT_INSTRUCTIONS_NAME], content[prefix + ENVIRONMENT_NAME]),

@@ -76,7 +76,7 @@ def test_shared_poll_delegates_to_core_and_deduplicates_idle_records(
             result=_automatic_apply_envelope(
                 success=False,
                 process_exit_code=10,
-                error_kind="patch_package_error",
+                error_kind="task_bundle_error",
                 error_message=(
                     "no state-bound patch package matches a registered repository"
                 ),
@@ -129,7 +129,7 @@ def test_shared_poll_records_success_and_distinct_core_error(
                 result=_automatic_apply_envelope(
                     success=False,
                     process_exit_code=10,
-                    error_kind="patch_package_error",
+                    error_kind="task_bundle_error",
                     error_message=(
                         "selected exchange patch changed during automatic discovery"
                     ),

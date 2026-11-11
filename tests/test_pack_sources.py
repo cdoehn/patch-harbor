@@ -49,10 +49,10 @@ def test_complete_explicit_tree_preserves_bytes_and_default_modes(contents):
     result.revalidate()
 
 
-@pytest.mark.parametrize('name',['patch.json','PATCH.JSON','PATCHHARBOR_META','patchharbor_meta','PatchHarbor_Meta'])
+@pytest.mark.parametrize('name',['task.json','PATCH.JSON','PATCHHARBOR_META','patchharbor_meta','PatchHarbor_Meta'])
 def test_reserved_root_inputs_are_not_silently_filtered(contents,name):
     (contents/name).write_bytes(b'{}')
-    fails(FailureReason.PATCH_PACKAGE_ERROR,lambda:capture_sources(contents,'run.sh'))
+    fails(FailureReason.TASK_BUNDLE_ERROR,lambda:capture_sources(contents,'run.sh'))
 
 
 @pytest.mark.parametrize('name',['.git','.patchharbor','nested/.GIT'])
@@ -77,7 +77,7 @@ def test_unsafe_entrypoint_paths_keep_source_error(contents,entrypoint):
 @pytest.mark.parametrize('name',['missing.sh','Run.sh','empty'])
 def test_missing_or_directory_entrypoint_keeps_package_error(contents,name):
     (contents/'empty').mkdir()
-    fails(FailureReason.PATCH_PACKAGE_ERROR,lambda:capture_sources(contents,name))
+    fails(FailureReason.TASK_BUNDLE_ERROR,lambda:capture_sources(contents,name))
 
 
 @pytest.mark.parametrize('raw',[b'#!/bin/bash\nexit 0\n',b'\xff',b'not a script'])
@@ -104,10 +104,10 @@ def test_unsafe_requested_modes_keep_source_error(contents,mode):
     fails(FailureReason.SOURCE_ERROR,lambda:capture_sources(contents,'run.sh',modes={'run.sh':mode}))
 
 
-@pytest.mark.parametrize('modes',[{'missing':0o644},{'empty':0o755},{'patch.json':0o644}])
+@pytest.mark.parametrize('modes',[{'missing':0o644},{'empty':0o755},{'task.json':0o644}])
 def test_modes_must_name_supplied_regular_files(contents,modes):
     (contents/'empty').mkdir()
-    fails(FailureReason.PATCH_PACKAGE_ERROR,lambda:capture_sources(contents,'run.sh',modes=modes))
+    fails(FailureReason.TASK_BUNDLE_ERROR,lambda:capture_sources(contents,'run.sh',modes=modes))
 
 
 @pytest.mark.parametrize('modes',[{'run.sh':True},{'run.sh':'0755'},{1:0o644},[]])

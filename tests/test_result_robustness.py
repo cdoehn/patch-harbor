@@ -74,7 +74,7 @@ def test_deep_json_cannot_abort_exchange_classification(tmp_path, monkeypatch, u
     path = tmp_path / "input.zip"; write_reference(path, files)
     # Interpreter recursion thresholds differ; a type hint is permissible, an
     # executable candidate is not. Exercise the overflow boundary explicitly too.
-    assert _classify_content(path, path.read_bytes(), resource_policy=DEFAULT_RESOURCE_POLICY).kind is not ExchangeArtifactKind.PATCH_PACKAGE
+    assert _classify_content(path, path.read_bytes(), resource_policy=DEFAULT_RESOURCE_POLICY).kind is not ExchangeArtifactKind.TASK_BUNDLE
     with pytest.raises(api.PatchHarborError): read_result_reference(path)
     def overflow(*args, **kwargs): raise RecursionError("JSON nesting limit")
     monkeypatch.setattr(json, "loads", overflow)
@@ -91,13 +91,13 @@ def test_outer_runtime_inventory_failures_never_become_patch_candidates(canonica
     elif fault == "nested_archive": files["runtime/nested.zip"] = canonical
     elif fault == "traversal": files["runtime/../outside.py"] = b"bad"
     elif fault == "both_markers":
-        files["patch.json"] = json.dumps(MANIFEST).encode()
+        files["task.json"] = json.dumps(MANIFEST).encode()
         files["run.sh"] = b"# PATCHHARBOR\n"
     path = tmp_path / "input.zip"; write_reference(path, files)
     if fault == "duplicate":
         with ZipFile(path, "a") as archive, pytest.warns(UserWarning):
             archive.writestr("runtime/runtime.json", files["runtime/runtime.json"])
-    assert _classify_content(path, path.read_bytes(), resource_policy=DEFAULT_RESOURCE_POLICY).kind is not ExchangeArtifactKind.PATCH_PACKAGE
+    assert _classify_content(path, path.read_bytes(), resource_policy=DEFAULT_RESOURCE_POLICY).kind is not ExchangeArtifactKind.TASK_BUNDLE
     with pytest.raises(api.PatchHarborError): read_result_reference(path)
     # The archive boundary rejects instead of downgrading corrupt runtime data
     # to a successfully checked unavailable reference.
@@ -124,6 +124,6 @@ def test_mixed_exchange_selects_only_real_patch_and_writer_produces_current_form
     document = json.loads(result.stdout)
     produced = Path(document["result"]["result_bundle"]["path"])
     with ZipFile(produced) as archive:
-        assert json.loads(archive.read("manifest.json"))["format_version"] == 3
+        assert json.loads(archive.read("manifest.json"))["format_version"] == 4
         assert json.loads(archive.read("runtime/runtime.json"))["reason"] == "source_not_prepared"
     assert (exchange / "embedded.zip").is_file() and (exchange / "unavailable.zip").is_file()

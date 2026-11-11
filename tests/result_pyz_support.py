@@ -1,4 +1,4 @@
-"""Synthetic Result-3 fixtures; no production writer activation is implied."""
+"""Synthetic Result-4 fixtures; no production writer activation is implied."""
 import pytest
 from patchharbor import runtime_pyz as pyz
 from patchharbor.pyz_artifact import PyzArtifact

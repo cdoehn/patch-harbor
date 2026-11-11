@@ -29,7 +29,7 @@ def reference_entries(*, kind="bundle", dirty=False, object_format="sha1", hando
                "timeout": PrimaryResult.timeout_result, "interrupted": PrimaryResult.interrupted_result}[kind]()
     raw = b"base\x00\xff\n"
     blob = hashlib.new(object_format, b"blob " + str(len(raw)).encode() + b"\0" + raw).hexdigest()
-    manifest = {"marker": "patch-harbor-result-bundle", "format_version": 3, **binding,
+    manifest = {"marker": "patch-harbor-result-bundle", "format_version": 4, **binding,
                 "created_at": stamp, "run_id": run_id, "dirty": dirty, "dry_run": kind == "dry_run",
                 "entrypoint_started": primary.entrypoint_started, "execution_present": primary.entrypoint_started,
                 "primary_result": primary.kind.value, "result_bundle_status": "created",
@@ -58,7 +58,7 @@ def reference_entries(*, kind="bundle", dirty=False, object_format="sha1", hando
         files["changes/unstaged.patch"] = b"opaque captured delta\n"
     if handoff:
         files["CHAT_INSTRUCTIONS.md"] = b"# Passive reference\n"
-        files["environment.json"] = json.dumps({"marker": "patch-harbor-environment", "format_version": 1,
+        files["environment.json"] = json.dumps({"marker": "patch-harbor-environment", "format_version": 2,
                                                 "bundle_type": "Result", "repository_context": binding,
                                                 "run_id": run_id, "bundle_suffix": ""}).encode()
     files.update({name: json.dumps(doc).encode() for name, doc in
@@ -76,7 +76,7 @@ def write_reference(path, files, *, executable=()):
 
 
 def bound_package(path, binding):
-    write_package(path, changes={"patch.json": json.dumps({**MANIFEST, **binding}).encode()})
+    write_package(path, changes={"task.json": json.dumps({**MANIFEST, **binding}).encode()})
 
 
 @lru_cache(maxsize=1)

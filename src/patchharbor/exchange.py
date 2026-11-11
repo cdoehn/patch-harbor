@@ -12,7 +12,7 @@ import stat
 from patchharbor.progress import activity
 
 from patchharbor.bundle_names import is_browser_temporary_name
-from patchharbor.errors import PatchHarborError, patch_package_error
+from patchharbor.errors import PatchHarborError, task_bundle_error
 from patchharbor.exchange_state import (
     ExchangeApplyStatus,
     ExchangeFileIdentity,
@@ -48,7 +48,7 @@ class ExchangeScanError(RuntimeError):
 class ExchangeArtifactKind(str, Enum):
     """Content class relevant to automatic Exchange selection."""
 
-    PATCH_PACKAGE = "task_package"
+    TASK_BUNDLE = "task_package"
     RESULT_BUNDLE = "result_bundle"
     OTHER = "other"
 
@@ -68,7 +68,7 @@ class ExchangeArtifact:
     def __post_init__(self) -> None:
         if isinstance(self.mtime_ns, bool) or not isinstance(self.mtime_ns, int):
             raise ValueError("Exchange artifact mtime_ns must be an integer")
-        is_patch = self.kind is ExchangeArtifactKind.PATCH_PACKAGE
+        is_patch = self.kind is ExchangeArtifactKind.TASK_BUNDLE
         if (self.selection is not None) != is_patch:
             raise ValueError("only Patch Package artifacts carry selection data")
         if self.package is not None:
@@ -190,7 +190,7 @@ def _classify_content(
 
     activity("PATCH", f"{path.name}: validated PatchHarbor package", "success")
     return _ContentClassification(
-        kind=ExchangeArtifactKind.PATCH_PACKAGE,
+        kind=ExchangeArtifactKind.TASK_BUNDLE,
         selection=ExchangeTaskSelection.from_manifest(package.manifest),
         package=package,
     )
@@ -379,7 +379,7 @@ def materialize_exchange_task(
     """Reopen the unique selected identity and require the same valid package."""
     activity("RECHECK", f"Reopen selected package and verify identical content: {artifact.path.name}")
     if (
-        artifact.kind is not ExchangeArtifactKind.PATCH_PACKAGE
+        artifact.kind is not ExchangeArtifactKind.TASK_BUNDLE
         or artifact.selection is None
     ):
         raise ValueError("only Patch Package artifacts can be materialized")
@@ -390,11 +390,11 @@ def materialize_exchange_task(
             resource_policy=resource_policy,
         )
     except ExchangeScanError as exc:
-        raise patch_package_error(
+        raise task_bundle_error(
             "selected exchange patch changed during automatic discovery"
         ) from exc
     if snapshot.identity != artifact.identity:
-        raise patch_package_error(
+        raise task_bundle_error(
             "selected exchange patch changed during automatic discovery"
         )
     classification = _classify_content(
@@ -403,11 +403,11 @@ def materialize_exchange_task(
         resource_policy=resource_policy,
     )
     if (
-        classification.kind is not ExchangeArtifactKind.PATCH_PACKAGE
+        classification.kind is not ExchangeArtifactKind.TASK_BUNDLE
         or classification.selection != artifact.selection
         or classification.package is None
     ):
-        raise patch_package_error(
+        raise task_bundle_error(
             "selected exchange patch changed during automatic discovery"
         )
     return classification.package
@@ -427,11 +427,11 @@ def require_exchange_identity_unchanged(
             retained_content_limit=1,
         )
     except ExchangeScanError as exc:
-        raise patch_package_error(
+        raise task_bundle_error(
             "selected exchange patch changed before repository mutation"
         ) from exc
     if current.identity != identity:
-        raise patch_package_error(
+        raise task_bundle_error(
             "selected exchange patch changed before repository mutation"
         )
 

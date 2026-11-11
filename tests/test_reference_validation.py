@@ -119,7 +119,7 @@ def test_json_reference_uses_public_api_and_foreign_windows_path(tmp_path, monke
     out, err = StringIO(), StringIO()
     assert main(["validate", str(patch), "--reference-bundle", str(reference), "--json", "-v"], stdout=out, stderr=err) == 0
     result = json.loads(out.getvalue())
-    assert result["output_version"] == 2 and result["success"] and result["error"] is None
+    assert result["output_version"] == 3 and result["success"] and result["error"] is None
     assert result["result"]["context"]["repository_path"] == "C:\\foreign\\repo"
     assert calls == [reference] and err.getvalue() == ""
 

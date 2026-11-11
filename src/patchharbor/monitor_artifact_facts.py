@@ -54,7 +54,7 @@ class ArtifactCache:
             return dict(kind='result_bundle', repo_id=str(facts.context.repo_id), context=binding(facts.context),
                 expected=binding(facts.expected), run_id=facts.run_id, operation=facts.operation,
                 dry_run=facts.dry_run, primary_result=facts.primary_result.as_document(),
-                result_status='created', patch_sha256=facts.patch_sha256,
+                result_status='created', task_sha256=facts.task_sha256,
                 started_at=run['started_at'], ended_at=run['ended_at'],
                 completed_commit=str(facts.completed_commit) if facts.completed_commit else None), None
         try:

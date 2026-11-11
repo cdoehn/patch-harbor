@@ -273,8 +273,8 @@ def _copy_project_for_release(tmp_path: Path) -> Path:
             "*.pyc",
             "*.pyo",
             "*.log",
-            "*_Patch_*.zip",
-            "*_Result_*.zip",
+            "*_Task_Bundle_*.zip",
+            "*_Result_Bundle_*.zip",
         ),
     )
 
@@ -337,8 +337,8 @@ def _write_release_patch_package(
 ) -> str:
     entrypoint_name = native_value("run.sh", "run.ps1")
     manifest = {
-        "marker": "patch-harbor",
-        "format_version": 1,
+        "marker": "patch-harbor-task-bundle",
+        "format_version": 2,
         "repo_id": context["repo_id"],
         "base_commit": context["base_commit"],
         "state_fingerprint": context["state_fingerprint"],
@@ -353,7 +353,7 @@ def _write_release_patch_package(
     )
     with zipfile.ZipFile(path, "w") as archive:
         archive.writestr(
-            "patch.json",
+            "task.json",
             json.dumps(
                 manifest,
                 ensure_ascii=False,
@@ -956,9 +956,9 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
     assert (worker_repository / "release-applied.txt").read_text(encoding="utf-8") == "entrypoint-ok"
     assert not (worker_repository / worker_entrypoint).exists()
     with zipfile.ZipFile(worker_result["result_bundle"]["path"]) as result_archive:
-        assert json.loads(result_archive.read('manifest.json'))['format_version'] == 3
+        assert json.loads(result_archive.read('manifest.json'))['format_version'] == 4
         runtime_metadata = json.loads(result_archive.read('runtime/runtime.json'))
-        assert runtime_metadata['format_version'] == 2 and runtime_metadata['status'] == 'embedded'
+        assert runtime_metadata['format_version'] == 3 and runtime_metadata['status'] == 'embedded'
         assert runtime_metadata['artifact']['type'] == 'pyz'
         assert {n for n in result_archive.namelist() if n.startswith('runtime/')} == {
             'runtime/runtime.json', runtime_metadata['artifact']['path']}

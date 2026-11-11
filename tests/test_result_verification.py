@@ -228,7 +228,7 @@ def test_emergency_json_survives_real_request_failure(repository, sleeps, monkey
     assert details["verification_attempts"] == 12 and details["waited_seconds"] == 300
     assert saved["result_bundle"]["status"] == "failed"
     assert saved["base_commit"] == str(report.context.base_commit)
-    assert not list(exchange.glob("*_Result_*.zip")) and not list(exchange.glob(".*.tmp"))
+    assert not list(exchange.glob("*_Result_Bundle_*.zip")) and not list(exchange.glob(".*.tmp"))
 
 
 @pytest.mark.parametrize("options,budget", [("rw", 300), ("actimeo=1,closetimeo=1", 300),

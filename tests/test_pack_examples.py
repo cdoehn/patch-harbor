@@ -31,7 +31,7 @@ api.register(sys.argv[1]);api.configure_exchange_directory(sys.argv[2],repositor
 print(json.dumps(str(api.bundle(sys.argv[1]).path)))
 ''', str(repo), str(tmp_path/'exchange')], tmp_path, environment)))
     facts, reference_sha = read_result_reference(reference)
-    assert facts.format_version == 3 and facts.runtime.status == 'embedded'
+    assert facts.format_version == 4 and facts.runtime.status == 'embedded'
     runtime = tmp_path/'selected.pyz'
     with ZipFile(reference) as archive: runtime.write_bytes(archive.read(facts.runtime.artifact.path))
     assert hashlib.sha256(runtime.read_bytes()).hexdigest() == facts.runtime.artifact.sha256

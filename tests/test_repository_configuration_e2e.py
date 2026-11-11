@@ -129,7 +129,7 @@ def test_automatic_discovery_never_routes_a_patch_from_the_wrong_exchange(repos,
     right.unlink()
     report = api.apply_next(dry_run=True)
     assert not report.success
-    assert report.primary_tool_error.kind is api.ErrorKind.PATCH_PACKAGE_ERROR
+    assert report.primary_tool_error.kind is api.ErrorKind.TASK_BUNDLE_ERROR
     assert wrong.exists()
 
 
@@ -193,7 +193,7 @@ def test_corrupt_live_repository_configuration_stops_global_poll_without_repair(
         config.write_bytes(b"invalid")
     report = api.apply_next()
     assert not report.success and not report.execution_present
-    assert not tuple(eb.glob("*_Result_*"))
+    assert not tuple(eb.glob("*_Result_Bundle_*"))
     assert not config.exists() if damage == "missing" else config.read_bytes() == b"invalid"
 
 

@@ -26,7 +26,7 @@ def _publish(publication: ResultBundlePublication, *, runtime=None, **options) -
     snapshot = build_result_bundle_snapshot(base_entries=(), staged_patch=b"", unstaged_patch=b"", untracked_entries=())
     context = _context_document(report)
     environment = {
-        "marker": "patch-harbor-environment", "format_version": 1, "bundle_type": "Result",
+        "marker": "patch-harbor-environment", "format_version": 2, "bundle_type": "Result",
         "repository_context": {k: context[k] for k in ("repo_id", "base_commit", "state_fingerprint", "fingerprint_algorithm")},
         "run_id": report.run_id_text, "bundle_suffix": "",
     }

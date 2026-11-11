@@ -26,7 +26,7 @@ def no_runtime_execution(monkeypatch):
     monkeypatch.setattr(bootstrap, 'import_api', forbidden)
 
 
-@pytest.mark.parametrize('result_formats', [[1,2,3],[3]], ids=['original_caps','current_caps'])
+@pytest.mark.parametrize('result_formats', [[4]], ids=['current_caps'])
 def test_closed_capabilities_keep_reference_bytes_binding_and_static_pack(
     canonical, request_files, tmp_path, result_formats,
 ):
@@ -41,8 +41,8 @@ def test_closed_capabilities_keep_reference_bytes_binding_and_static_pack(
     runtime = captured.facts.runtime
     assert captured.sha256 == digest
     assert runtime.result_formats == tuple(result_formats)
-    assert runtime.patch_formats == (1,)
-    assert runtime.operations == ('inspect_patch', 'validate_patch', 'pack_patch')
+    assert runtime.task_formats == (2,)
+    assert runtime.operations == ('inspect_task', 'validate_task', 'pack_task')
     assert runtime.artifact.sha256 == hashlib.sha256(canonical).hexdigest()
     for key, expected in binding.items():
         assert str(getattr(captured.facts.context, key)) == expected
@@ -100,25 +100,25 @@ def test_other_result_capabilities_are_rejected_without_output(
     assert_invalid_reference(files, binding, request_files, tmp_path)
 
 
-@pytest.mark.parametrize('result_formats', [[1,2,3],[3]], ids=['original_caps','current_caps'])
-@pytest.mark.parametrize('patch_formats', [[], [True], [1.0], [1,1], [1,2], '1', None],
+@pytest.mark.parametrize('result_formats', [[4]], ids=['current_caps'])
+@pytest.mark.parametrize('task_formats', [[], [True], [1.0], [1,1], [1,2], '1', None],
                          ids=['empty','bool','float','duplicate','future','scalar','null'])
 def test_result_capability_choice_does_not_relax_patch_format_validation(
-    canonical, request_files, tmp_path, result_formats, patch_formats,
+    canonical, request_files, tmp_path, result_formats, task_formats,
 ):
     files, binding = format3(canonical)
     edit_metadata(files, lambda doc: doc['capabilities'].update(
-        result_formats=result_formats, patch_formats=patch_formats))
+        result_formats=result_formats, task_formats=task_formats))
     assert_invalid_reference(files, binding, request_files, tmp_path)
 
 
-@pytest.mark.parametrize('result_formats', [[1,2,3],[3]], ids=['original_caps','current_caps'])
+@pytest.mark.parametrize('result_formats', [[4]], ids=['current_caps'])
 def test_unavailable_runtime_cannot_claim_either_capability_profile(
     request_files, tmp_path, result_formats,
 ):
     files, binding = format3(None)
     edit_metadata(files, lambda doc: doc.update(capabilities={
-        'operations': ['inspect_patch','validate_patch','pack_patch'],
-        'patch_formats': [1], 'result_formats': result_formats,
+        'operations': ['inspect_task','validate_task','pack_task'],
+        'task_formats': [2], 'result_formats': result_formats,
     }))
     assert_invalid_reference(files, binding, request_files, tmp_path)

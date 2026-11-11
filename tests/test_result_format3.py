@@ -1,4 +1,4 @@
-"""Reader-first Result 3: closed PYZ data, strict references and shared budgets."""
+"""Reader-first Result 4: closed PYZ data, strict references and shared budgets."""
 from dataclasses import FrozenInstanceError, replace
 import hashlib
 from io import BytesIO
@@ -28,7 +28,7 @@ def test_new_reference_keeps_actual_state_and_explicit_full_runtime_facts(canoni
     files,binding = format3(canonical if status=='embedded' else None,kind=kind,dirty=dirty)
     path=tmp_path/'result.zip';write_reference(path,files)
     facts,digest=read_result_reference(path)
-    assert facts.format_version==3 and facts.runtime.status==status
+    assert facts.format_version==4 and facts.runtime.status==status
     assert facts.context.dirty is dirty
     assert digest==hashlib.sha256(path.read_bytes()).hexdigest()
     assert capture_result_reference(path).facts==facts
@@ -42,8 +42,8 @@ def test_new_reference_keeps_actual_state_and_explicit_full_runtime_facts(canoni
         assert facts.runtime.artifact.type=='pyz'
         assert facts.runtime.artifact.sha256==hashlib.sha256(canonical).hexdigest()
         assert facts.runtime.profile==pyz.PROFILE
-        assert facts.runtime.operations==('inspect_patch','validate_patch','pack_patch')
-        assert facts.runtime.result_formats==(1,2,3)
+        assert facts.runtime.operations==('inspect_task','validate_task','pack_task')
+        assert facts.runtime.result_formats==(4,)
         assert not hasattr(facts.runtime,'wheel')
     else: assert facts.runtime.artifact is None and facts.runtime.profile is None
 
@@ -90,14 +90,14 @@ def test_corrupt_format3_never_becomes_a_full_native_reference(canonical,tmp_pat
     elif fault=='bool_recipe_version':edit_metadata(files,lambda d:d['provenance'].update(recipe_format_version=True))
     elif fault=='unknown_provenance':edit_metadata(files,lambda d:d['provenance'].update(unknown=1))
     elif fault=='unknown_capability':edit_metadata(files,lambda d:d['capabilities'].update(operations=['execute']))
-    elif fault=='missing_pack':edit_metadata(files,lambda d:d['capabilities'].update(operations=['inspect_patch','validate_patch']))
-    elif fault=='bool_patch_format':edit_metadata(files,lambda d:d['capabilities'].update(patch_formats=[True]))
+    elif fault=='missing_pack':edit_metadata(files,lambda d:d['capabilities'].update(operations=['inspect_task','validate_task']))
+    elif fault=='bool_patch_format':edit_metadata(files,lambda d:d['capabilities'].update(task_formats=[True]))
     elif fault=='missing_format3':edit_metadata(files,lambda d:d['capabilities'].update(result_formats=[1,2]))
     elif fault=='future_format':edit_metadata(files,lambda d:d['capabilities'].update(result_formats=[1,2,3,4]))
     elif fault=='unknown_capability_field':edit_metadata(files,lambda d:d['capabilities'].update(unknown=1))
     elif fault=='missing_handoff':files.pop('CHAT_INSTRUCTIONS.md');files.pop('environment.json')
     elif fault.startswith('result_version_'):
-        edit_document(files,'manifest.json',lambda d:d.update(format_version=True if fault.endswith('bool') else 4))
+        edit_document(files,'manifest.json',lambda d:d.update(format_version=True if fault.endswith('bool') else 5))
     elif fault in ('foreign_path','empty_pyz'):
         item={**doc['artifact'],'path':'../outside.pyz'} if fault=='foreign_path' else dict(type='pyz',**descriptor(name,b''))
         if fault=='empty_pyz':files[name]=b''
@@ -143,13 +143,13 @@ def test_shared_outer_inner_budget_is_exact_and_precedes_unbounded_expansion(can
     with ZipFile(BytesIO(canonical)) as archive:inner=sum(info.file_size for info in archive.infolist())
     maximum=sum(len(raw) for raw in files.values())+inner
     policy=replace(DEFAULT_RESOURCE_POLICY,max_zip_total_bytes=maximum)
-    assert parse_result_payloads(entries,resource_policy=policy).format_version==3
+    assert parse_result_payloads(entries,resource_policy=policy).format_version==4
     with pytest.raises(ValueError):parse_result_payloads(entries,resource_policy=replace(policy,max_zip_total_bytes=maximum-1))
 
 
 def test_private_diagnostic_fallback_retains_every_nonruntime_requirement(canonical):
     files,_=format3(canonical);files['runtime/runtime.json']=b'damaged optional runtime'
-    assert _parse_repository_payloads(payloads(files)).format_version==3
+    assert _parse_repository_payloads(payloads(files)).format_version==4
     with pytest.raises(ValueError):parse_result_payloads(payloads(files))
     files['base/tracked.txt'] += b'changed snapshot'
     with pytest.raises(ValueError):_parse_repository_payloads(payloads(files))

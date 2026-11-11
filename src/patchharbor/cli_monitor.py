@@ -21,7 +21,7 @@ def monitor_command(args, *, stdin, stdout, stderr):
         try:
             document = attach_once(snapshot_once(args.repo, args.exchange, args.query_timeout), state, args.query_timeout)
         except (OSError, ValueError, RuntimeError) as exc:
-            document = {'format_version': 1, 'kind': 'patchharbor-monitor', 'repositories': [],
+            document = {'format_version': 2, 'kind': 'patchharbor-monitor', 'repositories': [],
                         'exchanges': [], 'errors': [str(exc)], 'stale': True}
         print(json.dumps(document, ensure_ascii=True) if args.json_output else render(document, state), file=stdout)
         return 2 if document.get('stale') or document.get('errors') or document.get('bundle_view', {}).get('errors') or any(r.get('error') for r in document['repositories']) else 0

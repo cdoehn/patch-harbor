@@ -168,8 +168,8 @@ def verify_assets(directory: Path, version: str, commit: str) -> dict:
     caps=document['integration_capabilities'];host=document['capability_host']
     require(set(caps)=={'contract_version','snapshot_contract_version','guarded_apply_contract_version',
                        'safe_reference_contract_version'},'incomplete capability facts')
-    require(all(type(caps[k]) is int and caps[k]==1 for k in
-                ('contract_version','snapshot_contract_version','guarded_apply_contract_version')), 'unsupported integration contract')
+    require(all(type(caps[k]) is int and caps[k]==v for k,v in
+                {'contract_version':2,'snapshot_contract_version':2,'guarded_apply_contract_version':1}.items()), 'unsupported integration contract')
     require(caps['safe_reference_contract_version'] is None or
             (type(caps['safe_reference_contract_version']) is int and caps['safe_reference_contract_version']==1),
             'invalid safe-reference capability')

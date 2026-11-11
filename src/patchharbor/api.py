@@ -82,7 +82,7 @@ __all__ = [
 
 def integration_capabilities() -> IntegrationCapabilities:
     """Versioned contracts of this loaded API, separate from artifact metadata."""
-    return IntegrationCapabilities(1, 1, 1, 1 if _safe_host() else None)
+    return IntegrationCapabilities(2, 2, 1, 1 if _safe_host() else None)
 
 
 def _sha256_argument(value: str, name: str) -> str:

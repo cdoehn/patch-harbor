@@ -1,4 +1,4 @@
-"""Current consumers must preserve genuine, immutable 1.4.0 artifact contracts."""
+"""Frozen 1.4.0 evidence remains byte exact and is rejected by 2.0 consumers."""
 from __future__ import annotations
 
 import json
@@ -58,36 +58,16 @@ def pack_contents(root):
 @pytest.mark.parametrize('case', RESULT_CASES)
 def test_current_reader_preserves_original_reference_and_execution_facts(case):
     path, expected = artifact('result', case)
-    captured = capture_result_reference(path)
-    facts = captured.facts
-    assert captured.sha256 == expected['sha256']
-    assert facts.format_version == expected['format_version'] == 3
-    assert {key: str(getattr(facts.context, key)) for key in BINDING_FIELDS} == expected['binding']
-    assert str(facts.context.base_commit) == expected['after_commit']
-    assert facts.context.dirty is expected['dirty']
-    assert facts.operation == expected['operation']
-    assert facts.dry_run is expected['dry_run']
-    assert facts.primary_result.kind.value == expected['primary_kind']
-    assert facts.primary_result.entrypoint_exit_code == expected['entrypoint_exit_code']
-    assert facts.primary_result.process_exit_code == expected['process_exit_code']
-    assert (str(facts.completed_commit) if facts.completed_commit else None) == expected['completed_commit']
-    assert facts.patch_sha256 == expected['patch_sha256']
-    assert (str(facts.expected.base_commit) if facts.expected else None) == expected['expected_base_commit']
-    assert facts.runtime.status == expected['runtime_status']
-    if case == 'unavailable':
-        assert facts.runtime.reason == 'source_not_prepared' and facts.runtime.artifact is None
-        assert facts.warnings
-    else:
-        assert facts.runtime.artifact.sha256 == PYZ_SHA256
-        assert facts.runtime.version == '1.4.0' and facts.runtime.requires_python == '>=3.10'
-        assert facts.runtime.result_formats == (1, 2, 3)
+    raw = path.read_bytes()
+    assert sha256(raw) == expected['sha256']
+    with pytest.raises(api.PatchHarborError):
+        capture_result_reference(path)
     with ZipFile(path) as archive:
         assert archive.testzip() is None
-        assert set(archive.namelist()) == set(expected['entries'])
         for name, item in expected['entries'].items():
-            raw = archive.read(name)
-            assert len(raw) == item['bytes'] and sha256(raw) == item['sha256']
-    assert sha256(path.read_bytes()) == expected['sha256']
+            data = archive.read(name)
+            assert len(data) == item['bytes'] and sha256(data) == item['sha256']
+    assert path.read_bytes() == raw
 
 
 @pytest.mark.parametrize('case', RESULT_CASES)
@@ -95,29 +75,13 @@ def test_current_pack_inspect_validate_use_actual_frozen_binding_without_executi
     reference, expected = artifact('result', case)
     contents = pack_contents(tmp_path / 'contents')
     def forbidden(*args, **kwargs):
-        pytest.fail('static pack/reference work attempted a process or network operation')
+        pytest.fail('legacy reference rejection executed external code')
     monkeypatch.setattr(subprocess, 'Popen', forbidden)
     monkeypatch.setattr(socket, 'socket', forbidden)
-    packed = api.pack_task(contents, reference_bundle=reference, entrypoint='run.sh',
-                            output=tmp_path / 'packed.zip', modes={'run.sh': 0o755, 'payload.bin': 0o644})
-    checked = api.validate_task(packed.path, reference_bundle=reference)
-    inspected = api.inspect_task(packed.path)
-    assert checked.inspection == inspected and checked.binding_matches is True
-    assert checked.scope is api.TaskValidationScope.REFERENCE
-    assert packed.reference_sha256 == checked.reference_sha256 == expected['sha256']
-    assert {'authenticity', 'execution', 'tests', 'ci', 'replay'} <= set(checked.not_checked)
-    assert str(checked.context.base_commit) == expected['after_commit']
-    with ZipFile(packed.path) as archive:
-        manifest = json.loads(archive.read('patch.json'))
-        assert set(manifest) == {*BINDING_FIELDS, 'marker', 'format_version', 'entrypoint'}
-        assert manifest['format_version'] == 1 and manifest['marker'] == 'patch-harbor'
-        assert {key: manifest[key] for key in BINDING_FIELDS} == expected['binding']
-        environment = json.loads(archive.read('PATCHHARBOR_META/environment.json'))
-        assert environment['repository_context'] == expected['binding']
-        assert archive.read('payload.bin') == b'\x00public payload\xff\n'
-        assert archive.getinfo('run.sh').external_attr >> 16 == 0o100755
-        assert archive.getinfo('payload.bin').external_attr >> 16 == 0o100644
-    assert not packed.warnings
+    output = tmp_path / 'must-not-publish.zip'
+    with pytest.raises(api.PatchHarborError):
+        api.pack_task(contents, reference_bundle=reference, entrypoint='run.sh', output=output)
+    assert not output.exists()
     assert sha256(reference.read_bytes()) == expected['sha256']
 
 
@@ -126,17 +90,14 @@ def test_original_patches_retain_payload_modes_and_full_binding(case, monkeypatc
     path, expected = artifact('patch', case)
     reference = FIXTURES / expected['reference_fixture']
     def forbidden(*args, **kwargs):
-        pytest.fail('static reader imported a ZIP runtime or started a process')
+        pytest.fail('legacy Task rejection imported code or started a process')
     monkeypatch.setattr(zipimport, 'zipimporter', forbidden)
     monkeypatch.setattr(subprocess, 'Popen', forbidden)
-    inspected = api.inspect_task(path)
-    validated = api.validate_task(path, reference_bundle=reference)
-    assert validated.binding_matches and validated.inspection == inspected
-    assert inspected.package_sha256 == expected['sha256']
-    assert next(e for e in inspected.entries if e.path == 'run.sh').unix_mode == 0o755
-    if case == 'single':
-        assert next(e for e in inspected.entries if e.path == 'payload.sh').unix_mode == 0o755
-    assert {'execution', 'tests', 'ci', 'authenticity'} <= set(validated.not_checked)
+    with pytest.raises(api.PatchHarborError):
+        api.inspect_task(path)
+    with pytest.raises(api.PatchHarborError):
+        api.validate_task(path, reference_bundle=reference)
+    assert sha256(path.read_bytes()) == expected['sha256']
 
 
 @pytest.mark.parametrize('case', RESULT_CASES)
@@ -145,18 +106,9 @@ def test_exchange_and_recovery_evidence_remain_stricter_than_readability(case):
     raw = path.read_bytes()
     classified = _classify_content(path, raw, resource_policy=DEFAULT_RESOURCE_POLICY)
     assert classified.kind is ExchangeArtifactKind.RESULT_BUNDLE
-    if expected['archive_eligible']:
-        evidence = parse_archive_evidence(raw, path)
-        assert str(evidence.selection.base_commit) == expected['after_commit']
-        if expected['completed_commit']:
-            assert str(evidence.receipt.completed_commit) == expected['completed_commit']
-            assert evidence.receipt.patch_sha256 == expected['patch_sha256']
-            assert str(evidence.receipt.expected.base_commit) == expected['before_commit']
-        else:
-            assert evidence.receipt is None
-    else:
-        with pytest.raises(ValueError):
-            parse_archive_evidence(raw, path)
+    with pytest.raises(ValueError):
+        parse_archive_evidence(raw, path)
+    assert sha256(raw) == expected['sha256']
 
 
 def test_original_partial_progress_and_dirty_snapshot_are_not_clean_success():
@@ -184,21 +136,16 @@ def test_original_partial_progress_and_dirty_snapshot_are_not_clean_success():
     ('fingerprint_algorithm', 'unsupported-future-algorithm', 10),
 ])
 def test_all_four_binding_components_remain_required(tmp_path, field, value, code):
-    patch, _ = artifact('patch', 'diagnostic')
-    reference, _ = artifact('result', 'clean')
-    with ZipFile(patch) as archive:
-        manifest = json.loads(archive.read('patch.json'))
-        environment = json.loads(archive.read('PATCHHARBOR_META/environment.json'))
-    manifest[field] = value
-    environment['repository_context'][field] = value
-    # Keep the handoff consistent to reach the reference/algorithm boundary.
-    from patchharbor.chat_instructions import render_chat_handoff
-    handoff = render_chat_handoff(environment)
-    changes = {'patch.json': json_bytes(manifest), **dict(handoff.entries(patch=True))}
-    changed = tmp_path / 'changed.zip'
-    rewrite_zip(patch, changed, changes)
+    from tests.reference_support import reference_entries, write_reference
+    from tests.patch_inspection_support import MANIFEST, write_package
+    files, binding = reference_entries()
+    reference = tmp_path / 'current-result.zip'
+    write_reference(reference, files)
+    task = tmp_path / 'task.zip'
+    manifest = {**MANIFEST, **binding, field: value}
+    write_package(task, changes={'task.json': json_bytes(manifest)})
     with pytest.raises(api.PatchHarborError) as error:
-        api.validate_task(changed, reference_bundle=reference)
+        api.validate_task(task, reference_bundle=reference)
     assert int(exit_code_for_error(error.value)) == code
 
 
@@ -207,13 +154,15 @@ def test_invalid_and_future_copies_never_become_reference_or_success_proofs(tmp_
     original, original_facts = artifact('result', 'clean')
     bad = tmp_path / 'future-disguised-as-patch.zip'
     corrupt_reference(original, bad, fault)
-    patch, _ = artifact('patch', 'diagnostic')
+    from tests.reference_support import bound_package
+    patch = tmp_path / 'current-task.zip'
+    bound_package(patch, original_facts['binding'])
     with pytest.raises(api.PatchHarborError) as error:
         api.validate_task(patch, reference_bundle=bad)
     assert int(exit_code_for_error(error.value)) == 4
     with pytest.raises(ValueError):
         parse_archive_evidence(bad.read_bytes(), bad)
-    assert _classify_content(bad, bad.read_bytes(), resource_policy=DEFAULT_RESOURCE_POLICY).kind is not ExchangeArtifactKind.PATCH_PACKAGE
+    assert _classify_content(bad, bad.read_bytes(), resource_policy=DEFAULT_RESOURCE_POLICY).kind is not ExchangeArtifactKind.TASK_BUNDLE
     contents = pack_contents(tmp_path / 'contents')
     output = tmp_path / 'must-not-publish.zip'
     with pytest.raises(api.PatchHarborError) as error:
@@ -267,8 +216,8 @@ def test_pinned_original_pyz_operates_in_fresh_stdlib_process(tmp_path, mode):
                                     env=environment, capture_output=True, text=True)
             assert result.returncode == 0, result.stdout + result.stderr
             assert json.loads(result.stdout)['success'] is True
-        checked = api.validate_task(tmp_path / 'cli.zip', reference_bundle=reference)
-        assert checked.binding_matches and checked.reference_sha256 == expected['sha256']
+        with pytest.raises(api.PatchHarborError):
+            api.validate_task(tmp_path / 'cli.zip', reference_bundle=reference)
     else:
         program = '''
 import json,os,socket,subprocess,sys
@@ -293,7 +242,8 @@ print(json.dumps({'reference':checked.reference_sha256,'patch':packed.package_sh
         assert result.returncode == 0, result.stdout + result.stderr
         proof = json.loads(result.stdout)
         assert proof['reference'] == expected['sha256'] and proof['patch'] == sha256(output.read_bytes())
-        assert api.validate_task(output, reference_bundle=reference).binding_matches
+        with pytest.raises(api.PatchHarborError):
+            api.validate_task(output, reference_bundle=reference)
     assert sha256(runtime.read_bytes()) == PYZ_SHA256
 
 

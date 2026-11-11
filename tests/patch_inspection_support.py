@@ -8,7 +8,7 @@ from zipfile import ZipFile, ZipInfo
 
 
 MANIFEST = {
-    "marker": "patch-harbor", "format_version": 1,
+    "marker": "patch-harbor-task-bundle", "format_version": 2,
     "repo_id": "01234567-89ab-4cde-8fab-0123456789ab",
     "base_commit": "12" * 20, "state_fingerprint": "0123456789abcdef",
     "fingerprint_algorithm": "patchharbor-state-v1", "entrypoint": "run.sh",
@@ -21,11 +21,11 @@ SCRIPT = (b"#!/usr/bin/env bash\n# PATCHHARBOR\n"
 
 def write_package(path: Path, *, changes: dict[str, bytes] | None = None,
                   handoff: bool = False) -> dict[str, bytes]:
-    entries = {"patch.json": json.dumps(MANIFEST).encode(), "run.sh": SCRIPT,
+    entries = {"task.json": json.dumps(MANIFEST).encode(), "run.sh": SCRIPT,
                "docs/data.bin": b"\x00\xff\r\nbyte-exact"}
     if handoff:
         environment = {
-            "marker": "patch-harbor-environment", "format_version": 1, "bundle_type": "Patch",
+            "marker": "patch-harbor-environment", "format_version": 2, "bundle_type": "Task",
             "repository_context": {k: MANIFEST[k] for k in
                                    ("repo_id", "base_commit", "state_fingerprint", "fingerprint_algorithm")},
         }

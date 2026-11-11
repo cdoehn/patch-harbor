@@ -111,7 +111,7 @@ def _write_package_zip(
     }
     with zipfile.ZipFile(path, "w") as archive:
         archive.writestr(
-            "patch.json",
+            "task.json",
             json.dumps(
                 document,
                 ensure_ascii=False,
@@ -245,7 +245,7 @@ def test_state_mismatch_publishes_while_repository_lock_is_held(
     assert exit_code_for_error(captured.value) == ExitCode.STATE_MISMATCH
     assert observed_lock_codes == [int(ExitCode.REPOSITORY_BUSY)]
     assert probe_repository_lock(str(context.repo_id), environment) == 0
-    bundles = tuple(output_directory.glob("*_Result_*.zip"))
+    bundles = tuple(output_directory.glob("*_Result_Bundle_*.zip"))
     assert len(bundles) == 1
     assert not tuple(output_directory.glob(".*.tmp"))
 
@@ -437,7 +437,7 @@ def test_apply_result_matrix_preserves_emergency_execution_diagnostics(
     assert run_document["primary_result"]["kind"] == expected_kind.value
     assert run_document["result_bundle"]["status"] == "failed"
     assert run_document["process_exit_code"] == expected_exit
-    assert not tuple(output_directory.glob("*_Result_*.zip"))
+    assert not tuple(output_directory.glob("*_Result_Bundle_*.zip"))
     assert not tuple(output_directory.glob(".*.tmp"))
 
 
@@ -574,7 +574,7 @@ def test_apply_json_is_closed_and_preserves_emergency_execution_files(
     assert raw_marker.encode("utf-8") in (
         emergency_path / "execution.log"
     ).read_bytes()
-    assert not tuple(output_directory.glob("*_Result_*.zip"))
+    assert not tuple(output_directory.glob("*_Result_Bundle_*.zip"))
     assert not tuple(output_directory.glob(".*.tmp"))
 
 

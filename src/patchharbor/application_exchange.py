@@ -30,7 +30,7 @@ from patchharbor.errors import (
     LockBusyError,
     NoEligibleTaskError,
     configuration_error,
-    patch_package_error,
+    task_bundle_error,
     registry_error,
     repository_resolution_error,
 )
@@ -463,7 +463,7 @@ def discover_exchange_task(
         contexts[scope.repository_context.repo_id] = scope.repository_context
     for artifact in artifacts:
         activity("SELECT", f"Evaluate candidate: {artifact.path.name}")
-        if artifact.kind is not ExchangeArtifactKind.PATCH_PACKAGE:
+        if artifact.kind is not ExchangeArtifactKind.TASK_BUNDLE:
             activity("SKIP", f"{artifact.path.name}: {artifact.kind.value}, not a patch", "detail")
             continue
         selection = artifact.selection
@@ -507,9 +507,9 @@ def discover_exchange_task(
         )
         if not scope.is_repository_scoped:
             raise NoEligibleTaskError(
-                message, FailureReason.PATCH_PACKAGE_ERROR, error_kind=ErrorKind.PATCH_PACKAGE_ERROR,
+                message, FailureReason.TASK_BUNDLE_ERROR, error_kind=ErrorKind.TASK_BUNDLE_ERROR,
             )
-        raise patch_package_error(message)
+        raise task_bundle_error(message)
 
     artifact = _select_exchange_candidate(matches)
     activity("SELECT", f"Selected newest eligible patch: {artifact.path.name} "
@@ -524,7 +524,7 @@ def discover_exchange_task(
     _require_watch_target_unchanged(target)
     context = contexts.get(package.manifest.repo_id)
     if context is None or not _manifest_matches_context(package.manifest, context):
-        raise patch_package_error(
+        raise task_bundle_error(
             "selected exchange patch changed during automatic discovery"
         )
     return DiscoveredExchangeTask(

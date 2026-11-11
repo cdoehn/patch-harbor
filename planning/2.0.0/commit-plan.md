@@ -2,8 +2,8 @@
 
 **Plan-ID:** `PH-200` · **Revision:** 2 · **Stand:** 11. November 2026<br>
 **Zielversion:** **2.0.0**<br>
-**Status:** `200-01.C` durch Apply 091 bestätigt; Bundle 092 repariert `200-02.W1` und setzt die Folgephasen fort.<br>
-**Fortschritt:** **3 / 38 Umsetzungscommits**, zwölf WRC-Schritte; die Protokoll-Work-Phase besteht aus drei Teilcommits.<br>
+**Status:** `200-02.W1` durch Apply 092 bestätigt; Bundle 093 repariert `200-02.W2` und setzt die Folgephasen fort.<br>
+**Fortschritt:** **4 / 38 Umsetzungscommits**, zwölf WRC-Schritte; die Protokoll-Work-Phase besteht aus drei Teilcommits.<br>
 **Aktiver Planpfad:** `planning/2.0.0/commit-plan.md`<br>
 **Zugehöriger Detailentwurf:** [Lokale Testmessung und Profiling](test-profiling.md).
 Dieser Detailentwurf gehört zu diesem Plan; er ist kein konkurrierender Plan.
@@ -207,11 +207,12 @@ wenn dafür tatsächliche Informationen vorliegen.
 `bdba905c4cb982bca0e2f86384c3b97ea729a886` bestätigt. Result
 `930a7e0d-497e-4009-9462-df7ea75a0d57` belegt den sauberen letzten Stand.
 `200-01.C` ist zusätzlich durch Commit
-`682b042407048f5e0b6da23f70aad5c845ce0f37` und Result
-`5bc9a539-ef0a-40d8-a6af-5d672407cac0` bestätigt. Dessen folgender W1-Lauf
-scheiterte vor dem Commit; der tatsächliche uncommittete Zustand bleibt die
-gebundene Ausgangsbasis. Die übrigen 35 Positionen sind **OFFEN**;
-Bundle 092 bereitet die reparierten Positionen 4–9 vor.
+`682b042407048f5e0b6da23f70aad5c845ce0f37` bestätigt. `200-02.W1` ist durch
+Commit `c7fe8f991fd877c10acd4c73f3d6f1b9d229792a` und Result
+`86c0251b-7102-4bd4-95d0-099e695053f6` bestätigt. Der folgende W2-Lauf
+scheiterte vor dem Commit; sein tatsächlicher uncommitteter Zustand ist die
+gebundene Ausgangsbasis. Die übrigen 34 Positionen sind **OFFEN**;
+Bundle 093 bereitet die reparierten Positionen 5–10 vor.
 Die Commit-Subjects sind verbindliche
 Planvorlagen; Fortschritt wird erst mit tatsächlichem Commit und Result eingetragen.
 
@@ -705,3 +706,25 @@ W1, W2, W3, R, C und der Work-Schritt `200-03.W` mit jeweils vollständigem
 parallelem Apply-Gate. Statische Nachprüfung gleicht zusätzlich gekoppelte
 Artefakttypen und die versionierte Replay-Ablage ab. Keine dieser Vorbereitungen
 ist ein Erfolgsnachweis für die noch offenen Commits.
+
+
+## Apply 092 und Reparaturbundle 093
+
+Result `patchharbor-apply_Result_133613_1111_86c025.zip`, SHA-256
+`0b96af975a56a9ab79c56d670bb2fde948df887a5a1b59e2bedf288285bac863`,
+bestätigt `200-02.W1` auf `c7fe8f991fd877c10acd4c73f3d6f1b9d229792a`:
+3.760 bestandene Tests, 16 Skips, vier Worker. Die vorherigen 44 API-Namensfehler
+sind damit behoben. W2 stoppte vor seinem Commit mit fünf Fehlern, 3.744
+bestandenen Tests und 16 Skips. Vier Varianten einer Ressourcenprüfung
+erwarteten noch Result 3; ein Dateinamentest verwechselte Repository-Name und
+Task-Marker. Die festen Erwartungen werden passend zum neuen Vertrag korrigiert;
+die echten Reader-, Fallback- und Dateinamenprüfungen bleiben bestehen.
+
+Bundle 093 bindet exakt den erhaltenen W2-Zustand und führt W2, W3, R, C,
+`200-03.W` und `200-03.R` mit je einem vollständigen parallelen Apply-Gate fort.
+Beide Reparaturen gelten für jeden betroffenen Folgestand. Die neue Right-Phase
+sichert die Task-Beobachtung und die Trennung zwischen Watcherzustand und
+tatsächlichen Ausführungsdaten ab. Development bleibt ausschließlich statisch;
+Push, Tag und CI bleiben aus. Bestätigt sind 4/38 Schritte; die sechs Schritte
+dieses Bundles gelten erst nach ihren tatsächlichen Commit- und Result-Nachweisen
+als abgeschlossen.

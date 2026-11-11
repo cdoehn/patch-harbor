@@ -39,7 +39,7 @@ def test_actual_readers_keep_unproven_format3_and_standalone_pyz(
     write_reference(old, legacy)
     files = attach_pyz(files, None if state == 'unavailable' else canonical)
     if state == 'corrupt': files['runtime/runtime.json'] += b'corrupt'
-    elif state == 'future': edit_document(files, 'manifest.json', lambda d:d.update(format_version=4))
+    elif state == 'future': edit_document(files, 'manifest.json', lambda d:d.update(format_version=5))
     reference = exchange/'new-result-disguised-as-patch.zip';write_reference(reference,files)
     standalone = exchange/'standalone-disguised-as-patch.zip';standalone.write_bytes(canonical)
     before = {path:path.read_bytes() for path in (old,reference,standalone)}
@@ -68,7 +68,7 @@ def test_real_recovery_requires_full_format3_success(canonical,tmp_path,state):
     with ZipFile(result) as archive:files={name:archive.read(name) for name in archive.namelist()}
     files=attach_pyz(files,None if state=='unavailable' else canonical)
     if state=='corrupt':files['runtime/runtime.json']+=b'changed'
-    elif state=='future':edit_document(files,'manifest.json',lambda d:d.update(format_version=4))
+    elif state=='future':edit_document(files,'manifest.json',lambda d:d.update(format_version=5))
     elif state in ('old1','old2'):edit_document(files,'manifest.json',lambda d:d.update(format_version=int(state[-1])))
     write_reference(result,files)
     _edit_record(env,patch,lambda row:row.update(result_sha256=hashlib.sha256(result.read_bytes()).hexdigest()))

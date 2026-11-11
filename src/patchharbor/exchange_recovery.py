@@ -50,7 +50,7 @@ def _matches_receipt(record: ExchangeStateRecord, evidence: ArchiveEvidence) -> 
     receipt = evidence.receipt
     return (
         receipt is not None
-        and receipt.patch_sha256 == record.identity.sha256
+        and receipt.task_sha256 == record.identity.sha256
         and receipt.expected == record.manifest
         and receipt.run_id == record.attempt_run_id
         and receipt.completed_commit == evidence.selection.base_commit
@@ -105,7 +105,7 @@ def recover_exchange_artifacts(
         for record in pending:
             activity("RECOVERY", f"Examine attempted package: {record.identity.path.name}")
             patch = by_identity.get(record.identity)
-            if patch is None or patch.kind is not ExchangeArtifactKind.PATCH_PACKAGE:
+            if patch is None or patch.kind is not ExchangeArtifactKind.TASK_BUNDLE:
                 activity("KEEP", f"{record.identity.path.name}: matching patch not available", "detail")
                 continue
             if not results.get(record.result_sha256, ()):
@@ -174,7 +174,7 @@ def recover_exchange_artifacts(
         latest = load_exchange_state(paths)
         return tuple(
             replace(artifact, apply_status=record.apply_status)
-            if artifact.kind is ExchangeArtifactKind.PATCH_PACKAGE
+            if artifact.kind is ExchangeArtifactKind.TASK_BUNDLE
             and (record := latest.record_for(artifact.identity)) is not None
             else artifact for artifact in artifacts
         )

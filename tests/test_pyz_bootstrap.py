@@ -281,8 +281,8 @@ def test_bootstrap_rejects_noncanonical_runtime_metadata_before_import(reference
     path,files,raw=reference
     def corrupt(doc):
         if fault=='unknown':doc['unknown']=True
-        elif fault=='capabilities':doc['capabilities']['operations'].remove('pack_patch')
-        elif fault=='bool_format':doc['capabilities']['patch_formats']=[True]
+        elif fault=='capabilities':doc['capabilities']['operations'].remove('pack_task')
+        elif fault=='bool_format':doc['capabilities']['task_formats']=[True]
         elif fault=='inner_float':doc['artifact']['size']=float(len(raw))
         elif fault=='provenance':doc['provenance']['recipe_format_version']=True
         elif fault=='dependencies':doc['runtime_dependencies']=['installer-required']
@@ -293,7 +293,7 @@ def test_bootstrap_rejects_noncanonical_runtime_metadata_before_import(reference
 @pytest.mark.parametrize('fault',['unknown_result','unavailable_claim'])
 def test_unknown_format_and_invalid_unavailable_are_errors_not_legacy_fallback(reference,fault):
     path,files,_=reference
-    if fault=='unknown_result':edit_document(files,'manifest.json',lambda d:d.update(format_version=4))
+    if fault=='unknown_result':edit_document(files,'manifest.json',lambda d:d.update(format_version=5))
     else:
         files=attach_pyz(files,None)
         edit_metadata(files,lambda d:d.update(profile=pyz.PROFILE))

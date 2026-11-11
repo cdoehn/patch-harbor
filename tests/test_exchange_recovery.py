@@ -13,7 +13,7 @@ pytestmark = pytest.mark.usefixtures("prepared_result_producer")
 
 import patchharbor.exchange_recovery as recovery
 import patchharbor.exchange_state as ledger
-from patchharbor.errors import PatchHarborError, patch_package_error
+from patchharbor.errors import PatchHarborError, task_bundle_error
 from patchharbor.models import GitObjectId, GitObjectFormat, RepositoryId
 from tests.registration_support import git, set_isolated_user_environment, user_configuration_path
 from tests.archive_support import _inputs
@@ -151,7 +151,7 @@ def test_state_write_failure_leaves_recovery_repeatable(tmp_path, monkeypatch):
     paths, configuration, artifacts = _inputs(env, exchange, monkeypatch)
     original = ledger._write_unlocked
     def fail(*args):
-        raise patch_package_error("simulated storage failure")
+        raise task_bundle_error("simulated storage failure")
     monkeypatch.setattr(ledger, "_write_unlocked", fail)
     recovery.recover_exchange_artifacts(artifacts, configuration=configuration, paths=paths,
                                        repository_id=RepositoryId(context["repo_id"]))

@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Protocol
 from uuid import UUID
 
-from patchharbor.errors import LockBusyError, PatchHarborError, patch_package_error
+from patchharbor.errors import LockBusyError, PatchHarborError, task_bundle_error
 from patchharbor.watch_contract import ApplyLock, ApplyLockKind
 from patchharbor.json_document import serialize_json_document
 from patchharbor.models import (
@@ -225,7 +225,7 @@ class _DuplicateJsonKey(ValueError):
 
 
 def _error(message: str) -> PatchHarborError:
-    return patch_package_error(message)
+    return task_bundle_error(message)
 
 
 def _is_sha256(value: object) -> bool:

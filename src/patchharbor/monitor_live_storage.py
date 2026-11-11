@@ -56,7 +56,7 @@ def prune_completed(directory):
 
 
 def monitor_live(*, instance_id=None):
-    result = {'format_version': 1, 'kind': 'patchharbor-monitor-live', 'observed_at': observed_at(),
+    result = {'format_version': 2, 'kind': 'patchharbor-monitor-live', 'observed_at': observed_at(),
               'instances': [], 'errors': [], 'incomplete': False}
     paths = raw_registration_user_paths()
     directory = paths.state_directory / 'monitor-v1'

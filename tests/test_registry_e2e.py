@@ -92,7 +92,7 @@ def test_register_creates_identity_registry_and_clean_git_state(
     assert f"repo_id: {repo_id[:6]}…" in completed.stdout
     assert repo_id not in completed.stdout
     assert "patchharbor context --json [REPOSITORY]" in completed.stdout
-    assert "für patch.json mit --json" not in completed.stdout
+    assert "für task.json mit --json" not in completed.stdout
 
     registry = json.loads(_registry_path().read_text(encoding="utf-8"))
     assert registry["format_version"] == 1

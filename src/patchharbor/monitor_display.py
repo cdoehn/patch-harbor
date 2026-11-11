@@ -36,8 +36,8 @@ def repository_rows(document, session, *, width, height, now, frame):
             label = operation(run)
             if data.get('bundle_number'):
                 label = ('Result zu #' if label.startswith('Result') else 'Patch #') + data['bundle_number']
-                if data.get('patch_sha256'):
-                    label += ' ' + short_id(data['patch_sha256'])
+                if data.get('task_sha256'):
+                    label += ' ' + short_id(data['task_sha256'])
             if data.get('entrypoint_name') and run.get('activity', {}).get('code', run.get('phase')) == 'entrypoint':
                 text = label + ' · ' + data['entrypoint_name']
             else:

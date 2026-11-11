@@ -28,14 +28,14 @@ def json_cli_failure(path, command, code):
     stdout, stderr = StringIO(), StringIO()
     assert main([command, str(path), '--json'], stdout=stdout, stderr=stderr) == code
     result = json.loads(stdout.getvalue())
-    assert result['output_version'] == 2 and result['command'] == command
+    assert result['output_version'] == 3 and result['command'] == command
     assert result['success'] is False and result['result'] is None
     assert result['process_exit_code'] == result['error']['patchharbor_error_code'] == code
     assert stderr.getvalue() == ''
 
 
 def broken_archive(case):
-    entries = [('patch.json', json.dumps(MANIFEST).encode()), ('run.sh', SCRIPT)]
+    entries = [('task.json', json.dumps(MANIFEST).encode()), ('run.sh', SCRIPT)]
     compression = ZIP_STORED
     if case == 'duplicate':
         entries.append(('run.sh', SCRIPT))
@@ -117,7 +117,7 @@ def test_archive_failures_are_input_errors_without_partial_results(tmp_path, cas
 
 @pytest.mark.parametrize('content', [
     b'\xef\xbb\xbf' + json.dumps(MANIFEST).encode(),
-    json.dumps(MANIFEST).encode()[:-1] + b',"marker":"patch-harbor"}',
+    json.dumps(MANIFEST).encode()[:-1] + b',"marker":"patch-harbor-task-bundle"}',
     json.dumps({**MANIFEST, 'format_version': True}).encode(),
     json.dumps({**MANIFEST, 'format_version': 1.0}).encode(),
     json.dumps({**MANIFEST, 'base_commit': '123456'}).encode(),
@@ -133,7 +133,7 @@ def test_archive_failures_are_input_errors_without_partial_results(tmp_path, cas
 @pytest.mark.parametrize('command', ['inspect', 'validate'])
 def test_invalid_manifest_is_domain_error_not_crash(tmp_path, content, command):
     path = tmp_path / 'bad.zip'
-    write_package(path, changes={'patch.json': content})
+    write_package(path, changes={'task.json': content})
     json_cli_failure(path, command, 10)
 
 
@@ -156,7 +156,7 @@ def test_json_backend_recursion_limit_is_a_manifest_error(tmp_path, monkeypatch)
     monkeypatch.setattr(manifests.json, 'loads', recursion_limited)
     with pytest.raises(api.PatchHarborError) as caught:
         api.inspect_task(path)
-    assert caught.value.reason is api.FailureReason.PATCH_PACKAGE_ERROR
+    assert caught.value.reason is api.FailureReason.TASK_BUNDLE_ERROR
 
 
 def test_unexpected_programming_failure_is_not_disguised_as_package_rejection(tmp_path, monkeypatch):

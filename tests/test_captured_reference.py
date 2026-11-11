@@ -71,7 +71,7 @@ def test_capture_and_passive_bytes_cannot_be_changed_by_a_renderer(tmp_path):
 def test_unavailable_runtime_is_still_a_complete_reference(tmp_path, kind, dirty):
     path, files, _ = _reference(tmp_path, kind=kind, dirty=dirty)
     captured = reader.capture_result_reference(path)
-    assert captured.facts.format_version == 3
+    assert captured.facts.format_version == 4
     assert captured.facts.runtime.status == "unavailable"
     assert captured.facts.warnings
     assert captured.handoff.environment == files["environment.json"]
@@ -204,13 +204,13 @@ def test_internal_validation_uses_actual_package_bytes_and_original_error_catego
     patch = tmp_path / "patch.zip"
     bound_package(patch, binding)
     first = inspection.validate_task_against_reference(patch, captured)
-    write_package(patch, changes={"patch.json": json.dumps({**MANIFEST, **binding}).encode(),
+    write_package(patch, changes={"task.json": json.dumps({**MANIFEST, **binding}).encode(),
                                   "docs/data.bin": b"new payload"})
     second = inspection.validate_task_against_reference(patch, captured)
     assert second.inspection.package_sha256 == hashlib.sha256(patch.read_bytes()).hexdigest()
     assert first.inspection.package_sha256 != second.inspection.package_sha256
     assert first.reference_sha256 == second.reference_sha256
-    write_package(patch, changes={"patch.json": json.dumps({**MANIFEST, **binding}).encode(),
+    write_package(patch, changes={"task.json": json.dumps({**MANIFEST, **binding}).encode(),
                                   "run.sh": b"#!/usr/bin/env bash\ntrue\n"})
     with pytest.raises(PatchHarborError) as caught:
         inspection.validate_task_against_reference(patch, captured)

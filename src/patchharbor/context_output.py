@@ -29,7 +29,7 @@ def write_context_block(context: RepositoryContext, stream: TextIO) -> None:
     print(file=stream)
     print("INSTRUCTIONS:", file=stream)
     print(
-        "- Kurzansicht nicht in patch.json oder als Chat-/Maschineninput "
+        "- Kurzansicht nicht in task.json oder als Chat-/Maschineninput "
         "verwenden.",
         file=stream,
     )

@@ -68,7 +68,7 @@ def read_result_snapshot(path: Path, *, expected_sha256: str | None = None,
     effective = layer('effective', {**worktree.files, **untracked.files})
     runtime = facts.runtime
     if runtime is None:
-        raise RuntimeError('validated Result 3 lacks runtime facts')
+        raise RuntimeError('validated Result 4 lacks runtime facts')
     projection = SnapshotRuntime(runtime.status, runtime.reason, runtime.version, runtime.requires_python,
         runtime.profile, runtime.content_id,
         runtime.artifact.sha256 if runtime.artifact else None,

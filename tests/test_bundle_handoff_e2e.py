@@ -50,14 +50,14 @@ def _read_result(path: Path) -> dict[str, object]:
 
 
 def _write_patch(path: Path, context: dict[str, object], environment: dict[str, object], *, fail_once: bool = False, root_payload: bool = False) -> None:
-    target_data = {**environment, "bundle_type": "Patch", "bundle_filename": path.name}
+    target_data = {**environment, "bundle_type": "Task", "bundle_filename": path.name}
     handoff = render_chat_handoff(target_data)
     entrypoint = native_script(
         'test -f "$PH_HANDOFF_READY" || exit 23' if fail_once else "exit 0",
         'if (-not (Test-Path $env:PH_HANDOFF_READY)) { exit 23 }; exit 0' if fail_once else "exit 0",
     )
     with zipfile.ZipFile(path, "w") as archive:
-        archive.writestr("patch.json", json.dumps(_manifest(context)))
+        archive.writestr("task.json", json.dumps(_manifest(context)))
         archive.writestr(native_value("run.sh", "run.ps1"), entrypoint)
         for name, raw in handoff.entries(patch=True):
             archive.writestr(name, raw)
@@ -78,7 +78,7 @@ def test_manual_bundle_embeds_current_environment_without_touching_repository(tm
     assert data["runtime"]["python_version"]
     assert data["runtime"]["patchharbor_version"] == __version__
     assert data["filename_timezone"] == "UTC"
-    assert data["filename_schemas"]["Patch"].endswith(".zip<bundle_suffix>")
+    assert data["filename_schemas"]["Task"].endswith(".zip<bundle_suffix>")
     assert git(repository, "status", "--porcelain").stdout == ""
     assert not (repository / CHAT_INSTRUCTIONS_NAME).exists()
     assert not (repository / ENVIRONMENT_NAME).exists()
@@ -199,15 +199,15 @@ def test_watcher_regenerates_local_handoff_and_does_not_loop(tmp_path: Path) -> 
     def delegate():
         return delegate_to_automatic_apply(environment=apply_environment)
     state = SharedWatcherEventState()
-    before = set(exchange.glob("*_Result_*.zip"))
+    before = set(exchange.glob("*_Result_Bundle_*.zip"))
     assert poll_repositories_once(state, delegate=delegate, log_stream=StringIO(), error_stream=StringIO()) is WatcherPollOutcome.ERROR
-    after = set(exchange.glob("*_Result_*.zip"))
+    after = set(exchange.glob("*_Result_Bundle_*.zip"))
     (result,) = after - before
     data = _read_result(result)
     assert data["repository_path"] == str(repository.resolve())
     assert data["run_id"] != initial["run_id"]
     assert poll_repositories_once(state, delegate=delegate, log_stream=StringIO(), error_stream=StringIO()) is WatcherPollOutcome.WAITING
-    assert set(exchange.glob("*_Result_*.zip")) == after
+    assert set(exchange.glob("*_Result_Bundle_*.zip")) == after
     assert git(repository, "status", "--porcelain").stdout == ""
 
 
@@ -229,7 +229,7 @@ def test_configuration_change_during_handoff_is_revalidated(tmp_path: Path, monk
     monkeypatch.setattr(result_handoff_module, "capture_runtime_environment", capture_and_change)
     with pytest.raises(PatchHarborError, match="bundle suffix changed"):
         create_manual_result_bundle(repository)
-    assert not list(exchange.glob("*_Result_*"))
+    assert not list(exchange.glob("*_Result_Bundle_*"))
     assert not list(exchange.glob(".*.tmp"))
 
 
@@ -246,7 +246,7 @@ def test_template_failure_publishes_no_incomplete_bundle(
     with pytest.raises(PatchHarborError) as failure:
         create_manual_result_bundle(repository)
     assert failure.value.reason.value == "result_bundle_error"
-    assert not list(exchange.glob("*_Result_*"))
+    assert not list(exchange.glob("*_Result_Bundle_*"))
     assert not list(exchange.glob(".*.tmp"))
     assert git(repository, "status", "--porcelain").stdout == ""
 
@@ -272,7 +272,7 @@ def test_result_bundle_normalizes_generated_instructions_not_repository_bytes(
         monkeypatch.setenv(key, value)
     monkeypatch.setattr(template_module, "_template_path", lambda: template)
     create_manual_result_bundle(repository)
-    paths = list(exchange.glob("*_Result_*.zip"))
+    paths = list(exchange.glob("*_Result_Bundle_*.zip"))
     assert len(paths) == 1
     with zipfile.ZipFile(paths[0]) as archive:
         assert archive.testzip() is None

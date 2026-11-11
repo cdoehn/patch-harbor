@@ -40,7 +40,7 @@ class ResultRuntimePayload:
 
     @property
     def result_format(self) -> int:
-        return 3
+        return 4
 
     def entries(self) -> tuple[tuple[str, bytes], ...]:
         result = ((METADATA_PATH, self.metadata),)
@@ -66,9 +66,9 @@ class ResultRuntimePayload:
 
 
 def runtime_payload(artifact: PyzArtifact | None, *, reason: str | None = None) -> ResultRuntimePayload:
-    """Prepare the sole production Runtime-2/PYZ payload for Result format 3."""
+    """Prepare the sole production Runtime-2/PYZ payload for Result format 4."""
     doc = {
-        'marker':'patch-harbor-runtime', 'format_version':2,
+        'marker':'patch-harbor-runtime', 'format_version':3,
         'status':'unavailable', 'reason':reason, 'distribution':'patchharbor',
         'version':__version__, 'requires_python':'>=3.10', 'profile':None,
         'content_id':None, 'content_id_algorithm':None, 'artifact':None,
@@ -85,8 +85,8 @@ def runtime_payload(artifact: PyzArtifact | None, *, reason: str | None = None) 
                content_id_algorithm=runtime_pyz.CONTENT_ALGORITHM,
                artifact=dict(type='pyz',**_descriptor(path,artifact.pyz_bytes)),runtime_dependencies=[],
                provenance=dict(mode='canonical_resources',source_commit=recipe.source_commit,recipe_format_version=1),
-               capabilities=dict(operations=['inspect_patch','validate_patch','pack_patch'],
-                                 patch_formats=[1],result_formats=[3]))
+               capabilities=dict(operations=['inspect_task','validate_task','pack_task'],
+                                 task_formats=[2],result_formats=[4]))
     with ZipFile(BytesIO(artifact.pyz_bytes)) as archive:
         inner_bytes = sum(info.file_size for info in archive.infolist())
     return ResultRuntimePayload('embedded',None,serialize_json_document(doc).encode(),

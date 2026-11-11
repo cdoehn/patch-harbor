@@ -442,7 +442,7 @@ def create_apply_result_bundle(
             except (PatchHarborError, OSError, ValueError):
                 pass  # A success/no-op is not automatically a committed success.
         receipt = (None if package_sha256 is None else
-                   {"patch_sha256": package_sha256,
+                   {"task_sha256": package_sha256,
                     "completed_commit": str(completed_commit) if completed_commit else None})
         documents = _publication_documents(
             report, target, captured.bundle_snapshot, resources,

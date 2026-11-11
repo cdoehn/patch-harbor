@@ -12,7 +12,7 @@ from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
 
 from patchharbor.bundle_handoff import (
     ENVIRONMENT_FORMAT_VERSION, ENVIRONMENT_MARKER, MAX_HANDOFF_ENTRY_BYTES,
-    PATCH_FILENAME_SCHEMA, RESULT_FILENAME_SCHEMA,
+    TASK_FILENAME_SCHEMA, RESULT_FILENAME_SCHEMA,
 )
 from patchharbor.bundle_names import is_browser_temporary_name, validate_bundle_suffix
 from patchharbor.bundle_paths import _is_safe_path_segment
@@ -37,7 +37,7 @@ def _binding(reference: CapturedResultReference) -> dict[str, str]:
 
 def _target_environment(reference: CapturedResultReference) -> tuple[dict, tuple[str, ...]]:
     if reference.handoff is None:
-        raise _failure('Result 3 requires recorded handoff data', FailureReason.SOURCE_ERROR)
+        raise _failure('Result 4 requires recorded handoff data', FailureReason.SOURCE_ERROR)
     # These exact immutable bytes came from the complete native reader.
     return parse_json_document(reference.handoff.environment), ()
 
@@ -82,16 +82,16 @@ def prepare_metadata(reference: CapturedResultReference, package_id: UUID,
     if filename is None:
         prefix, adjustments = _repository_prefix(document)
         warnings += adjustments
-        filename = f'{prefix}_Patch_{created_at:%H%M%S}_{created_at:%m%d}_{str(package_id)[:6]}.zip{suffix}'
+        filename = f'{prefix}_Task_Bundle_{created_at:%H%M%S}_{created_at:%m%d}_{str(package_id)[:6]}.zip{suffix}'
     elif (not filename.endswith('.zip' + suffix) or is_browser_temporary_name(filename)
           or filename in ('.', '..') or any(c in filename for c in '/\\\0')):
         raise _failure('explicit output name must end in .zip plus the reference suffix',
                        FailureReason.PAYLOAD_PREPARATION_ERROR)
     document.update(
         marker=ENVIRONMENT_MARKER, format_version=ENVIRONMENT_FORMAT_VERSION,
-        bundle_type='Patch', bundle_filename=filename,
+        bundle_type='Task', bundle_filename=filename,
         repository_context=_binding(reference), bundle_suffix=suffix,
-        filename_schemas={'Patch': PATCH_FILENAME_SCHEMA, 'Result': RESULT_FILENAME_SCHEMA},
+        filename_schemas={'Task': TASK_FILENAME_SCHEMA, 'Result': RESULT_FILENAME_SCHEMA},
         filename_timezone='UTC',
     )
     raw = serialize_json_document(document).encode('utf-8')
@@ -133,7 +133,7 @@ def prepare_candidate(sources: CapturedSources,
                     template: str, *, resource_policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY
                     ) -> PackCandidate:
     """Prepare bounded exact entries before reserving an output file."""
-    manifest = {'marker': 'patch-harbor', 'format_version': 1,
+    manifest = {'marker': 'patch-harbor-task-bundle', 'format_version': 2,
                 **_binding(reference), 'entrypoint': sources.entrypoint}
     document = parse_json_document(metadata.environment)
     try:
@@ -147,7 +147,7 @@ def prepare_candidate(sources: CapturedSources,
     except (UnicodeError, ValueError) as exc:
         raise _failure('cannot render own canonical template', FailureReason.PAYLOAD_PREPARATION_ERROR) from exc
     entries = [(file.relative_path, file.content, file.unix_mode) for file in sources.files]
-    entries.append(('patch.json', serialize_json_document(manifest).encode('utf-8'), 0o644))
+    entries.append(('task.json', serialize_json_document(manifest).encode('utf-8'), 0o644))
     entries.extend((path, content, 0o644) for path, content in handoff.entries(patch=True))
     if (len(entries) > resource_policy.max_zip_entries
             or any(len(content) > resource_policy.max_content_bytes for _, content, _ in entries)

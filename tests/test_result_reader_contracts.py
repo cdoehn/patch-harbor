@@ -1,4 +1,4 @@
-"""Result-3 reader boundaries retained from the retired format-2 test suite."""
+"""Result-4 reader boundaries retained from the retired format-2 test suite."""
 from dataclasses import FrozenInstanceError, replace
 from io import BytesIO, StringIO
 import hashlib
@@ -36,7 +36,7 @@ def test_categorized_tool_failure_remains_a_reference_and_can_be_published(canon
     ref = tmp_path / "result.zip"; write_reference(ref, files)
     patch = tmp_path / "patch.zip"; bound_package(patch, binding)
     facts, _ = read_result_reference(ref)
-    assert facts.format_version == 3 and facts.primary_result == primary
+    assert facts.format_version == 4 and facts.primary_result == primary
     assert api.validate_task(patch, reference_bundle=ref).binding_matches
     publication._verify_result_bundle(ref, execution_present=False)
     with pytest.raises(ValueError):
@@ -56,7 +56,7 @@ def test_format3_reference_preserves_binding_and_separates_success_policy(canoni
     ref = tmp_path / "result.zip"; write_reference(ref, files)
     patch = tmp_path / "patch.zip"; bound_package(patch, binding)
     facts, digest = read_result_reference(ref)
-    assert facts.format_version == 3 and facts.runtime.status == status
+    assert facts.format_version == 4 and facts.runtime.status == status
     assert facts.context.dirty is dirty and facts.operation == ("bundle" if kind == "bundle" else "apply")
     assert digest == hashlib.sha256(ref.read_bytes()).hexdigest()
     report = api.validate_task(patch, reference_bundle=ref)

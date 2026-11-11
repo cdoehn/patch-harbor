@@ -50,8 +50,8 @@ def _commit_package(path, context):
         "git commit --allow-empty -m config-acceptance; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }",
     )
     with zipfile.ZipFile(path, "w") as archive:
-        archive.writestr("patch.json", json.dumps({
-            "marker": "patch-harbor", "format_version": 1,
+        archive.writestr("task.json", json.dumps({
+            "marker": "patch-harbor-task-bundle", "format_version": 2,
             "repo_id": str(context.repo_id), "base_commit": str(context.base_commit),
             "state_fingerprint": context.state_fingerprint,
             "fingerprint_algorithm": context.fingerprint_algorithm, "entrypoint": entrypoint,

@@ -43,7 +43,7 @@ Der Inhaltsordner ist die bewusste Auswahl: Entrypoint und gewünschte Nutzdatei
 keine `.git`-/`.patchharbor`-Daten. Es gibt keine `.gitignore`-Filterung oder
 selbstständige Änderungswahl. Alle zulässigen Dateien werden bytegleich aufgenommen;
 Archive bleiben Nutzdateien. Leere Verzeichnisse entfallen mit einem Hinweis.
-`patch.json` und der Root-Namensraum `PATCHHARBOR_META` sind für generierte Dateien
+`task.json` und der Root-Namensraum `PATCHHARBOR_META` sind für generierte Dateien
 reserviert. Eine normale Repositorydatei `CHAT_INSTRUCTIONS.md` bleibt Nutzdatei.
 
 Der Entrypoint braucht den bestehenden Bash-/PowerShell-Vertrag samt Pflichtmarker.
@@ -73,7 +73,7 @@ Fremde Pfade werden als Text verwendet und nicht auf dem Pack-Rechner aufgelöst
 ## Ausgabe und Veröffentlichung
 
 Genau eine Ausgabeart ist nötig: `output_directory` erzeugt den kanonischen Namen
-`<Repository>_Patch_<HHMMSS>_<MMDD>_<ID6>.zip<bundle_suffix>`; `output` erlaubt einen
+`<Repository>_Task_Bundle_<HHMMSS>_<MMDD>_<ID6>.zip<bundle_suffix>`; `output` erlaubt einen
 bewussten Namen mit `.zip` plus dem Referenzsuffix. Beide haben eine eigene UUID v4
 und UTC-Erzeugungszeit. Die Paket-ID ist weder Referenz-Run-ID noch Chat-Bundle-Nummer.
 Für Chat-Auslieferungen bleibt der kanonische Name vorgeschrieben.

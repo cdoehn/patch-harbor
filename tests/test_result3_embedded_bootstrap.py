@@ -16,7 +16,7 @@ from tests.reference_support import reference_entries, write_reference
 
 
 @pytest.mark.packaging
-@pytest.mark.parametrize('result_formats', [[1,2,3],[3]], ids=['original_caps','current_caps'])
+@pytest.mark.parametrize('result_formats', [[4]], ids=['current_caps'])
 @pytest.mark.parametrize('corrupt_snapshot',[False,True])
 def test_own_embedded_bootstrap_runs_in_fresh_process_and_pack_uses_same_result(
     built_result_source, request_files, tmp_path, corrupt_snapshot, result_formats,

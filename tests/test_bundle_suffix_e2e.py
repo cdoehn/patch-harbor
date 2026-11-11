@@ -35,7 +35,7 @@ def _configured(tmp_path: Path):
 
 def _assert_result(path: Path, suffix: str) -> dict[str, object]:
     assert path.is_file()
-    assert re.fullmatch(r"repository_Result_\d{6}_\d{4}_[a-f0-9]{6}\.zip" + re.escape(suffix), path.name)
+    assert re.fullmatch(r"repository_Result_Bundle_\d{6}_\d{4}_[a-f0-9]{6}\.zip" + re.escape(suffix), path.name)
     with zipfile.ZipFile(path) as archive:
         assert archive.testzip() is None
         context = json.loads(archive.read("context.json"))
@@ -43,7 +43,7 @@ def _assert_result(path: Path, suffix: str) -> dict[str, object]:
         assert len(context["repo_id"]) == 36
         assert len(context["base_commit"]) == 40
         assert len(context["state_fingerprint"]) == 16
-        assert json.loads(archive.read("manifest.json"))["format_version"] == 3
+        assert json.loads(archive.read("manifest.json"))["format_version"] == 4
     return context
 
 
@@ -54,7 +54,7 @@ def _write_no_mutation_package(path: Path, context: dict[str, object], *, fail_o
         'if (-not (Test-Path $env:PH_SUFFIX_READY)) { exit 23 }; exit 0' if fail_once else 'exit 0',
     )
     with zipfile.ZipFile(path, "w") as archive:
-        archive.writestr("patch.json", json.dumps(_manifest(context)))
+        archive.writestr("task.json", json.dumps(_manifest(context)))
         archive.writestr(native_value("run.sh", "run.ps1"), body)
 
 
@@ -114,7 +114,7 @@ def test_apply_accepts_old_and_suffixed_packages_and_publishes_suffixed_result(
     result = json.loads(completed.stdout)["result"]
     _assert_result(Path(result["result_bundle"]["path"]), ".txt")
     assert package.read_bytes() == before
-    assert classify_exchange_artifact(package).kind is ExchangeArtifactKind.PATCH_PACKAGE
+    assert classify_exchange_artifact(package).kind is ExchangeArtifactKind.TASK_BUNDLE
 
 
 def test_suffix_metadata_does_not_change_state_binding_or_cli_json_schema(tmp_path: Path) -> None:
@@ -159,12 +159,12 @@ def test_watcher_accepts_suffixed_patch_but_does_not_loop_after_failure(tmp_path
     first = poll_repositories_once(state, delegate=delegate, log_stream=first_log, error_stream=StringIO())
     assert first is WatcherPollOutcome.ERROR
     assert json.loads(first_log.getvalue())["process_exit_code"] == 23
-    bundles = tuple(exchange.glob("*_Result_*.zip.txt"))
+    bundles = tuple(exchange.glob("*_Result_Bundle_*.zip.txt"))
     assert len(bundles) == 1
     _assert_result(bundles[0], ".txt")
     second = poll_repositories_once(state, delegate=delegate, log_stream=StringIO(), error_stream=StringIO())
     assert second is WatcherPollOutcome.WAITING
-    assert tuple(exchange.glob("*_Result_*.zip.txt")) == bundles
+    assert tuple(exchange.glob("*_Result_Bundle_*.zip.txt")) == bundles
 
 
 @pytest.mark.parametrize("explicit_output", [False, True])
@@ -188,7 +188,7 @@ def test_suffix_change_during_capture_never_publishes_inconsistent_name(
     monkeypatch.setattr(capture_module, "capture_base_bundle_entries", capture_then_change)
     with pytest.raises(PatchHarborError, match="bundle suffix changed"):
         create_manual_result_bundle(repository, output_directory=output)
-    assert not tuple((output or exchange).glob("*_Result_*"))
+    assert not tuple((output or exchange).glob("*_Result_Bundle_*"))
 
 
 def test_newest_valid_suffixed_patch_is_selected_only_for_current_repository(tmp_path: Path) -> None:

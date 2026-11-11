@@ -23,7 +23,7 @@ def test_layers_match_independent_original_states(tmp_path,monkeypatch,kind,obje
     case=produce_case(tmp_path,monkeypatch,kind=kind,object_format=object_format,quoted=quoted)
     raw=case.result.read_bytes()
     snapshot=api.read_result_snapshot(case.result,expected_sha256=hashlib.sha256(raw).hexdigest())
-    assert snapshot.format_version==3 and snapshot.context.dirty==(kind!='clean')
+    assert snapshot.format_version==4 and snapshot.context.dirty==(kind!='clean')
     assert snapshot.sha256==hashlib.sha256(raw).hexdigest()
     assert snapshot.context==api.ReferenceContext(**{name:getattr(api.context(case.repository),name)
         for name in ('repo_id','base_commit','dirty','state_fingerprint','fingerprint_algorithm')},repository_path=str(case.repository.resolve()))
@@ -86,7 +86,7 @@ def test_public_signature_types_capabilities_and_argument_failures(tmp_path):
     assert typing.get_type_hints(api.read_result_snapshot)['return'] is api.ResultSnapshot
     assert {'ResultSnapshot','SnapshotLayer','SnapshotFile','SnapshotRuntime','ResultSnapshotError','SnapshotErrorCode'}<=set(api.__all__)
     capability=api.integration_capabilities()
-    assert capability.contract_version==capability.snapshot_contract_version==1
+    assert capability.contract_version==capability.snapshot_contract_version==2
     for digest in ('short','A'*64,'x'*64):
         with pytest.raises(ValueError):api.read_result_snapshot(tmp_path/'absent',expected_sha256=digest)
     for digest in (True,b'0'*64,5):
@@ -132,24 +132,16 @@ def test_frozen_140_snapshots_preserve_status_and_actual_file_layers(case,monkey
     import socket
     import subprocess
     from tests.compatibility_140_support import artifact
-    path,expected=artifact('result',case)
-    def forbidden(*args,**kwargs):pytest.fail('snapshot started a subprocess or network operation')
-    monkeypatch.setattr(subprocess,'Popen',forbidden);monkeypatch.setattr(socket,'socket',forbidden)
-    s=api.read_result_snapshot(path,expected_sha256=expected['sha256'])
-    assert s.context.dirty is expected['dirty']
-    assert s.primary_result.kind.value==expected['primary_kind']
-    assert s.dry_run is expected['dry_run']
-    if case=='dirty':
-        assert s.base.files['tracked.txt'].content==b'partial commit\n'
-        assert s.index.files['tracked.txt'].content==b'staged\n'
-        assert s.worktree.files['tracked.txt'].content==b'unstaged\n'
-        assert 'delete-me.txt' not in s.effective.files
-        assert s.effective.files['untracked.bin'].content==b'\x00public\xff\n'
-    elif case=='partial-failure':
-        assert s.worktree.files['tracked.txt'].content==b'uncommitted after failure\n'
-        assert s.primary_result.entrypoint_exit_code==7
-    else:
-        assert s.base.files==s.index.files==s.worktree.files==s.effective.files
+    path, expected = artifact('result', case)
+    raw = path.read_bytes()
+    def forbidden(*args, **kwargs):
+        pytest.fail('old snapshot rejection started external code')
+    monkeypatch.setattr(subprocess, 'Popen', forbidden)
+    monkeypatch.setattr(socket, 'socket', forbidden)
+    with pytest.raises(api.ResultSnapshotError) as caught:
+        api.read_result_snapshot(path, expected_sha256=expected['sha256'])
+    assert caught.value.code is api.SnapshotErrorCode.INVALID_RESULT
+    assert path.read_bytes() == raw
 
 
 def test_count_ceiling_allows_add_before_delete_in_same_git_layer(tmp_path,monkeypatch):

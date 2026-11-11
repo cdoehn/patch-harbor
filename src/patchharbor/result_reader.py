@@ -1,4 +1,4 @@
-"""Read complete Result-3 facts without imposing archival success policy."""
+"""Read complete Result-4 facts without imposing archival success policy."""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -47,7 +47,7 @@ _APPLY_FIELDS = {
     prefix + name for prefix in ("expected_", "actual_")
     for name in ("base_commit", "state_fingerprint", "fingerprint_algorithm")
 }
-_RECEIPT_FIELDS = {"patch_sha256", "completed_commit"}
+_RECEIPT_FIELDS = {"task_sha256", "completed_commit"}
 _RUN_FIELDS = _BINDING_FIELDS | {
     "run_id", "operation", "dry_run", "started_at", "ended_at", "duration_seconds",
     "repository_resolved", "repository_path", "warnings", "execution_present",
@@ -98,9 +98,9 @@ class ResultFacts:
     warnings: tuple[str, ...]
     base_entries: tuple[tuple[str, str, str], ...]
     expected: ExchangeTaskSelection | None
-    patch_sha256: str | None
+    task_sha256: str | None
     completed_commit: GitObjectId | None
-    format_version: int = 3
+    format_version: int = 4
     runtime: ResultPyzRuntime | None = None
     handoff_present: bool = False
 
@@ -184,7 +184,7 @@ def _handoff(files: dict[str, bytes], context: dict, run: dict) -> set[str]:
         raw.decode("utf-8")
     environment = _document(files["environment.json"])
     _require(environment.get("marker") == ENVIRONMENT_MARKER
-             and type(environment.get("format_version")) is int and environment["format_version"] == 1
+             and type(environment.get("format_version")) is int and environment["format_version"] == 2
              and environment.get("bundle_type") == "Result"
              and environment.get("repository_context") == {k: context[k] for k in _BINDING_FIELDS}
              and environment.get("run_id") == run["run_id"]
@@ -266,7 +266,7 @@ def _parse_result_payloads(payloads: tuple[BundlePayload, ...], *,
     version = manifest.get("format_version")
     manifest_fields = _MANIFEST_FIELDS | {"runtime"}
     _require(manifest.get("marker") == _RESULT_MARKER
-             and type(version) is int and version == 3
+             and type(version) is int and version == 4
              and set(manifest) in (manifest_fields, manifest_fields | _APPLY_FIELDS,
                                    manifest_fields | _APPLY_FIELDS | _RECEIPT_FIELDS)
              and set(context) in (_BINDING_FIELDS | {"dirty", "created_at"},
@@ -327,7 +327,7 @@ def _parse_result_payloads(payloads: tuple[BundlePayload, ...], *,
         _require(all(manifest["actual_" + key] == manifest[key] for key in _BINDING_FIELDS - {"repo_id"}),
                  "inconsistent actual result context")
     completed = None
-    digest = manifest.get("patch_sha256")
+    digest = manifest.get("task_sha256")
     if _RECEIPT_FIELDS <= set(manifest):
         _require(_hex_digest(digest), "invalid patch digest")
         if manifest["completed_commit"] is not None:
@@ -342,7 +342,7 @@ def _parse_result_payloads(payloads: tuple[BundlePayload, ...], *,
         expected_files.add("logs/execution.log")
     handoff = _handoff(files, context, run)
     _require(handoff == {"environment.json", CHAT_INSTRUCTIONS_NAME},
-             "Result 3 requires passive handoff data")
+             "Result 4 requires passive handoff data")
     expected_files.update(handoff)
     runtime = None
     if verify_runtime:

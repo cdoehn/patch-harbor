@@ -21,7 +21,7 @@ without installation. Both routes expose the same public API.
 from pathlib import Path
 from patchharbor import api
 
-repo = Path.home() / "Projekte" / "patch-harbor"
+repo = Path.home() / "Projekte" / "patch-harbor-task-bundle"
 context = api.context(repo)
 print(str(context.repo_id), str(context.base_commit), context.state_fingerprint)
 bundle = api.bundle(repo)
@@ -119,7 +119,7 @@ For `package` scope, binding/context/reference are `None`.
 `repository_binding`, `repository_state`, `authenticity`, `execution`,
 `interpreter_availability`, `tests`, `ci`, `replay`. Successful static validity
 does not establish sender trust or approve a later Apply. Content hashes are
-computed observations, not new declared hashes in format-1 `patch.json`.
+computed observations, not new declared hashes in format-1 `task.json`.
 
 `validate_task(patch, reference_bundle="result.zip")` returns scope `reference`,
 `binding_matches=True`, the full SHA-256 of the captured reference bytes and a
@@ -193,7 +193,7 @@ contains exactly one JSON object, including known error outcomes; JSON never
 contains progress output. Older commands keep output version 1.
 
 The inspect `result` has exactly the inspection fields above. `manifest` uses
-the seven patch.json field names and complete string identifiers; `entries` use
+the seven task.json field names and complete string identifiers; `entries` use
 the five PatchEntry field names; `messages` use `name` and `text`. Tuples become
 arrays and enums become their string values. The validate `result` has exactly
 the validation fields above, with nested `inspection`, null optional values,

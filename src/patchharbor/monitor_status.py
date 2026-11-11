@@ -68,7 +68,7 @@ def repo_name(row, document):
 
 def package_label(data, full=False):
     number = data.get('bundle_number')
-    digest = data.get('patch_sha256') or data.get('sha256')
+    digest = data.get('task_sha256') or data.get('sha256')
     if number:
         return 'Patch #' + number + (' · ' + short_id(digest, full) if digest else '')
     if digest:
@@ -156,7 +156,7 @@ def exchange_status(repo, document, now=None):
     if summary_current(summary, now):
         if summary.get('candidate'):
             number = summary['candidate'].get('bundle_number')
-            return ('Patch #' + number if number else 'Patch') + ' passend', 'title'
+            return ('Patch #' + number if number else 'Task') + ' passend', 'title'
         return 'kein Patch passend', 'waiting'
     if summary.get('incomplete') or summary.get('errors'):
         return 'Bestand unklar', 'unknown'

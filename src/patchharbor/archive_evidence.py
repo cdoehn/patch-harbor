@@ -16,7 +16,7 @@ from patchharbor.run_report import PrimaryResultKind
 class ApplyReceipt:
     """An executed patch's full binding; trust also requires the local ZIP digest."""
 
-    patch_sha256: str
+    task_sha256: str
     run_id: str
     expected: ExchangeTaskSelection
     completed_commit: GitObjectId
@@ -51,8 +51,8 @@ def _result_evidence(payloads: tuple[BundlePayload, ...]) -> ArchiveEvidence:
     receipt = None
     if facts.completed_commit is not None:
         # The reader has already validated the entire receipt and actual context.
-        assert facts.patch_sha256 is not None and facts.expected is not None
-        receipt = ApplyReceipt(facts.patch_sha256, facts.run_id, facts.expected, facts.completed_commit)
+        assert facts.task_sha256 is not None and facts.expected is not None
+        receipt = ApplyReceipt(facts.task_sha256, facts.run_id, facts.expected, facts.completed_commit)
     return ArchiveEvidence("result_bundle", selection, facts.base_entries, receipt)
 
 
@@ -60,7 +60,7 @@ def parse_archive_evidence(content: bytes, path: Path) -> ArchiveEvidence:
     """Validate complete bytes; errors mean 'keep', never an archival decision."""
     payloads = read_result_or_task_payloads(content)
     files = {item.relative_path: item.content for item in payloads}
-    if "manifest.json" in files and "patch.json" in files:
+    if "manifest.json" in files and "task.json" in files:
         raise ValueError("ambiguous bundle kind")
     if "manifest.json" in files:
         return _result_evidence(payloads)

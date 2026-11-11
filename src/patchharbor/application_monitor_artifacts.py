@@ -25,7 +25,7 @@ def replay_snapshot():
 
 
 def monitor_artifacts(repository, *, include_archive=False):
-    result = {'format_version': 1, 'kind': 'patchharbor-monitor-artifacts', 'observed_at': observed_at(),
+    result = {'format_version': 2, 'kind': 'patchharbor-monitor-artifacts', 'observed_at': observed_at(),
               'artifacts': [], 'errors': [], 'incomplete': False, 'selected_candidate': None,
               'history_complete': False}
     snapshot = monitor_snapshot(repository=repository)
@@ -127,7 +127,7 @@ def monitor_artifacts(repository, *, include_archive=False):
     rows = result['artifacts']
     for patch in (r for r in rows if r['kind'] == 'task_package' and not r['error']):
         patch['source_candidates'] = sorted({r['sha256'] for r in rows if r.get('context') == patch['expected'] and not r['error']})
-        patch['result_links'] = sorted({r['sha256'] for r in rows if r.get('patch_sha256') == patch['sha256']
+        patch['result_links'] = sorted({r['sha256'] for r in rows if r.get('task_sha256') == patch['sha256']
                                  and r.get('expected') == patch['expected'] and not r['error']})
         patch['source_relation'] = 'matching states only; source ZIP not uniquely recorded'
     runs = {}
@@ -138,7 +138,7 @@ def monitor_artifacts(repository, *, include_archive=False):
         row['ambiguous_run'] = len(runs.get(row.get('run_id'), ())) > 1
         if row.get('attempt_run_id'):
             row['attempt_result_missing'] = not any(r.get('run_id') == row['attempt_run_id']
-                and r.get('patch_sha256') == row['sha256'] and r.get('expected') == row['expected']
+                and r.get('task_sha256') == row['sha256'] and r.get('expected') == row['expected']
                 and not r['error'] for r in rows)
     return result
 
@@ -154,7 +154,7 @@ def monitor_overview(repository):
     candidate = next((r for r in own if r['path'] == view['selected_candidate']), None)
     return {**{k: view.get(k) for k in ('observed_at', 'repo_id', 'repository_path', 'exchange',
                                       'errors', 'incomplete', 'stale', 'repository_error')},
-            'kind': 'patchharbor-monitor-overview', 'format_version': 1,
+            'kind': 'patchharbor-monitor-overview', 'format_version': 2,
             'candidate': candidate, 'latest_result': outcomes[0] if outcomes else None,
             'history_complete': False,
             'eligible_count': sum(r.get('eligibility', '').startswith('eligible') for r in own),

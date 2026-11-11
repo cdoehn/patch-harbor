@@ -75,7 +75,7 @@ class PrimaryResultKind(str, Enum):
             FailureReason.NO_VALID_SCRIPT,
             FailureReason.INTERPRETER_ERROR,
             FailureReason.PAYLOAD_PREPARATION_ERROR,
-            FailureReason.PATCH_PACKAGE_ERROR,
+            FailureReason.TASK_BUNDLE_ERROR,
         }:
             return cls.VALIDATION_ERROR
         return cls.EXECUTION_ERROR

@@ -45,4 +45,4 @@ class MonitorSnapshot:
     errors: tuple[str, ...] = ()
 
     def document(self) -> dict:
-        return {'format_version': 1, 'kind': 'patchharbor-monitor', **asdict(self)}
+        return {'format_version': 2, 'kind': 'patchharbor-monitor', **asdict(self)}

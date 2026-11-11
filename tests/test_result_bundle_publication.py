@@ -26,7 +26,7 @@ def test_result_bundle_filename_starts_with_repository_and_uses_short_run_id() -
     assert result_bundle_filename(
         session,
         repository_name="patch-harbor",
-    ) == "patch-harbor_Result_102139_0830_123456.zip"
+    ) == "patch-harbor_Result_Bundle_102139_0830_123456.zip"
 
 
 def _publish_empty_bundle(final_path: Path) -> None:
@@ -143,12 +143,12 @@ def test_result_digest_is_pinned_before_atomic_publication(tmp_path: Path) -> No
 @pytest.mark.parametrize("failure", ["write-error", "edited-bytes", "replaced-file"])
 def test_receipt_failure_or_late_edit_never_publishes_success(tmp_path: Path, failure: str) -> None:
     from patchharbor.exit_status import ExitCode, exit_code_for_error
-    from patchharbor.errors import patch_package_error
+    from patchharbor.errors import task_bundle_error
     final_path = tmp_path / "result.zip"
     publication = prepare_result_bundle_publication(final_path, run_id=UUID("12345678-1234-4234-8234-123456789abc"))
     def pin(_digest):
         if failure == "write-error":
-            raise patch_package_error("simulated receipt write failure")
+            raise task_bundle_error("simulated receipt write failure")
         if failure == "replaced-file":
             # Keep the original inode allocated, even on aggressively reusing FSes.
             publication.temporary_path.rename(tmp_path / "displaced.zip")
