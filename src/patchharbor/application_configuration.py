@@ -71,7 +71,7 @@ def _change_repository_configuration(
     repository: Path,
     change: Callable[[RepositoryConfigurationPaths, RepositoryConfiguration, RegistrySnapshot], RepositoryConfiguration],
 ) -> tuple[Path, RepositoryConfiguration]:
-    """Serialize local setting updates with registration and running Apply."""
+    """Serialize local setting updates with registration and running Execute."""
     paths = configuration_user_paths()
     with registry_lock(paths):
         expected_registry = load_registry(paths)

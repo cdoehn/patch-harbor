@@ -29,19 +29,22 @@ def _identified_attempt(tmp_path, monkeypatch):
     record = _record(tmp_path / "patch.zip")
     ledger.merge_exchange_classifications(paths, (record,))
     run_id = str(uuid4())
-    ledger.mark_exchange_apply_started(paths, record.identity, record.manifest,
+    ledger.mark_exchange_execute_started(paths, record.identity, record.manifest,
                                       verify_identity=lambda: None, run_id=run_id)
     return paths, record, run_id
 
 
-@pytest.mark.parametrize("version", [1, 2, 3])
+@pytest.mark.parametrize("version", [1, 2, 3, 4])
 def test_old_state_reads_without_rewriting_or_inventing_proofs(tmp_path, monkeypatch, version):
-    paths, record, _ = _identified_attempt(tmp_path, monkeypatch)
+    paths, record, attempt_run = _identified_attempt(tmp_path, monkeypatch)
     data = json.loads(paths.exchange_state_path.read_bytes())
     data["format_version"] = version
     for row in data["entries"]:
-        row.pop("attempt_run_id")
-        row.pop("result_sha256")
+        row["kind"] = "patch_package" if row["kind"] == "task_bundle" else row["kind"]
+        row["apply_status"] = row.pop("execute_status")
+        if version < 4:
+            row.pop("attempt_run_id")
+            row.pop("result_sha256")
         if version < 3:
             row.pop("completed_commit")
         if version == 1:
@@ -49,13 +52,15 @@ def test_old_state_reads_without_rewriting_or_inventing_proofs(tmp_path, monkeyp
     paths.exchange_state_path.write_text(json.dumps(data), encoding="utf-8")
     before = paths.exchange_state_path.read_bytes()
     restored = ledger.load_exchange_state(paths).record_for(record.identity)
-    assert restored.apply_status is ledger.ExchangeApplyStatus.ATTEMPTED
-    assert restored.attempt_run_id is None and restored.result_sha256 is None
+    assert restored.execute_status is ledger.ExchangeExecuteStatus.ATTEMPTED
+    assert restored.attempt_run_id == (attempt_run if version == 4 else None)
+    assert restored.result_sha256 is None
     assert paths.exchange_state_path.read_bytes() == before
     ledger.merge_exchange_classifications(paths, (_record(tmp_path / "other.zip", "c"),))
-    assert json.loads(paths.exchange_state_path.read_bytes())["format_version"] == 4
+    assert json.loads(paths.exchange_state_path.read_bytes())["format_version"] == 5
     restored = ledger.load_exchange_state(paths).record_for(record.identity)
-    assert restored.attempt_run_id is None and restored.result_sha256 is None
+    assert restored.attempt_run_id == (attempt_run if version == 4 else None)
+    assert restored.result_sha256 is None
 
 
 @pytest.mark.parametrize("field,value", [("attempt_run_id", "not-a-uuid"), ("attempt_run_id", 42),
@@ -76,16 +81,16 @@ def test_result_receipt_cannot_be_reused_for_another_attempt(tmp_path, monkeypat
                                             run_id=str(uuid4()), result_sha256="d"*64)
     ledger.record_exchange_result_digest(paths, record.identity, record.manifest,
                                         run_id=run_id, result_sha256="d"*64)
-    ledger.mark_exchange_apply_finished(paths, record.identity, record.manifest,
-                                       ledger.ExchangeApplyStatus.FAILED, run_id=run_id)
+    ledger.mark_exchange_execute_finished(paths, record.identity, record.manifest,
+                                       ledger.ExchangeExecuteStatus.FAILED, run_id=run_id)
     new_run = str(uuid4())
-    ledger.mark_exchange_apply_started(paths, record.identity, record.manifest,
+    ledger.mark_exchange_execute_started(paths, record.identity, record.manifest,
                                       verify_identity=lambda: None, retry_failed=True, run_id=new_run)
     current = ledger.load_exchange_state(paths).record_for(record.identity)
     assert current.attempt_run_id == new_run and current.result_sha256 is None
     with pytest.raises(PatchHarborError):
-        ledger.mark_exchange_apply_finished(paths, record.identity, record.manifest,
-                                           ledger.ExchangeApplyStatus.SUCCEEDED, run_id=run_id)
+        ledger.mark_exchange_execute_finished(paths, record.identity, record.manifest,
+                                           ledger.ExchangeExecuteStatus.SUCCEEDED, run_id=run_id)
 
 
 def test_recovery_cas_rejects_changed_record_and_failed_final_check(tmp_path, monkeypatch):
@@ -97,13 +102,13 @@ def test_recovery_cas_rejects_changed_record_and_failed_final_check(tmp_path, mo
     def fail():
         raise ValueError("proof changed")
     with pytest.raises(ValueError):
-        ledger.recover_exchange_apply_finished(paths, expected, commit, verify_evidence=fail)
+        ledger.recover_exchange_execute_finished(paths, expected, commit, verify_evidence=fail)
     assert ledger.load_exchange_state(paths).record_for(record.identity) == expected
-    ledger.mark_exchange_apply_finished(paths, record.identity, record.manifest,
-                                       ledger.ExchangeApplyStatus.FAILED, run_id=run_id)
+    ledger.mark_exchange_execute_finished(paths, record.identity, record.manifest,
+                                       ledger.ExchangeExecuteStatus.FAILED, run_id=run_id)
     with pytest.raises(PatchHarborError):
-        ledger.recover_exchange_apply_finished(paths, expected, commit, verify_evidence=lambda: None)
-    assert ledger.load_exchange_state(paths).record_for(record.identity).apply_status is ledger.ExchangeApplyStatus.FAILED
+        ledger.recover_exchange_execute_finished(paths, expected, commit, verify_evidence=lambda: None)
+    assert ledger.load_exchange_state(paths).record_for(record.identity).execute_status is ledger.ExchangeExecuteStatus.FAILED
 
 
 @pytest.mark.parametrize("mutation", ["dirty", "head", "config", "registry", "patch", "result", "ledger", "grafts", "replace"])
@@ -111,7 +116,7 @@ def test_last_moment_change_prevents_recovery(tmp_path, monkeypatch, mutation):
     env, exchange, repo, context, patch, record = _pending(tmp_path)
     result = _result(exchange, record)
     paths, configuration, artifacts = _inputs(env, exchange, monkeypatch)
-    original = recovery.recover_exchange_apply_finished
+    original = recovery.recover_exchange_execute_finished
     changed = []
     def race(*args, **kwargs):
         changed.append(True)
@@ -136,12 +141,12 @@ def test_last_moment_change_prevents_recovery(tmp_path, monkeypatch, mutation):
         else:
             git(repo, "replace", context["base_commit"], "HEAD")
         return original(*args, **kwargs)
-    monkeypatch.setattr(recovery, "recover_exchange_apply_finished", race)
+    monkeypatch.setattr(recovery, "recover_exchange_execute_finished", race)
     recovery.recover_exchange_artifacts(artifacts, configuration=configuration, paths=paths,
                                        repository_id=RepositoryId(context["repo_id"]))
     assert changed
     saved = next(r for r in ledger.load_exchange_state(paths).records if r.identity.sha256 == record["sha256"])
-    assert saved.apply_status is ledger.ExchangeApplyStatus.ATTEMPTED
+    assert saved.execute_status is ledger.ExchangeExecuteStatus.ATTEMPTED
     assert saved.completed_commit is None
     assert patch.exists() and result.exists()
 
@@ -159,7 +164,7 @@ def test_state_write_failure_leaves_recovery_repeatable(tmp_path, monkeypatch):
     monkeypatch.setattr(ledger, "_write_unlocked", original)
     recovery.recover_exchange_artifacts(artifacts, configuration=configuration, paths=paths,
                                        repository_id=RepositoryId(context["repo_id"]))
-    assert _identity_record(env, patch)["apply_status"] == "succeeded"
+    assert _identity_record(env, patch)["execute_status"] == "succeeded"
 
 
 def test_out_of_band_ledger_edit_during_verification_is_not_overwritten(tmp_path, monkeypatch):
@@ -172,8 +177,8 @@ def test_out_of_band_ledger_edit_during_verification_is_not_overwritten(tmp_path
         data["entries"][0]["result_sha256"] = "e"*64
         paths.exchange_state_path.write_text(json.dumps(data), encoding="utf-8")
     with pytest.raises(PatchHarborError):
-        ledger.recover_exchange_apply_finished(paths, expected, GitObjectId("f"*40, GitObjectFormat.SHA1),
+        ledger.recover_exchange_execute_finished(paths, expected, GitObjectId("f"*40, GitObjectFormat.SHA1),
                                               verify_evidence=noncooperative_writer)
     saved = ledger.load_exchange_state(paths).record_for(record.identity)
-    assert saved.apply_status is ledger.ExchangeApplyStatus.ATTEMPTED
+    assert saved.execute_status is ledger.ExchangeExecuteStatus.ATTEMPTED
     assert saved.result_sha256 == "e"*64

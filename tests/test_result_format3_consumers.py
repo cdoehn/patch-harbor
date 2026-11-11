@@ -44,7 +44,7 @@ def test_actual_readers_keep_unproven_format3_and_standalone_pyz(
     standalone = exchange/'standalone-disguised-as-patch.zip';standalone.write_bytes(canonical)
     before = {path:path.read_bytes() for path in (old,reference,standalone)}
     _advance(repo);head = git(repo,'rev-parse','HEAD').stdout
-    result = run_cli(repo,'apply','--json',environment_overrides=env)
+    result = run_cli(repo,'execute','--json',environment_overrides=env)
     assert result.returncode == 10, result.stdout+result.stderr
     assert git(repo,'rev-parse','HEAD').stdout == head
     assert old.read_bytes() == before[old] and not (exchange/ARCHIVE/old.name).exists()
@@ -75,7 +75,7 @@ def test_real_recovery_requires_full_format3_success(canonical,tmp_path,state):
     head=git(repo,'rev-parse','HEAD').stdout.strip();patch_bytes=patch.read_bytes()
     assert _scan(repo,env,automatic=True).returncode==10
     saved=_identity_record(env,patch,hashlib.sha256(patch_bytes).hexdigest())
-    assert saved['apply_status']==('succeeded' if state=='embedded' else 'attempted')
+    assert saved['execute_status']==('succeeded' if state=='embedded' else 'attempted')
     assert git(repo,'rev-parse','HEAD').stdout.strip()==head and result.exists()
     if state=='embedded':
         assert saved['completed_commit']==head and not patch.exists()

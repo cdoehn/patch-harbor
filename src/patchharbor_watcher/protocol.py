@@ -1,4 +1,4 @@
-"""Private worker metadata; the persisted Core/CLI Apply envelope stays unchanged."""
+"""Private worker metadata; the persisted Core/CLI Execute envelope stays unchanged."""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -68,7 +68,7 @@ def encode_scope(targets) -> bytes:
 
 
 def decode_scope(raw: bytes):
-    if not raw:  # Legacy explicit one-shot worker still requests global automatic Apply.
+    if not raw:  # Legacy explicit one-shot worker still requests global automatic Execute.
         return None
     if len(raw) > MAX_REQUEST_BYTES:
         raise ValueError('worker scope exceeds request limit')

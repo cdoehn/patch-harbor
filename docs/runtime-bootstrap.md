@@ -24,7 +24,7 @@ Result snapshots support up to 250,000 stored repository files, with ten further
 outer ZIP slots for auxiliary data. The Core reader and stdlib bootstrap accept
 single-disk ZIP64 Results needed above the classic 65,535-member boundary. The
 bootstrap checks ZIP64 directory counts and offsets before allocating ZIP members.
-All byte budgets and the 1,000-member inner runtime limit still apply. A producer
+All byte budgets and the 1,000-member inner runtime limit still execute. A producer
 or reader entry-limit failure reports the actual count and limit without retrying.
 
 Read-only assessment and optional single-file preparation:
@@ -106,7 +106,7 @@ unknown future Results are rejected. Valid original 1.4.0 capability lists
 no arbitrary lists. Old wheel-helper behavior described below is historical. Production
 emits Format 3 from PP-06B. Its E-10 test obtains the executable helper from the
 first actual Result produced by a real installation, then performs pack, full
-reference validation and regular Apply through the selected PYZ.
+reference validation and regular Execute through the selected PYZ.
 
 ## Historical legacy wheel bootstrap
 
@@ -176,7 +176,7 @@ usage run `from patchharbor import api` in that interpreter, then
 `api.inspect_task(patch)` and `api.validate_task(patch, reference_bundle=result)`.
 Do not import into a different chat interpreter or register an invented Git
 repository from extracted `base/`. These calls remain read-only and never prove
-tests, CI, sender trust, replay permission or a future Apply.
+tests, CI, sender trust, replay permission or a future Execute.
 
 ## Mandatory previous procedure
 
@@ -207,7 +207,7 @@ downgrade or repackage the reference to obtain apparent native success.
 Open and check the final patch, payload hashes, size and SHA after all edits.
 Any byte change requires a new validation. Deliver exactly one canonical ZIP;
 only authorized backups may copy those same bytes. An external backup failure
-does not justify another patch. The real registered Apply independently rechecks
+does not justify another patch. The real registered Execute independently rechecks
 its repository state before mutation.
 
 ## Commits, diagnoses and evidence
@@ -221,7 +221,7 @@ PatchHarbor does not impose a project's test/CI policy in its Core.
 
 `tests/test_runtime_bootstrap.py` executes real offline installation and reference
 validation with a test-only process-family network denial guard. Build/fixture
-preparation is separate. `tests/test_handoff_commit_sequence.py` uses real Apply,
+preparation is separate. `tests/test_handoff_commit_sequence.py` uses real Execute,
 Git commits and a private local bare remote for zero/one/multiple commit cases.
 Its gate commands are fixture checks, not nested runs of the project suite.
 Both are selected by existing blocking packaging/E2E gates. Native Windows/CI
@@ -230,11 +230,11 @@ evidence must come from actual runs, never from these Linux development results.
 ## Current project acceptance policy
 
 For development of PatchHarbor itself, Development runs a documented,
-change-focused parallel selection. Apply runs the full parallel suite before
+change-focused parallel selection. Execute runs the full parallel suite before
 every commit, including the final commit; there are no serial gates. Only
 Christian starts the manual
 GitHub workflow. Neither the development loop nor a handoff entrypoint dispatches
-CI; the old five-bundle schedule does not apply. Other target projects choose
+CI; the old five-bundle schedule does not execute. Other target projects choose
 their own gates. No test or simulated transport is presented as native Windows
 or real CIFS evidence. A started workflow is not a completed acceptance run.
 
@@ -242,5 +242,5 @@ The historical RIV implementation and its past CI handoffs remain documented in
 [its own plan](../planning/runtime-inspect-validate/commit-plan.md). Those records
 are not instructions to resume that completed plan. The active
 [1.5.0 refactoring plan](../planning/1.5.0/commit-plan.md) requires final artifact
-hashes and the applicable Development, Apply, native and CIFS evidence for the
+hashes and the applicable Development, Execute, native and CIFS evidence for the
 concrete final state; outstanding proofs remain explicitly open.

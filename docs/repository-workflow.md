@@ -68,10 +68,10 @@ All three repositories must already be registered. A and B share a physical
 folder; C uses another one. The watcher scans each distinct physical Exchange
 folder once per event-triggered scan after its five-second quiet period. Manifest `repo_id`, not the filename or another project's
 preferences, determines ownership. Automatic discovery accepts a package only
-from its target repository's configured Exchange. An explicit `apply PATCH_ZIP`
+from its target repository's configured Exchange. An explicit `execute TASK_ZIP`
 can read a package elsewhere, but still uses its manifest target's settings.
 
-The flat Exchange directory may contain patch packages, Result Bundles, old
+The flat Exchange directory may contain Task Bundles, Result Bundles, old
 packages, and unrelated files together. PatchHarbor identifies content rather
 than relying on filenames. Conservative automatic archival moves only bundles
 with complete obsolescence proofs into a direct child folder; nothing is deleted.
@@ -87,7 +87,7 @@ An old `${XDG_CONFIG_HOME:-$HOME/.config}/patchharbor/config.json` on Linux or
 `%APPDATA%\PatchHarbor\config.json` on Windows is ignored, even when it exists.
 `watcher.json` and `paths.json` are not configuration sources either.
 
-Finish any running Apply and stop the watcher before changing the installation
+Finish any running Execute and stop the watcher before changing the installation
 or editing local metadata. Update the CLI and watcher together. Keep the central
 registry, `.patchharbor/id`, Git's local exclusion and the replay ledger; do not
 delete locks or replay records to work around a configuration error.
@@ -114,7 +114,7 @@ local metadata is valid; it does not reset its settings.
 ### Conservative automatic Exchange archival
 
 The default archive is **`PatchHarbor-Archive`**, directly inside the configured
-Exchange directory. It is created on demand during normal Apply discovery,
+Exchange directory. It is created on demand during normal Execute discovery,
 Watcher scans, or manual bundle creation. No separate cleanup command is needed.
 Configure its single folder name from the owning repository:
 
@@ -138,7 +138,7 @@ patchharbor configure archive-dir ""
 
 **A timestamp, filename or mere successful exit is never enough.** The existing
 replay state now records a full `completed_commit` only when a successful tracked
-Apply moves the repository to a new, clean descendant commit. A patch can be
+Execute moves the repository to a new, clean descendant commit. A patch can be
 archived only if its exact path/content identity, full manifest binding and
 successful completion receipt agree, and the current clean repository still
 contains that commit in its original Git history. Explicit exchange packages
@@ -153,8 +153,8 @@ rejected. Current, dirty, failed, incomplete, contradictory or damaged results
 remain. Unknown repositories, shallow/grafted/replaced histories, Git failures
 and unavailable proofs always mean **keep the original file**.
 
-Manual parameterless Apply and bundle creation maintain only the current
-registered repository. Explicit Apply maintains the package's repository, but
+Manual parameterless Execute and bundle creation maintain only the current
+registered repository. Explicit Execute maintains the package's repository, but
 never archives the explicitly selected file before executing it. The Watcher
 remains global across registered repositories. Dry-run never archives. Only
 top-level files are considered; the archive is never scanned recursively.
@@ -185,8 +185,8 @@ patchharbor configure show
 
 All newly generated Result Bundles for this repository then use
 `<Repository>_Result_Bundle_<HHMMSS>_<MMDD>_<ID6>.zip.txt`, including manual `bundle`,
-automatic Apply results (success, failure, dry-run), Watcher results, and explicit
-`--output-dir` targets. There is no suffix argument on `apply` or `bundle`.
+automatic Execute results (success, failure, dry-run), Watcher results, and explicit
+`--output-dir` targets. There is no suffix argument on `execute` or `bundle`.
 Disable it with:
 
 ```bash
@@ -307,10 +307,10 @@ resolves the registered path. The chat takes all
 repository-binding identifiers from the bundle's complete `context.json`, never
 from shortened human-facing terminal output.
 
-The chat contract requires one downloadable repository-bound ZIP patch package.
+The chat contract requires one downloadable repository-bound ZIP Task Bundle.
 Patch filenames use
 `<Repository>_Task_Bundle_<HHMMSS>_<MMDD>_<ID6>.zip`, followed by `bundle_suffix`
-from the Result Bundle when configured. After an Apply, upload the
+from the Result Bundle when configured. After an Execute, upload the
 newly created Result Bundle back to the same chat. For a failed entrypoint or
 test run, that bundle contains the actual remaining repository state plus
 `logs/run.json` and, when execution started, `logs/execution.log`.
@@ -318,7 +318,7 @@ test run, that bundle contains the actual remaining repository state plus
 ## Self-contained bundle handoff
 
 Every Result Bundle contains freshly generated root `CHAT_INSTRUCTIONS.md` and
-`environment.json`, including manual `bundle`, Apply success, failure, Dry Run,
+`environment.json`, including manual `bundle`, Execute success, failure, Dry Run,
 Watcher results, and explicit `--output-dir` targets. Both documents are verified
 and published atomically with the snapshot and logs. No sidecar is written and
 no `chat-instructions` command is introduced. Existing bundles are not rewritten.
@@ -370,7 +370,7 @@ are rejected. This is passive documentation, not authentication or orchestration
 The chat generates a fresh handoff for each Patch using the latest target
 machine's environment snapshot, retaining its capture time and unknown values,
 not probing the chat sandbox as if it were the development machine. PatchHarbor
-Core creates Result Bundles and `pack` creates patch packages from explicitly
+Core creates Result Bundles and `pack` creates Task Bundles from explicitly
 prepared contents. Pack does not choose changes, write the entrypoint, or edit
 a received package. See the chat contract for the first-upgrade bootstrap rule for older
 runners. The installed shared template is required; if missing, publication
@@ -386,14 +386,14 @@ cd /path/to/registered-repository
 patchharbor bundle
 # Upload the new Result Bundle; its chat instructions are already inside.
 # Save the chat's one returned patch ZIP in the configured Exchange directory.
-patchharbor apply --dry-run
-patchharbor apply
+patchharbor execute --dry-run
+patchharbor execute
 ```
 
-A deliberate manual parameterless `patchharbor apply` first resolves the
+A deliberate manual parameterless `patchharbor execute` first resolves the
 current working directory to exactly one registered Git repository. Calls from
 any subdirectory of that repository resolve to the same repository root. If the
-current directory is not inside a uniquely registered repository, Apply stops
+current directory is not inside a uniquely registered repository, Execute stops
 without scanning for a fallback package belonging to another repository.
 
 PatchHarbor then scans only the top level of the configured Exchange directory
@@ -410,22 +410,22 @@ The default timeout for one script or repository entrypoint is 10,800 seconds
 (three hours). Use `--timeout SECONDS` to override it for one invocation.
 
 A Dry Run validates the selected package without changing the repository or its
-replay state. A non-Dry-Run Apply records `attempted` immediately before mutation
+replay state. A non-Dry-Run Execute records `attempted` immediately before mutation
 or entrypoint execution and publishes `failed` or `succeeded` from the actual
 result. A successful package remains replay-protected. A failed package can be
-retried by another deliberate manual parameterless `patchharbor apply` while its
+retried by another deliberate manual parameterless `patchharbor execute` while its
 complete repository binding still matches. An explicit package path remains a
 separate deliberate override.
 
-### Recovering an interrupted Apply
+### Recovering an interrupted Execute
 
 An `attempted` record alone is not evidence of a crash or success. A run can
 still be working even when `screen -ls` shows no socket. Recovery must acquire
-the **same exclusive repository lock** as Apply. A busy lock, dirty repository,
+the **same exclusive repository lock** as Execute. A busy lock, dirty repository,
 missing receipt or contradiction leaves the attempt untouched. PatchHarbor does
 not infer liveness from process names and never automatically resets files.
 
-New Apply Result manifests record the full `task_sha256` of the exact validated
+New Execute Result manifests record the full `task_sha256` of the exact validated
 ZIP bytes and an optional `completed_commit`, alongside the existing `run_id`,
 repository ID and expected/actual state binding. A completion is recorded only
 for a successful executed entrypoint and a verified clean forward commit. Dry
@@ -451,8 +451,8 @@ made into proof just by retaining its filenames or JSON identifiers. Hashes are
 integrity/correlation checks anchored in the trusted local ledger, not digital
 signatures or authentication against somebody who can rewrite that ledger.
 
-Recovery runs before archival for manual CWD-scoped Apply, package-scoped
-explicit Apply and the global watcher, and during manual bundle maintenance.
+Recovery runs before archival for manual CWD-scoped Execute, package-scoped
+explicit Execute and the global watcher, and during manual bundle maintenance.
 It also runs when archival is disabled. Dry runs do not repair state. A still
 pending receipt is protected from archival. Once proven, the existing archival
 rules may move the consumed patch; a current Result still remains active.
@@ -469,11 +469,11 @@ rollback is attempted. Formats 1–3 remain readable without inventing run IDs,
 hashes or completion proofs; writes migrate to Format 4. This cannot retroactively
 repair old upgrade attempts that never recorded these proofs. A still-running
 older executable also does not gain the new receipt protocol by changing files:
-reinstall the current version before subsequent Apply runs.
+reinstall the current version before subsequent Execute runs.
 
 ### Compact console and verbose diagnostics
 
-Normal `apply`, `fs run` and `bundle` output shows important phases, results,
+Normal `execute`, `fs run` and `bundle` output shows important phases, results,
 warnings and errors. File reads/writes, ZIP members, SHA checks and individual
 Git queries are grouped instead of printed line by line. A running internal
 operation appends **at most one dot every 0.8 seconds** to its current line.
@@ -483,7 +483,7 @@ operations need no dots; completion or another visible message ends the line.
 Use `--verbose` (or `-v`) to show the complete technical activity stream:
 
 ```sh
-patchharbor apply --verbose
+patchharbor execute --verbose
 patchharbor bundle --verbose
 patchharbor --verbose context
 patchharbor fs run --verbose generated.sh
@@ -512,12 +512,12 @@ destination:
 
 ```bash
 patchharbor bundle --output-dir /path/to/results /path/to/repository
-patchharbor apply --dry-run --output-dir /path/to/results /path/to/patch.zip
-patchharbor apply --output-dir /path/to/results /path/to/patch.zip
+patchharbor execute --dry-run --output-dir /path/to/results /path/to/patch.zip
+patchharbor execute --output-dir /path/to/results /path/to/patch.zip
 ```
 
-Supplying both an explicit `PATCH_ZIP` and explicit `--output-dir` also permits
-Apply when the target repository's Exchange path is unset or unavailable. Its
+Supplying both an explicit `TASK_ZIP` and explicit `--output-dir` also permits
+Execute when the target repository's Exchange path is unset or unavailable. Its
 local configuration must nevertheless exist and validate; the target
 repository's configured suffix still applies. Explicit output directories must
 remain outside all registered repositories.
@@ -545,7 +545,7 @@ affected `0600` files are not automatically broadened.
 Entrypoints should use actual existing core functions for payload publication,
 path validation, state and archives, rather than implementing parallel copies.
 `patchharbor.payload_files.write_bundle_payloads` is a low-level core boundary,
-not a replacement for registered/state-bound `apply`: it does not acquire the
+not a replacement for registered/state-bound `execute`: it does not acquire the
 repository lock or perform the base/fingerprint gate. Reuse it only within an
 already controlled application/entrypoint context. See the
 [POSIX contract](../planning/posix-mode/specification.md) and `CHAT_INSTRUCTIONS.md`.

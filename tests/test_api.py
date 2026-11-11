@@ -42,13 +42,13 @@ assert all(hasattr(api, name) for name in api.__all__)
 
 
 @pytest.mark.parametrize("timeout", [0, -1, float("nan"), float("inf"), -float("inf")])
-@pytest.mark.parametrize("method", [api.apply, api.apply_next, api.run_scripts])
+@pytest.mark.parametrize("method", [api.execute, api.execute_next, api.run_scripts])
 def test_nonfinite_or_nonpositive_timeout_is_rejected_before_core(
     timeout: float, method, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     def forbidden(*args, **kwargs):
         pytest.fail("invalid API input must not reach Core")
-    monkeypatch.setattr(application, "run_apply_path", forbidden)
+    monkeypatch.setattr(application, "run_execute_path", forbidden)
     monkeypatch.setattr(application, "run_script_path", forbidden)
     with pytest.raises(ValueError):
         if method is api.run_scripts:
@@ -60,7 +60,7 @@ def test_nonfinite_or_nonpositive_timeout_is_rejected_before_core(
 @pytest.mark.parametrize("timeout", [True, "1", None, object()])
 def test_timeout_requires_number_not_coercible_text(timeout: object) -> None:
     with pytest.raises(TypeError):
-        api.apply(timeout=timeout)
+        api.execute(timeout=timeout)
 
 
 @pytest.mark.parametrize("path", [b"repo", 7, None])
@@ -77,7 +77,7 @@ def test_empty_or_nul_path_is_rejected(path: str) -> None:
 
 def test_conflicting_apply_targets_are_rejected() -> None:
     with pytest.raises(ValueError):
-        api.apply("some.zip", repository="another-repo")
+        api.execute("some.zip", repository="another-repo")
 
 
 def test_manual_and_automatic_apply_share_core_but_keep_distinct_scopes(
@@ -88,12 +88,12 @@ def test_manual_and_automatic_apply_share_core_but_keep_distinct_scopes(
     def fake(path, **kwargs):
         calls.append((path, kwargs))
         return report
-    monkeypatch.setattr(application, "run_apply_path", fake)
-    assert api.apply(repository=tmp_path) is report
+    monkeypatch.setattr(application, "run_execute_path", fake)
+    assert api.execute(repository=tmp_path) is report
     assert calls[-1][0] is None
     assert calls[-1][1]["current_directory"] == tmp_path
     assert not calls[-1][1].get("automatic", False)
-    assert api.apply_next(dry_run=True) is report
+    assert api.execute_next(dry_run=True) is report
     assert calls[-1][1]["automatic"] is True
     assert calls[-1][1]["dry_run"] is True
     assert "current_directory" not in calls[-1][1]
@@ -152,10 +152,10 @@ def test_output_sinks_are_explicit_and_passed_as_independent_channels(monkeypatc
     def fake(path, **kwargs):
         seen.append(kwargs["output"])
         return object()
-    monkeypatch.setattr(application, "run_apply_path", fake)
-    api.apply()
+    monkeypatch.setattr(application, "run_execute_path", fake)
+    api.execute()
     assert seen[-1] is None
-    api.apply(output=api.OutputStreams(text, raw, warnings, on_warning))
+    api.execute(output=api.OutputStreams(text, raw, warnings, on_warning))
     sinks = seen[-1]
     assert sinks.live_text_stream is text
     assert sinks.raw_output_stream is raw
@@ -170,7 +170,7 @@ def test_output_sinks_are_explicit_and_passed_as_independent_channels(monkeypatc
 ])
 def test_invalid_observer_output_or_switch_is_rejected(kwargs: dict) -> None:
     with pytest.raises(TypeError):
-        api.apply(**kwargs)
+        api.execute(**kwargs)
 
 
 def test_configuration_result_contains_persisted_settings(monkeypatch, tmp_path) -> None:

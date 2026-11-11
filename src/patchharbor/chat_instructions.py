@@ -96,7 +96,7 @@ def _commands(document: dict[str, object]) -> str:
         return (
             "Beispiele für PowerShell (nicht für cmd.exe):\n\n```powershell\n"
             f"Set-Location -LiteralPath '{escaped}' -ErrorAction Stop\n"
-            "patchharbor context --json\npatchharbor bundle\npatchharbor apply\n```\n"
+            "patchharbor context --json\npatchharbor bundle\npatchharbor execute\n```\n"
         )
     if system not in {"Linux", "Android", "Darwin", "FreeBSD"}:
         return "Keine Shell-Befehle generiert: Betriebssystem ist unbekannt.\n"
@@ -105,7 +105,7 @@ def _commands(document: dict[str, object]) -> str:
         "Beispiele für eine POSIX-Shell (sh/bash); nur auf dem Entwicklungsrechner ausführen:\n\n```sh\n"
         f"cd -- {quoted} && patchharbor context --json\n"
         f"cd -- {quoted} && patchharbor bundle\n"
-        f"cd -- {quoted} && patchharbor apply\n```\n"
+        f"cd -- {quoted} && patchharbor execute\n```\n"
     )
 
 

@@ -9,7 +9,7 @@ import sys
 from typing import TextIO
 
 import patchharbor.api as api
-from patchharbor_watcher.apply_boundary import delegate_to_automatic_apply
+from patchharbor_watcher.execute_boundary import delegate_to_automatic_execute
 from patchharbor_watcher.lifecycle import (
     WatcherStopController,
     installed_stop_signals,
@@ -41,7 +41,7 @@ def _build_parser() -> argparse.ArgumentParser:
         prog="patchharbor-watcher",
         allow_abbrev=False,
         description=(
-            "Watch filesystem events and request scoped automatic Apply "
+            "Watch filesystem events and request scoped automatic Execute "
             "after five seconds of quiet across the Exchange directories of all registered repositories. "
             "Use 'poll' for filesystems without reliable notifications, such as CIFS."
         ),
@@ -49,7 +49,7 @@ def _build_parser() -> argparse.ArgumentParser:
             "Register each repository and configure its Exchange with 'patchharbor configure "
             "exchange-directory DIRECTORY'. Run in the foreground or install "
             "the optional Linux systemd user unit; the installer does not "
-            "enable or start it. Use manual 'patchharbor apply' on "
+            "enable or start it. Use manual 'patchharbor execute' on "
             "Termux/Android."
         ),
     )
@@ -95,14 +95,14 @@ def main(
         with installed_stop_signals(stop_controller):
             if arguments.mode == 'poll':
                 run_polling_watcher(
-                    delegate=delegate_to_automatic_apply,
+                    delegate=delegate_to_automatic_execute,
                     log_stream=actual_stdout, error_stream=actual_stderr,
                     stop_requested=stop_controller.stop_requested, wait=stop_controller.wait,
                     interval=arguments.interval,
                 )
             else:
                 run_repository_watcher(
-                    delegate=delegate_to_automatic_apply,
+                    delegate=delegate_to_automatic_execute,
                     log_stream=actual_stdout,
                     error_stream=actual_stderr,
                     stop_requested=stop_controller.stop_requested,

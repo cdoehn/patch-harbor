@@ -1,4 +1,4 @@
-"""Single checked boundary for the first mutating apply operation."""
+"""Single checked boundary for the first mutating execute operation."""
 
 from __future__ import annotations
 
@@ -8,8 +8,8 @@ from enum import Enum
 
 from patchharbor.progress import activity
 
-from patchharbor.apply_preflight import PreparedTaskBundle
-from patchharbor.apply_repository import SafeResolvedRepository
+from patchharbor.execute_preflight import PreparedTaskBundle
+from patchharbor.execute_repository import SafeResolvedRepository
 from patchharbor.errors import (
     FailureReason,
     PatchHarborError,
@@ -39,7 +39,7 @@ class MutationFailureKind(str, Enum):
 
 
 @dataclass(frozen=True, slots=True)
-class ApplyMutationGate:
+class ExecuteMutationGate:
     """All checked inputs required before the first repository mutation."""
 
     session: RunSession
@@ -70,7 +70,7 @@ class ApplyMutationGate:
 
 
 @dataclass(frozen=True, slots=True)
-class ApplyMutationResult:
+class ExecuteMutationResult:
     """Observed outcome of the single mutation boundary."""
 
     context: RepositoryContext
@@ -102,7 +102,7 @@ class ApplyMutationResult:
         return self.error is None
 
     @classmethod
-    def succeeded(cls, context: RepositoryContext) -> ApplyMutationResult:
+    def succeeded(cls, context: RepositoryContext) -> ExecuteMutationResult:
         return cls(context=context)
 
     @classmethod
@@ -112,12 +112,12 @@ class ApplyMutationResult:
         *,
         kind: MutationFailureKind,
         error: PatchHarborError,
-    ) -> ApplyMutationResult:
+    ) -> ExecuteMutationResult:
         return cls(context=context, failure_kind=kind, error=error)
 
 
 def _capture_mutation_context(
-    mutation_gate: ApplyMutationGate,
+    mutation_gate: ExecuteMutationGate,
 ) -> RepositoryContext:
     """Capture the repository again immediately before its first mutation."""
     resolved = mutation_gate.resolved
@@ -129,19 +129,19 @@ def _capture_mutation_context(
     )
 
 
-def apply_payload_mutation(
-    mutation_gate: ApplyMutationGate,
-) -> ApplyMutationResult:
+def execute_payload_mutation(
+    mutation_gate: ExecuteMutationGate,
+) -> ExecuteMutationResult:
     """Recheck repository state, resolve targets afresh, and write payloads."""
     activity("RECHECK", "Capture repository state again immediately before mutation")
     current_context = _capture_mutation_context(mutation_gate)
     if current_context != mutation_gate.context:
         activity("RECHECK", "Repository changed after preflight; no payload writes", "error")
-        return ApplyMutationResult.failed(
+        return ExecuteMutationResult.failed(
             current_context,
             kind=MutationFailureKind.STATE_MISMATCH,
             error=state_mismatch_error(
-                "repository changed after apply preflight"
+                "repository changed after execute preflight"
             ),
         )
 
@@ -158,16 +158,16 @@ def apply_payload_mutation(
             cwd=mutation_gate.resolved.repository.value,
         )
     except PayloadTargetError as error:
-        return ApplyMutationResult.failed(
+        return ExecuteMutationResult.failed(
             current_context,
             kind=MutationFailureKind.UNSAFE_TARGET,
             error=error,
         )
     except PayloadWriteError as error:
-        return ApplyMutationResult.failed(
+        return ExecuteMutationResult.failed(
             current_context,
             kind=MutationFailureKind.WRITE_FAILURE,
             error=error,
         )
 
-    return ApplyMutationResult.succeeded(current_context)
+    return ExecuteMutationResult.succeeded(current_context)

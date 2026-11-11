@@ -42,20 +42,20 @@ print(report.success, report.result_bundle.status)
 | `unregister(selector, cwd=".")` | `unregister` | `UnregisterResult` |
 | `repositories()` | `registry list` | `RegistryListResult` |
 | `context(repository=".", capture_mode="git")` | `context` | `RepositoryContext` |
-| `inspect_task(patch)` | `inspect PATCH_ZIP` | `PatchInspection` |
-| `validate_task(patch, repository=None, reference_bundle=None)` | `validate PATCH_ZIP` | `PatchValidationResult` |
+| `inspect_task(patch)` | `inspect TASK_ZIP` | `PatchInspection` |
+| `validate_task(patch, repository=None, reference_bundle=None)` | `validate TASK_ZIP` | `PatchValidationResult` |
 | `pack_task(content_directory, reference_bundle=..., entrypoint=..., output=None, output_directory=None, modes=None)` | `pack CONTENT_DIRECTORY` | `PatchPackResult` |
 | `bundle(repository=".", output_directory=None, capture_mode="git", export_plan=None)` | `bundle` | `BundleResult` |
-| `apply(patch=None, repository=None, dry_run=False, ...)` | manual `apply` | `RunReport` |
-| `dry_run(patch=None, repository=None, ...)` | `apply --dry-run` | `RunReport` |
-| `apply_next(dry_run=False, ...)` | automatic global Apply | `RunReport` |
+| `execute(patch=None, repository=None, dry_run=False, ...)` | manual `execute` | `RunReport` |
+| `dry_run(patch=None, repository=None, ...)` | `execute --dry-run` | `RunReport` |
+| `execute_next(dry_run=False, ...)` | automatic global Execute | `RunReport` |
 | `watch_targets()` | validated Exchange roots and control paths, without bundle scanning | `WatchTargets` |
 | `watch_control_paths()` | registry/local config paths even with invalid local config | `WatchControlPaths` |
-| `apply_readiness(lock)` | probe and release a known technical lock conflict | `ApplyReadiness` |
+| `execute_readiness(lock)` | probe and release a known technical lock conflict | `ExecuteReadiness` |
 | `run_scripts(source, cwd=".", ...)` (deprecated) | `fs run` (deprecated) | `ScriptResult` |
 
 All operations accept `observer=None`. Execution operations accept
-`output=None`; `apply`, `apply_next`, and `run_scripts` accept `timeout=10800.0` seconds.
+`output=None`; `execute`, `execute_next`, and `run_scripts` accept `timeout=10800.0` seconds.
 Timeouts must be finite and positive; booleans and numeric strings are invalid.
 The public default is `api.DEFAULT_TIMEOUT_SECONDS`.
 
@@ -76,8 +76,8 @@ repositories.
 ## Static package inspection (RIV development addition)
 
 This development line implements package/binding validation, portable offline
-runtime, `pack_task` and Result Format 3; no release is implied. The existing
-`dry_run` keeps its Apply semantics and still creates a Result Bundle.
+runtime, `pack_task` and Result Format 4; no release is implied. The existing
+`dry_run` keeps its Execute semantics and still creates a Result Bundle.
 
 ```python
 from patchharbor import api
@@ -94,7 +94,7 @@ assert report.binding_matches is None
 Both calls require one explicit `str` or `PathLike[str]` file path. A relative
 path is anchored once to the caller's directory; this does not select a
 repository. The existing stable file/ZIP, manifest, reserved handoff and script
-parsers apply. Unsafe input never returns partial successful facts. Interpreter
+parsers execute. Unsafe input never returns partial successful facts. Interpreter
 syntax is checked without requiring the shell to be installed. No Git, registry,
 Exchange scan, locks, payload writes, script execution, temporary script, runtime
 provider or Result publication occurs in package/reference mode. Repository mode
@@ -118,27 +118,27 @@ For `package` scope, binding/context/reference are `None`.
 `checked_at` is an aware UTC `datetime`; `not_checked` is a tuple of identifiers:
 `repository_binding`, `repository_state`, `authenticity`, `execution`,
 `interpreter_availability`, `tests`, `ci`, `replay`. Successful static validity
-does not establish sender trust or approve a later Apply. Content hashes are
-computed observations, not new declared hashes in format-1 `task.json`.
+does not establish sender trust or approve a later Execute. Content hashes are
+computed observations, not new declared hashes in format-2 `task.json`.
 
 `validate_task(patch, reference_bundle="result.zip")` returns scope `reference`,
 `binding_matches=True`, the full SHA-256 of the captured reference bytes and a
 frozen `ReferenceContext`. Its fields are `repo_id`, `base_commit` (the existing
 typed IDs), `state_fingerprint`, `fingerprint_algorithm`, `dirty` and
 `repository_path` (recorded text, including foreign Windows paths; never resolved
-on this machine). The supported Result-3 reader checks the complete inventory, blob IDs,
+on this machine). The supported Result-4 reader checks the complete inventory, blob IDs,
 untracked SHA-256 and metadata consistency, accepting consistent dirty, failure
 and dry-run Results. It uses actual context, never the previous expected binding.
 Repository snapshot paths retain the existing portable UTF-8 repository rules;
-patch package paths still use the stricter ASCII contract.
+Task Bundle paths still use the stricter ASCII contract.
 
 The shared Result reader supplies integrity-checked facts to reference validation
 and to archival/recovery policy. A valid reference does not itself prove a
-successful Apply: those consumers still require a clean, completed success,
+successful Execute: those consumers still require a clean, completed success,
 no warnings or dry run, the appropriate expected binding and, for recovery,
 the existing receipt, local digest and Git evidence. Their conservative ZIP
-path policy is unchanged. Current writers emit format 3 with one verified Core-PYZ
-or a declared runtime-only restriction. This checkout reads Result 3 only;
+path policy is unchanged. Current writers emit format 4 with one verified Core-PYZ
+or a declared runtime-only restriction. This checkout reads Result 4 only;
 RF-06 removed the Result-1/2 readers and runtime-wheel path. Unchanged valid
 1.4.0 artifacts remain supported, including their original producer capabilities.
 Public signatures, result fields, validation scopes and error codes are unchanged.
@@ -153,7 +153,7 @@ reference SHA. The explicit repository must already be registered. Both keywords
 together raise `ValueError`; there is no implicit CWD, registry or Exchange target.
 All relative input paths are anchored to one calling directory before observation.
 The operations do not reserve a Result target or change registry, index, replay,
-attempts or repository contents. Later Apply always checks its inputs/state again.
+attempts or repository contents. Later Execute always checks its inputs/state again.
 Repository validation rechecks the existing identity and registry mapping after
 the consistent state capture, while retaining its repository lock. Read queries
 disable Git fsmonitor helpers; optional Git locks remain disabled. A missing
@@ -163,7 +163,7 @@ Read-only validation compares parsed index entries and stable raw file bytes,
 without Git's racy-index filter execution. Ambiguous content conversions fail
 with unsupported-state error 13: selected filters/working-tree encoding, expanded
 ident values, or CRLF bytes subject to Git text/EOL conversion. Ordinary LF text
-changes remain validatable even with text/eol attributes. Normal context, Apply
+changes remain validatable even with text/eol attributes. Normal context, Execute
 and bundle retain the existing state-v1 Git comparison and fingerprint contract,
 including `core.fileMode=false`; validation does not emulate conversion helpers.
 
@@ -172,7 +172,7 @@ Both binding scopes retain `authenticity`, `execution`, `interpreter_availabilit
 `live_repository_state`, `local_registration`, `reconstructed_state_fingerprint`,
 `legacy_delta_log_hashes`. That last name is a retained public output field,
 not a claim that the current reader accepts Result 1. Reference validation does
-not independently authenticate every log/delta or apply deltas. Repository additionally reports
+not independently authenticate every log/delta or execute deltas. Repository additionally reports
 `future_repository_state`. This is a point-in-time comparison, not an execution,
 replay or sender-trust authorization. Any binding mismatch raises error 9;
 invalid/unreadable/unsupported references raise input error 4. Repository errors
@@ -212,7 +212,7 @@ errors are input errors (4); a JSON decoder recursion limit is a manifest error
 Each request binds its own observer and restores the enclosing scope even on
 failure; a nested call with `observer=None` does not inherit its caller's
 observer. A replaced filename after capture cannot change the returned digest
-or facts; a later Apply must independently read and validate its own bytes.
+or facts; a later Execute must independently read and validate its own bytes.
 
 ## Repository-local configuration
 
@@ -257,7 +257,7 @@ when an Exchange value is present it is revalidated on writes. Only an explicit
 Exchange setter creates/replaces the requested directory setting.
 
 Multiple repositories may use the same Exchange directory while retaining
-different suffix/archive preferences. Bundle, Apply, Result publication and
+different suffix/archive preferences. Bundle, Execute, Result publication and
 archival use the resolved target's settings. `output_directory` overrides only
 the result destination: unset/unavailable Exchange is permitted, but a missing
 or corrupt config is never bypassed. `environment.json` describes this target,
@@ -271,22 +271,22 @@ configuration. Existing registered instances from the old version need manual
 local JSON setup as described in the README. No API call reads/imports the old
 global `config.json`, repairs missing metadata, or resets the replay ledger.
 
-## Apply selection and safety
+## Execute selection and safety
 
-With no explicit patch, `apply(repository=...)` selects for that registered
+With no explicit patch, `execute(repository=...)` selects for that registered
 repository (subdirectories are allowed). Omitting repository means current
-directory, exactly like manual CLI Apply. A failed identity is retryable only
+directory, exactly like manual CLI Execute. A failed identity is retryable only
 under the same existing state rules. An explicit patch selects by its manifest
 repo_id, not by cwd. Combining `patch` with `repository` is rejected: the latter
 is a discovery scope, not an extra target constraint that could be ignored.
 
-`apply_next()` performs exactly one global automatic poll across the registered
+`execute_next()` performs exactly one global automatic poll across the registered
 repositories' locally configured Exchange directories. It reloads their settings
 and scans each distinct physical directory once. A package in another repository's
 Exchange is not eligible unless its own target uses that same directory. Only
-then do state/replay validation and newest-`mtime_ns` selection apply across all
+then do state/replay validation and newest-`mtime_ns` selection execute across all
 eligible candidates. It never retries a failed identity; Core owns selection,
-replay, lock, revalidation, recovery and publication together. No separate select-then-apply token or stale
+replay, lock, revalidation, recovery and publication together. No separate select-then-execute token or stale
 validated package is exposed. The watcher uses this operation in a separate
 worker process for each event-triggered scan; the library never starts a loop.
 
@@ -311,11 +311,11 @@ local configuration validity, so a suspended client can observe a repair. Its
 `exchange_paths` also carries advisory paths from valid documents without
 requiring those directories to exist. Clients may watch their existing parents
 for restoration. These are never validated scan scopes; `watch_targets()` and
-Apply still reject missing or invalid destinations.
+Execute still reject missing or invalid destinations.
 
-Automatic calls set `report.automatic` to immutable `AutomaticApplyResult`:
+Automatic calls set `report.automatic` to immutable `AutomaticExecuteResult`:
 
-| `AutomaticApplyStatus` | Scheduling meaning |
+| `AutomaticExecuteStatus` | Scheduling meaning |
 | --- | --- |
 | `NO_CANDIDATE` | Valid discovery finished without an eligible candidate; stop draining. |
 | `ATTEMPTED` | The replay boundary consumed a candidate; execution may still have failed. Further candidates may be checked subject to the caller's quiet-period rules. |
@@ -323,30 +323,30 @@ Automatic calls set `report.automatic` to immutable `AutomaticApplyResult`:
 | `DRY_RUN` | Successful validation only; no consumption or progress-driven drain. |
 | `ERROR` | No confirmed progress; await an external change/repair, without blind retry. |
 
-For a known pending lock conflict, `apply_readiness(report.automatic.blocked_on)`
+For a known pending lock conflict, `execute_readiness(report.automatic.blocked_on)`
 probes the registry, repository or Exchange-state lock and releases it before
 returning. `ready` is momentary; `blocked_on` identifies a remaining conflict
 (possibly the registry needed to resolve a repository lock). No Exchange scan,
 bundle hashing, replay-state read or reservation occurs. Unregistered repository
 IDs and lock-operation errors raise `PatchHarborError`; they are not readiness.
-Apply must still reenter all normal gates after a successful probe. Do not call
+Execute must still reenter all normal gates after a successful probe. Do not call
 readiness periodically when idle.
 
-Scheduling status is in-process API data, not persisted Apply-success evidence;
-existing CLI/Result JSON schemas are unchanged. Manual Apply has `automatic=None`.
+Scheduling status is in-process API data, not persisted Execute-success evidence;
+existing CLI/Result JSON schemas are unchanged. Manual Execute has `automatic=None`.
 The CLI watcher uses native events and five quiet seconds per Exchange. WE-3
 passes the selected scope and structured progress through a versioned private
 worker protocol; the public CLI/Result envelope is unchanged.
 
 Dry-run still produces a Result Bundle when a repository can be safely resolved;
 it neither writes payload files nor executes, consumes replay or archives. API
-Apply still attempts the automatic Result Bundle on failures. There is no
+Execute still attempts the automatic Result Bundle on failures. There is no
 rollback: trusted scripts can commit, mutate files or fail after partial work.
 PatchHarbor remains a controlled runner, not a sandbox.
 
 ## Results and errors
 
-`apply`, `apply_next`, and `dry_run` always return the existing immutable
+`execute`, `execute_next`, and `dry_run` always return the existing immutable
 `RunReport` for known Core outcomes, including failures. Read `report.success`,
 `report.primary_result`, `report.completion_tool_error`, and
 `report.result_bundle`. Do not infer success merely from an existing bundle.
@@ -355,7 +355,7 @@ PatchHarbor remains a controlled runner, not a sandbox.
 124 or 130 is **not** reclassified as a tool timeout/interruption.
 
 ```python
-report = api.apply(repository=repo)
+report = api.execute(repository=repo)
 if not report.success:
     error = report.completion_tool_error
     if error is not None:
@@ -384,7 +384,7 @@ No new error-class hierarchy reinterprets existing categories.
 
 Except for the deprecated `run_scripts` warning handled by Python's warning
 machinery, no output is sent to `sys.stdout` or `sys.stderr` by default. No implicit stdin
-is read. Raw execution logs in Apply Result Bundles remain complete even without
+is read. Raw execution logs in Execute Result Bundles remain complete even without
 an output consumer. Callers request streaming explicitly:
 
 ```python
@@ -392,7 +392,7 @@ import sys
 from patchharbor import api
 
 with open("entrypoint.bin", "wb") as raw_log:
-    report = api.apply(
+    report = api.execute(
         repository=repo,
         output=api.OutputStreams(text=sys.stdout, raw=raw_log),
     )
@@ -405,11 +405,11 @@ child. Separate child stdout/stderr are not available from the current Core.
 They are flushed as data arrives; text/raw delivery can occur on the reader
 thread. Sink failures are reported under the existing execution-failure priority:
 a prior timeout, interruption or nonzero child exit keeps its primary status.
-A failed optional raw mirror cannot stop the mandatory Apply log from being
+A failed optional raw mirror cannot stop the mandatory Execute log from being
 recorded. No automatic unbounded
-`StringIO` buffer is allocated by the facade. Existing Core capture of Apply
+`StringIO` buffer is allocated by the facade. Existing Core capture of Execute
 logs for the Result Bundle remains unchanged, so this is not a bounded-memory
-guarantee for an entire Apply. Explicit sink contents are not console-sanitized.
+guarantee for an entire Execute. Explicit sink contents are not console-sanitized.
 
 `observer` receives `ActivityEvent`, `RequestStarted`, `RepositoryResolved`, and
 `ScriptPrepared`. Full identifiers are retained. `ScriptPrepared.messages`
@@ -468,11 +468,11 @@ extension surface. GUI, async, transport and plugin frameworks are out of scope.
 ## CLI and Watcher integration
 
 The main `patchharbor` CLI now calls this API for every operation, including
-configuration, registry, context, bundles, Apply/Dry-Run, automatic Apply and
+configuration, registry, context, bundles, Execute/Dry-Run, automatic Execute and
 fs-run. It passes its observer and sinks explicitly. JSON serializers,
 exit-code mapping, terminal styling, interactive selection and temporary `--log`
 files remain adapter concerns. The separate watcher calls `repositories()` at
-startup and runs a private worker that calls `apply_next()` directly, preserving
+startup and runs a private worker that calls `execute_next()` directly, preserving
 its process and stop semantics. It never requests a global configuration or
 resolves configuration against the service's current working directory.
 
@@ -484,10 +484,10 @@ Existing bundles receive the same initial five-second quiet period as later
 changes. Each worker starts the current installation's Python interpreter with
 `-m patchharbor_watcher.worker`. Its bounded, versioned stdin request contains
 full physical Exchange observations, never an explicit candidate path. The
-worker calls `api.apply_next(exchanges=...)` and preserves automatic no-retry
+worker calls `api.execute_next(exchanges=...)` and preserves automatic no-retry
 semantics. Empty scope remains empty. Malformed requests fail before Core.
 
-The private response adds `watcher_progress` to a copy of the Apply envelope.
+The private response adds `watcher_progress` to a copy of the Execute envelope.
 The parent uses its structured status and lock, never a guessed error message,
 to drain consumed work or await readiness. Raw script output remains in the
 Result Bundle. Public CLI and persisted Result schemas remain unchanged.
@@ -564,7 +564,7 @@ After confirmed publication, optional cleanup failures retain the entire result
 with warnings naming any remaining owned path. Success does not require reopening
 the final file: an external watcher may already have moved it. This evidence does
 not assert shell syntax, executed tests, authenticity or unchanged target state
-at a later Apply. See [pack details](pack.md).
+at a later Execute. See [pack details](pack.md).
 
 
 ## Python-only PYZ access
@@ -578,7 +578,7 @@ PatchHarbor modules, and never clears module caches to fake a version switch.
 Afterwards use the returned `api.inspect_task`, `api.validate_task` and
 `api.pack_task` normally. Full native reference validation remains separate
 from bootstrap checks; no installation or subprocess is needed for these calls.
-Result-3 production uses the same shared Core and request-local resource capture.
+Result-4 production uses the same shared Core and request-local resource capture.
 
 
 ## Historical reader-first introduction of Result 3 (PP-05A)
@@ -610,7 +610,7 @@ is captured once and all returned bytes remain usable after the file is moved
 or replaced. Text/binary staged and unstaged changes are strictly applied without
 fuzzy context. Untracked entries cannot overwrite a tracked path. Existing ZIP
 limits plus 256-MiB individual and 512-MiB cumulative reconstruction budgets
-apply, including binary programs and reverse verification.
+execute, including binary programs and reverse verification.
 
 Malformed input raises `api.ResultSnapshotError` (a `PatchHarborError`, reason
 SOURCE_ERROR) with `.code` from `api.SnapshotErrorCode`. Codes are invalid_result,
@@ -620,15 +620,15 @@ or dry-run Result is returned with its actual facts. Integrity does not prove
 authenticity, a historical commit tree or an independently recomputed dirty
 fingerprint; the existing four binding values are preserved.
 
-## Guarded host Apply (integration contract 1)
+## Guarded host Execute (integration contract 1)
 
-`api.apply_guarded(patch, *, expected_sha256, expected_repository, admission,
+`api.execute_guarded(patch, *, expected_sha256, expected_repository, admission,
 output_directory=None, timeout=DEFAULT_TIMEOUT_SECONDS, output=None, observer=None)`
-uses the ordinary Apply core. Check
-`api.integration_capabilities().guarded_apply_contract_version == 1`.
-Unlike the unchanged `apply`, the new operation requires one explicit package,
+uses the ordinary Execute core. Check
+`api.integration_capabilities().guarded_execute_contract_version == 1`.
+Unlike the unchanged `execute`, the new operation requires one explicit package,
 its full lowercase SHA-256, the expected repository root, and a trusted callback.
-The existing `apply(patch=..., repository=...)` remains invalid.
+The existing `execute(patch=..., repository=...)` remains invalid.
 
 The callback receives immutable `api.PatchAdmission`: `.inspection` is the full
 `PatchInspection`, `.contents` maps every archive member to its captured bytes
@@ -687,7 +687,7 @@ Added in 1.7.0. Use only the public `patchharbor.api` namespace. Before any
 producing call, require `integration_capabilities().safe_reference_contract_version`
 to be the integer `1`. Missing fields/functions, `None`, booleans or unknown
 versions are unsupported; do not retry with the default mode. The existing
-integration, snapshot and guarded-Apply capability versions remain `1`.
+integration, snapshot and guarded-Execute capability versions remain `1`.
 The host capability is advertised on Linux x86-64, CPython 3.10–3.14 only.
 Git and `/proc/self/fd` are required for production; the existing Python-only
 snapshot reader remains available without Git, a shell or network.
@@ -753,7 +753,7 @@ are preserved. New private files are 0600 and diagnostic directories 0700.
 An existing valid lock directory is required. Output files are never overwritten;
 publication needs same-directory hardlink support and is exclusive and atomic.
 A filesystem lacking that capability fails safely. There is no global temp fallback,
-Exchange scan, archive, replay write, recovery, Apply, watcher or service start.
+Exchange scan, archive, replay write, recovery, Execute, watcher or service start.
 
 The source and its index/refs/history/configuration are never written. Index
 objects and raw files are compared without conversion helpers or stat-cache
@@ -765,7 +765,7 @@ assume-unchanged and skip-worktree), symlinks, submodules and incomplete/promiso
 object stores remain unsupported. These checks do not execute a helper to test
 whether it is harmless. Ordinary clean/staged/unstaged/mixed/untracked states,
 binary/empty files, rename/deletion and file modes retain state-v1 and native
-Result-3 semantics. Ignored files are preserved in place and excluded by policy.
+Result-4 semantics. Ignored files are preserved in place and excluded by policy.
 
 `SafeExportError` extends `PatchHarborError`. Its enum `code` is one of
 `unsupported_host`, `unsupported_conversion`, `repository`, `configuration`,
@@ -824,7 +824,7 @@ registry and independently observes repository/configuration/Git facts. Select a
 full repository ID or path; optional Exchange is a path. The frozen snapshot has
 `observed_at`, `repositories`, `exchanges`, `errors`; `document()` returns format 1
 JSON-compatible data (`kind: patchharbor-monitor`). Observations neither acquire
-Apply locks nor change source files or replay state. Unknown facts remain null.
+Execute locks nor change source files or replay state. Unknown facts remain null.
 `MonitorRepository` and `MonitorExchange` are exported through the facade.
 
 `include_state=False` discovers registration/configuration without expensive Git
@@ -836,21 +836,21 @@ expected_sha256=...)` reads a bounded log from exactly that validated Result.
 Both return JSON-compatible dictionaries and never acquire execution locks.
 
 `api.monitor_overview(repository)` returns a compact, read-only summary using
-the same native artifact checks: candidate, latest retained Apply Result,
+the same native artifact checks: candidate, latest retained Execute Result,
 per-repository counts, observation timestamp, errors and completeness. It never
 reserves a candidate. Result ordering uses the validated run's end timestamp;
 an incomplete inventory cannot prove the absence of eligible patches.
 
-`api.monitor_live(instance_id=None)` reads optional version-1/2 watcher/Apply
+`api.monitor_live(instance_id=None)` reads optional version-1/2 watcher/Execute
 observations. A canonical instance ID requests that instance's bounded log tail.
 `api.watcher_observation()` creates a best-effort publisher for a watcher; call
 `update(phase=..., **facts)` with observed facts and `close()` on exit. Each
-Apply request publishes independently through the existing application boundary.
+Execute request publishes independently through the existing application boundary.
 Version 2 also observes manual Git-mode Result-bundle capture and retains up to
 32 preceding activity records plus the current activity. Optional
 `activity_code`, `activity_status` and `activity_message` keywords to `update`
 publish factual transitions. The closed schema validates ordered sequences,
 timestamps, statuses and size bounds; the reader preserves version-1 support.
-Apply data may include `entrypoint_name` and an unambiguous declared
+Execute data may include `entrypoint_name` and an unambiguous declared
 `bundle_number`. These are display metadata; full hashes and bindings still
 govern identity and all Core decisions.

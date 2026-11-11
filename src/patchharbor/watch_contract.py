@@ -1,7 +1,7 @@
-"""Immutable, advisory facts for event-driven automatic Apply clients.
+"""Immutable, advisory facts for event-driven automatic Execute clients.
 
 These values never authorize a candidate or reserve a lock. Core rechecks the
-configuration, directory identity and normal Apply gates on every invocation.
+configuration, directory identity and normal Execute gates on every invocation.
 """
 from __future__ import annotations
 
@@ -55,23 +55,23 @@ restoration. No directory enumeration, bundle reads or Git state capture occurs.
     configuration_paths: tuple[Path, ...]
 
 
-class ApplyLockKind(str, Enum):
+class ExecuteLockKind(str, Enum):
     REGISTRY = "registry"
     REPOSITORY = "repository"
     EXCHANGE_STATE = "exchange_state"
 
 
 @dataclass(frozen=True, slots=True)
-class ApplyLock:
+class ExecuteLock:
     """A technical lock, not an acquired handle or candidate reservation."""
 
-    kind: ApplyLockKind
+    kind: ExecuteLockKind
     repo_id: RepositoryId | None = None
 
     def __post_init__(self) -> None:
-        if not isinstance(self.kind, ApplyLockKind):
-            raise TypeError("lock kind must be ApplyLockKind")
-        if self.kind is ApplyLockKind.REPOSITORY:
+        if not isinstance(self.kind, ExecuteLockKind):
+            raise TypeError("lock kind must be ExecuteLockKind")
+        if self.kind is ExecuteLockKind.REPOSITORY:
             if not isinstance(self.repo_id, RepositoryId):
                 raise ValueError("repository lock requires a repository ID")
         elif self.repo_id is not None:
@@ -79,17 +79,17 @@ class ApplyLock:
 
 
 @dataclass(frozen=True, slots=True)
-class ApplyReadiness:
+class ExecuteReadiness:
     """Momentary availability; all probed locks have already been released."""
 
-    blocked_on: ApplyLock | None = None
+    blocked_on: ExecuteLock | None = None
 
     @property
     def ready(self) -> bool:
         return self.blocked_on is None
 
 
-class AutomaticApplyStatus(str, Enum):
+class AutomaticExecuteStatus(str, Enum):
     NO_CANDIDATE = "no_candidate"
     ATTEMPTED = "attempted"
     LOCKED = "locked"
@@ -98,20 +98,20 @@ class AutomaticApplyStatus(str, Enum):
 
 
 @dataclass(frozen=True, slots=True)
-class AutomaticApplyResult:
-    """Drain/stop decision independent of messages and primary Apply success.
+class AutomaticExecuteResult:
+    """Drain/stop decision independent of messages and primary Execute success.
 
 ATTEMPTED means the replay boundary consumed a candidate, even if execution
 failed. LOCKED permits readiness probes; ERROR requires a new external event.
 Dry-runs never consume candidates and must not trigger a drain loop.
 """
 
-    status: AutomaticApplyStatus
-    blocked_on: ApplyLock | None = None
+    status: AutomaticExecuteStatus
+    blocked_on: ExecuteLock | None = None
 
     def __post_init__(self) -> None:
-        if not isinstance(self.status, AutomaticApplyStatus):
-            raise TypeError("automatic status must be AutomaticApplyStatus")
-        if ((self.status is AutomaticApplyStatus.LOCKED and not isinstance(self.blocked_on, ApplyLock))
-                or (self.status is not AutomaticApplyStatus.LOCKED and self.blocked_on is not None)):
+        if not isinstance(self.status, AutomaticExecuteStatus):
+            raise TypeError("automatic status must be AutomaticExecuteStatus")
+        if ((self.status is AutomaticExecuteStatus.LOCKED and not isinstance(self.blocked_on, ExecuteLock))
+                or (self.status is not AutomaticExecuteStatus.LOCKED and self.blocked_on is not None)):
             raise ValueError("only locked automatic outcomes require a lock")

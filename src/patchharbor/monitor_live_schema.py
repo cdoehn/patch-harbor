@@ -38,7 +38,7 @@ def parse_live(content, name):
     if set(row) != fields or type(version) is not int or version != 3:
         raise ValueError('unsupported live observation schema')
     _uuid(row['instance_id'])
-    if row['kind'] not in (('apply', 'watcher', 'bundle') if version == 3 else ('apply', 'watcher')) or name != row['kind'] + '-' + row['instance_id'] + '.json':
+    if row['kind'] not in (('execute', 'watcher', 'bundle') if version == 3 else ('execute', 'watcher')) or name != row['kind'] + '-' + row['instance_id'] + '.json':
         raise ValueError('live filename and identity disagree')
     if type(row['pid']) is not int or not 0 < row['pid'] <= 2**32-1:
         raise ValueError('invalid publisher PID')
@@ -65,7 +65,7 @@ def parse_live(content, name):
             if type(event['message']) is not str or len(event['message']) > 512:
                 raise ValueError('invalid activity message')
     data = row['data']
-    allowed = {'message', 'patch_path', 'repo_id', 'repository_path', 'base_commit', 'fingerprint',
+    allowed = {'message', 'task_path', 'repo_id', 'repository_path', 'base_commit', 'fingerprint',
         'run_id', 'origin', 'dry_run', 'requested_timeout_seconds', 'effective_timeout_seconds',
         'entrypoint_started_at', 'entrypoint_exit_code', 'process_state', 'primary_result',
         'result_status', 'result_path', 'task_sha256', 'subscriptions', 'targets',
@@ -92,7 +92,7 @@ def parse_live(content, name):
         raise ValueError('invalid declared bundle number')
     if 'active_exchanges' in data and (type(data['active_exchanges']) is not list or len(data['active_exchanges']) > 128 or any(type(p) is not str for p in data['active_exchanges'])):
         raise ValueError('invalid active Exchange scope')
-    for key in ('message', 'patch_path', 'repository_path', 'base_commit', 'fingerprint',
+    for key in ('message', 'task_path', 'repository_path', 'base_commit', 'fingerprint',
                 'result_path', 'last_error', 'process_state'):
         if data.get(key) is not None and type(data[key]) is not str:
             raise ValueError('invalid live text field: ' + key)
@@ -118,8 +118,8 @@ def parse_live(content, name):
         _primary(data['primary_result'])
     if data.get('result_status') is not None and data['result_status'] not in ('created', 'failed', 'not_attempted'):
         raise ValueError('invalid Result publication status')
-    if row['kind'] == 'apply' and (not data.get('run_id') or data.get('origin') not in ('manual', 'automatic') or type(data.get('dry_run')) is not bool):
-        raise ValueError('incomplete Apply observation')
+    if row['kind'] == 'execute' and (not data.get('run_id') or data.get('origin') not in ('manual', 'automatic') or type(data.get('dry_run')) is not bool):
+        raise ValueError('incomplete Execute observation')
     targets, subscriptions = data.get('targets', []), data.get('subscriptions', [])
     if type(targets) is not list or len(targets) > 128 or type(subscriptions) is not list or len(subscriptions) > 1024:
         raise ValueError('invalid watcher target list')

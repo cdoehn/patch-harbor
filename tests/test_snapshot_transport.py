@@ -61,7 +61,7 @@ sys.path.insert(0,selected)
 from patchharbor import api
 assert api.__file__.startswith(selected+os.sep),api.__file__
 assert api.integration_capabilities().snapshot_contract_version==2
-assert api.integration_capabilities().guarded_apply_contract_version==1
+assert api.integration_capabilities().guarded_execute_contract_version==2
 module=runpy.run_path(str(root/'example.py'))
 snapshot,packed=module['prepare_transport'](root/'reference.zip',expected_result_sha256=expected_sha,
     trusted_entrypoint=root/'approved.sh',workspace=root/'workspace',output_directory=root/'output')
@@ -128,7 +128,7 @@ def accept(facts):
     assert hashlib.sha256(facts.contents[facts.inspection.entrypoint]).hexdigest()==sys.argv[5]
     assert not (Path(sys.argv[4])/'executed').exists()
     return True
-report=api.apply_guarded(packed.path,expected_sha256=packed.package_sha256,expected_repository=sys.argv[4],admission=accept)
+report=api.execute_guarded(packed.path,expected_sha256=packed.package_sha256,expected_repository=sys.argv[4],admission=accept)
 assert report.success and len(called)==1,report
 snapshot=api.read_result_snapshot(report.result_bundle.path)
 assert snapshot.primary_result.entrypoint_exit_code==0

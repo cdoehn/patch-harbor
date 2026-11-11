@@ -49,7 +49,7 @@ def _advance(repository, message="next state"):
 
 def _scan(repository, environment, *, automatic=False):
     arguments = ("--automatic",) if automatic else ()
-    return run_cli(repository, "apply", "--json", *arguments, environment_overrides=environment)
+    return run_cli(repository, "execute", "--json", *arguments, environment_overrides=environment)
 
 
 def _committing_patch(path, context):

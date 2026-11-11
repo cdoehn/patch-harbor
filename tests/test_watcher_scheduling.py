@@ -129,12 +129,12 @@ def test_busy_root_does_not_delay_an_independent_quiet_root(tmp_path):
 
 def test_events_during_apply_survive_completion_of_the_previous_generation(tmp_path):
     h = Harness(tmp_path)
-    def apply(targets):
+    def execute(targets):
         if len(h.calls) == 1:
             h.now = 6
             h.at(6)
         return completion()
-    h.on_apply = apply
+    h.on_apply = execute
     h.run()
     assert [t for t, _ in h.calls] == [5, 11]
 
@@ -258,7 +258,7 @@ def test_backend_failure_is_not_idle_or_a_polling_fallback(tmp_path):
 def test_registry_lock_during_refresh_uses_readiness_and_then_new_start_deadline(tmp_path):
     from patchharbor.errors import LockBusyError, repository_busy_error
     h = Harness(tmp_path)
-    h.fail = LockBusyError(repository_busy_error(), api.ApplyLock(api.ApplyLockKind.REGISTRY))
+    h.fail = LockBusyError(repository_busy_error(), api.ExecuteLock(api.ExecuteLockKind.REGISTRY))
     def available(lock):
         h.fail = None
         return None
@@ -270,22 +270,22 @@ def test_registry_lock_during_refresh_uses_readiness_and_then_new_start_deadline
 
 def test_rebinding_during_apply_prevents_old_idle_completion_from_clearing_new_work(tmp_path):
     h = Harness(tmp_path)
-    def apply(targets):
+    def execute(targets):
         if len(h.calls) == 1:
             h.now = 6
             h.at(6, h.registry.parent, h.registry.name,
                  action=lambda: setattr(h, 'targets', (target(h.b),)))
         return completion()
-    h.on_apply = apply
+    h.on_apply = execute
     h.run()
     assert [(t, scope[0].directory) for t, scope in h.calls] == [(5, h.a), (11, h.b)]
 
 
 def test_stop_during_worker_prevents_progress_driven_followup(tmp_path):
     h = Harness(tmp_path)
-    def apply(targets):
+    def execute(targets):
         h.controller.request_stop()
         return completion('attempted', code=0)
-    h.on_apply = apply
+    h.on_apply = execute
     h.run()
     assert len(h.calls) == 1

@@ -1,4 +1,4 @@
-"""Trusted host admission over owned package bytes within the existing Apply lock."""
+"""Trusted host admission over owned package bytes within the existing Execute lock."""
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from types import MappingProxyType
 
-from patchharbor.apply_repository import SafeResolvedRepository, _inspect_repository_identity
+from patchharbor.execute_repository import SafeResolvedRepository, _inspect_repository_identity
 from patchharbor.errors import ErrorKind, FailureReason, PatchHarborError, state_mismatch_error
 from patchharbor.models import RepositoryContext
 from patchharbor.task_inspection import TaskInspection, inspect_captured_task
@@ -24,7 +24,7 @@ AdmissionCallback = Callable[[TaskAdmission], bool]
 
 
 @dataclass(frozen=True, slots=True)
-class ApplyAdmissionPolicy:
+class ExecuteAdmissionPolicy:
     expected_sha256: str
     expected_repository: Path
     admission: AdmissionCallback

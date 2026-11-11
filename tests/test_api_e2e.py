@@ -72,7 +72,7 @@ def test_apply_preserves_complete_raw_log_report_and_full_events(workspace, capf
     write_package(patch, context)
     text, raw = StringIO(), BytesIO()
     events = []
-    report = api.apply(
+    report = api.execute(
         patch, output=api.OutputStreams(text=text, raw=raw), observer=events.append,
     )
     assert report.success and report.primary_result.entrypoint_exit_code == 0
@@ -100,7 +100,7 @@ def test_explicit_raw_sink_failure_cannot_truncate_mandatory_result_log(workspac
             raise OSError("caller destination unavailable")
         def flush(self):
             pass
-    report = api.apply(patch, output=api.OutputStreams(raw=BrokenSink()))
+    report = api.execute(patch, output=api.OutputStreams(raw=BrokenSink()))
     assert not report.success
     assert report.primary_result.failure_reason is api.FailureReason.EXECUTION_ERROR
     assert report.result_bundle.status is api.ResultBundleStatus.CREATED
@@ -114,7 +114,7 @@ def test_child_exit_codes_are_not_reclassified_as_tool_errors(workspace, code) -
     _, context, exchange = workspace
     patch = exchange / "nonzero.zip"
     write_package(patch, context, exit_code=code)
-    report = api.apply(patch)
+    report = api.execute(patch)
     assert not report.success
     assert report.primary_result.entrypoint_exit_code == code
     assert report.primary_result.kind is api.PrimaryResultKind.ENTRYPOINT_EXIT
@@ -139,7 +139,7 @@ def test_repository_argument_scopes_manual_discovery_without_chdir(workspace, tm
     assert report.context is not None and report.context.repo_id == context.repo_id
     assert not report.execution_present and not report.context.dirty
     assert Path.cwd() == cwd
-    automatic = api.apply_next(dry_run=True)
+    automatic = api.execute_next(dry_run=True)
     assert automatic.context is not None and automatic.context.repo_id == other_context.repo_id
     assert (exchange / "local.zip").exists() and (exchange / "foreign.zip").exists()
 
@@ -150,7 +150,7 @@ def test_state_mismatch_remains_reported_without_mutating_repository(workspace) 
     write_package(patch, context)
     (repo / "tracked.txt").write_bytes(b"keep my changes\n")
     before = git(repo, "status", "--porcelain").stdout
-    report = api.apply(patch)
+    report = api.execute(patch)
     assert not report.success and not report.execution_present
     assert report.primary_result.kind is api.PrimaryResultKind.STATE_MISMATCH
     assert git(repo, "status", "--porcelain").stdout == before
@@ -162,12 +162,12 @@ def test_manual_failed_retry_and_automatic_no_retry_use_core_replay(workspace) -
     repo, context, exchange = workspace
     patch = exchange / "retry.zip"
     write_package(patch, context, exit_code=17)
-    first = api.apply(repository=repo)
+    first = api.execute(repository=repo)
     assert first.execution_present and first.primary_result.entrypoint_exit_code == 17
-    automatic = api.apply_next()
+    automatic = api.execute_next()
     assert not automatic.execution_present
     assert not automatic.repository_resolved
-    manual = api.apply(repository=repo)
+    manual = api.execute(repository=repo)
     assert manual.execution_present and manual.primary_result.entrypoint_exit_code == 17
     assert first.run_id != manual.run_id
 
@@ -175,8 +175,8 @@ def test_manual_failed_retry_and_automatic_no_retry_use_core_replay(workspace) -
 def test_successful_identity_is_not_replayed(workspace) -> None:
     repo, context, exchange = workspace
     write_package(exchange / "once.zip", context)
-    assert api.apply(repository=repo).success
-    again = api.apply(repository=repo)
+    assert api.execute(repository=repo).success
+    again = api.execute(repository=repo)
     assert not again.success and not again.execution_present
 
 

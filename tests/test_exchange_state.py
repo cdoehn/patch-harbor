@@ -7,7 +7,7 @@ import pytest
 
 from patchharbor.errors import FailureReason
 from patchharbor.errors import PatchHarborError
-from patchharbor.exchange_state import ExchangeApplyStatus, load_exchange_state, mark_exchange_apply_finished, mark_exchange_apply_started, merge_exchange_classifications
+from patchharbor.exchange_state import ExchangeExecuteStatus, load_exchange_state, mark_exchange_execute_finished, mark_exchange_execute_started, merge_exchange_classifications
 from patchharbor.models import GitObjectFormat, GitObjectId
 from patchharbor.platform.filesystem import FileSystemOperationError
 from patchharbor.state_fingerprint import FINGERPRINT_ALGORITHM
@@ -16,7 +16,7 @@ from tests.registration_support import set_isolated_user_environment
 from tests.exchange_support import _identity, _selection, _record
 
 
-def test_classification_and_apply_lifecycle_are_persisted_in_closed_v4_state(
+def test_classification_and_execute_lifecycle_are_persisted_in_closed_v5_state(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -34,11 +34,11 @@ def test_classification_and_apply_lifecycle_are_persisted_in_closed_v4_state(
     assert document == {
         "entries": [
             {
-                "apply_status": None,
+                "execute_status": None,
                 "completed_commit": None,
                 "attempt_run_id": None,
                 "result_sha256": None,
-                "kind": "task_package",
+                "kind": "task_bundle",
                 "manifest": {
                     "base_commit": "b" * 40,
                     "fingerprint_algorithm": FINGERPRINT_ALGORITHM,
@@ -49,11 +49,11 @@ def test_classification_and_apply_lifecycle_are_persisted_in_closed_v4_state(
                 "sha256": "a" * 64,
             }
         ],
-        "format_version": 4,
+        "format_version": 5,
     }
 
     verified: list[bool] = []
-    mark_exchange_apply_started(
+    mark_exchange_execute_started(
         paths,
         record.identity,
         _selection(),
@@ -63,21 +63,21 @@ def test_classification_and_apply_lifecycle_are_persisted_in_closed_v4_state(
     assert verified == [True]
     attempted = load_exchange_state(paths).record_for(record.identity)
     assert attempted is not None
-    assert attempted.apply_status is ExchangeApplyStatus.ATTEMPTED
-    mark_exchange_apply_finished(
+    assert attempted.execute_status is ExchangeExecuteStatus.ATTEMPTED
+    mark_exchange_execute_finished(
         paths,
         record.identity,
         _selection(),
-        ExchangeApplyStatus.FAILED,
+        ExchangeExecuteStatus.FAILED,
     )
     failed = load_exchange_state(paths).record_for(record.identity)
     assert failed is not None
-    assert failed.apply_status is ExchangeApplyStatus.FAILED
+    assert failed.execute_status is ExchangeExecuteStatus.FAILED
     with pytest.raises(
         PatchHarborError,
         match="selected exchange patch was already attempted",
     ):
-        mark_exchange_apply_started(
+        mark_exchange_execute_started(
             paths,
             record.identity,
             _selection(),
@@ -96,24 +96,24 @@ def test_failed_apply_can_be_reopened_only_by_an_explicit_retry_transition(
     patch.write_bytes(b"package")
     record = _record(patch)
     merge_exchange_classifications(paths, (record,))
-    mark_exchange_apply_started(
+    mark_exchange_execute_started(
         paths,
         record.identity,
         _selection(),
         verify_identity=lambda: None,
     )
-    mark_exchange_apply_finished(
+    mark_exchange_execute_finished(
         paths,
         record.identity,
         _selection(),
-        ExchangeApplyStatus.FAILED,
+        ExchangeExecuteStatus.FAILED,
     )
 
     with pytest.raises(
         PatchHarborError,
         match="selected exchange patch was already attempted",
     ):
-        mark_exchange_apply_started(
+        mark_exchange_execute_started(
             paths,
             record.identity,
             _selection(),
@@ -121,7 +121,7 @@ def test_failed_apply_can_be_reopened_only_by_an_explicit_retry_transition(
         )
 
     verified: list[bool] = []
-    mark_exchange_apply_started(
+    mark_exchange_execute_started(
         paths,
         record.identity,
         _selection(),
@@ -132,7 +132,7 @@ def test_failed_apply_can_be_reopened_only_by_an_explicit_retry_transition(
     assert verified == [True]
     reopened = load_exchange_state(paths).record_for(record.identity)
     assert reopened is not None
-    assert reopened.apply_status is ExchangeApplyStatus.ATTEMPTED
+    assert reopened.execute_status is ExchangeExecuteStatus.ATTEMPTED
 
 
 def test_successful_apply_is_persisted_as_a_distinct_terminal_state(
@@ -147,24 +147,24 @@ def test_successful_apply_is_persisted_as_a_distinct_terminal_state(
     record = _record(patch)
     merge_exchange_classifications(paths, (record,))
 
-    mark_exchange_apply_started(
+    mark_exchange_execute_started(
         paths,
         record.identity,
         _selection(),
         verify_identity=lambda: None,
     )
-    mark_exchange_apply_finished(
+    mark_exchange_execute_finished(
         paths,
         record.identity,
         _selection(),
-        ExchangeApplyStatus.SUCCEEDED,
+        ExchangeExecuteStatus.SUCCEEDED,
     )
 
     persisted = load_exchange_state(paths).record_for(record.identity)
     assert persisted is not None
-    assert persisted.apply_status is ExchangeApplyStatus.SUCCEEDED
+    assert persisted.execute_status is ExchangeExecuteStatus.SUCCEEDED
     document = json.loads(paths.exchange_state_path.read_text(encoding="utf-8"))
-    assert document["entries"][0]["apply_status"] == "succeeded"
+    assert document["entries"][0]["execute_status"] == "succeeded"
 
 
 def test_legacy_attempt_flags_load_conservatively_and_migrate_on_next_write(
@@ -180,7 +180,7 @@ def test_legacy_attempt_flags_load_conservatively_and_migrate_on_next_write(
         legacy_entries.append(
             {
                 "attempted": attempted,
-                "kind": "task_package",
+                "kind": "patch_package",
                 "manifest": {
                     "base_commit": "b" * 40,
                     "fingerprint_algorithm": FINGERPRINT_ALGORITHM,
@@ -202,17 +202,17 @@ def test_legacy_attempt_flags_load_conservatively_and_migrate_on_next_write(
 
     loaded = load_exchange_state(paths)
 
-    assert loaded.record_for(_identity(patch, "a")).apply_status is None  # type: ignore[union-attr]
+    assert loaded.record_for(_identity(patch, "a")).execute_status is None  # type: ignore[union-attr]
     assert (  # type: ignore[union-attr]
-        loaded.record_for(_identity(patch, "d")).apply_status
-        is ExchangeApplyStatus.ATTEMPTED
+        loaded.record_for(_identity(patch, "d")).execute_status
+        is ExchangeExecuteStatus.ATTEMPTED
     )
 
     merge_exchange_classifications(paths, (_record(patch, "e"),))
     migrated = json.loads(paths.exchange_state_path.read_text(encoding="utf-8"))
-    assert migrated["format_version"] == 4
+    assert migrated["format_version"] == 5
     statuses = {
-        entry["sha256"]: entry["apply_status"]
+        entry["sha256"]: entry["execute_status"]
         for entry in migrated["entries"]
     }
     assert statuses == {
@@ -235,7 +235,7 @@ def test_changed_bytes_at_the_same_path_form_an_independent_identity(
     second = _record(patch, "d")
 
     merge_exchange_classifications(paths, (first, second))
-    mark_exchange_apply_started(
+    mark_exchange_execute_started(
         paths,
         first.identity,
         _selection(),
@@ -244,10 +244,10 @@ def test_changed_bytes_at_the_same_path_form_an_independent_identity(
 
     state = load_exchange_state(paths)
     assert (  # type: ignore[union-attr]
-        state.record_for(first.identity).apply_status
-        is ExchangeApplyStatus.ATTEMPTED
+        state.record_for(first.identity).execute_status
+        is ExchangeExecuteStatus.ATTEMPTED
     )
-    assert state.record_for(second.identity).apply_status is None  # type: ignore[union-attr]
+    assert state.record_for(second.identity).execute_status is None  # type: ignore[union-attr]
 
 
 def test_identity_verification_failure_does_not_consume_the_record(
@@ -266,7 +266,7 @@ def test_identity_verification_failure_does_not_consume_the_record(
         raise PatchHarborError("changed", FailureReason.TASK_BUNDLE_ERROR)
 
     with pytest.raises(PatchHarborError, match="changed"):
-        mark_exchange_apply_started(
+        mark_exchange_execute_started(
             paths,
             record.identity,
             _selection(),
@@ -303,7 +303,7 @@ def test_failed_atomic_attempt_publication_preserves_the_previous_state(
         PatchHarborError,
         match="cannot write exchange processing state",
     ):
-        mark_exchange_apply_started(
+        mark_exchange_execute_started(
             paths,
             record.identity,
             _selection(),
@@ -356,15 +356,15 @@ def test_completion_receipt_is_full_persistent_and_cleared_on_explicit_retry(tmp
     package.write_bytes(b"package")
     record = _record(package)
     merge_exchange_classifications(paths, (record,))
-    mark_exchange_apply_started(paths, record.identity, _selection(), verify_identity=lambda: None)
+    mark_exchange_execute_started(paths, record.identity, _selection(), verify_identity=lambda: None)
     commit = GitObjectId("d" * 40, GitObjectFormat.SHA1)
-    mark_exchange_apply_finished(paths, record.identity, _selection(), ExchangeApplyStatus.SUCCEEDED,
+    mark_exchange_execute_finished(paths, record.identity, _selection(), ExchangeExecuteStatus.SUCCEEDED,
                                  completed_commit=commit)
     assert load_exchange_state(paths).record_for(record.identity).completed_commit == commit
-    mark_exchange_apply_started(paths, record.identity, _selection(), verify_identity=lambda: None,
+    mark_exchange_execute_started(paths, record.identity, _selection(), verify_identity=lambda: None,
                                 explicitly_selected=True)
     reread = load_exchange_state(paths).record_for(record.identity)
-    assert reread.apply_status is ExchangeApplyStatus.ATTEMPTED
+    assert reread.execute_status is ExchangeExecuteStatus.ATTEMPTED
     assert reread.completed_commit is None
 
 
@@ -380,7 +380,7 @@ def test_inconsistent_completion_receipts_are_rejected(tmp_path, monkeypatch, st
     package.write_bytes(b"package")
     merge_exchange_classifications(paths, (_record(package),))
     document = json.loads(paths.exchange_state_path.read_bytes())
-    document["entries"][0].update(apply_status=status, completed_commit=commit)
+    document["entries"][0].update(execute_status=status, completed_commit=commit)
     paths.exchange_state_path.write_text(json.dumps(document))
     with pytest.raises(PatchHarborError):
         load_exchange_state(paths)

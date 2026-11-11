@@ -134,12 +134,12 @@ def prepare_task_bundle(
         root_must_exist=True,
     ):
         raise _preflight_error(
-            "private apply temporary directory is inside the repository",
+            "private execute temporary directory is inside the repository",
             FailureReason.EXECUTION_ERROR,
         )
 
     try:
-        with private_request_directory(prefix="patchharbor-apply-") as private_root:
+        with private_request_directory(prefix="patchharbor-execute-") as private_root:
             entrypoint = _prepare_entrypoint(package, private_root)
             yield PreparedTaskBundle(
                 entrypoint=entrypoint,

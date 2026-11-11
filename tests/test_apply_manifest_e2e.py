@@ -76,7 +76,7 @@ def _run_dry_run(
     json_output: bool = False,
     output_directory: Path | None = None,
 ):
-    arguments = ["apply", "--dry-run"]
+    arguments = ["execute", "--dry-run"]
     if json_output:
         arguments.append("--json")
     if output_directory is not None:
@@ -290,7 +290,7 @@ def test_dry_run_rejects_a_non_zip_with_closed_apply_result(
         "error",
         "process_exit_code",
     }
-    assert envelope["command"] == "apply"
+    assert envelope["command"] == "execute"
     assert envelope["success"] is False
     assert envelope["process_exit_code"] == int(ExitCode.TASK_BUNDLE_ERROR)
     result = envelope["result"]
@@ -395,6 +395,6 @@ def test_apply_without_dry_run_reaches_repository_resolution(tmp_path: Path) -> 
     package = tmp_path / "patch.zip"
     _write_package(package)
 
-    completed = run_cli(tmp_path, "apply", str(package))
+    completed = run_cli(tmp_path, "execute", str(package))
 
     assert completed.returncode == int(ExitCode.REPOSITORY_ERROR)

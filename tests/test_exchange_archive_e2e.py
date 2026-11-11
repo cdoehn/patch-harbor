@@ -81,7 +81,7 @@ def test_completed_patch_archives_on_next_scan_and_keeps_current_result(tmp_path
     applied = _scan(repo, env)
     assert applied.returncode == 0, applied.stderr + applied.stdout
     record = _identity_record(env, package)
-    assert record["apply_status"] == "succeeded"
+    assert record["execute_status"] == "succeeded"
     assert record["completed_commit"] == git(repo, "rev-parse", "HEAD").stdout.strip()
     results = [path for path in exchange.iterdir() if path.is_file() and path != package]
     assert len(results) == 1
@@ -100,7 +100,7 @@ def test_explicit_exchange_patch_keeps_explicit_selection_and_records_completion
     env, exchange, repo, context = _world(tmp_path)
     package = exchange / "explicit.zip"
     _committing_patch(package, context)
-    applied = run_cli(tmp_path, "apply", str(package), "--json", environment_overrides=env)
+    applied = run_cli(tmp_path, "execute", str(package), "--json", environment_overrides=env)
     assert applied.returncode == 0, applied.stderr + applied.stdout
     assert _identity_record(env, package)["completed_commit"] is not None
     assert _scan(repo, env).returncode == 10
@@ -144,7 +144,7 @@ def test_success_without_commit_and_legacy_success_are_not_commit_proofs(tmp_pat
     _write_custom_package(package, context, posix_entrypoint="true", powershell_entrypoint="$null = 1")
     assert _scan(repo, env).returncode == 0
     record = _identity_record(env, package)
-    assert record["apply_status"] == "succeeded"
+    assert record["execute_status"] == "succeeded"
     assert record["completed_commit"] is None
     _advance(repo)
     _scan(repo, env)
@@ -153,6 +153,9 @@ def test_success_without_commit_and_legacy_success_are_not_commit_proofs(tmp_pat
     state = json.loads(state_path.read_bytes())
     state["format_version"] = 2
     for entry in state["entries"]:
+        entry["apply_status"] = entry.pop("execute_status")
+        if entry["kind"] == "task_bundle":
+            entry["kind"] = "patch_package"
         entry.pop("completed_commit")
         entry.pop("attempt_run_id")
         entry.pop("result_sha256")
@@ -253,7 +256,7 @@ def test_dry_run_has_no_archive_side_effects(tmp_path):
     old = _bundle(repo, env)
     _advance(repo)
     run_cli(repo, "configure", "archive-dir", ARCHIVE, environment_overrides=env)
-    assert run_cli(repo, "apply", "--dry-run", "--json", environment_overrides=env).returncode == 10
+    assert run_cli(repo, "execute", "--dry-run", "--json", environment_overrides=env).returncode == 10
     assert old.exists()
     assert not (exchange / ARCHIVE).exists()
 
@@ -303,6 +306,9 @@ def test_legacy_success_loses_no_data_and_invents_no_completion_receipt(tmp_path
     state = json.loads(state_path.read_bytes())
     state["format_version"] = 2
     for record in state["entries"]:
+        record["apply_status"] = record.pop("execute_status")
+        if record["kind"] == "task_bundle":
+            record["kind"] = "patch_package"
         record.pop("completed_commit")
         record.pop("attempt_run_id")
         record.pop("result_sha256")

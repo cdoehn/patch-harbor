@@ -1,6 +1,6 @@
 """Application facade and script-input orchestration.
 
-The public API delegates configuration, discovery, Apply and Result workflows
+The public API delegates configuration, discovery, Execute and Result workflows
 to their owning modules through this stable facade.
 """
 
@@ -50,17 +50,17 @@ from patchharbor.application_configuration import (
     unregister_repository,
 )
 from patchharbor.application_exchange import (
-    apply_readiness,
+    execute_readiness,
     watch_control_paths,
     watch_targets,
 )
-from patchharbor.application_apply import (
-    apply_task_bundle,
+from patchharbor.application_execute import (
+    execute_task_bundle,
     dry_run_task_bundle,
     preflight_task_bundle_repository,
     resolve_task_bundle,
-    run_apply_path,
-    run_guarded_apply_path,
+    run_execute_path,
+    run_guarded_execute_path,
 )
 from patchharbor.application_results import (
     bundle_repository,
@@ -77,7 +77,7 @@ def validate_task_bundle(
 
 
 def inspect_task(path: Path) -> TaskInspection:
-    """Read package facts without entering the Apply lifecycle."""
+    """Read package facts without entering the Execute lifecycle."""
     return _inspect_task(path)
 
 

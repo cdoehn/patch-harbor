@@ -26,10 +26,10 @@ It bridges these separate environments using verified ZIP packages, allowing AI 
 ### Key features
 
 - `bundle` captures the repository state for AI-assisted development.
-- `pack` creates verified patch packages from selected files and a Result reference.
-- `apply` validates and executes explicitly prepared patches.
+- `pack` creates verified Task Bundles from selected files and a Result reference.
+- `execute` validates and executes explicitly prepared patches.
 - `api.read_result_snapshot` returns complete verified file layers without Git or writes.
-- `api.apply_guarded` requires explicit package/target binding and trusted host approval before payloads.
+- `api.execute_guarded` requires explicit package/target binding and trusted host approval before payloads.
 - `inspect` and `validate` examine packages without executing their code.
 - An optional watcher automatically applies incoming patches after five seconds of filesystem quiet, or polls explicitly every four seconds when native notifications are unavailable.
 - `monitor` shows repository and Exchange activity, a persistent five-line event history, active entrypoints and optional bundle numbers in a read-only TUI.
@@ -53,7 +53,7 @@ Linux x86-64 with CPython 3.10–3.14.
 **CPython 3.10 or newer is required.** Core-PYZ has no watcher; the normal
 wheel and sdist include it. A version string establishes neither a published
 release/tag nor an upgraded installation. Native CI and downstream acceptance
-remain separate from local tests and actual Apply. Historical
+remain separate from local tests and actual Execute. Historical
 [1.5.0 refactoring](planning/1.5.0/commit-plan.md) and
 [1.6.0 integration](planning/specroad-integration/commit-plan.md) records remain
 available; their original artifacts and evidence are unchanged.
@@ -110,17 +110,17 @@ Exchanges, old configuration migration and automatic archival.
 4. Let the existing watcher process it, **or**, in manual mode, run:
 
    ```bash
-   patchharbor apply --dry-run
-   patchharbor apply
+   patchharbor execute --dry-run
+   patchharbor execute
    ```
 
 5. Read the new Result and execution log. A Dry Run checks the package; it does
-   not prove a successful actual Apply. A failed Apply may leave changed files
+   not prove a successful actual Execute. A failed Execute may leave changed files
    or completed commits, which become the basis of the next patch.
 
 The entrypoint defines the target project's tests, commits and optional push.
 The watcher does not invent that policy. Do not run a second watcher or another
-Apply orchestrator for the same repositories.
+Execute orchestrator for the same repositories.
 
 ## Build and check a patch
 
@@ -143,9 +143,9 @@ Bash/PowerShell marker contract; pack neither writes nor executes it.
 Pack copies all permitted files in the chosen directory; it does not use
 `.gitignore` to select a diff. Ordinary payloads are written into the repository
 **before** the entrypoint runs. A diff is a payload that the entrypoint must
-explicitly apply. `task.json` and `PATCHHARBOR_META` are generated/reserved.
+explicitly execute. `task.json` and `PATCHHARBOR_META` are generated/reserved.
 Pack validates the final ZIP and its complete Result binding, but does not prove
-shell syntax, target tests, replay eligibility or a future Apply.
+shell syntax, target tests, replay eligibility or a future Execute.
 
 The same operation is available to Python callers:
 
@@ -192,7 +192,7 @@ python -I -S -B /private/runtime/patchharbor-VERSION.pyz pack /work/contents \
 
 Use the actual prepared path/version, not an arbitrary neighboring archive.
 This requires no pip, venv, network or host installation. The PYZ contains Core
-operations, **no watcher or service installer**. Git/apply operations still have
+operations, **no watcher or service installer**. Git/execute operations still have
 their normal repository and interpreter requirements.
 
 If the runtime is absent or technically unusable, use the
@@ -205,9 +205,9 @@ procedure is retained as historical documentation.
 
 ## Manual operation and watcher
 
-Manual `patchharbor apply` selects an eligible patch only for the registered
+Manual `patchharbor execute` selects an eligible patch only for the registered
 repository containing the current working directory. An explicit path,
-`patchharbor apply /path/to/patch.zip`, selects the repository from its manifest
+`patchharbor execute /path/to/patch.zip`, selects the repository from its manifest
 and still checks the full binding. `--output-dir` changes only the Result
 destination. See [selection, retries and recovery](docs/repository-workflow.md#manual-workflow).
 
@@ -240,14 +240,14 @@ patchharbor watcher poll --interval 0.5  # fractions are supported
 
 The equivalent standalone command is `patchharbor-watcher poll`. Polling checks
 immediately, then waits the configured interval after each completed check or
-Apply. It refreshes registered Exchanges every cycle, runs one worker at a time,
+Execute. It refreshes registered Exchanges every cycle, runs one worker at a time,
 and retains Core's binding, integrity, locking and replay checks. Stop it with
 Ctrl+C. The monitor shows polling mode, interval and the next planned scan.
 Use one watcher mode for a deployment; stop an existing watcher after its active
-Apply finishes before switching. Polling needs the full wheel/source installation;
+Execute finishes before switching. Polling needs the full wheel/source installation;
 the Core-PYZ still excludes the watcher. There is no silent polling fallback.
 See [watcher behavior](docs/watcher-events.md).
-Termux/Android should use manual Apply; a reliable Android background service
+Termux/Android should use manual Execute; a reliable Android background service
 is not part of the supported watcher contract. Windows supports the foreground
 watcher; the systemd unit is Linux-specific.
 
@@ -293,12 +293,12 @@ there is no general secret detector.
 | Pack contents scan (files and directories) | 10,000 nodes |
 | Inner runtime archive | 1,000 entries; separate artifact/profile byte limits |
 
-These limits apply together: 250,000 files does not allow unlimited total bytes.
+These limits execute together: 250,000 files does not allow unlimited total bytes.
 Outer Result ZIP64 is supported. The larger outer limit does not enlarge pack's
 scan budget or the runtime archive budget. See [pack limits](docs/pack.md#grenzen-und-nachweise)
 and [runtime limits](docs/runtime-bootstrap.md).
 
-For a failed Apply, inspect `logs/run.json` and `logs/execution.log` when present.
+For a failed Execute, inspect `logs/run.json` and `logs/execution.log` when present.
 If Result creation itself fails, preserve the reported emergency diagnostics
 directory. An entrypoint may already have committed or pushed: **missing Result
 does not mean rollback**. Check the actual repository and logs before retrying;
@@ -319,7 +319,7 @@ independent Core policy. An authorized entrypoint can run tests, make zero or
 several commits, and push according to that project's workflow. Static checks
 and successful pack creation do not establish those execution results.
 The explicit legacy `patchharbor fs run` script runner remains available; it
-does not replace repository-bound Apply.
+does not replace repository-bound Execute.
 
 ## Documentation and development
 
@@ -342,7 +342,7 @@ does not replace repository-bound Apply.
 For development, install `.[dev]` in a dedicated environment and run only a
 change-focused parallel selection, for example
 `python tools/run_tests.py -- tests/test_runtime_pyz.py`. Document the selection
-and its results. Apply runs the full parallel suite before every commit with
+and its results. Execute runs the full parallel suite before every commit with
 `python tools/run_tests.py --suite all`, including the final commit of a bundle.
 GitHub CI is manual and started only by the project owner. Local tests
 do not substitute for native Windows acceptance or release publication.
@@ -352,7 +352,7 @@ and `patchharbor-watcher --help`.
 Current [1.6.0 integration plan](planning/specroad-integration/commit-plan.md),
 [behavior matrix](planning/specroad-integration/test-matrix.md) and
 [delivery record](planning/specroad-integration/delivery.md) separate prepared
-source, actual Apply and external acceptance.
+source, actual Execute and external acceptance.
 
 
 ## Export the installed Core runtime

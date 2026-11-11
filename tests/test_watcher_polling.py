@@ -40,7 +40,7 @@ class PollHarness:
 
     def delegate(self, *, exchanges):
         self.calls.append((self.now, exchanges))
-        self.now += 3  # Discovery/Apply takes time; it must never overlap a poll.
+        self.now += 3  # Discovery/Execute takes time; it must never overlap a poll.
         return completion()
 
     def run(self, **options):

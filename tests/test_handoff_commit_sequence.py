@@ -75,7 +75,7 @@ if COUNT:
         }))
         archive.writestr(entrypoint, body)
         if count: archive.writestr("tracked.txt", b"state 1\n")
-    report = api.apply(patch)
+    report = api.execute(patch)
     facts, digest = read_result_reference(report.result_bundle.path)
     with ZipFile(report.result_bundle.path) as archive:
         log = archive.read("logs/execution.log").decode()

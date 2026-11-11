@@ -38,7 +38,7 @@ def test_real_crash_after_publication_recovers_and_archives(tmp_path, explicit, 
     else:
         assert _scan(repo, env, automatic=trigger == "watcher").returncode == 10
     saved = _identity_record(env, patch, sha256(raw).hexdigest())
-    assert saved["apply_status"] == "succeeded"
+    assert saved["execute_status"] == "succeeded"
     assert saved["completed_commit"] == completed
     assert not patch.exists()
     assert (exchange / ARCHIVE / patch.name).read_bytes() == raw
@@ -62,7 +62,7 @@ def test_crash_without_published_success_stays_attempted(tmp_path, point):
     record = _identity_record(env, patch)
     before = (repo / "tracked.txt").read_bytes()
     assert before == b"patched\n"
-    assert record["apply_status"] == "attempted"
+    assert record["execute_status"] == "attempted"
     assert bool(record["result_sha256"]) is (point == "before_publish")
     _scan(repo, env)
     assert _identity_record(env, patch) == record
@@ -90,7 +90,7 @@ def test_recovery_works_when_archival_is_disabled(tmp_path, trigger):
         _bundle(repo, env)
     else:
         _scan(repo, env, automatic=trigger == "watcher")
-    assert _identity_record(env, patch)["apply_status"] == "succeeded"
+    assert _identity_record(env, patch)["execute_status"] == "succeeded"
     assert patch.exists()
 
 
@@ -131,7 +131,7 @@ def test_uncertain_evidence_does_not_repair_or_rollback(tmp_path, damage):
     _scan(repo, env)
     records = json.loads(state_path.read_bytes())["entries"]
     old = next(r for r in records if r["path"] == str(patch.resolve()) and r["sha256"] == record["sha256"])
-    assert old["apply_status"] == "attempted"
+    assert old["execute_status"] == "attempted"
     assert old["completed_commit"] is None
     assert patch.exists()
     if damage == "dirty":
@@ -162,7 +162,7 @@ def test_semantic_receipt_validation_even_with_inconsistent_local_digest(tmp_pat
     # Simulate internally inconsistent persisted state as well as damaged input.
     _edit_record(env, patch, lambda r: r.update(result_sha256=sha256(result.read_bytes()).hexdigest()))
     _scan(repo, env)
-    assert _identity_record(env, patch)["apply_status"] == "attempted"
+    assert _identity_record(env, patch)["execute_status"] == "attempted"
     assert patch.exists() and result.exists()
 
 
@@ -190,7 +190,7 @@ def test_result_renaming_and_successor_commits_do_not_break_byte_receipt(tmp_pat
 
 def test_dry_run_does_not_recover_pending_attempt(tmp_path):
     env, exchange, repo, _, patch, record = _pending(tmp_path)
-    run_cli(repo, "apply", "--dry-run", "--json", environment_overrides=env)
+    run_cli(repo, "execute", "--dry-run", "--json", environment_overrides=env)
     assert _identity_record(env, patch) == record
     assert patch.exists()
 
@@ -200,7 +200,7 @@ def test_noop_and_failed_entrypoints_do_not_create_a_completion_receipt(tmp_path
     for name, posix, windows, expected_code in [("fail", "exit 7", "exit 7", 7), ("noop", "true", "$null = 1", 0)]:
         patch = exchange / (name + ".zip")
         _write_custom_package(patch, context, posix_entrypoint=posix, powershell_entrypoint=windows)
-        completed = run_cli(repo, "apply", str(patch), "--json", environment_overrides=env)
+        completed = run_cli(repo, "execute", str(patch), "--json", environment_overrides=env)
         assert completed.returncode == expected_code, completed.stdout + completed.stderr
         record = _identity_record(env, patch)
         assert record["completed_commit"] is None and record["result_sha256"] is None

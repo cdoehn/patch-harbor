@@ -18,7 +18,7 @@ from patchharbor_watcher.loop import (
     WatcherPollOutcome,
     poll_repositories_once,
 )
-from patchharbor_watcher.apply_boundary import delegate_to_automatic_apply
+from patchharbor_watcher.execute_boundary import delegate_to_automatic_execute
 from tests.platform_support import (
     native_script,
     native_value,
@@ -104,7 +104,7 @@ def test_watcher_retries_after_core_repository_lock_is_released(
     apply_environment = project_environment(environment)
 
     def delegate():
-        return delegate_to_automatic_apply(
+        return delegate_to_automatic_execute(
             environment=apply_environment,
         )
 
@@ -127,7 +127,7 @@ def test_watcher_retries_after_core_repository_lock_is_released(
             stop_repository_lock_holder(holder)
 
     locked_record = json.loads(locked_log.getvalue())
-    locked_response = locked_record["apply_result"]
+    locked_response = locked_record["execute_result"]
     assert locked is WatcherPollOutcome.ERROR
     assert locked_record["process_exit_code"] == int(ExitCode.REPOSITORY_BUSY)
     assert isinstance(locked_response, dict)
@@ -229,7 +229,7 @@ def test_shared_watcher_delegates_discovery_identity_and_retry_to_core(
     apply_environment = project_environment(environment)
 
     def delegate():
-        return delegate_to_automatic_apply(
+        return delegate_to_automatic_execute(
             environment=apply_environment,
         )
 
@@ -265,7 +265,7 @@ def test_shared_watcher_delegates_discovery_identity_and_retry_to_core(
         if record["path"] == str(package.resolve())
     ]
     assert len(matching_records) == 1
-    assert matching_records[0]["apply_status"] == "succeeded"
+    assert matching_records[0]["execute_status"] == "succeeded"
 
     restart_log = StringIO()
     second = poll_repositories_once(
@@ -281,7 +281,7 @@ def test_shared_watcher_delegates_discovery_identity_and_retry_to_core(
     ) == "x"
     first_record = json.loads(first_log.getvalue())
     second_record = json.loads(restart_log.getvalue())
-    assert first_record["event"] == "automatic_apply_completed"
+    assert first_record["event"] == "automatic_execute_completed"
     assert second_record["event"] == "waiting_for_exchange_patch"
     assert "input_path" not in first_record
     assert "input_sha256" not in first_record
@@ -354,7 +354,7 @@ def test_watcher_does_not_loop_after_a_failed_entrypoint(
     apply_environment = project_environment(environment)
 
     def delegate():
-        return delegate_to_automatic_apply(environment=apply_environment)
+        return delegate_to_automatic_execute(environment=apply_environment)
 
     first = poll_repositories_once(
         SharedWatcherEventState(),
@@ -383,4 +383,4 @@ def test_watcher_does_not_loop_after_a_failed_entrypoint(
         if record["path"] == str(package.resolve())
     ]
     assert len(matching_records) == 1
-    assert matching_records[0]["apply_status"] == "failed"
+    assert matching_records[0]["execute_status"] == "failed"

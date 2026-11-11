@@ -4,9 +4,9 @@ import os
 from pathlib import Path
 import sys
 
-from patchharbor_watcher.apply_boundary import (
-    DEFAULT_APPLY_COMMAND,
-    delegate_to_automatic_apply,
+from patchharbor_watcher.execute_boundary import (
+    DEFAULT_EXECUTE_COMMAND,
+    delegate_to_automatic_execute,
 )
 
 
@@ -15,7 +15,7 @@ def _write_stub(path: Path, body: str) -> None:
 
 
 def test_default_apply_boundary_uses_the_current_installation() -> None:
-    assert DEFAULT_APPLY_COMMAND == (
+    assert DEFAULT_EXECUTE_COMMAND == (
         sys.executable,
         "-m",
         "patchharbor_watcher.worker",
@@ -36,12 +36,12 @@ raise SystemExit(9)
 """,
     )
 
-    completion = delegate_to_automatic_apply(
-        apply_command=(sys.executable, os.fspath(stub)),
+    completion = delegate_to_automatic_execute(
+        execute_command=(sys.executable, os.fspath(stub)),
     )
 
     assert completion.process_exit_code == 9
-    assert completion.apply_result == {
+    assert completion.execute_result == {
         "argv": []
     }
     assert completion.invalid_response_text is None
@@ -61,11 +61,11 @@ raise SystemExit(4)
 """,
     )
 
-    completion = delegate_to_automatic_apply(
-        apply_command=(sys.executable, os.fspath(stub)),
+    completion = delegate_to_automatic_execute(
+        execute_command=(sys.executable, os.fspath(stub)),
     )
 
     assert completion.process_exit_code == 4
-    assert completion.apply_result is None
+    assert completion.execute_result is None
     assert completion.invalid_response_text is not None
     assert completion.stderr_text

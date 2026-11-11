@@ -36,7 +36,7 @@ from tests.runtime_pyz_support import prepared
 def publication_inputs(tmp_path, count):
     path = tmp_path / 'result.zip'
     report = replace(successful_bundle_run_report(tmp_path / 'repository', path),
-                     operation=RunOperation.APPLY,
+                     operation=RunOperation.EXECUTE,
                      primary_result=PrimaryResult.entrypoint_success_result())
     blob = GitObjectId('e69de29bb2d1d6434b8b29ae775ad8c2e48c5391', GitObjectFormat.SHA1)
     snapshot = build_result_bundle_snapshot(

@@ -63,7 +63,7 @@ assert api.__file__.startswith(selected + os.sep), api.__file__
 caps = api.integration_capabilities()
 assert caps.safe_reference_contract_version == 1
 assert caps.contract_version == caps.snapshot_contract_version == 2
-assert caps.guarded_apply_contract_version == 1
+assert caps.guarded_execute_contract_version == 2
 example = runpy.run_path(str(root / 'example.py'))
 authorized = []
 def authorize(plan):

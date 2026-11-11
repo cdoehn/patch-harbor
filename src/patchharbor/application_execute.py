@@ -1,4 +1,4 @@
-"""Apply orchestration: resolution, preflight, mutation and execution.
+"""Execute orchestration: resolution, preflight, mutation and execution.
 
 Repository locks and private inputs live through Result completion.
 """
@@ -8,7 +8,7 @@ from __future__ import annotations
 from collections.abc import Callable, Iterator
 from contextlib import ExitStack, contextmanager
 from dataclasses import replace
-from patchharbor.apply_admission import AdmissionCallback, ApplyAdmissionPolicy
+from patchharbor.execute_admission import AdmissionCallback, ExecuteAdmissionPolicy
 from patchharbor.errors import FailureReason, repository_resolution_error
 from pathlib import Path
 
@@ -20,13 +20,13 @@ from patchharbor.progress import (
     activity,
     emit,
 )
-from patchharbor.apply_mutation import (
-    ApplyMutationGate,
+from patchharbor.execute_mutation import (
+    ExecuteMutationGate,
     MutationFailureKind,
-    apply_payload_mutation,
+    execute_payload_mutation,
 )
-from patchharbor.apply_preflight import prepare_task_bundle
-from patchharbor.apply_repository import safely_resolved_repository
+from patchharbor.execute_preflight import prepare_task_bundle
+from patchharbor.execute_repository import safely_resolved_repository
 from patchharbor.errors import (
     PatchHarborError,
     LockBusyError,
@@ -47,14 +47,14 @@ from patchharbor.payload_files import validate_bundle_payload_targets
 from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY, ResourcePolicy
 from patchharbor.result_resources import capture_result_resources
 from patchharbor.run_report import (
-    ApplyPrimaryOutcome,
+    ExecutePrimaryOutcome,
     RunReport,
     RunSession,
-    unresolved_apply_report,
+    unresolved_execute_report,
 )
 from patchharbor.watch_contract import (
-    AutomaticApplyResult,
-    AutomaticApplyStatus,
+    AutomaticExecuteResult,
+    AutomaticExecuteStatus,
     ExchangeWatchTarget,
 )
 from patchharbor.application_exchange import (
@@ -65,7 +65,7 @@ from patchharbor.application_exchange import (
     discover_exchange_task,
 )
 from patchharbor.application_results import (
-    _complete_apply_result_bundle,
+    _complete_execute_result_bundle,
     _complete_mutation_result_bundle,
     _publish_attempt_outcome,
     _complete_entrypoint_execution,
@@ -90,8 +90,8 @@ def preflight_task_bundle_repository(
     dry_run: bool = True,
     output: OutputTargets | None = None,
     before_mutation: Callable[[], None] | None = None,
-    admission_policy: ApplyAdmissionPolicy | None = None,
-) -> Iterator[ApplyMutationGate]:
+    admission_policy: ExecuteAdmissionPolicy | None = None,
+) -> Iterator[ExecuteMutationGate]:
     """Yield the explicit mutation gate while private inputs and locks live."""
     actual_session = session or RunSession.start()
     manifest = package.manifest
@@ -105,7 +105,7 @@ def preflight_task_bundle_repository(
                 )
             )
         except PatchHarborError as error:
-            report = unresolved_apply_report(
+            report = unresolved_execute_report(
                 session=actual_session,
                 dry_run=dry_run,
                 warnings=package.warnings,
@@ -121,14 +121,14 @@ def preflight_task_bundle_repository(
         def reported_preflight_failure(error: PatchHarborError) -> PatchHarborError:
             # Both failures occur before a mutation gate exists. Keep their
             # publication inside the resolved repository/resource lifetime.
-            report = _complete_apply_result_bundle(
+            report = _complete_execute_result_bundle(
                 resolved,
                 package,
                 session=actual_session,
                 resources=resources,
                 dry_run=dry_run,
                 warnings=package.warnings,
-                primary_outcome=ApplyPrimaryOutcome.from_tool_error(error),
+                primary_outcome=ExecutePrimaryOutcome.from_tool_error(error),
             )
             return report.reported_error()
 
@@ -174,7 +174,7 @@ def preflight_task_bundle_repository(
                 warnings=prepared_package.warnings,
             ))
 
-            yield ApplyMutationGate(
+            yield ExecuteMutationGate(
                 session=actual_session,
                 resolved=resolved,
                 package=package,
@@ -204,7 +204,7 @@ def dry_run_task_bundle(
         activity("DRY-RUN", "Validation complete; no payload write or entrypoint execution", "success")
         report = _complete_mutation_result_bundle(
             mutation_gate,
-            primary_outcome=ApplyPrimaryOutcome.dry_run_success(),
+            primary_outcome=ExecutePrimaryOutcome.dry_run_success(),
         )
         if report.completion_tool_error is not None:
             raise report.reported_error()
@@ -212,17 +212,17 @@ def dry_run_task_bundle(
 
 
 def _require_payload_mutation(
-    mutation_gate: ApplyMutationGate,
+    mutation_gate: ExecuteMutationGate,
     *,
     publish_attempt_outcome: Callable[[bool, GitObjectId | None], None] | None = None,
 ) -> None:
-    """Complete a failed mutation as the primary apply result."""
+    """Complete a failed mutation as the primary execute result."""
     try:
-        result = apply_payload_mutation(mutation_gate)
+        result = execute_payload_mutation(mutation_gate)
     except PatchHarborError as error:
         report = _complete_mutation_result_bundle(
             mutation_gate,
-            primary_outcome=ApplyPrimaryOutcome.from_tool_error(error),
+            primary_outcome=ExecutePrimaryOutcome.from_tool_error(error),
         )
         raise report.reported_error() from error
 
@@ -240,13 +240,13 @@ def _require_payload_mutation(
         raise RuntimeError("failed mutation result has no error")
     report = _complete_mutation_result_bundle(
         mutation_gate,
-        primary_outcome=ApplyPrimaryOutcome.from_tool_error(error),
+        primary_outcome=ExecutePrimaryOutcome.from_tool_error(error),
         actual_context=result.context,
     )
     raise report.reported_error()
 
 
-def apply_task_bundle(
+def execute_task_bundle(
     package: ValidatedTaskBundle,
     *,
     output_directory: Path | None = None,
@@ -256,7 +256,7 @@ def apply_task_bundle(
     before_mutation: Callable[[], None] | None = None,
     publish_attempt_outcome: Callable[[bool, GitObjectId | None], None] | None = None,
     before_result_publication: Callable[[str], None] | None = None,
-    admission_policy: ApplyAdmissionPolicy | None = None,
+    admission_policy: ExecuteAdmissionPolicy | None = None,
 ) -> RunReport:
     """Write one validated package, run its private entrypoint, and bundle it."""
     actual_session = session or RunSession.start()
@@ -290,7 +290,7 @@ def apply_task_bundle(
         )
 
 
-def run_apply_path(
+def run_execute_path(
     path: Path | None,
     *,
     dry_run: bool,
@@ -301,13 +301,13 @@ def run_apply_path(
     automatic: bool = False,
     current_directory: Path | None = None,
     exchanges: tuple[ExchangeWatchTarget, ...] | None = None,
-    admission_policy: ApplyAdmissionPolicy | None = None,
+    admission_policy: ExecuteAdmissionPolicy | None = None,
 ) -> RunReport:
-    """Observe the existing Apply workflow without changing its admission rules."""
-    from patchharbor.monitor_live import apply_observation
+    """Observe the existing Execute workflow without changing its admission rules."""
+    from patchharbor.monitor_live import execute_observation
     actual_session = session or RunSession.start()
-    with apply_observation(actual_session, automatic=automatic, dry_run=dry_run, timeout=timeout_seconds) as publication:
-        report = _run_apply_path(path, dry_run=dry_run, output_directory=output_directory,
+    with execute_observation(actual_session, automatic=automatic, dry_run=dry_run, timeout=timeout_seconds) as publication:
+        report = _run_execute_path(path, dry_run=dry_run, output_directory=output_directory,
             timeout_seconds=timeout_seconds, output=output, session=actual_session,
             automatic=automatic, current_directory=current_directory, exchanges=exchanges,
             admission_policy=admission_policy)
@@ -315,7 +315,7 @@ def run_apply_path(
         return report
 
 
-def _run_apply_path(
+def _run_execute_path(
     path: Path | None,
     *,
     dry_run: bool,
@@ -326,27 +326,27 @@ def _run_apply_path(
     automatic: bool = False,
     current_directory: Path | None = None,
     exchanges: tuple[ExchangeWatchTarget, ...] | None = None,
-    admission_policy: ApplyAdmissionPolicy | None = None,
+    admission_policy: ExecuteAdmissionPolicy | None = None,
 ) -> RunReport:
-    """Run one Apply request through a single public application boundary."""
+    """Run one Execute request through a single public application boundary."""
     actual_session = session or RunSession.start()
     if exchanges is not None and (not automatic or path is not None):
-        raise ValueError("Exchange watch scope requires automatic parameterless Apply")
+        raise ValueError("Exchange watch scope requires automatic parameterless Execute")
     if admission_policy is not None and (path is None or dry_run or automatic):
-        raise ValueError("guarded Apply requires one explicit, actual request")
+        raise ValueError("guarded Execute requires one explicit, actual request")
     attempted = False
 
     def finish(report: RunReport, error: PatchHarborError | None = None) -> RunReport:
         if not automatic:
             return report
-        status = AutomaticApplyStatus.ERROR
+        status = AutomaticExecuteStatus.ERROR
         blocked_on = None
         if attempted:
-            status = AutomaticApplyStatus.ATTEMPTED
+            status = AutomaticExecuteStatus.ATTEMPTED
         elif isinstance(error, NoEligibleTaskError):
-            status = AutomaticApplyStatus.NO_CANDIDATE
+            status = AutomaticExecuteStatus.NO_CANDIDATE
         elif dry_run and report.success:
-            status = AutomaticApplyStatus.DRY_RUN
+            status = AutomaticExecuteStatus.DRY_RUN
         else:
             # Completion may wrap a pre-mutation lock failure to attach its
             # Result Bundle. Follow explicit causes, never diagnostic text.
@@ -355,10 +355,10 @@ def _run_apply_path(
             while cause is not None and id(cause) not in seen:
                 seen.add(id(cause))
                 if isinstance(cause, LockBusyError):
-                    status, blocked_on = AutomaticApplyStatus.LOCKED, cause.lock
+                    status, blocked_on = AutomaticExecuteStatus.LOCKED, cause.lock
                     break
                 cause = cause.__cause__
-        return replace(report, automatic=AutomaticApplyResult(status, blocked_on))
+        return replace(report, automatic=AutomaticExecuteResult(status, blocked_on))
 
     def publish_attempt() -> None:
         nonlocal attempted
@@ -393,7 +393,7 @@ def _run_apply_path(
             if not dry_run:
                 discovered = _maintain_explicit_exchange(package, selected_path, output=output)
     except PatchHarborError as error:
-        return finish(unresolved_apply_report(
+        return finish(unresolved_execute_report(
             session=actual_session,
             dry_run=dry_run,
             error=error,
@@ -428,7 +428,7 @@ def _run_apply_path(
                 output=output,
                 session=actual_session,
             ))
-        return finish(apply_task_bundle(
+        return finish(execute_task_bundle(
             package,
             output_directory=output_directory,
             timeout_seconds=timeout_seconds,
@@ -456,7 +456,7 @@ def _run_apply_path(
         report = error.run_report
         if isinstance(report, RunReport):
             return finish(report, error)
-        return finish(unresolved_apply_report(
+        return finish(unresolved_execute_report(
             session=actual_session,
             dry_run=dry_run,
             warnings=package.warnings,
@@ -464,12 +464,12 @@ def _run_apply_path(
         ), error)
 
 
-def run_guarded_apply_path(
+def run_guarded_execute_path(
     path: Path, *, expected_sha256: str, expected_repository: Path, admission: AdmissionCallback,
     output_directory: Path | None = None, timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
     output: OutputTargets | None = None,
 ) -> RunReport:
-    """Supply explicit host conditions to the single existing Apply workflow."""
-    return run_apply_path(path, dry_run=False, output_directory=output_directory,
+    """Supply explicit host conditions to the single existing Execute workflow."""
+    return run_execute_path(path, dry_run=False, output_directory=output_directory,
         timeout_seconds=timeout_seconds, output=output,
-        admission_policy=ApplyAdmissionPolicy(expected_sha256, expected_repository, admission))
+        admission_policy=ExecuteAdmissionPolicy(expected_sha256, expected_repository, admission))

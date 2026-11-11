@@ -210,7 +210,7 @@ def test_cancellation_during_retry_cleans_only_owned_temporary_file(destination,
     assert not destination.temporary_path.exists() and not destination.final_path.exists()
 
 
-@pytest.mark.parametrize("route", ["bundle", "apply", "failed-apply"])
+@pytest.mark.parametrize("route", ["bundle", "execute", "failed-execute"])
 def test_emergency_json_survives_real_request_failure(repository, sleeps, monkeypatch, route):
     root, exchange = repository
     # Inject only publication reads; repository state/entrypoint capture stay real.
@@ -220,8 +220,8 @@ def test_emergency_json_survives_real_request_failure(repository, sleeps, monkey
             api.bundle(root)
         report = caught.value.run_report
     else:
-        report = api.apply(package(root, exchange, exit_code=23 if route == "failed-apply" else 0))
-        assert report.primary_result.entrypoint_exit_code == (23 if route == "failed-apply" else 0)
+        report = api.execute(package(root, exchange, exit_code=23 if route == "failed-execute" else 0))
+        assert report.primary_result.entrypoint_exit_code == (23 if route == "failed-execute" else 0)
     directory = report.result_bundle.emergency_diagnostics_path
     details = json.loads((directory / "verification.json").read_bytes())
     saved = json.loads((directory / "run.json").read_bytes())

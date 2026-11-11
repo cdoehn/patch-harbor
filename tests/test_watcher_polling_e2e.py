@@ -1,4 +1,4 @@
-"""Real automatic Apply without native notifications; fresh scope and replay."""
+"""Real automatic Execute without native notifications; fresh scope and replay."""
 from io import StringIO
 import json
 from pathlib import Path
@@ -9,7 +9,7 @@ import sys
 import pytest
 
 from patchharbor import api
-from patchharbor_watcher.apply_boundary import delegate_to_automatic_apply
+from patchharbor_watcher.execute_boundary import delegate_to_automatic_execute
 from patchharbor_watcher.polling import run_polling_watcher
 from tests.apply_support import write_package
 from tests.platform_support import project_environment
@@ -34,7 +34,7 @@ def test_poll_discovers_new_files_and_new_exchange_without_events_and_preserves_
     ticks = [0.0]
     def delegate(*, exchanges):
         scopes.append(tuple(t.directory for t in exchanges))
-        result = delegate_to_automatic_apply(exchanges=exchanges, environment=project_environment())
+        result = delegate_to_automatic_execute(exchanges=exchanges, environment=project_environment())
         reports.append(result)
         return result
     def wait(seconds):
@@ -56,7 +56,7 @@ def test_poll_discovers_new_files_and_new_exchange_without_events_and_preserves_
     assert api.context(repo) == context
     for r in reports:
         if r.progress.status == 'attempted':
-            assert Path(r.apply_result['result']['result_bundle']['path']).is_file()
+            assert Path(r.execute_result['result']['result_bundle']['path']).is_file()
 
 
 @pytest.mark.skipif(sys.platform == 'win32', reason='POSIX signal delivery; cross-platform stop event is tested separately')

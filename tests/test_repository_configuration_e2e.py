@@ -87,7 +87,7 @@ def test_automatic_discovery_scans_each_physical_directory_once(repos, tmp_path,
         scans.append(directory)
         return scan(directory, **kwargs)
     monkeypatch.setattr(application, "scan_exchange_directory", observed)
-    report = api.apply_next(dry_run=True)
+    report = api.execute_next(dry_run=True)
     assert report.success, report.primary_result
     assert report.context.repo_id == cb.repo_id
     assert report.result_bundle.path.parent == eb
@@ -111,7 +111,7 @@ def test_physical_aliases_of_shared_exchange_are_deduplicated(repos, tmp_path, m
         scans.append(directory)
         return scan(directory, **kwargs)
     monkeypatch.setattr(application, "scan_exchange_directory", observed)
-    assert api.apply_next(dry_run=True).success
+    assert api.execute_next(dry_run=True).success
     assert scans == [physical]
 
 
@@ -127,7 +127,7 @@ def test_automatic_discovery_never_routes_a_patch_from_the_wrong_exchange(repos,
     assert selected.artifact.path == right
     assert selected.configuration_paths.repository.value == b
     right.unlink()
-    report = api.apply_next(dry_run=True)
+    report = api.execute_next(dry_run=True)
     assert not report.success
     assert report.primary_tool_error.kind is api.ErrorKind.TASK_BUNDLE_ERROR
     assert wrong.exists()
@@ -156,15 +156,15 @@ def test_manual_subdirectory_is_local_but_explicit_apply_uses_manifest_target(re
 def test_automatic_polls_reload_changed_local_exchange_and_suffix(repos, tmp_path):
     a, b, ca, cb, ea, eb = _configured(repos, tmp_path)
     write_package(ea / "first.zip", ca)
-    first = api.apply_next(dry_run=True)
+    first = api.execute_next(dry_run=True)
     assert first.success and first.result_bundle.path.parent == ea
     new = tmp_path / "new-exchange"
     api.configure_exchange_directory(new, repository=a)
     api.configure_bundle_suffix(".new", repository=a)
-    idle = api.apply_next(dry_run=True)
+    idle = api.execute_next(dry_run=True)
     assert not idle.success  # old Exchange still contains the former patch
     write_package(new / "second.zip", ca)
-    second = api.apply_next(dry_run=True)
+    second = api.execute_next(dry_run=True)
     assert second.success and second.result_bundle.path.parent == new
     assert second.result_bundle.path.name.endswith(".zip.new")
     assert (ea / "first.zip").exists()
@@ -175,7 +175,7 @@ def test_unconfigured_repositories_do_not_block_configured_watcher_targets(repos
     exchange = tmp_path / "exchange"
     api.configure_exchange_directory(exchange, repository=b)
     write_package(exchange / "b.zip", cb)
-    report = api.apply_next(dry_run=True)
+    report = api.execute_next(dry_run=True)
     assert report.success and report.context.repo_id == cb.repo_id
     local = api.dry_run(repository=a)
     assert not local.success
@@ -191,7 +191,7 @@ def test_corrupt_live_repository_configuration_stops_global_poll_without_repair(
         config.unlink()
     else:
         config.write_bytes(b"invalid")
-    report = api.apply_next()
+    report = api.execute_next()
     assert not report.success and not report.execution_present
     assert not tuple(eb.glob("*_Result_Bundle_*"))
     assert not config.exists() if damage == "missing" else config.read_bytes() == b"invalid"
@@ -307,7 +307,7 @@ def test_archive_maintenance_uses_each_repositorys_own_child_directory(repos, tm
     raw_a, raw_b = old_a.read_bytes(), old_b.read_bytes()
     git(a, "commit", "--allow-empty", "-m", "advance-a")
     git(b, "commit", "--allow-empty", "-m", "advance-b")
-    report = api.apply_next()
+    report = api.execute_next()
     assert not report.success and not report.execution_present
     assert not old_a.exists() and not old_b.exists()
     assert (ea / "Archive-A" / old_a.name).read_bytes() == raw_a

@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from patchharbor.archive_evidence import ArchiveEvidence
-from patchharbor.exchange_state import ExchangeApplyStatus, ExchangeStateRecord
+from patchharbor.exchange_state import ExchangeExecuteStatus, ExchangeStateRecord
 from patchharbor.git_commands import run_git_bytes
 from patchharbor.git_objects import parse_base_tree_entries
 from patchharbor.models import GitObjectId, RepositoryContext, RepositoryPath
@@ -72,11 +72,11 @@ def is_proven_obsolete(
     if context.dirty or selection.repo_id != context.repo_id:
         return False
     # Cheap negative decisions keep files in place. They need no Git proof.
-    if evidence.kind == "task_package":
+    if evidence.kind == "task_bundle":
         if (
             record is None or record.kind != evidence.kind
             or record.manifest != selection
-            or record.apply_status is not ExchangeApplyStatus.SUCCEEDED
+            or record.execute_status is not ExchangeExecuteStatus.SUCCEEDED
             or record.completed_commit is None
             or selection.base_commit == record.completed_commit
         ):

@@ -20,7 +20,7 @@ from patchharbor.task_inspection import (
     TaskEntry, TaskEntryRole, TaskInspection, TaskManifest, TaskMessage,
     TaskValidationResult, TaskValidationScope,
 )
-from patchharbor.apply_admission import AdmissionCallback, TaskAdmission
+from patchharbor.execute_admission import AdmissionCallback, TaskAdmission
 from patchharbor.safe_export_types import SafeExportPlan, SafeExportError, SafeExportErrorCode
 from patchharbor.result_reader import ReferenceContext
 from patchharbor.snapshot_types import (
@@ -30,8 +30,8 @@ from patchharbor.snapshot_types import (
 from patchharbor.pack_types import TaskPackResult
 from patchharbor.runtime_export_types import RuntimeExportResult, RuntimeExportError, RuntimeExportErrorCode
 from patchharbor.watch_contract import (
-    ApplyLock, ApplyLockKind, ApplyReadiness, AutomaticApplyResult,
-    AutomaticApplyStatus, ExchangeWatchTarget, WatchControlPaths, WatchTargets,
+    ExecuteLock, ExecuteLockKind, ExecuteReadiness, AutomaticExecuteResult,
+    AutomaticExecuteStatus, ExchangeWatchTarget, WatchControlPaths, WatchTargets,
 )
 from patchharbor.progress import (
     ActivityEvent, PackageFile, ProgressEvent, RepositoryResolved,
@@ -116,7 +116,7 @@ does not retain separate stdout/stderr channels. Warnings have a separate sink
 and callback. Text/raw sinks may be called on an output-reader thread. The API
 flushes, but never closes, the sinks. Sink failures are execution errors, unlike
 best-effort progress observers. The facade adds no in-memory capture buffer;
-the existing Core still captures Apply logs for the Result Bundle.
+the existing Core still captures Execute logs for the Result Bundle.
     """
 
     text: TextIO | None = None

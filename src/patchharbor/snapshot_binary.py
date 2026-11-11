@@ -33,7 +33,7 @@ def _integer(data: bytes, offset: int) -> tuple[int, int]:
     raise invalid('binary delta integer overflow')
 
 
-def apply_delta(data: bytes, original: bytes, budget: SnapshotBudget) -> bytes:
+def execute_delta(data: bytes, original: bytes, budget: SnapshotBudget) -> bytes:
     source_size, offset = _integer(data, 0)
     target_size, offset = _integer(data, offset)
     if source_size != len(original):
@@ -107,4 +107,4 @@ def read_block(stream: BytesIO, original: bytes, budget: SnapshotBudget) -> byte
     if len(data) != size or not decoder.eof or decoder.unused_data or decoder.unconsumed_tail:
         raise invalid('binary expansion size or stream boundary mismatch')
     budget.take(size)
-    return data if header[1] == b'literal' else apply_delta(data, original, budget)
+    return data if header[1] == b'literal' else execute_delta(data, original, budget)

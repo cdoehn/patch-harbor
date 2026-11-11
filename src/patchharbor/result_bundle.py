@@ -52,7 +52,7 @@ from patchharbor.result_bundle_target import (
     revalidate_result_bundle_target,
 )
 from patchharbor.run_report import (
-    ApplyPrimaryOutcome,
+    ExecutePrimaryOutcome,
     PrimaryResult,
     ResultBundleResult,
     RunOperation,
@@ -264,7 +264,7 @@ def _publish_documents(
     snapshot: ResultBundleSnapshot, run_directory: Path, *, execution_log: bytes | None = None,
     before_publish: Callable[[str], None] | None = None,
 ) -> PublishedResultBundle:
-    """Publish the same prepared document set for manual and Apply requests."""
+    """Publish the same prepared document set for manual and Execute requests."""
     _write_run_document(run_directory, documents.report)
     try:
         return publish_result_bundle(
@@ -357,7 +357,7 @@ def _manual_bundle_failure(
     )
 
 
-def _apply_report(
+def _execute_report(
     *,
     session: RunSession,
     dry_run: bool,
@@ -365,10 +365,10 @@ def _apply_report(
     repo_id: RepositoryId,
     context: RepositoryContext,
     warnings: tuple[str, ...],
-    primary_outcome: ApplyPrimaryOutcome,
+    primary_outcome: ExecutePrimaryOutcome,
     result_bundle: ResultBundleResult,
 ) -> RunReport:
-    return RunReport.completed_apply(
+    return RunReport.completed_execute(
         timing=session.finish(),
         dry_run=dry_run,
         context=context,
@@ -380,7 +380,7 @@ def _apply_report(
     )
 
 
-def create_apply_result_bundle(
+def create_execute_result_bundle(
     repository: RepositoryPath,
     repo_id: RepositoryId,
     registry_snapshot: RegistrySnapshot,
@@ -392,18 +392,18 @@ def create_apply_result_bundle(
     warnings: tuple[str, ...],
     session: RunSession,
     dry_run: bool,
-    primary_outcome: ApplyPrimaryOutcome,
+    primary_outcome: ExecutePrimaryOutcome,
     resources: PinnedResultResources,
     execution_log: bytes | None = None,
     package_sha256: str | None = None,
     before_publish: Callable[[str], None] | None = None,
 ) -> RunReport:
-    """Attempt one apply Result Bundle while the repository lock is held."""
+    """Attempt one execute Result Bundle while the repository lock is held."""
     paths = registration_user_paths()
     try:
         run_directory = _create_private_run_directory(session.run_id)
     except (OSError, RuntimeError):
-        return _apply_report(
+        return _execute_report(
             session=session,
             dry_run=dry_run,
             repository=repository,
@@ -423,7 +423,7 @@ def create_apply_result_bundle(
         captured = capture_result_bundle(repository, repo_id)
         diagnostic_context = captured.context
         revalidate_result_bundle_target(target, registry_snapshot)
-        report = _apply_report(
+        report = _execute_report(
             session=session,
             dry_run=dry_run,
             repository=repository,
@@ -456,7 +456,7 @@ def create_apply_result_bundle(
             execution_log=execution_log,
         )
     except PatchHarborError as exc:
-        report = _apply_report(
+        report = _execute_report(
             session=session,
             dry_run=dry_run,
             repository=repository,
@@ -476,7 +476,7 @@ def create_apply_result_bundle(
             report.result_bundle.with_emergency_diagnostics(emergency_path)
         )
     except (OSError, RuntimeError, TypeError, ValueError):
-        report = _apply_report(
+        report = _execute_report(
             session=session,
             dry_run=dry_run,
             repository=repository,

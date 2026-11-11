@@ -41,7 +41,7 @@ def test_cli_runs_the_global_repository_watcher(
         stdout=stdout,
         stderr=stderr,
     ) == 0
-    assert observed["delegate"] is watcher_cli.delegate_to_automatic_apply
+    assert observed["delegate"] is watcher_cli.delegate_to_automatic_execute
     assert callable(observed["stop_requested"])
     assert callable(observed["bind_wake"])
     assert observed["log_stream"] is stdout

@@ -39,7 +39,7 @@ Datei enthält PowerShell-Code. Die lokalen Pack-Aufrufe starten keine Ziel-Shel
 ## Vollständige Dateien
 
 `contents` enthält `tracked.txt` mit den gewünschten endgültigen Bytes und einen
-Entrypoint. Apply schreibt `tracked.txt` bereits **vor** dem Entrypoint an seinen
+Entrypoint. Execute schreibt `tracked.txt` bereits **vor** dem Entrypoint an seinen
 relativen Zielpfad. Der Entrypoint muss sie daher nicht aus einem angenommenen
 ZIP-Stagingordner kopieren. Ein einfaches Bash-Beispiel ist:
 
@@ -59,7 +59,7 @@ exit 0
 
 ## Diff und gemischte Inhalte
 
-Ein Diff ist eine normale Nutzdatei, beispielsweise `change.patch`. Apply schreibt
+Ein Diff ist eine normale Nutzdatei, beispielsweise `change.patch`. Execute schreibt
 sie zuerst ins Repository; erst der Entrypoint führt sie ausdrücklich aus:
 
 ```bash
@@ -86,7 +86,7 @@ nicht als Projektdateien übernommen.
 
 Der Inhaltsordner darf ausschließlich einen Entrypoint enthalten. Er kann zum
 Beispiel `git status --porcelain=v1` ausgeben. Die Ausgabe landet im Ausführungslog
-des tatsächlichen Apply-Results. Keine Nutzdatei, kein Commit und kein Push sind
+des tatsächlichen Execute-Results. Keine Nutzdatei, kein Commit und kein Push sind
 für eine solche Diagnose nötig. Auch eine Diagnose braucht die vollständige
 Repositorybindung; `fs run` ersetzt diese nicht.
 
@@ -101,7 +101,7 @@ if deliberately broken (
 
 Pack und statische Referenzvalidierung dürfen hier erfolgreich sein. Sie führen
 die Datei nicht aus und behaupten weder Shellsyntax noch Projekt-Test-Erfolg.
-Erst der tatsächliche Apply meldet den Entrypointfehler. Sein Result und Log sind
+Erst der tatsächliche Execute meldet den Entrypointfehler. Sein Result und Log sind
 maßgeblich; bereits geschriebene Nutzdateien werden nicht global zurückgerollt.
 Fachliche Validatorfehler, ungültige Referenzen oder falsche Bindung bleiben dagegen
 blockierend und dürfen nicht als technischer Startfallback umgangen werden.
@@ -113,7 +113,7 @@ eigene temporäre Reste. Es gibt keinen automatischen Versand oder Watcherstart.
 Der Benutzer bestimmt die eine kanonische finale ZIP und ihren Übergabeort.
 
 `tests/test_pack_examples.py` führt diese fünf Verhaltensfälle mit installierter
-CLI, PYZ-CLI und PYZ-API sowie tatsächlichem Apply aus. Die Tests prüfen Dateien,
+CLI, PYZ-CLI und PYZ-API sowie tatsächlichem Execute aus. Die Tests prüfen Dateien,
 Bindung, Ausführungslog und Commitzustand, keine Dokumentformulierungen. Die
 zusätzliche Erstnutzung aus der eigenen eingebetteten Anleitung und die drei
 identischen PYZ-Generationen bleiben in der vollständigen Suite enthalten.

@@ -1,5 +1,10 @@
 # PatchHarbor – Spezifikationserweiterung: Result-PYZ und `pack`
 
+> **Aktiver 2.0-Vertrag ab 200-02.W3:** [Task / Execute / Result](../docs/protocol-2.md)
+> ist für die geänderten Formate, API-Namen und Maschinenverträge maßgeblich.
+> Die historischen Basisabschnitte unten bleiben als Sicherheits- und Herkunftsnachweis erhalten;
+> ihre abgelösten Formatnummern und API-Namen aktivieren keinen Kompatibilitätsleser.
+
 **Dokument-ID:** `PYZ-PACK`  
 **Revision:** 8
 **Stand:** 30. Oktober 2026
@@ -105,7 +110,7 @@ Die ausführende Runtime eines Results und der übergebene Repository-Snapshot s
 
 **GOV-02.** Vor der Implementierung muss der dann tatsächlich aktuelle Repositorystand mit dieser Grundlage abgeglichen werden. Bereits fortgeschrittene Arbeiten dürfen nicht auf den alten Snapshot zurückgesetzt werden. Die obigen Kennungen sind Herkunftsangaben dieses Dokuments, **keine fest eingebauten Bindungswerte für spätere Patches**.
 
-Zum Statusabgleich gehören ausdrücklich `planning/watcher-events/commit-plan.md`, `planning/result-publication/commit-plan.md` und `docs/result-publication-cifs.md`. Im gebundenen Snapshot bezeichnet sich der Watcher-Plan als Revision 7, **abgeschlossen**. Der nachfolgende CIFS-Plan beschreibt `CIFS-1` dagegen als in Bundle 023 vorbereitet und führt tatsächlichen Apply/Push, native Windows-Abnahme sowie den Test auf der betroffenen Linux→Windows-CIFS-Freigabe noch als offen. Das sind dokumentierte Statusangaben dieser Quelle, keine hier neu erbrachten Ausführungsnachweise. [B7, B8]
+Zum Statusabgleich gehören ausdrücklich `planning/watcher-events/commit-plan.md`, `planning/result-publication/commit-plan.md` und `docs/result-publication-cifs.md`. Im gebundenen Snapshot bezeichnet sich der Watcher-Plan als Revision 7, **abgeschlossen**. Der nachfolgende CIFS-Plan beschreibt `CIFS-1` dagegen als in Bundle 023 vorbereitet und führt tatsächlichen Execute/Push, native Windows-Abnahme sowie den Test auf der betroffenen Linux→Windows-CIFS-Freigabe noch als offen. Das sind dokumentierte Statusangaben dieser Quelle, keine hier neu erbrachten Ausführungsnachweise. [B7, B8]
 
 PP-00 muss diese Angaben mit den dann tatsächlich verfügbaren Result-, Commit- und CI-Nachweisen abgleichen. Bereits erledigte Arbeiten werden nicht erneut aktiviert; noch offene Zielplattformnachweise gelten nicht aufgrund lokaler Tests oder eines vorhandenen Quellstands als erledigt. Alte Statuspassagen in der Hauptspezifikation ändern den belegten Planfortschritt nicht automatisch.
 
@@ -115,8 +120,8 @@ PP-00 muss diese Angaben mit den dann tatsächlich verfügbaren Result-, Commit-
 |---|---|
 | §§ 4 und 32: Installation und öffentliche API | Normale Installation bleibt erhalten; PYZ als zusätzliche Distribution; `pack_task` wird ergänzt. |
 | § 5 und § 36: CLI | Neues Unterkommando `pack`; vorhandene Core-Kommandos bleiben erhalten. |
-| §§ 10, 15–17 und 34: Paket, Apply und Modi | Werden wiederverwendet, nicht durch eine neue Einspielstrategie ersetzt. |
-| § 19.6a: „Der Core erzeugt keine Patch-Pakete.“ | Ausschließlich für die ausdrücklich aufgerufene neue Pack-Operation aufgehoben; kein automatisches Packen durch `bundle`, `apply` oder den Watcher. |
+| §§ 10, 15–17 und 34: Paket, Execute und Modi | Werden wiederverwendet, nicht durch eine neue Einspielstrategie ersetzt. |
+| § 19.6a: „Der Core erzeugt keine Patch-Pakete.“ | Ausschließlich für die ausdrücklich aufgerufene neue Pack-Operation aufgehoben; kein automatisches Packen durch `bundle`, `execute` oder den Watcher. |
 | §§ 2.2 und 23: keine rekursive Ordnersuche | Begrenzte Ausnahme für die vollständige Inventarisierung des ausdrücklich gewählten Pack-Inhaltsordners. Exchange-/Runner-Suche und die Auswahl angrenzender Projektdateien bleiben unverändert. |
 | §§ 19.6a und 21: Chat-Handoff und externe Paketnamen | Technische Erzeugung des Pflichtpaars und des kanonischen Namens darf an `pack` delegiert werden. Der Ersteller verantwortet weiterhin Inhalt und Auslieferung. Die manuelle Namenswahl gemäß `PACK-15` ist eine ausdrückliche Ausnahme nur außerhalb der kanonischen Chat-Auslieferung. |
 | § 18.5: Result-Veröffentlichung | Bestehender Sync-/Retry-/Hash-/Diagnosevertrag einschließlich Result-`os.replace()` bleibt für Format 3 erhalten (`MIG-06`). Pack-No-replace und dessen ausdrücklich getrennte Dateisystempolitik gelten nur für `pack` (`PACK-19/23`). |
@@ -152,7 +157,7 @@ Unverändert bleiben insbesondere repositorylokale Konfiguration, Registry-Ident
 
 Diese Erweiterung enthält keinen automatischen Dateivergleich zwischen bearbeitetem Arbeitsverzeichnis und Result, keine selbstständige Auswahl gewünschter Änderungen, keinen Diff-Generator, keinen automatisch geschriebenen Entrypoint und keinen Commit-Planer.
 
-`pack` installiert nichts, führt kein Skript aus, startet keine Tests, committet oder pusht nicht und wendet kein Paket an. Es beobachtet keine Ordner. Es erhält weder `--apply` noch einen impliziten anschließenden Apply.
+`pack` installiert nichts, führt kein Skript aus, startet keine Tests, committet oder pusht nicht und wendet kein Paket an. Es beobachtet keine Ordner. Es erhält weder `--execute` noch einen impliziten anschließenden Execute.
 
 Es werden kein neuer Python-Interpreter, keine virtuelle Umgebung, keine externen Runtime-Dependencies, kein allgemeiner Plugin-Loader, kein Netzwerkdienst und keine neue Sicherheits-Sandbox ausgeliefert. Native EXE-Launcher, Signaturen, eine Multi-Wheel-Abhängigkeitssammlung und ein universeller Runtime-Updater sind ebenfalls nicht Gegenstand dieses Auftrags. Ältere Python-Versionen waren im ursprünglichen PYZ/PACK-Auftrag ausgeschlossen; der neue CPython-Auftrag hebt ausschließlich diesen Ausschluss gemäß §1.1.1 auf.
 
@@ -173,10 +178,10 @@ Die Richtungen bleiben getrennt:
 
 ```text
 Repository --bundle--> Result-Bundle --Bearbeitung--> vorbereitete Inhalte
-vorbereitete Inhalte + Result-Bundle --pack--> Patch-Paket --apply--> Repository
+vorbereitete Inhalte + Result-Bundle --pack--> Patch-Paket --execute--> Repository
 ```
 
-### 3.2 Bestehender Apply-Vertrag
+### 3.2 Bestehender Execute-Vertrag
 
 **SEM-01.** `pack` erzeugt weiterhin **Patchformat 1**. Dessen Einspielsemantik wird nicht geändert. Der Core prüft Paket und Zielbindung, schreibt die regulären Nutzdateien vor dem Entrypoint an ihre relativen Repositorypfade und führt anschließend den Entrypoint mit dem Repository als Arbeitsverzeichnis aus. Entrypoint, Manifest und passive Handoff-Metadaten werden nicht als gewöhnliche Nutzdateien ins Repository geschrieben. [B2, B3]
 
@@ -194,14 +199,14 @@ Daraus folgen verbindlich:
 
 ```text
 patch-inhalt/
-├── apply.sh
+├── execute.sh
 ├── src/
 │   └── geaenderte_datei.py
 └── scripts/
     └── neuer_helfer.sh
 ```
 
-Nach `pack` enthält das ZIP zusätzlich das generierte `task.json` und die beiden Handoff-Dateien. `src/geaenderte_datei.py` und `scripts/neuer_helfer.sh` sind Nutzdateien; `apply.sh` ist in diesem Beispiel der private Entrypoint. Dieses Beispiel ist keine Vorschrift für die Benennung des Inhaltsordners oder Entrypoints.
+Nach `pack` enthält das ZIP zusätzlich das generierte `task.json` und die beiden Handoff-Dateien. `src/geaenderte_datei.py` und `scripts/neuer_helfer.sh` sind Nutzdateien; `execute.sh` ist in diesem Beispiel der private Entrypoint. Dieses Beispiel ist keine Vorschrift für die Benennung des Inhaltsordners oder Entrypoints.
 
 ## 4. Gemeinsame Architektur und Funktionsumfang
 
@@ -219,7 +224,7 @@ Ein gemeinsamer interner Service darf geprüfte Referenzbytes und daraus abgelei
 
 ### 4.2 Core-Parität ohne Watcher
 
-**ARCH-02.** Zum PYZ-Funktionsumfang gehören die vorhandenen Core-CLI-Pfade für Konfiguration, Registrierung, Registry-Verwaltung, Kontext, `bundle`, `apply`, den manuellen Runner `fs run`, `inspect`, `validate` und das neue `pack`, einschließlich fortgeltender Core-Optionen und kompatibler Aufrufformen. Die öffentliche Core-API bleibt erhalten.
+**ARCH-02.** Zum PYZ-Funktionsumfang gehören die vorhandenen Core-CLI-Pfade für Konfiguration, Registrierung, Registry-Verwaltung, Kontext, `bundle`, `execute`, den manuellen Runner `fs run`, `inspect`, `validate` und das neue `pack`, einschließlich fortgeltender Core-Optionen und kompatibler Aufrufformen. Die öffentliche Core-API bleibt erhalten.
 
 Neutrale Core-Datenverträge wie `patchharbor.watch_contract` sowie bereits öffentliche, vom installierten Watcher verwendete Core-API-Funktionen dürfen erhalten bleiben. Ihr Vorhandensein ist nicht gleichbedeutend mit dem Mitliefern des Watchers. Es darf keine Importabhängigkeit vom **ausgeschlossenen Paket** `patchharbor_watcher` entstehen.
 
@@ -228,7 +233,7 @@ Neutrale Core-Datenverträge wie `patchharbor.watch_contract` sowie bereits öff
 | `inspect`, `validate` ohne Repository, `validate --reference-bundle` | Lesbare lokale Eingabedateien; kein Git oder Shellinterpreter. |
 | `pack` | Zusätzlich lesbarer Inhaltsordner und ausdrücklich freigegebener beschreibbarer Ausgabebereich. |
 | Repositoryvalidierung, `context`, `bundle` | Reguläre Git-, Repository-, Registry- und Konfigurationsvoraussetzungen. |
-| `apply`, `fs run` | Je nach Operation zusätzlich passende Shell, Prozessausführung und reguläre Dateisystemrechte. |
+| `execute`, `fs run` | Je nach Operation zusätzlich passende Shell, Prozessausführung und reguläre Dateisystemrechte. |
 
 **ARCH-03.** Fehlende Voraussetzungen führen zu den regulären Fehlern der jeweiligen Funktion. Die PYZ darf dafür keine Sicherheitsprüfungen umgehen und kein künstliches Git-Repository registrieren. Die Parität betrifft Softwarefunktionen, nicht die Ausstattung einer Chat-Laufzeit.
 
@@ -308,7 +313,7 @@ Der bevorzugte In-Process-Weg ist die öffentliche API, nicht ein erneuter CLI-S
 
 **PYZ-06.** Die PYZ gehört zum ausführenden PatchHarbor, nicht zum bearbeiteten Zielrepository. Die normale Build-Pipeline bereitet alle zur reproduzierbaren PYZ-Materialisierung erforderlichen Daten vor und liefert sie mit der regulären Installation aus.
 
-Während `bundle` oder eines Apply-Auftrags dürfen weder Buildbackend, `pip`, `uv`, Git zur Artefakterzeugung, ein Paketindex noch ein Netzwerkzugriff gestartet werden. Das Zusammenstellen einer ZIP aus bereits vorbereiteten, gehashten Ressourcen ist eine begrenzte Datenoperation und kein spontaner Quellbuild.
+Während `bundle` oder eines Execute-Auftrags dürfen weder Buildbackend, `pip`, `uv`, Git zur Artefakterzeugung, ein Paketindex noch ein Netzwerkzugriff gestartet werden. Das Zusammenstellen einer ZIP aus bereits vorbereiteten, gehashten Ressourcen ist eine begrenzte Datenoperation und kein spontaner Quellbuild.
 
 Ein offizieller Build muss denselben kanonischen PYZ-Kandidaten erzeugen beziehungsweise verifizieren können. Ein Cache ist eine Optimierung, keine Voraussetzung. Das Löschen von Installer-Caches darf die Runtime-Bereitstellung nicht verhindern.
 
@@ -384,7 +389,7 @@ Diese Determinismusregeln sind PatchHarbor-Produktentscheidungen; das allgemeine
 
 ### 6.5 Selbstupdate und Roundtrip
 
-**PYZ-10.** Vor möglichen Apply-Mutationen werden Erzeugeridentität, benötigte Runtime-Ressourcen und statische Chat-Vorlage gemeinsam request-lokal fixiert. Ein späterer Snapshot darf einen neueren Repositoryzustand zeigen; die Runtime darf dabei nicht mit Ressourcen einer anderen Version vermischt werden.
+**PYZ-10.** Vor möglichen Execute-Mutationen werden Erzeugeridentität, benötigte Runtime-Ressourcen und statische Chat-Vorlage gemeinsam request-lokal fixiert. Ein späterer Snapshot darf einen neueren Repositoryzustand zeigen; die Runtime darf dabei nicht mit Ressourcen einer anderen Version vermischt werden.
 
 **PYZ-11.** `bundle` aus einer PYZ muss wiederum ein Result mit derselben kanonischen PYZ erzeugen können. Weder benötigt es dazu eine installierte PatchHarbor-Distribution, noch darf es sein vollständiges Archiv als zusätzliche Ressource in eine neue PYZ einbetten.
 
@@ -550,7 +555,7 @@ Historisch war ein Zwischenstand mit Leser 1/2/3 und Writer 2 zulässig. Das ist
 
 Das erste mit dem umgestellten Writer erzeugte Result muss in einer frischen Umgebung anhand seiner eigenen Anleitung nutzbar sein: geprüfte PYZ entnehmen, ohne Wheel-Installation und ohne zufällig installierten Core starten und ein Paket gegen genau dieses Result erzeugen und validieren. Der entsprechende Durchstich (`E-10`, mit den Funktionsbausteinen aus `E-01/E-06`) ist **Freigabegate für PP-06**, nicht nur eine spätere Endabnahme. Eine gemeinsame atomare Umsetzung ist erlaubt; ein separat ausgelieferter Stand mit PYZ-Result und Wheel-only-Anleitung ist es nicht.
 
-Die Aktivierung des Format-3-Writers erfolgt an der gemeinsamen Result-Erzeugungsgrenze für manuelle Bundles, Apply-Erfolg und -Fehler, Dry-Run und die durch den **installierten** Watcher ausgelösten Core-Aufträge. Für letztere wird kein Watcher in die PYZ aufgenommen.
+Die Aktivierung des Format-3-Writers erfolgt an der gemeinsamen Result-Erzeugungsgrenze für manuelle Bundles, Execute-Erfolg und -Fehler, Dry-Run und die durch den **installierten** Watcher ausgelösten Core-Aufträge. Für letztere wird kein Watcher in die PYZ aufgenommen.
 
 ### 8.3 Altprogramme und vorhandene Paketformate
 
@@ -561,7 +566,7 @@ konservativ behalten/abgelehnt, niemals ausgeführt oder als Erfolgsbeleg
 archiviert/gelöscht. Bestehende 1.4.0-Leser müssen keine zukünftigen Formate
 verstehen; das ist keine Zusage von Vorwärtskompatibilität.
 
-Die neuen Patch-Pakete bleiben Format 1. Ihre Kompatibilität mit unterstützten Apply-Engines ab 1.4.0 wird anhand des bereits vorhandenen Handoff- und Modivertrags beschrieben und getestet, nicht allein aus der Formatnummer abgeleitet. Eine neue generelle Bootstrap- oder Migrationsautomatik für sehr alte Runner wird nicht eingeführt.
+Die neuen Patch-Pakete bleiben Format 1. Ihre Kompatibilität mit unterstützten Execute-Engines ab 1.4.0 wird anhand des bereits vorhandenen Handoff- und Modivertrags beschrieben und getestet, nicht allein aus der Formatnummer abgeleitet. Eine neue generelle Bootstrap- oder Migrationsautomatik für sehr alte Runner wird nicht eingeführt.
 
 ### 8.4 Diagnose hat Vorrang vor Runtime-Komfort
 
@@ -606,7 +611,7 @@ Die Schreibweise der gemeinsamen Darstellungsoptionen folgt der bestehenden Pars
 
 Genau eine Ausgabeoption ist erforderlich. Es gibt keinen Standard-Ausgabeort über Registry, CWD oder Exchange. Relative ausdrücklich übergebene Dateisystempfade werden einmal gegen das Aufrufverzeichnis aufgelöst; daraus folgt keine automatische Repositorywahl.
 
-Nicht angeboten werden in diesem Umfang `--repository`, `--force`, `--overwrite`, `--skip-validation`, `--no-validate`, `--apply`, `--no-handoff`, freie Bindungsüberschreibungen, ein frei übergebenes Manifest, URL-Eingaben oder STDIN-Paketinhalte.
+Nicht angeboten werden in diesem Umfang `--repository`, `--force`, `--overwrite`, `--skip-validation`, `--no-validate`, `--execute`, `--no-handoff`, freie Bindungsüberschreibungen, ein frei übergebenes Manifest, URL-Eingaben oder STDIN-Paketinhalte.
 
 ### 9.2 Beispiele
 
@@ -615,7 +620,7 @@ Kanonischer Dateiname aus dem Result:
 ```bash
 patchharbor pack ./patch-inhalt \
   --reference-bundle ./result.zip \
-  --entrypoint apply.sh \
+  --entrypoint execute.sh \
   --output-dir ./ausgabe \
   --mode scripts/neuer_helfer.sh=0755 \
   --json
@@ -626,7 +631,7 @@ Derselbe Vorgang mit der PYZ:
 ```bash
 python ./runtime/patchharbor-<version>.pyz pack ./patch-inhalt \
   --reference-bundle ./result.zip \
-  --entrypoint apply.sh \
+  --entrypoint execute.sh \
   --output-dir ./ausgabe \
   --json
 ```
@@ -636,7 +641,7 @@ Bewusst gewählter manueller Dateiname bei leerem Referenzsuffix:
 ```bash
 patchharbor pack ./patch-inhalt \
   --reference-bundle ./result.zip \
-  --entrypoint apply.sh \
+  --entrypoint execute.sh \
   --output ./ausgabe/mein-patch.zip
 ```
 
@@ -762,7 +767,7 @@ state_fingerprint
 fingerprint_algorithm
 ```
 
-Insbesondere werden weder `expected_*` eines fehlgeschlagenen Apply-Laufs noch verkürzte Konsolenkennungen als Ersatz verwendet. Ein gültiges Dirty-, Dry-Run-, Fehler- oder Diagnose-Result kann Referenz sein. Ein erfolgreiches Vor-Apply, ein sauberer Git-Zustand oder eine geplante Commitanzahl sind keine zusätzliche Pack-Voraussetzung.
+Insbesondere werden weder `expected_*` eines fehlgeschlagenen Execute-Laufs noch verkürzte Konsolenkennungen als Ersatz verwendet. Ein gültiges Dirty-, Dry-Run-, Fehler- oder Diagnose-Result kann Referenz sein. Ein erfolgreiches Vor-Execute, ein sauberer Git-Zustand oder eine geplante Commitanzahl sind keine zusätzliche Pack-Voraussetzung.
 
 **PACK-07.** Zur Referenzprüfung werden kein Git-Repository erzeugt, keine Registry gelesen/angelegt und keine Pfade des Zielrechners auf dem Pack-Rechner aufgelöst. Der vollständige native Reader-Vertrag einschließlich einer vorhandenen Runtime bleibt erforderlich. Bei deklarierter, aber defekter Runtime scheitert `pack`; bei einem gültigen Result mit `unavailable` darf es fortfahren.
 
@@ -812,9 +817,9 @@ Die Erkennung darf keinen auf dem Pack-Rechner installierten Bash-/PowerShell-In
 
 Ein Modusschlüssel muss exakt einen vorhandenen Entrypoint- oder Nutzdateipfad benennen. Verzeichnisse, generierte Dateien, nicht vorhandene Dateien und reservierte Pfade sind unzulässig. Ein Modus für den Entrypoint beeinflusst nicht dessen Zielablage: Er bleibt privat und wird durch den festgelegten Interpreter ausgeführt.
 
-Auf POSIX erhält eine vorhandene reguläre Zieldatei beim späteren Apply nach dem bestehenden Vertrag ihren bereits beobachteten sicheren lokalen Modus; ein angeforderter ZIP-Modus ist kein allgemeiner `chmod`-Befehl. Bei neu angelegten Dateien kann der explizite angeforderte Modus wirken. Das Verhalten auf Windows folgt weiter dem dortigen Core-Vertrag. [B2, B3]
+Auf POSIX erhält eine vorhandene reguläre Zieldatei beim späteren Execute nach dem bestehenden Vertrag ihren bereits beobachteten sicheren lokalen Modus; ein angeforderter ZIP-Modus ist kein allgemeiner `chmod`-Befehl. Bei neu angelegten Dateien kann der explizite angeforderte Modus wirken. Das Verhalten auf Windows folgt weiter dem dortigen Core-Vertrag. [B2, B3]
 
-Damit kann ein Windows- oder Chat-Ersteller ein neues ausführbares POSIX-Skript ausdrücklich mit `0755` verpacken, ohne zufällige Rechte aus seiner eigenen Umgebung zu übernehmen. Eine gewünschte Modusänderung an einer bereits vorhandenen Zieldatei muss entsprechend dem bestehenden Apply-/Entrypoint-Vertrag geplant werden.
+Damit kann ein Windows- oder Chat-Ersteller ein neues ausführbares POSIX-Skript ausdrücklich mit `0755` verpacken, ohne zufällige Rechte aus seiner eigenen Umgebung zu übernehmen. Eine gewünschte Modusänderung an einer bereits vorhandenen Zieldatei muss entsprechend dem bestehenden Execute-/Entrypoint-Vertrag geplant werden.
 
 ### 11.6 Ressourcen und Grenzen
 
@@ -903,7 +908,7 @@ Die dynamischen Zielangaben stammen dagegen aus der **geprüften Referenz**, nic
 | `repository_name`, `repository_path` | Bekannte aufgezeichnete Zielangaben, nicht lokal auflösen. |
 | `exchange_directory`, `output_directory` | Aufgezeichnete Zielrechnerdaten; nicht durch den lokalen Pack-Ausgabepfad ersetzen. |
 | `runtime` | Bekannte Zielsystem-/Interpreter-/Tooldaten aus dem Result; nicht durch Pack-Hostdaten ersetzen. |
-| `run_id` | Soweit vorhanden die Referenz-Run-ID; im Patch-Kontext ausdrücklich Herkunft des Ziel-Snapshots, keine neue Apply-Run-ID. |
+| `run_id` | Soweit vorhanden die Referenz-Run-ID; im Patch-Kontext ausdrücklich Herkunft des Ziel-Snapshots, keine neue Execute-Run-ID. |
 | `filename_schemas`, `filename_timezone` | Bestehender Vertrag; UTC und die gültigen Schemata. |
 
 Zusätzliche zulässige passive Referenzangaben dürfen übernommen werden, sofern sie strikt als endliche JSON-Daten behandelt werden, nicht mit den verbindlichen Feldern kollidieren und die Größen-/Renderregeln einhalten. Es gibt keine beliebige Auswertung solcher Daten als Code oder lokale Pfade.
@@ -1031,7 +1036,7 @@ Gemeinsame sichere Low-Level-Mechanik darf verwendet werden; Result-Replace/Resu
 
 - `package`: gültiges Paket, aber kein Repository-Bindungsabgleich; `binding_matches=null`.
 - `reference`: gültiges Paket und Abgleich gegen eine vollständig geprüfte Referenz; bei Erfolg `binding_matches=true`.
-- `repository`: Abgleich mit einer realen passenden registrierten Repositoryinstanz; spätere zeitnahe Apply-Prüfung bleibt notwendig.
+- `repository`: Abgleich mit einer realen passenden registrierten Repositoryinstanz; spätere zeitnahe Execute-Prüfung bleibt notwendig.
 
 Ein erfolgreicher `pack`-Aufruf enthält bereits den `reference`-Nachweis. Ein unmittelbar danach identischer separater `validate`-Aufruf ist für den Pack-Vertrag nicht erforderlich. Eine erneute Prüfung ist erforderlich, wenn das Paket verändert oder seine Byteidentität seitdem nicht mehr gewährleistet ist. `inspect` kann zusätzlich für den inhaltlichen Soll-/Ist-Abgleich genutzt werden.
 
@@ -1044,9 +1049,9 @@ Ein erfolgreicher `pack`-Aufruf enthält bereits den `reference`-Nachweis. Ein u
 - bestandene Projekttests, Commits, Push oder CI;
 - Authentizität, Vertrauenswürdigkeit oder Schadlosigkeit des Pakets;
 - unveränderten Zustand des Zielrechners nach Erzeugung der Referenz;
-- Replay-/Recovery-Freigabe für einen späteren Apply.
+- Replay-/Recovery-Freigabe für einen späteren Execute.
 
-Ein absichtlich syntaktisch fehlerhaftes, aber statisch paketkonformes Shellskript ist deshalb ein notwendiger Negativnachweis für **die Aussagegrenze**, nicht zwingend ein Paketfehler. Die tatsächlichen späteren Apply-, Plattform- und Projektprüfungen bleiben vollständig erhalten.
+Ein absichtlich syntaktisch fehlerhaftes, aber statisch paketkonformes Shellskript ist deshalb ein notwendiger Negativnachweis für **die Aussagegrenze**, nicht zwingend ein Paketfehler. Die tatsächlichen späteren Execute-, Plattform- und Projektprüfungen bleiben vollständig erhalten.
 
 ## 15. Bootstrap und Nutzung im Chat
 
@@ -1074,7 +1079,7 @@ from patchharbor import api
 result = api.pack_task(
     "patch-inhalt",
     reference_bundle="result.zip",
-    entrypoint="apply.sh",
+    entrypoint="execute.sh",
     output_directory="ausgabe",
 )
 assert result.validation.binding_matches is True
@@ -1108,7 +1113,7 @@ Eine inhaltliche Ablehnung durch den Validator, eine falsche Bindung oder ein un
 
 **CHAT-05.** Der bestehende Vertrag über eine kanonische finale Patch-ZIP und genau eine finale Patch-Bereit-Meldung bleibt erhalten. Eine Backup- oder Mail-Funktion wird nicht in `pack` oder die PYZ eingebaut. Externe Sicherung/Versand erfolgen nur durch verfügbare externe Werkzeuge und mit denselben geprüften Bytes.
 
-Ein Backupfehler führt nicht zu einem neuen Paket. Änderungen nach einer erfolgreichen Pack-Operation machen deren Bytefreigabe für die geänderte Datei ungültig und verlangen einen erneuten vollständigen Verpackungs-/Prüfvorgang. Die hier vorliegende **Spezifikationsdatei** ist selbst kein Patch-Paket und löst keinen Apply aus.
+Ein Backupfehler führt nicht zu einem neuen Paket. Änderungen nach einer erfolgreichen Pack-Operation machen deren Bytefreigabe für die geänderte Datei ungültig und verlangen einen erneuten vollständigen Verpackungs-/Prüfvorgang. Die hier vorliegende **Spezifikationsdatei** ist selbst kein Patch-Paket und löst keinen Execute aus.
 
 Die laufende Chat-Bundle-Nummer wird nach dem bestehenden Chat-/Planvertrag vergeben, nicht von `pack` aus seiner Paket-ID erzeugt. Die Verwendung des Packers ändert weder diesen Zähler noch die CI-Zuständigkeiten (`PACK-15`, `TEST-05`).
 
@@ -1163,7 +1168,7 @@ Die normale Installation muss den Watcher weiterhin korrekt dokumentieren. In de
 | Z-03 | Empfohlener Aufruf `-I -S -B` funktioniert; technische Isolation wird nicht als Sandbox behauptet. | PYZ-01/02, CHAT-01 |
 | Z-04 | `inspect`, paket-/referenzbasiertes `validate` und `pack` funktionieren ohne Git/Bash/PowerShell. | ARCH-02, PACK-21 |
 | Z-05 | Kein `patchharbor_watcher/` und keine Watcher-Ressourcen im echten PYZ-Inventar; Core-Import benötigt sie nicht. | SCOPE-03, PYZ-03 |
-| Z-06 | Alle vorgesehenen Core-CLI-/API-Wege funktionieren aus der PYZ bei vorhandenen regulären Voraussetzungen, einschließlich `fs run`, Registry/Konfiguration und Apply. | ARCH-02/03 |
+| Z-06 | Alle vorgesehenen Core-CLI-/API-Wege funktionieren aus der PYZ bei vorhandenen regulären Voraussetzungen, einschließlich `fs run`, Registry/Konfiguration und Execute. | ARCH-02/03 |
 | Z-07 | Kanonische Vorlage, Lizenz und API-Daten werden aus der PYZ gelesen; kein CWD-/Fremdinstallations-Fallback bei defekten eigenen Ressourcen. | PYZ-04 |
 | Z-08 | Zu alter Interpreter, fehlende Ressourcen, beschädigte Identität, widersprüchliche Rezeptdaten und nicht unterstütztes Profil werden korrekt behandelt. | PYZ-02/07/08 |
 | Z-09 | In-Process-API ohne Unterprozess; Konflikt mit vorher importierter anderer Version wird erkannt, nicht per unsicherem Entladen kaschiert. | PYZ-05 |
@@ -1184,7 +1189,7 @@ Die normale Installation muss den Watcher weiterhin korrekt dokumentieren. In de
 | F-03 | Deskriptoren, Bytegrößen, Hashes, Profil, Content-ID, Versionsangaben und Capability-Daten werden konsistent geprüft. | FMT-02/03/05 |
 | F-04 | `unavailable` hat genau die erlaubte Struktur, Gründe und null-Werte; keine behaupteten Artefakte. | FMT-04 |
 | F-05 | Zusätzliche Runtime-Dateien, Wheel+PYZ-Doppelbelegung, unbekannte Schlüssel und unbekannte Formate werden konservativ abgelehnt. | FMT-05, MIG-01 |
-| F-06 | Result-Erzeugung funktioniert manuell, nach Apply-Erfolg/-Fehler, im Dry-Run, mit explizitem Ziel und über installierten Watcher. | MIG-02 |
+| F-06 | Result-Erzeugung funktioniert manuell, nach Execute-Erfolg/-Fehler, im Dry-Run, mit explizitem Ziel und über installierten Watcher. | MIG-02 |
 | F-07 | Runtime-only-Ausfall erhält Snapshot/Logs als `unavailable`; echte Resultfehler, Abbruch und Notfallrettung behalten ihre Priorität. | MIG-04 |
 | F-08 | Archivierung/Recovery verwenden keine bloß strukturelle Klassifikation oder schwächere Diagnoseprüfung als Erfolgsbeweis. | MIG-02/05 |
 | F-09 | Aktuelle Verbraucher führen nicht unterstützte/future Results oder standalone PYZs nicht als Patch aus und verwenden sie nicht als Lösch-/Archivnachweis. | MIG-03 |
@@ -1244,9 +1249,9 @@ Die normale Installation muss den Watcher weiterhin korrekt dokumentieren. In de
 
 | Test-ID | Verbindlicher Nachweis | Anforderungen |
 |---|---|---|
-| E-01 | Result aus echter Installation → PYZ entnehmen → `pack` → `inspect`/Referenzvalidierung → regulärer Apply in isoliertem registriertem Repository. | Alle Featuregrenzen |
+| E-01 | Result aus echter Installation → PYZ entnehmen → `pack` → `inspect`/Referenzvalidierung → regulärer Execute in isoliertem registriertem Repository. | Alle Featuregrenzen |
 | E-02 | Derselbe Durchstich mit vollständigen Dateien, Diff-Payload und gemischtem Paket; Nutzdateien werden vor Entrypoint geschrieben. | SEM-01 |
-| E-03 | Tatsächliche spätere Repositoryänderung nach Pack-Erfolg wird beim regulären Apply abgelehnt. | CHECK-02 |
+| E-03 | Tatsächliche spätere Repositoryänderung nach Pack-Erfolg wird beim regulären Execute abgelehnt. | CHECK-02 |
 | E-04 | Paketkonformer, aber syntaktisch defekter beziehungsweise fachlich fehlerhafter Entrypoint wird nicht als erfolgreich ausgeführt/testiert behauptet. | CHECK-02 |
 | E-05 | Startbar ohne Schreibrechte im PYZ-Verzeichnis; `pack` schreibt nur ins freigegebene Ausgabeziel. | PYZ-04, PACK-21 |
 | E-06 | Bootstrap ohne installierten Core, falsche Python-Version, Herkunftskonflikt und fehlende Ausführungsmöglichkeiten werden ehrlich unterschieden. | CHAT-01/02/04 |
@@ -1265,7 +1270,7 @@ Die regulären Wheel-/sdist-/pip-/pipx-/uv-Bereitstellungsnachweise werden nach 
 Christian; kein automatischer Dispatch, Retry oder Fünf-Bundle-Zähler.
 Keine Push-/PR-/Zeitplan-Trigger. Gemäß der Nutzerentscheidung vom 29. Oktober
 2026 prüft Development ausschließlich eine dokumentierte änderungsbezogene
-Auswahl parallel. Apply prüft jeden Commitstand vollständig parallel, auch vor
+Auswahl parallel. Execute prüft jeden Commitstand vollständig parallel, auch vor
 dem letzten Commit; keine seriellen Gates. Das vorhandene 120-Minuten-Timeout
 des Acceptance-/Release-Gate-Jobs bleibt erhalten. Historische Policies in [B6]
 ersetzen diese neuere Anweisung nicht.
@@ -1286,7 +1291,7 @@ der aktive Folgeplan ist `planning/specroad-integration/commit-plan.md`.
 
 **PLAN-01.** Der folgende Plan ist ein ausführbarer fachlicher Arbeitsplan, aber keine Behauptung bereits erledigter Commits. Der konkrete Commitplan soll unter `planning/pyz-pack/commit-plan.md` geführt werden und für jeden Schritt Ausgangsbindung, Status, Tests, Dokumentation und tatsächliche Nachweise enthalten. Er muss `spec/SPECIFICATION.md` **und** `spec/SPECIFICATION_EXTENSION_PYZ_PACK.md` ausdrücklich als gemeinsamen Spezifikationssatz referenzieren und seine Auswahl für den Auftrag `PYZ-PACK` eindeutig machen.
 
-Die neue Planung überschreibt weder den in der gebundenen Quelle abgeschlossenen Watcher-Plan noch den dort nachfolgenden Result-/CIFS-Plan. PP-00 gleicht ihren tatsächlichen aktuellen Fortschritt und offene Apply-/CI-/Zielplattformnachweise ab (`GOV-02`). Eigenständige offene Aufträge bleiben erkennbar; eine noch unveränderte Paketversion entscheidet nicht über den aktiven Featureplan. Es gibt keine neue Infrastruktur oder einen zusätzlichen verpflichtenden Nutzer-Aufbereitungsschritt.
+Die neue Planung überschreibt weder den in der gebundenen Quelle abgeschlossenen Watcher-Plan noch den dort nachfolgenden Result-/CIFS-Plan. PP-00 gleicht ihren tatsächlichen aktuellen Fortschritt und offene Execute-/CI-/Zielplattformnachweise ab (`GOV-02`). Eigenständige offene Aufträge bleiben erkennbar; eine noch unveränderte Paketversion entscheidet nicht über den aktiven Featureplan. Es gibt keine neue Infrastruktur oder einen zusätzlichen verpflichtenden Nutzer-Aufbereitungsschritt.
 
 **PLAN-02.** Jeder fachliche Abschnitt wird nach W → R → C bearbeitet: kleinste bereits sichere durchgängige Funktion, Robustheit/Grenzfälle, anschließend sinnvolle Bereinigung ohne verdeckte neue Fachfunktion. W darf Sicherheitsgrenzen nicht auf einen späteren R-Schritt verschieben.
 
@@ -1332,13 +1337,13 @@ Diese Zuordnung ist eine Bestandsorientierung, keine Pflicht zum Beibehalten pri
 
 **PLAN-04.** Jeder Schritt enthält die zu ihm gehörenden Tests und Dokumentationsänderungen. PP-07 ist ein übergreifender Abschlussabgleich, kein Aufschub der für PP-06 erforderlichen Bootstrap-Funktion oder eingebetteten Startanweisung. PP-08 ist der finale Integrationsnachweis, kein Ersatz für fehlende frühere Sicherheits-/Funktionstests. Der erste neue Writerstand wird bereits nach `MIG-02`/`E-10` geprüft.
 
-Commit-, Push- und CI-Aktionen erfolgen ausschließlich nach dem bestehenden beauftragten Entwicklungs-/Apply-Ablauf. `pack` selbst kennt diese Planung nicht und führt keine solchen Aktionen aus. Eine bloße Spezifikationsübernahme ist kein abgeschlossener Umsetzungsschritt und kein Release.
+Commit-, Push- und CI-Aktionen erfolgen ausschließlich nach dem bestehenden beauftragten Entwicklungs-/Execute-Ablauf. `pack` selbst kennt diese Planung nicht und führt keine solchen Aktionen aus. Eine bloße Spezifikationsübernahme ist kein abgeschlossener Umsetzungsschritt und kein Release.
 
 ## 19. Abnahme und Definition of Done
 
 ### 19.1 Zentrales Abnahmeszenario
 
-> Eine unveränderte, regulär installierte PatchHarbor-Version erzeugt ohne zusätzliche manuelle Vorbereitung ein vollständiges Result mit einer passenden PYZ. Diese PYZ wird in einer frischen gewöhnlichen Python-Laufzeit ohne PatchHarbor-Installation verwendet. Sie erzeugt mit `pack` aus vorbereiteten Inhalten ein Patchformat-1-Paket, validiert die geschriebenen Bytes gegen genau dieses Result und veröffentlicht genau diese Bytes. Das Paket lässt sich anschließend über den regulären Apply-Weg in einer passenden isolierten Repositoryinstanz verarbeiten. Ein durch die PYZ erzeugtes weiteres Result enthält wiederum dieselbe kanonische PYZ. Der Watcher ist nicht in der PYZ enthalten.
+> Eine unveränderte, regulär installierte PatchHarbor-Version erzeugt ohne zusätzliche manuelle Vorbereitung ein vollständiges Result mit einer passenden PYZ. Diese PYZ wird in einer frischen gewöhnlichen Python-Laufzeit ohne PatchHarbor-Installation verwendet. Sie erzeugt mit `pack` aus vorbereiteten Inhalten ein Patchformat-1-Paket, validiert die geschriebenen Bytes gegen genau dieses Result und veröffentlicht genau diese Bytes. Das Paket lässt sich anschließend über den regulären Execute-Weg in einer passenden isolierten Repositoryinstanz verarbeiten. Ein durch die PYZ erzeugtes weiteres Result enthält wiederum dieselbe kanonische PYZ. Der Watcher ist nicht in der PYZ enthalten.
 
 ### 19.2 Verbindliche Freigabebedingungen
 
@@ -1370,12 +1375,12 @@ Die folgenden Referenzen beziehen sich ausschließlich auf die in Abschnitt 1.2 
 |---|---|---|
 | **B1** | `spec/SPECIFICATION.md`, insbesondere §§ 1, 2.2, 5, 15–19.6a, 21, 23, 26.3/26.6/26.8 und 32–41 | Bestehender Produkt-, API-, Runtime-, Result-, Chat- und Testvertrag; präzise begrenzte Ablösung durch diese Ergänzung. |
 | **B2** | `CHAT_INSTRUCTIONS.md`, insbesondere §§ 3–4 und 7–8; `src/patchharbor/bundle_handoff.py` | Bootstrap-/Spezifikationsauswahl, Dateinamen/Suffix, Manifest, passive Begleitdateien und Bedeutung der Paketpfade. |
-| **B3** | `src/patchharbor/apply_mutation.py`, `apply_preflight.py`, `patch_package.py`, `payload_modes.py`, `bundle_paths.py` | Vor-Entrypoint-Nutzdateien, Moduspolitik und sichere Paketgrenzen. |
+| **B3** | `src/patchharbor/execute_mutation.py`, `execute_preflight.py`, `patch_package.py`, `payload_modes.py`, `bundle_paths.py` | Vor-Entrypoint-Nutzdateien, Moduspolitik und sichere Paketgrenzen. |
 | **B4** | `build_backend.py`, `src/patchharbor/runtime_wheel.py`, `runtime_artifact.py`, `result_resources.py`, `chat_instructions.py` | Bestehende kanonische Erzeugung, Identität, request-lokale Ressourcen und anzupassende Verzeichniszugriffe. |
 | **B5** | `src/patchharbor/result_reader.py`, `result_runtime.py`, `inspection_output.py`, `api.py`, `api_types.py`, `cli.py`, `errors.py`, `exit_status.py`, `resource_policy.py` | Referenzschema, geschlossene Wheel-Capabilities, bestehende Ergebnisse, Fehlercodes und Budgets. |
 | **B6** | `.github/workflows/acceptance-tests.yml`, `docs/test-parallelism.md`, Hauptspezifikation § 33 | Vorhandene Plattform-/Python-Lanes, manueller Workflow und Acceptance-Timeout. |
 | **B7** | Hauptspezifikation §18.5; `docs/result-publication-cifs.md`; Result-Publikations-/Verifikations- und Plattformmodule | Bestehende Eigentums-/Sync-/Retry-/Hash-/Diagnosepolitik für eigene Result-Ausgaben; unverändert auch bei Format 3, keine implizite Übertragung auf Pack-Eingaben. |
-| **B8** | `planning/watcher-events/commit-plan.md` und `planning/result-publication/commit-plan.md` | Gebundener Planstatus: Watcher abgeschlossen; im nachfolgenden CIFS-Plan dokumentierte noch offene Apply-/Windows-/CIFS-Nachweise vor Umsetzung aktuell abgleichen. |
+| **B8** | `planning/watcher-events/commit-plan.md` und `planning/result-publication/commit-plan.md` | Gebundener Planstatus: Watcher abgeschlossen; im nachfolgenden CIFS-Plan dokumentierte noch offene Execute-/Windows-/CIFS-Nachweise vor Umsetzung aktuell abgleichen. |
 
 Die frühere Gesprächserklärung, nach der der Entrypoint grundsätzlich erst alle vollständigen Dateien ins Ziel kopiere, ist **keine Grundlage** dieses Dokuments. Maßgeblich ist der kontrollierte Core-Payload-Schritt vor dem Entrypoint gemäß Abschnitt 3.2. Ebenso wird die frühere pauschale Aufnahme des Watchers in den PYZ-Umfang ausdrücklich nicht übernommen.
 
@@ -1421,7 +1426,7 @@ Die Review-Unterlagen `REVIEW_SPECIFICATION_EXTENSION_PYZ_PACK.md` und `PRUEFNAC
 | R-01 | `PACK-03/22`: bestehende Kategorien 3/4/5/9/10 phasenunabhängig erhalten; neue Argument-, Ausgabe- und Publikationsfälle getrennt. | P-04/P-08/P-11, S-15, Bestands-Inspect-/Validate-Regression. |
 | R-02 | `GOV-03`, `CHAT-06`, `DOC-01`, `PLAN-01`: gemeinsamer Normsatz und expliziter Featureplan, keine künstliche Mehrdeutigkeit durch Ergänzung. | E-09 und Review des konkreten Commitplans. |
 | R-03 | `MIG-02`, PP-04/PP-05/PP-06 und `PLAN-04`: nutzbarer Bootstrap samt eingebetteter Vorlage vor oder atomar mit Writerumschaltung. | F-10 und E-10 als PP-06-Freigabegate. |
-| R-04 | §1.3/`GOV-04`: Ausnahmen zu Core-Paketerzeugung, rekursivem Inhaltsbaum, Handoff/Namen und Trennung Result-/Pack-Publikation ausdrücklich begrenzt. | P-09, F-14 und Bestands-Exchange-/Apply-Regression. |
+| R-04 | §1.3/`GOV-04`: Ausnahmen zu Core-Paketerzeugung, rekursivem Inhaltsbaum, Handoff/Namen und Trennung Result-/Pack-Publikation ausdrücklich begrenzt. | P-09, F-14 und Bestands-Exchange-/Execute-Regression. |
 | R-05 | `GOV-02`, `MIG-06`, `PACK-23`, `TEST-07`, PP-00/PP-01/PP-06/PP-08: tatsächlicher Planstatus, Result-CIFS-Vertrag erhalten, Pack zunächst ohne Stabilitäts-Retry. | F-13/F-14/S-17, getrennte tatsächliche Windows-/CIFS-Nachweise. |
 | R-06 | `PACK-03/04/05/18/20/22`: bestätigter Publikationserfolg bleibt vollständig zugänglich; Cleanup-Warnung, CLI-Ausgabe und Unterbrechungen getrennt. | S-12/S-16/S-18, API ohne Observer und intakter/defekter CLI-Ausgabepfad. |
 | K-01 | `PACK-04/15`: eine Paket-ID und Erzeugungszeit pro Auftrag bei beiden Ausgabearten. | P-17. |
@@ -1432,10 +1437,10 @@ Die Überarbeitung schließt die genannten Vertrags- und Planungslücken **auf D
 ## 21. Additive Integrations-API 1.6.0
 
 Hauptspec §42 ergänzt den bestehenden Python-only-Vertrag um
-`read_result_snapshot` und die Hostoperation `apply_guarded`, beide mit
+`read_result_snapshot` und die Hostoperation `execute_guarded`, beide mit
 öffentlichen Typen und `integration_capabilities` in derselben Core-PYZ.
 Snapshotprüfung benötigt kein Git und führt keine untersuchte Runtime aus;
-Host-Apply behält seine Systemvoraussetzungen. Die geschlossenen Wire-Schemas,
+Host-Execute behält seine Systemvoraussetzungen. Die geschlossenen Wire-Schemas,
 Bootstrap-Prüfung und originale 1.4.0-Artefakte bleiben unverändert.
 Der aktive Folgeplan ist `planning/specroad-integration/commit-plan.md`;
 frühere Plan- und Releaseabnahmen werden dadurch nicht geschlossen.
@@ -1458,10 +1463,10 @@ PYZ wird aus Installation, PYZ und Result geliefert und bei jedem zukünftigen
 Release als echtes Asset verlangt. Python-/Safe-Reference-Grenzen und Capability-
 Versionen bleiben erhalten. Der ausdrückliche 1.8.0-Auftrag autorisiert CI, Tag
 und Release nach exakten Abschlussgates; frühere allgemeine Nutzer-only-Regeln
-blockieren diesen Auftrag nicht. Kein CI-/Releaseaufruf im Apply-Entrypoint.
+blockieren diesen Auftrag nicht. Kein CI-/Releaseaufruf im Execute-Entrypoint.
 
 
-Aktuelle Nutzerentscheidung im REL-180-Auftrag: Nach Apply-Abschluss, lokalen
+Aktuelle Nutzerentscheidung im REL-180-Auftrag: Nach Execute-Abschluss, lokalen
 Abnahmen und geprüftem Build darf Codex das neue v1.8.0-Tag am vollständigen
 Abschlusscommit anlegen; danach folgt die exakte CI. Bei fehlgeschlagener CI
 wird ausschließlich dieses selbst neu angelegte und weiterhin unveränderte

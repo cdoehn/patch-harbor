@@ -1,4 +1,4 @@
-"""Apply the producer's full-index Git diff syntax exactly to immutable trees."""
+"""Execute the producer's full-index Git diff syntax exactly to immutable trees."""
 from __future__ import annotations
 
 import hashlib

@@ -61,7 +61,7 @@ Do not use `python -m patchharbor`: the installed module entrypoint is
 
 ## Update while a watcher is installed
 
-1. Let an active Apply finish and examine its Result/logs. Do not replace the
+1. Let an active Execute finish and examine its Result/logs. Do not replace the
    installation under a running worker or interrupt it just to upgrade.
 2. Stop the watcher. With the standard Linux user service:
 
@@ -71,7 +71,7 @@ Do not use `python -m patchharbor`: the installed module entrypoint is
    ```
 
    The stopped service remains enabled if it was enabled before. For a foreground
-   watcher, stop that process after its active Apply finishes.
+   watcher, stop that process after its active Execute finishes.
 3. Upgrade the **same installation that the service uses** with the reviewed
    new wheel. For pipx, a newer local wheel can replace the managed package:
 
@@ -106,7 +106,7 @@ Do not use `python -m patchharbor`: the installed module entrypoint is
 
 Do not start a second foreground watcher while the service runs. On Windows,
 restart the foreground watcher using the upgraded installation. On Termux use
-manual Apply; no Android background-service lifecycle is promised.
+manual Execute; no Android background-service lifecycle is promised.
 
 Upgrading changes the installed code, not the target repository registration.
 Keep `.patchharbor/id`, the valid local configuration, central registry, locks
@@ -126,7 +126,7 @@ python scripts/build_release.py --outdir dist
 
 This builds wheel, sdist and the separate canonical Core-PYZ. It does not publish
 a release, create a tag, install the artifacts, or replace a running watcher.
-Development runs the documented change-focused parallel selection; Apply runs
+Development runs the documented change-focused parallel selection; Execute runs
 the full parallel suite before every commit, including the final commit.
 Retain artifact hashes and evidence for the actual source state. CI is explicitly dispatched under the applicable user authorization; the
 1.9.1 release task authorizes its own required CI. See the

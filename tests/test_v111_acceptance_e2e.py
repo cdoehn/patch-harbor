@@ -14,7 +14,7 @@ from patchharbor.exit_status import ExitCode
 
 from patchharbor.task_manifest import TASK_FORMAT_VERSION, TASK_MARKER
 from patchharbor.state_fingerprint import FINGERPRINT_ALGORITHM
-from patchharbor_watcher.apply_boundary import delegate_to_automatic_apply
+from patchharbor_watcher.execute_boundary import delegate_to_automatic_execute
 from patchharbor_watcher.loop import (
     SharedWatcherEventState,
     WatcherPollOutcome,
@@ -163,7 +163,7 @@ def test_v111_acceptance_complete_repository_workflow(tmp_path: Path) -> None:
 
     dry_run = run_cli(
         caller,
-        "apply",
+        "execute",
         "--dry-run",
         "--json",
         environment_overrides=environment,
@@ -183,7 +183,7 @@ def test_v111_acceptance_complete_repository_workflow(tmp_path: Path) -> None:
 
     applied = run_cli(
         caller,
-        "apply",
+        "execute",
         "--json",
         environment_overrides=environment,
         timeout_seconds=120,
@@ -235,7 +235,7 @@ def test_v111_acceptance_state_mismatch_writes_nothing_and_bundles_actual_state(
 
     completed = run_cli(
         tmp_path,
-        "apply",
+        "execute",
         "--json",
         "--output-dir",
         str(tmp_path / "results"),
@@ -288,7 +288,7 @@ def test_v111_acceptance_entrypoint_failure_preserves_exit_and_result_bundle(
 
     completed = run_cli(
         tmp_path,
-        "apply",
+        "execute",
         "--json",
         "--output-dir",
         str(tmp_path / "results"),
@@ -350,7 +350,7 @@ def test_v111_acceptance_bundle_failure_after_success_returns_eleven(
 
     completed = run_cli(
         tmp_path,
-        "apply",
+        "execute",
         "--json",
         "--output-dir",
         str(output_directory),
@@ -406,7 +406,7 @@ def test_v111_acceptance_watcher_delegates_to_real_apply_once(
     apply_environment = project_environment(environment)
 
     def delegate():
-        return delegate_to_automatic_apply(
+        return delegate_to_automatic_execute(
             environment=apply_environment,
         )
 
@@ -433,9 +433,9 @@ def test_v111_acceptance_watcher_delegates_to_real_apply_once(
     records = [json.loads(line) for line in log_stream.getvalue().splitlines()]
     assert len(records) == 1
     assert records[0]["process_exit_code"] == 0
-    apply_envelope = records[0]["apply_result"]
+    apply_envelope = records[0]["execute_result"]
     assert isinstance(apply_envelope, dict)
-    assert apply_envelope["command"] == "apply"
+    assert apply_envelope["command"] == "execute"
     assert apply_envelope["success"] is True
     assert _result_bundle_path(apply_envelope).is_file()
     assert error_stream.getvalue() == ""

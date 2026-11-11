@@ -1,4 +1,4 @@
-"""Real guarded Apply through the ordinary registered/locked lifecycle."""
+"""Real guarded Execute through the ordinary registered/locked lifecycle."""
 from dataclasses import FrozenInstanceError
 import hashlib
 import inspect
@@ -38,7 +38,7 @@ def package(host,*,body=None,payloads=None,path=None):
 
 
 def guarded(host,path,digest,callback):
-    return api.apply_guarded(path,expected_sha256=digest,expected_repository=host[0],admission=callback)
+    return api.execute_guarded(path,expected_sha256=digest,expected_repository=host[0],admission=callback)
 
 
 def no_execution(repo,report):
@@ -107,7 +107,7 @@ def test_wrong_digest_rejects_before_callback_and_payload(host):
 def test_wrong_explicit_repository_rejects_under_registered_binding(host,tmp_path):
     repo,_=host;path,digest,_=package(host)
     other=create_repository(tmp_path/'other');api.register(other)
-    report=api.apply_guarded(path,expected_sha256=digest,expected_repository=other,
+    report=api.execute_guarded(path,expected_sha256=digest,expected_repository=other,
                              admission=lambda _:pytest.fail('wrong target admitted'))
     no_execution(repo,report)
     assert report.primary_result.failure_reason is api.FailureReason.STATE_MISMATCH
@@ -189,8 +189,8 @@ def test_second_attempt_obeys_actual_state_and_watcher_does_not_replay(host):
     assert first.success and not second.execution_present
     assert second.primary_result.failure_reason is api.FailureReason.STATE_MISMATCH
     assert len(calls)==1
-    automatic=api.apply_next()
-    assert automatic.automatic.status is api.AutomaticApplyStatus.NO_CANDIDATE
+    automatic=api.execute_next()
+    assert automatic.automatic.status is api.AutomaticExecuteStatus.NO_CANDIDATE
     assert (repo/'stage/item').read_bytes()==b'approved payload'
 
 
@@ -219,13 +219,13 @@ def test_result_publication_failure_keeps_actual_executed_outcome(host,monkeypat
 
 def test_signatures_are_explicit_and_old_apply_contract_unchanged(host):
     repo,_=host;path,digest,_=package(host)
-    assert list(inspect.signature(api.apply_guarded).parameters)==['patch','expected_sha256','expected_repository','admission','output_directory','timeout','output','observer']
-    assert typing.get_type_hints(api.apply_guarded)['return'] is api.RunReport
-    assert api.integration_capabilities().guarded_apply_contract_version==1
-    with pytest.raises(ValueError):api.apply(path,repository=repo)
+    assert list(inspect.signature(api.execute_guarded).parameters)==['task','expected_sha256','expected_repository','admission','output_directory','timeout','output','observer']
+    assert typing.get_type_hints(api.execute_guarded)['return'] is api.RunReport
+    assert api.integration_capabilities().guarded_execute_contract_version==2
+    with pytest.raises(ValueError):api.execute(path,repository=repo)
     for changes in ({'expected_sha256':'short'},{'admission':None},{'expected_repository':b'bytes'}):
         options={'expected_sha256':digest,'expected_repository':repo,'admission':lambda _:True};options.update(changes)
-        with pytest.raises((TypeError,ValueError)):api.apply_guarded(path,**options)
+        with pytest.raises((TypeError,ValueError)):api.execute_guarded(path,**options)
     assert not (repo/'stage').exists()
 
 
@@ -250,9 +250,9 @@ class Output:
             _thread.interrupt_main()
         return len(value)
     def flush(self):pass
-report=api.apply_guarded(sys.argv[1],expected_sha256=sys.argv[2],expected_repository=sys.argv[3],
+report=api.execute_guarded(sys.argv[1],expected_sha256=sys.argv[2],expected_repository=sys.argv[3],
                          admission=lambda facts:True,timeout=30,output=api.OutputStreams(text=Output()))
-Path(sys.argv[4]).write_text(json.dumps(report.apply_result()))
+Path(sys.argv[4]).write_text(json.dumps(report.execute_result()))
 raise SystemExit(report.process_exit_code)
 ''')
     result=subprocess.run([sys.executable,str(runner),str(path),digest,str(repo),str(report_file)],
@@ -269,7 +269,7 @@ raise SystemExit(report.process_exit_code)
 
 def test_observer_acceptance_cannot_override_callback_denial(host):
     repo,_=host;path,digest,_=package(host)
-    report=api.apply_guarded(path,expected_sha256=digest,expected_repository=repo,
+    report=api.execute_guarded(path,expected_sha256=digest,expected_repository=repo,
         admission=lambda _:False,observer=lambda _:True)
     no_execution(repo,report)
     assert report.primary_tool_error.kind is api.ErrorKind.ADMISSION_REJECTED

@@ -1,4 +1,4 @@
-"""Real event waits and isolated Apply processes; no accelerated quiet interval."""
+"""Real event waits and isolated Execute processes; no accelerated quiet interval."""
 from __future__ import annotations
 
 from io import StringIO
@@ -17,7 +17,7 @@ import pytest
 from patchharbor.compat import add_exception_note
 
 from patchharbor import api
-from patchharbor_watcher.apply_boundary import delegate_to_automatic_apply
+from patchharbor_watcher.execute_boundary import delegate_to_automatic_execute
 from patchharbor_watcher.lifecycle import WatcherStopController
 from patchharbor_watcher.loop import run_repository_watcher
 from patchharbor_watcher.platform import open_event_source
@@ -131,7 +131,7 @@ def test_real_event_loop_drains_multiple_bundles_and_never_retries_failed_identi
     def delegate(*, exchanges):
         scopes.append(exchanges)
         started = monotonic()
-        result = delegate_to_automatic_apply(exchanges=exchanges, environment=project_environment())
+        result = delegate_to_automatic_execute(exchanges=exchanges, environment=project_environment())
         timings.append((monotonic() - started, result.progress.status, result.process_exit_code))
         reports.append(result)
         if result.progress.status == 'no_candidate':
@@ -147,7 +147,7 @@ def test_real_event_loop_drains_multiple_bundles_and_never_retries_failed_identi
     assert reports[-1].progress.status == 'no_candidate'
     assert all(tuple(t.directory for t in scope) == (exchange,) for scope in scopes)
     for result in attempted:
-        path = Path(result.apply_result['result']['result_bundle']['path'])
+        path = Path(result.execute_result['result']['result_bundle']['path'])
         with ZipFile(path) as z:
             run = json.loads(z.read('logs/run.json'))
             assert run['execution_present'] and not run['dry_run']
@@ -186,7 +186,7 @@ def test_real_event_loop_ignores_neighbor_download_until_its_own_quiet_period(tm
         calls.append((monotonic(), tuple(t.directory for t in exchanges)))
         if b in calls[-1][1]:
             neighbor_scanned.set()
-        result = delegate_to_automatic_apply(exchanges=exchanges, environment=project_environment())
+        result = delegate_to_automatic_execute(exchanges=exchanges, environment=project_environment())
         completions.append((monotonic(), result.progress.status, result.process_exit_code))
         if result.progress.status == 'attempted':
             finished.set()

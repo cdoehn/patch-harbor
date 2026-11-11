@@ -19,7 +19,7 @@ def instances(document):
 
 
 def active_runs(document, repo_id=None, now=None):
-    return sorted((r for r in instances(document) if r['kind'] in ('apply', 'bundle') and live(r, document, now)
+    return sorted((r for r in instances(document) if r['kind'] in ('execute', 'bundle') and live(r, document, now)
                    and (repo_id is None or r.get('data', {}).get('repo_id') == repo_id)),
                   key=lambda r: (r['started_at'], r['instance_id']))
 
@@ -37,7 +37,7 @@ def activity(row):
             code, status, message = 'no-candidate', 'waiting', 'Kein ausführbarer Patch gefunden'
         elif primary or data.get('result_status') == 'failed':
             status = 'success' if primary.get('success') and data.get('result_status') != 'failed' else 'failure'
-            message = 'Apply erfolgreich abgeschlossen' if status == 'success' else 'Apply fehlgeschlagen'
+            message = 'Execute erfolgreich abgeschlossen' if status == 'success' else 'Execute fehlgeschlagen'
         elif row['kind'] == 'watcher' and phase == 'stopped':
             status, message = ('failure' if data.get('last_error') else 'success'), 'Watcher beendet'
     elif row['kind'] == 'watcher':
@@ -73,7 +73,7 @@ def package_label(data, full=False):
         return 'Patch #' + number + (' · ' + short_id(digest, full) if digest else '')
     if digest:
         return 'Patch ' + short_id(digest, full)
-    return 'Patch ' + basename(data['patch_path']) if data.get('patch_path') else 'Patch-Suche'
+    return 'Patch ' + basename(data['task_path']) if data.get('task_path') else 'Patch-Suche'
 
 
 def operation(row, full=False):
@@ -132,7 +132,7 @@ def repository_status(repo, document, now=None):
         if facts.get('dirty'):
             return 'Prüfung vorgemerkt', 'waiting', None
         return 'Wartet auf Änderungen', 'waiting', None
-    stale = next((r for r in instances(document) if r['kind'] in ('apply', 'bundle') and
+    stale = next((r for r in instances(document) if r['kind'] in ('execute', 'bundle') and
                   r.get('data', {}).get('repo_id') == repo['repo_id'] and not r.get('completed')), None)
     return ('Aktivität nicht mehr bestätigt' if stale else 'Keine aktive Ausführung beobachtet'), 'unknown', None
 
@@ -169,7 +169,7 @@ def last_result(repo, document, now=None):
     candidates = []
     for row in instances(document):
         data = row.get('data', {})
-        if row['kind'] == 'apply' and row.get('completed') and data.get('repo_id') == repo['repo_id'] and not data.get('dry_run'):
+        if row['kind'] == 'execute' and row.get('completed') and data.get('repo_id') == repo['repo_id'] and not data.get('dry_run'):
             if data.get('automatic_status') in ('no_candidate', 'locked') or activity(row)['code'] == 'no-candidate':
                 continue
             candidates.append((row.get('facts_updated_at', ''), data, False))

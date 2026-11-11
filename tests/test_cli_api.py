@@ -28,9 +28,9 @@ class RoutedToApi(RuntimeError):
     (["unregister", "repo"], "unregister"),
     (["context", "repo", "--json"], "context"),
     (["bundle", "repo", "--json"], "bundle"),
-    (["apply", "--json", "some.zip"], "apply"),
-    (["apply", "--dry-run", "--json"], "apply"),
-    (["apply", "--json", "--automatic"], "apply_next"),
+    (["execute", "--json", "some.zip"], "execute"),
+    (["execute", "--dry-run", "--json"], "execute"),
+    (["execute", "--json", "--automatic"], "execute_next"),
     (["fs", "run", "script.sh"], "run_scripts"),
     (["fs", "run"], "run_scripts"),
 ])
@@ -46,7 +46,7 @@ def test_every_cli_operation_uses_public_api(monkeypatch, arguments, function) -
     assert "observer" in observed[0][1]
 
 
-@pytest.mark.parametrize("command", [["apply"], ["fs", "run"]])
+@pytest.mark.parametrize("command", [["execute"], ["fs", "run"]])
 @pytest.mark.parametrize("seconds", ["nan", "inf", "-inf"])
 def test_cli_rejects_nonfinite_timeout_at_argument_boundary(command, seconds) -> None:
     with pytest.raises(SystemExit) as caught:

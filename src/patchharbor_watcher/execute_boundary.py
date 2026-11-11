@@ -11,24 +11,24 @@ from typing import NoReturn
 
 from patchharbor_watcher.protocol import Progress, encode_scope, read_progress
 
-DEFAULT_APPLY_COMMAND = (sys.executable, "-m", "patchharbor_watcher.worker")
+DEFAULT_EXECUTE_COMMAND = (sys.executable, "-m", "patchharbor_watcher.worker")
 
 
 @dataclass(frozen=True, slots=True)
-class ApplyCompletion:
-    """Opaque completion returned by the public Core apply boundary."""
+class ExecuteCompletion:
+    """Opaque completion returned by the public Core execute boundary."""
 
     process_exit_code: int
-    apply_result: dict[str, object] | None
+    execute_result: dict[str, object] | None
     invalid_response_text: str | None
     stderr_text: str
 
     @property
     def progress(self) -> Progress:
         try:
-            if self.apply_result is None:
+            if self.execute_result is None:
                 raise ValueError('worker returned no document')
-            return read_progress(self.apply_result.get('watcher_progress'))
+            return read_progress(self.execute_result.get('watcher_progress'))
         except (ValueError, TypeError, AttributeError):
             return Progress('error')
 
@@ -37,7 +37,7 @@ def _reject_nonfinite_json(value: str) -> NoReturn:
     raise ValueError(f"non-finite JSON value: {value}")
 
 
-def _parse_apply_response(
+def _parse_execute_response(
     stdout: bytes,
 ) -> tuple[dict[str, object] | None, str | None]:
     try:
@@ -53,19 +53,19 @@ def _parse_apply_response(
     return candidate, None
 
 
-def delegate_to_automatic_apply(
+def delegate_to_automatic_execute(
     *,
     exchanges=None,
-    apply_command: Sequence[str] = DEFAULT_APPLY_COMMAND,
+    execute_command: Sequence[str] = DEFAULT_EXECUTE_COMMAND,
     environment: Mapping[str, str] | None = None,
-) -> ApplyCompletion:
+) -> ExecuteCompletion:
     """Run one API worker with the existing process and signal boundary.
 
     No new session, process group, timeout, retry, or shell is introduced. The
-    worker calls api.apply_next with an advisory scope over its private stdin
+    worker calls api.execute_next with an advisory scope over its private stdin
     protocol. No explicit candidate path, manual retry or CLI flags are sent.
     """
-    arguments = list(apply_command)
+    arguments = list(execute_command)
     completed = subprocess.run(
         arguments,
         check=False,
@@ -74,10 +74,10 @@ def delegate_to_automatic_apply(
         stderr=subprocess.PIPE,
         env=environment,
     )
-    apply_result, invalid_response_text = _parse_apply_response(completed.stdout)
-    return ApplyCompletion(
+    execute_result, invalid_response_text = _parse_execute_response(completed.stdout)
+    return ExecuteCompletion(
         process_exit_code=completed.returncode,
-        apply_result=apply_result,
+        execute_result=execute_result,
         invalid_response_text=invalid_response_text,
         stderr_text=completed.stderr.decode("utf-8", errors="replace"),
     )

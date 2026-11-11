@@ -6,7 +6,7 @@ emits a caller-local FutureWarning. No CLI invocation, process-wide chdir,
 implicit stdin, sys.exit, signal-handler installation or console rendering occurs
 here. Git and trusted entrypoint subprocesses are still run by the existing Core.
 
-``apply`` / ``apply_next`` / ``dry_run`` return a RunReport for known tool and
+``execute`` / ``execute_next`` / ``dry_run`` return a RunReport for known tool and
 script failures, retaining the Result-Bundle outcome. Other operations raise
 PatchHarborError for tool failures. Bad API argument types/values raise
 TypeError/ValueError before Core work. Unexpected exceptions are not disguised.
@@ -36,8 +36,8 @@ from patchharbor.api_types import (
     TaskPackResult, RuntimeExportResult, RuntimeExportError, RuntimeExportErrorCode,
     IntegrationCapabilities, ResultSnapshot, ResultSnapshotError, SnapshotErrorCode,
     SnapshotFile, SnapshotLayer, SnapshotRuntime,
-    ApplyLock, ApplyLockKind, ApplyReadiness, AutomaticApplyResult,
-    AutomaticApplyStatus, ExchangeWatchTarget, WatchControlPaths, WatchTargets,
+    ExecuteLock, ExecuteLockKind, ExecuteReadiness, AutomaticExecuteResult,
+    AutomaticExecuteStatus, ExchangeWatchTarget, WatchControlPaths, WatchTargets,
 )
 from patchharbor.errors import ErrorKind, FailureReason, PatchHarborError
 from patchharbor.script_deprecation import warn_script_api as _warn_script_api
@@ -55,7 +55,7 @@ PathInput = str | os.PathLike[str]
 __all__ = [
     "monitor_live", "watcher_observation", "monitor_artifacts", "monitor_overview", "monitor_log", "monitor_snapshot", "MonitorSnapshot", "MonitorRepository", "MonitorExchange",
     "ActivityEvent", "BundleResult", "CandidateSelector", "ConfigurationResult",
-    "AdmissionCallback", "TaskAdmission", "apply_guarded",
+    "AdmissionCallback", "TaskAdmission", "execute_guarded",
     "SafeExportPlan", "SafeExportError", "SafeExportErrorCode", "prepare_reference_export",
     "DEFAULT_TIMEOUT_SECONDS", "DirectoryCandidate", "ErrorKind", "FailureReason",
     "GitObjectFormat", "GitObjectId", "OutputStreams", "PackageFile", "PathInput",
@@ -64,14 +64,14 @@ __all__ = [
     "RepositoryContext", "RepositoryId", "RepositoryPath", "RepositoryResolved",
     "RequestStarted", "ResultBundleResult", "ResultBundleStatus", "RunOperation",
     "RunReport", "RunTiming", "RunToolError", "ScriptPrepared", "ScriptResult",
-    "UnregisterResult", "apply", "apply_next", "bundle", "configure_archive_directory",
+    "UnregisterResult", "execute", "execute_next", "bundle", "configure_archive_directory",
     "configure_bundle_suffix", "configure_exchange_directory", "configuration",
     "context", "dry_run", "register", "repositories", "run_scripts", "unregister",
     "TaskEntry", "TaskEntryRole", "TaskInspection", "TaskManifest", "TaskMessage",
     "TaskValidationResult", "TaskValidationScope", "ReferenceContext", "inspect_task", "validate_task",
-    "ApplyLock", "ApplyLockKind", "ApplyReadiness", "AutomaticApplyResult",
-    "AutomaticApplyStatus", "ExchangeWatchTarget", "WatchControlPaths", "WatchTargets",
-    "watch_targets", "watch_control_paths", "apply_readiness",
+    "ExecuteLock", "ExecuteLockKind", "ExecuteReadiness", "AutomaticExecuteResult",
+    "AutomaticExecuteStatus", "ExchangeWatchTarget", "WatchControlPaths", "WatchTargets",
+    "watch_targets", "watch_control_paths", "execute_readiness",
     "pack_task", "TaskPackResult",
     "export_runtime", "RuntimeExportResult", "RuntimeExportError", "RuntimeExportErrorCode",
     "IntegrationCapabilities", "ResultSnapshot", "ResultSnapshotError", "SnapshotErrorCode",
@@ -82,7 +82,7 @@ __all__ = [
 
 def integration_capabilities() -> IntegrationCapabilities:
     """Versioned contracts of this loaded API, separate from artifact metadata."""
-    return IntegrationCapabilities(2, 2, 1, 1 if _safe_host() else None)
+    return IntegrationCapabilities(2, 2, 2, 1 if _safe_host() else None)
 
 
 def _sha256_argument(value: str, name: str) -> str:
@@ -324,34 +324,34 @@ def bundle(
 
 
 def _inspection_arguments(
-    patch: PathInput, observer: ProgressObserver | None,
+    task: PathInput, observer: ProgressObserver | None,
 ) -> tuple[Path, ProgressObserver | None]:
-    path = _path(patch, "patch")
+    path = _path(task, "task")
     actual_observer = _observer(observer)
     try:
         return path.absolute(), actual_observer
     except (OSError, UnicodeError) as exc:
-        raise PatchHarborError("cannot anchor patch input path: " + str(exc),
+        raise PatchHarborError("cannot anchor task input path: " + str(exc),
                                FailureReason.SOURCE_ERROR) from exc
 
 
 def inspect_task(
-    patch: PathInput, *, observer: ProgressObserver | None = None,
+    task: PathInput, *, observer: ProgressObserver | None = None,
 ) -> TaskInspection:
     """Inspect one explicit package without Git, registration, shell lookup or writes."""
-    path, actual_observer = _inspection_arguments(patch, observer)
+    path, actual_observer = _inspection_arguments(task, observer)
     with _observe_activity(actual_observer):
         return _application.inspect_task(path)
 
 
 def validate_task(
-    patch: PathInput, *, repository: PathInput | None = None,
+    task: PathInput, *, repository: PathInput | None = None,
     reference_bundle: PathInput | None = None, observer: ProgressObserver | None = None,
 ) -> TaskValidationResult:
     """Validate a package, optionally bound to one explicit repository or Result."""
     if repository is not None and reference_bundle is not None:
         raise ValueError("repository and reference_bundle are mutually exclusive")
-    path = _path(patch, "patch")
+    path = _path(task, "task")
     target = _optional_path(repository, "repository")
     reference = _optional_path(reference_bundle, "reference_bundle")
     actual_observer = _observer(observer)
@@ -365,50 +365,50 @@ def validate_task(
         return _application.validate_task(path, repository=target, reference_bundle=reference)
 
 
-def apply(
-    patch: PathInput | None = None, *, repository: PathInput | None = None,
+def execute(
+    task: PathInput | None = None, *, repository: PathInput | None = None,
     dry_run: bool = False, output_directory: PathInput | None = None,
     timeout: float = DEFAULT_TIMEOUT_SECONDS, output: OutputStreams | None = None,
     observer: ProgressObserver | None = None,
 ) -> RunReport:
-    """Apply one bound package, or discover the latest manual-retry candidate.
+    """Execute one bound package, or discover the latest manual-retry candidate.
 
-With no patch, repository (default current directory) scopes discovery. With an
-explicit patch its manifest alone resolves the registered repository; supplying
+With no task, repository (default current directory) scopes discovery. With an
+explicit task its manifest alone resolves the registered repository; supplying
 repository as well is rejected instead of silently ignoring a target constraint.
 Dry-run preserves the existing safety checks and Result-Bundle generation, but
 never writes payloads, runs the entrypoint, consumes replay or archives bundles.
     """
-    if patch is not None and repository is not None:
-        raise ValueError("repository scopes discovery only; do not combine it with patch")
+    if task is not None and repository is not None:
+        raise ValueError("repository scopes discovery only; do not combine it with task")
     if not isinstance(dry_run, bool):
         raise TypeError("dry_run must be boolean")
-    path = _optional_path(patch, "patch")
+    path = _optional_path(task, "task")
     directory = _optional_path(repository, "repository")
     destination = _optional_path(output_directory, "output_directory")
     seconds, targets = _timeout(timeout), _output(output)
     with _observe_activity(_observer(observer)):
-        return _application.run_apply_path(
+        return _application.run_execute_path(
             path, dry_run=dry_run, output_directory=destination,
             timeout_seconds=seconds, output=targets, current_directory=directory,
         )
 
 
 
-def apply_guarded(
-    patch: PathInput, *, expected_sha256: str, expected_repository: PathInput,
+def execute_guarded(
+    task: PathInput, *, expected_sha256: str, expected_repository: PathInput,
     admission: AdmissionCallback, output_directory: PathInput | None = None,
     timeout: float = DEFAULT_TIMEOUT_SECONDS, output: OutputStreams | None = None,
     observer: ProgressObserver | None = None,
 ) -> RunReport:
-    """Apply the captured package only after explicit trusted host admission.
+    """Execute the captured package only after explicit trusted host admission.
 
 The callback runs once under the ordinary repository lock, before payloads,
 with immutable complete package bytes and the bound repository context.
 Only True accepts; denial/errors return the normal failure report. This is
 host code, not a sandbox. Existing diagnostic/Result effects remain possible.
     """
-    path = _path(patch, "patch")
+    path = _path(task, "task")
     target = _path(expected_repository, "expected_repository")
     digest = _sha256_argument(expected_sha256, "expected_sha256")
     if not callable(admission):
@@ -416,30 +416,30 @@ host code, not a sandbox. Existing diagnostic/Result effects remain possible.
     destination = _optional_path(output_directory, "output_directory")
     seconds, targets = _timeout(timeout), _output(output)
     with _observe_activity(_observer(observer)):
-        return _application.run_guarded_apply_path(path, expected_sha256=digest,
+        return _application.run_guarded_execute_path(path, expected_sha256=digest,
             expected_repository=target, admission=admission, output_directory=destination,
             timeout_seconds=seconds, output=targets)
 
 
 def dry_run(
-    patch: PathInput | None = None, *, repository: PathInput | None = None,
+    task: PathInput | None = None, *, repository: PathInput | None = None,
     output_directory: PathInput | None = None, output: OutputStreams | None = None,
     observer: ProgressObserver | None = None,
 ) -> RunReport:
-    """Validate via the same Apply boundary without executing the patch."""
-    return apply(
-        patch, repository=repository, dry_run=True, output_directory=output_directory,
+    """Validate via the same Execute boundary without executing the task."""
+    return execute(
+        task, repository=repository, dry_run=True, output_directory=output_directory,
         output=output, observer=observer,
     )
 
 
-def apply_next(
+def execute_next(
     *, dry_run: bool = False, output_directory: PathInput | None = None,
     timeout: float = DEFAULT_TIMEOUT_SECONDS, output: OutputStreams | None = None,
     observer: ProgressObserver | None = None,
     exchanges: tuple[ExchangeWatchTarget, ...] | None = None,
 ) -> RunReport:
-    """Discover/apply once, optionally limited to freshly observed Exchange roots.
+    """Discover/execute once, optionally limited to freshly observed Exchange roots.
 
 This is not a polling loop. The watcher/larger orchestrator owns that lifecycle.
 The existing automatic Core path performs selection, revalidation, mutation and
@@ -457,7 +457,7 @@ fail closed. The report's automatic field describes progress without messages.
     destination = _optional_path(output_directory, "output_directory")
     seconds, targets = _timeout(timeout), _output(output)
     with _observe_activity(_observer(observer)):
-        return _application.run_apply_path(
+        return _application.run_execute_path(
             None, automatic=True, dry_run=dry_run, output_directory=destination,
             timeout_seconds=seconds, output=targets, exchanges=exchanges,
         )
@@ -475,16 +475,16 @@ def watch_control_paths(*, observer: ProgressObserver | None = None) -> WatchCon
         return _application.watch_control_paths()
 
 
-def apply_readiness(lock: ApplyLock, *, observer: ProgressObserver | None = None) -> ApplyReadiness:
+def execute_readiness(lock: ExecuteLock, *, observer: ProgressObserver | None = None) -> ExecuteReadiness:
     """Probe one known pending lock conflict; release it before returning.
 
 This reads no bundle contents and reserves nothing. Operation/configuration
-errors still raise PatchHarborError. Clients must reenter normal Apply gates.
+errors still raise PatchHarborError. Clients must reenter normal Execute gates.
     """
-    if not isinstance(lock, ApplyLock):
-        raise TypeError("lock must be ApplyLock")
+    if not isinstance(lock, ExecuteLock):
+        raise TypeError("lock must be ExecuteLock")
     with _observe_activity(_observer(observer)):
-        return _application.apply_readiness(lock)
+        return _application.execute_readiness(lock)
 
 
 def run_scripts(
@@ -539,7 +539,7 @@ def export_runtime(output_directory: PathInput, *, observer: ProgressObserver | 
 
 
 def monitor_snapshot(*, repository: str | None = None, exchange: PathInput | None = None, include_state: bool = True) -> MonitorSnapshot:
-    """Observe registered repositories without locks, mutation, recovery or Apply."""
+    """Observe registered repositories without locks, mutation, recovery or Execute."""
     if repository is not None and (not isinstance(repository, str) or not repository or '\x00' in repository):
         raise ValueError('repository must be a nonempty full ID or path')
     if type(include_state) is not bool:
@@ -571,7 +571,7 @@ def monitor_log(path: PathInput, *, expected_sha256: str) -> dict:
 
 
 def monitor_overview(repository: str) -> dict:
-    """Observe candidate and latest retained Apply evidence without mutating sources."""
+    """Observe candidate and latest retained Execute evidence without mutating sources."""
     if not isinstance(repository, str) or not repository or '\x00' in repository:
         raise ValueError('repository must be a nonempty full ID or path')
     from patchharbor.application_monitor_artifacts import monitor_overview as observe

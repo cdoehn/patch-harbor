@@ -57,7 +57,7 @@ def test_format3_reference_preserves_binding_and_separates_success_policy(canoni
     patch = tmp_path / "patch.zip"; bound_package(patch, binding)
     facts, digest = read_result_reference(ref)
     assert facts.format_version == 4 and facts.runtime.status == status
-    assert facts.context.dirty is dirty and facts.operation == ("bundle" if kind == "bundle" else "apply")
+    assert facts.context.dirty is dirty and facts.operation == ("bundle" if kind == "bundle" else "execute")
     assert digest == hashlib.sha256(ref.read_bytes()).hexdigest()
     report = api.validate_task(patch, reference_bundle=ref)
     assert report.binding_matches and report.context.base_commit == facts.context.base_commit

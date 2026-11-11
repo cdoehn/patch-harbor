@@ -1,5 +1,10 @@
 # PatchHarbor – CPython 3.10 und 3.11
 
+> **Aktiver 2.0-Vertrag ab 200-02.W3:** [Task / Execute / Result](../docs/protocol-2.md)
+> ist für die geänderten Formate, API-Namen und Maschinenverträge maßgeblich.
+> Die historischen Basisabschnitte unten bleiben als Sicherheits- und Herkunftsnachweis erhalten;
+> ihre abgelösten Formatnummern und API-Namen aktivieren keinen Kompatibilitätsleser.
+
 **Dokument-ID:** `CPYTHON-310-311`
 **Revision:** 5
 **Stand:** 30. Oktober 2026
@@ -38,7 +43,7 @@ RF-01 präzisiert CPY-10–12 nach Hauptspec §1.1; Sicherheitsregeln bleiben er
 CPython 3.10. Unter 3.10 und 3.11 funktionieren die vollständige öffentliche
 synchrone API sowie sämtliche Core-CLI-Operationen mit ihren bisherigen
 Voraussetzungen. Dazu gehören `pack`, `inspect`, `validate`, Registrierung,
-Konfiguration, Kontext, `bundle`, tatsächliches/fehlgeschlagenes/Dry-Run-Apply
+Konfiguration, Kontext, `bundle`, tatsächliches/fehlgeschlagenes/Dry-Run-Execute
 und `fs run`. Ein erfolgreicher Import oder `--version` genügt nicht.
 
 **CPY-03.** Die normal installierte Watcher-Anwendung einschließlich API,
@@ -46,7 +51,7 @@ CLI, Worker-Grenze und vorhandener Dienstintegration funktioniert ebenfalls
 unter beiden Interpretern. Linux-inotify, Windows-Ereignisse, fünf Sekunden
 Quiet-Time, deduplizierte Beobachtung, Replay/Recovery, kontrolliertes Ende und
 unterdrückte identische `no_candidate`-Meldungen bleiben erhalten. Kein
-Ein-Sekunden-Poller, kein zweiter Apply-Runner und kein Watcher in der PYZ.
+Ein-Sekunden-Poller, kein zweiter Execute-Runner und kein Watcher in der PYZ.
 Die Unterstützung erzeugt keine zusätzliche Android-/Termux-Dienstzusage.
 
 **CPY-04.** Core und PYZ bleiben ohne externe Laufzeitabhängigkeiten und ohne
@@ -153,7 +158,7 @@ parallelen Suites. Für jede Änderung entstehen ihre Fehler-/Sicherheitsprüfun
 im selben Implementierungsschritt. Keine Tests auf Konsolenlayout, Farben,
 README-Prosa oder Markdown. Versionssimulationen sind ergänzende Grenztests,
 kein Ersatz für tatsächliche CPython-Prozesse, native Windows-Handles oder
-reale Result-/Pack-/Apply-Durchstiche mit gebauten Artefakten außerhalb des
+reale Result-/Pack-/Execute-Durchstiche mit gebauten Artefakten außerhalb des
 Checkouts. Ein Skip ist kein positiver Unterstützungsnachweis.
 
 **CPY-15.** Die manuelle CI-Matrix erhält reale 3.10- und 3.11-Lanes für
@@ -162,11 +167,11 @@ Linux und Windows einschließlich PowerShell-Integration und Watcher. Bestehende
 startet `workflow_dispatch`; keine Push-/PR-/Zeitplan-Trigger, kein automatischer
 Dispatch oder Retry durch Codex, Watcher oder Entrypoint. Gemäß Nutzerentscheidung
 vom 29. Oktober 2026 prüft Development nur eine dokumentierte änderungsbezogene
-Auswahl parallel. Apply prüft jeden Commit mit der vollständigen parallelen
+Auswahl parallel. Execute prüft jeden Commit mit der vollständigen parallelen
 Suite, auch vor dem letzten Commit am Bundle-Ende; keine seriellen Gates.
 
 **CPY-16.** Abnahme erfordert vollständigen Commit, tatsächlich geprüfte
-Python-Patchstände, gebaute Wheel-/sdist-/PYZ-Hashes, echte lokale/Apply-Results
+Python-Patchstände, gebaute Wheel-/sdist-/PYZ-Hashes, echte lokale/Execute-Results
 und passende erfolgreiche manuelle CI. Derselbe kanonische PYZ-Inhalt muss aus
 Installation und PYZ selbst einschließlich drei isolierter Resultgenerationen
 reproduzierbar sein. Messungen und fehlende native/Praxisnachweise bleiben
@@ -186,14 +191,14 @@ für die geänderte Kombination. Tags, Releases und Hostupdates sind eigene Auft
 | CT-06 | Unterstützte PYZ mit >=3.10 und beide Capability-Varianten bestehen; unbekannte Anforderungen, gemischte Deskriptoren/Startbytes und neu gehashte Widersprüche scheitern. |
 | CT-07 | Frischer stdlib-Prozess startet die neue PYZ unter 3.10/3.11 offline; kein fremdes Paket, Installer oder Checkout wird verwendet. |
 | CT-08 | Eigene Result-Anleitung bootstrapped ihre tatsächliche PYZ; In-Process-API, Herkunft, Importkonflikt und zu alter Interpreter werden korrekt behandelt. |
-| CT-09 | Vollständige Core-API/CLI-Parität: Konfiguration, Registrierung, bundle, tatsächliches Apply, Dry-Run, fehlgeschlagenes Apply und fs-run mit denselben Verträgen. |
+| CT-09 | Vollständige Core-API/CLI-Parität: Konfiguration, Registrierung, bundle, tatsächliches Execute, Dry-Run, fehlgeschlagenes Execute und fs-run mit denselben Verträgen. |
 | CT-10 | API-/CLI-/PYZ-pack mit vollständigen/diff/gemischten/Diagnose-Inhalten erzeugt dieselben gültigen Verträge; inspect/validate prüfen exakt die Referenz. |
 | CT-11 | Pack-Nebenwirkungsfreiheit, No-replace, konkurrierende Publikation, Inputwechsel, Abbruch und Cleanup erhalten Erfolg/Fehlerkategorien. |
 | CT-12 | Resultproduktion, Replay/Recovery/Archivierung, ZIP64, Datei-/Bytegrenzen und Runtime-unavailable/Fallback bleiben korrekt. |
 | CT-13 | Normale Wheel-/sdist-Installation unter 3.10/3.11 bereitet Ressourcen vor; PYZ bleibt ohne Watcher/Runtime-Dependencies und ohne Cache materialisierbar. |
 | CT-14 | Gebaute PYZ führt drei isolierte Generationen, Eigenressourcen/Pinning/Selbstupdate und Byte-Reproduktion unter beiden Interpretern durch. |
-| CT-15 | Tatsächlich installierter Watcher: native Ereignisse, fünf Sekunden Ruhe, Änderungen während Apply, Duplikate, Neustart/Ende und beide Windows-Shells. |
-| CT-16 | Dokumentierte parallele Development-Auswahl und vollständige parallele Apply-Gates, eindeutige manuelle CI-IDs/Commitbindungen und getrennte neue CIFS-Praxis bei betroffenen Pfaden. |
+| CT-15 | Tatsächlich installierter Watcher: native Ereignisse, fünf Sekunden Ruhe, Änderungen während Execute, Duplikate, Neustart/Ende und beide Windows-Shells. |
+| CT-16 | Dokumentierte parallele Development-Auswahl und vollständige parallele Execute-Gates, eindeutige manuelle CI-IDs/Commitbindungen und getrennte neue CIFS-Praxis bei betroffenen Pfaden. |
 
 ## 7. Primärquellen und Abgrenzung
 
@@ -214,7 +219,7 @@ Sicherheitsentscheidungen sind PatchHarbor-Verträge, keine Garantie der Quellen
 | Revision | Datum | Änderung |
 | --- | --- | --- |
 | 4 | 2026-10-30 | RF-13: Produktversion 1.5.0 eingeordnet; Python-Untergrenze, Format-/Sicherheitsverträge und erforderliche Abnahmen unverändert. |
-| 3 | 2026-10-30 | RF-12: CPY-15/CT-16 an die geltende ausgewählte parallele Development-Prüfung und vollständige parallele Apply-Gates angeglichen; Interpreter- und Sicherheitsverträge unverändert. |
+| 3 | 2026-10-30 | RF-12: CPY-15/CT-16 an die geltende ausgewählte parallele Development-Prüfung und vollständige parallele Execute-Gates angeglichen; Interpreter- und Sicherheitsverträge unverändert. |
 | 2 | 2026-10-29 | RF-01: Supportbasis ab 1.4.0 statt Pflicht für Results 1/2 und originale 1.3.0-PYZ; historische Bytes bleiben unverändert, Untergrenze und Sicherheitsverträge erhalten. |
 | 1 | 2026-10-13 | Beauftragtes Ziel CPython 3.10/3.11, Vertragsabgrenzung, geschlossene Legacy-/Ziel-PYZ-Varianten und Abnahmematrix; noch keine Runtime-Änderung. |
 
@@ -222,7 +227,7 @@ Sicherheitsentscheidungen sind PatchHarbor-Verträge, keine Garantie der Quellen
 
 CPY-02/04/05 gelten auch für Hauptspec §42: öffentliche Snapshotprüfung und
 Fähigkeitsabfrage laufen mit der Core-PYZ ohne Git/Shell/Netzwerk, Hostfreigabe
-mit denselben Voraussetzungen wie Apply. Dieselbe Implementierung muss unter
+mit denselben Voraussetzungen wie Execute. Dieselbe Implementierung muss unter
 CPython 3.10/3.11 und den bestehenden 3.12/3.14-Lanes funktionieren. Nicht
 vorhandene native Nachweise bleiben offen; keine neue 3.13-CI-Lane oder
 Änderung des ausschließlich manuellen Workflowstarts wird behauptet.
@@ -245,10 +250,10 @@ PYZ wird aus Installation, PYZ und Result geliefert und bei jedem zukünftigen
 Release als echtes Asset verlangt. Python-/Safe-Reference-Grenzen und Capability-
 Versionen bleiben erhalten. Der ausdrückliche 1.8.0-Auftrag autorisiert CI, Tag
 und Release nach exakten Abschlussgates; frühere allgemeine Nutzer-only-Regeln
-blockieren diesen Auftrag nicht. Kein CI-/Releaseaufruf im Apply-Entrypoint.
+blockieren diesen Auftrag nicht. Kein CI-/Releaseaufruf im Execute-Entrypoint.
 
 
-Aktuelle Nutzerentscheidung im REL-180-Auftrag: Nach Apply-Abschluss, lokalen
+Aktuelle Nutzerentscheidung im REL-180-Auftrag: Nach Execute-Abschluss, lokalen
 Abnahmen und geprüftem Build darf Codex das neue v1.8.0-Tag am vollständigen
 Abschlusscommit anlegen; danach folgt die exakte CI. Bei fehlgeschlagener CI
 wird ausschließlich dieses selbst neu angelegte und weiterhin unveränderte

@@ -10,7 +10,7 @@ import pytest
 
 from patchharbor import api
 from patchharbor_watcher import worker
-from patchharbor_watcher.apply_boundary import ApplyCompletion, delegate_to_automatic_apply
+from patchharbor_watcher.execute_boundary import ExecuteCompletion, delegate_to_automatic_execute
 from patchharbor_watcher.protocol import MAX_REQUEST_BYTES, Progress, decode_scope, encode_scope, read_progress
 from tests.registration_support import create_repository, set_isolated_user_environment
 
@@ -27,7 +27,7 @@ def test_empty_and_global_scope_remain_distinct():
     # out of that environment variable so Windows can reach the test body.
     pytest.param(b'x' * (MAX_REQUEST_BYTES + 1), id='oversized-request')])
 def test_invalid_worker_scope_never_calls_core(monkeypatch, raw):
-    monkeypatch.setattr(api, 'apply_next', lambda **kw: pytest.fail('invalid request reached Core'))
+    monkeypatch.setattr(api, 'execute_next', lambda **kw: pytest.fail('invalid request reached Core'))
     with pytest.raises((ValueError, TypeError)):
         worker.main(request=raw, stdout=StringIO(), stderr=StringIO())
 
@@ -35,12 +35,12 @@ def test_invalid_worker_scope_never_calls_core(monkeypatch, raw):
 def test_scoped_worker_passes_full_physical_binding_to_public_api(monkeypatch, tmp_path):
     target = api.ExchangeWatchTarget(tmp_path, 17, 19, (api.RepositoryId('00000000-0000-4000-8000-000000000001'),))
     calls = []
-    def apply(**kwargs):
+    def execute(**kwargs):
         calls.append(kwargs)
-        return SimpleNamespace(automatic=api.AutomaticApplyResult(api.AutomaticApplyStatus.NO_CANDIDATE),
-            apply_json_envelope=lambda: {'command': 'apply', 'process_exit_code': 10},
+        return SimpleNamespace(automatic=api.AutomaticExecuteResult(api.AutomaticExecuteStatus.NO_CANDIDATE),
+            execute_json_envelope=lambda: {'command': 'execute', 'process_exit_code': 10},
             process_exit_code=10, result_bundle=SimpleNamespace(status=api.ResultBundleStatus.NOT_ATTEMPTED, emergency_diagnostics_path=None))
-    monkeypatch.setattr(api, 'apply_next', apply)
+    monkeypatch.setattr(api, 'execute_next', execute)
     output = StringIO()
     assert worker.main(request=encode_scope((target,)), stdout=output, stderr=StringIO()) == 10
     assert calls == [{'exchanges': (target,)}]
@@ -55,19 +55,19 @@ def test_scoped_worker_passes_full_physical_binding_to_public_api(monkeypatch, t
 def test_invalid_progress_is_error_and_never_guessed_from_console_text(document):
     response = {'watcher_progress': document, 'error': {'kind': 'task_bundle_error',
                 'message': 'no state-bound patch package matches a registered repository'}}
-    assert ApplyCompletion(10, response, None, '').progress == Progress('error')
+    assert ExecuteCompletion(10, response, None, '').progress == Progress('error')
 
 
 def test_transport_sends_scope_as_private_stdin_without_new_signal_or_shell_boundary(monkeypatch, tmp_path):
-    from patchharbor_watcher import apply_boundary
+    from patchharbor_watcher import execute_boundary
     calls = []
     def run(command, **kwargs):
         calls.append((command, kwargs))
-        return SimpleNamespace(returncode=10, stdout=b'{"command":"apply"}', stderr=b'')
-    monkeypatch.setattr(apply_boundary.subprocess, 'run', run)
-    delegate_to_automatic_apply(exchanges=())
+        return SimpleNamespace(returncode=10, stdout=b'{"command":"execute"}', stderr=b'')
+    monkeypatch.setattr(execute_boundary.subprocess, 'run', run)
+    delegate_to_automatic_execute(exchanges=())
     command, kwargs = calls[0]
-    assert command == list(apply_boundary.DEFAULT_APPLY_COMMAND)
+    assert command == list(execute_boundary.DEFAULT_EXECUTE_COMMAND)
     assert decode_scope(kwargs['input']) == []
     assert not {'shell', 'start_new_session', 'creationflags', 'timeout'} & kwargs.keys()
 

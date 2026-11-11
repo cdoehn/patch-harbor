@@ -667,7 +667,7 @@ def _require_no_content_conversion(
 ) -> None:
     """Reject ambiguous raw differences without invoking a Git conversion helper.
 
-    Normal context/Apply/bundle retain the state-v1 Git candidate selection.
+    Normal context/Execute/bundle retain the state-v1 Git candidate selection.
     Read-only validation can prove raw differences only when no selected Git
     conversion could make those bytes equal to the index. It never emulates a
     configured clean filter or silently returns a different fingerprint contract.

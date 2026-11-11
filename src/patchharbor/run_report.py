@@ -17,7 +17,7 @@ from patchharbor.exit_status import (
     completed_process_exit_code, exit_code_for_reason, primary_process_exit_code,
 )
 from patchharbor.models import RepositoryContext, RepositoryId, RepositoryPath
-from patchharbor.watch_contract import AutomaticApplyResult
+from patchharbor.watch_contract import AutomaticExecuteResult
 
 
 _SECRET_ENV_MARKERS = (
@@ -36,7 +36,7 @@ class RunOperation(str, Enum):
     """Public operations that produce the shared structured run contract."""
 
     BUNDLE = "bundle"
-    APPLY = "apply"
+    EXECUTE = "execute"
 
 
 class PrimaryResultKind(str, Enum):
@@ -481,7 +481,7 @@ class PrimaryResult:
             "interrupted": self.interrupted,
         }
 
-    def as_apply_document(self) -> dict[str, object]:
+    def as_execute_document(self) -> dict[str, object]:
         return {
             "kind": self.kind_text,
             "entrypoint_started": self.entrypoint_started,
@@ -493,8 +493,8 @@ class PrimaryResult:
 
 
 @dataclass(frozen=True, slots=True)
-class ApplyPrimaryOutcome:
-    """One primary apply outcome before Result-Bundle publication."""
+class ExecutePrimaryOutcome:
+    """One primary execute outcome before Result-Bundle publication."""
 
     result: PrimaryResult
     tool_error: RunToolError | None = None
@@ -513,23 +513,23 @@ class ApplyPrimaryOutcome:
                 raise ValueError("primary tool failure reasons disagree")
 
     @classmethod
-    def success(cls) -> ApplyPrimaryOutcome:
+    def success(cls) -> ExecutePrimaryOutcome:
         return cls(result=PrimaryResult.success_result())
 
     @classmethod
-    def dry_run_success(cls) -> ApplyPrimaryOutcome:
+    def dry_run_success(cls) -> ExecutePrimaryOutcome:
         return cls(result=PrimaryResult.dry_run_success_result())
 
     @classmethod
-    def entrypoint_success(cls) -> ApplyPrimaryOutcome:
+    def entrypoint_success(cls) -> ExecutePrimaryOutcome:
         return cls(result=PrimaryResult.entrypoint_success_result())
 
     @classmethod
-    def entrypoint_exit(cls, exit_code: int) -> ApplyPrimaryOutcome:
+    def entrypoint_exit(cls, exit_code: int) -> ExecutePrimaryOutcome:
         return cls(result=PrimaryResult.entrypoint_exit_result(exit_code))
 
     @classmethod
-    def timeout(cls) -> ApplyPrimaryOutcome:
+    def timeout(cls) -> ExecutePrimaryOutcome:
         return cls(
             result=PrimaryResult.timeout_result(),
             tool_error=RunToolError.from_error(
@@ -538,7 +538,7 @@ class ApplyPrimaryOutcome:
         )
 
     @classmethod
-    def interrupted(cls) -> ApplyPrimaryOutcome:
+    def interrupted(cls) -> ExecutePrimaryOutcome:
         return cls(
             result=PrimaryResult.interrupted_result(),
             tool_error=RunToolError.from_error(
@@ -554,7 +554,7 @@ class ApplyPrimaryOutcome:
         reason: FailureReason,
         message: str = "PatchHarbor tool failure",
         error_kind: ErrorKind = ErrorKind.TOOL_ERROR,
-    ) -> ApplyPrimaryOutcome:
+    ) -> ExecutePrimaryOutcome:
         return cls(
             result=PrimaryResult.tool_failure(
                 kind=kind,
@@ -568,7 +568,7 @@ class ApplyPrimaryOutcome:
         )
 
     @classmethod
-    def from_tool_error(cls, error: PatchHarborError) -> ApplyPrimaryOutcome:
+    def from_tool_error(cls, error: PatchHarborError) -> ExecutePrimaryOutcome:
         """Create one primary outcome without duplicating error mappings."""
         return cls(
             result=PrimaryResult.from_tool_error(error),
@@ -582,8 +582,8 @@ class ApplyPrimaryOutcome:
         entrypoint_started: bool,
         entrypoint_exit_code: int | None,
         patchharbor_error: PatchHarborError | None,
-    ) -> ApplyPrimaryOutcome:
-        """Apply process-result priority without conflating its three codes."""
+    ) -> ExecutePrimaryOutcome:
+        """Execute process-result priority without conflating its three codes."""
         if patchharbor_error is not None:
             if entrypoint_exit_code is not None:
                 raise ValueError(
@@ -708,7 +708,7 @@ class ResultBundleResult:
             "error": self.error,
         }
 
-    def as_apply_document(self) -> dict[str, object]:
+    def as_execute_document(self) -> dict[str, object]:
         return {
             "attempted": self.attempted,
             "status": self.status_text,
@@ -734,8 +734,8 @@ class RunReport:
     result_bundle: ResultBundleResult
     primary_tool_error: RunToolError | None = None
     # In-process automatic scheduling information; persisted Result/CLI schemas
-    # remain unchanged. This is not evidence of a successful Apply.
-    automatic: AutomaticApplyResult | None = None
+    # remain unchanged. This is not evidence of a successful Execute.
+    automatic: AutomaticExecuteResult | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(
@@ -750,25 +750,25 @@ class RunReport:
                 raise ValueError("run repository conflicts with its context")
             if self.repo_id not in (None, self.context.repo_id):
                 raise ValueError("run repository ID conflicts with its context")
-        if self.operation is RunOperation.APPLY:
+        if self.operation is RunOperation.EXECUTE:
             if self.repository_resolved != (self.context is not None):
                 raise ValueError(
-                    "safe Apply repository resolution requires one complete context"
+                    "safe Execute repository resolution requires one complete context"
                 )
             failure_reason = self.primary_result.failure_reason
             if failure_reason is None:
                 if self.primary_tool_error is not None:
                     raise ValueError(
-                        "non-tool Apply primary result cannot carry a tool error"
+                        "non-tool Execute primary result cannot carry a tool error"
                     )
             else:
                 if self.primary_tool_error is None:
                     raise ValueError(
-                        "Apply tool failure requires immutable primary error data"
+                        "Execute tool failure requires immutable primary error data"
                     )
                 if self.primary_tool_error.reason != failure_reason:
                     raise ValueError(
-                        "Apply primary result and tool failure reason disagree"
+                        "Execute primary result and tool failure reason disagree"
                     )
                 expected_kind = PrimaryResultKind.for_tool_error(
                     PatchHarborError(
@@ -779,7 +779,7 @@ class RunReport:
                 )
                 if expected_kind is not self.primary_result.kind:
                     raise ValueError(
-                        "Apply primary-result kind and tool-error category disagree"
+                        "Execute primary-result kind and tool-error category disagree"
                     )
         if self.result_bundle.status is ResultBundleStatus.NOT_ATTEMPTED:
             if self.repository_resolved:
@@ -801,7 +801,7 @@ class RunReport:
                 )
 
     @classmethod
-    def completed_apply(
+    def completed_execute(
         cls,
         *,
         timing: RunTiming,
@@ -810,13 +810,13 @@ class RunReport:
         repository: RepositoryPath | None,
         repo_id: RepositoryId | None,
         warnings: tuple[str, ...],
-        primary_outcome: ApplyPrimaryOutcome,
+        primary_outcome: ExecutePrimaryOutcome,
         result_bundle: ResultBundleResult,
     ) -> RunReport:
-        """Build one complete Apply report from its two independent outcomes."""
+        """Build one complete Execute report from its two independent outcomes."""
         return cls(
             timing=timing,
-            operation=RunOperation.APPLY,
+            operation=RunOperation.EXECUTE,
             dry_run=dry_run,
             context=context,
             repository=repository,
@@ -893,7 +893,7 @@ class RunReport:
         return replace(self, result_bundle=result)
 
     def reported_error(self) -> PatchHarborError:
-        """Create the effective Apply exception solely from this run report."""
+        """Create the effective Execute exception solely from this run report."""
         error = self.completion_tool_error
         if error is None:
             raise ValueError("completed run has no PatchHarbor tool error")
@@ -942,10 +942,10 @@ class RunReport:
             "process_exit_code": self.process_exit_code,
         }
 
-    def apply_result(self) -> dict[str, object]:
-        """Return the closed ``apply --json`` result object."""
-        if self.operation is not RunOperation.APPLY:
-            raise ValueError("run report is not an apply result")
+    def execute_result(self) -> dict[str, object]:
+        """Return the closed ``execute --json`` result object."""
+        if self.operation is not RunOperation.EXECUTE:
+            raise ValueError("run report is not an execute result")
         return {
             "run_id": self.run_id_text,
             "repository_resolved": self.repository_resolved,
@@ -957,19 +957,19 @@ class RunReport:
             "repository_path": physical_absolute_path_text(
                 self.resolved_repository
             ),
-            "primary_result": self.primary_result.as_apply_document(),
-            "result_bundle": self.result_bundle.as_apply_document(),
+            "primary_result": self.primary_result.as_execute_document(),
+            "result_bundle": self.result_bundle.as_execute_document(),
         }
 
-    def apply_json_envelope(self) -> dict[str, object]:
-        """Return the complete shared JSON completion for one Apply run."""
-        if self.operation is not RunOperation.APPLY:
-            raise ValueError("run report is not an apply result")
+    def execute_json_envelope(self) -> dict[str, object]:
+        """Return the complete shared JSON completion for one Execute run."""
+        if self.operation is not RunOperation.EXECUTE:
+            raise ValueError("run report is not an execute result")
         return {
-            "output_version": 1,
-            "command": "apply",
+            "output_version": 2,
+            "command": "execute",
             "success": self.success,
-            "result": self.apply_result(),
+            "result": self.execute_result(),
             "error": self.error_document(),
             "process_exit_code": self.process_exit_code,
         }
@@ -1003,16 +1003,16 @@ class RunReport:
         }
 
 
-def unresolved_apply_report(
+def unresolved_execute_report(
     *,
     session: RunSession,
     dry_run: bool,
     error: PatchHarborError,
     warnings: tuple[str, ...] = (),
 ) -> RunReport:
-    """Complete one Apply failure before a repository is safely resolved."""
-    primary_outcome = ApplyPrimaryOutcome.from_tool_error(error)
-    return RunReport.completed_apply(
+    """Complete one Execute failure before a repository is safely resolved."""
+    primary_outcome = ExecutePrimaryOutcome.from_tool_error(error)
+    return RunReport.completed_execute(
         timing=session.finish(),
         dry_run=dry_run,
         context=None,

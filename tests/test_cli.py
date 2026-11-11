@@ -56,7 +56,7 @@ def test_non_core_orchestration_commands_are_not_public(
         ("registry", "list", "--js"),
         ("context", "--js", "missing-repository"),
         ("bundle", "--out", "results", "missing-repository"),
-        ("apply", "--dry", "missing-package.zip"),
+        ("execute", "--dry", "missing-package.zip"),
         ("fs", "run", "--pla", "missing-script.sh"),
     ),
 )
@@ -74,8 +74,8 @@ def test_public_cli_rejects_abbreviated_options(
 @pytest.mark.parametrize(
     ("arguments", "expected_automatic"),
     (
-        (("apply", "--json"), False),
-        (("apply", "--json", "--automatic"), True),
+        (("execute", "--json"), False),
+        (("execute", "--json", "--automatic"), True),
     ),
 )
 def test_parameterless_apply_propagates_manual_or_automatic_origin(
@@ -94,11 +94,11 @@ def test_parameterless_apply_propagates_manual_or_automatic_origin(
         observed.append((None, True))
         return report
 
-    monkeypatch.setattr(cli.api, "apply", fake_apply)
-    monkeypatch.setattr(cli.api, "apply_next", fake_apply_next)
+    monkeypatch.setattr(cli.api, "execute", fake_apply)
+    monkeypatch.setattr(cli.api, "execute_next", fake_apply_next)
     monkeypatch.setattr(
         cli_commands,
-        "_write_apply_completion",
+        "_write_execute_completion",
         lambda _report, **_options: 0,
     )
 
@@ -116,14 +116,14 @@ def test_internal_automatic_origin_is_hidden_and_rejects_an_explicit_path(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     with pytest.raises(SystemExit) as help_exit:
-        main(["apply", "--help"])
+        main(["execute", "--help"])
     assert help_exit.value.code == 0
     assert "--automatic" not in capsys.readouterr().out
 
     with pytest.raises(SystemExit) as path_exit:
-        main(["apply", "--automatic", "patch.zip"])
+        main(["execute", "--automatic", "patch.zip"])
     assert path_exit.value.code == 2
-    assert "does not accept PATCH_ZIP" in capsys.readouterr().err
+    assert "does not accept TASK_ZIP" in capsys.readouterr().err
 
 
 def test_fs_run_without_path_on_terminal_is_a_usage_error(

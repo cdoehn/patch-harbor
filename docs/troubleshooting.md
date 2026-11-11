@@ -1,14 +1,14 @@
-# Troubleshooting Apply and Result publication
+# Troubleshooting Execute and Result publication
 
 Start with the actual run, full package SHA-256 and repository state. A filename,
-an apparently successful start or a Dry Run is not proof of completed Apply.
+an apparently successful start or a Dry Run is not proof of completed Execute.
 Use `patchharbor configure show`, `patchharbor context --json` and read-only
 `git status`/`git log` in the intended repository. Human-facing shortened IDs
 must not be copied into a package manifest.
 
 ## Read the right evidence
 
-An Apply Result contains `logs/run.json` and, when execution started,
+An Execute Result contains `logs/run.json` and, when execution started,
 `logs/execution.log`. Read the primary execution result separately from the
 Result-publication result. Check `dry_run`, actual context, complete binding
 and any confirmed partial progress. Inspect/validate are static checks:
@@ -18,8 +18,8 @@ patchharbor inspect /path/to/patch.zip --json
 patchharbor validate /path/to/patch.zip --reference-bundle /path/to/result.zip --json
 ```
 
-`patchharbor apply --verbose` exposes detailed rejection reasons, but a non-dry
-Apply can execute a package. Stop a conflicting watcher/orchestrator and review
+`patchharbor execute --verbose` exposes detailed rejection reasons, but a non-dry
+Execute can execute a package. Stop a conflicting watcher/orchestrator and review
 the actual state before choosing a deliberate manual retry. Use verbose mode on
 the initial request or a justified recovery request, not as a harmless log reader.
 
@@ -33,14 +33,14 @@ the initial request or a justified recovery request, not as a harmless log reade
 | 9 | Repository state mismatch. Compare the actual base commit and fingerprint; create a fresh Result if state changed. |
 | 10 | Invalid patch package. Inspect the reported schema, path, entrypoint or integrity failure. |
 | 11 | Result creation/publication failed. Inspect emergency diagnostics and the actual repository before retrying. |
-| 12 | Repository busy. Let the owning Apply finish; do not delete lock files. |
+| 12 | Repository busy. Let the owning Execute finish; do not delete lock files. |
 
 These are PatchHarbor tool statuses. Entrypoint exit codes are also preserved
 and can have the same numeric values; the run report identifies which occurred.
 Timeout/interruption and interpreter failures have their own diagnoses. Do not
 infer a test result or repository rollback from an exit number alone.
 
-## Apply succeeded but no Result appeared
+## Execute succeeded but no Result appeared
 
 The entrypoint can finish, commit and push before Result publication fails.
 The process can then exit with code 11 even though those changes remain.
@@ -53,10 +53,10 @@ publication phases. Inspect the actual Git HEAD, working tree and remote evidenc
 without resetting or cleaning files. Correct the diagnosed publication problem,
 then run `patchharbor bundle` from the registered repository to capture the
 current state. This new manual bundle is a state snapshot; it does not recreate
-the missing Apply receipt or retroactively prove tests, commit or push.
+the missing Execute receipt or retroactively prove tests, commit or push.
 
 An interrupted `attempted` replay record is not automatically a crashed process.
-Existing [recovery checks](repository-workflow.md#recovering-an-interrupted-apply)
+Existing [recovery checks](repository-workflow.md#recovering-an-interrupted-execute)
 require the lock and complete pinned evidence. Leave uncertain attempts intact.
 
 ## Large snapshots and shared storage
@@ -80,14 +80,14 @@ without credentials. See [CIFS publication](result-publication-cifs.md).
 The watcher uses all registered repositories' configured Exchanges. It observes
 top-level filesystem events and waits for five seconds of quiet. Result Bundles,
 foreign packages, stale bindings and replay-ineligible packages cannot become
-Apply candidates. Repeated identical `no_candidate` messages are suppressed;
+Execute candidates. Repeated identical `no_candidate` messages are suppressed;
 silence is not proof that the service stopped.
 
 Check the service and journal, local settings and package binding. Changes only
 inside existing subdirectories do not trigger discovery. A Git change alone
 does not trigger it either. On network mounts, verify that the OS supplies the
 needed native events; Result write retries cannot repair missing watcher events.
-A deliberate manual Apply is available. The watcher never silently substitutes
+A deliberate manual Execute is available. The watcher never silently substitutes
 polling or automatically retries an unchanged failed package.
 
 See [watcher operation](watcher-events.md), [safe publication](../README.md#publish-only-complete-zips)

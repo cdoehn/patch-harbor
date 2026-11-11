@@ -7,10 +7,10 @@ build and every release from 1.8.0 onward requires its own Core-PYZ as well as
 wheel and built sdist. A source archive supplied by GitHub does not replace them.
 The workflow is generic: filenames derive from the requested actual version.
 
-The release operator records the complete confirmed Apply commit and verifies
+The release operator records the complete confirmed Execute commit and verifies
 that it was normally pushed to `dev`. Local Development evidence is a documented
-parallel selection. Apply must complete its full parallel suite before each
-actual commit. The Apply entrypoint never tags, runs CI or publishes a release.
+parallel selection. Execute must complete its full parallel suite before each
+actual commit. The Execute entrypoint never tags, runs CI or publishes a release.
 Historical releases are not rebuilt or relabeled.
 
 Preserve the repository's LF attributes for canonical Core sources, packaged
@@ -33,7 +33,7 @@ network and subprocess operations on every platform.
 3. Dispatch `none` with the same full `expected_commit` and another unique
    `handoff_id`. This runs the existing 13 native Python/Linux/Windows/shell and
    Docker lanes. Wait for the complete run and retain its Run-ID. On failure,
-   correct the proved failure through Apply before trying a new candidate.
+   correct the proved failure through Execute before trying a new candidate.
    Never treat a green run at another HEAD as release approval. For 1.9.1, the
    user requests dev-to-main integration before the tag: after successful
    acceptance, verify both heads and fast-forward/push main to this exact dev

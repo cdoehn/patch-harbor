@@ -12,7 +12,7 @@ import zipfile
 import pytest
 
 from patchharbor import api
-from patchharbor_watcher.apply_boundary import delegate_to_automatic_apply
+from patchharbor_watcher.execute_boundary import delegate_to_automatic_execute
 from tests.platform_support import (
     IS_WINDOWS, assert_child_process_stopped, cleanup_test_processes,
     native_script, native_value, project_environment, wait_for_child_pid,
@@ -61,12 +61,12 @@ sys.meta_path.insert(0, NoCli())
 from patchharbor_watcher.worker import main
 raise SystemExit(main())
 ''', encoding="utf-8")
-    completion = delegate_to_automatic_apply(
-        apply_command=(sys.executable, str(launcher)), environment=project_environment(),
+    completion = delegate_to_automatic_execute(
+        execute_command=(sys.executable, str(launcher)), environment=project_environment(),
     )
     assert completion.process_exit_code == 0
     assert completion.invalid_response_text is None
-    document = completion.apply_result
+    document = completion.execute_result
     assert document is not None and document["success"] is True
     assert document["result"]["repo_id"] == str(context.repo_id)
     bundle = Path(document["result"]["result_bundle"]["path"])

@@ -20,7 +20,7 @@ from patchharbor.platform.locking import (
     exclusive_file_lock,
 )
 from patchharbor.user_paths import RegistrationUserPaths
-from patchharbor.watch_contract import ApplyLock, ApplyLockKind
+from patchharbor.watch_contract import ExecuteLock, ExecuteLockKind
 
 
 @contextmanager
@@ -52,7 +52,7 @@ def registry_lock(paths: RegistrationUserPaths) -> Iterator[None]:
     with _application_lock(
         paths.registry_lock_path,
         unavailable_error=LockBusyError(
-            registry_error("repository registry is busy"), ApplyLock(ApplyLockKind.REGISTRY),
+            registry_error("repository registry is busy"), ExecuteLock(ExecuteLockKind.REGISTRY),
         ),
         operation_error=registry_error,
     ):
@@ -86,7 +86,7 @@ def repository_lock(
     with _application_lock(
         repository_lock_path(paths, repo_id),
         unavailable_error=LockBusyError(
-            repository_busy_error(), ApplyLock(ApplyLockKind.REPOSITORY, repo_id),
+            repository_busy_error(), ExecuteLock(ExecuteLockKind.REPOSITORY, repo_id),
         ),
         operation_error=repository_resolution_error,
     ):

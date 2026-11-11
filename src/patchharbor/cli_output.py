@@ -78,16 +78,16 @@ def _write_emergency_diagnostics_notice(
         )
 
 
-def _write_apply_completion(
+def _write_execute_completion(
     report: RunReport,
     *,
     json_output: bool,
     stdout: TextIO,
     stderr: TextIO,
 ) -> int:
-    """Render one completed Apply run solely from its immutable report."""
+    """Render one completed Execute run solely from its immutable report."""
     if json_output:
-        _write_json_document(report.apply_json_envelope(), stdout)
+        _write_json_document(report.execute_json_envelope(), stdout)
     else:
         tool_error = report.completion_tool_error
         if tool_error is not None:

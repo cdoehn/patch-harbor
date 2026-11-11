@@ -14,7 +14,7 @@ from patchharbor.cli_parser import (
     _build_parser,
 )
 from patchharbor.cli_commands import (
-    _apply_command,
+    _execute_command,
     _bundle_command,
     _configuration_command,
     _context_command,
@@ -60,6 +60,9 @@ def main(
 
     parser = _build_parser()
     args = parser.parse_args(argv)
+    if args.command == "apply":
+        print("patchharbor apply is deprecated; use patchharbor execute.", file=actual_stderr)
+        args.command = "execute"
     for option in ("verbose", "plain", "no_color"):
         if not hasattr(args, option):
             setattr(args, option, False)
@@ -70,11 +73,11 @@ def main(
     }
 
     if (
-        args.command == "apply"
+        args.command == "execute"
         and args.automatic
-        and args.patch_zip is not None
+        and args.task_zip is not None
     ):
-        parser.error("internal --automatic mode does not accept PATCH_ZIP")
+        parser.error("internal --automatic mode does not accept TASK_ZIP")
 
     if (
         args.command == "configure"
@@ -132,7 +135,7 @@ def main(
 
     if args.command in ("inspect", "validate"):
         return _package_command(
-            args.command, args.patch_zip, json_output=args.json_output,
+            args.command, args.task_zip, json_output=args.json_output,
             repository=getattr(args, "repository", None),
             reference_bundle=getattr(args, "reference_bundle", None), **presentation,
         )
@@ -143,9 +146,9 @@ def main(
             json_output=args.json_output, **presentation,
         )
 
-    if args.command == "apply":
-        return _apply_command(
-            args.patch_zip, dry_run=args.dry_run, timeout_seconds=args.timeout,
+    if args.command == "execute":
+        return _execute_command(
+            args.task_zip, dry_run=args.dry_run, timeout_seconds=args.timeout,
             output_directory=args.output_dir, json_output=args.json_output,
             automatic=args.automatic, **presentation,
         )

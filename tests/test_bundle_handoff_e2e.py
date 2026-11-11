@@ -138,14 +138,14 @@ def test_apply_failure_retry_and_dry_run_all_embed_fresh_handoff(tmp_path: Path,
     environment["PH_HANDOFF_READY"] = str(tmp_path / "external-ready")
     cwd = tmp_path if automatic else repository
     origin = ("--automatic",) if automatic else ()
-    dry_run = run_cli(cwd, "apply", "--json", "--dry-run", *origin, environment_overrides=environment)
+    dry_run = run_cli(cwd, "execute", "--json", "--dry-run", *origin, environment_overrides=environment)
     assert dry_run.returncode == 0, dry_run.stderr + dry_run.stdout
     dry_doc = json.loads(dry_run.stdout)
     _read_result(Path(dry_doc["result"]["result_bundle"]["path"]))
-    failed = run_cli(cwd, "apply", "--json", *origin, environment_overrides=environment)
+    failed = run_cli(cwd, "execute", "--json", *origin, environment_overrides=environment)
     assert failed.returncode == 23, failed.stdout + failed.stderr
     doc = json.loads(failed.stdout)
-    # Apply error JSON exposes the Result Bundle path in the result as before.
+    # Execute error JSON exposes the Result Bundle path in the result as before.
     result_path = Path(doc["result"]["result_bundle"]["path"])
     result_data = _read_result(result_path)
     assert result_data["repository_path"] == str(repository.resolve())
@@ -153,15 +153,15 @@ def test_apply_failure_retry_and_dry_run_all_embed_fresh_handoff(tmp_path: Path,
     assert git(repository, "status", "--porcelain").stdout == ""
     assert not (repository / TASK_HANDOFF_DIRECTORY).exists()
     if automatic:
-        repeated = run_cli(cwd, "apply", "--json", *origin, environment_overrides=environment)
+        repeated = run_cli(cwd, "execute", "--json", *origin, environment_overrides=environment)
         assert repeated.returncode == 10
     Path(environment["PH_HANDOFF_READY"]).touch()
-    success = run_cli(repository, "apply", "--json", environment_overrides=environment)
+    success = run_cli(repository, "execute", "--json", environment_overrides=environment)
     assert success.returncode == 0, success.stdout + success.stderr
     fresh = _read_result(Path(json.loads(success.stdout)["result"]["result_bundle"]["path"]))
     assert fresh["run_id"] != result_data["run_id"]
     assert git(repository, "status", "--porcelain").stdout == ""
-    assert run_cli(repository, "apply", "--json", environment_overrides=environment).returncode == 10
+    assert run_cli(repository, "execute", "--json", environment_overrides=environment).returncode == 10
 
 
 def test_explicit_foreign_repo_uses_target_facts_and_metadata_is_not_payload(tmp_path: Path) -> None:
@@ -173,7 +173,7 @@ def test_explicit_foreign_repo_uses_target_facts_and_metadata_is_not_payload(tmp
     _, data_b = _bundle(repo_b, environment)
     patch = exchange / "foreign.zip"
     _write_patch(patch, context_b, data_b, root_payload=True)
-    completed = run_cli(repo_a, "apply", "--json", str(patch), environment_overrides=environment)
+    completed = run_cli(repo_a, "execute", "--json", str(patch), environment_overrides=environment)
     assert completed.returncode == 0, completed.stderr + completed.stdout
     actual = _read_result(Path(json.loads(completed.stdout)["result"]["result_bundle"]["path"]))
     assert actual["repository_path"] == str(repo_b.resolve())
@@ -185,7 +185,7 @@ def test_explicit_foreign_repo_uses_target_facts_and_metadata_is_not_payload(tmp
 
 def test_watcher_regenerates_local_handoff_and_does_not_loop(tmp_path: Path) -> None:
     from io import StringIO
-    from patchharbor_watcher.apply_boundary import delegate_to_automatic_apply
+    from patchharbor_watcher.execute_boundary import delegate_to_automatic_execute
     from patchharbor_watcher.loop import SharedWatcherEventState, WatcherPollOutcome, poll_repositories_once
     from tests.platform_support import project_environment
 
@@ -197,7 +197,7 @@ def test_watcher_regenerates_local_handoff_and_does_not_loop(tmp_path: Path) -> 
     _write_patch(exchange / "watcher.zip", context, initial, fail_once=True)
     apply_environment = project_environment(environment)
     def delegate():
-        return delegate_to_automatic_apply(environment=apply_environment)
+        return delegate_to_automatic_execute(environment=apply_environment)
     state = SharedWatcherEventState()
     before = set(exchange.glob("*_Result_Bundle_*.zip"))
     assert poll_repositories_once(state, delegate=delegate, log_stream=StringIO(), error_stream=StringIO()) is WatcherPollOutcome.ERROR

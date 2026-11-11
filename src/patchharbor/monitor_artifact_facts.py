@@ -62,7 +62,7 @@ class ArtifactCache:
                 package_sha256=captured.sha256, package_size=captured.size)
         except PatchHarborError:
             return {'kind': 'other'}, None
-        return {'kind': 'task_package', 'bundle_number': declared_bundle_number(package.entrypoint.content),
+        return {'kind': 'task_bundle', 'bundle_number': declared_bundle_number(package.entrypoint.content),
                 'entrypoint_name': package.entrypoint.relative_path}, ExchangeTaskSelection.from_manifest(package.manifest)
 
 
@@ -95,11 +95,11 @@ def artifact_fact(path, archived, state, cache):
             if archived and record is None:
                 identity = ExchangeFileIdentity(path.parent.parent / path.name, artifact.identity.sha256)
                 record = state.record_for(identity)
-            if record and (record.kind != 'task_package' or record.manifest != artifact.selection):
+            if record and (record.kind != 'task_bundle' or record.manifest != artifact.selection):
                 raise ValueError('replay classification disagrees with validated package')
             row['replay_source_path'] = str(identity.path) if record else None
             row.update(repo_id=expected['repo_id'], expected=expected,
-                       replay_status=record.apply_status.value if record and record.apply_status else None,
+                       replay_status=record.execute_status.value if record and record.execute_status else None,
                        attempt_run_id=record.attempt_run_id if record else None,
                        result_sha256=record.result_sha256 if record else None,
                        completed_commit=str(record.completed_commit) if record and record.completed_commit else None)

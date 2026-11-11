@@ -4,7 +4,7 @@ Historischer Einführungsplan: `planning/test-parallel/commit-plan.md` (15 echte
 Historischer Vertrag: `planning/test-parallel/specification.md`.
 **Aktuelle Nutzerentscheidung vom 29. Oktober 2026:** Development führt nur
 ausgewählte, änderungsbezogene Tests parallel aus. Die vollständige parallele
-Suite läuft im Apply vor jedem Commit, auch am Bundle-Ende. Keine seriellen Gates. Nur Christian selbst startet den weiterhin manuellen CI-Workflow.
+Suite läuft im Execute vor jedem Commit, auch am Bundle-Ende. Keine seriellen Gates. Nur Christian selbst startet den weiterhin manuellen CI-Workflow.
 Codex und Entrypoints starten keine CI; der frühere Fünfertakt entfällt.
 Eine ausdrücklich aktivierte Schleife arbeitet den bestehenden Plan ohne feste Korrekturgrenze ab; ein einzelner Folgeauftrag startet keine Schleife.
 Der vorhandene Watcher übernimmt ausschließlich fertig veröffentlichte Pakete.
@@ -75,7 +75,7 @@ Alte Aussagen „PP-00 allein“ und „nächste CI 029“ beschreiben nur diese
 
 **Die folgenden Beispiele beschreiben die vorhandenen Werkzeuge. Für den aktiven
 Auftrag gilt die obige Laptop-Policy: gezielte parallele Auswahl im Development,
-vollständige parallele Commit-Gates im Apply.
+vollständige parallele Commit-Gates im Execute.
 Ein beschriebener Modusvergleich ist kein Auftrag, serielle Tests zu starten.**
 
 ## Teststart
@@ -112,7 +112,7 @@ Der Launcher deaktiviert pytest-timeout und führt keine Test-/Suitefrist ein.
 Produkt-Timeouttests, kontrollierte Prozessprüfungen, Docker-Build-/Preflight-
 Grenzen und äußere CI-Joblimits bleiben eigenständige Mechanismen. Für lange
 Patchfolgen wird das äußere Limit ausdrücklich mit
-`patchharbor apply --timeout 28800 ...` erhöht; das ZIP erhöht es nicht selbst.
+`patchharbor execute --timeout 28800 ...` erhöht; das ZIP erhöht es nicht selbst.
 Auf einem knappen Gerät kann `--workers 2` oder `--workers 4` sinnvoller als
 `auto` sein. Es gibt keine garantierte Laufzeit oder lineare Beschleunigung.
 
@@ -132,7 +132,7 @@ Prozess-/Locktests bleiben erhalten; es wird kein echter systemd-Dienst gestarte
 Jeder Launcher-Lauf aktiviert die Vollständigkeitsprüfung, auch ohne gespeicherte
 Datei. Eine persistente JSON-Datei ist optional. Development dokumentiert seine
 gezielte parallele Auswahl; ein vollständiger Bericht über diese Auswahl ist
-kein Vollsuite-Nachweis. Apply benötigt den vollständigen parallelen Suite-Bericht
+kein Vollsuite-Nachweis. Execute benötigt den vollständigen parallelen Suite-Bericht
 vor jedem Commit, auch am Bundle-Ende. Eine serielle Referenz ist nicht erforderlich:
 
 ```sh
@@ -165,10 +165,10 @@ und xdist-Version und die ausgewählte Windows-Engine. Quellen dürfen während
 eines Laufs nicht wechseln. Lauf-ID, Zeit, Reihenfolge und Worker-Zuteilung
 werden dagegen nicht fachlich verglichen. Ein Quellenwechsel erfordert einen
 neuen parallelen Bericht zum vorgeschriebenen Umfang: gezielte Development-Auswahl
-oder vollständiges Apply-Gate, auch bei Dokumentänderungen.
+oder vollständiges Execute-Gate, auch bei Dokumentänderungen.
 Alte Berichte eines anderen Standes sind kein Gate für neue Quellen. Nur der
 separat beauftragte Modusverifier benötigt zusätzlich seine passende serielle
-Referenz; er gehört nicht zum Development-/Apply-Ablauf.
+Referenz; er gehört nicht zum Development-/Execute-Ablauf.
 
 ## Vollständige Modusabnahme
 
@@ -176,7 +176,7 @@ Referenz; er gehört nicht zum Development-/Apply-Ablauf.
 python tools/verify_test_modes.py --outdir /tmp/ph-mode-check-001
 ```
 
-Dieser Modusvergleich ist kein Development- oder reguläres Apply-Gate.
+Dieser Modusvergleich ist kein Development- oder reguläres Execute-Gate.
 Das Ziel darf noch nicht existieren. Nacheinander laufen vollständige Suites:
 seriell, zwei, vier und auto Worker mit Hash-Seed 0; danach zwei Worker mit Seed 1,
 vier mit Seed 42 und auto mit Seed 314159. Alle Berichte werden mit derselben
@@ -201,7 +201,7 @@ Runner-Policy. Keine optionalen Tests, kein continue-on-error und keine stillen
 Retries.
 
 Der Workflow wird ausschließlich von Christian selbst gestartet. Codex und
-Apply-Entrypoints führen keinen Dispatch aus. Der bisherige automatische
+Execute-Entrypoints führen keinen Dispatch aus. Der bisherige automatische
 Fünfertakt gilt nicht mehr. Fehlende CI allein blockiert keinen Folgepatch;
 native Plattformabnahmen und Releasefreigabe bleiben bis zum passenden Nachweis
 offen. Bekannte CI-Fehler werden weiterhin anhand tatsächlicher Ergebnisse
@@ -242,7 +242,7 @@ als ausführbar behauptet; die Datenlesbarkeit alter Results und die neue
 private temporäre Fixtures. CI ersetzt keine zusätzliche geforderte CIFS-Praxis
 oder die abschließende Releaseentscheidung.
 
-Im Development läuft nur die begründete parallele Testauswahl. Im Apply läuft
+Im Development läuft nur die begründete parallele Testauswahl. Im Execute läuft
 vor jedem Commitstand die vollständige parallele Suite, auch am Bundle-Ende;
 kein serieller Vorlauf und kein
 Vergleich mit einer seriellen Referenz:

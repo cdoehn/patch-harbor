@@ -13,7 +13,7 @@ from patchharbor.application import configure_bundle_suffix
 from patchharbor.errors import PatchHarborError
 from patchharbor.exchange import classify_exchange_artifact, ExchangeArtifactKind
 from patchharbor.result_bundle import create_manual_result_bundle
-from patchharbor_watcher.apply_boundary import delegate_to_automatic_apply
+from patchharbor_watcher.execute_boundary import delegate_to_automatic_execute
 from patchharbor_watcher.loop import SharedWatcherEventState, poll_repositories_once, WatcherPollOutcome
 from tests.platform_support import native_script, native_value, project_environment, run_cli
 from tests.registration_support import create_repository, user_configuration_path
@@ -90,7 +90,7 @@ def test_configure_rejects_ambiguous_or_missing_suffix_argument(tmp_path: Path, 
     assert path.read_bytes() == previous
 
 
-@pytest.mark.parametrize("command", ["bundle", "apply"])
+@pytest.mark.parametrize("command", ["bundle", "execute"])
 def test_no_per_invocation_suffix_option_is_added(tmp_path: Path, command: str) -> None:
     completed = run_cli(tmp_path, command, "--suffix", ".txt")
     assert completed.returncode == 2
@@ -108,7 +108,7 @@ def test_apply_accepts_old_and_suffixed_packages_and_publishes_suffixed_result(
     _write_package(package, context)
     before = package.read_bytes()
     arguments = (str(package),) if explicit_package else ()
-    completed = run_cli(repository, "apply", "--json", *arguments, environment_overrides=environment)
+    completed = run_cli(repository, "execute", "--json", *arguments, environment_overrides=environment)
     assert completed.returncode == 0, completed.stdout + completed.stderr
     assert (repository / "automatic-result.txt").read_text() == "selected"
     result = json.loads(completed.stdout)["result"]
@@ -134,16 +134,16 @@ def test_parameterless_failed_retry_and_successful_replay_remain_intact(tmp_path
     environment["PH_SUFFIX_READY"] = str(ready)
     package = exchange / "retry.zip.txt"
     _write_no_mutation_package(package, context, fail_once=True)
-    failed = run_cli(repository, "apply", "--json", environment_overrides=environment)
+    failed = run_cli(repository, "execute", "--json", environment_overrides=environment)
     assert failed.returncode == 23, failed.stdout + failed.stderr
     failed_result = json.loads(failed.stdout)["result"]
     failed_context = _assert_result(Path(failed_result["result_bundle"]["path"]), ".txt")
     assert failed_context["state_fingerprint"] == context["state_fingerprint"]
     ready.touch()
-    retried = run_cli(repository, "apply", "--json", environment_overrides=environment)
+    retried = run_cli(repository, "execute", "--json", environment_overrides=environment)
     assert retried.returncode == 0, retried.stdout + retried.stderr
     _assert_result(Path(json.loads(retried.stdout)["result"]["result_bundle"]["path"]), ".txt")
-    third = run_cli(repository, "apply", "--json", environment_overrides=environment)
+    third = run_cli(repository, "execute", "--json", environment_overrides=environment)
     assert third.returncode == 10
 
 
@@ -153,7 +153,7 @@ def test_watcher_accepts_suffixed_patch_but_does_not_loop_after_failure(tmp_path
     _write_no_mutation_package(exchange / "watcher.zip.txt", context, fail_once=True)
     apply_environment = project_environment(environment)
     def delegate():
-        return delegate_to_automatic_apply(environment=apply_environment)
+        return delegate_to_automatic_execute(environment=apply_environment)
     state = SharedWatcherEventState()
     first_log = StringIO()
     first = poll_repositories_once(state, delegate=delegate, log_stream=first_log, error_stream=StringIO())
@@ -206,7 +206,7 @@ def test_newest_valid_suffixed_patch_is_selected_only_for_current_repository(tmp
     for index, path in enumerate((old, newest_valid, mismatch, foreign)):
         value = 1_700_000_000_000_000_000 + index * 1_000_000_000
         os.utime(path, ns=(value, value))
-    completed = run_cli(repository, "apply", "--json", environment_overrides=environment)
+    completed = run_cli(repository, "execute", "--json", environment_overrides=environment)
     assert completed.returncode == 0, completed.stdout + completed.stderr
     assert (repository / "automatic-result.txt").read_text() == "new"
     assert not (other / "automatic-result.txt").exists()
@@ -221,7 +221,7 @@ def test_apply_result_suffix_covers_dry_run_and_output_override(
     package = exchange / "patch.zip.txt"
     _write_package(package, context)
     output = tmp_path / "explicit-results" if explicit_output else exchange
-    arguments = ["apply", "--json", str(package)]
+    arguments = ["execute", "--json", str(package)]
     if dry_run:
         arguments.append("--dry-run")
     if explicit_output:
@@ -239,6 +239,6 @@ def test_old_suffixed_patch_is_still_accepted_after_suffix_is_cleared(tmp_path: 
     package = exchange / "patch.zip.txt"
     _write_package(package, context)
     assert run_cli(repository, "configure", "bundle-suffix", "--clear", environment_overrides=environment).returncode == 0
-    completed = run_cli(repository, "apply", "--json", environment_overrides=environment)
+    completed = run_cli(repository, "execute", "--json", environment_overrides=environment)
     assert completed.returncode == 0, completed.stdout + completed.stderr
     _assert_result(Path(json.loads(completed.stdout)["result"]["result_bundle"]["path"]), "")

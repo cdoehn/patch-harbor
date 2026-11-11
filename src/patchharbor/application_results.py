@@ -1,4 +1,4 @@
-"""Result completion and receipts for manual bundles and Apply attempts.
+"""Result completion and receipts for manual bundles and Execute attempts.
 
 Primary outcomes, publication errors and already published receipts stay distinct.
 """
@@ -9,8 +9,8 @@ from collections.abc import Callable
 from pathlib import Path
 
 from patchharbor.progress import activity
-from patchharbor.apply_mutation import ApplyMutationGate
-from patchharbor.apply_repository import SafeResolvedRepository
+from patchharbor.execute_mutation import ExecuteMutationGate
+from patchharbor.execute_repository import SafeResolvedRepository
 from patchharbor.archive_git import completed_commit_for_context
 from patchharbor.errors import PatchHarborError
 from patchharbor.execution import ScriptExecutionResult
@@ -22,15 +22,15 @@ from patchharbor.repository_state import (
 )
 from patchharbor.result_bundle import (
     ManualResultBundle,
-    create_apply_result_bundle,
+    create_execute_result_bundle,
     create_manual_result_bundle,
 )
 from patchharbor.result_resources import PinnedResultResources
-from patchharbor.run_report import ApplyPrimaryOutcome, RunReport, RunSession
+from patchharbor.run_report import ExecutePrimaryOutcome, RunReport, RunSession
 from patchharbor.application_exchange import _maintain_bundle_exchange
 
 
-def _complete_apply_result_bundle(
+def _complete_execute_result_bundle(
     resolved: SafeResolvedRepository,
     package: ValidatedTaskBundle,
     *,
@@ -38,13 +38,13 @@ def _complete_apply_result_bundle(
     resources: PinnedResultResources,
     dry_run: bool,
     warnings: tuple[str, ...],
-    primary_outcome: ApplyPrimaryOutcome,
+    primary_outcome: ExecutePrimaryOutcome,
     execution_log: bytes | None = None,
     actual_context: RepositoryContext | None = None,
     before_result_publication: Callable[[str], None] | None = None,
 ) -> RunReport:
-    activity("BUNDLE", "Capture and publish the current Apply Result Bundle", "heading")
-    return create_apply_result_bundle(
+    activity("BUNDLE", "Capture and publish the current Execute Result Bundle", "heading")
+    return create_execute_result_bundle(
         resolved.repository,
         resolved.repo_id,
         resolved.registry_snapshot,
@@ -64,15 +64,15 @@ def _complete_apply_result_bundle(
 
 
 def _complete_mutation_result_bundle(
-    mutation_gate: ApplyMutationGate,
+    mutation_gate: ExecuteMutationGate,
     *,
-    primary_outcome: ApplyPrimaryOutcome,
+    primary_outcome: ExecutePrimaryOutcome,
     execution_log: bytes | None = None,
     actual_context: RepositoryContext | None = None,
     before_result_publication: Callable[[str], None] | None = None,
 ) -> RunReport:
-    """Complete one apply result from the single checked mutation gate."""
-    return _complete_apply_result_bundle(
+    """Complete one execute result from the single checked mutation gate."""
+    return _complete_execute_result_bundle(
         mutation_gate.resolved,
         mutation_gate.package,
         session=mutation_gate.session,
@@ -87,7 +87,7 @@ def _complete_mutation_result_bundle(
 
 
 def _publish_attempt_outcome(
-    mutation_gate: ApplyMutationGate,
+    mutation_gate: ExecuteMutationGate,
     publisher: Callable[[bool, GitObjectId | None], None] | None,
     *,
     succeeded: bool,
@@ -117,17 +117,17 @@ def _publish_attempt_outcome(
         if completed_report is not None:
             # The successful execution bundle is already published and pinned.
             # Do not overwrite it or attempt another bundle with the same name.
-            report = RunReport.completed_apply(
+            report = RunReport.completed_execute(
                 timing=completed_report.timing, dry_run=completed_report.dry_run,
                 context=completed_report.context, repository=completed_report.repository,
                 repo_id=completed_report.repo_id, warnings=completed_report.warnings,
-                primary_outcome=ApplyPrimaryOutcome.from_tool_error(error),
+                primary_outcome=ExecutePrimaryOutcome.from_tool_error(error),
                 result_bundle=completed_report.result_bundle,
             )
         else:
             report = _complete_mutation_result_bundle(
                 mutation_gate,
-                primary_outcome=ApplyPrimaryOutcome.from_tool_error(error),
+                primary_outcome=ExecutePrimaryOutcome.from_tool_error(error),
                 execution_log=execution_log,
                 actual_context=actual_context,
             )
@@ -135,14 +135,14 @@ def _publish_attempt_outcome(
 
 
 def _complete_entrypoint_execution(
-    mutation_gate: ApplyMutationGate,
+    mutation_gate: ExecuteMutationGate,
     execution: ScriptExecutionResult,
     *,
     publish_attempt_outcome: Callable[[bool, GitObjectId | None], None] | None = None,
     before_result_publication: Callable[[str], None] | None = None,
 ) -> RunReport:
-    """Publish one execution result before unwinding the shared apply scope."""
-    primary_outcome = ApplyPrimaryOutcome.from_execution_result(
+    """Publish one execution result before unwinding the shared execute scope."""
+    primary_outcome = ExecutePrimaryOutcome.from_execution_result(
         entrypoint_started=execution.entrypoint_started,
         entrypoint_exit_code=execution.entrypoint_exit_code,
         patchharbor_error=execution.patchharbor_error,

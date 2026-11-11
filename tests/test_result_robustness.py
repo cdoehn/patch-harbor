@@ -118,7 +118,7 @@ def test_mixed_exchange_selects_only_real_patch_and_writer_produces_current_form
     patch = exchange / "actual.patch.zip"
     _write_custom_package(patch, context, posix_entrypoint="printf ran > executed.txt",
                           powershell_entrypoint="[System.IO.File]::WriteAllText('executed.txt', 'ran')")
-    result = run_cli(repo, "apply", "--json", environment_overrides=env)
+    result = run_cli(repo, "execute", "--json", environment_overrides=env)
     assert result.returncode == 0, result.stdout + result.stderr
     assert (repo / "executed.txt").read_bytes() == b"ran"
     document = json.loads(result.stdout)

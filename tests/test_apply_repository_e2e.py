@@ -134,7 +134,7 @@ def _run_dry_run(
     output_directory: Path | None = None,
 ):
     caller.mkdir(exist_ok=True)
-    arguments = ["apply", "--dry-run"]
+    arguments = ["execute", "--dry-run"]
     if json_output:
         arguments.append("--json")
     if output_directory is not None:
@@ -197,7 +197,7 @@ def test_apply_noninteractive_output_is_sanitized_while_log_remains_raw(
         archive.writestr(entrypoint_name, entrypoint.encode("utf-8"))
 
     output_directory = tmp_path / "results"
-    arguments = ["apply"]
+    arguments = ["execute"]
     if force_plain:
         arguments.append("--plain")
     arguments.extend(("--output-dir", str(output_directory), str(package)))
@@ -236,7 +236,7 @@ def test_apply_timeout_bundles_output_and_exit_code(
 
     completed = run_cli(
         caller,
-        "apply",
+        "execute",
         "--json",
         "--timeout",
         "1.0",
@@ -276,7 +276,7 @@ def test_apply_timeout_preserves_output_after_entrypoint_ready(tmp_path, monkeyp
     import io
     import threading
 
-    from patchharbor.application import apply_task_bundle, resolve_task_bundle
+    from patchharbor.application import execute_task_bundle, resolve_task_bundle
     from patchharbor.errors import FailureReason, PatchHarborError
     from patchharbor.output import OutputTargets
     from patchharbor.platform.lifecycle import ProcessTree
@@ -303,13 +303,13 @@ def test_apply_timeout_preserves_output_after_entrypoint_ready(tmp_path, monkeyp
         return real_run(tree, timeout_seconds=timeout_seconds)
     monkeypatch.setattr(ProcessTree, "run", run_after_output)
     with pytest.raises(PatchHarborError) as failure:
-        apply_task_bundle(resolve_task_bundle(package), output_directory=tmp_path / "results",
+        execute_task_bundle(resolve_task_bundle(package), output_directory=tmp_path / "results",
                             timeout_seconds=1.0,
                             output=OutputTargets(visible_text_stream=io.StringIO(), line_observer=observe))
     assert failure.value.reason is FailureReason.TIMEOUT
     report = failure.value.run_report
     assert report.process_exit_code == int(ExitCode.TIMEOUT)
-    result = report.apply_result()
+    result = report.execute_result()
     assert result["primary_result"]["timed_out"] is True
     assert result["primary_result"]["entrypoint_started"] is True
     with zipfile.ZipFile(result["result_bundle"]["path"]) as archive:
@@ -337,7 +337,7 @@ def test_apply_interrupt_bundles_output_and_exit_code(
     )
     output_directory = tmp_path / "results"
     report_path = tmp_path / "interrupt-report.json"
-    runner_path = tmp_path / "interrupt-apply.py"
+    runner_path = tmp_path / "interrupt-execute.py"
     runner_path.write_text(
         """\
 from __future__ import annotations
@@ -348,7 +348,7 @@ from pathlib import Path
 import sys
 import threading
 
-from patchharbor.application import apply_task_bundle, resolve_task_bundle
+from patchharbor.application import execute_task_bundle, resolve_task_bundle
 from patchharbor.exit_status import ExitCode
 from patchharbor.errors import PatchHarborError
 from patchharbor.output import OutputTargets
@@ -369,7 +369,7 @@ def interrupt_on_ready(lines: tuple[str, ...], _discarded: int) -> None:
 
 
 try:
-    report = apply_task_bundle(
+    report = execute_task_bundle(
         resolve_task_bundle(package),
         output_directory=output_directory,
         timeout_seconds=30,
@@ -386,7 +386,7 @@ except PatchHarborError as error:
         json.dumps(
             {
                 "process_exit_code": report.process_exit_code,
-                "result": report.apply_result(),
+                "result": report.execute_result(),
             }
         ),
         encoding="utf-8",
@@ -396,7 +396,7 @@ report_path.write_text(
     json.dumps(
         {
             "process_exit_code": report.process_exit_code,
-            "result": report.apply_result(),
+            "result": report.execute_result(),
         }
     ),
     encoding="utf-8",
@@ -675,7 +675,7 @@ def test_state_mismatch_returns_nine_and_bundles_actual_repository_state(
 
     assert completed.returncode == int(ExitCode.STATE_MISMATCH)
     envelope = json.loads(completed.stdout)
-    assert envelope["command"] == "apply"
+    assert envelope["command"] == "execute"
     assert envelope["success"] is False
     assert envelope["process_exit_code"] == int(ExitCode.STATE_MISMATCH)
     assert envelope["result"]["primary_result"]["kind"] == "state_mismatch"
@@ -716,7 +716,7 @@ def test_state_mismatch_returns_nine_and_bundles_actual_repository_state(
         result_manifest["actual_fingerprint_algorithm"]
         == FINGERPRINT_ALGORITHM
     )
-    assert run_report["operation"] == "apply"
+    assert run_report["operation"] == "execute"
     assert run_report["dry_run"] is True
     assert run_report["repository_resolved"] is True
     assert run_report["primary_result"] == {
@@ -776,7 +776,7 @@ def test_state_mismatch_uses_physically_resolved_output_directory(
 
     completed = run_cli(
         caller,
-        "apply",
+        "execute",
         "--dry-run",
         "--output-dir",
         str(requested_output),

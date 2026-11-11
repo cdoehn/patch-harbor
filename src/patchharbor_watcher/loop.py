@@ -1,4 +1,4 @@
-"""Native event lifecycle around scoped Core automatic Apply."""
+"""Native event lifecycle around scoped Core automatic Execute."""
 
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ from patchharbor_watcher.observation import Observation, live_observation
 from patchharbor_watcher.protocol import LockReference
 from patchharbor_watcher.scheduling import QUIET_SECONDS, Schedule
 
-from patchharbor_watcher.apply_boundary import ApplyCompletion
+from patchharbor_watcher.execute_boundary import ExecuteCompletion
 
 
 class WatcherPollOutcome(str, Enum):
@@ -56,24 +56,24 @@ def _canonical_json(value: object) -> str:
     )
 
 
-def _apply_error_document(
-    completion: ApplyCompletion,
+def _execute_error_document(
+    completion: ExecuteCompletion,
 ) -> dict[str, object] | None:
-    response = completion.apply_result
+    response = completion.execute_result
     if not isinstance(response, dict):
         return None
     error = response.get("error")
     return error if isinstance(error, dict) else None
 
 
-def _shared_poll_outcome(completion: ApplyCompletion) -> WatcherPollOutcome:
-    response = completion.apply_result
+def _shared_poll_outcome(completion: ExecuteCompletion) -> WatcherPollOutcome:
+    response = completion.execute_result
     if (
         completion.progress.status == 'attempted'
         and
         completion.process_exit_code == 0
         and isinstance(response, dict)
-        and response.get("command") == "apply"
+        and response.get("command") == "execute"
         and response.get("success") is True
         and response.get("process_exit_code") == 0
     ):
@@ -86,9 +86,9 @@ def _shared_poll_outcome(completion: ApplyCompletion) -> WatcherPollOutcome:
 
 def _completion_signature(
     outcome: WatcherPollOutcome,
-    completion: ApplyCompletion,
+    completion: ExecuteCompletion,
 ) -> tuple[object, ...]:
-    error = _apply_error_document(completion)
+    error = _execute_error_document(completion)
     if outcome is WatcherPollOutcome.WAITING:
         return (
             outcome.value,
@@ -107,28 +107,28 @@ def _completion_signature(
     return (
         outcome.value,
         completion.process_exit_code,
-        _canonical_json(completion.apply_result),
+        _canonical_json(completion.execute_result),
     )
 
 
 def _write_operational_record(
     outcome: WatcherPollOutcome,
-    completion: ApplyCompletion,
+    completion: ExecuteCompletion,
     stream: TextIO,
 ) -> None:
     record = {
         "event": (
             "waiting_for_exchange_patch"
             if outcome is WatcherPollOutcome.WAITING
-            else "automatic_apply_completed"
+            else "automatic_execute_completed"
             if outcome is WatcherPollOutcome.APPLIED
-            else "automatic_apply_failed"
+            else "automatic_execute_failed"
         ),
         "scope": "registered_repositories",
         "process_exit_code": completion.process_exit_code,
-        "apply_response_is_json_object": completion.apply_result is not None,
-        "apply_result": completion.apply_result,
-        "invalid_apply_response": completion.invalid_response_text,
+        "execute_response_is_json_object": completion.execute_result is not None,
+        "execute_result": completion.execute_result,
+        "invalid_execute_response": completion.invalid_response_text,
     }
     stream.write(_canonical_json(record))
     stream.write("\n")
@@ -156,12 +156,12 @@ def _write_lifecycle_record(
 def poll_repositories_once(
     event_state: SharedWatcherEventState,
     *,
-    delegate: Callable[[], ApplyCompletion],
+    delegate: Callable[[], ExecuteCompletion],
     log_stream: TextIO,
     error_stream: TextIO,
     stop_requested: Callable[[], bool] = _never_stop,
 ) -> WatcherPollOutcome | None:
-    """Ask Core once to refresh all local settings and apply one eligible package."""
+    """Ask Core once to refresh all local settings and execute one eligible package."""
     if stop_requested():
         return None
     completion = delegate()
@@ -183,7 +183,7 @@ def publish_completion(event_state, completion, log_stream, error_stream):
                 if not completion.stderr_text.endswith("\n"):
                     error_stream.write("\n")
             else:
-                error = _apply_error_document(completion)
+                error = _execute_error_document(completion)
                 message = (
                     error.get("message")
                     if error is not None
@@ -196,9 +196,9 @@ def publish_completion(event_state, completion, log_stream, error_stream):
 
 
 def _readiness(lock: LockReference):
-    core_lock = api.ApplyLock(api.ApplyLockKind(lock.kind),
+    core_lock = api.ExecuteLock(api.ExecuteLockKind(lock.kind),
                              None if lock.repo_id is None else api.RepositoryId(lock.repo_id))
-    blocked = api.apply_readiness(core_lock).blocked_on
+    blocked = api.execute_readiness(core_lock).blocked_on
     return None if blocked is None else LockReference(
         blocked.kind.value, None if blocked.repo_id is None else str(blocked.repo_id))
 
@@ -210,11 +210,11 @@ def run_repository_watcher(
     readiness=_readiness, source_factory=open_event_source, clock=time.monotonic,
     worker_factory=Thread, publication_factory=api.watcher_observation,
 ) -> None:
-    """Block on events/deadlines; keep receiving while one isolated Apply runs.
+    """Block on events/deadlines; keep receiving while one isolated Execute runs.
 
     The main thread alone owns subscriptions and generations. A single helper
     thread waits for the existing worker process and wakes this event loop on
-    completion. Stop retains the existing policy: wait for an active Apply;
+    completion. Stop retains the existing policy: wait for an active Execute;
     process-group signals continue to reach the worker through the OS.
     """
     schedule, observation = Schedule(), Observation()
@@ -306,9 +306,9 @@ def run_repository_watcher(
                         raise result
                     progress = result.progress
                     if progress.status == 'attempted':
-                        publication.update(activity_code='apply-completed',
+                        publication.update(activity_code='execute-completed',
                                            activity_status='success' if result.process_exit_code == 0 else 'failure',
-                                           activity_message='Apply abgeschlossen · Exit ' + str(result.process_exit_code))
+                                           activity_message='Execute abgeschlossen · Exit ' + str(result.process_exit_code))
                     code = ('no-candidate' if progress.status == 'no_candidate' else
                             'pending' if progress.status == 'attempted' else
                             progress.blocked_on.kind + '-lock' if progress.status == 'locked' else 'waiting-change')
@@ -343,7 +343,7 @@ def run_repository_watcher(
                 if targets and not stop_requested():
                     snapshot = schedule.begin(targets)
                     publication.update(activity_code='worker-start')
-                    worker = worker_factory(target=invoke, args=(targets,), name='patchharbor-apply')
+                    worker = worker_factory(target=invoke, args=(targets,), name='patchharbor-execute')
                     worker.start()
             publish_status()
             if not stop_requested():

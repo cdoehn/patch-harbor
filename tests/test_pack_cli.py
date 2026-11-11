@@ -96,7 +96,7 @@ def test_duplicate_mode_path_is_not_last_value_wins(request_files):
 
 
 @pytest.mark.parametrize('option', ['--repository', '--force', '--overwrite', '--skip-validation',
-                                   '--no-validate', '--apply', '--no-handoff', '--repo-id'])
+                                   '--no-validate', '--execute', '--no-handoff', '--repo-id'])
 def test_no_unsafe_or_implicit_pack_options(request_files, option):
     with pytest.raises(SystemExit) as caught: invoke(arguments(request_files, option))
     assert caught.value.code == 2
@@ -230,7 +230,7 @@ def test_packed_payload_uses_regular_apply_and_rechecks_later_repository_state(t
     (contents/'payload.txt').write_bytes(b'desired')
     packed = api.pack_task(contents,reference_bundle=reference,entrypoint=entrypoint,output_directory=exchange)
     if change_target:(repo/'tracked.txt').write_text('later change\n')
-    report = api.apply(packed.path)
+    report = api.execute(packed.path)
     if change_target:
         assert not report.success and report.primary_result.failure_reason is api.FailureReason.STATE_MISMATCH
         assert not report.primary_result.entrypoint_started and not (repo/'payload.txt').exists()

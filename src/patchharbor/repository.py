@@ -280,7 +280,7 @@ def _atomic_write(path: Path, content: bytes, *, description: str) -> None:
         raise _error(f"cannot update {description}: {exc.cause}") from exc
 
 
-def apply_local_registration(
+def execute_local_registration(
     state: LocalRegistrationState,
     repo_id: RepositoryId,
 ) -> None:

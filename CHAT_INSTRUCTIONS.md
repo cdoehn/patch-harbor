@@ -1,26 +1,31 @@
-# PatchHarbor 1.6.0 – Chat-Initialisierung
+# PatchHarbor 2.0.0 (Entwicklung) – Chat-Initialisierung
 
-**Vertragsversion:** 1.6.0<br>
-**Patch-Paketmarker:** `patch-harbor`<br>
-**Patch-Paketformat:** `1`<br>
+Für diesen Entwicklungsstand gilt der Task-/Execute-/Result-Vertrag 2.
+`apply` ist nur ein deprecated CLI-Alias für `execute`; Hinweise stehen auf stderr.
+Alte Bundle-Formate und Python-API-Namen werden nicht unterstützt.
+Result-Format 4 und Runtime-Metadatenformat 3 gehören zu dieser Generation.
+
+**Vertragsversion:** 2<br>
+**Task-Bundlemarker:** `patch-harbor-task-bundle`<br>
+**Task-Bundleformat:** `2`<br>
 **Result-Bundle-Marker:** `patch-harbor-result-bundle`<br>
 **Fingerprint-Algorithmus:** `patchharbor-state-v1`<br>
 **Entrypoint-Pflichtmarker:** `# PATCHHARBOR`
 
 Diese Datei ist die verbindliche Handlungsanweisung für einen externen
 Entwicklungs-Chat. Halte dich an diesen Vertrag, wenn du aus einem PatchHarbor
-Result Bundle ein Patch-Paket für ein registriertes Repository erzeugst.
+Result Bundle ein Task-Bundle für ein registriertes Repository erzeugst.
 
 ## 1. Deine Aufgabe und die Sicherheitsgrenze
 
-Der Chat entwickelt; der lokale Runner bindet jedes Patch-Paket an genau eine
+Der Chat entwickelt; der lokale Runner bindet jedes Task-Bundle an genau eine
 registrierte Repository-Instanz und ihren geprüften Zustand.
 
 PatchHarbor registriert lokale Git-Instanzen per UUID v4, prüft Base-Commit und
 vollständigen Fingerprint, validiert sichere ZIP-Pakete, ordnet sie per repo_id
 zu und schreibt geprüfte Payloads vor genau einem Bash-/PowerShell-Entrypoint.
 Es erfasst stdout/stderr, Exit-Code, Laufzeit, Abbruch und Toolfehler, erzeugt
-Result Bundles und unterscheidet diese von Patch-Paketen. Exchange-Auswahl und
+Result Bundles und unterscheidet diese von Task-Bundlesn. Exchange-Auswahl und
 Archivierung folgen den unten beschriebenen Regeln.
 
 Die für diesen Vertrag relevanten öffentlichen Befehle sind:
@@ -37,8 +42,8 @@ patchharbor registry list
 patchharbor unregister REPOSITORY_OR_REPO_ID
 patchharbor context [REPOSITORY]
 patchharbor bundle [REPOSITORY]
-patchharbor apply [PATCH_ZIP]
-patchharbor apply --dry-run [PATCH_ZIP]
+patchharbor execute [TASK_ZIP]
+patchharbor execute --dry-run [TASK_ZIP]
 patchharbor fs run QUELLE
 patchharbor-watcher
 ```
@@ -49,7 +54,7 @@ Prüfe vor Entrypoint-Code die tatsächlich vorhandenen Core-/API-Funktionen.
 Nutze sie für Payload-Ausbringung, atomare Ersetzung, Pfad-/Sicherheitsprüfung,
 Repository-Zuordnung, Zustand und Archivierung statt eigener Nachbauten.
 Fehlende allgemeine Infrastruktur gehört bevorzugt als eigener geprüfter
-Schritt in den Core. Keine erfundene API, rekursiven apply/bundle-Aufrufe oder
+Schritt in den Core. Keine erfundene API, rekursiven execute/bundle-Aufrufe oder
 Umgehung der bestehenden Checks. Entrypoints orchestrieren auftragsspezifische
 Änderungen, Tests und Commits; sie sind kein zweiter PatchHarbor-Core.
 
@@ -106,10 +111,10 @@ die vollständige ignorierte Konfiguration darf nicht aus Bundle-Metadaten
 rekonstruiert oder per Patch-Nutzdatei überschrieben werden. Insbesondere ist
 `archive_directory` nicht zwingend als Begleitdatum enthalten.
 
-### Apply, Watcher und Archivierung
+### Execute, Watcher und Archivierung
 
 `bundle` veröffentlicht ohne explizites Ausgabeziel im konfigurierten
-Exchange-Ordner. Ein manueller parameterloser `apply` löst zuerst das aktuelle
+Exchange-Ordner. Ein manueller parameterloser `execute` löst zuerst das aktuelle
 Arbeitsverzeichnis einschließlich Repository-Unterverzeichnissen auf und
 betrachtet ausschließlich Pakete für genau diese registrierte Repository-Instanz.
 Unter den vollständig state- und replay-kompatiblen Kandidaten gewinnt der
@@ -118,7 +123,7 @@ Dateiname deterministisch. Einen weiterhin passenden fehlgeschlagenen Patch darf
 der manuelle Aufruf bewusst erneut versuchen. Der Watcher bleibt dagegen global
 für alle registrierten Repositorys und verwendet einen automatischen Ursprung,
 der fehlgeschlagene Pakete nicht erneut pollt. Erfolgreiche Pakete bleiben in
-beiden Fällen Replay-geschützt. Ein expliziter `PATCH_ZIP` darf weiterhin über
+beiden Fällen Replay-geschützt. Ein expliziter `TASK_ZIP` darf weiterhin über
 seine `repo_id` ein anderes registriertes Repository als das aktuelle auswählen.
 `fs run` ist der ältere explizite Runner.
 
@@ -126,7 +131,7 @@ Der normale Exchange-Scan kann ausschließlich nachweislich überholte, vollstä
 geprüfte eigene Bundles in `PatchHarbor-Archive` direkt unter dem Exchange-Ordner
 verschieben. Ein leerer Archivname (`configure archive-dir --clear`) deaktiviert
 dies. Es werden keine Bundles gelöscht. Alter und Dateiname sind keine Beweise.
-Patch-Pakete benötigen einen erfolgreichen Replay-Beleg mit bestätigtem
+Task-Bundles benötigen einen erfolgreichen Replay-Beleg mit bestätigtem
 Abschlusscommit in der aktuellen Git-Historie; alte Belege ohne Abschlusscommit
 bleiben liegen. Result Bundles benötigen einen vollständig geprüften sauberen
 Erfolgssnapshot eines echten Vorfahren des aktuellen sauberen HEAD. Im Zweifel
@@ -147,7 +152,7 @@ weiterhin ausschließlich die vollständigen Bindungswerte aus `context.json`.
 
 ### Unterbrochene Attempts und Erfolgsnachweis
 
-Neue Apply-Result-Manifeste verknüpfen `task_sha256`, `run_id`, `repo_id`, die
+Neue Execute-Result-Manifeste verknüpfen `task_sha256`, `run_id`, `repo_id`, die
 vollständige erwartete Bindung und optional `completed_commit`. Replay-Format 4
 speichert außerdem `attempt_run_id` und eine vor Veröffentlichung lokal verankerte
 `result_sha256`. Nur ein vollständig passendes erfolgreiches Result und sauberer
@@ -155,7 +160,7 @@ Git-Nachweis unter dem echten freien Repository-Lock erlauben eine automatische
 Reparatur `attempted -> succeeded`. Ältere Einträge ohne Beweise bleiben unverändert.
 
 `screen -ls` ohne Socket beweist keinen Prozessabbruch. Ein `attempted`, ein dirty
-Working Tree oder ein fehlendes Result kann zu einem noch laufenden Apply gehören.
+Working Tree oder ein fehlendes Result kann zu einem noch laufenden Execute gehören.
 Vor jeder manuellen Wiederherstellung den echten Lock-/Prozesszustand prüfen und
 Änderungen sichern; niemals aufgrund dieser Symptome allein `git restore`,
 `reset --hard` oder das Löschen von Lock-/Replay-Dateien anweisen. Recovery setzt
@@ -184,7 +189,7 @@ Kennungen aus verkürzten Präfixen.
 Behaupte nicht aus Gesprächserinnerung, den aktuellen Repository-Zustand zu
 kennen. Fehlt ein aktuelles oder ausreichend vollständiges Result Bundle,
 verwende `REPOSITORY_STATE_INCOMPLETE` nach Abschnitt 10 und erzeuge kein
-Patch-Paket.
+Task-Bundle.
 
 ## 3. Result Bundle vollständig auswerten
 
@@ -213,7 +218,7 @@ Prüfe vor jeder Änderung mindestens:
 - `changes/staged.patch`,
 - `changes/unstaged.patch`,
 - alle nicht ignorierten untracked Dateien unter `untracked/`,
-- bei einem vorherigen Apply zuerst `logs/run.json`,
+- bei einem vorherigen Execute zuerst `logs/run.json`,
 - bei Fehler, Warning oder unklarer Ausführung zusätzlich
   `logs/execution.log`.
 
@@ -245,7 +250,7 @@ Bestehende 1.4.0-Capabilities `[1, 2, 3]` bleiben gültig; neue bereinigte
 Produzenten deklarieren `[3]`. Angaben beschreiben den jeweiligen Produzenten,
 nicht die Lesepflicht des aktuellen Werkzeugs. Originalbytes bleiben unverändert.
 
-Der folgende ausführbare Bootstrap prüft unterstützte Result-3-Daten.
+Der folgende ausführbare Bootstrap prüft unterstützte Result-4-Daten.
 Nicht unterstützte Resultformate sind keine Grundlage für eine Ersatz-Ausführung.
 Die PYZ enthält den vollständigen Core ohne Watcher. Kein pip-, venv-, Build-
 oder Downloadschritt und keine Änderung der vorhandenen Installation.
@@ -277,7 +282,7 @@ python -I -S -B /absolut/patchharbor-VERSION.pyz validate /absolut/fertiges-patc
 `scope=reference`, `binding_matches=true` und dessen vollständigen SHA bestätigen.
 Ein fachlicher Fehler darf nicht durch einen schwächeren manuellen Weg umgangen
 werden. Die fertige ZIP vor Auslieferung vollständig prüfen; lokale Vorprüfung
-beweist weder Tests noch Apply oder CI. Ein vorhandenes Fremdmodul darf nicht
+beweist weder Tests noch Execute oder CI. Ein vorhandenes Fremdmodul darf nicht
 entladen werden, um die Runtime im selben Prozess auszutauschen.
 
 Python-only ohne Subprozess: lade den untenstehenden geprüften Helfer als eigenes
@@ -1007,7 +1012,7 @@ keine Reparatur- oder Netzwerkschleife. Entwickle am geprüften tatsächlichen
 Snapshot; verwende vorhandene vertrauenswürdige Paketprüfer oder die etablierten
 ZIP-, Payload-, Hash- und Bindungsprüfungen. Alle vier vollständigen Werte aus
 `context.json` bleiben verbindlich. Kein künstliches `git init` aus `base/`,
-kein ungebundenes `fs run`; Apply prüft den realen Zustand erneut.
+kein ungebundenes `fs run`; Execute prüft den realen Zustand erneut.
 
 Bei ausschließlich defektem Runtime-Zusatz separat äußere ZIP-Sicherheit,
 Pflichtdateien, Snapshot-Inventar/Blob-IDs/Hashes, Kontext und Run-Konsistenz
@@ -1017,7 +1022,7 @@ Vollvalidierung des defekten Results. Ungültige Repositorydaten,
 unsichere Paketpfade und Bindungsabweichungen bleiben blockierend.
 
 Ausfallgrund, Werkzeuge, tatsächliche Prüfungen und fehlende Nachweise benennen.
-Statische Validierung belegt weder Tests noch CI, Authentizität oder Apply-Erfolg.
+Statische Validierung belegt weder Tests noch CI, Authentizität oder Execute-Erfolg.
 Die finale ZIP vollständig öffnen und prüfen; bei jeder Byteänderung erneut
 prüfen. Genau eine kanonische Datei ausliefern; externe Backups nur bei
 Autorisierung und bytegleich, ohne eine zweite ZIP wegen eines Backupfehlers.
@@ -1051,7 +1056,7 @@ ungebundenen Skripttyp in `ScriptBundle` und dessen API in `run_scripts` um;
 Quellversion `2.0.0.dev0` bezeichnet keinen produktiven Zwischenrelease.
 Der repositorygebundene Task-/Execute-/Result-Wechsel folgt erst in `200-02`;
 für diese erste Übergabe bleiben Patchformat 1, Resultformat 3 und die vorhandene
-native Pack-/Apply-Grenze maßgeblich. Eine neue Produktversion darf nicht
+native Pack-/Execute-Grenze maßgeblich. Eine neue Produktversion darf nicht
 vortäuschen, dass die folgenden Planfähigkeiten schon implementiert sind.
 
 Python-API-Rückwärtskompatibilität ist ausdrücklich nicht verlangt. Die im Plan
@@ -1098,13 +1103,13 @@ PatchHarbor selbst. Andere Zielprojekte behalten ihre eigenen Test-/CI-Regeln.
 Die spätere ausdrückliche Nutzeranweisung vom 7. Oktober 2026 ersetzt ältere
 lokale serielle Gates, die Pixel-CI-only-Regel und den CI-Fünfertakt.
 Seit 29. Oktober 2026 prüft Development nur eine dokumentierte, änderungsbezogene
-parallele Testauswahl. Apply prüft jeden Commitstand vollständig parallel, auch am
+parallele Testauswahl. Execute prüft jeden Commitstand vollständig parallel, auch am
 Bundle-Ende. Keine Vollsuite im Development. Kein serieller Lauf und keine verkürzte Auswahl als Vollabnahme.
 Nur Christian startet den manuellen CI-Workflow; Codex und Entrypoints tun das nie.
 
 RF-00 bis RF-13 sind durch tatsächliche Applies bestätigt, zuletzt Bundle 070
 auf `312e8a3c003c0f9421587b92941ecea7917b5d3f` mit 3281 bestandenen Tests
-und 15 Skips in der vollständigen parallelen Apply-Suite. Die 1.5.0-Releaseabnahme
+und 15 Skips in der vollständigen parallelen Execute-Suite. Die 1.5.0-Releaseabnahme
 bleibt separat offen (`planning/1.5.0/release-acceptance.md`).
 Der neue Auftrag umfasst SRI-01 bis SRI-04 / Bundle 071 für 1.6.0; deren
 tatsächliche Commits sind erst durch ein neues Result bestätigt. Kein neuer
@@ -1113,8 +1118,8 @@ gestoppt; Sicherheitsgrenzen und belastbare Resultbindung bleiben Voraussetzung.
 
 Development bleibt ausschließlich in `patchharbor-codex`. Nur die fertig und
 vollständig geprüfte kanonische Patch-ZIP gelangt atomar in den Exchange.
-Der bereits laufende Watcher übernimmt allein den Apply. Keine direkten
-Development-Commits, Apply-Mutationen, Hook-Umgehungen oder Watcher-Neustarts.
+Der bereits laufende Watcher übernimmt allein den Execute. Keine direkten
+Development-Commits, Execute-Mutationen, Hook-Umgehungen oder Watcher-Neustarts.
 Nach erfolgreichen Commit-Gates genau ein normaler Push; kein automatisches Tag.
 
 Die frühere 1.3.0-Abnahme einschließlich Christians CIFS-Praxisbestätigung
@@ -1210,7 +1215,7 @@ W, R und C getrennte echte Zwischenstände mit eigenen Prüfungen und Commits;
 auch mehrere Folgen dürfen in einem Bundle liegen. W/R/C ist kein allgemeiner
 Default.
 
-## 7. Genau ein sicheres Patch-Paket erzeugen
+## 7. Genau ein sicheres Task-Bundle erzeugen
 
 Verwende mit einer nutzbaren aktuellen Runtime `pack` beziehungsweise
 `api.pack_task` für den bewusst vorbereiteten Inhaltsordner, genau das geprüfte
@@ -1237,14 +1242,14 @@ nicht die Endung einer möglicherweise umbenannten Upload-Datei.
 
 Der Benutzer setzt es im betreffenden Repository per `patchharbor configure bundle-suffix .txt`,
 löscht es per `patchharbor configure bundle-suffix --clear` und erzeugt danach
-ein frisches Result Bundle. `apply` und `bundle` benötigen keinen Schalter.
-Der Core erzeugt Result Bundles; du benennst externe Patch-Pakete entsprechend.
+ein frisches Result Bundle. `execute` und `bundle` benötigen keinen Schalter.
+Der Core erzeugt Result Bundles; du benennst externe Task-Bundles entsprechend.
 ZIP-Inhalt und State-Bindung bleiben unverändert. Füge `bundle_suffix` niemals
 in `task.json` ein. Das geschlossene `context --json`-Schema bleibt unverändert;
 bei separater Kontextübergabe muss die Suffixpräferenz zusätzlich genannt werden.
 Ohne diese Information gilt kein Suffix.
 
-Das ZIP enthält genau eine Root-Datei `task.json`. Für Format 1 sind dort
+Das ZIP enthält genau eine Root-Datei `task.json`. Für Task-Format 2 sind dort
 exakt diese sieben Felder erlaubt:
 
 ```json
@@ -1311,7 +1316,7 @@ vor Tests und Commit entfernen. Keine Bestandsdatei darf dabei verloren gehen.
 Alle übrigen sicheren regulären Paketdateien sind Nutzdateien. PatchHarbor
 schreibt sie vor dem Entrypoint bytegenau in den entsprechenden relativen
 Repository-Pfad. Der Entrypoint selbst wird nicht in das Repository geschrieben.
-Enthaltene Archive werden nicht rekursiv als weitere Patch-Pakete geöffnet.
+Enthaltene Archive werden nicht rekursiv als weitere Task-Bundles geöffnet.
 
 Für jeden ZIP-Pfad gelten mindestens diese harten Regeln:
 
@@ -1349,7 +1354,7 @@ Starte GitHub-CI nicht allein aufgrund eines PatchHarbor-Defaults.
 
 **PatchHarbor-Projekt:** Für die aktive Laptop-Entwicklung gelten die oben
 festgehaltenen gezielten parallelen Development-Prüfungen und vollständigen
-parallelen Apply-Commit-Gates. Die frühere Pixel-CI-only-
+parallelen Execute-Commit-Gates. Die frühere Pixel-CI-only-
 Ausnahme ist beendet. Externe CI startet ausschließlich der Nutzer; notwendige
 native Abschlussnachweise bleiben bis zur tatsächlichen Auswertung offen.
 
@@ -1390,10 +1395,10 @@ Bei einem Fehler darf diese Zeile niemals erscheinen. Bei Teilerfolg ebenfalls
 nicht. Danach darf PatchHarbor Snapshot-/Result-Meldungen ausgeben. Der Entrypoint ruft nicht
 rekursiv `patchharbor bundle` auf.
 
-Vor Apply nur vorgesehene Tests und Commits nennen, nicht als erfolgreich
+Vor Execute nur vorgesehene Tests und Commits nennen, nicht als erfolgreich
 behaupten. Tatsächliche Ergebnisse erst aus dem zurückgegebenen Result ableiten.
 
-## 9. Result Bundle nach Apply auswerten
+## 9. Result Bundle nach Execute auswerten
 
 Unterscheide vollständigen Erfolg, Teilerfolg, Entrypoint-/Testfehler,
 PatchHarbor-Toolfehler, fehlgeschlagenes Result Bundle und Ablehnung vor Mutation.
@@ -1432,7 +1437,7 @@ Verwende insbesondere `PLAN_NOT_FOUND`, `PLAN_AMBIGUOUS`,
 `REPOSITORY_STATE_INCOMPLETE`, `REQUIREMENT_AMBIGUOUS`,
 `UNSAFE_OR_IMPOSSIBLE` und `PATCH_CREATION_FAILED`. Nach der Codezeile folgen
 höchstens kurze Erklärung und benötigte Entscheidung. Bei STOP entsteht kein
-Patch-Bundle: keine neue Bundle-Nummer, kein Patch-Link und kein `PATCH BEREIT`.
+Task-Bundle: keine neue Bundle-Nummer, kein Patch-Link und kein `PATCH BEREIT`.
 Der identische rote Block bildet zusätzlich den Abschluss der Antwort.
 
 ## 11. Verbindliche schmale Patch-Bereit-UI
@@ -1507,7 +1512,7 @@ Zeige Plan und Spec; `Änderungen` fünf bis zehn kurze Zeilen, `Tests` nur
 vorgesehene projektbezogene Gates, `Noch offen` verbleibende Plan-Commits. Erfolgsabschluss:
 genau Bereitschaftsbalken, Bundle-Nummer, Patch-Link. Der Patch-Link ist die
 allerletzte Zeile der gesamten Antwort; danach folgt nichts. `PATCH BEREIT` erst
-nach Existenz der Datei; vor Apply keine vorgesehenen Tests als grün behaupten.
+nach Existenz der Datei; vor Execute keine vorgesehenen Tests als grün behaupten.
 
 ## 12. Verantwortungsgrenzen im Gesamtsystem
 

@@ -24,10 +24,10 @@ An automatic scan with no eligible candidate is waiting, not a failed execution;
 version 2 retains the typed automatic outcome alongside the unchanged raw report.
 
 Repository rows emphasize current PatchHarbor work, Exchange state and the last
-observed Apply outcome. A selected row adds package/Exchange context. View 2 groups
+observed Execute outcome. A selected row adds package/Exchange context. View 2 groups
 repositories under their shared Exchange. Dirty Git state does not color the
 operational row as a failure. `g` shows Git details, including separate
-staged/unstaged/untracked counts; ignored files do not count. Last Apply evidence
+staged/unstaged/untracked counts; ignored files do not count. Last Execute evidence
 is retained history, not a claim of completeness. Old observations are marked stale.
 The current operation shows its repository, Patch/Result role, entrypoint, and
 full-identity-derived short hash. A bundle number appears only if the first
@@ -84,9 +84,9 @@ watcher observation does not imply that an unobserved inventory has no patches.
 Shared Exchanges retain per-repository candidate identities. Latest retained
 Results are ordered by their verified run timestamps, not ZIP modification time.
 
-Views 6/7 show watcher/Apply/manual Result-bundle instances and their live log tails. Each instance
+Views 6/7 show watcher/Execute/manual Result-bundle instances and their live log tails. Each instance
 has its own UUID, PID plus native process birth identity, timestamps and actual
-phase. The Apply detail shows requested and effective timeout separately; the
+phase. The Execute detail shows requested and effective timeout separately; the
 effective value appears only when the interpreter really starts. Remaining time
 is a timeout budget, never a completion estimate. Watcher targets, subscriptions,
 quiet deadlines and observed lock/backoff state come from its event loop.
@@ -94,8 +94,8 @@ Absence of a current observation is unknown, never stopped or unlocked.
 
 Producers publish optional version-2 observations under the user state directory
 in `monitor-v1`, outside configured Exchanges. They update bounded memory and
-one background thread coalesces disk writes; failures never change Apply or
-watcher results. No viewer is needed. Each Apply retains at most 32 KiB of live
+one background thread coalesces disk writes; failures never change Execute or
+watcher results. No viewer is needed. Each Execute retains at most 32 KiB of live
 output; its required execution log remains byte-exact and unbounded by this view.
 Heartbeat freshness is 15 seconds, checked against a native process birth token
 on Linux and Windows. Viewers only read these files. Existing running processes
@@ -106,7 +106,7 @@ is not reconstructed from log text. Version 2 retains at most 32 preceding
 activity records per instance, independently of open viewers. Each record has a
 sequence, timestamp, phase-start time, semantic code, outcome and bounded text.
 Repeated updates of the same phase are coalesced. A new phase alone does not
-turn its predecessor green. Core activity events supply Apply phases; the
+turn its predecessor green. Core activity events supply Execute phases; the
 watcher's actual event loop supplies changes, quiet periods, lock probes, worker
 completion and shutdown. Manual Git-mode `bundle` captures publish their own
 instance and actual run/repository identity. The separate safe-export host

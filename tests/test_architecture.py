@@ -162,9 +162,9 @@ def test_cli_composes_public_boundaries_without_domain_orchestration() -> None:
         "patchharbor.application*",
         "patchharbor.output",
         "patchharbor.progress",
-        "patchharbor.apply_mutation",
-        "patchharbor.apply_preflight",
-        "patchharbor.apply_repository",
+        "patchharbor.execute_mutation",
+        "patchharbor.execute_preflight",
+        "patchharbor.execute_repository",
         "patchharbor.bundles",
         "patchharbor.exchange",
         "patchharbor.git_*",
@@ -187,7 +187,7 @@ def test_runtime_responsibilities_follow_the_specified_boundaries() -> None:
     forbidden_by_module = {
         "patchharbor.exchange": {
             "patchharbor.application*",
-            "patchharbor.apply_*",
+            "patchharbor.execute_*",
             "patchharbor.execution",
             "patchharbor.git_*",
             "patchharbor.locks",
@@ -292,8 +292,8 @@ def test_runtime_responsibilities_follow_the_specified_boundaries() -> None:
             dependencies,
             {
                 "patchharbor.application*",
-                "patchharbor.apply_mutation",
-                "patchharbor.apply_preflight",
+                "patchharbor.execute_mutation",
+                "patchharbor.execute_preflight",
                 "patchharbor.execution",
                 "patchharbor.presentation",
                 "patchharbor_watcher*",
@@ -333,7 +333,7 @@ def test_watcher_uses_public_api_with_an_isolated_worker_boundary() -> None:
         else:
             core = {name for name in dependencies if name == "patchharbor" or name.startswith("patchharbor.")}
             assert core <= allowed, module
-            if module == "patchharbor_watcher.apply_boundary":
+            if module == "patchharbor_watcher.execute_boundary":
                 assert not core
             else:
                 assert "subprocess" not in _import_roots(_runtime_modules()[module]), module
@@ -363,7 +363,7 @@ def test_bundle_handoff_is_passive_output_not_chat_or_commit_orchestration() -> 
         "patchharbor.platform.environment",
     ):
         assert not _forbidden_dependencies(graph[module], {
-            "patchharbor.application*", "patchharbor.execution", "patchharbor.apply_*",
+            "patchharbor.application*", "patchharbor.execution", "patchharbor.execute_*",
             "patchharbor.git_*", "patchharbor.registry", "patchharbor_watcher*",
         })
     assert "patchharbor.chat_instructions" not in graph["patchharbor.task_package"]
@@ -392,7 +392,7 @@ def test_domain_errors_and_application_do_not_depend_on_cli_statuses() -> None:
     modules = _runtime_modules()
     graph = _dependency_graph()
     for module in ({name for name in graph if is_workflow(name)} | {
-        "patchharbor.errors", "patchharbor.execution", "patchharbor.apply_mutation", "patchharbor.sources"}):
+        "patchharbor.errors", "patchharbor.execution", "patchharbor.execute_mutation", "patchharbor.sources"}):
         assert not _forbidden_dependencies(graph[module], {"patchharbor.exit_status", "patchharbor.cli*"})
         tree = ast.parse(modules[module].read_text(encoding="utf-8"))
         assert not any(isinstance(n, ast.Attribute) and n.attr == "process_exit_code"
@@ -407,7 +407,7 @@ def test_public_api_does_not_invoke_cli_or_duplicate_core_workflows() -> None:
     assert any(is_workflow(name) for name in dependencies)
     assert not _forbidden_dependencies(dependencies, {
         "patchharbor.cli*", "patchharbor.presentation", "patchharbor.exchange*",
-        "patchharbor.apply_*", "patchharbor.git_*", "patchharbor.registry",
+        "patchharbor.execute_*", "patchharbor.git_*", "patchharbor.registry",
         "patchharbor_watcher*",
     })
     assert "subprocess" not in _import_roots(_runtime_modules()["patchharbor.api"])

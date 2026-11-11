@@ -14,7 +14,7 @@ ein Repository-Patch aktualisiert weder globale Installation noch laufenden Dien
 Nach Repositoryauflösung und vor Payload/Entrypoint fixiert der Request Runtime
 und statische Vorlage gemeinsam aus seinem tatsächlich geladenen Erzeuger. Der
 spätere Snapshot beschreibt den tatsächlichen Repositoryzustand. Selbst bei einem
-Update gleicher Version während Apply stammen Runtime und Anleitung aus den
+Update gleicher Version während Execute stammen Runtime und Anleitung aus den
 fixierten alten Bytes, während der Snapshot schon den neuen Commit enthalten darf.
 Ein frischer Prozess nutzt die neue Installation; ein alter erkennt geänderte
 Ressourcen an seinem beim Import festgehaltenen Producer-ID.
@@ -39,13 +39,13 @@ Buildquellen und Installer-Caches und erzeugen drei echte Result-/PYZ-Generation
 Ab der zweiten Generation läuft ausschließlich die vorherige Result-PYZ in einem
 frischen Prozess, ohne Neuinstallation. Ihre SHA-256, Größe und Bytes müssen
 identisch bleiben; schreibgeschützte Runtimeverzeichnisse werden mitgeprüft.
-Die Self-update-Tests ersetzen eine echte isolierte Installation während Apply
+Die Self-update-Tests ersetzen eine echte isolierte Installation während Execute
 und prüfen erfolgreichen sowie fehlgeschlagenen Entrypoint mit neuem Commit.
 
 E-10 entnimmt den Bootstrap ausschließlich der eigenen Root-Anleitung des ersten
 neuen Results aus einer echten Installation. Der frische Python-only-Prozess
 packt und validiert gegen genau dieses Result. Danach führen vollständige Dateien,
-Diff-Payload und gemischte Pakete einen regulären Apply im isolierten Repository
+Diff-Payload und gemischte Pakete einen regulären Execute im isolierten Repository
 aus. Dieselbe PYZ unterstützt Kontext, Registry/Konfiguration, Result-Erzeugung
 und den älteren `fs run`-Weg. Der installierte Watcher nutzt den gemeinsamen Core;
 Watcher-Code wird nicht in die PYZ aufgenommen.

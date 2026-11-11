@@ -1,4 +1,4 @@
-"""Native roundtrips with independent Git-created layers and a Git-apply oracle."""
+"""Native roundtrips with independent Git-created layers and a Git-execute oracle."""
 from pathlib import Path
 import hashlib
 import sys

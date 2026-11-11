@@ -90,7 +90,7 @@ if caps.snapshot_contract_version != 1:
 
 A version or a checksum downloaded beside the same file does not establish
 trust by itself. Capability versions describe actual API contracts, not product
-version numbers. The existing integration, snapshot and guarded-apply versions
+version numbers. The existing integration, snapshot and guarded-execute versions
 remain 1. Safe-reference version 1 is available only on its supported Linux
 x86-64 / CPython 3.10–3.14 host; check the actual capability before use.
 

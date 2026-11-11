@@ -3,7 +3,7 @@
 Die Adapter sind durch WE-2 angewendet. WE-3 bindet sie im Development an
 die CLI mit fünf Sekunden Ruhefrist, Worker-Steuerung und
 Konfigurationsaktualisierung an. Die Module
-sind interne Watcher-Bausteine und keine zusätzliche öffentliche Apply-API.
+sind interne Watcher-Bausteine und keine zusätzliche öffentliche Execute-API.
 `events.py` enthält den plattformneutralen Vertrag. Die Factory und nativen
 Systemaufrufe liegen getrennt unter `patchharbor_watcher.platform`; Core
 importiert keine Watcher-Module. Die Factory lädt die native Bibliothek erst
@@ -13,7 +13,7 @@ beim Öffnen einer Quelle.
 eine feste Generation flacher Verzeichnisbeobachtungen. Der Aufrufer bezieht
 Exchange-/Kontrollpfade zuvor aus Core. Nur vorhandene, physisch kanonische
 Verzeichnisse sind zulässig. Bei Änderungen der Zielmenge wird eine neue Quelle
-geöffnet; eine alte Beobachtung erteilt niemals eine Apply-Freigabe.
+geöffnet; eine alte Beobachtung erteilt niemals eine Execute-Freigabe.
 
 - `read(timeout=None)` wartet blockierend auf relevante Ereignisse. Ein endlicher
   Timeout dient später der offenen Ruhefrist, nicht einem periodischen Scan.
@@ -108,6 +108,6 @@ Keine neuen Laufzeitabhängigkeiten, kein automatischer Polling-Fallback und
 keine neue Termux-Service-Zusage. Netzwerk-/virtuelle Dateisysteme und Änderungen
 ohne unterstützte OS-Ereignisse erhalten keine pauschale Erkennungsgarantie.
 Core muss weiterhin Inhalt, Pfade, Fingerprint und Replay unabhängig prüfen;
-manueller Apply und der dokumentierte Wheel-/Runtime-Fallback bleiben verfügbar.
+manueller Execute und der dokumentierte Wheel-/Runtime-Fallback bleiben verfügbar.
 
 Weitere Betriebs- und Abnahmedetails: [Ereignis-Watcher](watcher-events.md).

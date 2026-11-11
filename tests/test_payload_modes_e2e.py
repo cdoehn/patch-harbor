@@ -1,4 +1,4 @@
-"""Real format-1 apply and dry-run must enforce the core permission contract."""
+"""Real format-1 execute and dry-run must enforce the core permission contract."""
 from __future__ import annotations
 
 import json
@@ -11,7 +11,7 @@ import zipfile
 
 import pytest
 
-from patchharbor.application import apply_task_bundle, dry_run_task_bundle, register_repository
+from patchharbor.application import execute_task_bundle, dry_run_task_bundle, register_repository
 from patchharbor.errors import PatchHarborError
 from patchharbor.exit_status import ExitCode, exit_code_for_error
 from patchharbor.task_package import resolve_task_bundle
@@ -60,7 +60,7 @@ def test_entrypoint_observes_correct_modes_after_core_mutation(tmp_path: Path, m
     git(repo, "commit", "--quiet", "--allow-empty", "-m", "fixture permissions")
     context = register_repository(repo)
     package = package_for(tmp_path / "patch.zip", context, existing_mode=mode)
-    report = apply_task_bundle(package, output_directory=tmp_path / "results")
+    report = execute_task_bundle(package, output_directory=tmp_path / "results")
     assert report.process_exit_code == 0
     assert report.primary_result.entrypoint_started
     assert stat.S_IMODE(target.stat().st_mode) == mode
@@ -95,7 +95,7 @@ def test_special_existing_target_rejected_without_entrypoint(tmp_path: Path, dry
     git(repo, "commit", "--quiet", "--allow-empty", "-m", "fixture permissions")
     context = register_repository(repo)
     package = package_for(tmp_path / "patch.zip", context)
-    operation = dry_run_task_bundle if dry_run else apply_task_bundle
+    operation = dry_run_task_bundle if dry_run else execute_task_bundle
     with pytest.raises(PatchHarborError) as raised:
         operation(package, output_directory=tmp_path / "results")
     assert exit_code_for_error(raised.value) == ExitCode.PAYLOAD_PREPARATION_ERROR

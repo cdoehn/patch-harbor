@@ -44,10 +44,10 @@ from patchharbor.exchange import (
 )
 from patchharbor.exchange_state import (
     _state_lock,
-    ExchangeApplyStatus,
+    ExchangeExecuteStatus,
     ExchangeTaskSelection,
-    mark_exchange_apply_finished,
-    mark_exchange_apply_started,
+    mark_exchange_execute_finished,
+    mark_exchange_execute_started,
     record_exchange_result_digest,
 )
 from patchharbor.locks import registry_lock, repository_lock
@@ -73,9 +73,9 @@ from patchharbor.user_paths import (
     registration_user_paths,
 )
 from patchharbor.watch_contract import (
-    ApplyLock,
-    ApplyLockKind,
-    ApplyReadiness,
+    ExecuteLock,
+    ExecuteLockKind,
+    ExecuteReadiness,
     ExchangeWatchTarget,
     WatchControlPaths,
     WatchTargets,
@@ -114,11 +114,11 @@ class DiscoveredExchangeTask:
         if self.artifact.selection is None:
             raise ValueError("discovered Exchange patch requires selection data")
         expected_status = (
-            ExchangeApplyStatus.FAILED if self.retry_failed else None
+            ExchangeExecuteStatus.FAILED if self.retry_failed else None
         )
-        if not self.explicitly_selected and self.artifact.apply_status is not expected_status:
+        if not self.explicitly_selected and self.artifact.execute_status is not expected_status:
             raise ValueError(
-                "discovered Exchange patch has an ineligible apply status"
+                "discovered Exchange patch has an ineligible execute status"
             )
         if (
             self.artifact.selection
@@ -150,7 +150,7 @@ class DiscoveredExchangeTask:
                 _require_watch_target_unchanged(self.watch_target)
 
         activity("REPLAY", f"Record attempted run {str(run_id)} before mutation", identifiers=(str(run_id),))
-        mark_exchange_apply_started(
+        mark_exchange_execute_started(
             self.paths,
             self.artifact.identity,
             selection,
@@ -172,19 +172,19 @@ class DiscoveredExchangeTask:
 
     def publish_outcome(self, succeeded: bool, completed_commit: GitObjectId | None = None,
                         *, run_id: str | None = None) -> None:
-        """Persist the known terminal result of this started automatic apply."""
+        """Persist the known terminal result of this started automatic execute."""
         selection = self.artifact.selection
         if selection is None:
             raise RuntimeError("discovered Exchange patch lost selection data")
         activity("REPLAY", f"Record terminal attempt outcome: {'succeeded' if succeeded else 'failed'}")
-        mark_exchange_apply_finished(
+        mark_exchange_execute_finished(
             self.paths,
             self.artifact.identity,
             selection,
             (
-                ExchangeApplyStatus.SUCCEEDED
+                ExchangeExecuteStatus.SUCCEEDED
                 if succeeded
-                else ExchangeApplyStatus.FAILED
+                else ExchangeExecuteStatus.FAILED
             ),
             completed_commit=completed_commit,
             run_id=run_id,
@@ -213,7 +213,7 @@ def _revalidate_exchange_discovery(
 
 @dataclass(frozen=True, slots=True)
 class ExchangeDiscoveryScope:
-    """Repository and retry boundaries for one parameterless Apply."""
+    """Repository and retry boundaries for one parameterless Execute."""
 
     repository_context: RepositoryContext | None
     allow_failed_retry: bool
@@ -228,7 +228,7 @@ class ExchangeDiscoveryScope:
 def _manual_exchange_discovery_scope(
     current_directory: Path,
 ) -> ExchangeDiscoveryScope:
-    """Resolve manual parameterless Apply to the current registered repository."""
+    """Resolve manual parameterless Execute to the current registered repository."""
     try:
         context = capture_repository_context(current_directory)
     except PatchHarborError as exc:
@@ -247,7 +247,7 @@ def _manual_exchange_discovery_scope(
 def _automatic_exchange_discovery_scope(
     exchanges: tuple[ExchangeWatchTarget, ...] | None = None,
 ) -> ExchangeDiscoveryScope:
-    """Keep automatic Apply non-retrying, optionally limited to observed roots."""
+    """Keep automatic Execute non-retrying, optionally limited to observed roots."""
     return ExchangeDiscoveryScope(
         repository_context=None,
         allow_failed_retry=False,
@@ -310,7 +310,7 @@ def _exchange_settings(
     }
     if scope.exchanges is not None:
         if scope.is_repository_scoped or scope.allow_failed_retry:
-            raise configuration_error("watch scope is only valid for automatic Apply")
+            raise configuration_error("watch scope is only valid for automatic Execute")
         # Explicit empty scope stays empty. Supplied snapshots are restrictions,
         # never trusted permissions; aliases/fabricated/stale observations fail.
         for target in scope.exchanges:
@@ -326,7 +326,7 @@ def _exchange_settings(
 def _watch_control_paths(paths: RegistrationUserPaths, registry: RegistrySnapshot) -> WatchControlPaths:
     # Advisory restoration paths only. A missing Exchange cannot be an approved
     # WatchTarget, but its nearest existing parent can reveal its return. Broken
-    # settings still fail watch_targets()/Apply; they are never repaired here.
+    # settings still fail watch_targets()/Execute; they are never repaired here.
     exchanges = set()
     for mapping in registry.repositories:
         try:
@@ -361,24 +361,24 @@ def watch_targets() -> WatchTargets:
         return WatchTargets(tuple(targets.values()), controls.registry_path, controls.configuration_paths)
 
 
-def apply_readiness(lock: ApplyLock) -> ApplyReadiness:
+def execute_readiness(lock: ExecuteLock) -> ExecuteReadiness:
     """Probe only the named technical lock; no candidate work or reservation."""
     paths = registration_user_paths(create_configuration_directory=False)
     try:
-        if lock.kind is ApplyLockKind.EXCHANGE_STATE:
+        if lock.kind is ExecuteLockKind.EXCHANGE_STATE:
             with _state_lock(paths):
                 pass
         else:
             with registry_lock(paths):
-                if lock.kind is ApplyLockKind.REPOSITORY:
+                if lock.kind is ExecuteLockKind.REPOSITORY:
                     registry = load_registry(paths)
                     if not any(mapping.repo_id == lock.repo_id for mapping in registry.repositories):
                         raise repository_resolution_error("lock repository is no longer registered")
                     with repository_lock(paths, lock.repo_id):
                         pass
     except LockBusyError as exc:
-        return ApplyReadiness(blocked_on=exc.lock)
-    return ApplyReadiness()
+        return ExecuteReadiness(blocked_on=exc.lock)
+    return ExecuteReadiness()
 
 
 def _candidate_filename_key(artifact: ExchangeArtifact) -> tuple[str, str]:
@@ -484,11 +484,11 @@ def discover_exchange_task(
                      f"actual base {str(context.base_commit)}, "
                      f"state {str(context.state_fingerprint)})", "detail", identifiers=(str(selection.base_commit), str(selection.state_fingerprint), str(context.base_commit), str(context.state_fingerprint),))
             continue
-        if artifact.apply_status is not None and not (
+        if artifact.execute_status is not None and not (
             scope.allow_failed_retry
-            and artifact.apply_status is ExchangeApplyStatus.FAILED
+            and artifact.execute_status is ExchangeExecuteStatus.FAILED
         ):
-            activity("SKIP", f"{artifact.path.name}: replay status {artifact.apply_status.value} blocks this origin", "detail")
+            activity("SKIP", f"{artifact.path.name}: replay status {artifact.execute_status.value} blocks this origin", "detail")
             continue
         activity("MATCH", f"{artifact.path.name}: eligible, mtime_ns={artifact.mtime_ns}", "success")
         matches.append(artifact)
@@ -533,7 +533,7 @@ def discover_exchange_task(
         paths=paths,
         configuration=configuration,
         configuration_paths=local,
-        retry_failed=(artifact.apply_status is ExchangeApplyStatus.FAILED),
+        retry_failed=(artifact.execute_status is ExchangeExecuteStatus.FAILED),
         watch_target=target,
     )
 

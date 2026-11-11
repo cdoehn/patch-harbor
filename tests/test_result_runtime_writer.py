@@ -7,7 +7,7 @@ from zipfile import ZipFile
 import pytest
 
 from patchharbor import api
-import patchharbor.application_apply as application
+import patchharbor.application_execute as application
 import patchharbor.result_bundle as result_bundle
 import patchharbor.result_resources as resources
 from patchharbor.result_reader import read_result_reference
@@ -17,7 +17,7 @@ from tests.result_pyz_support import artifact
 from tests.apply_support import repository, package
 
 
-@pytest.mark.parametrize("route", ["bundle", "apply", "dry_run", "failure", "watcher"])
+@pytest.mark.parametrize("route", ["bundle", "execute", "dry_run", "failure", "watcher"])
 def test_all_result_routes_embed_same_producer_runtime(repository, artifact, monkeypatch, route):
     root, exchange = repository
     calls = []
@@ -30,9 +30,9 @@ def test_all_result_routes_embed_same_producer_runtime(repository, artifact, mon
     if route == "bundle":
         report = api.bundle(root).report
     elif route == "watcher":
-        report = api.apply_next()
+        report = api.execute_next()
     else:
-        report = api.apply(patch, dry_run=route == "dry_run")
+        report = api.execute(patch, dry_run=route == "dry_run")
     assert len(calls) == 1
     assert report.process_exit_code == (27 if route == "failure" else 0)
     facts, _ = read_result_reference(report.result_bundle.path)
@@ -61,7 +61,7 @@ def test_runtime_failure_preserves_actual_failed_apply_and_log(repository, monke
     root, exchange = repository
     monkeypatch.setattr(resources.PyzProvider, "capture",
                         lambda self: PyzProvision("unavailable", reason, None))
-    report = api.apply(package(root, exchange, exit_code=23))
+    report = api.execute(package(root, exchange, exit_code=23))
     assert report.process_exit_code == 23
     facts, _ = read_result_reference(report.result_bundle.path)
     assert facts.runtime.status == "unavailable" and facts.runtime.reason == expected
@@ -88,7 +88,7 @@ def test_runtime_and_template_are_pinned_before_actual_entrypoint(repository, ar
         monkeypatch.setattr(chat, "load_chat_template", lambda: pytest.fail("late template read"))
         return execute(*args, **kwargs)
     monkeypatch.setattr(application, "execute_prepared_script_with_log", changed_installation)
-    report = api.apply(package(root, exchange))
+    report = api.execute(package(root, exchange))
     assert report.process_exit_code == 0
     facts, _ = read_result_reference(report.result_bundle.path)
     assert facts.runtime.artifact.sha256 == artifact.pyz_sha256
@@ -104,7 +104,7 @@ def test_runtime_budget_falls_back_without_losing_snapshot(repository, artifact,
     monkeypatch.setattr(resources.PyzProvider, "capture", lambda self: PyzProvision("embedded", None, artifact))
     monkeypatch.setattr(result_bundle, "runtime_fits", partial(resources.runtime_fits,
                         policy=ResourcePolicy(max_zip_total_bytes=128 * 1024)))
-    report = api.apply(package(root, exchange))
+    report = api.execute(package(root, exchange))
     assert report.process_exit_code == 0
     facts, _ = read_result_reference(report.result_bundle.path)
     assert facts.runtime.status == "unavailable" and facts.runtime.reason == "resource_limit"
@@ -124,7 +124,7 @@ def test_missing_mandatory_template_remains_a_result_error(repository, monkeypat
     monkeypatch.setattr(resources.PyzProvider, "capture_required_template", missing)
     monkeypatch.setattr(resources.PyzProvider, "capture",
                         lambda self: PyzProvision("unavailable", "resources_missing", None))
-    report = api.apply(package(root, exchange, exit_code=27))
+    report = api.execute(package(root, exchange, exit_code=27))
     assert report.primary_result.entrypoint_exit_code == 27
     assert report.result_bundle.status is api.ResultBundleStatus.FAILED
     assert report.result_bundle.emergency_diagnostics_path.is_dir()

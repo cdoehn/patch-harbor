@@ -14,7 +14,7 @@ from patchharbor.progress import activity
 from patchharbor.bundle_names import is_browser_temporary_name
 from patchharbor.errors import PatchHarborError, task_bundle_error
 from patchharbor.exchange_state import (
-    ExchangeApplyStatus,
+    ExchangeExecuteStatus,
     ExchangeFileIdentity,
     ExchangeTaskSelection,
     ExchangeStateRecord,
@@ -48,7 +48,7 @@ class ExchangeScanError(RuntimeError):
 class ExchangeArtifactKind(str, Enum):
     """Content class relevant to automatic Exchange selection."""
 
-    TASK_BUNDLE = "task_package"
+    TASK_BUNDLE = "task_bundle"
     RESULT_BUNDLE = "result_bundle"
     OTHER = "other"
 
@@ -62,7 +62,7 @@ class ExchangeArtifact:
     mtime_ns: int
     kind: ExchangeArtifactKind
     selection: ExchangeTaskSelection | None = None
-    apply_status: ExchangeApplyStatus | None = None
+    execute_status: ExchangeExecuteStatus | None = None
     package: ValidatedTaskBundle | None = None
 
     def __post_init__(self) -> None:
@@ -79,15 +79,15 @@ class ExchangeArtifact:
                 != self.selection
             ):
                 raise ValueError("Patch Package selection data is inconsistent")
-        if self.apply_status is not None and not is_patch:
-            raise ValueError("only Patch Package artifacts may have apply status")
+        if self.execute_status is not None and not is_patch:
+            raise ValueError("only Patch Package artifacts may have execute status")
         if self.path != self.identity.path:
             raise ValueError("Exchange artifact path and identity disagree")
 
     @property
     def attempted(self) -> bool:
-        """Return whether automatic apply has started for this identity."""
-        return self.apply_status is not None
+        """Return whether automatic execute has started for this identity."""
+        return self.execute_status is not None
 
 
 @dataclass(frozen=True, slots=True)
@@ -209,7 +209,7 @@ def _artifact_from_record(
         mtime_ns=mtime_ns,
         kind=ExchangeArtifactKind(record.kind),
         selection=record.manifest,
-        apply_status=record.apply_status,
+        execute_status=record.execute_status,
         package=package,
     )
 
@@ -366,7 +366,7 @@ def _record_from_artifact(artifact: ExchangeArtifact) -> ExchangeStateRecord:
         identity=artifact.identity,
         kind=artifact.kind.value,
         manifest=artifact.selection,
-        apply_status=artifact.apply_status,
+        execute_status=artifact.execute_status,
     )
 
 

@@ -33,7 +33,7 @@ def run_polling_watcher(*, delegate, log_stream, error_stream, stop_requested, w
     """Check immediately, then wait after each completed check, with no overlap.
 
     Core supplies and revalidates every scope. No native event source, directory
-    cache, candidate selection, manual retry or alternative Apply path exists
+    cache, candidate selection, manual retry or alternative Execute path exists
     here. The synchronous worker retains its process group and signal policy.
     """
     interval = poll_interval(interval)
@@ -71,7 +71,7 @@ def run_polling_watcher(*, delegate, log_stream, error_stream, stop_requested, w
                     progress = result.progress
                     code, status = 'worker-error', 'failure'
                     if progress.status == 'attempted':
-                        code = 'apply-completed'
+                        code = 'execute-completed'
                         status = 'success' if result.process_exit_code == 0 else 'failure'
                     elif progress.status == 'no_candidate':
                         code, status = 'no-candidate', 'waiting'

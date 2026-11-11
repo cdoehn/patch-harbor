@@ -40,7 +40,7 @@ from patchharbor.registry import (
 )
 from patchharbor.repository import (
     LocalRegistrationState,
-    apply_local_registration,
+    execute_local_registration,
     canonicalize_repository_reference,
     inspect_local_registration,
     inspect_repository,
@@ -267,7 +267,7 @@ def _commit_identity_transition(
     transition: _IdentityTransition,
 ) -> None:
     try:
-        apply_local_registration(
+        execute_local_registration(
             transition.local_state,
             transition.repo_id,
         )

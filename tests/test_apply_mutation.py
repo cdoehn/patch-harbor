@@ -4,14 +4,14 @@ from pathlib import Path
 
 import pytest
 
-import patchharbor.apply_mutation as mutation_module
+import patchharbor.execute_mutation as mutation_module
 from patchharbor.application import (
     preflight_task_bundle_repository,
     register_repository,
 )
-from patchharbor.apply_mutation import (
+from patchharbor.execute_mutation import (
     MutationFailureKind,
-    apply_payload_mutation,
+    execute_payload_mutation,
 )
 from patchharbor.configuration import RepositoryConfigurationPaths, write_exchange_directory
 from patchharbor.exit_status import ExitCode, exit_code_for_error
@@ -95,7 +95,7 @@ def test_mutation_boundary_rechecks_and_writes_while_repository_is_locked(
     )
 
     with preflight_task_bundle_repository(package, dry_run=False) as gate:
-        result = apply_payload_mutation(gate)
+        result = execute_payload_mutation(gate)
 
     assert result.success is True
     assert result.failure_kind is None
@@ -121,7 +121,7 @@ def test_mutation_boundary_reports_changed_state_without_payload_write(
 
     with preflight_task_bundle_repository(package, dry_run=False) as gate:
         (repository / "external.txt").write_bytes(b"external")
-        result = apply_payload_mutation(gate)
+        result = execute_payload_mutation(gate)
 
     assert result.success is False
     assert result.failure_kind is MutationFailureKind.STATE_MISMATCH
@@ -168,7 +168,7 @@ def test_mutation_boundary_keeps_target_and_write_failures_distinct(
     monkeypatch.setattr(mutation_module, "write_bundle_payloads", fail_write)
 
     with preflight_task_bundle_repository(package, dry_run=False) as gate:
-        result = apply_payload_mutation(gate)
+        result = execute_payload_mutation(gate)
 
     assert result.success is False
     assert result.failure_kind is expected_kind
@@ -209,7 +209,7 @@ def test_attempt_publication_runs_after_state_check_and_before_payload_write(
         dry_run=False,
         before_mutation=publish_attempt,
     ) as gate:
-        result = apply_payload_mutation(gate)
+        result = execute_payload_mutation(gate)
 
     assert result.success is True
     assert observations == [(False, int(ExitCode.REPOSITORY_BUSY))]
@@ -243,7 +243,7 @@ def test_failed_attempt_publication_prevents_every_repository_write(
             PatchHarborError,
             match="cannot publish automatic attempt",
         ):
-            apply_payload_mutation(gate)
+            execute_payload_mutation(gate)
 
     assert not target.exists()
 
@@ -268,7 +268,7 @@ def test_state_mismatch_prevents_attempt_publication(
         before_mutation=lambda: publications.append(True),
     ) as gate:
         (repository / "external.txt").write_bytes(b"changed")
-        result = apply_payload_mutation(gate)
+        result = execute_payload_mutation(gate)
 
     assert result.failure_kind is MutationFailureKind.STATE_MISMATCH
     assert publications == []

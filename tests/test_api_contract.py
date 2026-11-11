@@ -22,9 +22,9 @@ OPERATIONS = {
     "repositories": (),
     "unregister": ("selector",),
     "bundle": ("repository",),
-    "apply": ("patch",),
-    "dry_run": ("patch",),
-    "apply_next": (),
+    "execute": ("task",),
+    "dry_run": ("task",),
+    "execute_next": (),
     "run_scripts": ("source",),
 }
 PUBLIC_TYPES = {
@@ -65,12 +65,12 @@ def test_public_operation_call_shapes_and_annotations(name, positional) -> None:
 
 
 def test_execution_and_configuration_defaults_are_explicit_and_stable() -> None:
-    for function in (api.apply, api.apply_next, api.run_scripts):
+    for function in (api.execute, api.execute_next, api.run_scripts):
         parameters = inspect.signature(function).parameters
         assert parameters["timeout"].default == api.DEFAULT_TIMEOUT_SECONDS
         assert parameters["output"].default is None
     assert inspect.signature(api.configuration).parameters["revalidate"].default is False
-    assert inspect.signature(api.apply).parameters["repository"].default is None
+    assert inspect.signature(api.execute).parameters["repository"].default is None
     assert inspect.signature(api.run_scripts).parameters["select_candidate"].default is None
     assert inspect.signature(api.dry_run).parameters["output"].default is None
 

@@ -43,7 +43,7 @@ _MANIFEST_FIELDS = _BINDING_FIELDS | {
     "entrypoint_started", "execution_present", "primary_result",
     "result_bundle_status", "base_entries", "untracked_entries",
 }
-_APPLY_FIELDS = {
+_EXECUTE_FIELDS = {
     prefix + name for prefix in ("expected_", "actual_")
     for name in ("base_commit", "state_fingerprint", "fingerprint_algorithm")
 }
@@ -235,7 +235,7 @@ def read_result_or_task_payloads(content: bytes, *,
 
 def parse_result_payloads(payloads: tuple[BundlePayload, ...], *,
                           resource_policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY) -> ResultFacts:
-    """Validate ZIP-reader output; neither apply deltas nor infer a live fingerprint."""
+    """Validate ZIP-reader output; neither execute deltas nor infer a live fingerprint."""
     return _parse_result_payloads(payloads, resource_policy=resource_policy, verify_runtime=True)
 
 
@@ -243,7 +243,7 @@ def _parse_repository_payloads(payloads: tuple[BundlePayload, ...], *,
                                resource_policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY) -> ResultFacts:
     """Private handoff fallback: repository evidence only, never full Result validity.
 
-    Outer ZIP/path/CRC limits still apply before this boundary. The original
+    Outer ZIP/path/CRC limits still execute before this boundary. The original
     artifact is neither rewritten nor downgraded. Native readers and archive/
     recovery callers always use parse_result_payloads with runtime verification.
     """
@@ -267,8 +267,8 @@ def _parse_result_payloads(payloads: tuple[BundlePayload, ...], *,
     manifest_fields = _MANIFEST_FIELDS | {"runtime"}
     _require(manifest.get("marker") == _RESULT_MARKER
              and type(version) is int and version == 4
-             and set(manifest) in (manifest_fields, manifest_fields | _APPLY_FIELDS,
-                                   manifest_fields | _APPLY_FIELDS | _RECEIPT_FIELDS)
+             and set(manifest) in (manifest_fields, manifest_fields | _EXECUTE_FIELDS,
+                                   manifest_fields | _EXECUTE_FIELDS | _RECEIPT_FIELDS)
              and set(context) in (_BINDING_FIELDS | {"dirty", "created_at"},
                                   _BINDING_FIELDS | {"dirty", "created_at", "bundle_suffix"})
              and set(run) == _RUN_FIELDS, "unsupported or incomplete result schema")
@@ -306,20 +306,20 @@ def _parse_result_payloads(payloads: tuple[BundlePayload, ...], *,
     _require(type(run["process_exit_code"]) is int and run["process_exit_code"] == primary.process_exit_code,
              "inconsistent process status")
     operation = run["operation"]
-    _require(operation in ("bundle", "apply"), "unsupported operation")
+    _require(operation in ("bundle", "execute"), "unsupported operation")
     if operation == "bundle":
         _require(not run["dry_run"] and not primary.entrypoint_started
-                 and primary.kind is PrimaryResultKind.SUCCESS and not _APPLY_FIELDS.intersection(manifest),
+                 and primary.kind is PrimaryResultKind.SUCCESS and not _EXECUTE_FIELDS.intersection(manifest),
                  "inconsistent manual bundle")
     else:
         _require(not run["dry_run"] or not primary.entrypoint_started, "dry-run executed an entrypoint")
         if primary.success:
             _require((run["dry_run"] and primary.kind is PrimaryResultKind.DRY_RUN_SUCCESS)
                      or (not run["dry_run"] and primary.kind is PrimaryResultKind.SUCCESS and primary.entrypoint_started),
-                     "inconsistent apply success")
+                     "inconsistent execute success")
 
     expected = None
-    if _APPLY_FIELDS <= set(manifest):
+    if _EXECUTE_FIELDS <= set(manifest):
         expected = _selection({"repo_id": manifest["repo_id"],
                                **{key: manifest["expected_" + key] for key in _BINDING_FIELDS - {"repo_id"}}})
         _require(not primary.success or expected.base_commit.object_format == binding.base_commit.object_format,

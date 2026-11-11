@@ -15,8 +15,8 @@ WATCH_LABELS = {
     'changed': 'Änderung im Exchange erkannt', 'quiet': 'Wartet auf Ruhe im Exchange',
     'ready': 'Exchange-Prüfung bereit', 'overflow': 'Ereignisüberlauf; erneute Prüfung',
     'replaced': 'Verzeichnis geändert; Überwachung erneuern',
-    'worker-start': 'Apply-Prozess wird gestartet', 'applying': 'Apply aktiv',
-    'completion': 'Apply-Rückmeldung wird ausgewertet',
+    'worker-start': 'Execute-Prozess wird gestartet', 'applying': 'Execute aktiv',
+    'completion': 'Execute-Rückmeldung wird ausgewertet',
     'no-candidate': 'Kein ausführbarer Patch gefunden', 'pending': 'Weitere Prüfung vorgemerkt',
     'waiting-change': 'Wartet nach Fehler auf eine neue Änderung',
     'registry-lock': 'Wartet auf Registrierungssperre',
@@ -25,9 +25,9 @@ WATCH_LABELS = {
     'lock-probe': 'Sperre wird erneut geprüft', 'lock-free': 'Sperre freigegeben',
     'lock-held': 'Sperre weiterhin belegt', 'probe-failed': 'Sperrprüfung fehlgeschlagen',
     'configuration-error': 'Konfiguration oder Exchange nicht verfügbar',
-    'worker-error': 'Apply-Prozess oder Rückmeldung fehlgeschlagen',
+    'worker-error': 'Execute-Prozess oder Rückmeldung fehlgeschlagen',
     'watcher-error': 'Watcher fehlgeschlagen', 'stopping': 'Beenden angefordert',
-    'draining': 'Wartet vor dem Beenden auf den Apply', 'stopped': 'Watcher beendet',
+    'draining': 'Wartet vor dem Beenden auf den Execute', 'stopped': 'Watcher beendet',
 }
 PHASES = {
     'DISCOVER': ('discovery', 'Exchange-Konfiguration wird gelesen'),

@@ -21,7 +21,7 @@ def test_poll_commands_share_validated_interval_and_stop_controller(tmp_path, mo
     main, prefix = (cli.main, ['watcher', 'poll']) if entry == 'core' else (watcher_cli.main, ['poll'])
     assert main(prefix + arguments, stdout=stdout, stderr=stderr) == 0
     assert len(calls) == 1 and calls[0]['interval'] == expected
-    assert calls[0]['delegate'] is watcher_cli.delegate_to_automatic_apply
+    assert calls[0]['delegate'] is watcher_cli.delegate_to_automatic_execute
     assert calls[0]['log_stream'] is stdout and calls[0]['error_stream'] is stderr
     assert callable(calls[0]['stop_requested']) and callable(calls[0]['wait'])
 

@@ -19,13 +19,13 @@ from tests.registration_support import create_repository, set_isolated_user_envi
 @pytest.mark.parametrize("code", [0, 10, 11, 23, 124, 130])
 def test_worker_calls_public_automatic_api_once_and_transports_report(monkeypatch, code):
     calls = []
-    envelope = {"output_version": 1, "command": "apply", "success": code == 0,
+    envelope = {"output_version": 2, "command": "execute", "success": code == 0,
                 "result": {"opaque": "Größe / 日本語"}, "error": None,
                 "process_exit_code": code}
     report = SimpleNamespace(
-        apply_json_envelope=lambda: envelope,
+        execute_json_envelope=lambda: envelope,
         process_exit_code=code,
-        automatic=api.AutomaticApplyResult(api.AutomaticApplyStatus.ATTEMPTED),
+        automatic=api.AutomaticExecuteResult(api.AutomaticExecuteStatus.ATTEMPTED),
         result_bundle=SimpleNamespace(
             emergency_diagnostics_path=None, status=api.ResultBundleStatus.NOT_ATTEMPTED,
         ),
@@ -35,7 +35,7 @@ def test_worker_calls_public_automatic_api_once_and_transports_report(monkeypatc
         calls.append((args, kwargs))
         return report
 
-    monkeypatch.setattr(api, "apply_next", automatic)
+    monkeypatch.setattr(api, "execute_next", automatic)
     output = StringIO()
     assert worker.main(stdout=output, stderr=StringIO()) == code
     assert calls == [((), {})]  # no path, no manual retry, no visible script sinks
@@ -50,7 +50,7 @@ def test_worker_calls_public_automatic_api_once_and_transports_report(monkeypatc
 def test_worker_never_disguises_unexpected_errors_as_idle(monkeypatch, failure):
     def automatic():
         raise failure
-    monkeypatch.setattr(api, "apply_next", automatic)
+    monkeypatch.setattr(api, "execute_next", automatic)
     with pytest.raises(type(failure)):
         worker.main(stdout=StringIO(), stderr=StringIO())
 
@@ -128,6 +128,6 @@ def test_watcher_validation_never_creates_missing_exchange(monkeypatch, tmp_path
     exchange = tmp_path / "exchange"
     api.configure_exchange_directory(exchange, repository=repo)
     exchange.rmdir()
-    report = api.apply_next()
+    report = api.execute_next()
     assert report.process_exit_code != 0
     assert not exchange.exists()

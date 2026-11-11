@@ -60,7 +60,7 @@ Hash-Read erhält keine neuen fünf Minuten. Der erste vollständig verifizierte
 ZIP-Hash wird festgehalten. Ein optionaler Recovery-Beleg verwendet genau diesen
 Hash und wird einmal geschrieben. Vor dem atomaren Rename müssen die aktuellen
 Bytes erneut denselben Hash liefern. Ein inhaltlich anderes Result wird nicht
-durch längeres Warten akzeptiert. Apply, Entrypoint, Commit und Push sind außerhalb
+durch längeres Warten akzeptiert. Execute, Entrypoint, Commit und Push sind außerhalb
 der Wiederholung. Der begrenzte Runtime-unavailable-/PYZ-Fallback bleibt
 erhalten; alte Result-Runtime-Wheels sind ab der 1.4.0-Kompatibilitätsbasis
 keine Supportpflicht mehr. Dies ändert weder Retrybudget noch Publikationsregeln.
@@ -82,7 +82,7 @@ Für die Abnahme auf der betroffenen Linux→Windows-CIFS-Verbindung:
    exakt dabei ausgegebenen Result-Pfad aufzeichnen; kein älteres Result auswählen.
 3. Die entstandenen Results durch PatchHarbors vollständigen Result-Leser prüfen.
    `unzip -t` und ein bloß berechneter SHA-256 sind nur ergänzende Nachweise.
-4. Auch die Result-Erzeugung nach einem kontrollierten tatsächlichen Apply prüfen;
+4. Auch die Result-Erzeugung nach einem kontrollierten tatsächlichen Execute prüfen;
    dessen Entrypoint darf trotz Verifikations-Retries nur einmal laufen.
 5. Bei Fehlern `run.json` und `verification.json` auswerten. Bei Erfolg dürfen
    keine eigene temporäre ZIP und keine fälschliche Notfalldiagnose verbleiben.
@@ -90,7 +90,7 @@ Für die Abnahme auf der betroffenen Linux→Windows-CIFS-Verbindung:
 Lokale Regressionen simulieren Cacheabweichungen und Zeitabläufe ohne echte
 Minutenpausen, einschließlich Erschöpfung, Abbruch, Dateiaustausch, Symlink-/FIFO-
 Rennen, Integritätsfehlern und Inhaltsänderungen gleicher Länge bei wiederhergestellter
-`mtime`. Development und Apply verwenden nach der aktuellen Nutzerentscheidung
+`mtime`. Development und Execute verwenden nach der aktuellen Nutzerentscheidung
 nur vollständige parallele Gates. Die oben genannte Nutzerbestätigung ist
 reale CIFS-Praxisevidenz; sie ist keine hashgebundene Plattformabnahme jedes
 späteren Builds. Native Windows-Nachweise werden separat geführt. Ausschließlich Christian startet die

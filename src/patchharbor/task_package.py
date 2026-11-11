@@ -144,7 +144,7 @@ def resolve_task_bundle(
     resource_policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY,
     expected_identity: os.stat_result | None = None,
 ) -> ValidatedTaskBundle:
-    """Read every ZIP member, then apply format-1 package roles."""
+    """Read every ZIP member, then execute format-1 package roles."""
     activity("OPEN", f"Open explicit patch and capture stable content with SHA-256: {path}")
     try:
         target = path.resolve(strict=True) if expected_identity is None else path

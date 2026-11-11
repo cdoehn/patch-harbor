@@ -75,7 +75,7 @@ class Publication:
                 self.update(activity_code=code, activity_status=status, activity_message=message)
         elif isinstance(event, RequestStarted):
             entrypoint = next((f.name for f in event.files if f.kind == 'entrypoint'), None)
-            self.update(patch_path=event.source_name, repo_id=event.requested_repo_id, entrypoint_name=entrypoint)
+            self.update(task_path=event.source_name, repo_id=event.requested_repo_id, entrypoint_name=entrypoint)
         elif isinstance(event, RepositoryResolved):
             self.update(repo_id=str(event.context.repo_id), repository_path=str(event.context.repository_path),
                         base_commit=str(event.context.base_commit), fingerprint=event.context.state_fingerprint)
@@ -90,7 +90,7 @@ class Publication:
         try:
             automatic = report.automatic.status.value if report.automatic is not None else None
             code, status = 'completed', 'success' if report.success else 'failure'
-            message = ('Result-Bundle' if self.document['kind'] == 'bundle' else 'Apply') + (' erfolgreich abgeschlossen' if report.success else ' fehlgeschlagen')
+            message = ('Result-Bundle' if self.document['kind'] == 'bundle' else 'Execute') + (' erfolgreich abgeschlossen' if report.success else ' fehlgeschlagen')
             if automatic == 'no_candidate':
                 code, status, message = 'no-candidate', 'waiting', 'Kein ausführbarer Patch gefunden'
             elif automatic == 'locked':
@@ -108,7 +108,7 @@ class Publication:
     def close(self):
         try:
             with self.lock:
-                if self.document['kind'] in ('apply', 'bundle') and 'primary_result' not in self.data and self.document['activity']['status'] != 'failure':
+                if self.document['kind'] in ('execute', 'bundle') and 'primary_result' not in self.data and self.document['activity']['status'] != 'failure':
                     self.data['completion_unknown'] = True
                     self.document['phase'] = 'outcome-unknown'
                     record_activity(self.document, 'outcome-unknown', 'unknown', 'Abschluss nicht bestätigt', observed_at())
@@ -183,8 +183,8 @@ def start_publication(kind, **data):
 
 
 @contextmanager
-def apply_observation(session, *, automatic, dry_run, timeout):
-    publication = start_publication('apply', run_id=str(session.run_id),
+def execute_observation(session, *, automatic, dry_run, timeout):
+    publication = start_publication('execute', run_id=str(session.run_id),
         origin='automatic' if automatic else 'manual', dry_run=dry_run,
         requested_timeout_seconds=timeout, effective_timeout_seconds=None)
     token = _current.set(publication)

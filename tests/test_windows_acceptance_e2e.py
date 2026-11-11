@@ -340,7 +340,7 @@ def test_windows_apply_json_is_utf8_and_execution_log_remains_raw(
     environment = _isolated_environment(tmp_path / "benutzer-ä")
     repository = create_repository(tmp_path / "repository-ä")
     context = _register_context(repository, environment)
-    package = tmp_path / "windows-apply.zip"
+    package = tmp_path / "windows-execute.zip"
     _write_apply_package(
         package,
         context,
@@ -356,7 +356,7 @@ def test_windows_apply_json_is_utf8_and_execution_log_remains_raw(
 
     completed = run_cli(
         tmp_path,
-        "apply",
+        "execute",
         "--json",
         "--output-dir",
         str(output_directory),

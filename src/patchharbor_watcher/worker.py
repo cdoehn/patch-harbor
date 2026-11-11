@@ -1,4 +1,4 @@
-"""Private one-shot worker: public API in, existing Apply JSON protocol out.
+"""Private one-shot worker: public API in, existing Execute JSON protocol out.
 
 A separate process per poll preserves the watcher's current isolation and signal
 behavior. The API remains a synchronous library: no CLI parser, implicit stdin,
@@ -30,8 +30,8 @@ def main(*, request: bytes = b'', stdout: TextIO | None = None, stderr: TextIO |
     targets = None if entries is None else tuple(api.ExchangeWatchTarget(
         Path(entry['directory']), entry['device'], entry['inode'],
         tuple(api.RepositoryId(value) for value in entry['repository_ids'])) for entry in entries)
-    report = api.apply_next() if targets is None else api.apply_next(exchanges=targets)
-    document = dict(report.apply_json_envelope())
+    report = api.execute_next() if targets is None else api.execute_next(exchanges=targets)
+    document = dict(report.execute_json_envelope())
     document['watcher_progress'] = progress_document(report.automatic)
     result_stream.write(json.dumps(
         document, ensure_ascii=True, allow_nan=False,

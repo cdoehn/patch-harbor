@@ -9,7 +9,7 @@ from zipfile import ZipFile
 
 import patchharbor
 from patchharbor import api
-from patchharbor_watcher.apply_boundary import delegate_to_automatic_apply
+from patchharbor_watcher.execute_boundary import delegate_to_automatic_execute
 from patchharbor_watcher.lifecycle import WatcherStopController
 from patchharbor_watcher.loop import run_repository_watcher
 from patchharbor_watcher.platform import open_event_source
@@ -35,7 +35,7 @@ def main():
         return result
     def delegate(*, exchanges):
         started = monotonic()
-        result = delegate_to_automatic_apply(exchanges=exchanges)
+        result = delegate_to_automatic_execute(exchanges=exchanges)
         results.append((started, result))
         stop.request_stop()
         return result
@@ -49,7 +49,7 @@ def main():
     assert len(results) == 1 and results[0][0] >= opened[0] + 5
     result = results[0][1]
     assert result.process_exit_code == 0 and result.progress.status == 'attempted'
-    with ZipFile(result.apply_result['result']['result_bundle']['path']) as z:
+    with ZipFile(result.execute_result['result']['result_bundle']['path']) as z:
         report = json.loads(z.read('logs/run.json'))
         assert report['execution_present'] and report['primary_result']['success'] and not report['dry_run']
         assert report['repo_id'] == str(context.repo_id)

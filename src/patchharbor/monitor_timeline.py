@@ -52,7 +52,7 @@ def forecast(row, document, now=None):
         elif code in ('watching', 'no-candidate', 'waiting-change'):
             labels = ('Auf nächste Änderung warten', 'Nach Änderung: Ruhefrist abwarten')
         elif code == 'draining':
-            return [('Nach Apply-Abschluss: Watcher beenden', 'future'), unknown]
+            return [('Nach Execute-Abschluss: Watcher beenden', 'future'), unknown]
         else:
             return [unknown, unknown]
     elif data.get('dry_run'):
@@ -107,7 +107,7 @@ def timeline(document, session, *, now=None, frame=0, width=120):
         label = operation(row, full)
         if width < 85:
             data = row.get('data', {})
-            if row['kind'] == 'apply' and data.get('bundle_number'):
+            if row['kind'] == 'execute' and data.get('bundle_number'):
                 label = ('Result zu #' if current['code'].startswith('result-') else 'Patch #') + data['bundle_number']
             if current['code'] == 'entrypoint' and current['status'] == 'running':
                 text = (data.get('entrypoint_name') or 'Entrypoint') + ' läuft'

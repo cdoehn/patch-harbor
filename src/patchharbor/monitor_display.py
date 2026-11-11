@@ -28,7 +28,7 @@ def repository_rows(document, session, *, width, height, now, frame):
     last_width = 21 if width >= 105 else 0
     state_width = max(12, width - name_width - exchange_width - last_width - 8)
     rows = [[('  ' + fit('Repository', name_width) + '  ' + fit('PatchHarbor aktuell', state_width) +
-              '  ' + fit('Exchange', exchange_width) + ('  Letzter Apply*' if last_width else ''), 'title')]]
+              '  ' + fit('Exchange', exchange_width) + ('  Letzter Execute*' if last_width else ''), 'title')]]
     for repo in repos[first:first+visible]:
         text, status, run = repository_status(repo, document, now)
         if run:
@@ -72,7 +72,7 @@ def overview_details(selected, document, session, now):
                   ('Entrypoint: ' + (run['data'].get('entrypoint_name') or 'noch nicht bestimmt'), ''),
                   ('Lauf: ' + str(run['data'].get('run_id') or run['instance_id']), 'unknown')]
     latest, style = last_result(selected, document, now)
-    lines.append(('Letzter beobachteter Apply: ' + latest, style))
+    lines.append(('Letzter beobachteter Execute: ' + latest, style))
     summary = document.get('repository_views', {}).get(selected['repo_id'], {})
     candidate = summary.get('candidate')
     if candidate:
@@ -130,7 +130,7 @@ def lines(document, session, *, width=100, height=35, now=None, frame=0, help_op
                 ('g: Git-Details · a: Archiv · /: Suche · s: Sortierung', ''),
                 ('r: aktualisieren · ?: Hilfe schließen · q: nur diesen Viewer schließen', ''),
                 ('✓ Erfolg · × Fehler · Spinner aktiv · Lila Vorschau · Grau unbekannt/wartend', ''),
-                ('* Letzter Apply aus beobachteten Nachweisen; Historie kann unvollständig sein.', 'unknown')]
+                ('* Letzter Execute aus beobachteten Nachweisen; Historie kann unvollständig sein.', 'unknown')]
     elif session.view == 'exchanges':
         body = exchange_details(document, session, now, frame)
     elif session.view in ('live', 'live-logs'):
@@ -152,7 +152,7 @@ def lines(document, session, *, width=100, height=35, now=None, frame=0, help_op
     result += formatted[:available]
     keys = ('Tab Fokus · ↑↓ j/k · v IDs · g Git · l aktiv · r neu · ? Hilfe · q' if width >= 80
             else 'Tab Fokus · 1–7 Ansicht · v IDs · ? Hilfe · q Ende')
-    result += [[(keys, 'title')], [('* Letzter Apply aus beobachteten Nachweisen', 'unknown')]]
+    result += [[(keys, 'title')], [('* Letzter Execute aus beobachteten Nachweisen', 'unknown')]]
     return result[:height]
 
 

@@ -1,4 +1,4 @@
-"""Pin producer-owned runtime and template bytes before an Apply can mutate them."""
+"""Pin producer-owned runtime and template bytes before an Execute can mutate them."""
 from __future__ import annotations
 
 from dataclasses import dataclass

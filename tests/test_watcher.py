@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from patchharbor_watcher.apply_boundary import ApplyCompletion
+from patchharbor_watcher.execute_boundary import ExecuteCompletion
 from patchharbor_watcher.loop import (
     SharedWatcherEventState,
     WatcherPollOutcome,
@@ -21,10 +21,10 @@ def _completion(
     result: dict[str, object] | None = None,
     invalid_response: str | None = None,
     stderr: str = "",
-) -> ApplyCompletion:
-    return ApplyCompletion(
+) -> ExecuteCompletion:
+    return ExecuteCompletion(
         process_exit_code=exit_code,
-        apply_result={"success": True} if result is None else result,
+        execute_result={"success": True} if result is None else result,
         invalid_response_text=invalid_response,
         stderr_text=stderr,
     )
@@ -40,8 +40,8 @@ def _automatic_apply_envelope(
 ) -> dict[str, object]:
     return {
         "watcher_progress": {"version": 1, "status": "no_candidate" if run_id.startswith("idle-") else "attempted" if success else "error", "blocked_on": None},
-        "output_version": 1,
-        "command": "apply",
+        "output_version": 2,
+        "command": "execute",
         "success": success,
         "result": {
             "run_id": run_id,
@@ -68,7 +68,7 @@ def test_shared_poll_delegates_to_core_and_deduplicates_idle_records(
     log = StringIO()
     errors = StringIO()
 
-    def delegate() -> ApplyCompletion:
+    def delegate() -> ExecuteCompletion:
         nonlocal calls
         calls += 1
         return _completion(
@@ -159,8 +159,8 @@ def test_shared_poll_records_success_and_distinct_core_error(
     )
     records = [json.loads(line) for line in log.getvalue().splitlines()]
     assert [record["event"] for record in records] == [
-        "automatic_apply_completed",
-        "automatic_apply_failed",
+        "automatic_execute_completed",
+        "automatic_execute_failed",
     ]
     assert errors.getvalue() == "core diagnostic\n"
 

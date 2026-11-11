@@ -73,7 +73,7 @@ def _parameterless_apply(
     automatic: bool = False,
 ):
     cwd.mkdir(exist_ok=True)
-    arguments = ["apply", "--json"]
+    arguments = ["execute", "--json"]
     if dry_run:
         arguments.append("--dry-run")
     if automatic:
@@ -93,7 +93,7 @@ def _assert_unresolved_selection_failure(
 ) -> None:
     assert completed.returncode == int(ExitCode.TASK_BUNDLE_ERROR)
     envelope = json.loads(completed.stdout)
-    assert envelope["command"] == "apply"
+    assert envelope["command"] == "execute"
     assert envelope["success"] is False
     assert envelope["error"] == {
         "kind": "task_bundle_error",
@@ -113,7 +113,7 @@ def _assert_unresolved_selection_failure(
 def _assert_unresolved_repository_failure(completed) -> None:
     assert completed.returncode == int(ExitCode.REPOSITORY_ERROR)
     envelope = json.loads(completed.stdout)
-    assert envelope["command"] == "apply"
+    assert envelope["command"] == "execute"
     assert envelope["success"] is False
     assert envelope["error"] == {
         "kind": "repository_resolution_error",
@@ -198,8 +198,8 @@ def test_manual_parameterless_apply_only_selects_current_repository_package(
     assert result["repo_id"] == first_context["repo_id"]
     assert (first / "automatic-result.txt").read_text(encoding="utf-8") == "first"
     assert not (second / "automatic-result.txt").exists()
-    assert _identity_record(environment, first_package)["apply_status"] == "succeeded"
-    assert _identity_record(environment, second_package)["apply_status"] is None
+    assert _identity_record(environment, first_package)["execute_status"] == "succeeded"
+    assert _identity_record(environment, second_package)["execute_status"] is None
 
 
 def test_newer_foreign_repository_package_is_irrelevant_to_manual_apply(
@@ -222,8 +222,8 @@ def test_newer_foreign_repository_package_is_irrelevant_to_manual_apply(
     assert completed.returncode == 0
     assert (first / "automatic-result.txt").read_text(encoding="utf-8") == "first"
     assert not (second / "automatic-result.txt").exists()
-    assert _identity_record(environment, first_package)["apply_status"] == "succeeded"
-    assert _identity_record(environment, second_package)["apply_status"] is None
+    assert _identity_record(environment, first_package)["execute_status"] == "succeeded"
+    assert _identity_record(environment, second_package)["execute_status"] is None
 
 
 def test_no_matching_candidate_fails_without_repository_mutation_or_bundle(
@@ -272,8 +272,8 @@ def test_multiple_matching_candidates_select_the_newest_mtime_ns(
     assert (repository / "automatic-result.txt").read_text(
         encoding="utf-8"
     ) == "newest"
-    assert _identity_record(environment, first)["apply_status"] == "succeeded"
-    assert _identity_record(environment, second)["apply_status"] is None
+    assert _identity_record(environment, first)["execute_status"] == "succeeded"
+    assert _identity_record(environment, second)["execute_status"] is None
 
 
 def test_newer_state_mismatch_does_not_block_older_matching_package(
@@ -299,8 +299,8 @@ def test_newer_state_mismatch_does_not_block_older_matching_package(
     assert (repository / "automatic-result.txt").read_text(
         encoding="utf-8"
     ) == "matching"
-    assert _identity_record(environment, matching)["apply_status"] == "succeeded"
-    assert _identity_record(environment, mismatched)["apply_status"] is None
+    assert _identity_record(environment, matching)["execute_status"] == "succeeded"
+    assert _identity_record(environment, mismatched)["execute_status"] is None
 
 
 @pytest.mark.parametrize(
@@ -332,10 +332,10 @@ def test_equal_mtime_uses_deterministic_normalized_filename_tie_breaker(
     ) == "alpha"
     assert _identity_record(
         environment, exchange / "alpha.zip"
-    )["apply_status"] == "succeeded"
+    )["execute_status"] == "succeeded"
     assert _identity_record(
         environment, exchange / "zulu.zip"
-    )["apply_status"] is None
+    )["execute_status"] is None
 
 
 def test_newer_succeeded_package_does_not_block_older_eligible_package(
@@ -372,8 +372,8 @@ def test_newer_succeeded_package_does_not_block_older_eligible_package(
     assert first.returncode == 0
     assert second.returncode == 0
     assert (repository / "automatic-runs.txt").read_text(encoding="utf-8") == "no"
-    assert _identity_record(environment, newer)["apply_status"] == "succeeded"
-    assert _identity_record(environment, older)["apply_status"] == "succeeded"
+    assert _identity_record(environment, newer)["execute_status"] == "succeeded"
+    assert _identity_record(environment, older)["execute_status"] == "succeeded"
 
 
 def test_explicit_patch_path_bypasses_exchange_candidate_selection(
@@ -389,7 +389,7 @@ def test_explicit_patch_path_bypasses_exchange_candidate_selection(
 
     completed = run_cli(
         tmp_path,
-        "apply",
+        "execute",
         "--json",
         str(explicit),
         environment_overrides=environment,
@@ -433,7 +433,7 @@ def test_explicit_patch_path_may_target_another_registered_repository(
 
     completed = run_cli(
         current,
-        "apply",
+        "execute",
         "--json",
         str(package),
         environment_overrides=environment,
@@ -475,8 +475,8 @@ def test_automatic_parameterless_apply_remains_global_across_repositories(
     assert result["repo_id"] == second_context["repo_id"]
     assert not (first / "automatic-result.txt").exists()
     assert (second / "automatic-result.txt").read_text(encoding="utf-8") == "second"
-    assert _identity_record(environment, first_package)["apply_status"] is None
-    assert _identity_record(environment, second_package)["apply_status"] == "succeeded"
+    assert _identity_record(environment, first_package)["execute_status"] is None
+    assert _identity_record(environment, second_package)["execute_status"] == "succeeded"
 
 
 @pytest.mark.parametrize(
@@ -584,13 +584,13 @@ def test_dry_run_does_not_consume_but_parameterless_apply_does(
 
     assert first_dry_run.returncode == 0
     assert second_dry_run.returncode == 0
-    assert _identity_record(environment, package)["apply_status"] is None
+    assert _identity_record(environment, package)["execute_status"] is None
     assert not (repository / "automatic-runs.txt").exists()
 
     applied = _parameterless_apply(repository, environment)
 
     assert applied.returncode == 0
-    assert _identity_record(environment, package)["apply_status"] == "succeeded"
+    assert _identity_record(environment, package)["execute_status"] == "succeeded"
     assert (repository / "automatic-runs.txt").read_text(encoding="utf-8") == "x"
 
     repeated = _parameterless_apply(repository, environment)
@@ -602,7 +602,7 @@ def test_dry_run_does_not_consume_but_parameterless_apply_does(
 
     explicit = run_cli(
         tmp_path,
-        "apply",
+        "execute",
         "--json",
         str(package),
         environment_overrides=environment,
@@ -651,11 +651,11 @@ def test_changed_bytes_at_the_same_exchange_path_are_a_new_identity(
     assert second.returncode == 0
     assert (repository / "automatic-runs.txt").read_text(encoding="utf-8") == "12"
     assert (
-        _identity_record(environment, package, first_hash)["apply_status"]
+        _identity_record(environment, package, first_hash)["execute_status"]
         == "succeeded"
     )
     assert (
-        _identity_record(environment, package, second_hash)["apply_status"]
+        _identity_record(environment, package, second_hash)["execute_status"]
         == "succeeded"
     )
     assert package.is_file()
@@ -683,7 +683,7 @@ def test_preflight_failure_remains_retryable_without_attempt_mark(
 
     assert first.returncode == int(ExitCode.NO_VALID_SCRIPT)
     assert second.returncode == int(ExitCode.NO_VALID_SCRIPT)
-    assert _identity_record(environment, package)["apply_status"] is None
+    assert _identity_record(environment, package)["execute_status"] is None
     assert package.is_file()
 
 
@@ -715,7 +715,7 @@ def test_failed_parameterless_apply_can_be_retried_manually_and_then_succeeds(
     first = _parameterless_apply(repository, environment)
 
     assert first.returncode == 23
-    assert _identity_record(environment, package)["apply_status"] == "failed"
+    assert _identity_record(environment, package)["execute_status"] == "failed"
     assert git(repository, "status", "--porcelain").stdout == ""
     current = run_cli(
         repository,
@@ -730,7 +730,7 @@ def test_failed_parameterless_apply_can_be_retried_manually_and_then_succeeds(
     second = _parameterless_apply(repository, environment)
 
     assert second.returncode == 0
-    assert _identity_record(environment, package)["apply_status"] == "succeeded"
+    assert _identity_record(environment, package)["execute_status"] == "succeeded"
     assert (repository / "automatic-runs.txt").read_text(
         encoding="utf-8"
     ) == "x"
@@ -792,8 +792,8 @@ def test_failed_newer_automatic_candidate_does_not_block_older_package(
     assert first.returncode == 23
     assert second.returncode == 0
     assert (repository / "automatic-runs.txt").read_text(encoding="utf-8") == "fo"
-    assert _identity_record(environment, newer)["apply_status"] == "failed"
-    assert _identity_record(environment, older)["apply_status"] == "succeeded"
+    assert _identity_record(environment, newer)["execute_status"] == "failed"
+    assert _identity_record(environment, older)["execute_status"] == "succeeded"
 
 
 def test_automatic_apply_does_not_repeat_a_failed_package(
@@ -830,7 +830,7 @@ def test_automatic_apply_does_not_repeat_a_failed_package(
         second,
         message=_AUTOMATIC_NO_MATCH,
     )
-    assert _identity_record(environment, package)["apply_status"] == "failed"
+    assert _identity_record(environment, package)["execute_status"] == "failed"
     assert (repository / "automatic-runs.txt").read_text(
         encoding="utf-8"
     ) == "x"
@@ -855,7 +855,7 @@ def test_failed_manual_retry_still_requires_the_original_repository_state(
     failed = _parameterless_apply(repository, environment)
 
     assert failed.returncode == 23
-    assert _identity_record(environment, package)["apply_status"] == "failed"
+    assert _identity_record(environment, package)["execute_status"] == "failed"
     assert git(repository, "status", "--porcelain").stdout == ""
 
     (repository / "tracked.txt").write_text("changed\n", encoding="utf-8")
@@ -869,7 +869,7 @@ def test_failed_manual_retry_still_requires_the_original_repository_state(
         mismatched,
         message=_MANUAL_NO_MATCH,
     )
-    assert _identity_record(environment, package)["apply_status"] == "failed"
+    assert _identity_record(environment, package)["execute_status"] == "failed"
     assert package.is_file()
 
 
@@ -901,7 +901,7 @@ def test_result_bundle_failure_still_consumes_automatic_identity(
 
     failed = run_cli(
         repository,
-        "apply",
+        "execute",
         "--json",
         "--output-dir",
         str(output_directory),
@@ -910,7 +910,7 @@ def test_result_bundle_failure_still_consumes_automatic_identity(
     )
 
     assert failed.returncode == int(ExitCode.RESULT_BUNDLE_ERROR)
-    assert _identity_record(environment, package)["apply_status"] == "succeeded"
+    assert _identity_record(environment, package)["execute_status"] == "succeeded"
     assert (repository / "automatic-runs.txt").read_text(encoding="utf-8") == "x"
     assert output_directory.is_file()
 

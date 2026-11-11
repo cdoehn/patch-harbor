@@ -138,7 +138,7 @@ def _apply_patch(
     patch: bytes,
     *arguments: str,
 ) -> None:
-    """Apply raw bundle patch bytes without a filesystem intermediary."""
+    """Execute raw bundle patch bytes without a filesystem intermediary."""
     subprocess.run(
         ["git", "apply", *arguments, "--binary"],
         cwd=repository,

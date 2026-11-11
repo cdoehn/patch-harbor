@@ -31,7 +31,7 @@ def test_automatic_exchange_consumer_ignores_partial_then_applies_complete_pack(
         try:
             assert before_publish.wait(60),'pack did not reach publication'
             assert len(list(exchange.glob('.patchharbor-pack-*.partial')))==1
-            absent=api.apply_next()
+            absent=api.execute_next()
             assert absent.process_exit_code==10
             assert not absent.primary_result.entrypoint_started
             assert not (repo/'payload.bin').exists()
@@ -39,7 +39,7 @@ def test_automatic_exchange_consumer_ignores_partial_then_applies_complete_pack(
             continue_publish.set()
         packed=task.result(timeout=60)
     assert packed.validation.binding_matches and packed.path.is_file()
-    applied=api.apply_next()
+    applied=api.execute_next()
     assert applied.success and applied.primary_result.entrypoint_started
     assert applied.primary_result.entrypoint_exit_code==0
     assert (repo/'payload.bin').read_bytes()==b'complete-payload'

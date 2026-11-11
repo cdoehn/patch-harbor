@@ -103,7 +103,7 @@ def monitor_artifacts(repository, *, include_archive=False):
                 elif not state_known:
                     reason = 'replay state unavailable'
                 elif row['replay_status'] is not None:
-                    reason = 'replay blocks automatic apply: ' + row['replay_status']
+                    reason = 'replay blocks automatic execute: ' + row['replay_status']
                 else:
                     reason = 'eligible (observation, not reserved)'
                     candidates.append(artifact)
@@ -125,7 +125,7 @@ def monitor_artifacts(repository, *, include_archive=False):
     if candidates and not result['incomplete'] and not result['errors']:
         result['selected_candidate'] = str(_select_exchange_candidate(candidates).path)
     rows = result['artifacts']
-    for patch in (r for r in rows if r['kind'] == 'task_package' and not r['error']):
+    for patch in (r for r in rows if r['kind'] == 'task_bundle' and not r['error']):
         patch['source_candidates'] = sorted({r['sha256'] for r in rows if r.get('context') == patch['expected'] and not r['error']})
         patch['result_links'] = sorted({r['sha256'] for r in rows if r.get('task_sha256') == patch['sha256']
                                  and r.get('expected') == patch['expected'] and not r['error']})
@@ -148,7 +148,7 @@ def monitor_overview(repository):
     view = monitor_artifacts(repository)
     rows = view['artifacts']
     own = [r for r in rows if r.get('repo_id') == view.get('repo_id')]
-    outcomes = [r for r in own if r['kind'] == 'result_bundle' and r.get('operation') == 'apply'
+    outcomes = [r for r in own if r['kind'] == 'result_bundle' and r.get('operation') == 'execute'
                 and not r.get('dry_run') and not r.get('error')]
     outcomes.sort(key=lambda r: (r.get('ended_at', ''), r['run_id']), reverse=True)
     candidate = next((r for r in own if r['path'] == view['selected_candidate']), None)
@@ -158,5 +158,5 @@ def monitor_overview(repository):
             'candidate': candidate, 'latest_result': outcomes[0] if outcomes else None,
             'history_complete': False,
             'eligible_count': sum(r.get('eligibility', '').startswith('eligible') for r in own),
-            'patch_count': sum(r['kind'] == 'task_package' for r in own),
+            'patch_count': sum(r['kind'] == 'task_bundle' for r in own),
             'unreadable_count': sum(bool(r.get('error')) for r in rows)}

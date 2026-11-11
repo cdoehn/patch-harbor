@@ -37,7 +37,7 @@ def artifact_lines(document, session, *, height):
             expected = selected.get('expected') or selected.get('context') or {}
             lines.append(('Repo: ' + str(selected.get('repo_id')), ''))
             lines.append(('Erwarteter Ausgang: ' + str(expected.get('base_commit')) + ' / ' + str(expected.get('state_fingerprint')), ''))
-            if selected['kind'] == 'task_package':
+            if selected['kind'] == 'task_bundle':
                 lines.append((selected['eligibility'], 'warning'))
                 for digest in selected.get('source_candidates', []):
                     lines.append(('Passender Ausgangs-Result-Hash: ' + digest, ''))

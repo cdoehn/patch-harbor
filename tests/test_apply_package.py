@@ -292,4 +292,4 @@ def test_parser_and_digest_use_the_same_immutable_package_capture(tmp_path: Path
     assert package.package_sha256 == sha256(original_bytes).hexdigest()
     assert package.payloads[0].content == b"original"
     # Revalidation before mutation, not a second uncorrelated hash here, rejects
-    # the replaced source. Existing Apply race tests exercise that boundary.
+    # the replaced source. Existing Execute race tests exercise that boundary.

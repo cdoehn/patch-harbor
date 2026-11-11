@@ -1,4 +1,4 @@
-"""Real in-place self-update while an installed producer owns an Apply request."""
+"""Real in-place self-update while an installed producer owns an Execute request."""
 from __future__ import annotations
 
 import json
@@ -73,11 +73,11 @@ from patchharbor import api
 from patchharbor.pyz_artifact import PyzProvider
 from patchharbor.result_reader import read_result_reference
 def no_network(*args, **kwargs):
-    raise AssertionError('Apply producer attempted Python networking')
+    raise AssertionError('Execute producer attempted Python networking')
 socket.socket = no_network
 before = PyzProvider().capture().artifact
 assert before is not None
-report = api.apply(Path(sys.argv[1]))
+report = api.execute(Path(sys.argv[1]))
 assert report.process_exit_code == int(sys.argv[2])
 facts, _ = read_result_reference(report.result_bundle.path)
 assert facts.runtime.status == 'embedded' and not facts.warnings

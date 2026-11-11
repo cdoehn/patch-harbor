@@ -5,7 +5,7 @@ import struct
 
 from patchharbor_watcher.platform import linux
 from patchharbor import api
-from patchharbor_watcher.apply_boundary import ApplyCompletion
+from patchharbor_watcher.execute_boundary import ExecuteCompletion
 
 
 def inotify_record(wd=1, mask=linux.IN_CREATE, name=b"file"):
@@ -15,7 +15,7 @@ def inotify_record(wd=1, mask=linux.IN_CREATE, name=b"file"):
 
 
 def completion(status='no_candidate', lock=None, code=10):
-    return ApplyCompletion(code, {'command': 'apply', 'success': code == 0,
+    return ExecuteCompletion(code, {'command': 'execute', 'success': code == 0,
         'process_exit_code': code, 'error': None, 'watcher_progress': {
             'version': 1, 'status': status, 'blocked_on': None if lock is None else {
                 'kind': lock.kind, 'repo_id': lock.repo_id}}}, None, '')

@@ -10,7 +10,7 @@ import shutil
 
 import pytest
 
-from patchharbor import api, application_apply, application_exchange, application_results
+from patchharbor import api, application_execute, application_exchange, application_results
 from patchharbor import exchange_state
 from patchharbor.errors import configuration_error, task_bundle_error
 from patchharbor.locks import registry_lock, repository_lock
@@ -131,9 +131,9 @@ def test_scoped_apply_never_scans_hashes_or_maintains_other_exchange(pair, monke
     monkeypatch.setattr(application_exchange, "scan_exchange_directory", scan_a)
     monkeypatch.setattr(application_exchange, "archive_exchange_artifacts", lambda a, **kw: maintain_a(archive, a, **kw))
     monkeypatch.setattr(application_exchange, "recover_exchange_artifacts", lambda a, **kw: maintain_a(recover, a, **kw))
-    report = api.apply_next(exchanges=(target,))
+    report = api.execute_next(exchanges=(target,))
     assert report.success
-    assert report.automatic.status is api.AutomaticApplyStatus.ATTEMPTED
+    assert report.automatic.status is api.AutomaticExecuteStatus.ATTEMPTED
     assert scanned == [exchanges[0]] and maintained == [contexts[0].repo_id] * 2
     assert downloading.read_bytes() == original
     assert set(exchanges[1].iterdir()) == {downloading}
@@ -143,9 +143,9 @@ def test_empty_scope_never_becomes_global(pair, monkeypatch):
     _, contexts, exchanges = pair
     write_package(exchanges[0] / "ready.zip", contexts[0])
     forbid_bundle_work(monkeypatch)
-    report = api.apply_next(exchanges=())
+    report = api.execute_next(exchanges=())
     assert not report.success
-    assert report.automatic.status is api.AutomaticApplyStatus.NO_CANDIDATE
+    assert report.automatic.status is api.AutomaticExecuteStatus.NO_CANDIDATE
 
 
 @pytest.mark.parametrize("change", ["foreign", "inode", "owner", "reconfigured", "replaced", "removed"])
@@ -167,9 +167,9 @@ def test_stale_or_foreign_target_fails_before_any_scan(pair, tmp_path, monkeypat
         if change == "replaced":
             exchanges[0].mkdir()
     forbid_bundle_work(monkeypatch)
-    report = api.apply_next(exchanges=(target,))
+    report = api.execute_next(exchanges=(target,))
     assert not report.success
-    assert report.automatic.status is api.AutomaticApplyStatus.ERROR
+    assert report.automatic.status is api.AutomaticExecuteStatus.ERROR
     assert report.primary_tool_error.kind is api.ErrorKind.CONFIGURATION_ERROR
 
 
@@ -178,7 +178,7 @@ def test_new_shared_owner_invalidates_previous_scope(pair, monkeypatch):
     target = api.watch_targets().exchanges[0]
     api.configure_exchange_directory(exchanges[0], repository=roots[1])
     forbid_bundle_work(monkeypatch)
-    assert api.apply_next(exchanges=(target,)).automatic.status is api.AutomaticApplyStatus.ERROR
+    assert api.execute_next(exchanges=(target,)).automatic.status is api.AutomaticExecuteStatus.ERROR
 
 
 @pytest.mark.parametrize("boundary", ["before_replay", "during_identity_read"])
@@ -186,7 +186,7 @@ def test_root_replacement_between_selection_and_mutation_is_rejected(pair, tmp_p
     _, contexts, exchanges = pair
     target = api.watch_targets().exchanges[0]
     write_package(exchanges[0] / "ready.zip", contexts[0])
-    apply_package = application_apply.apply_task_bundle
+    apply_package = application_execute.execute_task_bundle
 
     def replace_root():
         moved = tmp_path / "old-root"
@@ -197,18 +197,18 @@ def test_root_replacement_between_selection_and_mutation_is_rejected(pair, tmp_p
         def compete(package, **kwargs):
             replace_root()
             return apply_package(package, **kwargs)
-        monkeypatch.setattr(application_apply, "apply_task_bundle", compete)
+        monkeypatch.setattr(application_execute, "execute_task_bundle", compete)
     else:
         read_identity = application_exchange.require_exchange_identity_unchanged
         def compete(identity, **kwargs):
             read_identity(identity, **kwargs)
             replace_root()
         monkeypatch.setattr(application_exchange, "require_exchange_identity_unchanged", compete)
-    report = api.apply_next(exchanges=(target,))
+    report = api.execute_next(exchanges=(target,))
     assert not report.success and not report.execution_present
-    assert report.automatic.status is api.AutomaticApplyStatus.ERROR
+    assert report.automatic.status is api.AutomaticExecuteStatus.ERROR
     records = exchange_state.load_exchange_state(registration_user_paths()).records
-    assert records and all(record.apply_status is None and record.attempt_run_id is None for record in records)
+    assert records and all(record.execute_status is None and record.attempt_run_id is None for record in records)
 
 
 def test_default_global_selection_and_scoped_dry_run_keep_existing_contract(pair):
@@ -217,16 +217,16 @@ def test_default_global_selection_and_scoped_dry_run_keep_existing_contract(pair
         path = exchange / "ready.zip"
         write_package(path, context)
         os.utime(path, ns=((index + 1) * 1000000000,) * 2)
-    global_report = api.apply_next(dry_run=True)
+    global_report = api.execute_next(dry_run=True)
     assert global_report.success and global_report.repo_id == contexts[1].repo_id
-    assert global_report.automatic.status is api.AutomaticApplyStatus.DRY_RUN
+    assert global_report.automatic.status is api.AutomaticExecuteStatus.DRY_RUN
     target = api.watch_targets().exchanges[0]
-    scoped = api.apply_next(dry_run=True, exchanges=(target, target))
+    scoped = api.execute_next(dry_run=True, exchanges=(target, target))
     assert scoped.success and scoped.repo_id == contexts[0].repo_id
-    assert scoped.automatic.status is api.AutomaticApplyStatus.DRY_RUN
+    assert scoped.automatic.status is api.AutomaticExecuteStatus.DRY_RUN
     records = exchange_state.load_exchange_state(registration_user_paths()).records
-    assert records and all(record.apply_status is None and record.attempt_run_id is None for record in records)
-    assert "automatic" not in scoped.apply_json_envelope()
+    assert records and all(record.execute_status is None and record.attempt_run_id is None for record in records)
+    assert "automatic" not in scoped.execute_json_envelope()
 
 
 @pytest.mark.parametrize("exit_code", [0, 7])
@@ -235,14 +235,14 @@ def test_actual_attempt_progress_does_not_allow_automatic_retry(pair, exit_code)
     target = api.watch_targets().exchanges[0]
     path = exchanges[0] / "candidate.zip"
     write_package(path, contexts[0], exit_code=exit_code)
-    first = api.apply_next(exchanges=(target,))
-    assert first.automatic.status is api.AutomaticApplyStatus.ATTEMPTED
+    first = api.execute_next(exchanges=(target,))
+    assert first.automatic.status is api.AutomaticExecuteStatus.ATTEMPTED
     assert first.success is (exit_code == 0)
-    second = api.apply_next(exchanges=(target,))
-    assert second.automatic.status is api.AutomaticApplyStatus.NO_CANDIDATE
+    second = api.execute_next(exchanges=(target,))
+    assert second.automatic.status is api.AutomaticExecuteStatus.NO_CANDIDATE
     assert not second.execution_present
     if exit_code:
-        manual = api.apply(path)
+        manual = api.execute(path)
         assert manual.execution_present and manual.automatic is None
 
 
@@ -250,24 +250,24 @@ def test_actual_attempt_progress_does_not_allow_automatic_retry(pair, exit_code)
 def test_error_text_cannot_impersonate_empty_discovery(pair, monkeypatch, factory):
     def fail(*args, **kwargs):
         raise factory("no state-bound patch package matches a registered repository")
-    monkeypatch.setattr(application_apply, "discover_exchange_task", fail)
-    assert api.apply_next().automatic.status is api.AutomaticApplyStatus.ERROR
+    monkeypatch.setattr(application_execute, "discover_exchange_task", fail)
+    assert api.execute_next().automatic.status is api.AutomaticExecuteStatus.ERROR
 
 
-@pytest.mark.parametrize("kind", list(api.ApplyLockKind))
+@pytest.mark.parametrize("kind", list(api.ExecuteLockKind))
 def test_lock_readiness_has_no_bundle_work_and_releases_every_lock(pair, monkeypatch, kind):
     _, contexts, _ = pair
     paths = registration_user_paths()
-    lock = api.ApplyLock(kind, contexts[0].repo_id if kind is api.ApplyLockKind.REPOSITORY else None)
+    lock = api.ExecuteLock(kind, contexts[0].repo_id if kind is api.ExecuteLockKind.REPOSITORY else None)
     acquire = {
-        api.ApplyLockKind.REGISTRY: lambda: registry_lock(paths),
-        api.ApplyLockKind.REPOSITORY: lambda: repository_lock(paths, contexts[0].repo_id),
-        api.ApplyLockKind.EXCHANGE_STATE: lambda: exchange_state._state_lock(paths),
+        api.ExecuteLockKind.REGISTRY: lambda: registry_lock(paths),
+        api.ExecuteLockKind.REPOSITORY: lambda: repository_lock(paths, contexts[0].repo_id),
+        api.ExecuteLockKind.EXCHANGE_STATE: lambda: exchange_state._state_lock(paths),
     }[kind]
     forbid_bundle_work(monkeypatch)
     with acquire():
-        assert api.apply_readiness(lock) == api.ApplyReadiness(blocked_on=lock)
-    assert api.apply_readiness(lock).ready
+        assert api.execute_readiness(lock) == api.ExecuteReadiness(blocked_on=lock)
+    assert api.execute_readiness(lock).ready
     with acquire():
         pass  # Readiness returned no reservation, including its registry probe.
     with registry_lock(paths):
@@ -280,34 +280,34 @@ def test_repository_lock_retry_uses_real_other_process_and_scoped_apply(pair):
     write_package(exchanges[0] / "ready.zip", contexts[0])
     holder = start_repository_lock_holder(str(contexts[0].repo_id), environment=project_environment())
     try:
-        locked = api.apply_next(exchanges=(target,))
-        assert locked.automatic.status is api.AutomaticApplyStatus.LOCKED
+        locked = api.execute_next(exchanges=(target,))
+        assert locked.automatic.status is api.AutomaticExecuteStatus.LOCKED
         lock = locked.automatic.blocked_on
-        assert lock == api.ApplyLock(api.ApplyLockKind.REPOSITORY, contexts[0].repo_id)
-        assert not api.apply_readiness(lock).ready
+        assert lock == api.ExecuteLock(api.ExecuteLockKind.REPOSITORY, contexts[0].repo_id)
+        assert not api.execute_readiness(lock).ready
     finally:
         try:
             assert release_repository_lock_holder(holder) == 0
         finally:
             stop_repository_lock_holder(holder)
-    assert api.apply_readiness(lock).ready
-    assert api.apply_next(exchanges=(target,)).success
+    assert api.execute_readiness(lock).ready
+    assert api.execute_next(exchanges=(target,)).success
 
 
-@pytest.mark.parametrize("kind", [api.ApplyLockKind.REGISTRY, api.ApplyLockKind.EXCHANGE_STATE])
+@pytest.mark.parametrize("kind", [api.ExecuteLockKind.REGISTRY, api.ExecuteLockKind.EXCHANGE_STATE])
 def test_automatic_global_lock_conflicts_are_structured(pair, kind):
     paths = registration_user_paths()
-    acquire = registry_lock if kind is api.ApplyLockKind.REGISTRY else exchange_state._state_lock
+    acquire = registry_lock if kind is api.ExecuteLockKind.REGISTRY else exchange_state._state_lock
     with acquire(paths):
-        report = api.apply_next()
-    assert report.automatic == api.AutomaticApplyResult(
-        api.AutomaticApplyStatus.LOCKED, api.ApplyLock(kind),
+        report = api.execute_next()
+    assert report.automatic == api.AutomaticExecuteResult(
+        api.AutomaticExecuteStatus.LOCKED, api.ExecuteLock(kind),
     )
 
 
 def test_readiness_rejects_unregistered_repository(pair):
     with pytest.raises(api.PatchHarborError) as caught:
-        api.apply_readiness(api.ApplyLock(api.ApplyLockKind.REPOSITORY, api.RepositoryId.new()))
+        api.execute_readiness(api.ExecuteLock(api.ExecuteLockKind.REPOSITORY, api.RepositoryId.new()))
     assert caught.value.error_kind is api.ErrorKind.REPOSITORY_RESOLUTION_ERROR
     with registry_lock(registration_user_paths()):
         pass
@@ -322,33 +322,33 @@ def test_lock_operation_failure_is_not_busy(pair, monkeypatch):
         yield  # pragma: no cover - context manager fails while entering
     monkeypatch.setattr(locks, "exclusive_file_lock", fail)
     with pytest.raises(api.PatchHarborError) as caught:
-        api.apply_readiness(api.ApplyLock(api.ApplyLockKind.REGISTRY))
+        api.execute_readiness(api.ExecuteLock(api.ExecuteLockKind.REGISTRY))
     assert caught.value.error_kind is api.ErrorKind.REGISTRY_ERROR
-    assert api.apply_next().automatic.status is api.AutomaticApplyStatus.ERROR
+    assert api.execute_next().automatic.status is api.AutomaticExecuteStatus.ERROR
 
 
 def test_lock_conflict_at_replay_boundary_survives_result_error_wrapping(pair, monkeypatch):
     _, contexts, exchanges = pair
     target = api.watch_targets().exchanges[0]
     write_package(exchanges[0] / "ready.zip", contexts[0])
-    original = application_apply.apply_task_bundle
+    original = application_execute.execute_task_bundle
     def compete(package, **kwargs):
         with exchange_state._state_lock(registration_user_paths()):
             return original(package, **kwargs)
-    monkeypatch.setattr(application_apply, "apply_task_bundle", compete)
-    report = api.apply_next(exchanges=(target,))
+    monkeypatch.setattr(application_execute, "execute_task_bundle", compete)
+    report = api.execute_next(exchanges=(target,))
     assert not report.execution_present
-    assert report.automatic == api.AutomaticApplyResult(
-        api.AutomaticApplyStatus.LOCKED, api.ApplyLock(api.ApplyLockKind.EXCHANGE_STATE),
+    assert report.automatic == api.AutomaticExecuteResult(
+        api.AutomaticExecuteStatus.LOCKED, api.ExecuteLock(api.ExecuteLockKind.EXCHANGE_STATE),
     )
     records = exchange_state.load_exchange_state(registration_user_paths()).records
-    assert all(record.apply_status is None for record in records)
-    monkeypatch.setattr(application_apply, "apply_task_bundle", original)
-    assert api.apply_next(exchanges=(target,)).success
+    assert all(record.execute_status is None for record in records)
+    monkeypatch.setattr(application_execute, "execute_task_bundle", original)
+    assert api.execute_next(exchanges=(target,)).success
 
 
 @pytest.mark.parametrize("invalid", [[], "exchange", (Path("/tmp"),)])
 def test_scope_argument_type_errors_precede_core_work(monkeypatch, invalid):
     forbid_bundle_work(monkeypatch)
     with pytest.raises(TypeError):
-        api.apply_next(exchanges=invalid)
+        api.execute_next(exchanges=invalid)

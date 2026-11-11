@@ -88,7 +88,7 @@ def test_actual_apply_publishes_effective_timeout_output_and_result(tmp_path, mo
             "[Console]::Out.WriteLine('live-end')"))
     events = []
     with ThreadPoolExecutor(max_workers=1) as pool:
-        future = pool.submit(api.apply, path, timeout=requested_timeout, observer=events.append)
+        future = pool.submit(api.execute, path, timeout=requested_timeout, observer=events.append)
         try:
             # Preflight and native interpreter startup have no test performance
             # deadline. Once ready, the real entrypoint stays alive until observed.
@@ -98,7 +98,7 @@ def test_actual_apply_publishes_effective_timeout_output_and_result(tmp_path, mo
                     pytest.fail(f'Apply ended before entrypoint readiness: {report.primary_result.as_document()}')
                 time.sleep(.03)
             row = wait_for(lambda: next((r for r in api.monitor_live()['instances']
-                if r['kind'] == 'apply' and r['data'].get('effective_timeout_seconds') == requested_timeout), None))
+                if r['kind'] == 'execute' and r['data'].get('effective_timeout_seconds') == requested_timeout), None))
             observed = wait_for(lambda: (r if 'live-start' in r.get('log_tail', '') else None)
                                 if (r := instance(row['instance_id'])) else None)
             assert observed['live'] and not observed['completed']
@@ -132,7 +132,7 @@ def test_publication_io_failure_cannot_fail_apply(tmp_path, monkeypatch):
     _write_custom_package(path, {k: str(getattr(context, k)) for k in ('repo_id', 'base_commit', 'state_fingerprint')},
         posix_entrypoint='exit 0', powershell_entrypoint='exit 0')
     monkeypatch.setattr(monitor_live, 'atomic_replace_bytes', lambda *a, **k: (_ for _ in ()).throw(OSError('disk full')))
-    report = api.apply(path)
+    report = api.execute(path)
     assert report.success and report.primary_result.entrypoint_exit_code == 0
 
 
@@ -198,7 +198,7 @@ def test_malformed_live_source_is_isolated_from_valid_peer(tmp_path, monkeypatch
     wait_for(lambda: instance(publication.instance_id))
     try:
         directory = publication.paths.state_directory / 'monitor-v1'
-        (directory / 'apply-bad.json').write_text('{"format_version":1,"pid":-1}')
+        (directory / 'execute-bad.json').write_text('{"format_version":1,"pid":-1}')
         result = api.monitor_live()
         assert result['errors']
         assert any(r['instance_id'] == publication.instance_id for r in result['instances'])
@@ -220,7 +220,7 @@ def test_concurrent_real_applies_keep_run_and_repository_identity(tmp_path, monk
             posix_entrypoint='sleep .6; exit 0', powershell_entrypoint='Start-Sleep -Milliseconds 600; exit 0')
         paths.append(path)
     with ThreadPoolExecutor(max_workers=2) as pool:
-        futures = [pool.submit(api.apply, p) for p in paths]
+        futures = [pool.submit(api.execute, p) for p in paths]
         reports = [future.result(timeout=15) for future in futures]
     # Existing Core locks may reject one concurrent admission; observation must
     # preserve both actual outcomes and never merge their identities.
@@ -245,7 +245,7 @@ def test_live_distinguishes_exit_zero_from_failed_result_publication(tmp_path, m
     def fail(*args, **kwargs):
         raise OSError('injected Result publication failure')
     monkeypatch.setattr(publication, '_verify_result_bundle', fail)
-    report = api.apply(path)
+    report = api.execute(path)
     assert report.primary_result.entrypoint_exit_code == 0 and not report.success
     row = wait_for(lambda: next((r for r in api.monitor_live()['instances'] if r['completed']), None))
     assert row['data']['result_status'] == 'failed'

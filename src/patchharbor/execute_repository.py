@@ -72,7 +72,7 @@ class SafeResolvedRepository:
         if self.result_target.final_path != self.result_publication.final_path:
             raise ValueError("Result Bundle target and publication disagree")
         if not self.result_publication.reserved:
-            raise ValueError("apply Result Bundle publication must be reserved")
+            raise ValueError("execute Result Bundle publication must be reserved")
 
     def matches_manifest_state(self, manifest: TaskManifest) -> bool:
         """Whether the manifest names this exact resolved repository state."""

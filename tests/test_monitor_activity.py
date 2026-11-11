@@ -35,7 +35,7 @@ def event(code, status, message, sequence, seconds):
 
 
 def document():
-    apply = dict(kind='apply', instance_id=RUN, pid=123, phase='entrypoint',
+    execute = dict(kind='execute', instance_id=RUN, pid=123, phase='entrypoint',
                  started_at=stamp(-140), updated_at=stamp(), facts_updated_at=stamp(-134),
                  completed=False, live=True, stale=False,
                  data=dict(repo_id=REPO, repository_path='/repos/patchharbor', run_id=RUN,
@@ -51,7 +51,7 @@ def document():
              for identity, name in ((REPO, 'patchharbor'), (OTHER, 'other'))]
     return dict(observed_at=stamp(), repositories=repos,
                 exchanges=[dict(path='/exchange', available=True, repository_ids=[REPO, OTHER])],
-                errors=[], live_view=dict(instances=[apply], observed_at=stamp(), errors=[]),
+                errors=[], live_view=dict(instances=[execute], observed_at=stamp(), errors=[]),
                 repository_views={})
 
 
@@ -112,7 +112,7 @@ def test_successful_entrypoint_with_failed_result_stays_failed():
     row = doc['live_view']['instances'][0]
     row.update(completed=True, live=False, facts_updated_at=stamp())
     row['data'].update(primary_result={'success': True, 'entrypoint_exit_code': 0}, result_status='failed')
-    row['activity'] = event('completed', 'failure', 'Apply fehlgeschlagen', 4, 0)
+    row['activity'] = event('completed', 'failure', 'Execute fehlgeschlagen', 4, 0)
     text, status = last_result(doc['repositories'][0], doc, NOW)
     assert status == 'failure' and 'Result fehlgeschlagen' in text
     assert all(style == 'unknown' for _, style in forecast(row, doc, NOW))
@@ -210,7 +210,7 @@ def test_native_apply_reports_bundle_number_entrypoint_repo_and_exit(tmp_path, m
     _write_custom_package(path, {k: str(getattr(context, k)) for k in ('repo_id', 'base_commit', 'state_fingerprint')},
         posix_entrypoint='# PATCHHARBOR-BUNDLE-NR: 082\nexit 0',
         powershell_entrypoint='# PATCHHARBOR-BUNDLE-NR: 082\nexit 0')
-    report = api.apply(path)
+    report = api.execute(path)
     assert report.success
     row = wait_for(lambda: next((r for r in api.monitor_live()['instances']
         if r['data'].get('run_id') == str(report.run_id) and r['completed']), None))
@@ -232,9 +232,9 @@ def test_manual_result_bundle_is_a_separate_observed_operation(tmp_path, monkeyp
 
 def test_empty_automatic_scan_is_waiting_not_a_failed_apply(tmp_path, monkeypatch):
     registered(tmp_path, monkeypatch)
-    report = api.apply_next()
+    report = api.execute_next()
     assert report.automatic.status.value == 'no_candidate'
-    row = wait_for(lambda: next((r for r in api.monitor_live()['instances'] if r['kind'] == 'apply' and r['completed']), None))
+    row = wait_for(lambda: next((r for r in api.monitor_live()['instances'] if r['kind'] == 'execute' and r['completed']), None))
     assert row['data']['automatic_status'] == 'no_candidate'
     assert activity(row)['status'] == 'waiting'
     assert activity(row)['code'] == 'no-candidate'

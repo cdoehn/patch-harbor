@@ -34,7 +34,7 @@ def test_cli_helpers_preserve_default_or_explicit_subprocess_timeout(tmp_path, m
 
     def run():
         if helper == "text":
-            return support.run_cli(tmp_path, "apply", **arguments)
+            return support.run_cli(tmp_path, "execute", **arguments)
         if helper == "bytes":
             return support.run_cli_bytes(tmp_path, "fs", "run", "-", input_bytes=b"script", **arguments)
         return support.run_patchharbor(tmp_path / "run.sh", cwd=tmp_path, **arguments)

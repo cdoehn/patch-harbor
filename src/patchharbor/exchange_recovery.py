@@ -22,8 +22,8 @@ from patchharbor.exchange import (
 )
 from patchharbor.exchange_paths import ExchangePathPolicyError, require_exchange_outside_registry
 from patchharbor.exchange_state import (
-    ExchangeApplyStatus, ExchangeStateRecord, load_exchange_state,
-    recover_exchange_apply_finished,
+    ExchangeExecuteStatus, ExchangeStateRecord, load_exchange_state,
+    recover_exchange_execute_finished,
 )
 from patchharbor.locks import registry_lock
 from patchharbor.models import RepositoryContext, RepositoryId
@@ -81,7 +81,7 @@ def recover_exchange_artifacts(
     try:
         snapshot = load_exchange_state(paths)
         pending = tuple(record for record in snapshot.records if (
-            record.apply_status is ExchangeApplyStatus.ATTEMPTED
+            record.execute_status is ExchangeExecuteStatus.ATTEMPTED
             and record.attempt_run_id is not None and record.result_sha256 is not None
             and record.manifest is not None
             and record.manifest.repo_id == repository_id
@@ -117,7 +117,7 @@ def recover_exchange_artifacts(
                         read_exchange_artifact_content(patch, directory=configuration.exchange_directory),
                         patch.path,
                     )
-                    if package_evidence.kind != "task_package" or package_evidence.selection != record.manifest:
+                    if package_evidence.kind != "task_bundle" or package_evidence.selection != record.manifest:
                         activity("KEEP", f"{patch.path.name}: patch proof does not match the recorded binding", "detail")
                         continue
                     evidence = parse_archive_evidence(
@@ -130,7 +130,7 @@ def recover_exchange_artifacts(
                     assert record.manifest is not None and evidence.receipt is not None
                     selected_id = record.manifest.repo_id
                     # A busy repository is not a crash. Acquire the SAME lock as
-                    # apply/context; never delete a lock file or inspect screen.
+                    # execute/context; never delete a lock file or inspect screen.
                     activity("RECOVERY", "Acquire real repository lock and verify clean Git/state proof")
                     with locked_repository_context_for_id(selected_id) as context:
                         if context is None or not _proven_result(record, evidence, context):
@@ -159,7 +159,7 @@ def recover_exchange_artifacts(
                                     raise ValueError("recovery registration/configuration changed")
                                 require_local_repository_identity(context.repository_path, selected_id)
 
-                            recover_exchange_apply_finished(
+                            recover_exchange_execute_finished(
                                 paths, record, evidence.receipt.completed_commit,
                                 verify_evidence=verify_evidence,
                             )
@@ -173,7 +173,7 @@ def recover_exchange_artifacts(
             return artifacts
         latest = load_exchange_state(paths)
         return tuple(
-            replace(artifact, apply_status=record.apply_status)
+            replace(artifact, execute_status=record.execute_status)
             if artifact.kind is ExchangeArtifactKind.TASK_BUNDLE
             and (record := latest.record_for(artifact.identity)) is not None
             else artifact for artifact in artifacts

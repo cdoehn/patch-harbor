@@ -12,20 +12,20 @@ import zipfile
 
 import pytest
 
-import patchharbor.application_apply as application_module
-import patchharbor.apply_mutation as apply_mutation_module
-import patchharbor.apply_preflight as apply_preflight_module
+import patchharbor.application_execute as application_module
+import patchharbor.execute_mutation as apply_mutation_module
+import patchharbor.execute_preflight as apply_preflight_module
 import patchharbor.payload_files as payload_files_module
 import patchharbor.result_bundle_publication as publication_module
 from patchharbor.cli import main as cli_main
 from patchharbor.application import (
-    apply_task_bundle,
+    execute_task_bundle,
     dry_run_task_bundle,
     preflight_task_bundle_repository,
     register_repository,
 )
-from patchharbor.apply_mutation import ApplyMutationGate
-from patchharbor.apply_repository import safely_resolved_repository
+from patchharbor.execute_mutation import ExecuteMutationGate
+from patchharbor.execute_repository import safely_resolved_repository
 from patchharbor.exit_status import ExitCode, exit_code_for_error
 from patchharbor.errors import FailureReason
 from patchharbor.errors import (
@@ -412,7 +412,7 @@ def test_apply_result_matrix_preserves_emergency_execution_diagnostics(
 
     captured_error: PatchHarborError | None = None
     try:
-        report = apply_task_bundle(
+        report = execute_task_bundle(
             _package(_manifest(context)),
             output_directory=output_directory,
         )
@@ -480,7 +480,7 @@ def test_apply_removes_private_resources_after_every_process_outcome(
     )
 
     try:
-        apply_task_bundle(
+        execute_task_bundle(
             _package(_manifest(context)),
             output_directory=tmp_path / "results",
         )
@@ -518,7 +518,7 @@ def test_apply_json_is_closed_and_preserves_emergency_execution_files(
     stdout = StringIO()
     exit_code = cli_main(
         [
-            "apply",
+            "execute",
             "--json",
             "--output-dir",
             str(output_directory),
@@ -665,7 +665,7 @@ def test_repository_change_after_preflight_is_bundled_without_payload_write(
     )
 
     with pytest.raises(PatchHarborError) as captured:
-        apply_task_bundle(package, output_directory=output_directory)
+        execute_task_bundle(package, output_directory=output_directory)
 
     report = captured.value.run_report
     assert exit_code_for_error(captured.value) is ExitCode.STATE_MISMATCH
@@ -735,7 +735,7 @@ def test_second_capture_failure_is_bundled_before_releasing_repository_lock(
     )
 
     with pytest.raises(PatchHarborError) as captured:
-        apply_task_bundle(
+        execute_task_bundle(
             _package(_manifest(context)),
             output_directory=tmp_path / "results",
         )
@@ -790,7 +790,7 @@ def test_parent_replaced_after_second_context_is_rejected_before_staging(
     )
 
     with pytest.raises(PatchHarborError) as captured:
-        apply_task_bundle(package, output_directory=output_directory)
+        execute_task_bundle(package, output_directory=output_directory)
 
     report = captured.value.run_report
     assert exit_code_for_error(captured.value) is ExitCode.PAYLOAD_PREPARATION_ERROR
@@ -857,7 +857,7 @@ def test_payload_write_failure_keeps_partial_files_without_starting_entrypoint(
     )
 
     with pytest.raises(PatchHarborError) as captured:
-        apply_task_bundle(
+        execute_task_bundle(
             package,
             output_directory=output_directory,
         )
@@ -928,7 +928,7 @@ def test_process_start_failure_bundles_without_claiming_entrypoint_start(
     )
 
     with pytest.raises(PatchHarborError) as captured:
-        apply_task_bundle(
+        execute_task_bundle(
             _package(_manifest(context)),
             output_directory=output_directory,
         )

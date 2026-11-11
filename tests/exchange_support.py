@@ -121,7 +121,7 @@ def _exchange_records(environment: dict[str, str]) -> list[dict[str, object]]:
     document = json.loads(
         exchange_state_path(environment).read_text(encoding="utf-8")
     )
-    assert document["format_version"] == 4
+    assert document["format_version"] == 5
     records = document["entries"]
     assert isinstance(records, list)
     return records
@@ -159,6 +159,6 @@ def _selection() -> ExchangeTaskSelection:
 def _record(path: Path, character: str = "a") -> ExchangeStateRecord:
     return ExchangeStateRecord(
         identity=_identity(path, character),
-        kind="task_package",
+        kind="task_bundle",
         manifest=_selection(),
     )

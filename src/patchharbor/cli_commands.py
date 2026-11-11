@@ -32,7 +32,7 @@ from patchharbor.cli_output import (
     _output_streams_for_presentation,
     _presented_completion,
     _progress_observer,
-    _write_apply_completion,
+    _write_execute_completion,
     _write_command_error,
     _write_emergency_diagnostics_notice,
     _write_json_document,
@@ -310,7 +310,7 @@ def _bundle_command(
     return 0
 
 
-def _apply_command(
+def _execute_command(
     path: Path | None,
     *,
     dry_run: bool,
@@ -342,13 +342,13 @@ def _apply_command(
         )
         try:
             if automatic:
-                report = api.apply_next(
+                report = api.execute_next(
                     dry_run=dry_run, timeout=timeout_seconds,
                     output_directory=output_directory, output=output,
                     observer=_progress_observer(console),
                 )
             else:
-                report = api.apply(
+                report = api.execute(
                     path, dry_run=dry_run, timeout=timeout_seconds,
                     output_directory=output_directory, output=output,
                     observer=_progress_observer(console),
@@ -368,7 +368,7 @@ def _apply_command(
             return int(ExitCode.EXECUTION_ERROR)
 
         if console is None or not console.started:
-            return _write_apply_completion(
+            return _write_execute_completion(
                 report,
                 json_output=json_output,
                 stdout=visible_stdout,
@@ -395,7 +395,7 @@ def _apply_command(
             )
             return int(ExitCode.EXECUTION_ERROR)
         if console.separate_child_output:
-            return _write_apply_completion(
+            return _write_execute_completion(
                 report, json_output=False, stdout=visible_stdout, stderr=visible_stderr,
             )
         _write_emergency_diagnostics_notice(

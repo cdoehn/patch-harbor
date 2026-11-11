@@ -7,7 +7,7 @@ import zlib
 import pytest
 
 from patchharbor import api
-from patchharbor.snapshot_binary import apply_delta, read_block
+from patchharbor.snapshot_binary import execute_delta, read_block
 from patchharbor.snapshot_budget import SnapshotBudget
 from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY
 
@@ -29,7 +29,7 @@ def encoded_block(kind,raw,*,declared=None,trailing=b''):
     b'\x03\x01\x90\x02',b'\x03\x02\x01x', # target over/underflow
 ])
 def test_invalid_delta_programs_are_rejected(program):
-    with pytest.raises(api.ResultSnapshotError) as caught:apply_delta(program,b'abc',SnapshotBudget())
+    with pytest.raises(api.ResultSnapshotError) as caught:execute_delta(program,b'abc',SnapshotBudget())
     assert caught.value.code is api.SnapshotErrorCode.INVALID_PATCH
 
 
@@ -38,7 +38,7 @@ def test_copy_default_size_and_insert_are_implemented():
     # copy instruction with implicit 64-KiB size, then one literal byte.
     original=b'x'*65536
     program=b'\x80\x80\x04\x81\x80\x04\x80\x01!'
-    assert apply_delta(program,original,SnapshotBudget())==original+b'!'
+    assert execute_delta(program,original,SnapshotBudget())==original+b'!'
 
 
 @pytest.mark.parametrize('case',['short','long','trailing','truncated','budget','delta_target_budget'])

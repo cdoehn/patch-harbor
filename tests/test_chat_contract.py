@@ -77,13 +77,13 @@ def test_public_commands_accept_documented_arguments_and_reject_missing_or_unkno
         ["unregister", "repository-or-id"],
         ["context"], ["context", "repository"],
         ["bundle"], ["bundle", "repository"],
-        ["apply"], ["apply", "package.zip"],
-        ["apply", "--dry-run"], ["apply", "--dry-run", "package.zip"],
+        ["execute"], ["execute", "package.zip"],
+        ["execute", "--dry-run"], ["execute", "--dry-run", "package.zip"],
         ["fs", "run", "source"],
     ):
         parser.parse_args(arguments)
     build_watcher_parser().parse_args([])
-    for arguments in (["unregister"], ["apply", "--retry-failed"],
+    for arguments in (["unregister"], ["execute", "--retry-failed"],
                       ["chat"], ["commit"], ["plan"], ["rollback"], ["test"]):
         with pytest.raises(SystemExit) as error:
             parser.parse_args(arguments)

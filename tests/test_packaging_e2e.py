@@ -57,7 +57,7 @@ EXPECTED_RUNTIME_FILES = {
     "patchharbor/safe_export_plan.py",
     "patchharbor/safe_export_types.py",
     "patchharbor/safe_git_patch.py",
-    "patchharbor/apply_admission.py",
+    "patchharbor/execute_admission.py",
     "patchharbor/result_snapshot.py",
     "patchharbor/snapshot_types.py",
     "patchharbor/snapshot_budget.py",
@@ -66,7 +66,7 @@ EXPECTED_RUNTIME_FILES = {
     "patchharbor/py.typed",
     "patchharbor/__init__.py",
     "patchharbor/application.py",
-    "patchharbor/application_apply.py",
+    "patchharbor/application_execute.py",
     "patchharbor/application_results.py",
     "patchharbor/application_configuration.py",
     "patchharbor/application_exchange.py",
@@ -86,9 +86,9 @@ EXPECTED_RUNTIME_FILES = {
     "patchharbor/pack_types.py",
     "patchharbor/task_pack.py",
     "patchharbor/platform/pack_output.py",
-    "patchharbor/apply_mutation.py",
-    "patchharbor/apply_preflight.py",
-    "patchharbor/apply_repository.py",
+    "patchharbor/execute_mutation.py",
+    "patchharbor/execute_preflight.py",
+    "patchharbor/execute_repository.py",
     "patchharbor/bundle_paths.py",
     "patchharbor/bundle_names.py",
     "patchharbor/bundle_handoff.py",
@@ -166,7 +166,7 @@ EXPECTED_RUNTIME_FILES = {
     "patchharbor_watcher/cli.py",
     "patchharbor_watcher/polling.py",
     "patchharbor_watcher/lifecycle.py",
-    "patchharbor_watcher/apply_boundary.py",
+    "patchharbor_watcher/execute_boundary.py",
     "patchharbor_watcher/systemd_linux.py",
     "patchharbor_watcher/worker.py",
     "patchharbor_watcher/events.py",
@@ -346,9 +346,9 @@ def _write_release_patch_package(
         "entrypoint": entrypoint_name,
     }
     entrypoint = native_script(
-        'printf "%s\n" "installed-apply"\n'
+        'printf "%s\n" "installed-execute"\n'
         'printf "%s" "entrypoint-ok" > release-applied.txt',
-        '[Console]::Out.WriteLine("installed-apply")\n'
+        '[Console]::Out.WriteLine("installed-execute")\n'
         '[System.IO.File]::WriteAllText("release-applied.txt", "entrypoint-ok")',
     )
     with zipfile.ZipFile(path, "w") as archive:
@@ -530,7 +530,7 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
             f"{root}/src/patchharbor_watcher/loop.py",
             f"{root}/src/patchharbor_watcher/cli.py",
             f"{root}/src/patchharbor_watcher/lifecycle.py",
-            f"{root}/src/patchharbor_watcher/apply_boundary.py",
+            f"{root}/src/patchharbor_watcher/execute_boundary.py",
             f"{root}/src/patchharbor_watcher/systemd_linux.py",
             f"{root}/src/patchharbor_watcher/worker.py",
         ):
@@ -653,7 +653,7 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
         ("unregister", "--help"),
         ("context", "--help"),
         ("bundle", "--help"),
-        ("apply", "--help"),
+        ("execute", "--help"),
         ("fs", "--help"),
         ("fs", "run", "--help"),
     ):
@@ -669,16 +669,16 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
     assert ".patchharbor/config.json" in help_outputs[("configure", "--help")]
     assert "committed HEAD" in help_outputs[("register", "--help")]
     assert "current working directory to one registered repository" in (
-        help_outputs[("apply", "--help")]
+        help_outputs[("execute", "--help")]
     )
     assert "newest eligible Exchange package by mtime_ns" in (
-        help_outputs[("apply", "--help")]
+        help_outputs[("execute", "--help")]
     )
     assert "deterministic normalized-filename tie-breaker" in (
-        help_outputs[("apply", "--help")]
+        help_outputs[("execute", "--help")]
     )
     assert "watcher's internal automatic mode remains global" in (
-        help_outputs[("apply", "--help")]
+        help_outputs[("execute", "--help")]
     )
 
     watcher_help = _run(
@@ -757,10 +757,10 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
             str(tmp_path / "invalid-results"),
             str(tmp_path / "missing-repository"),
         ),
-        ("apply", "--dry", str(tmp_path / "missing-package.zip")),
+        ("execute", "--dry", str(tmp_path / "missing-package.zip")),
         ("fs", "run", "--pla", str(tmp_path / "missing-script.sh")),
         ("register", "--json", str(tmp_path / "missing-repository")),
-        ("apply", "--log", str(tmp_path / "missing-package.zip")),
+        ("execute", "--log", str(tmp_path / "missing-package.zip")),
     )
     for arguments in invalid_core_invocations:
         rejected = _run(
@@ -848,7 +848,7 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
         _run(
             [
                 str(executable),
-                "apply",
+                "execute",
                 "--dry-run",
                 "--json",
                 "--timeout",
@@ -865,11 +865,11 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
     assert not (repository / "nested").exists()
     assert not (repository / "release-applied.txt").exists()
 
-    apply_result = _successful_json_result(
+    execute_result = _successful_json_result(
         _run(
             [
                 str(executable),
-                "apply",
+                "execute",
                 "--json",
                 "--plain",
                 "--no-color",
@@ -881,7 +881,7 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
             environment=runtime_environment,
         )
     )
-    assert apply_result["primary_result"]["kind"] == "success"
+    assert execute_result["primary_result"]["kind"] == "success"
     assert (repository / "nested" / "release.bin").read_bytes() == (
         b"\x00release-payload\xff"
     )
@@ -889,7 +889,7 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
         encoding="utf-8"
     ) == "entrypoint-ok"
     assert not (repository / entrypoint_name).exists()
-    apply_bundle = Path(str(apply_result["result_bundle"]["path"]))
+    apply_bundle = Path(str(execute_result["result_bundle"]["path"]))
     assert apply_bundle.parent == exchange_directory.resolve()
     assert apply_bundle.is_file()
     with zipfile.ZipFile(apply_bundle) as archive:
@@ -962,7 +962,7 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
         assert runtime_metadata['artifact']['type'] == 'pyz'
         assert {n for n in result_archive.namelist() if n.startswith('runtime/')} == {
             'runtime/runtime.json', runtime_metadata['artifact']['path']}
-        assert b"installed-apply" in result_archive.read("logs/execution.log")
+        assert b"installed-execute" in result_archive.read("logs/execution.log")
         installed_handoff = json.loads(result_archive.read("environment.json"))
         assert installed_handoff["runtime"]["patchharbor_version"] == RELEASE_VERSION
 

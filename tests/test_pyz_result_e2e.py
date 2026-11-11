@@ -1,4 +1,4 @@
-"""First productive Result uses its own embedded bootstrap, then real Apply."""
+"""First productive Result uses its own embedded bootstrap, then real Execute."""
 import hashlib
 from io import BytesIO
 import json
@@ -100,7 +100,7 @@ print(json.dumps({'patch':str(packed.path),'pyz':str(prepared.path),'sha256':pac
         _run([*prefix,'configure','show'],repo,environment)
         command('inspect',proof['patch'])
         assert command('validate',proof['patch'],'--reference-bundle',reference)['binding_matches']
-        outcome=command('apply',proof['patch'])
+        outcome=command('execute',proof['patch'])
         returned=Path(outcome['result_bundle']['path'])
         returned_facts,_=read_result_reference(returned)
         assert returned_facts.format_version==4 and returned_facts.runtime.artifact.sha256==facts.runtime.artifact.sha256

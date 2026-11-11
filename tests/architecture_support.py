@@ -55,7 +55,7 @@ def is_cli(module: str) -> bool:
 
 WORKFLOW_BOUNDARIES = frozenset({
     'patchharbor.registration', 'patchharbor.repository_state', 'patchharbor.result_bundle',
-    'patchharbor.apply_mutation', 'patchharbor.sources', 'patchharbor.bundles',
+    'patchharbor.execute_mutation', 'patchharbor.sources', 'patchharbor.bundles',
     'patchharbor.execution', 'patchharbor.exchange',
 })
 WORKFLOW_FORBIDDEN = frozenset({

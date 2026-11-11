@@ -85,7 +85,7 @@ def _add_configuration_commands(commands) -> None:
         help="configure the current repository settings",
         description=(
             "Manage this repository's .patchharbor/config.json for Result "
-            "Bundles, automatic Apply discovery, and the optional watcher."
+            "Bundles, automatic Execute discovery, and the optional watcher."
         ),
         epilog=(
             "Exchange directories may be shared by repositories but must not overlap "
@@ -264,9 +264,9 @@ def _add_package_commands(commands) -> None:
                 "Validate can additionally compare one explicit repository or Result reference."
             ),
         )
-        package_parser.add_argument("patch_zip", type=_explicit_package_path, metavar="PATCH_ZIP")
+        package_parser.add_argument("task_zip", type=_explicit_package_path, metavar="TASK_ZIP")
         package_parser.add_argument("--json", action="store_true", dest="json_output",
-                                    help="write the version-2 machine-readable result")
+                                    help="write the version-3 machine-readable result")
         if name == "validate":
             binding = package_parser.add_mutually_exclusive_group()
             binding.add_argument("--repository", type=_explicit_package_path, metavar="REPOSITORY")
@@ -280,14 +280,14 @@ def _add_package_commands(commands) -> None:
     pack_parser.add_argument('--reference-bundle', required=True, type=_explicit_package_path, metavar='RESULT_ZIP')
     pack_parser.add_argument('--entrypoint', required=True, type=_pack_entrypoint, metavar='PACKAGE_PATH')
     pack_target = pack_parser.add_mutually_exclusive_group(required=True)
-    pack_target.add_argument('--output', type=_explicit_package_path, metavar='PATCH_ZIP')
+    pack_target.add_argument('--output', type=_explicit_package_path, metavar='TASK_ZIP')
     pack_target.add_argument('--output-dir', type=_explicit_package_path, metavar='DIRECTORY')
     pack_parser.add_argument('--mode', action=_PackModeAction, dest='modes', metavar='PACKAGE_PATH=0644')
     pack_parser.add_argument('--json', action='store_true', dest='json_output')
 
 
 
-def _add_bundle_apply_commands(commands) -> None:
+def _add_bundle_execute_commands(commands) -> None:
     bundle_parser = commands.add_parser(
         "bundle",
         help="create a Result Bundle for one registered repository",
@@ -322,32 +322,32 @@ def _add_bundle_apply_commands(commands) -> None:
         help="write the versioned machine-readable result",
     )
 
-    apply_parser = commands.add_parser(
-        "apply",
-        help="validate or apply one repository-bound patch package",
+    execute_parser = commands.add_parser(
+        "execute", aliases=["apply"],
+        help="validate or execute one repository-bound patch package",
         description=(
-            "Validate or apply one repository-bound ZIP patch package. A "
-            "manual call without PATCH_ZIP resolves the current working "
+            "Validate or execute one repository-bound ZIP patch package. A "
+            "manual call without TASK_ZIP resolves the current working "
             "directory to one registered repository, then selects its newest "
             "eligible Exchange package by mtime_ns. Equal timestamps use a "
             "deterministic normalized-filename tie-breaker."
         ),
         epilog=(
-            "An explicit PATCH_ZIP bypasses parameterless discovery and may "
+            "An explicit TASK_ZIP bypasses parameterless discovery and may "
             "resolve another registered repository through its repo_id. The "
             "watcher's internal automatic mode remains global across all "
             "registered repositories. An explicit --output-dir overrides only "
-            "the Result Bundle destination. Apply attempts a Result Bundle "
+            "the Result Bundle destination. Execute attempts a Result Bundle "
             "after repository resolution; earlier writes are not globally "
             "rolled back after a later failure."
         ),
     )
-    apply_parser.add_argument(
+    execute_parser.add_argument(
         "--dry-run",
         action="store_true",
         help="validate the patch package without changing a repository",
     )
-    apply_parser.add_argument(
+    execute_parser.add_argument(
         "--timeout",
         type=_positive_seconds,
         default=DEFAULT_TIMEOUT_SECONDS,
@@ -357,7 +357,7 @@ def _add_bundle_apply_commands(commands) -> None:
             f"(default: {DEFAULT_TIMEOUT_SECONDS:g})"
         ),
     )
-    apply_parser.add_argument(
+    execute_parser.add_argument(
         "--output-dir",
         type=Path,
         metavar="DIRECTORY",
@@ -368,22 +368,22 @@ def _add_bundle_apply_commands(commands) -> None:
     )
 
 
-    apply_parser.add_argument(
+    execute_parser.add_argument(
         "--json",
         action="store_true",
         dest="json_output",
         help="write the versioned machine-readable result",
     )
-    apply_parser.add_argument(
+    execute_parser.add_argument(
         "--automatic",
         action="store_true",
         help=argparse.SUPPRESS,
     )
-    apply_parser.add_argument(
-        "patch_zip",
+    execute_parser.add_argument(
+        "task_zip",
         type=Path,
         nargs="?",
-        metavar="PATCH_ZIP",
+        metavar="TASK_ZIP",
         help=(
             "explicit ZIP package containing a root task.json; when omitted, "
             "use the current registered repository and its newest eligible "
@@ -472,7 +472,7 @@ def _build_parser() -> argparse.ArgumentParser:
         prog="patchharbor",
         description=(
             "Register local Git repository instances, exchange complete "
-            "Result Bundles, and validate or apply repository-bound ZIP "
+            "Result Bundles, and validate or execute repository-bound ZIP "
             "patch packages. The separate 'fs run' command executes "
             "explicit scripts and ZIP ScriptBundles."
         ),
@@ -498,7 +498,7 @@ def _build_parser() -> argparse.ArgumentParser:
     _add_configuration_commands(commands)
     _add_repository_commands(commands)
     _add_package_commands(commands)
-    _add_bundle_apply_commands(commands)
+    _add_bundle_execute_commands(commands)
     watcher = commands.add_parser('watcher', help='run the optional Exchange watcher')
     watcher_commands = watcher.add_subparsers(dest='watcher_command', required=True)
     poll = watcher_commands.add_parser('poll', help='poll registered Exchanges without filesystem events')

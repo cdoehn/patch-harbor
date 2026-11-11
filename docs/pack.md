@@ -10,7 +10,7 @@ braucht keine Installation; ihr Start aus einem Result folgt dem
 
 ```bash
 patchharbor pack ./patch-inhalt --reference-bundle ./result.zip \
-  --entrypoint apply.sh --output-dir ./vorhandene-ausgabe \
+  --entrypoint execute.sh --output-dir ./vorhandene-ausgabe \
   --mode scripts/neues-tool.sh=0755 --json
 ```
 
@@ -32,7 +32,7 @@ from patchharbor import api
 result = api.pack_task(
     "patch-inhalt",
     reference_bundle="result.zip",
-    entrypoint="apply.sh",
+    entrypoint="execute.sh",
     output_directory="vorhandene-ausgabe",
     modes={"scripts/neues-tool.sh": 0o755},
 )
@@ -51,14 +51,14 @@ Pack verändert weder Marker, Shebang, Encoding noch Zeilenenden. Die statische
 Prüfung benötigt keine installierte Ziel-Shell und bestätigt keine Shellsyntax.
 Alle angeforderten Paketmodi sind zunächst `0644`; explizite sichere Modi sind
 möglich, Hostrechte werden nicht übernommen. Modusschlüssel müssen vorhandene
-reguläre Eingabedateien bezeichnen. Das spätere Apply erhält vorhandene sichere
+reguläre Eingabedateien bezeichnen. Das spätere Execute erhält vorhandene sichere
 POSIX-Zielrechte nach dem bestehenden Vertrag.
 
 ## Referenz und Begleitdaten
 
 Ein ausdrücklich benanntes, vollständig gültiges Result ist Pflicht. Alte,
 Dirty-, Fehler-, Diagnose- und Dry-Run-Results sind zulässig. Die vier Bindungswerte
-kommen aus dem tatsächlichen Kontext, nie aus `expected_*` eines früheren Apply.
+kommen aus dem tatsächlichen Kontext, nie aus `expected_*` eines früheren Execute.
 Eine deklarierte defekte Runtime bleibt ein Fehler; gültiges `unavailable` ist
 zulässig. Die Referenz wird nur einmal vollständig erfasst. Ihr Hash, Suffix und
 passive Zielinformationen stammen aus genau diesen geprüften Bytes.
@@ -67,7 +67,7 @@ Manifest und Handoff sind neue Dateien. Die Vorlage stammt aus den verifizierten
 Ressourcen des ausführenden Packers; die schon gerenderte Referenzanleitung wird
 nicht als neue Vorlage eingesetzt. Bekannte Zielpfade, Runtimeinformationen und
 Erfassungszeit bleiben erhalten. Zulässige unbekannte Umgebungswerte bleiben `null`; Pflichtdaten einer
-unterstützten Result-3-Referenz dürfen nicht fehlen.
+unterstützten Result-4-Referenz dürfen nicht fehlen.
 Fremde Pfade werden als Text verwendet und nicht auf dem Pack-Rechner aufgelöst.
 
 ## Ausgabe und Veröffentlichung
@@ -115,11 +115,11 @@ nicht als atomarer Snapshot versprochen.
 Referenzvalidierung, Hashes, Größe und Warnungen. Das bestätigt Paketformat und
 Bindung. Es bestätigt keine fachliche Richtigkeit, Shellausführung, Projekttests,
 Authentizität, Replayfreigabe oder den späteren Zustand des Zielrepositories.
-Pack startet weder Git, Shell, Netzwerk, Installer, Build noch Apply.
+Pack startet weder Git, Shell, Netzwerk, Installer, Build noch Execute.
 
 Die Tests für Referenzen, Inhaltsaufnahme, Kandidatenbau und öffentliche API laufen
 in der vollständigen parallelen Suite. Linux-Nachweise ersetzen keine native
-Windows-/CIFS-Abnahme. Der tatsächliche Handoff- und Apply-Status steht im Plan und
+Windows-/CIFS-Abnahme. Der tatsächliche Handoff- und Execute-Status steht im Plan und
 im zugehörigen Result. Die Erstnutzung aus der eigenen eingebetteten Anleitung
 und drei echte Result-/PYZ-Generationen sind eigene vollständige Tests.
 [Funktionsbeispiele](pack-examples.md) zeigen Voll-Datei-, Diff-, Misch- und

@@ -93,7 +93,7 @@ def test_platform_zip_patchbundle_preserves_binary_payload(
     archive_path = tmp_path / "platform-bundle.zip"
     binary_payload = bytes((0, 1, 2, 127, 128, 255)) + b"PATCHHARBOR"
     if IS_WINDOWS:
-        script_name = "apply.ps1"
+        script_name = "execute.ps1"
         script = (
             f"{REQUIRED_MARKER}\n"
             '$actual = [BitConverter]::ToString('
@@ -102,7 +102,7 @@ def test_platform_zip_patchbundle_preserves_binary_payload(
             '[Console]::Out.WriteLine("bundle-ok")\n'
         )
     else:
-        script_name = "apply.sh"
+        script_name = "execute.sh"
         script = (
             f"{REQUIRED_MARKER}\n"
             'actual="$(od -An -tx1 -v assets/blob.bin | tr -d " \\n")"\n'

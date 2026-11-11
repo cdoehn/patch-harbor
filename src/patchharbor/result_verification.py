@@ -1,4 +1,4 @@
-"""Bounded stabilization of one owned Result, without repeating an Apply."""
+"""Bounded stabilization of one owned Result, without repeating an Execute."""
 from collections.abc import Callable
 from pathlib import Path
 from time import sleep

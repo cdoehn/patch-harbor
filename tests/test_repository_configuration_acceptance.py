@@ -1,4 +1,4 @@
-"""End-to-end ownership across configuration, Apply, worker and archive boundaries."""
+"""End-to-end ownership across configuration, Execute, worker and archive boundaries."""
 from __future__ import annotations
 
 import json
@@ -10,7 +10,7 @@ import pytest
 
 from patchharbor import api
 from patchharbor.user_paths import registration_user_paths
-from patchharbor_watcher.apply_boundary import delegate_to_automatic_apply
+from patchharbor_watcher.execute_boundary import delegate_to_automatic_execute
 from tests.platform_support import native_script, native_value, project_environment
 from tests.registration_support import create_repository, git, set_isolated_user_environment
 from tests.apply_support import write_package
@@ -68,12 +68,12 @@ def test_actual_apply_from_nested_cwd_and_explicit_other_target(pair, tmp_path, 
     nested = a / "nested"
     nested.mkdir()
     monkeypatch.chdir(nested)
-    first = api.apply()
+    first = api.execute()
     assert first.success and first.execution_present
     assert first.context.repo_id == ca.repo_id
     assert first.result_bundle.path.parent == ea
     assert first.result_bundle.path.name.endswith(".zip.A")
-    second = api.apply(external)
+    second = api.execute(external)
     assert second.success and second.execution_present
     assert second.context.repo_id == cb.repo_id
     assert second.result_bundle.path.parent == eb
@@ -102,7 +102,7 @@ def test_explicit_output_uses_valid_target_config_without_exchange(pair, tmp_pat
     external = tmp_path / "b.zip"
     write_package(external, cb)
     output = tmp_path / "explicit-output"
-    report = api.apply(external, output_directory=output)
+    report = api.execute(external, output_directory=output)
     assert report.success and report.execution_present
     assert report.context.repo_id == cb.repo_id
     assert report.result_bundle.path.parent == output
@@ -125,7 +125,7 @@ def test_explicit_output_never_bypasses_damaged_local_config(pair, tmp_path, dam
     package = tmp_path / "b.zip"
     write_package(package, cb)
     output = tmp_path / "not-published"
-    report = api.apply(package, output_directory=output)
+    report = api.execute(package, output_directory=output)
     assert not report.success and not report.execution_present
     assert report.result_bundle.path is None
     assert git(b, "rev-parse", "HEAD").stdout.strip() == str(cb.base_commit)
@@ -140,9 +140,9 @@ def test_real_worker_reloads_target_config_and_ignores_wrong_exchange(pair, tmp_
     outside.mkdir()
     monkeypatch.chdir(outside)
     write_package(eb / "first-b.zip", cb)
-    first = delegate_to_automatic_apply(environment=project_environment())
+    first = delegate_to_automatic_execute(environment=project_environment())
     assert first.process_exit_code == 0, first
-    result = first.apply_result["result"]
+    result = first.execute_result["result"]
     assert result["repo_id"] == str(cb.repo_id)
     path = Path(result["result_bundle"]["path"])
     assert path.parent == eb and path.name.endswith(".zip.B")
@@ -156,9 +156,9 @@ def test_real_worker_reloads_target_config_and_ignores_wrong_exchange(pair, tmp_
     write_package(correct, cb)
     os.utime(correct, ns=(1_000_000_000, 1_000_000_000))
     os.utime(wrong, ns=(9_000_000_000, 9_000_000_000))
-    second = delegate_to_automatic_apply(environment=project_environment())
+    second = delegate_to_automatic_execute(environment=project_environment())
     assert second.process_exit_code == 0, second
-    path = Path(second.apply_result["result"]["result_bundle"]["path"])
+    path = Path(second.execute_result["result"]["result_bundle"]["path"])
     assert path.parent == new_exchange and path.name.endswith(".zip.new")
     assert _environment(path)["exchange_directory"] == str(new_exchange)
     assert wrong.exists() and correct.exists()
@@ -176,8 +176,8 @@ def test_shared_exchange_archives_only_the_owning_repositories_bundles(pair, tmp
     _commit_package(patch_a, ca)
     _commit_package(patch_b, cb)
     patch_a_bytes, patch_b_bytes = patch_a.read_bytes(), patch_b.read_bytes()
-    assert api.apply(patch_a).success
-    assert api.apply(patch_b).success
+    assert api.execute(patch_a).success
+    assert api.execute(patch_b).success
     # Current Result snapshots remain; old clean ancestor results and proven patches move.
     api.bundle(a)
     assert not old_a.exists() and not patch_a.exists()
@@ -200,7 +200,7 @@ def test_shared_exchange_archives_only_the_owning_repositories_bundles(pair, tmp
 def test_config_writes_preserve_existing_replay_ledger(pair, tmp_path):
     a, b, ca, cb, ea, eb = _configure(pair, tmp_path, False)
     write_package(ea / "applied.zip", ca)
-    report = api.apply(repository=a)
+    report = api.execute(repository=a)
     assert report.success
     ledger = registration_user_paths().exchange_state_path
     before = ledger.read_bytes()

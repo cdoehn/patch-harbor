@@ -14,7 +14,7 @@ from tests.exchange_support import _identity_record
 
 _CRASH = r'''
 import os, sys
-import patchharbor.application_apply as app
+import patchharbor.application_execute as app
 import patchharbor.application_exchange as exchange_app
 import patchharbor.result_bundle_publication as publication
 from patchharbor.cli import main
@@ -28,15 +28,15 @@ elif point == "after_commit":
 elif point == "before_publish":
     publication.replace_path = crash
 elif point == "after_publish":
-    exchange_app.mark_exchange_apply_finished = crash
+    exchange_app.mark_exchange_execute_finished = crash
 elif point == "persistence_error":
     from patchharbor.errors import task_bundle_error
     def fail(*args, **kwargs):
         raise task_bundle_error("simulated ledger write failure")
-    exchange_app.mark_exchange_apply_finished = fail
+    exchange_app.mark_exchange_execute_finished = fail
 else:
     raise AssertionError(point)
-raise SystemExit(main(["apply", "--json", *sys.argv[2:]]))
+raise SystemExit(main(["execute", "--json", *sys.argv[2:]]))
 '''
 
 
@@ -53,7 +53,7 @@ def _pending(tmp_path, *, point="after_publish", explicit=False):
     _committing_patch(patch, context)
     _crash(repo, env, point, *([str(patch)] if explicit else []))
     record = _identity_record(env, patch)
-    assert record["apply_status"] == "attempted"
+    assert record["execute_status"] == "attempted"
     assert record["completed_commit"] is None
     assert record["attempt_run_id"]
     return env, exchange, repo, context, patch, record

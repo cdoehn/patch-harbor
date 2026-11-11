@@ -18,7 +18,7 @@ from patchharbor.models import (
     RepositoryPath,
 )
 from patchharbor.run_report import (
-    ApplyPrimaryOutcome,
+    ExecutePrimaryOutcome,
     PrimaryResult,
     PrimaryResultKind,
     ResultBundleResult,
@@ -246,7 +246,7 @@ def test_apply_primary_outcome_maps_tool_errors_once(
     error: PatchHarborError,
     expected_kind: PrimaryResultKind,
 ) -> None:
-    outcome = ApplyPrimaryOutcome.from_tool_error(error)
+    outcome = ExecutePrimaryOutcome.from_tool_error(error)
 
     assert outcome.result.kind is expected_kind
     assert outcome.result.success is False
@@ -273,49 +273,49 @@ def test_apply_primary_outcome_maps_tool_errors_once(
             int(ExitCode.RESULT_BUNDLE_ERROR),
         ),
         (
-            RunOperation.APPLY,
+            RunOperation.EXECUTE,
             PrimaryResult.dry_run_success_result(),
             ResultBundleStatus.CREATED,
             0,
         ),
         (
-            RunOperation.APPLY,
+            RunOperation.EXECUTE,
             PrimaryResult.dry_run_success_result(),
             ResultBundleStatus.FAILED,
             int(ExitCode.RESULT_BUNDLE_ERROR),
         ),
         (
-            RunOperation.APPLY,
+            RunOperation.EXECUTE,
             PrimaryResult.entrypoint_success_result(),
             ResultBundleStatus.CREATED,
             0,
         ),
         (
-            RunOperation.APPLY,
+            RunOperation.EXECUTE,
             PrimaryResult.entrypoint_success_result(),
             ResultBundleStatus.FAILED,
             int(ExitCode.RESULT_BUNDLE_ERROR),
         ),
         (
-            RunOperation.APPLY,
+            RunOperation.EXECUTE,
             PrimaryResult.entrypoint_exit_result(23),
             ResultBundleStatus.FAILED,
             23,
         ),
         (
-            RunOperation.APPLY,
+            RunOperation.EXECUTE,
             PrimaryResult.timeout_result(),
             ResultBundleStatus.FAILED,
             124,
         ),
         (
-            RunOperation.APPLY,
+            RunOperation.EXECUTE,
             PrimaryResult.interrupted_result(),
             ResultBundleStatus.FAILED,
             130,
         ),
         (
-            RunOperation.APPLY,
+            RunOperation.EXECUTE,
             PrimaryResult.tool_failure(
                 kind=PrimaryResultKind.VALIDATION_ERROR,
                 failure_reason=FailureReason.INTERPRETER_ERROR,
@@ -339,13 +339,13 @@ def test_completed_process_exit_code_preserves_primary_result_priority(
 
 
 def test_apply_primary_outcome_models_entrypoint_exit_timeout_and_interrupt() -> None:
-    entrypoint_exit = ApplyPrimaryOutcome.entrypoint_exit(23)
-    timeout = ApplyPrimaryOutcome.from_execution_result(
+    entrypoint_exit = ExecutePrimaryOutcome.entrypoint_exit(23)
+    timeout = ExecutePrimaryOutcome.from_execution_result(
         entrypoint_started=True,
         entrypoint_exit_code=None,
         patchharbor_error=PatchHarborError("timed out", FailureReason.TIMEOUT),
     )
-    interrupted = ApplyPrimaryOutcome.from_execution_result(
+    interrupted = ExecutePrimaryOutcome.from_execution_result(
         entrypoint_started=True,
         entrypoint_exit_code=None,
         patchharbor_error=PatchHarborError(
@@ -353,7 +353,7 @@ def test_apply_primary_outcome_models_entrypoint_exit_timeout_and_interrupt() ->
         ),
     )
 
-    assert entrypoint_exit.result.as_apply_document() == {
+    assert entrypoint_exit.result.as_execute_document() == {
         "kind": "entrypoint_exit",
         "entrypoint_started": True,
         "entrypoint_exit_code": 23,
@@ -361,7 +361,7 @@ def test_apply_primary_outcome_models_entrypoint_exit_timeout_and_interrupt() ->
         "interrupted": False,
         "patchharbor_error_code": None,
     }
-    assert timeout.result.as_apply_document() == {
+    assert timeout.result.as_execute_document() == {
         "kind": "timeout",
         "entrypoint_started": True,
         "entrypoint_exit_code": None,
@@ -369,7 +369,7 @@ def test_apply_primary_outcome_models_entrypoint_exit_timeout_and_interrupt() ->
         "interrupted": False,
         "patchharbor_error_code": int(ExitCode.TIMEOUT),
     }
-    assert interrupted.result.as_apply_document() == {
+    assert interrupted.result.as_execute_document() == {
         "kind": "interrupted",
         "entrypoint_started": True,
         "entrypoint_exit_code": None,
@@ -380,12 +380,12 @@ def test_apply_primary_outcome_models_entrypoint_exit_timeout_and_interrupt() ->
 
 
 def test_execution_result_keeps_entrypoint_tool_and_process_codes_separate() -> None:
-    entrypoint_exit = ApplyPrimaryOutcome.from_execution_result(
+    entrypoint_exit = ExecutePrimaryOutcome.from_execution_result(
         entrypoint_started=True,
         entrypoint_exit_code=int(ExitCode.INTERPRETER_ERROR),
         patchharbor_error=None,
     )
-    tool_failure = ApplyPrimaryOutcome.from_execution_result(
+    tool_failure = ExecutePrimaryOutcome.from_execution_result(
         entrypoint_started=False,
         entrypoint_exit_code=None,
         patchharbor_error=PatchHarborError(
@@ -409,7 +409,7 @@ def test_execution_result_keeps_entrypoint_tool_and_process_codes_separate() -> 
     )
 
     with pytest.raises(ValueError):
-        ApplyPrimaryOutcome.from_execution_result(
+        ExecutePrimaryOutcome.from_execution_result(
             entrypoint_started=True,
             entrypoint_exit_code=23,
             patchharbor_error=PatchHarborError(
@@ -533,7 +533,7 @@ def test_resolved_apply_report_cannot_leave_bundle_unattempted(
     with pytest.raises(ValueError):
         RunReport(
             timing=_timing(),
-            operation=RunOperation.APPLY,
+            operation=RunOperation.EXECUTE,
             dry_run=True,
             context=context,
             repository=context.repository_path,
@@ -562,13 +562,13 @@ def test_apply_report_is_single_source_for_completion_representations(
         FailureReason.STATE_MISMATCH,
         error_kind=ErrorKind.STATE_MISMATCH,
     )
-    outcome = ApplyPrimaryOutcome.from_tool_error(primary_error)
+    outcome = ExecutePrimaryOutcome.from_tool_error(primary_error)
     bundle_result = ResultBundleResult.failed(
         "secondary bundle failure"
     ).with_emergency_diagnostics(emergency_path)
     report = RunReport(
         timing=_timing(),
-        operation=RunOperation.APPLY,
+        operation=RunOperation.EXECUTE,
         dry_run=False,
         context=context,
         repository=context.repository_path,
@@ -580,13 +580,13 @@ def test_apply_report_is_single_source_for_completion_representations(
     )
 
     run_document = report.as_run_document()
-    envelope = report.apply_json_envelope()
+    envelope = report.execute_json_envelope()
     reported_error = report.reported_error()
 
     assert run_document["primary_result"]["kind"] == "state_mismatch"
     assert run_document["result_bundle"]["status"] == "failed"
     assert run_document["process_exit_code"] == int(ExitCode.STATE_MISMATCH)
-    assert envelope["result"] == report.apply_result()
+    assert envelope["result"] == report.execute_result()
     assert envelope["error"] == {
         "kind": "state_mismatch",
         "message": "repository state changed",
@@ -605,11 +605,11 @@ def test_entrypoint_exit_does_not_become_a_tool_error_when_bundle_fails(
     repository = tmp_path / "repository"
     repository.mkdir()
     context = _context(repository)
-    outcome = ApplyPrimaryOutcome.entrypoint_exit(23)
+    outcome = ExecutePrimaryOutcome.entrypoint_exit(23)
     bundle_result = ResultBundleResult.failed("bundle failed")
     report = RunReport(
         timing=_timing(),
-        operation=RunOperation.APPLY,
+        operation=RunOperation.EXECUTE,
         dry_run=False,
         context=context,
         repository=context.repository_path,
@@ -620,7 +620,7 @@ def test_entrypoint_exit_does_not_become_a_tool_error_when_bundle_fails(
         primary_tool_error=outcome.tool_error,
     )
 
-    envelope = report.apply_json_envelope()
+    envelope = report.execute_json_envelope()
 
     assert report.completion_tool_error is None
     assert envelope["error"] is None
@@ -637,11 +637,11 @@ def test_bundle_failure_becomes_effective_error_only_after_primary_success(
     repository = tmp_path / "repository"
     repository.mkdir()
     context = _context(repository)
-    outcome = ApplyPrimaryOutcome.entrypoint_success()
+    outcome = ExecutePrimaryOutcome.entrypoint_success()
     bundle_result = ResultBundleResult.failed("bundle publication failed")
     report = RunReport(
         timing=_timing(),
-        operation=RunOperation.APPLY,
+        operation=RunOperation.EXECUTE,
         dry_run=False,
         context=context,
         repository=context.repository_path,
@@ -652,7 +652,7 @@ def test_bundle_failure_becomes_effective_error_only_after_primary_success(
         primary_tool_error=outcome.tool_error,
     )
 
-    envelope = report.apply_json_envelope()
+    envelope = report.execute_json_envelope()
     error = report.reported_error()
 
     assert envelope["error"]["kind"] == "result_bundle_error"
@@ -674,7 +674,7 @@ def test_apply_report_rejects_partial_repository_resolution(
 ) -> None:
     repository = tmp_path / "repository"
     repository.mkdir()
-    outcome = ApplyPrimaryOutcome.from_tool_error(
+    outcome = ExecutePrimaryOutcome.from_tool_error(
         PatchHarborError(
             "repository resolution failed",
             FailureReason.REPOSITORY_ERROR,
@@ -685,7 +685,7 @@ def test_apply_report_rejects_partial_repository_resolution(
     with pytest.raises(ValueError):
         RunReport(
             timing=_timing(),
-            operation=RunOperation.APPLY,
+            operation=RunOperation.EXECUTE,
             dry_run=False,
             context=None,
             repository=(
@@ -709,7 +709,7 @@ def test_apply_result_reports_dry_run_without_execution(tmp_path: Path) -> None:
     bundle_path = tmp_path / "results" / "dry-run.zip"
     report = RunReport(
         timing=_timing(),
-        operation=RunOperation.APPLY,
+        operation=RunOperation.EXECUTE,
         dry_run=True,
         context=context,
         repository=context.repository_path,
@@ -719,7 +719,7 @@ def test_apply_result_reports_dry_run_without_execution(tmp_path: Path) -> None:
         result_bundle=ResultBundleResult.created(bundle_path),
     )
 
-    result = report.apply_result()
+    result = report.execute_result()
 
     assert set(result) == {
         "run_id",
@@ -753,7 +753,7 @@ def test_apply_result_reports_dry_run_without_execution(tmp_path: Path) -> None:
 
 def test_reserved_child_statuses_are_not_reclassified_as_tool_errors() -> None:
     for code in (2, 7, 11, 124, 130):
-        outcome = ApplyPrimaryOutcome.from_execution_result(
+        outcome = ExecutePrimaryOutcome.from_execution_result(
             entrypoint_started=True, entrypoint_exit_code=code, patchharbor_error=None,
         )
         assert outcome.result.kind is PrimaryResultKind.ENTRYPOINT_EXIT
@@ -768,7 +768,7 @@ def test_core_outcomes_store_reasons_not_numeric_tool_statuses() -> None:
 
     assert "patchharbor_error_code" not in {field.name for field in fields(PrimaryResult)}
     assert "patchharbor_error_code" not in {field.name for field in fields(RunToolError)}
-    failure = ApplyPrimaryOutcome.from_tool_error(
+    failure = ExecutePrimaryOutcome.from_tool_error(
         PatchHarborError("missing source", FailureReason.SOURCE_ERROR)
     )
     assert failure.result.failure_reason is FailureReason.SOURCE_ERROR

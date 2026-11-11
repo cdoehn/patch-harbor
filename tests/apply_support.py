@@ -1,4 +1,4 @@
-"""Shared apply fixtures and behavior probes."""
+"""Shared execute fixtures and behavior probes."""
 from __future__ import annotations
 
 import json

@@ -20,7 +20,7 @@ from tests.result_pyz_support import artifact
 from tests.apply_support import repository, package
 
 
-@pytest.mark.parametrize("route", ["bundle", "apply", "failure"])
+@pytest.mark.parametrize("route", ["bundle", "execute", "failure"])
 @pytest.mark.parametrize("runtime_state", ["embedded", "missing", "budget"])
 def test_dirty_snapshot_and_explicit_target_survive_runtime_restrictions(
     repository, artifact, monkeypatch, tmp_path, route, runtime_state,
@@ -42,7 +42,7 @@ def test_dirty_snapshot_and_explicit_target_survive_runtime_restrictions(
     if route == "bundle":
         report = api.bundle(root, output_directory=target).report
     else:
-        report = api.apply(package(root, exchange, exit_code=29 if route == "failure" else 0),
+        report = api.execute(package(root, exchange, exit_code=29 if route == "failure" else 0),
                            output_directory=target)
     assert report.process_exit_code == (29 if route == "failure" else 0)
     assert report.result_bundle.path.parent == target
@@ -95,7 +95,7 @@ def test_real_publication_failures_preserve_primary_and_latest_proven_context(
     monkeypatch.setattr(writer, "_write_entry", write)
     if fault == "verify": monkeypatch.setattr(publication, "_verify_result_bundle", fail)
     if fault == "replace": monkeypatch.setattr(publication, "replace_path", fail)
-    report = api.apply(patch)
+    report = api.execute(patch)
     assert report.primary_result.entrypoint_exit_code == exit_code
     assert report.result_bundle.status is api.ResultBundleStatus.FAILED
     current = git(root, "rev-parse", "HEAD").stdout.strip()

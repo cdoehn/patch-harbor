@@ -17,7 +17,7 @@ from patchharbor.safe_capture import capture_safe_result
 from patchharbor.safe_export_paths import BoundDirectory, bound_lock
 from patchharbor.safe_export_plan import converted_error, revalidate_plan
 from patchharbor.safe_export_types import SafeExportPlan, SafeExportError, SafeExportErrorCode, require_host
-from patchharbor.watch_contract import ApplyLock, ApplyLockKind
+from patchharbor.watch_contract import ExecuteLock, ExecuteLockKind
 
 
 def _write_diagnostic(directory: BoundDirectory, name: str, data: dict):
@@ -53,10 +53,10 @@ def _export_reference(path: Path, *, plan: SafeExportPlan, output_directory: Pat
             output = scope.enter_context(BoundDirectory(plan.output_directory))
             locks = scope.enter_context(BoundDirectory(plan.lock_paths[0].parent))
             lock_checks = []
-            for lock_path, kind in zip(plan.lock_paths, (ApplyLockKind.REGISTRY, ApplyLockKind.REPOSITORY)):
-                busy = registry_error('repository registry is busy') if kind is ApplyLockKind.REGISTRY else repository_busy_error()
+            for lock_path, kind in zip(plan.lock_paths, (ExecuteLockKind.REGISTRY, ExecuteLockKind.REPOSITORY)):
+                busy = registry_error('repository registry is busy') if kind is ExecuteLockKind.REGISTRY else repository_busy_error()
                 lock_checks.append(scope.enter_context(bound_lock(locks, lock_path.name,
-                    busy_error=LockBusyError(busy, ApplyLock(kind, source.repo_id if kind is ApplyLockKind.REPOSITORY else None)))))
+                    busy_error=LockBusyError(busy, ExecuteLock(kind, source.repo_id if kind is ExecuteLockKind.REPOSITORY else None)))))
             source = revalidate_plan(plan, path)
             output.verify()
             diagnostic_name = '.patchharbor-safe-' + str(session.run_id)

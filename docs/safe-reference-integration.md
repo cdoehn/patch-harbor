@@ -14,7 +14,7 @@ put that directory on `sys.path`. Direct wheel ZIP imports are for read-only
 inspection and do not provide the resource layout needed for Result production.
 Use only `from patchharbor import api`. Require the exact integer
 `safe_reference_contract_version == 1` before source/export calls. The existing
-`contract_version`, `snapshot_contract_version` and `guarded_apply_contract_version`
+`contract_version`, `snapshot_contract_version` and `guarded_execute_contract_version`
 remain 1; a version string alone is insufficient.
 
 [safe_reference_export.py](examples/safe_reference_export.py) is a complete
@@ -37,8 +37,8 @@ bytes; an ignored witness must remain absent from the Result.
 The delivery includes native clean and dirty Result ZIPs made from this fixture
 with the exact new runtime, plus wheel, sdist, Core-PYZ and a SHA-256/provenance
 manifest. The embedded descriptor/runtime and all five file layers are checked
-through the public reader. The source inventory is bound before Apply and must
-match the actual confirmed Apply commit. A recipe's own metadata is not a trusted
+through the public reader. The source inventory is bound before Execute and must
+match the actual confirmed Execute commit. A recipe's own metadata is not a trusted
 substitute for this external provenance.
 
 On success use `BundleResult.path`, `context`, `report`, `run_id` and
@@ -54,7 +54,7 @@ The new producer capability is Linux x86-64 / CPython 3.10–3.14, with local Gi
 Active filter/encoding/ident conversions, ambiguous EOL normalization and
 previously unsupported Git states are refused. Default CLI, watcher and API
 calls retain their previous behavior. The safe mode does no Exchange maintenance,
-recovery, archive, replay write or Apply.
+recovery, archive, replay write or Execute.
 
 Local evidence is CPython 3.14.4 / Linux x86-64 only. The manual CI catalogue now
 also includes native Linux 3.13 and requires the real wheel/PYZ safe-export
@@ -72,4 +72,4 @@ parallel tests only. The actual outcome, commits, complete hashes, artifact path
 and per-requirement status are recorded externally in
 `exchange/reports/patchharbor-safe-reference-074-result-review.json` and
 `exchange/reports/patchharbor-safe-reference-074-integration-delivery.json`.
-Before these records confirm Apply, this document describes a prepared delivery.
+Before these records confirm Execute, this document describes a prepared delivery.

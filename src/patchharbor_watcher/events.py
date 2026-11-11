@@ -1,4 +1,4 @@
-"""Native directory-event contract; no bundle discovery, timer or Apply policy.
+"""Native directory-event contract; no bundle discovery, timer or Execute policy.
 
 One reader may block in read(); another thread may wake or close the source.
 Timeout/wake/closed reads return (). Native failures are structured exceptions,
@@ -38,7 +38,7 @@ class EventBackendError(RuntimeError):
 
 @dataclass(frozen=True, slots=True)
 class DirectoryEvent:
-    """A hint to revalidate, never a trusted candidate path or Apply permission.
+    """A hint to revalidate, never a trusted candidate path or Execute permission.
 
 directory=None on OVERFLOW invalidates knowledge of every subscribed root.
 name is a direct entry only, or None for a change to the root itself.

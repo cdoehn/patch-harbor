@@ -5,7 +5,7 @@ from __future__ import annotations
 from enum import Enum
 from pathlib import Path
 
-from patchharbor.watch_contract import ApplyLock
+from patchharbor.watch_contract import ExecuteLock
 
 
 TOOL_PREFIX = "patchharbor:"
@@ -72,7 +72,7 @@ class PatchHarborError(Exception):
 class LockBusyError(PatchHarborError):
     """Nonblocking lock contention, preserving the existing public error kind."""
 
-    def __init__(self, error: PatchHarborError, lock: ApplyLock) -> None:
+    def __init__(self, error: PatchHarborError, lock: ExecuteLock) -> None:
         super().__init__(str(error), error.reason, error_kind=error.error_kind)
         self.lock = lock
 

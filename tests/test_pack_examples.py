@@ -1,4 +1,4 @@
-"""Executable pack examples: real installed CLI, PYZ CLI/API and regular Apply."""
+"""Executable pack examples: real installed CLI, PYZ CLI/API and regular Execute."""
 import hashlib
 import json
 import os
@@ -77,7 +77,7 @@ print(json.dumps({'path':str(p.path),'package_sha256':p.package_sha256,'referenc
 import json,sys
 sys.path.insert(0,sys.argv[1])
 from patchharbor import api
-r=api.apply(sys.argv[2])
+r=api.execute(sys.argv[2])
 print(json.dumps({'success':r.success,'exit_code':r.process_exit_code,
                   'result':str(r.result_bundle.path),'started':r.primary_result.entrypoint_started}))
 ''',str(runtime),str(patch)],repo,environment))

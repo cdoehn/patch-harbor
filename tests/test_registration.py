@@ -23,7 +23,7 @@ from patchharbor.registry import (
     write_registry,
 )
 from patchharbor.repository import (
-    apply_local_registration,
+    execute_local_registration,
     inspect_local_registration,
     inspect_repository,
 )
@@ -90,7 +90,7 @@ def test_repository_id_replacement_preserves_the_previous_file_on_failure(
     monkeypatch.setattr("patchharbor.platform.filesystem.os.replace", fail_replace)
 
     with pytest.raises(PatchHarborError) as captured:
-        apply_local_registration(state, RepositoryId.new())
+        execute_local_registration(state, RepositoryId.new())
 
     assert exit_code_for_error(captured.value) is ExitCode.REPOSITORY_ERROR
     assert id_path.read_text(encoding="ascii") == f"{original_id}\n"
@@ -206,7 +206,7 @@ def test_identity_and_registry_publication_share_the_global_lock(
     observed: list[str] = []
 
     from patchharbor.repository import (
-        apply_local_registration as real_apply_local_registration,
+        execute_local_registration as real_apply_local_registration,
     )
     from patchharbor.registry import write_registry as real_write_registry
 
@@ -227,7 +227,7 @@ def test_identity_and_registry_publication_share_the_global_lock(
         real_write_registry(*args, **kwargs)
 
     monkeypatch.setattr(
-        "patchharbor.registration.apply_local_registration",
+        "patchharbor.registration.execute_local_registration",
         apply_while_locked,
     )
     monkeypatch.setattr(
@@ -402,7 +402,7 @@ def test_failed_identity_rollback_is_reported_as_registry_inconsistency(
     set_isolated_user_environment(monkeypatch, tmp_path / "user")
 
     from patchharbor.repository import (
-        apply_local_registration as real_apply_local_registration,
+        execute_local_registration as real_apply_local_registration,
     )
 
     def mutate_then_fail(*args: object, **kwargs: object) -> None:
@@ -419,7 +419,7 @@ def test_failed_identity_rollback_is_reported_as_registry_inconsistency(
         )
 
     monkeypatch.setattr(
-        "patchharbor.registration.apply_local_registration",
+        "patchharbor.registration.execute_local_registration",
         mutate_then_fail,
     )
     monkeypatch.setattr(
@@ -476,7 +476,7 @@ def test_local_identity_persistence_rejects_a_noncanonical_repository_id(
     exclude_before = state.exclude_path.read_bytes()
 
     with pytest.raises(PatchHarborError) as captured:
-        apply_local_registration(state, invalid_id)
+        execute_local_registration(state, invalid_id)
 
     assert exit_code_for_error(captured.value) is ExitCode.REPOSITORY_ERROR
     assert captured.value.error_kind is ErrorKind.REPOSITORY_RESOLUTION_ERROR

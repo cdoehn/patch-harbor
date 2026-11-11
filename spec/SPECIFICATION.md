@@ -1,9 +1,14 @@
 # PatchHarbor – Spezifikation
 
+> **Aktiver 2.0-Vertrag ab 200-02.W3:** [Task / Execute / Result](../docs/protocol-2.md)
+> ist für die geänderten Formate, API-Namen und Maschinenverträge maßgeblich.
+> Die historischen Basisabschnitte unten bleiben als Sicherheits- und Herkunftsnachweis erhalten;
+> ihre abgelösten Formatnummern und API-Namen aktivieren keinen Kompatibilitätsleser.
+
 **Dateiname:** `SPECIFICATION.md`<br>
 **Historischer Basisvertrag – Versionsangabe nur für dessen ursprünglichen Stand:**<br>
 **Produktversion:** `1.2.1`<br>
-**Aktuelle Quellversion:** `2.0.0.dev0`; unveröffentlichter Entwicklungsstand `200-01.W`, Ziel 2.0.0.<br>
+**Aktuelle Quellversion:** `2.0.0.dev0`; unveröffentlichter Entwicklungsstand `200-02.W3`, Ziel 2.0.0.<br>
 **Spezifikationsstand:** 2026-11-11 · PH-200: ScriptBundle und eigenständiger deprecated Skriptaufruf.<br>
 **Status:** Verbindlicher Bestands- und Zielvertrag mit den unten erklärten Ergänzungen. Aktueller Fortschritt steht im Plan PH-200; historische Nachweise bleiben erhalten.<br>
 **RIV-Status:** 18/18 Umsetzungsschritte samt Abschlusskorrektur durch Bundle 015 und CI-Run 37306630290 auf `a02391dc045d42e317b3e766f0b1e9fa8dfadec1` bestätigt; Plan abgeschlossen.<br>
@@ -22,15 +27,7 @@ bleiben funktional erhalten, sind jedoch deprecated. Die CLI gibt pro Aufruf
 auf stderr einen Ersatzhinweis aus; direkte Python-Aufrufe geben `FutureWarning`
 mit Aufruferbezug aus. Globale Warning-Filter werden nicht verändert.
 
-Der Task-/Execute-/Result-Formatwechsel ist der folgende Schritt `200-02`.
-Bis dahin bleiben die unten beschriebenen repositorygebundenen Format-1/3-
-Verträge der tatsächlich implementierte Entwicklungsstand. Zwischenstände
-werden nicht produktiv eingesetzt und sind keine Zwischenreleases. Die
-[1.9.1-Releaseunterlagen](../planning/1.9.1/commit-plan.md) und die
-[Monitor-Erweiterung](../planning/viewer/specification.md) bleiben Basisnachweise.
-Dieser Entwicklungsauftrag startet keine CI und autorisiert kein neues Tag,
-Release, Main-Merge oder Hostupdate. Die folgenden SAFE-/SRI-Hinweise beschreiben
-historische Aufträge.
+Der Task-/Execute-/Result-Wechsel ist ab `200-02.W3` implementiert; maßgeblich ist der oben verlinkte aktuelle Vertrag.
 
 Der zuvor ausdrücklich beauftragte Entwicklungsplan liegt unter
 [`planning/safe-reference/commit-plan.md`](../planning/safe-reference/commit-plan.md),
@@ -80,8 +77,8 @@ Konfigurationsrevision ersetzt den bisherigen globalen Konfigurationsvertrag:
   Locks und Laufzeit-/Replay-Zustände, aber keine globale Einstellungsebene,
 - pro Repository frei wählbare Exchange-Verzeichnisse; mehrere Repositorys dürfen
   denselben physischen Ordner als Übergabe für Patch-Pakete und Result Bundles nutzen,
-- `patchharbor apply` ohne expliziten Dateipfad mit sicherer, nicht rekursiver und zustandsgebundener Paketauswahl,
-- `patchharbor bundle` und automatische Apply-Result-Bundles mit dem Exchange-Ordner als Standardziel,
+- `patchharbor execute` ohne expliziten Dateipfad mit sicherer, nicht rekursiver und zustandsgebundener Paketauswahl,
+- `patchharbor bundle` und automatische Execute-Result-Bundles mit dem Exchange-Ordner als Standardziel,
 - eine gemeinsame Erkennungs- und Wiederverarbeitungsgrenze für Core und Watcher,
 - die versionierte Datei `CHAT_INSTRUCTIONS.md` zur Initialisierung eines neuen Entwicklungs-Chats,
 - eine verbindliche schmale Chat-Oberfläche für `PLAN`, `FIX`, `OFF-PLAN`, `WARNING`, `STOP` und fertige Patch-Pakete.
@@ -137,7 +134,7 @@ PatchHarbor ist ein kontrollierter, plattformübergreifender Runner für von ein
 PatchHarbor unterstützt zwei öffentliche Ausführungswege:
 
 1. den fortgeführten expliziten manuellen Runner `patchharbor fs run`,
-2. den neuen sicheren Mehr-Repository-Pfad `patchharbor apply`.
+2. den neuen sicheren Mehr-Repository-Pfad `patchharbor execute`.
 
 Der sichere Mehr-Repository-Pfad ordnet ein Patch-Paket genau einer registrierten lokalen Repository-Instanz in genau einem erwarteten Zustand zu:
 
@@ -175,7 +172,7 @@ PatchHarbor ist kein Testmanager, kein Commit-Manager, kein Build-System, kein C
 - ein vollständiges PatchHarbor Result Bundle erzeugen,
 - repositorylokale Einstellungen aus `.patchharbor/config.json` identitätsgebunden lesen und sicher schreiben,
 - den für das betroffene Repository konfigurierten Exchange-Ordner als Standardübergabe in beide Richtungen verwenden,
-- bei manuellem parameterlosem `patchharbor apply` das aktuelle registrierte Repository bestimmen und ausschließlich dafür den neuesten zulässigen Kandidaten nach `mtime_ns` mit deterministischem Dateinamen-Tie-Breaker auswählen,
+- bei manuellem parameterlosem `patchharbor execute` das aktuelle registrierte Repository bestimmen und ausschließlich dafür den neuesten zulässigen Kandidaten nach `mtime_ns` mit deterministischem Dateinamen-Tie-Breaker auswählen,
 - Patch-Pakete, Result Bundles und sonstige Dateien im Exchange-Ordner sicher voneinander unterscheiden,
 - einen maschinenlesbaren Ergebnisvertrag für Watcher, Repo Assist und einen späteren Orchestrator anbieten.
 
@@ -238,7 +235,7 @@ Der Watcher besitzt keine eigene Eingangsordner-Konfiguration. Startup prüft nu
 die Registry über `api.repositories()`, nicht eine Konfiguration relativ zum
 Service-Arbeitsverzeichnis. Native Ereignisse markieren geprüfte Exchange-Wurzeln
 als bearbeitungsbedürftig. Erst nach fünf Sekunden Ruhe ruft ein privater Worker
-`api.apply_next(exchanges=...)` auf. Core revalidiert die lokalen Konfigurationen,
+`api.execute_next(exchanges=...)` auf. Core revalidiert die lokalen Konfigurationen,
 physischen Wurzeln, Inhalte und sämtliche Ausführungsgrenzen. Im unveränderten
 Leerlauf findet kein periodischer Scan oder Workerstart statt. Gültiges `null`
 und fehlende Repository-Pfade werden übersprungen; beschädigte Konfigurationen
@@ -255,30 +252,30 @@ Das normative Entwicklungsziel steht in
 [`planning/watcher-events/specification.md`](../planning/watcher-events/specification.md),
 die Commitfolge in
 [`planning/watcher-events/commit-plan.md`](../planning/watcher-events/commit-plan.md).
-WE-0 bis WE-2 sind durch tatsächliches Apply bestätigt. WE-3 ersetzt die
+WE-0 bis WE-2 sind durch tatsächliches Execute bestätigt. WE-3 ersetzt die
 Polling-Schleife im Development; die installierte Engine wird nicht automatisch
 umgestellt. Der entfernte Aufruf `--poll-interval` wird als ungültig abgewiesen.
 
 Ziel: native, nicht rekursive Ereignisüberwachung pro physischem Exchange-Root;
 mindestens fünf zusammenhängende Sekunden Ruhe vor einem Scan, zurückgesetzt
 durch jede relevante Änderung. Im unveränderten Leerlauf kein periodischer Scan
-oder Apply-Worker. Vorhandene Dateien erhalten nach Einrichtung der Beobachtung
+oder Execute-Worker. Vorhandene Dateien erhalten nach Einrichtung der Beobachtung
 eine einmalige Startprüfung nach derselben Ruhefrist. Lesen und Änderungen
 innerhalb von Unterordnern lösen keinen Scan aus.
 
 Core behält Konfiguration, Klassifikation, Bindung, Locks, Replay und Ausführung.
 Eine geprüfte Scope-Erweiterung der öffentlichen automatischen API begrenzt die
-Auswahl auf aktuell ruhige Exchanges. Ereignisse während Apply, mehrere Bundles,
+Auswahl auf aktuell ruhige Exchanges. Ereignisse während Execute, mehrere Bundles,
 Konfigurationswechsel, Sperrkonflikte, Root-Ersatz und Ereignisverlust werden
 gemäß der neuen Spezifikation behandelt. Zusätzliche Laufzeitabhängigkeiten und
-ein stiller Polling-Fallback sind nicht vorgesehen. Bisherige manuelle Apply-
+ein stiller Polling-Fallback sind nicht vorgesehen. Bisherige manuelle Execute-
 und Runtime-Fallback-Verträge bleiben erhalten.
 
 WE-1 konkretisiert dies durch `api.watch_targets()` und `watch_control_paths()`
-für Beobachtungs-/Kontrollpfade, `apply_next(exchanges=...)` für erneut geprüfte
-physische Wurzeln und `apply_readiness(lock)` für bekannte Sperrkonflikte ohne
+für Beobachtungs-/Kontrollpfade, `execute_next(exchanges=...)` für erneut geprüfte
+physische Wurzeln und `execute_readiness(lock)` für bekannte Sperrkonflikte ohne
 Bundle-Scan oder Reservierung. `RunReport.automatic` liefert strukturierte
-Nachlaufentscheidungen zusätzlich zu den unveränderten Apply-Ergebnissen;
+Nachlaufentscheidungen zusätzlich zu den unveränderten Execute-Ergebnissen;
 ein verbrauchter Versuch ist kein Erfolgsnachweis. Details der Schnittstellen
 stehen in [`docs/python-api.md`](../docs/python-api.md).
 
@@ -286,13 +283,13 @@ WE-2 liefert flache native Ereignisadapter, strukturierte Verlust-/Fehlermeldung
 begrenzte Ereignismengen und unterbrechbare Ressourcenlebenszyklen. Sie führen
 keine Core-Discovery aus; native Windows-Nachweise bleiben ausstehend. Der
 [Adaptervertrag](../docs/watcher-event-adapters.md) beschreibt die Grenze zur
-WE-3-Zeitsteuerung. Diese erfasst Ereignisse während Apply weiter und schützt
+WE-3-Zeitsteuerung. Diese erfasst Ereignisse während Execute weiter und schützt
 neue Generationen vor dem Abschluss älterer Arbeit. Bekannte Sperren werden
 ohne Bundle-Scan mit Backoff geprüft. Kontrollereignisse erneuern die Core-Ziele;
 fehlende Roots erhalten nur unverbindliche Beobachtungshinweise über
 `WatchControlPaths.exchange_paths`, keine Ausführungsfreigabe. WE-4 ergänzt echte
-Ereignis-/Apply- und installierte Wheel-Prüfungen. [Betrieb und Abnahme](../docs/watcher-events.md)
-unterscheiden lokale Nachweise von noch ausstehendem Apply und nativer Windows-CI.
+Ereignis-/Execute- und installierte Wheel-Prüfungen. [Betrieb und Abnahme](../docs/watcher-events.md)
+unterscheiden lokale Nachweise von noch ausstehendem Execute und nativer Windows-CI.
 
 ### 3.2.2 Expliziter Polling-Modus – Nutzerauftrag vom 10. November 2026
 
@@ -304,11 +301,11 @@ endliche Sekundenwerte einschließlich Bruchteilen. Null, negative Werte,
 NaN und Unendlich sind Aufruffehler vor Registry-Zugriff oder Workerstart.
 
 Die erste Prüfung erfolgt unmittelbar. Anschließend liegt das Intervall jeweils
-zwischen abgeschlossenem Prüflauf/Apply und nächster Prüfung. Keine überlappenden
+zwischen abgeschlossenem Prüflauf/Execute und nächster Prüfung. Keine überlappenden
 Worker und keine nachgeholten Poll-Serien. Jeder Poll fragt Core nach den aktuellen
 Zielen und delegiert nur den erneut durch Core zu prüfenden Scope. Registry-
 oder Exchange-Änderungen benötigen hier kein OS-Ereignis. Konfigurationsfehler
-verhindern diesen Apply und werden beim nächsten Poll erneut geprüft.
+verhindern diesen Execute und werden beim nächsten Poll erneut geprüft.
 
 Polling öffnet keine nativen Ereignisquellen und setzt keine fünfsekündige
 Ereignis-Ruhefrist voraus. Die Vorgaben zum unveränderten Leerlauf, zu
@@ -529,9 +526,9 @@ von registrierten Repositorys. Jede tatsächliche Verwendung prüft den Pfad ern
 
 `context` benötigt gültige lokale Konfiguration, aber keinen gesetzten Exchange.
 `registry list`, `unregister` und der unabhängige `fs run` benötigen keinen Exchange.
-Default-`bundle`, parameterloses Apply und Default-Result-Publikation benötigen
+Default-`bundle`, parameterloses Execute und Default-Result-Publikation benötigen
 hingegen einen verfügbaren Exchange des Zielrepositorys. Ein explizites
-`PATCH_ZIP` bestimmt das Repository ausschließlich per Manifest-ID. Ein explizites
+`TASK_ZIP` bestimmt das Repository ausschließlich per Manifest-ID. Ein explizites
 `--output-dir` übersteuert nur das Ausgabeziel: Es erlaubt einen nicht gesetzten
 oder nicht verfügbaren Exchange, niemals fehlende oder ungültige lokale Config.
 Der lokale Suffix bleibt wirksam; Identität, Exchange-Wert und Suffix werden vor
@@ -540,7 +537,7 @@ Result-Veröffentlichung revalidiert.
 Das Suffix wird bei neuen Bundles des betreffenden Repositorys unverändert direkt
 hinter `.zip` angehängt. Es benennt keine Bestandsdatei um und ändert weder
 ZIP-Inhalt noch `task.json`, Fingerprint oder Replay. Kein Suffix-Schalter auf
-`apply`/`bundle`. Bundle-Begleitdaten beschreiben das konkrete Zielrepository.
+`execute`/`bundle`. Bundle-Begleitdaten beschreiben das konkrete Zielrepository.
 
 Mehrere Repositorys dürfen denselben physischen Exchange verwenden; separate
 Ordner sind ebenso zulässig. Es gibt keine Eindeutigkeitsanforderung an diesen
@@ -629,8 +626,8 @@ patchharbor registry list
 patchharbor unregister [REPOSITORY_OR_REPO_ID]
 patchharbor context [REPOSITORY]
 patchharbor bundle [REPOSITORY]
-patchharbor apply [PATCH_ZIP]
-patchharbor apply --dry-run [PATCH_ZIP]
+patchharbor execute [TASK_ZIP]
+patchharbor execute --dry-run [TASK_ZIP]
 ```
 
 Die Optionen sind pro Befehl verbindlich begrenzt:
@@ -646,13 +643,13 @@ Die Optionen sind pro Befehl verbindlich begrenzt:
 | `patchharbor unregister` | keine fachliche Zusatzoption |
 | `patchharbor context` | `--json` |
 | `patchharbor bundle` | `--json`, `--output-dir VERZEICHNIS` |
-| `patchharbor apply` | `--dry-run`, `--timeout SEKUNDEN`, `--plain`, `--no-color`, `--json`, `--output-dir VERZEICHNIS` |
+| `patchharbor execute` | `--dry-run`, `--timeout SEKUNDEN`, `--plain`, `--no-color`, `--json`, `--output-dir VERZEICHNIS` |
 
-Für `patchharbor apply` beträgt der Standard-Timeout 10.800 Sekunden (drei Stunden).
+Für `patchharbor execute` beträgt der Standard-Timeout 10.800 Sekunden (drei Stunden).
 
-Ist `PATCH_ZIP` angegeben, wird ausschließlich diese Datei verarbeitet. Das Paket bestimmt über seine vollständige `repo_id` das registrierte Ziel-Repository; das aktuelle Arbeitsverzeichnis schränkt diesen expliziten Auftrag nicht ein. Ist `PATCH_ZIP` nicht angegeben, löst ein manueller Aufruf zuerst das aktuelle Arbeitsverzeichnis einschließlich Unterverzeichnissen zu genau einer registrierten Repository-Instanz auf. Danach betrachtet PatchHarbor im konfigurierten Exchange-Ordner ausschließlich Pakete für diese `repo_id`, filtert vollständige State-Bindung und Replay-Eignung und wählt nach Abschnitt 16.2 den höchsten `mtime_ns` mit deterministischem Dateinamen-Tie-Breaker. Ist das aktuelle Repository nicht eindeutig registriert, gibt es keinen repositoryübergreifenden Fallback. Ein bewusster manueller Aufruf darf einen weiterhin exakt gebundenen fehlgeschlagenen Patch erneut versuchen. Der Watcher verwendet einen internen automatischen Ursprung, bleibt repositoryübergreifend und wiederholt fehlgeschlagene Identitäten nicht. Ein öffentlicher Schalter `--retry-failed` ist nicht erforderlich.
+Ist `TASK_ZIP` angegeben, wird ausschließlich diese Datei verarbeitet. Das Paket bestimmt über seine vollständige `repo_id` das registrierte Ziel-Repository; das aktuelle Arbeitsverzeichnis schränkt diesen expliziten Auftrag nicht ein. Ist `TASK_ZIP` nicht angegeben, löst ein manueller Aufruf zuerst das aktuelle Arbeitsverzeichnis einschließlich Unterverzeichnissen zu genau einer registrierten Repository-Instanz auf. Danach betrachtet PatchHarbor im konfigurierten Exchange-Ordner ausschließlich Pakete für diese `repo_id`, filtert vollständige State-Bindung und Replay-Eignung und wählt nach Abschnitt 16.2 den höchsten `mtime_ns` mit deterministischem Dateinamen-Tie-Breaker. Ist das aktuelle Repository nicht eindeutig registriert, gibt es keinen repositoryübergreifenden Fallback. Ein bewusster manueller Aufruf darf einen weiterhin exakt gebundenen fehlgeschlagenen Patch erneut versuchen. Der Watcher verwendet einen internen automatischen Ursprung, bleibt repositoryübergreifend und wiederholt fehlgeschlagene Identitäten nicht. Ein öffentlicher Schalter `--retry-failed` ist nicht erforderlich.
 
-Ohne `--output-dir` veröffentlicht `bundle` sein Result Bundle im Exchange-Ordner. Dasselbe gilt für den Result-Bundle-Versuch von `apply`. Ein explizites `--output-dir` überschreibt nur das Ausgabeziel, nicht die Paketauswahl.
+Ohne `--output-dir` veröffentlicht `bundle` sein Result Bundle im Exchange-Ordner. Dasselbe gilt für den Result-Bundle-Versuch von `execute`. Ein explizites `--output-dir` überschreibt nur das Ausgabeziel, nicht die Paketauswahl.
 
 Der separate Watcher besitzt ab 1.1.1 keinen eigenen Eingangsordnerparameter und keine eigene `--configure`-Option. Seine öffentlichen Betriebsaufrufe lauten:
 
@@ -670,7 +667,7 @@ Alle Befehle unterstützen die üblichen argparse-Hilfen wie `--help`.
 
 ### 5.2 Gemeinsamer JSON-Ausgabevertrag
 
-Die Befehle `registry list --json`, `context --json`, `bundle --json` und `apply --json` verwenden einen gemeinsamen versionierten Abschlussvertrag.
+Die Befehle `registry list --json`, `context --json`, `bundle --json` und `execute --json` verwenden einen gemeinsamen versionierten Abschlussvertrag.
 
 Nach erfolgreicher CLI-Argumentanalyse gilt:
 
@@ -689,7 +686,7 @@ Jedes Abschlussobjekt besitzt exakt diese Top-Level-Felder:
 | Feld | Typ | Bedeutung |
 |---|---|---|
 | `output_version` | Integer | Exakt `1`. |
-| `command` | String | `registry.list`, `context`, `bundle` oder `apply`. |
+| `command` | String | `registry.list`, `context`, `bundle` oder `execute`. |
 | `success` | Boolean | `true` genau dann, wenn der Prozess-Exit-Code `0` ist. |
 | `result` | Objekt oder `null` | Befehlsspezifisches Ergebnis, soweit vorhanden. |
 | `error` | Objekt oder `null` | Strukturierter PatchHarbor-Tool-Fehler, soweit vorhanden. |
@@ -795,7 +792,7 @@ Das erfolgreiche `result`-Objekt besitzt exakt:
 }
 ```
 
-#### `patchharbor apply --json`
+#### `patchharbor execute --json`
 
 Das erfolgreiche oder fachlich fehlgeschlagene `result`-Objekt besitzt exakt:
 
@@ -829,7 +826,7 @@ Zulässige Bundle-Statuswerte sind `created`, `failed` und `not_attempted`. `not
 ```json
 {
   "output_version": 1,
-  "command": "apply",
+  "command": "execute",
   "success": false,
   "result": {
     "run_id": "b592be12-55f2-49d7-9699-2435bbcd7935",
@@ -894,7 +891,7 @@ Start
 → Auftrag beenden
 ```
 
-Beim sicheren Apply werden sämtliche rein lesenden Prüfungen einschließlich Entrypoint-, Marker-, Interpreter- und Result-Zielprüfung vor der ersten Änderung einer Repository-Datei abgeschlossen.
+Beim sicheren Execute werden sämtliche rein lesenden Prüfungen einschließlich Entrypoint-, Marker-, Interpreter- und Result-Zielprüfung vor der ersten Änderung einer Repository-Datei abgeschlossen.
 
 Kein Skript startet, bevor das zugehörige Eingabepaket vollständig validiert wurde und alle vorab bereitzustellenden Nutzdateien erfolgreich geschrieben wurden.
 
@@ -902,7 +899,7 @@ Kein Skript startet, bevor das zugehörige Eingabepaket vollständig validiert w
 
 Beim manuellen Runner läuft jedes Skript im ursprünglichen aktuellen Arbeitsverzeichnis des Aufrufs.
 
-Beim sicheren Apply läuft der Entrypoint im Wurzelverzeichnis des anhand der Repository-ID aufgelösten Ziel-Repositorys.
+Beim sicheren Execute läuft der Entrypoint im Wurzelverzeichnis des anhand der Repository-ID aufgelösten Ziel-Repositorys.
 
 Der Speicherort der Eingabedatei, des ZIP-Pakets oder der temporären Entrypoint-Datei ändert das Arbeitsverzeichnis nicht.
 
@@ -1070,7 +1067,7 @@ Regeln:
 
 ## 10. Sichere ZIP-Nutzdateien
 
-Die Regeln dieses Abschnitts gelten sowohl für den manuellen ZIP-ScriptBundle-Pfad als auch für sichere `patchharbor apply`-Pakete.
+Die Regeln dieses Abschnitts gelten sowohl für den manuellen ZIP-ScriptBundle-Pfad als auch für sichere `patchharbor execute`-Pakete.
 
 ### 10.1 Erlaubte relative Pfade
 
@@ -1116,7 +1113,7 @@ Diese Regel ist eine Entpack- und Bereitstellungsgrenze, keine Sandbox für das 
 
 Das gesamte Paket wird einschließlich aller Eintragstypen, Zielpfade, Duplikate, Kollisionen und Ressourcenbudgets validiert, bevor eine Zieldatei geschrieben wird.
 
-Beim sicheren Apply werden zusätzlich vor der ersten Repository-Änderung:
+Beim sicheren Execute werden zusätzlich vor der ersten Repository-Änderung:
 
 - der Entrypoint privat temporär bereitgestellt,
 - sein Pflichtmarker geprüft,
@@ -1254,7 +1251,7 @@ sichtbare Darstellung entschärft. Der rohe Logstrom bleibt unverändert.
 
 ### 12.2 Farbige fortlaufende Konsole
 
-Die bisherige feste Oberfläche entfällt. Normale Apply-, Bundle- und manuelle
+Die bisherige feste Oberfläche entfällt. Normale Execute-, Bundle- und manuelle
 Run-Aufträge erhalten eine ausführliche, chronologisch nach unten wachsende
 Ausgabe. Keine Bildschirm-Löschung, kein Cursor-Verstecken, keine Neuzeichnung,
 keine festen Fensterhöhen, keine Zeilen- oder Breitenkürzung von Meldungen.
@@ -1290,7 +1287,7 @@ exakt ihr geschlossenes Schema und mischen keine Ablaufmeldungen oder
 Skriptausgaben in stdout.
 
 Das zusätzliche interne Ablaufprotokoll ist Konsolenausgabe. Es wird nicht in
-das bytegenaue `logs/execution.log` eines Apply-Result-Bundles eingemischt und
+das bytegenaue `logs/execution.log` eines Execute-Result-Bundles eingemischt und
 fügt keine neuen ZIP-Einträge zum bestehenden Result- oder Recovery-Vertrag
 hinzu. Dieser Log bleibt der vollständige rohe Entrypoint-Strom; strukturierte
 Run-Metadaten und die bisherigen manuellen Log-Metadaten bleiben erhalten.
@@ -1312,7 +1309,7 @@ Das Log enthält:
 
 Ohne `--log` erzeugt der manuelle Runner keine vollständige separate Ausgabedatei.
 
-Der sichere Apply-Pfad verwendet unabhängig davon den vollständigen Run-Log für sein Result Bundle.
+Der sichere Execute-Pfad verwendet unabhängig davon den vollständigen Run-Log für sein Result Bundle.
 
 ---
 
@@ -1369,7 +1366,7 @@ PatchHarbor verändert nicht ungefragt die gemeinsam versionierte `.gitignore`.
 Fehlende/ungültige lokale Metadaten einer bereits bekannten Instanz werden nicht
 repariert. Die Fehler-Rücknahme einer noch nicht abgeschlossenen frischen
 Registrierung erhält dagegen ihren bisherigen Transaktionsvertrag; sie ist keine
-Migration, kein Reparaturmodus und keine Rückabwicklung eines Apply.
+Migration, kein Reparaturmodus und keine Rückabwicklung eines Execute.
 
 ### 13.4 Repository-ID
 
@@ -1590,9 +1587,9 @@ clock$
 
 Für die Kollisionsprüfung bildet PatchHarbor aus jedem vollständig decodierten Pfad einen Vergleichsschlüssel mit Unicode-`casefold()`, ohne die gespeicherten Pfadbytes zu verändern. Zwei verschiedene Repository-Pfade mit demselben Vergleichsschlüssel werden als Groß-/Kleinschreibungs-Kollision abgelehnt.
 
-Die gleichen Portabilitätsregeln gelten für Pfade, die in `base/`, `untracked/`, Rekonstruktions-Patches oder JSON-Manifeste aufgenommen werden. Ein nicht sicher als regulärer UTF-8-ZIP-Pfad darstellbarer Repository-Pfad wird vor Kontextausgabe, Apply oder Bundle-Erzeugung abgelehnt.
+Die gleichen Portabilitätsregeln gelten für Pfade, die in `base/`, `untracked/`, Rekonstruktions-Patches oder JSON-Manifeste aufgenommen werden. Ein nicht sicher als regulärer UTF-8-ZIP-Pfad darstellbarer Repository-Pfad wird vor Kontextausgabe, Execute oder Bundle-Erzeugung abgelehnt.
 
-Vor Kontext, Apply und Bundle werden außerdem folgende Zustände abgelehnt:
+Vor Kontext, Execute und Bundle werden außerdem folgende Zustände abgelehnt:
 
 - nicht aufgelöste Merge-Stages,
 - Indexeinträge mit `assume-unchanged`,
@@ -1861,7 +1858,7 @@ PatchHarbor lehnt den Patch ab. Der Benutzer erzeugt einen neuen Kontext oder ei
 
 ### 15.1 Container
 
-Ein über `patchharbor apply` verarbeiteter Patch ist immer ein ZIP-Paket.
+Ein über `patchharbor execute` verarbeiteter Patch ist immer ein ZIP-Paket.
 
 Der äußere Dateiname und die Dateiendung sind keine Sicherheits- oder Zuordnungsinformation. PatchHarbor prüft die tatsächlichen ZIP-Bytes.
 
@@ -1949,7 +1946,7 @@ Ein enthaltenes ZIP oder anderes Archiv wird nicht als weiteres Patch-Paket geö
 
 ---
 
-## 16. Exklusive Repository-Sperre, Exchange-Auswahl und Apply-Ablauf
+## 16. Exklusive Repository-Sperre, Exchange-Auswahl und Execute-Ablauf
 
 ### 16.1 Sperrmodell
 
@@ -1957,10 +1954,10 @@ Für jede `repo_id` existiert genau eine betriebssystemübergreifende exklusive 
 
 Die Sperre:
 
-- wird von `context`, `apply`, `apply --dry-run` und `bundle` verwendet,
+- wird von `context`, `execute`, `execute --dry-run` und `bundle` verwendet,
 - gilt pro `repo_id`, nicht pro Exchange-Dateiname,
 - wird vor der ersten vollständigen Zustandsaufnahme des ausgewählten Repositorys erworben,
-- bleibt bei `apply`, Dry-Run und Bundle bis zum Abschluss oder Fehlschlag der Result-Bundle-Erzeugung gehalten,
+- bleibt bei `execute`, Dry-Run und Bundle bis zum Abschluss oder Fehlschlag der Result-Bundle-Erzeugung gehalten,
 - wird bei `context` unmittelbar nach der konsistenten Zustandsaufnahme freigegeben,
 - wird über einen sicheren Cleanup-Pfad freigegeben,
 - darf durch Prozessabsturz nicht dauerhaft unauflösbar werden.
@@ -1973,7 +1970,7 @@ Bei einer Auflösung über die zentrale Registry gilt die Lock-Reihenfolge aus A
 
 ### 16.2 Parameterlose Paketauswahl im Exchange-Ordner
 
-Wird `patchharbor apply` ohne `PATCH_ZIP` aufgerufen, verwendet PatchHarbor ausschließlich den konfigurierten Exchange-Ordner. Der Aufruf besitzt intern entweder den Ursprung `manual` oder `automatic`; der normale CLI-Aufruf ist manuell, der Watcher delegiert mit automatischem Ursprung.
+Wird `patchharbor execute` ohne `TASK_ZIP` aufgerufen, verwendet PatchHarbor ausschließlich den konfigurierten Exchange-Ordner. Der Aufruf besitzt intern entweder den Ursprung `manual` oder `automatic`; der normale CLI-Aufruf ist manuell, der Watcher delegiert mit automatischem Ursprung.
 
 Beim manuellen Ursprung wird vor dem Exchange-Scan zuerst der Auswahlkontext bestimmt:
 
@@ -2015,15 +2012,15 @@ Kann eine einzelne reguläre Exchange-Datei während eines Scans nicht stabil od
 
 Auf virtuellen oder gemeinsam eingebundenen Dateisystemen dürfen Pfad- und Deskriptoransicht trotz unveränderter Datei keine vergleichbare Inode-Identität liefern. Ausschließlich für Exchange-Dateien darf die stabile Aufnahme in diesem Fall auf übereinstimmenden regulären Dateityp, Größe und Änderungszeit zurückfallen. Der vollständige SHA-256 bleibt Bestandteil der Identität; ein ausgewähltes Paket wird vor Materialisierung und unmittelbar vor der ersten Mutation erneut geöffnet und gegen denselben vollständigen Hash geprüft. Andere PatchHarbor-Vertrauensgrenzen verwenden weiterhin die strikte physische Dateidentität.
 
-Die Zustandsprüfung während der Auswahl verwendet dieselbe gesperrte und konsistente Kontextaufnahme wie `patchharbor context`. Beim manuellen Ursprung wird nur das aktuelle Repository aufgenommen. Beim automatischen Ursprung dürfen Repositorys nur lesend und nacheinander gesperrt werden. Nach der Kandidatenentscheidung wird für den eigentlichen Apply-Auftrag die vollständige Sperr-, Preflight- und Revalidierungsfolge erneut durchlaufen.
+Die Zustandsprüfung während der Auswahl verwendet dieselbe gesperrte und konsistente Kontextaufnahme wie `patchharbor context`. Beim manuellen Ursprung wird nur das aktuelle Repository aufgenommen. Beim automatischen Ursprung dürfen Repositorys nur lesend und nacheinander gesperrt werden. Nach der Kandidatenentscheidung wird für den eigentlichen Execute-Auftrag die vollständige Sperr-, Preflight- und Revalidierungsfolge erneut durchlaufen.
 
-Result Bundles werden an ihrem eigenen Marker erkannt und niemals als Patch ausgeführt. Andere ZIP-Dateien, direkte Skripte, alte Shell-Patch-ZIPs und beliebige sonstige Dateien sind keine Kandidaten für den sicheren Apply-Pfad.
+Result Bundles werden an ihrem eigenen Marker erkannt und niemals als Patch ausgeführt. Andere ZIP-Dateien, direkte Skripte, alte Shell-Patch-ZIPs und beliebige sonstige Dateien sind keine Kandidaten für den sicheren Execute-Pfad.
 
-Gibt es keinen passenden Kandidaten, endet der Auftrag ohne Mutation mit einem klaren Fehler. Ein manueller parameterloser Apply darf eine Identität im Zustand `failed` nur dann erneut öffnen, wenn Repository-ID, Base-Commit, Zustands-Fingerprint, Paketvalidierung und Revalidierung weiterhin vollständig passen. Unmittelbar vor der ersten Mutation wechselt diese Identität atomar zurück auf `attempted`; nach dem tatsächlichen Ausführungsergebnis wird sie als `failed` oder `succeeded` abgeschlossen.
+Gibt es keinen passenden Kandidaten, endet der Auftrag ohne Mutation mit einem klaren Fehler. Ein manueller parameterloser Execute darf eine Identität im Zustand `failed` nur dann erneut öffnen, wenn Repository-ID, Base-Commit, Zustands-Fingerprint, Paketvalidierung und Revalidierung weiterhin vollständig passen. Unmittelbar vor der ersten Mutation wechselt diese Identität atomar zurück auf `attempted`; nach dem tatsächlichen Ausführungsergebnis wird sie als `failed` oder `succeeded` abgeschlossen.
 
-Erfolgreiche Patch-Pakete sind gegen Replay geschützt. Ein fehlgeschlagener Patch kann durch einen bewussten manuellen Apply erneut versucht werden, solange Repository-Bindung und Patch-Zustand weiterhin exakt passen. Der Watcher wiederholt fehlgeschlagene Pakete nicht automatisch in einer Endlosschleife.
+Erfolgreiche Patch-Pakete sind gegen Replay geschützt. Ein fehlgeschlagener Patch kann durch einen bewussten manuellen Execute erneut versucht werden, solange Repository-Bindung und Patch-Zustand weiterhin exakt passen. Der Watcher wiederholt fehlgeschlagene Pakete nicht automatisch in einer Endlosschleife.
 
-Ein explizites `patchharbor apply PATCH_ZIP` übersteuert die parameterlose Auswahl. Es darf unabhängig vom aktuellen Arbeitsverzeichnis das über seine `repo_id` bestimmte registrierte Repository auflösen und behält sämtliche Paket-, State-, Pfad- und Revalidierungsprüfungen. Es ist kein öffentlicher `--retry-failed`-Schalter erforderlich, weil der normale parameterlose manuelle Aufruf bereits die bewusste Benutzeraktion darstellt. Ein Dry-Run verändert keinen Replay-Status.
+Ein explizites `patchharbor execute TASK_ZIP` übersteuert die parameterlose Auswahl. Es darf unabhängig vom aktuellen Arbeitsverzeichnis das über seine `repo_id` bestimmte registrierte Repository auflösen und behält sämtliche Paket-, State-, Pfad- und Revalidierungsprüfungen. Es ist kein öffentlicher `--retry-failed`-Schalter erforderlich, weil der normale parameterlose manuelle Aufruf bereits die bewusste Benutzeraktion darstellt. Ein Dry-Run verändert keinen Replay-Status.
 
 Die explizit ausgewählte Datei wird vor ihrer Ausführung nicht archiviert. Die optionale vorgeschaltete Exchange-Archivierung darf ausschließlich nachgewiesen überholte Bundles aus dem jeweiligen Repository-Scope verschieben; sie löscht keine Bundles. Wird unter demselben Pfad später anderer Inhalt abgelegt, entsteht wegen des neuen SHA-256 eine neue Dateidentität.
 
@@ -2081,8 +2078,8 @@ Git-Prüfungen verwenden vollständige Objekt-IDs und unveränderte Originalhist
 Shallow-Repositories, Grafts und Replacement-Refs werden konservativ abgelehnt.
 Fehlende Git-Objekte oder Git-Fehler erlauben niemals einen Fallback auf Vermutungen.
 
-Beim manuellen parameterlosen Apply und beim manuellen Bundle-Bau gilt der Scope
-des aktuellen registrierten Repositorys. Bei explizitem Apply gilt die Paket-ID,
+Beim manuellen parameterlosen Execute und beim manuellen Bundle-Bau gilt der Scope
+des aktuellen registrierten Repositorys. Bei explizitem Execute gilt die Paket-ID,
 wobei die ausgewählte Datei von der Wartung ausgeschlossen ist. Der Watcher bleibt
 repositoryübergreifend. Dry-Run archiviert nichts. Der vorhandene flache Scan
 betrachtet den Archiv-Unterordner nicht rekursiv als aktive Paketquelle.
@@ -2137,9 +2134,9 @@ Kann das Repository vorher nicht sicher aufgelöst werden, entsteht kein Reposit
 
 ### 16.4 Validierungs- und Ausführungsreihenfolge
 
-`patchharbor apply [PATCH_ZIP]` führt mindestens aus:
+`patchharbor execute [TASK_ZIP]` führt mindestens aus:
 
-1. Bei fehlendem `PATCH_ZIP` den manuellen oder automatischen Auswahlkontext bestimmen und den neuesten zulässigen Kandidaten nach Abschnitt 16.2 auswählen; andernfalls ausschließlich den expliziten Pfad verwenden.
+1. Bei fehlendem `TASK_ZIP` den manuellen oder automatischen Auswahlkontext bestimmen und den neuesten zulässigen Kandidaten nach Abschnitt 16.2 auswählen; andernfalls ausschließlich den expliziten Pfad verwenden.
 2. Eingabedatei stabil und vollständig lesbar öffnen.
 3. Tatsächliches ZIP-Format prüfen.
 4. Archivstruktur, Eintragstypen, Pfade und Ressourcenlimits vollständig prüfen.
@@ -2159,7 +2156,7 @@ Kann das Repository vorher nicht sicher aufgelöst werden, entsteht kein Reposit
 18. Vor der ersten Repository-Schreiboperation Base-Commit, Fingerprint, Registry-Zuordnung, lokale ID, alle Zielpfade und deren relevante Eltern erneut prüfen.
 19. Beim Dry-Run keine Dateidentität konsumieren, keine Nutzdatei schreiben und keinen Entrypoint starten.
 20. Bei einem im Exchange verfolgten Nicht-Dry-Run-Auftrag die Identität mit vollständiger `attempt_run_id` atomar auf `attempted` setzen; nur ein manueller Ursprung darf dabei `failed` erneut öffnen; bei Fehler ohne Mutation abbrechen.
-21. Beim echten Apply Nutzdateien einzeln atomar schreiben oder ersetzen.
+21. Beim echten Execute Nutzdateien einzeln atomar schreiben oder ersetzen.
 22. Entrypoint mit Repository-Wurzel als CWD ausführen.
 23. stdout und stderr vollständig in den Run-Log aufnehmen.
 24. Exit-Code, Timeout, Strg+C oder Tool-Fehler als primäres Ergebnis bestimmen; den terminalen Replay-Status noch nicht vor der Result-Veröffentlichung abschließen.
@@ -2179,7 +2176,7 @@ Die neue repositorylokale Konfiguration verwendet unabhängig davon ihr geschlos
 
 Die Patch-SHA entsteht aus denselben stabil eingelesenen ZIP-Bytes wie Parser,
 Entrypoint und Nutzdaten, nicht aus einem später separat geöffneten Download.
-Neue Apply-Result-Manifeste enthalten bei bekannter Paket-SHA das optionale Paar
+Neue Execute-Result-Manifeste enthalten bei bekannter Paket-SHA das optionale Paar
 `task_sha256` und `completed_commit`. `completed_commit` ist nur bei tatsächlich
 erfolgreichem Entrypoint, sauberem konsistentem Result-Snapshot und bestätigtem
 Vorwärts-Commit gesetzt, sonst `null`. Die vorhandenen `run_id`, `repo_id`,
@@ -2196,7 +2193,7 @@ bleibt das erfolgreiche ZIP bytegleich erhalten. Keine zweite fehlerhafte Ausgab
 plattformabhängig best-effort; es gibt keine absolute Stromausfallsicherheitszusage.
 
 Recovery erfolgt vor Archivierung bei nicht-trockenen Exchange-Scans. Manuelles
-Apply und `bundle` bleiben auf ihr Repository begrenzt, explizites Apply auf das
+Execute und `bundle` bleiben auf ihr Repository begrenzt, explizites Execute auf das
 Paket-Repository, der Watcher bleibt global. Die Funktion ist unabhängig vom
 Archivierungs-Schalter. Dry-Run repariert keine Einträge. Es gibt keinen neuen
 CLI-Schalter, kein zweites Journal und keinen parallelen Auswahlalgorithmus.
@@ -2242,7 +2239,7 @@ oder bei alten Runs ohne lokal verankerte Hashes bleibt die Reparatur aus.
 PatchHarbor lehnt vor der ersten Repository-Änderung unter anderem ab:
 
 - fehlende oder ungültige lokale Konfiguration auch bei explizitem Patch-/Ausgabeauftrag; ein explizites Ausgabeziel übergeht nur einen unset/unavailable Exchange-Pfad,
-- beim manuellen parameterlosen Apply ein nicht eindeutig registriertes aktuelles Repository,
+- beim manuellen parameterlosen Execute ein nicht eindeutig registriertes aktuelles Repository,
 - keinen passenden Kandidaten im jeweiligen manuellen oder automatischen Repository-Scope,
 - unbekannte oder widersprüchliche Repository-ID,
 - fehlende oder kopierte lokale ID,
@@ -2276,7 +2273,7 @@ Da die temporäre Bundle-Datei außerhalb aller registrierten Repositories liegt
 ## 17. Dry-Run
 
 ```bash
-patchharbor apply --dry-run PATCH_ZIP
+patchharbor execute --dry-run TASK_ZIP
 ```
 
 ### 17.1 Der Dry-Run führt aus
@@ -2363,7 +2360,7 @@ Beispiel:
 ```json
 {
   "run_id": "b592be12-55f2-49d7-9699-2435bbcd7935",
-  "operation": "apply",
+  "operation": "execute",
   "dry_run": false,
   "repository_resolved": true,
   "primary_result": {
@@ -2409,10 +2406,10 @@ not_attempted
 
 `not_attempted` ist nur zulässig, wenn kein Repository sicher aufgelöst werden konnte.
 
-### 18.4 Maschinenlesbare Apply-Ausgabe
+### 18.4 Maschinenlesbare Execute-Ausgabe
 
 ```bash
-patchharbor apply --json PATCH_ZIP
+patchharbor execute --json TASK_ZIP
 ```
 
 Die Ausgabe folgt exakt dem gemeinsamen Vertrag aus Abschnitt 5.2.
@@ -2519,7 +2516,7 @@ patchharbor bundle [REPOSITORY]
 
 Ohne `--output-dir` wird das Result Bundle in `exchange_directory` veröffentlicht.
 
-Automatisch versucht `patchharbor apply` nach jedem Auftrag ein Result Bundle zu erzeugen, sobald das Ziel-Repository sicher aufgelöst und gesperrt wurde. Ohne `--output-dir` verwendet auch dieser Versuch `exchange_directory`.
+Automatisch versucht `patchharbor execute` nach jedem Auftrag ein Result Bundle zu erzeugen, sobald das Ziel-Repository sicher aufgelöst und gesperrt wurde. Ohne `--output-dir` verwendet auch dieser Versuch `exchange_directory`.
 
 Das gilt auch bei:
 
@@ -2602,7 +2599,7 @@ Das vollständige Manifest enthält zusätzlich zwei nach UTF-8-Pfadbytes sortie
 
 Diese Metadaten sind die plattformunabhängige Quelle für Dateimodi. Die ZIP-Einträge tragen zusätzlich passende reguläre Dateirechte, soweit das ZIP-Format sie abbilden kann.
 
-Bei `apply` enthält das Manifest außerdem die aus `task.json` erwarteten und die tatsächlich ermittelten Zustandswerte, sodass ein Mismatch eindeutig nachvollziehbar bleibt. Neue Apply-Resultate mit bekannter Paket-SHA ergänzen gemeinsam `task_sha256` und `completed_commit` gemäß Abschnitt 16.4.1. Der Abschlusscommit darf `null` sein; beide Felder fehlen in alten Resultaten und manuellen Bundles. Bestehende Resultate ohne diese optionalen Felder bleiben lesbar, liefern aber keinen neuen Recovery-Beleg.
+Bei `execute` enthält das Manifest außerdem die aus `task.json` erwarteten und die tatsächlich ermittelten Zustandswerte, sodass ein Mismatch eindeutig nachvollziehbar bleibt. Neue Execute-Resultate mit bekannter Paket-SHA ergänzen gemeinsam `task_sha256` und `completed_commit` gemäß Abschnitt 16.4.1. Der Abschlusscommit darf `null` sein; beide Felder fehlen in alten Resultaten und manuellen Bundles. Bestehende Resultate ohne diese optionalen Felder bleiben lesbar, liefern aber keinen neuen Recovery-Beleg.
 
 ### 19.6 `context.json`
 
@@ -2636,12 +2633,12 @@ Runtime und statischer Vorlage vor einer möglichen Mutation. Die dynamischen
 Resultdaten werden weiterhin frisch aus dem tatsächlichen Lauf ergänzt.
 
 Jede neue Result-Bundle-Veröffentlichung enthält genau eine Root-Datei
-`CHAT_INSTRUCTIONS.md` und `environment.json`: manuelles Bundle, Apply-Erfolg,
+`CHAT_INSTRUCTIONS.md` und `environment.json`: manuelles Bundle, Execute-Erfolg,
 Fehler, Dry Run, Watcher und explizites Ausgabeziel. Sie werden gemeinsam mit
 Snapshot und Logs geschrieben, CRC-geprüft und atomar veröffentlicht. Kein
 zusätzlicher CLI-Befehl, keine Sidecar-Datei, kein nachträgliches Umschreiben
 alter Bundles. Der tatsächlich aufgelöste Repository-Kontext ist maßgeblich,
-nicht CWD eines Watchers oder eines explizit anders gerichteten Apply.
+nicht CWD eines Watchers oder eines explizit anders gerichteten Execute.
 
 `exchange_directory` und `bundle_suffix` in `environment.json` stammen aus der
 lokalen Konfiguration genau dieses Zielrepositorys; `output_directory` ist das
@@ -3063,7 +3060,7 @@ Mindestens zu erhalten und weiter zu testen sind:
 - Exit `11` bei ausschließlich fehlgeschlagener Bundle-Erzeugung,
 - Notfallrettung ohne halbfertige endgültige ZIP-Datei,
 - JSON-Modus mit genau einem Objekt auf stdout,
-- exakte JSON-Verträge für `registry list`, `context`, `bundle` und `apply` einschließlich Fehlerobjekten,
+- exakte JSON-Verträge für `registry list`, `context`, `bundle` und `execute` einschließlich Fehlerobjekten,
 - temporäre STDIN-Artefakte werden über den zentralen Cleanup-Pfad entfernt,
 - Watcher delegiert stabile Exchange-Dateien ohne duplizierte Core-Logik,
 - konkurrierende autonome Watcher-, Repo-Assist- oder Orchestrator-Pfade werden für dieselben Repositories nicht gleichzeitig aktiviert.
@@ -3087,23 +3084,23 @@ Mindestens zusätzlich zu prüfen sind:
 - spätere Registrierung mit Konflikt zum Exchange-Ordner,
 - fehlende Konfiguration bei Befehlen mit und ohne explizite Overrides,
 - `bundle` ohne `--output-dir` veröffentlicht im Exchange-Ordner,
-- automatisches Apply-Result-Bundle veröffentlicht im Exchange-Ordner,
+- automatisches Execute-Result-Bundle veröffentlicht im Exchange-Ordner,
 - explizites `--output-dir` übersteuert das Standardziel,
 - nicht rekursiver Exchange-Scan ohne Abhängigkeit von Dateiname oder Endung,
 - Result Bundles, direkte Skripte, alte Patch-ZIPs, Browser-Temporärdateien und sonstige Dateien werden nicht als sichere Patch-Kandidaten ausgeführt,
-- manueller parameterloser Apply löst das aktuelle registrierte Repository einschließlich Unterverzeichnisaufrufen zuerst auf und betrachtet keine Pakete fremder Repositorys,
+- manueller parameterloser Execute löst das aktuelle registrierte Repository einschließlich Unterverzeichnisaufrufen zuerst auf und betrachtet keine Pakete fremder Repositorys,
 - ein nicht registriertes oder nicht eindeutig auflösbares aktuelles Repository führt ohne repositoryübergreifenden Fallback zum kontrollierten Fehler,
 - vollständig passende Kandidaten werden vor jeder Zeitrangfolge anhand von Repository-Scope, `repo_id`, Base-Commit, Fingerprint und Replay-Eignung gefiltert,
 - bei mehreren zulässigen Kandidaten wird der höchste `mtime_ns` gewählt; ein exakter Zeitgleichstand wird deterministisch über Unicode-NFC-normalisierten Dateinamen und unveränderten Dateinamen aufgelöst,
 - ein neuerer unzulässiger Kandidat blockiert keinen älteren zulässigen Kandidaten,
-- explizites `PATCH_ZIP` übersteuert die parameterlose CWD-Auswahl und darf ein anderes registriertes Repository über `repo_id` bestimmen,
+- explizites `TASK_ZIP` übersteuert die parameterlose CWD-Auswahl und darf ein anderes registriertes Repository über `repo_id` bestimmen,
 - Dry-Run verändert keinen Replay-Status,
 - `attempted`, `failed` und `succeeded` bleiben über Prozessneustarts unterscheidbar,
-- ein fehlgeschlagener parameterloser manueller Apply kann bei unveränderter vollständiger State-Bindung dasselbe Paket erneut ausführen,
+- ein fehlgeschlagener parameterloser manueller Execute kann bei unveränderter vollständiger State-Bindung dasselbe Paket erneut ausführen,
 - ein Watcher-Poll wiederholt dasselbe fehlgeschlagene Paket nicht unmittelbar erneut,
 - ein erfolgreiches Paket bleibt für manuelle parameterlose und automatische Auswahl Replay-geschützt,
 - Base-Commit- oder Fingerprint-Mismatch verhindert den manuellen Retry eines fehlgeschlagenen Pakets,
-- mehrere Pakete für verschiedene Repositorys oder Zustände führen beim manuellen Apply nicht zur Auswahl eines falschen Kandidaten; der Watcher bleibt global,
+- mehrere Pakete für verschiedene Repositorys oder Zustände führen beim manuellen Execute nicht zur Auswahl eines falschen Kandidaten; der Watcher bleibt global,
 - geänderter Inhalt unter demselben Namen ist eine neue Identität,
 - Patch- und Result-Dateinamen folgen dem Repository-/Typ-/Uhrzeit-/Datum-/ID6-Vertrag,
 - menschenlesbare technische IDs erscheinen zentral als sechs Zeichen plus `…`, während JSON und Sicherheitsdaten vollständig bleiben,
@@ -3239,14 +3236,14 @@ Eine normale frische Registrierung erzeugt dagegen ihre Grundkonfiguration.
 
 ### 25.3 Repositorylokale Revision in zwei OFF-PLAN-Aufträgen
 
-REPO-CONFIG-1 stellt Persistenz, Registrierung, Configure, Bundle/Apply,
+REPO-CONFIG-1 stellt Persistenz, Registrierung, Configure, Bundle/Execute,
 Archivierung und Watcher technisch um. REPO-CONFIG-2 gleicht Spezifikation,
 README, Python-API-Vertrag, Planungsspezifikation und Chat-Anweisungen ab und
 sichert die vollständigen Benutzerabläufe mit Verhaltenstests.
 
 Der abgeschlossene API-Plan bleibt bei 4/4. Die Konfigurationsrevision erzeugt
 weder automatisch einen Release-Tag noch eine Publikation. Der konkrete
-Apply-/Commit-Erfolg und externe CI benötigen eigene Nachweise; die
+Execute-/Commit-Erfolg und externe CI benötigen eigene Nachweise; die
 Dokumentationsfortschreibung ist kein grünes Testergebnis.
 
 ## 26. Verbindlicher Chat-Initialisierungsvertrag
@@ -3278,7 +3275,7 @@ Vor jeder Änderung prüft der Chat mindestens:
 - den vollständigen Base-Snapshot,
 - staged und unstaged Patches,
 - nicht ignorierte untracked Dateien,
-- bei einem vorherigen Apply zuerst `logs/run.json`,
+- bei einem vorherigen Execute zuerst `logs/run.json`,
 - bei Fehler, Warning oder unklarer Ausführung zusätzlich `logs/execution.log`.
 
 Ein fehlgeschlagener Patch kann Dateien verändert oder neu erzeugt haben. Der Chat arbeitet deshalb immer auf dem tatsächlich zurückgegebenen Snapshot weiter und unterstellt keine globale Rückabwicklung.
@@ -3391,7 +3388,7 @@ beginnt keine weitere Änderungsphase. Muss die Projektpolicy weitere Prüfungen
 desselben Zustands ausführen, bleiben diese vorgeschrieben. Bereits erfolgreiche
 Commits und der tatsächliche Arbeitszustand werden nicht global zurückgerollt.
 
-Vor Apply werden nur vorgesehene Tests und Commits beschrieben. Tatsächlicher
+Vor Execute werden nur vorgesehene Tests und Commits beschrieben. Tatsächlicher
 Erfolg wird erst aus dem zurückgegebenen Result abgeleitet.
 
 Die kanonische ZIP erhält eine dreistellige `PATCHHARBOR-BUNDLE-NR`; sie bezeichnet
@@ -3443,8 +3440,8 @@ Historie beginnt der externe Chat bei `001`; unabhängige Chats dürfen kollidie
 Die Nummer ist Handoff-Metadatum, keine Sicherheits- oder State-Bindung.
 
 Bei mehreren Commits nennt die Übergabe ihre geordnete Folge mit Kennungen,
-Commit-Messages und relevanten Planpositionen kompakt. Vor Apply sind Tests und
-Commits als vorgesehen zu kennzeichnen; Teilerfolg wird nach Apply nicht als
+Commit-Messages und relevanten Planpositionen kompakt. Vor Execute sind Tests und
+Commits als vorgesehen zu kennzeichnen; Teilerfolg wird nach Execute nicht als
 Gesamterfolg dargestellt.
 
 Vor der finalen Antwort wird die ZIP erstellt, geöffnet und validiert; erst dann
@@ -3457,7 +3454,7 @@ Abschlussblock. Der Erfolgsabschluss besteht aus Bereitschaftsbalken,
 Bundle-Nummer und Patch-Link; der Patch-Link ist die allerletzte Zeile der
 Antwort.
 
-### 26.9 Auswertung nach lokalem Apply
+### 26.9 Auswertung nach lokalem Execute
 
 Nach Rückgabe eines Results unterscheidet der Chat vollständigen Erfolg,
 Teilerfolg, Entrypoint-/Testfehler, PatchHarbor-Toolfehler, fehlgeschlagenes
@@ -3493,8 +3490,8 @@ fachliche Probleme zeigen, ohne einen nicht beauftragten Commit zu verlangen.
 - `.patchharbor/config.json` ist die einzige Quelle aller Repository-Einstellungen: geschlossenes lokales Format 1, kein globaler Fallback, keine Migration, keine automatische Reparatur.
 - Jedes Repository wählt seinen Exchange; getrennte oder gemeinsam genutzte flache Übergaben sind zulässig, Suffix und Archivregeln bleiben repositorylokal.
 - Exchange-Ordner und registrierte Repositorys dürfen sich in keiner Richtung überlappen.
-- `bundle` und Apply-Result-Bundles verwenden ohne explizites `--output-dir` den Exchange-Ordner.
-- Ein manueller `apply` ohne `PATCH_ZIP` ist an das registrierte Repository des aktuellen Arbeitsverzeichnisses gebunden; Unterverzeichnisse werden zur Repository-Wurzel aufgelöst und fremde Repository-Pakete sind keine Kandidaten.
+- `bundle` und Execute-Result-Bundles verwenden ohne explizites `--output-dir` den Exchange-Ordner.
+- Ein manueller `execute` ohne `TASK_ZIP` ist an das registrierte Repository des aktuellen Arbeitsverzeichnisses gebunden; Unterverzeichnisse werden zur Repository-Wurzel aufgelöst und fremde Repository-Pakete sind keine Kandidaten.
 - Der Watcher bleibt mit internem automatischem Ursprung repositoryübergreifend.
 - Erst nach Repository-, State- und Replay-Filterung gewinnt der höchste `mtime_ns`; bei Zeitgleichstand entscheidet deterministisch der Unicode-NFC-normalisierte und danach der unveränderte Dateiname.
 - Result Bundles und sonstige Dateien werden nie als sichere Patch-Pakete ausgeführt.
@@ -3524,7 +3521,7 @@ fachliche Probleme zeigen, ohne einen nicht beauftragten Commit zu verlangen.
 
 Diese Ergänzung ersetzt ausschließlich ältere Vorgaben zur standardmäßig
 vollständigen Detailausgabe. Alle realen Sicherheitsprüfungen bleiben gleich.
-Die normale Ausgabe von Apply, fs run und Bundle zeigt zusammengefasste
+Die normale Ausgabe von Execute, fs run und Bundle zeigt zusammengefasste
 Arbeitsschritte und Ergebnisse. Die zentrale Präsentationspolitik unterdrückt
 Einzelmeldungen von Git, ZIP, SHA, Payload-Dateien und Result-ZIP-Dateien.
 `--verbose`/`-v` zeigt die vollständige Detailspur; Emittern ist der Modus unbekannt.
@@ -3603,7 +3600,7 @@ zusätzlich den verfügbaren physischen Exchange und die Registry-Pfadpolitik.
 Keine API-Funktion erzeugt fehlende lokale Metadaten außer echter Erstregistrierung.
 
 Der Watcher prüft beim Start `api.repositories()` und startet pro Poll weiterhin
-einen separaten Prozess, der `api.apply_next()` direkt aufruft. Core lädt lokale
+einen separaten Prozess, der `api.execute_next()` direkt aufruft. Core lädt lokale
 Konfigurationen frisch, fasst physisch gleiche Exchange-Pfade zusammen und
 wendet die Repository-/Verzeichnisbindung an. Signal-/Stop-Verhalten,
 automatische Nichtwiederholung fehlgeschlagener Identitäten, Replay und
@@ -3652,15 +3649,15 @@ bleiben sichtbar und an ihren tatsächlich geprüften Stand gebunden.
 
 Die Nutzerentscheidung vom 29. Oktober 2026 präzisiert den Testumfang:
 Development prüft ausschließlich eine dokumentierte änderungsbezogene Auswahl
-parallel, keine Vollsuite. Apply prüft jeden Commitstand mit der vollständigen
+parallel, keine Vollsuite. Execute prüft jeden Commitstand mit der vollständigen
 parallelen Suite, auch vor dem letzten Commit am Bundle-Ende. Keine seriellen
-Gates. Im Apply läuft
+Gates. Im Execute läuft
 `.venv/bin/python tools/run_tests.py --suite all` vor dem Commit. Nach allen
 erfolgreichen Phasen und Commits folgt genau ein normaler abschließender Push.
 Das gilt auch für Dokumentations- und W/R/C-Commits. Diagnosebundles mit null
 Commits folgen dem beauftragten Prüfumfang gemäß 26.5.
 
-Keine zusätzlichen künstlichen Test-/Suite-Timeouts. Das äußere Apply-Limit,
+Keine zusätzlichen künstlichen Test-/Suite-Timeouts. Das äußere Execute-Limit,
 CI-Joblimits und fachliche Timeouttests bleiben eigenständige Verträge.
 Eine W/R/C-Patchfolge wendet jeden Zwischenstand einzeln an und committet ihn
 nur nach erfolgreichen Prüfungen. Bei Fehler bleiben vorherige Commits stehen.
@@ -3710,7 +3707,7 @@ W-Cores für seine Schreiboperationen, keine zweite Writer-Implementierung.
 
 Die frühere Testzuordnung des POSIX-W/R/C-Auftrags ist historisch. Für aktuelle
 PatchHarbor-Entwicklung gelten Abschnitt 33 und `docs/test-parallelism.md`:
-Development ausschließlich parallel; Apply-Zwischenstände parallel, nur am
+Development ausschließlich parallel; Execute-Zwischenstände parallel, nur am
 Bundle-Ende vollständig seriell und parallel vor letztem Commit/Push.
 GitHub-CI verwendet ausschließlich `workflow_dispatch` gemäß Abschnitt 33.
 
@@ -3729,7 +3726,7 @@ Quellversion. Herkunft und vollständige Bindung stehen im RIV-Plan.
 
 PatchHarbor erhält lesende Funktionen zum Untersuchen und Validieren sicherer Patch-Pakete. Beide Funktionen sind über die öffentliche Python-API und die CLI verfügbar. Neue Result-Bundles enthalten standardmäßig eine passende, installationsfrei nutzbare Core-PYZ nach der PYZ/PACK-Ergänzung. Die Chat-Anweisungen beschreiben deren sichere Bereitstellung und bevorzugte Nutzung.
 
-Die bestehenden Apply-, Fingerprint-, Replay-, Recovery-, Prozess-, Archivierungs- und Auslieferungsverträge bleiben erhalten. Diese Erweiterung macht aus PatchHarbor weder eine Sandbox noch einen Paketmanager oder einen Netzwerkdienst. GitHub-, Drive- und Gmail-Zugriffe bleiben Aufgaben des externen Chats beziehungsweise ausdrücklich beauftragter Entrypoints.
+Die bestehenden Execute-, Fingerprint-, Replay-, Recovery-, Prozess-, Archivierungs- und Auslieferungsverträge bleiben erhalten. Diese Erweiterung macht aus PatchHarbor weder eine Sandbox noch einen Paketmanager oder einen Netzwerkdienst. GitHub-, Drive- und Gmail-Zugriffe bleiben Aufgaben des externen Chats beziehungsweise ausdrücklich beauftragter Entrypoints.
 
 Diese Abschnitte ergänzen den aktuellen 1.2.1-Bestandsvertrag. Ausschließlich die ausdrücklich beschriebenen CLI-/API-Ergänzungen, Result-Format-Erweiterungen und Chat-Arbeitsabläufe ändern sich. Das Patch-Paketformat und sein geschlossenes `task.json` bleiben unverändert.
 
@@ -3770,7 +3767,7 @@ report = api.validate_task("patch.zip", reference_bundle="result.zip")
 
 Beide Funktionen akzeptieren wie die bestehende API Textpfade beziehungsweise `PathLike[str]` und einen optionalen request-lokalen `observer`. Leere Pfade, Bytespfade und widersprüchliche Optionen werden abgelehnt; relative Pfade sind zulässig und werden einmal gegen das Aufrufverzeichnis aufgelöst. Das ist keine automatische Zielauswahl. Für ausdrücklich benannte Dateipfade gelten dieselben sicheren Auflösungsregeln wie beim bestehenden expliziten Paketleser; daraus folgt keine Ausweitung der flachen Exchange-Suche. Sie sind synchron, ohne Beobachter still und verwenden die bestehende Application/Core-Schicht. Die CLI ruft diese öffentliche API auf. Es entstehen keine parallelen ZIP-, Manifest- oder Bindungsprüfer.
 
-Fachlich gleiche Prüfungen in `inspect`, `validate` und `apply` müssen dieselben Core-Funktionen und Ressourcenregeln verwenden. `apply` behält darüber hinaus seine eigenen zeitnahen Zustands-, Sperr- und Mutationsprüfungen.
+Fachlich gleiche Prüfungen in `inspect`, `validate` und `execute` müssen dieselben Core-Funktionen und Ressourcenregeln verwenden. `execute` behält darüber hinaus seine eigenen zeitnahen Zustands-, Sperr- und Mutationsprüfungen.
 
 ### 36.2 `inspect_task`
 
@@ -3801,13 +3798,13 @@ Falsche API-Argumenttypen beziehungsweise widersprüchliche Parameter führen en
 ### 36.4 CLI-Vertrag
 
 ```bash
-patchharbor inspect PATCH_ZIP
-patchharbor inspect PATCH_ZIP --json
+patchharbor inspect TASK_ZIP
+patchharbor inspect TASK_ZIP --json
 
-patchharbor validate PATCH_ZIP
-patchharbor validate PATCH_ZIP --repository REPOSITORY
-patchharbor validate PATCH_ZIP --reference-bundle RESULT_ZIP
-patchharbor validate PATCH_ZIP --reference-bundle RESULT_ZIP --json
+patchharbor validate TASK_ZIP
+patchharbor validate TASK_ZIP --repository REPOSITORY
+patchharbor validate TASK_ZIP --reference-bundle RESULT_ZIP
+patchharbor validate TASK_ZIP --reference-bundle RESULT_ZIP --json
 ```
 
 Beide Kommandos unterstützen `--help`, `--json`, `--verbose`/`-v` und `--no-color`. Die Standarddarstellung bleibt kompakt; bestehende Aktivitätspunkte erscheinen frühestens alle 0,8 Sekunden und ohne Carriage Return. Vollständige technische Kennungen bleiben in API und JSON erhalten.
@@ -3826,7 +3823,7 @@ Ein unbekannter Fingerprint-Algorithmus darf nicht durch bloße Stringgleichheit
 
 **Lesend bedeutet hier keine fachliche Mutation, nicht absolut keinen Betriebssystemeffekt.** Normale Dateizugriffe können Zugriffsdaten verändern. Ausschließlich im Repositorymodus sind vorhandene Registry-/Repository-Locks einschließlich ihrer begrenzten Lockdateien und -Verzeichnisse sowie kontrollierte lesende Git-Abfragen zulässig. Bei belegter Sperre gilt die bestehende Busy-Semantik. Keine Reservierung eines Result-Ziels, keine Entrypoint-Tempdatei, kein Anlegen einer Repositoryidentität. Paket- und Referenzmodus benötigen weder Registry noch Git noch einen Runtime-Provider und dürfen durch bloßes Prüfen auch keinen Runtime-Cache aufbauen.
 
-Der neue Pfad darf nicht den gesamten Apply-Preflight aufrufen. Er verwendet dessen geeignete reine Teilfunktionen sowie den lesenden Zustandsmechanismus. Der Beobachter ist aufrufereigener Code; die Garantie betrifft PatchHarbors eigene Operationen. Ein vom Aufrufer bewusst schreibender Callback macht den Core nicht zu einer Sandbox.
+Der neue Pfad darf nicht den gesamten Execute-Preflight aufrufen. Er verwendet dessen geeignete reine Teilfunktionen sowie den lesenden Zustandsmechanismus. Der Beobachter ist aufrufereigener Code; die Garantie betrifft PatchHarbors eigene Operationen. Ein vom Aufrufer bewusst schreibender Callback macht den Core nicht zu einer Sandbox.
 
 ZIP-Sicherheit, Pfadnormalisierung, Duplikate und plattformübergreifende Kollisionen, JSON-Schema, Grenzen, CRC und verfügbare Integritätsdaten werden vor einer Erfolgsrückgabe geprüft. Prüfsumme und Ergebnis gehören zur selben stabil gelesenen Bytefassung. Ändert sich der Pfad später, gilt der Bericht weiter nur für diese SHA-256; eine erneute Anwendung liest und prüft neu. Es werden keine externen Git-Filter, Textkonverter, Hooks oder Netzwerkzugriffe als Nebenwirkung der lesenden Prüfung benötigt. Die bestehenden kontrollierten Git-Aufrufe und unterstützten Repositorygrenzen sind beizubehalten; entsprechende Nebenwirkungstests gehören zum Repositorymodus.
 
@@ -3840,7 +3837,7 @@ Für `base/` werden Pfad, Modus, Größe und Git-Blob-ID gemäß dessen Objektfo
 
 Der Referenzmodus wendet Deltas nicht an, rekonstruiert keinen Git-Commit und berechnet aus dem Bundle keinen angeblich live gemessenen Fingerprint. Eine zusätzliche syntaktische Deltaanalyse darf keine fachlichen Vollständigkeitsbehauptungen ersetzen. Verglichen werden die bekannten, konsistent dokumentierten Bindungswerte; `reference_sha256` identifiziert die gesamte geprüfte Referenzdatei. Diese Aussage belegt weder den heutigen Zustand des Originalrechners noch den Absender. Nicht verfügbare beziehungsweise nicht ausgeführte Prüfungen werden im Ergebnis explizit ausgewiesen.
 
-Die bei fehlgeschlagenem Apply gegebenenfalls vorhandenen `expected_*`-Felder beschreiben den früheren Auftrag. Als Basis für den nächsten Patch dient immer der **tatsächlich im Result dokumentierte aktuelle Kontext**, nicht der erfolglos erwartete Ausgangszustand.
+Die bei fehlgeschlagenem Execute gegebenenfalls vorhandenen `expected_*`-Felder beschreiben den früheren Auftrag. Als Basis für den nächsten Patch dient immer der **tatsächlich im Result dokumentierte aktuelle Kontext**, nicht der erfolglos erwartete Ausgangszustand.
 
 ### 37.3 Repositoryprüfung und spätere Ausführung
 
@@ -3849,7 +3846,7 @@ Working-Tree-Bytes vom Index ab und könnten konfigurierte Filter,
 Working-Tree-Encoding, Ident-Expansion oder eine relevante Zeilenendenumwandlung
 den kanonischen Vergleich verändern, wird der Zustand mit Fehler 13 abgelehnt.
 Git-Konvertierungen werden nicht nachgebaut oder still als andere
-Fingerprint-Semantik ausgegeben. Normale Kontext-, Apply- und Bundle-Erfassung
+Fingerprint-Semantik ausgegeben. Normale Kontext-, Execute- und Bundle-Erfassung
 behalten den bestehenden state-v1-Vertrag; gewöhnliche LF-Textänderungen bleiben
 auch bei text/eol-Attributen validierbar.
 
@@ -3857,7 +3854,7 @@ Der Modus `repository` verwendet die existierenden Regeln für Registrierung, vo
 
 Das Ergebnis gilt nur für den beobachteten Prüfzeitpunkt. Jede spätere Anwendung liest das konkrete Patch-Paket erneut und prüft den aktuellen Zustand nochmals an der bestehenden Mutationsgrenze. Ein vorheriger Validierungsbericht ist weder eine Sperrreservierung noch ein Token zum Überspringen von Sicherheitsprüfungen.
 
-Die vorhandene Funktion `apply --dry-run` bleibt erhalten. Anders als die neue lesende Validierung besitzt sie ihren bestehenden Apply-/Result-Lebenszyklus. Sie wird nicht stillschweigend umdefiniert.
+Die vorhandene Funktion `execute --dry-run` bleibt erhalten. Anders als die neue lesende Validierung besitzt sie ihren bestehenden Execute-/Result-Lebenszyklus. Sie wird nicht stillschweigend umdefiniert.
 
 ## 38. Portable PatchHarbor-Runtime
 
@@ -3914,7 +3911,7 @@ Der Dateistand 1.c.W/R/C konkretisiert dies durch `build_backend.py`,
 `runtime_wheel.py` und den request-lokalen `RuntimeProvider`. Der Build ergänzt
 das Transport-Wheel um `_runtime`-Paketressourcen; Source-/sdist-Builds verwenden
 denselben Backend-Vertrag. Seit 1.e.W verbindet `result_resources.py` den Provider mit allen gemeinsamen
-Result-Wegen; die Requestdaten werden vor möglichen Apply-Mutationen fixiert.
+Result-Wegen; die Requestdaten werden vor möglichen Execute-Mutationen fixiert.
 Die Erzeugung von Rezept und Transportressourcen erfolgt ausschließlich im
 Buildbackend. Die installierte Runtime enthält den lesenden Validator und
 Materializer; `RuntimeProvider` besitzt die unveränderliche Requestantwort.
@@ -3982,7 +3979,7 @@ eine Umordnung über Deny-/Objekt-/Callback-ACEs oder Flaggruppen hinweg bleiben
 Fehler. Vollständiger nativer UTF-8-JSON-Readback ist Pflicht; Exit-Code 0 allein
 genügt nicht. Echte DACL-Abweichungen und unvollständige Belege erhalten das private
 Journal. Die erfolgreiche Windows-Ausführung bleibt vor GATE-RUNTIME erforderlich;
-sie ist für FIX3 durch Lauf 37206108132 auf dem tatsächlichen Apply-Commit
+sie ist für FIX3 durch Lauf 37206108132 auf dem tatsächlichen Execute-Commit
 `f4b0920cadac710cd48568fb16d517e9c92fe692` bestätigt (65 Packaging-Tests / 1 POSIX-Skip).
 
 Editable-/direkter Quellbetrieb ist keine freigegebene portable Runtime-Quelle. Fehlt ein nachweislich passender vorbereiteter Ressourcensatz oder wurde der Quellstand verändert, ist `unavailable` mit Grund `source_not_prepared` beziehungsweise `source_changed` zulässig. Dies beeinträchtigt nicht die Arbeit am Quellcode und erlaubt keine stillen Builds während eines Requests. Es darf nicht dazu führen, dass normale nicht-editierbare Installation dauerhaft ohne Runtime ausgeliefert wird.
@@ -3991,7 +3988,7 @@ Editable-/direkter Quellbetrieb ist keine freigegebene portable Runtime-Quelle. 
 
 ### 39.1 Standardverhalten und Struktur
 
-Jeder reguläre neue Result-Lauf einer unterstützten Standardinstallation integriert die Runtime ohne Zusatzoption: manuelles `bundle`, erfolgreicher und fehlgeschlagener Apply, Dry-Run, Watcher und explizites Ausgabeziel. Das gilt für alle Fälle, in denen nach dem bestehenden Vertrag überhaupt ein Result-Bundle erstellt werden kann. Ein Fehler vor sicherer Repositoryauflösung bekommt dadurch nicht nachträglich ein erfundenes Repository-Result.
+Jeder reguläre neue Result-Lauf einer unterstützten Standardinstallation integriert die Runtime ohne Zusatzoption: manuelles `bundle`, erfolgreicher und fehlgeschlagener Execute, Dry-Run, Watcher und explizites Ausgabeziel. Das gilt für alle Fälle, in denen nach dem bestehenden Vertrag überhaupt ein Result-Bundle erstellt werden kann. Ein Fehler vor sicherer Repositoryauflösung bekommt dadurch nicht nachträglich ein erfundenes Repository-Result.
 
 ```text
 <Repository>_Result_Bundle_....zip
@@ -4039,7 +4036,7 @@ Bestehende äußere Eingabe-/ZIP-Grenzen bleiben gültig. Ein inneres Archiv bek
 
 Klassifikation, allgemeiner Result-Leser, Referenzprüfung, Archiv- und Recovery-Nachweis sowie Veröffentlichungsprüfung verwenden konsistente versionsbezogene Inventare. Ein schneller struktureller Dateityp-Hinweis darf von einer vollständigen Prüfung unterschieden werden; er ist kein Validierungsnachweis. Fremde oder überzählige Runtime-Dateien, Duplikate, fehlende Pflichtdateien und falsche Hashes werden nicht ignoriert.
 
-Exchange bleibt flach; weder Results noch Runtime-Artefakte werden zu Patch-Kandidaten. Vollständige Result-Gültigkeit, Runtime-Verfügbarkeit und archivierungs-/recoveryfähiger Nachweis sind getrennte Entscheidungen. Bei `unavailable` sind Warnungen kein Erfolgssiegel; die bisherigen konservativen Archiv-/Recovery-Bedingungen bleiben mindestens so streng. Die eingebettete Runtime ist niemals eine Autorität, die einen unbewiesenen Apply nachträglich legitimiert.
+Exchange bleibt flach; weder Results noch Runtime-Artefakte werden zu Patch-Kandidaten. Vollständige Result-Gültigkeit, Runtime-Verfügbarkeit und archivierungs-/recoveryfähiger Nachweis sind getrennte Entscheidungen. Bei `unavailable` sind Warnungen kein Erfolgssiegel; die bisherigen konservativen Archiv-/Recovery-Bedingungen bleiben mindestens so streng. Die eingebettete Runtime ist niemals eine Autorität, die einen unbewiesenen Execute nachträglich legitimiert.
 
 Bereits installierte Altleser werden nicht rückwirkend geändert. Neue Leser
 prüfen unveränderte 1.4.0-Results; unbekannte oder nicht unterstützte Formate
@@ -4048,7 +4045,7 @@ Lesern sind keine Freigabepflicht mehr; Abwärts- ist keine Vorwärtskompatibili
 
 ### 39.4 Diagnose vor Runtime-Komfort
 
-Eine beschädigte oder fehlende Runtime darf nach einem Apply nicht den einzigen verwertbaren Repository-Snapshot und das Ausführungsprotokoll vernichten. Die Ausnahme betrifft ausschließlich die optionale Runtime-Zugabe: Defekte Basisdaten, fehlende bisherige Pflichtdateien und ein tatsächlich gescheiterter Result-Write bleiben echte Result-Fehler.
+Eine beschädigte oder fehlende Runtime darf nach einem Execute nicht den einzigen verwertbaren Repository-Snapshot und das Ausführungsprotokoll vernichten. Die Ausnahme betrifft ausschließlich die optionale Runtime-Zugabe: Defekte Basisdaten, fehlende bisherige Pflichtdateien und ein tatsächlich gescheiterter Result-Write bleiben echte Result-Fehler.
 
 Kann die passende Runtime nicht bereitgestellt werden, wird nach Möglichkeit trotzdem das vollständige Result veröffentlicht: `runtime.status` ist `unavailable`, `reason` enthält einen maschinenlesbaren Grund, `runtime.json` beschreibt die Einschränkung, und es gibt kein behauptetes Runtime-Artefakt. Zusätzlich erscheint eine Warnung. Das Primärergebnis und die bestehenden Exitcode-Prioritäten ändern sich dadurch nicht.
 
@@ -4119,7 +4116,7 @@ unveränderter vollständiger Repositorybindung. Für die Paketprüfung werden
 vorhandene vertrauenswürdige, formatkompatible Core-Prüfer verwendet. Stehen die
 neuen nativen Operationen nicht zur Verfügung, werden die bisherigen ZIP-,
 Payload-, Hash- und Bindungsprüfungen mit den etablierten verfügbaren Werkzeugen
-durchgeführt und konkret nachgewiesen. Der lokale PatchHarbor-Apply prüft das
+durchgeführt und konkret nachgewiesen. Der lokale PatchHarbor-Execute prüft das
 Paket und den aktuellen Repositoryzustand an seiner Mutationsgrenze erneut.
 Dies ist kein Wechsel zum ungebundenen `fs run` und kein Umgehen von Prüfungen.
 
@@ -4162,7 +4159,7 @@ Vor der Auslieferung wird die endgültige ZIP tatsächlich geöffnet und gegen d
 
 Anschließend werden eine kanonische Datei, Größe und SHA-256 festgelegt. Chat-Link, privates Drive-Backup und E-Mail-Backup beziehen sich ausschließlich auf diese Bytefassung. Bestehende Best-Effort-, Empfänger- und Nachweisregeln bleiben erhalten. Es gibt genau eine finale Bereitschaftsmeldung, keinen stillen Neubau wegen eines Backupfehlers und keine zweite gleichzeitig gültige ZIP.
 
-Runtime-Bereitstellung, Paketprüfung, lokale Projekttests, Apply auf dem Zielrechner und CI bleiben getrennte Nachweise. Keine dieser Prüfungen darf als Ersatz für eine tatsächlich noch ausstehende andere Prüfung ausgegeben werden.
+Runtime-Bereitstellung, Paketprüfung, lokale Projekttests, Execute auf dem Zielrechner und CI bleiben getrennte Nachweise. Keine dieser Prüfungen darf als Ersatz für eine tatsächlich noch ausstehende andere Prüfung ausgegeben werden.
 
 ## 41. Abnahmekriterien und WRC-Umsetzung
 
@@ -4180,11 +4177,11 @@ API und CLI müssen denselben fachlichen Code verwenden; die neuen Operationen m
 |---|---|
 | Paketprüfung | Sicheres Inventar und MESSAGE-Daten aus stabilen Bytes; Typen, JSON, Exitcodes; keine Repositoryvoraussetzung für `package`. |
 | Bindung | `reference` ohne Registry/Git, `repository` mit realer Registrierung; Mismatches; Dirty-/Dry-Run-/Fehlerreferenzen; tatsächlicher Result-Kontext statt `expected_*`. |
-| Read-only | Keine fachlichen Writes, Entrypoint-/Test-/Build-/Runtime-Ausführung; erlaubte reine Lockeffekte gesondert; spätere Apply-Rechecks bleiben wirksam. |
+| Read-only | Keine fachlichen Writes, Entrypoint-/Test-/Build-/Runtime-Ausführung; erlaubte reine Lockeffekte gesondert; spätere Execute-Rechecks bleiben wirksam. |
 | Runtime-Profil | Unveränderte Standardinstallation, Metadaten/Ressourcen/Typing, keine Runtime-Dependencies; `.pth`/Fremdmodule/nativer Code im Runtime-Artefakt abgelehnt. |
 | Materialisierung | Entfernte Installer-Caches und Quelldownloads; kanonische Bytes aus vorbereiteten Ressourcen; bekannte Content-ID, separater Archivhash, kein Build oder Netz im Request. |
 | Kompatibilität | Unveränderte 1.4.0-Results und Patchformat 1; geschlossene Capability-Varianten; nicht unterstützte Daten konservativ; Konsistenz bleibt von Archiv-/Recovery-Erfolg getrennt. |
-| Result-Wege | Manuelles Bundle, Apply-Erfolg/-Fehler, Dry-Run, Watcher, explizites Ziel, Fremdprojekt, Selbstupdate samt eingefrorener Vorlage. |
+| Result-Wege | Manuelles Bundle, Execute-Erfolg/-Fehler, Dry-Run, Watcher, explizites Ziel, Fremdprojekt, Selbstupdate samt eingefrorener Vorlage. |
 | Roundtrip | Mindestens drei isolierte Installations-/Result-Generationen mit identischer kanonischer Core-PYZ; kein rekursives Wachstum. |
 | Fehlerdiagnose | Runtime-only-Ausfall/Limit erzeugt `unavailable`, soweit Result möglich; echte Snapshot-/Publikationsfehler bleiben sichtbar; alte Notfallrettung intakt. |
 | Bootstrap | Offline und aus richtigem Interpreter; sichere Eingaben/Vertrauen vor Import; falsche Python-Version, Importkonflikte und Shadowing berücksichtigt; kein Installer erforderlich. |
@@ -4209,9 +4206,9 @@ Ein Bundle darf null, einen oder mehrere Commit-Schritte enthalten, einschließl
 mehrerer echter W/R/C-Folgen. Die Anzahl allein erfordert keine Sondergenehmigung.
 Paketgrenzen dürfen innerhalb des Auftrags zusammengelegt oder geteilt werden,
 sofern Tests und Fehleranalyse beherrschbar bleiben. Jeder Commit entsteht im
-Apply-Repository erst nach seiner vollständigen parallelen Suite, auch am
+Execute-Repository erst nach seiner vollständigen parallelen Suite, auch am
 Bundle-Ende. Development erzeugt keine Git-Commits. Nach allen erfolgreichen
-Phasen und Commits führt der Apply-Entrypoint genau einen normalen Push auf
+Phasen und Commits führt der Execute-Entrypoint genau einen normalen Push auf
 den bestätigten Zielbranch aus. Diagnosebundles mit null Commits pushen nicht.
 Kein Zwischenpush, Reset/Rollback oder automatischer Tag. CI startet nur
 Christian manuell nach §33; ein Push ist kein CI-Nachweis.
@@ -4259,7 +4256,7 @@ Historische Quelle der Exchange-Revision 2: `patch-harbor_Result_Bundle_145659_0
 Commit `9e3a6f9036dc681f463d2fdd6b603aee9b409598`. Die Integration verwendet die
 oben genannte aktuelle Result-Basis; ursprüngliche Dokumentgrößen und SHA-256
 sind im Plan als Herkunft erhalten. Geprüfte Ansatzpunkte sind insbesondere
-`patch_package.py`, `apply_repository.py`, `repository_state.py`,
+`patch_package.py`, `execute_repository.py`, `repository_state.py`,
 `archive_evidence.py`, Result-Lebenszyklus, `chat_instructions.py`, `pyproject.toml`
 und die Test-/CI-Verträge. Dies war der damalige Analyseumfang vor der
 RIV-Implementierung; deren heutiger Abschluss ist am Dokumentanfang belegt.
@@ -4343,7 +4340,7 @@ kanonische Fingerprint-Eingabe speichert. Er wird erhalten und schema-/quergepr�
 aber nicht als aus dem effektiven Baum nachgerechnet ausgegeben. Nur der
 kanonische Clean-Fingerprint ist unabhängig vergleichbar. Kein neuer Digest
 wird als bestehender `state_fingerprint` ausgegeben.
-Integrität beweist weder Authentizität noch erfolgreiches Apply. Gültige Fehler-,
+Integrität beweist weder Authentizität noch erfolgreiches Execute. Gültige Fehler-,
 Dry-Run- und Dirty-Results behalten ihren tatsächlichen Status.
 
 `ResultSnapshotError` ist `PatchHarborError` mit unverändertem
@@ -4356,7 +4353,7 @@ Best-effort Observer erteilen keine Freigabe und bleiben request-lokal.
 
 ### 42.4 Verbindliche Hostfreigabe (SRI-ADMISSION)
 
-`api.apply_guarded(patch, *, expected_sha256, expected_repository, admission,
+`api.execute_guarded(patch, *, expected_sha256, expected_repository, admission,
 output_directory=None, timeout=DEFAULT_TIMEOUT_SECONDS, output=None,
 observer=None)` liefert den bestehenden `RunReport`. Die drei neuen
 Pflichtbedingungen können nicht weggelassen werden. Es wird genau ein explizites
@@ -4364,7 +4361,7 @@ Paket einmal stabil erfasst; sein vollständiger SHA wird vor Übernahme geprüf
 Die Pfadangabe `expected_repository` benennt die erwartete kanonische lokale
 Repositorywurzel zusätzlich zur Manifestbindung. Unter dem vorhandenen
 Repositorylock müssen Registrierung, Identität, Pfad und Zustand übereinstimmen.
-Die alte Signatur `apply(patch=..., repository=...)` bleibt unzulässig.
+Die alte Signatur `execute(patch=..., repository=...)` bleibt unzulässig.
 
 Der vertrauenswürdige Hostcallback `admission(PatchAdmission) -> bool` erhält
 vollständige unveränderbare Daten: bestehende `PatchInspection`, alle ZIP-Dateien
@@ -4384,7 +4381,7 @@ behalten den bestehenden API-Vertrag. Fehler-/Result-Prioritäten bleiben erhalt
 Freigabe läuft innerhalb der vorhandenen Preflight-/Lock-Lebensdauer. Danach
 werden Identität, Zustand und Payloadziele vor Mutation erneut geprüft.
 Privater Entrypoint, Replay, Attempt-Nachweise, Timeout, Logs und Resultpublikation
-bleiben im bestehenden Core; kein zweiter Apply-Ablauf. Verweigerung darf normale
+bleiben im bestehenden Core; kein zweiter Execute-Ablauf. Verweigerung darf normale
 Diagnose-/Result-/Wartungseffekte haben, aber keine Paketpayloads oder Ausführung.
 Callbacks sind Hostcode, keine Sandbox und kein aus dem Paket geladenes Plugin.
 SpecRoad behält Closure, Staginglayout, erlaubten Entrypoint, Proposal- und
@@ -4396,7 +4393,7 @@ beobachtete Ergebnisse, keine implizite Wiederholung.
 
 `api.integration_capabilities()` liefert unveränderbare `IntegrationCapabilities`:
 `contract_version=1`, `snapshot_contract_version` und
-`guarded_apply_contract_version` jeweils `1` bei implementierter Fähigkeit,
+`guarded_execute_contract_version` jeweils `1` bei implementierter Fähigkeit,
 sonst `None`. Ältere Versionen besitzen diese Funktion nicht. Eine bloße
 Produktversion, ein erfolgreicher Bootstrap oder importierbare Symbole ersetzen
 keine explizite Fähigkeitsabfrage und Verhaltenstests.
@@ -4411,7 +4408,7 @@ erfragt. Originale gültige Artefakte ab 1.4.0 bleiben lesbar, Result 1/2 nicht.
 Normalinstallation und tatsächlich gebaute Core-PYZ verwenden denselben Code,
 CPython >=3.10 und keine Fremdabhängigkeiten. Neue CLI-/Watcher-Startwege sind
 nicht erforderlich. Die manuelle CI-Matrix bleibt unverändert nutzbar; Start
-allein durch Christian. Entwicklung prüft ausgewählte Tests parallel, Apply den
+allein durch Christian. Entwicklung prüft ausgewählte Tests parallel, Execute den
 vollen parallelen Stand vor jedem Commit. SRI-SNAPSHOT (SpecRoad 15.m.R) und
 SRI-ADMISSION haben getrennte Bereitschaftsnachweise; SpecRoads eigener Rundweg
 ist erst nach dessen Integration bestätigt.
@@ -4421,7 +4418,7 @@ ist erst nach dessen Integration bestätigt.
 Dieser additive Vertrag gilt gemeinsam mit beiden bestehenden Ergänzungen.
 Er ersetzt für ausdrücklich sichere Aufrufe die bisherige Git-Worktree-Diff-
 Erfassung, nicht Result 3, Patch 1 oder `patchharbor-state-v1`. Normale Aufrufe,
-CLI, Watcher, Guarded Apply und ursprüngliche Artefakte ab 1.4.0 bleiben erhalten.
+CLI, Watcher, Guarded Execute und ursprüngliche Artefakte ab 1.4.0 bleiben erhalten.
 
 ### 43.1 Öffentliche Auswahl und Fähigkeit
 
@@ -4500,7 +4497,7 @@ sicheren Produzenten werden aus erfassten Rohbytes als Git-kompatible
 Full-index-Binärpatches mit beidseitigen Literalblöcken erzeugt, ohne Git auf
 Worktree-Inhalte loszulassen. Dies ist die gezielte sichere Alternative zu
 unverändertem Git-Diff-stdout in §19; beide bleiben dasselbe native Resultformat.
-Ein unabhängiges Git-Apply-Oracle prüft die Deltas nur in synthetischen Tests.
+Ein unabhängiges Git-Execute-Oracle prüft die Deltas nur in synthetischen Tests.
 Keine parallele Resultvalidierung oder private SpecRoad-Rekonstruktion.
 
 Clean, staged, unstaged, beides an derselben Datei, untracked, Binär-/Leerdateien,
@@ -4539,7 +4536,7 @@ Erst der sichere Export darf die zwei angegebenen Standard-PH-Locks öffnen
 bzw. anlegen, private run-spezifische Diagnosebytes unter `diagnostics_parent`
 und eine eigene temporäre ZIP im Ausgabeordner schreiben. Locks sind nicht
 neu definiert: derselbe bestehende Registry-/Repository-Lock koordiniert mit
-normalem Apply. Auch bei Revalidierungsfehlern können bereits zulässige eigene
+normalem Execute. Auch bei Revalidierungsfehlern können bereits zulässige eigene
 Lockdateien verbleiben. Ein Planungsaufruf führt diese Wirkungen nicht aus.
 Verzeichnisdeskriptoren verankern alle Schreiboperationen; Pfadtausch darf
 keinen neuen Schreibbereich freigeben. Betriebspfade werden im Plan vollständig
@@ -4578,7 +4575,7 @@ Geschlossene Result-/Run-Schemas werden dafür nicht erweitert oder umgedeutet.
 ### 43.6 Abnahme und Verantwortungsgrenze
 
 PH-SAFE-01 bis PH-SAFE-15 im aktuellen Plan sind vollständig zuzuordnen.
-Entwicklungsprüfungen, vollständige parallele Apply-Gates, manuelle CI und
+Entwicklungsprüfungen, vollständige parallele Execute-Gates, manuelle CI und
 Produktfreigabe sind getrennte Nachweise. Echte Wheel-/PYZ-Builds benötigen
 externe vollständige Hashes, Quellinventar und bestätigten Commitbezug. Saubere
 und Dirty-Integrationsreferenzen enthalten ausschließlich synthetische Daten.
@@ -4691,7 +4688,7 @@ abweichende Tags/Assets werden nicht ersetzt. Keine Force-Pushes/Versionswechsel
 Schreibrechte nur im Publikationsjob; keine Secrets in Assets/Logs. Das Gate gilt
 für den Repositoryworkflow, nicht als Behauptung über allmächtige Administratoren.
 CI bleibt explizit ausgelöst; dieser Auftrag erlaubt die nötigen Aufrufe. Kein
-Release/CI im Apply-Entrypoint, kein neuer oder veränderter laufender Watcher.
+Release/CI im Execute-Entrypoint, kein neuer oder veränderter laufender Watcher.
 
 ### 44.5 Verbraucher und Abnahme
 
@@ -4703,10 +4700,10 @@ Safe-Reference bleibt Linux x86-64 / CPython 3.10–3.14 (§43). Isolierte synth
 Clean-/Dirty-Referenzen müssen Kontext, Plan-/Betriebsgrenzen, sicheren Export,
 extern gehashten Snapshot, korrekte Inventare und Quellunverändertheit belegen.
 Abnahmeplan und ausgewählte Development-Nachweise, vollständige parallele
-Apply-Gates, genaue CI und Release-Downloads sind getrennt zu dokumentieren.
+Execute-Gates, genaue CI und Release-Downloads sind getrennt zu dokumentieren.
 
 
-Aktuelle Nutzerentscheidung im REL-180-Auftrag: Nach Apply-Abschluss, lokalen
+Aktuelle Nutzerentscheidung im REL-180-Auftrag: Nach Execute-Abschluss, lokalen
 Abnahmen und geprüftem Build darf Codex das neue v1.8.0-Tag am vollständigen
 Abschlusscommit anlegen; danach folgt die exakte CI. Bei fehlgeschlagener CI
 wird ausschließlich dieses selbst neu angelegte und weiterhin unveränderte

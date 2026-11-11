@@ -36,7 +36,7 @@ def reference_entries(*, kind="bundle", dirty=False, object_format="sha1", hando
                 "base_entries": [{"path": "tracked.txt", "git_mode": "100644", "object_id": blob, "size": len(raw)}],
                 "untracked_entries": []}
     context = {**binding, "dirty": dirty, "created_at": stamp, "bundle_suffix": ""}
-    run = {**binding, "run_id": run_id, "operation": "bundle" if kind == "bundle" else "apply",
+    run = {**binding, "run_id": run_id, "operation": "bundle" if kind == "bundle" else "execute",
            "dry_run": kind == "dry_run", "started_at": stamp, "ended_at": stamp, "duration_seconds": 0.2,
            "repository_resolved": True, "repository_path": "/foreign/missing/repository", "warnings": [],
            "execution_present": primary.entrypoint_started, "primary_result": primary.as_document(),

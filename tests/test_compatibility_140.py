@@ -190,7 +190,7 @@ def test_real_exchange_keeps_frozen_results_and_standalone_pyz_without_apply(tmp
     held[standalone] = pyz.read_bytes()
     standalone.write_bytes(held[standalone])
     head = git(repo, 'rev-parse', 'HEAD').stdout
-    outcome = api.apply_next()
+    outcome = api.execute_next()
     assert outcome.process_exit_code == 10 and not outcome.primary_result.entrypoint_started
     assert git(repo, 'rev-parse', 'HEAD').stdout == head
     assert not git(repo, 'status', '--porcelain=v1').stdout

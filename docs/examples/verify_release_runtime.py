@@ -28,7 +28,7 @@ def load_runtime(path, expected):
         raise RuntimeError('unexpected library origin')
     caps=api.integration_capabilities()
     expected_contracts = {'contract_version': 2, 'snapshot_contract_version': 2,
-                          'guarded_apply_contract_version': 1, 'safe_reference_contract_version': 1}
+                          'guarded_execute_contract_version': 2, 'safe_reference_contract_version': 1}
     for name, expected in expected_contracts.items():
         if type(getattr(caps,name,None)) is not int or getattr(caps,name)!=expected:
             raise RuntimeError('required integration contract unavailable: '+name)

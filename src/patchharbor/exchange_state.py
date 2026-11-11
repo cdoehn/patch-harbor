@@ -13,7 +13,7 @@ from typing import Protocol
 from uuid import UUID
 
 from patchharbor.errors import LockBusyError, PatchHarborError, task_bundle_error
-from patchharbor.watch_contract import ApplyLock, ApplyLockKind
+from patchharbor.watch_contract import ExecuteLock, ExecuteLockKind
 from patchharbor.json_document import serialize_json_document
 from patchharbor.models import (
     GitObjectFormat,
@@ -41,7 +41,7 @@ from patchharbor.user_paths import RegistrationUserPaths
 
 
 _LEGACY_FORMAT_VERSION = 1
-_FORMAT_VERSION = 4
+_FORMAT_VERSION = 5
 _DOCUMENT_FIELDS = frozenset({"entries", "format_version"})
 _LEGACY_ENTRY_FIELDS = frozenset(
     {"attempted", "kind", "manifest", "path", "sha256"}
@@ -50,7 +50,8 @@ _VERSION_2_ENTRY_FIELDS = frozenset(
     {"apply_status", "kind", "manifest", "path", "sha256"}
 )
 _VERSION_3_ENTRY_FIELDS = _VERSION_2_ENTRY_FIELDS | {"completed_commit"}
-_ENTRY_FIELDS = _VERSION_3_ENTRY_FIELDS | {"attempt_run_id", "result_sha256"}
+_VERSION_4_ENTRY_FIELDS = _VERSION_3_ENTRY_FIELDS | {"attempt_run_id", "result_sha256"}
+_ENTRY_FIELDS = (_VERSION_4_ENTRY_FIELDS - {"apply_status"}) | {"execute_status"}
 _MANIFEST_FIELDS = frozenset(
     {
         "base_commit",
@@ -59,10 +60,10 @@ _MANIFEST_FIELDS = frozenset(
         "state_fingerprint",
     }
 )
-_ALLOWED_KINDS = frozenset({"other", "task_package", "result_bundle"})
+_ALLOWED_KINDS = frozenset({"other", "task_bundle", "result_bundle"})
 
 
-class ExchangeApplyStatus(str, Enum):
+class ExchangeExecuteStatus(str, Enum):
     """Persisted lifecycle state for one automatically selected package."""
 
     ATTEMPTED = "attempted"
@@ -142,12 +143,12 @@ class ExchangeTaskSelection:
 
 @dataclass(frozen=True, slots=True)
 class ExchangeStateRecord:
-    """Cached classification and apply lifecycle for one Exchange identity."""
+    """Cached classification and execute lifecycle for one Exchange identity."""
 
     identity: ExchangeFileIdentity
     kind: str
     manifest: ExchangeTaskSelection | None
-    apply_status: ExchangeApplyStatus | None = None
+    execute_status: ExchangeExecuteStatus | None = None
     completed_commit: GitObjectId | None = None
     attempt_run_id: str | None = None
     result_sha256: str | None = None
@@ -155,37 +156,37 @@ class ExchangeStateRecord:
     def __post_init__(self) -> None:
         if self.kind not in _ALLOWED_KINDS:
             raise ValueError("exchange state kind is invalid")
-        if self.apply_status is not None and not isinstance(
-            self.apply_status,
-            ExchangeApplyStatus,
+        if self.execute_status is not None and not isinstance(
+            self.execute_status,
+            ExchangeExecuteStatus,
         ):
-            raise ValueError("exchange apply status is invalid")
-        if (self.manifest is not None) != (self.kind == "task_package"):
+            raise ValueError("exchange execute status is invalid")
+        if (self.manifest is not None) != (self.kind == "task_bundle"):
             raise ValueError("only patch-package state may contain a manifest")
-        if self.apply_status is not None and self.kind != "task_package":
-            raise ValueError("only patch-package state may have an apply status")
+        if self.execute_status is not None and self.kind != "task_bundle":
+            raise ValueError("only patch-package state may have an execute status")
 
         if self.attempt_run_id is not None:
-            if (self.apply_status is None or type(self.attempt_run_id) is not str
+            if (self.execute_status is None or type(self.attempt_run_id) is not str
                 or not _is_run_id(self.attempt_run_id)):
                 raise ValueError("attempt run ID is invalid")
         if self.result_sha256 is not None and (
             not _is_sha256(self.result_sha256) or self.attempt_run_id is None
-            or self.apply_status not in {ExchangeApplyStatus.ATTEMPTED, ExchangeApplyStatus.SUCCEEDED}
+            or self.execute_status not in {ExchangeExecuteStatus.ATTEMPTED, ExchangeExecuteStatus.SUCCEEDED}
         ):
             raise ValueError("result digest requires an identified successful or pending attempt")
         if self.completed_commit is not None and (
-            self.apply_status is not ExchangeApplyStatus.SUCCEEDED
+            self.execute_status is not ExchangeExecuteStatus.SUCCEEDED
             or self.manifest is None
             or self.completed_commit.object_format != self.manifest.base_commit.object_format
             or self.completed_commit == self.manifest.base_commit
         ):
-            raise ValueError("completion commit requires a successful changed-HEAD apply")
+            raise ValueError("completion commit requires a successful changed-HEAD execute")
 
     @property
     def attempted(self) -> bool:
-        """Return whether this identity has crossed the apply-start boundary."""
-        return self.apply_status is not None
+        """Return whether this identity has crossed the execute-start boundary."""
+        return self.execute_status is not None
 
     def same_classification(self, other: ExchangeStateRecord) -> bool:
         return (
@@ -291,15 +292,15 @@ def _parse_selection(value: object) -> ExchangeTaskSelection | None:
         raise ValueError("exchange state manifest is invalid") from exc
 
 
-def _parse_apply_status(value: object) -> ExchangeApplyStatus | None:
+def _parse_execute_status(value: object) -> ExchangeExecuteStatus | None:
     if value is None:
         return None
     if type(value) is not str:
-        raise ValueError("exchange state apply status is invalid")
+        raise ValueError("exchange state execute status is invalid")
     try:
-        return ExchangeApplyStatus(value)
+        return ExchangeExecuteStatus(value)
     except ValueError as exc:
-        raise ValueError("exchange state apply status is invalid") from exc
+        raise ValueError("exchange state execute status is invalid") from exc
 
 
 def _parse_record(value: object, *, format_version: int) -> ExchangeStateRecord:
@@ -307,20 +308,28 @@ def _parse_record(value: object, *, format_version: int) -> ExchangeStateRecord:
         _LEGACY_ENTRY_FIELDS
         if format_version == _LEGACY_FORMAT_VERSION
         else _VERSION_2_ENTRY_FIELDS if format_version == 2
-        else _VERSION_3_ENTRY_FIELDS if format_version == 3 else _ENTRY_FIELDS
+        else _VERSION_3_ENTRY_FIELDS if format_version == 3
+        else _VERSION_4_ENTRY_FIELDS if format_version == 4 else _ENTRY_FIELDS
     )
     if type(value) is not dict or set(value) != expected_fields:
         raise ValueError("exchange state entry is invalid")
     path_text = _require_string(value, "path")
     sha256 = _require_string(value, "sha256")
     kind = _require_string(value, "kind")
+    if format_version < 5:
+        # Preserve identities, attempt status and receipts. This translates only
+        # the ledger vocabulary, never accepts or converts an old input bundle.
+        if kind not in {"other", "patch_package", "task_package", "result_bundle"}:
+            raise ValueError("legacy exchange state kind is invalid")
+        if kind in {"patch_package", "task_package"}:
+            kind = "task_bundle"
     if format_version == _LEGACY_FORMAT_VERSION:
         attempted = value["attempted"]
         if type(attempted) is not bool:
             raise ValueError("exchange state attempted flag is invalid")
-        apply_status = ExchangeApplyStatus.ATTEMPTED if attempted else None
+        execute_status = ExchangeExecuteStatus.ATTEMPTED if attempted else None
     else:
-        apply_status = _parse_apply_status(value["apply_status"])
+        execute_status = _parse_execute_status(value["execute_status" if format_version == 5 else "apply_status"])
     if value.get("completed_commit") is not None and type(value["completed_commit"]) is not str:
         raise ValueError("exchange completed commit is invalid")
     path = Path(path_text)
@@ -329,7 +338,7 @@ def _parse_record(value: object, *, format_version: int) -> ExchangeStateRecord:
             identity=ExchangeFileIdentity(path=path, sha256=sha256),
             kind=kind,
             manifest=_parse_selection(value["manifest"]),
-            apply_status=apply_status,
+            execute_status=execute_status,
             attempt_run_id=value.get("attempt_run_id"),
             result_sha256=value.get("result_sha256"),
             completed_commit=(
@@ -364,6 +373,7 @@ def _parse_state(content: bytes) -> ExchangeStateSnapshot:
         _LEGACY_FORMAT_VERSION,
         2,
         3,
+        4,
         _FORMAT_VERSION,
     }:
         raise _error("exchange processing state format_version is invalid")
@@ -406,9 +416,9 @@ def _encoded_state(snapshot: ExchangeStateSnapshot) -> bytes:
         {
             "entries": [
                 {
-                    "apply_status": (
-                        record.apply_status.value
-                        if record.apply_status is not None
+                    "execute_status": (
+                        record.execute_status.value
+                        if record.execute_status is not None
                         else None
                     ),
                     "attempt_run_id": record.attempt_run_id,
@@ -499,7 +509,7 @@ def _state_lock(paths: RegistrationUserPaths) -> Iterator[None]:
         lock.__enter__()
     except LockUnavailable as exc:
         raise LockBusyError(
-            _error("exchange processing state is busy"), ApplyLock(ApplyLockKind.EXCHANGE_STATE),
+            _error("exchange processing state is busy"), ExecuteLock(ExecuteLockKind.EXCHANGE_STATE),
         ) from exc
     except LockOperationError as exc:
         raise _error(
@@ -523,7 +533,7 @@ def merge_exchange_classifications(
     paths: RegistrationUserPaths,
     records: Iterable[ExchangeStateRecord],
 ) -> ExchangeStateSnapshot:
-    """Atomically add classifications without losing apply lifecycle state."""
+    """Atomically add classifications without losing execute lifecycle state."""
     pending = tuple(records)
     with _state_lock(paths):
         current = _load_unlocked(paths)
@@ -545,7 +555,7 @@ def merge_exchange_classifications(
         return next_snapshot
 
 
-def mark_exchange_apply_started(
+def mark_exchange_execute_started(
     paths: RegistrationUserPaths,
     identity: ExchangeFileIdentity,
     selection: ExchangeTaskSelection,
@@ -562,7 +572,7 @@ def mark_exchange_apply_started(
         record = current.record_for(identity)
         if (
             record is None
-            or record.kind != "task_package"
+            or record.kind != "task_bundle"
             or record.manifest != selection
         ):
             raise _error(
@@ -570,12 +580,12 @@ def mark_exchange_apply_started(
             )
         retrying_failed = (
             retry_failed
-            and record.apply_status is ExchangeApplyStatus.FAILED
+            and record.execute_status is ExchangeExecuteStatus.FAILED
         )
-        if record.apply_status is not None and not retrying_failed and not explicitly_selected:
+        if record.execute_status is not None and not retrying_failed and not explicitly_selected:
             raise _error("selected exchange patch was already attempted")
         next_records = tuple(
-            replace(candidate, apply_status=ExchangeApplyStatus.ATTEMPTED, completed_commit=None,
+            replace(candidate, execute_status=ExchangeExecuteStatus.ATTEMPTED, completed_commit=None,
                     attempt_run_id=run_id, result_sha256=None)
             if candidate.identity == identity
             else candidate
@@ -584,37 +594,37 @@ def mark_exchange_apply_started(
         _write_unlocked(paths, ExchangeStateSnapshot(next_records))
 
 
-def mark_exchange_apply_finished(
+def mark_exchange_execute_finished(
     paths: RegistrationUserPaths,
     identity: ExchangeFileIdentity,
     selection: ExchangeTaskSelection,
-    status: ExchangeApplyStatus,
+    status: ExchangeExecuteStatus,
     *,
     completed_commit: GitObjectId | None = None,
     run_id: str | None = None,
 ) -> None:
-    """Atomically record the known failed or successful primary apply result."""
+    """Atomically record the known failed or successful primary execute result."""
     if status not in {
-        ExchangeApplyStatus.FAILED,
-        ExchangeApplyStatus.SUCCEEDED,
+        ExchangeExecuteStatus.FAILED,
+        ExchangeExecuteStatus.SUCCEEDED,
     }:
-        raise ValueError("finished exchange apply requires a terminal status")
+        raise ValueError("finished exchange execute requires a terminal status")
     with _state_lock(paths):
         current = _load_unlocked(paths)
         record = current.record_for(identity)
         if (
             record is None
-            or record.kind != "task_package"
+            or record.kind != "task_bundle"
             or record.manifest != selection
         ):
             raise _error(
                 "selected exchange patch has no matching processing state"
             )
-        if record.apply_status is not ExchangeApplyStatus.ATTEMPTED or record.attempt_run_id != run_id:
+        if record.execute_status is not ExchangeExecuteStatus.ATTEMPTED or record.attempt_run_id != run_id:
             raise _error("selected exchange patch has no active attempt")
         next_records = tuple(
-            replace(candidate, apply_status=status, completed_commit=completed_commit,
-                    result_sha256=(candidate.result_sha256 if status is ExchangeApplyStatus.SUCCEEDED else None))
+            replace(candidate, execute_status=status, completed_commit=completed_commit,
+                    result_sha256=(candidate.result_sha256 if status is ExchangeExecuteStatus.SUCCEEDED else None))
             if candidate.identity == identity
             else candidate
             for candidate in current.records
@@ -629,8 +639,8 @@ def mark_exchange_attempted(
     *,
     verify_identity: Callable[[], None],
 ) -> None:
-    """Compatibility alias for the explicit apply-start transition."""
-    mark_exchange_apply_started(
+    """Compatibility alias for the explicit execute-start transition."""
+    mark_exchange_execute_started(
         paths,
         identity,
         selection,
@@ -657,7 +667,7 @@ def record_exchange_result_digest(
         current = _load_unlocked(paths)
         record = current.record_for(identity)
         if (record is None or record.manifest != selection
-            or record.apply_status is not ExchangeApplyStatus.ATTEMPTED
+            or record.execute_status is not ExchangeExecuteStatus.ATTEMPTED
             or record.attempt_run_id != run_id
             or record.result_sha256 not in {None, result_sha256}):
             raise _error("successful result does not belong to the active attempt")
@@ -667,7 +677,7 @@ def record_exchange_result_digest(
         )))
 
 
-def recover_exchange_apply_finished(
+def recover_exchange_execute_finished(
     paths: RegistrationUserPaths,
     expected: ExchangeStateRecord,
     completed_commit: GitObjectId,
@@ -679,7 +689,7 @@ def recover_exchange_apply_finished(
     The callback revalidates files, repository and Git while this state lock is
     held; it must NOT load the ledger recursively. No reset/rollback is performed.
     """
-    if (expected.apply_status is not ExchangeApplyStatus.ATTEMPTED
+    if (expected.execute_status is not ExchangeExecuteStatus.ATTEMPTED
         or expected.attempt_run_id is None or expected.result_sha256 is None):
         raise _error("recovery requires a pinned result for an identified attempt")
     with _state_lock(paths):
@@ -689,7 +699,7 @@ def recover_exchange_apply_finished(
         verify_evidence()
         if _load_unlocked(paths) != current:
             raise _error("exchange state changed during recovery proof")
-        recovered = replace(expected, apply_status=ExchangeApplyStatus.SUCCEEDED,
+        recovered = replace(expected, execute_status=ExchangeExecuteStatus.SUCCEEDED,
                             completed_commit=completed_commit)
         _write_unlocked(paths, ExchangeStateSnapshot(tuple(
             recovered if item == expected else item for item in current.records

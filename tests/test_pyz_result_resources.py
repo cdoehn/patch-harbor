@@ -7,7 +7,7 @@ from zipfile import ZipFile
 
 import pytest
 
-from patchharbor import api, application_apply as application, result_bundle, result_resources as resources
+from patchharbor import api, application_execute as application, result_bundle, result_resources as resources
 from patchharbor import pyz_artifact, runtime_pyz as pyz
 from patchharbor.result_reader import read_result_reference
 from patchharbor.resource_policy import ResourcePolicy
@@ -70,15 +70,15 @@ def test_required_template_is_from_the_same_captured_artifact_after_changes(monk
     assert provider.capture().artifact is pinned
 
 
-@pytest.mark.parametrize('route',['bundle','apply','dry_run','failure','watcher'])
+@pytest.mark.parametrize('route',['bundle','execute','dry_run','failure','watcher'])
 def test_private_format3_resources_run_through_actual_existing_writer_routes(repository,monkeypatch,tmp_path,route):
     provider,_,_,_=provider_for(monkeypatch,tmp_path)
     artifact=provider.capture().artifact
     root,exchange=repository
     patch=package(root,exchange,exit_code=23 if route=='failure' else 0)
     if route=='bundle':report=api.bundle(root).report
-    elif route=='watcher':report=api.apply_next()
-    else:report=api.apply(patch,dry_run=route=='dry_run')
+    elif route=='watcher':report=api.execute_next()
+    else:report=api.execute(patch,dry_run=route=='dry_run')
     assert report.process_exit_code==(23 if route=='failure' else 0)
     facts,_=read_result_reference(report.result_bundle.path)
     assert facts.format_version==4 and facts.runtime.status=='embedded'
@@ -100,7 +100,7 @@ def test_runtime_only_failure_keeps_snapshot_and_actual_failure_log(repository,m
     entry=json.loads(files['task.json'])['entrypoint']
     files[entry]=native_script("printf 'diagnostic-bytes'\nexit 23", "[Console]::Write('diagnostic-bytes')\nexit 23")
     write_reference(patch,files)
-    report=api.apply(patch)
+    report=api.execute(patch)
     assert report.process_exit_code==23
     facts,_=read_result_reference(report.result_bundle.path)
     assert facts.format_version==4 and facts.runtime.status=='unavailable'
@@ -113,7 +113,7 @@ def test_runtime_only_failure_keeps_snapshot_and_actual_failure_log(repository,m
 def test_format3_budget_fallback_cannot_reintroduce_legacy_wheel_contract(repository,monkeypatch,tmp_path):
     provider_for(monkeypatch,tmp_path)
     monkeypatch.setattr(result_bundle,'runtime_fits',partial(resources.runtime_fits,policy=ResourcePolicy(max_zip_total_bytes=1)))
-    report=api.apply(package(*repository))
+    report=api.execute(package(*repository))
     assert report.process_exit_code==0
     facts,_=read_result_reference(report.result_bundle.path)
     assert facts.format_version==4 and facts.runtime.reason=='resource_limit'
@@ -131,7 +131,7 @@ def test_prepared_runtime_and_template_are_frozen_before_mutation(repository,mon
         monkeypatch.setattr(pyz_artifact.PyzProvider,'capture',lambda *a:pytest.fail('late runtime capture'))
         return original(*args,**kwargs)
     monkeypatch.setattr(application,'execute_prepared_script_with_log',mutate)
-    report=api.apply(package(*repository))
+    report=api.execute(package(*repository))
     assert report.process_exit_code==0
     facts,_=read_result_reference(report.result_bundle.path)
     assert facts.runtime.artifact.sha256==expected.pyz_sha256
@@ -142,7 +142,7 @@ def test_prepared_runtime_and_template_are_frozen_before_mutation(repository,mon
 def test_required_template_failure_still_preserves_actual_error_diagnostics(repository,monkeypatch,tmp_path):
     _,source,_,_=provider_for(monkeypatch,tmp_path)
     damage(source,'directory',pyz.CHAT_PATH)
-    report=api.apply(package(*repository,exit_code=23))
+    report=api.execute(package(*repository,exit_code=23))
     assert report.primary_result.entrypoint_exit_code==23
     assert report.result_bundle.status is api.ResultBundleStatus.FAILED
     assert report.result_bundle.emergency_diagnostics_path.is_dir()

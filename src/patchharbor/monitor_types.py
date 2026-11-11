@@ -1,4 +1,4 @@
-"""Immutable observations, never Apply permissions or reservations."""
+"""Immutable observations, never Execute permissions or reservations."""
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
