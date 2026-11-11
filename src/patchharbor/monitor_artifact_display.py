@@ -52,7 +52,7 @@ def artifact_lines(document, session, *, height):
                     lines.append(('Result-Zustand: ' + context['base_commit'] + ' / ' + context['state_fingerprint'], ''))
                 lines.append((f"Run: {selected.get('run_id')} · {'DRY-RUN / Validierung' if selected.get('dry_run') else selected.get('operation', '—')} · Result: {selected.get('result_status', 'unbekannt')}", result_semantic({**selected, 'stale': view.get('stale')})))
                 if selected.get('task_sha256'):
-                    lines.append(('Patch: ' + selected['task_sha256'], ''))
+                    lines.append(('Task: ' + selected['task_sha256'], ''))
             if selected.get('error'):
                 lines.append((selected['error'], 'dirty'))
     else:

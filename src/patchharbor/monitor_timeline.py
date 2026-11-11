@@ -22,7 +22,7 @@ def watcher_line(document, now=None):
         text = activity(row)['message']
         if row.get('data', {}).get('last_error'):
             text += ' · letzter Fehler vorhanden'
-        if any(t.get('dirty') for t in row.get('data', {}).get('targets', [])) and row.get('phase') == 'applying':
+        if any(t.get('dirty') for t in row.get('data', {}).get('targets', [])) and row.get('phase') == 'executing':
             text += ' · weitere Prüfung vorgemerkt'
         texts.append(text)
     count = len(active_runs(document, now=now))
@@ -108,7 +108,7 @@ def timeline(document, session, *, now=None, frame=0, width=120):
         if width < 85:
             data = row.get('data', {})
             if row['kind'] == 'execute' and data.get('bundle_number'):
-                label = ('Result zu #' if current['code'].startswith('result-') else 'Patch #') + data['bundle_number']
+                label = ('Result zu #' if current['code'].startswith('result-') else 'Task #') + data['bundle_number']
             if current['code'] == 'entrypoint' and current['status'] == 'running':
                 text = (data.get('entrypoint_name') or 'Entrypoint') + ' läuft'
         text = repo_name(row, document) + ' · ' + label + ' · ' + text

@@ -43,7 +43,7 @@ def document():
                            origin='automatic', dry_run=False, effective_timeout_seconds=3600,
                            entrypoint_started_at=stamp(-134)),
                  history=[event('binding', 'success', 'Repository-Bindung stimmt überein', 1, -136),
-                          event('payload', 'success', 'Patch-Dateien übernommen', 2, -135)],
+                          event('payload', 'success', 'Task-Dateien übernommen', 2, -135)],
                  activity=event('entrypoint', 'running', 'Entrypoint läuft', 3, -134))
     repos = [dict(repo_id=identity, name=name, path='/repos/'+name, registration='ok',
                   git_status='dirty', staged=1, unstaged=2, untracked=3, exchange='/exchange',
@@ -146,9 +146,9 @@ def test_unknown_or_incomplete_inventory_does_not_claim_no_candidate():
     for view in ({}, {'incomplete': True}, {'observed_at': stamp(-90)},
                  {'observed_at': stamp(), 'repository_error': 'cannot inspect state'}):
         doc['repository_views'][OTHER] = view
-        assert 'kein Patch passend' not in exchange_status(repo, doc, NOW)[0]
+        assert 'kein Task passend' not in exchange_status(repo, doc, NOW)[0]
     doc['repository_views'][OTHER] = dict(observed_at=stamp(), eligible_count=0, candidate=None)
-    assert exchange_status(repo, doc, NOW)[0] == 'kein Patch passend'
+    assert exchange_status(repo, doc, NOW)[0] == 'kein Task passend'
 
 
 def test_global_live_jump_keeps_operation_visible_outside_repository_filter():
@@ -249,6 +249,8 @@ def test_overview_summaries_observe_unselected_repositories_with_full_binding(tm
     (a, ac), (b, bc) = registered(tmp_path, monkeypatch, ('one', 'two'))
     ap, bp = patch(a, ac, 'a.zip'), patch(b, bc, 'b.zip')
     first, second = api.monitor_overview(str(a)), api.monitor_overview(str(b))
+    assert first['task_count'] == second['task_count'] == 1
+    assert 'patch_count' not in first and 'patch_count' not in second
     assert first['candidate']['path'] == str(ap) and second['candidate']['path'] == str(bp)
     assert first['candidate']['repo_id'] == str(ac.repo_id)
     (b/'tracked.txt').write_text('changed')

@@ -141,7 +141,7 @@ def test_watcher_retries_after_core_repository_lock_is_released(
         error_stream=StringIO(),
     )
 
-    assert retried is WatcherPollOutcome.APPLIED
+    assert retried is WatcherPollOutcome.EXECUTED
     assert (repository / "watcher-executed.txt").read_text(
         encoding="utf-8"
     ) == "executed"
@@ -241,7 +241,7 @@ def test_shared_watcher_delegates_discovery_identity_and_retry_to_core(
         error_stream=StringIO(),
     )
 
-    assert first is WatcherPollOutcome.APPLIED
+    assert first is WatcherPollOutcome.EXECUTED
     assert (repository / "watcher-automatic-runs.txt").read_text(
         encoding="utf-8"
     ) == "x"
@@ -282,7 +282,7 @@ def test_shared_watcher_delegates_discovery_identity_and_retry_to_core(
     first_record = json.loads(first_log.getvalue())
     second_record = json.loads(restart_log.getvalue())
     assert first_record["event"] == "automatic_execute_completed"
-    assert second_record["event"] == "waiting_for_exchange_patch"
+    assert second_record["event"] == "waiting_for_exchange_task"
     assert "input_path" not in first_record
     assert "input_sha256" not in first_record
 

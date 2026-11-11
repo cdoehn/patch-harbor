@@ -423,7 +423,7 @@ def test_v111_acceptance_watcher_delegates_to_real_apply_once(
         error_stream=StringIO(),
     )
 
-    assert first is WatcherPollOutcome.APPLIED
+    assert first is WatcherPollOutcome.EXECUTED
     assert second is WatcherPollOutcome.WAITING
     assert package.read_bytes() == package_bytes
     assert (repository / "watcher-payload.bin").read_bytes() == b"watcher-payload"

@@ -105,7 +105,7 @@ def test_shared_poll_delegates_to_core_and_deduplicates_idle_records(
     assert calls == 2
     records = [json.loads(line) for line in log.getvalue().splitlines()]
     assert len(records) == 1
-    assert records[0]["event"] == "waiting_for_exchange_patch"
+    assert records[0]["event"] == "waiting_for_exchange_task"
     assert records[0]["scope"] == "registered_repositories"
     assert "input_path" not in records[0]
     assert errors.getvalue() == ""
@@ -154,7 +154,7 @@ def test_shared_poll_records_success_and_distinct_core_error(
     )
 
     assert outcomes == (
-        WatcherPollOutcome.APPLIED,
+        WatcherPollOutcome.EXECUTED,
         WatcherPollOutcome.ERROR,
     )
     records = [json.loads(line) for line in log.getvalue().splitlines()]

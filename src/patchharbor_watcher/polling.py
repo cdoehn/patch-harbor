@@ -65,7 +65,8 @@ def run_polling_watcher(*, delegate, log_stream, error_stream, stop_requested, w
                     'quiet_until': None, 'blocked_on': None, 'probe_at': None}
                     for t in targets[:128]], targets_truncated=len(targets) > 128, last_error=None)
                 if targets and not stop_requested():
-                    publication.update(active_exchanges=[str(t.directory) for t in targets[:128]])
+                    publication.update(phase='executing', activity_code='executing',
+                                       active_exchanges=[str(t.directory) for t in targets[:128]])
                     result = delegate(exchanges=targets)
                     publish_completion(event_state, result, log_stream, error_stream)
                     progress = result.progress

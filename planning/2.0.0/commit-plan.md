@@ -708,6 +708,26 @@ Artefakttypen und die versionierte Replay-Ablage ab. Keine dieser Vorbereitungen
 ist ein Erfolgsnachweis für die noch offenen Commits.
 
 
+### Vorbereiteter Work-Schritt 200-03.W in Bundle 092
+
+Der Watcher veröffentlicht `executing`, `executed` und
+`waiting_for_exchange_task`; Core und Monitor teilen das Task-Ereignis `TASK`.
+Übersichten, Live-Details, Artefakte und die dauerhaft sichtbare Fünf-Zeilen-
+Aktivität verwenden Task/Execute. Bekannte Bundle-Nummer, Task-SHA, Entrypoint
+und Repository bleiben im aktuellen Vorgang sichtbar; die nächste Aktion bleibt
+eine bedingte Erwartung. Der Monitor führt weiterhin ausschließlich lesende
+Beobachtungen aus. Die maschinenlesbare Übersicht zählt `task_count`.
+
+Zusätzliche statisch erkannte Korrekturen sind in alle betroffenen 200-02-
+Folgestände übernommen: der Artefakttyp bleibt bis zum Execute-Schritt zur
+Ledger-Version konsistent. Version 5 des Exchange-Ledgers benennt Status und
+Task-Typ um, ohne Pfade, vollständige Hashes, Versuche oder Result-Nachweise zu
+verlieren. Ältere Ledger werden nur gelesen und beim nächsten ohnehin erlaubten
+Schreibvorgang aktualisiert; alte Eingabebundles werden dadurch nicht akzeptiert.
+Die Regressionen werden erst durch die Apply-Gates ausgeführt. Bestätigt bleiben
+3/38 Schritte; alle sechs Stände dieses Bundles warten auf tatsächliche Results.
+
+
 ## Apply 092 und Reparaturbundle 093
 
 Result `patchharbor-apply_Result_133613_1111_86c025.zip`, SHA-256

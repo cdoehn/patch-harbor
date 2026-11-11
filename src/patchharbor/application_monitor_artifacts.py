@@ -90,7 +90,7 @@ def monitor_artifacts(repository, *, include_archive=False):
             row, artifact = artifact_fact(path, archived, state, cache)
             if row['error']:
                 result['incomplete'] = True
-            row['eligibility'] = 'not a patch'
+            row['eligibility'] = 'not a task'
             if artifact is not None and artifact.selection is not None:
                 if archived:
                     reason = 'archived'
@@ -125,11 +125,11 @@ def monitor_artifacts(repository, *, include_archive=False):
     if candidates and not result['incomplete'] and not result['errors']:
         result['selected_candidate'] = str(_select_exchange_candidate(candidates).path)
     rows = result['artifacts']
-    for patch in (r for r in rows if r['kind'] == 'task_bundle' and not r['error']):
-        patch['source_candidates'] = sorted({r['sha256'] for r in rows if r.get('context') == patch['expected'] and not r['error']})
-        patch['result_links'] = sorted({r['sha256'] for r in rows if r.get('task_sha256') == patch['sha256']
-                                 and r.get('expected') == patch['expected'] and not r['error']})
-        patch['source_relation'] = 'matching states only; source ZIP not uniquely recorded'
+    for task in (r for r in rows if r['kind'] == 'task_bundle' and not r['error']):
+        task['source_candidates'] = sorted({r['sha256'] for r in rows if r.get('context') == task['expected'] and not r['error']})
+        task['result_links'] = sorted({r['sha256'] for r in rows if r.get('task_sha256') == task['sha256']
+                                 and r.get('expected') == task['expected'] and not r['error']})
+        task['source_relation'] = 'matching states only; source ZIP not uniquely recorded'
     runs = {}
     for row in rows:
         if row.get('run_id') and not row.get('error'):
@@ -158,5 +158,5 @@ def monitor_overview(repository):
             'candidate': candidate, 'latest_result': outcomes[0] if outcomes else None,
             'history_complete': False,
             'eligible_count': sum(r.get('eligibility', '').startswith('eligible') for r in own),
-            'patch_count': sum(r['kind'] == 'task_bundle' for r in own),
+            'task_count': sum(r['kind'] == 'task_bundle' for r in own),
             'unreadable_count': sum(bool(r.get('error')) for r in rows)}

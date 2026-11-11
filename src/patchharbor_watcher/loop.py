@@ -25,7 +25,7 @@ class WatcherPollOutcome(str, Enum):
     """One shared-Core polling outcome visible to the watcher lifecycle."""
 
     WAITING = "waiting"
-    APPLIED = "applied"
+    EXECUTED = "executed"
     ERROR = "error"
 
 
@@ -77,7 +77,7 @@ def _shared_poll_outcome(completion: ExecuteCompletion) -> WatcherPollOutcome:
         and response.get("success") is True
         and response.get("process_exit_code") == 0
     ):
-        return WatcherPollOutcome.APPLIED
+        return WatcherPollOutcome.EXECUTED
 
     if completion.progress.status == 'no_candidate':
         return WatcherPollOutcome.WAITING
@@ -118,10 +118,10 @@ def _write_operational_record(
 ) -> None:
     record = {
         "event": (
-            "waiting_for_exchange_patch"
+            "waiting_for_exchange_task"
             if outcome is WatcherPollOutcome.WAITING
             else "automatic_execute_completed"
-            if outcome is WatcherPollOutcome.APPLIED
+            if outcome is WatcherPollOutcome.EXECUTED
             else "automatic_execute_failed"
         ),
         "scope": "registered_repositories",
@@ -226,7 +226,7 @@ def run_repository_watcher(
     subscribed = ()
 
     def publish_status():
-        publication.update(**live_observation(schedule, subscribed, applying=worker is not None,
+        publication.update(**live_observation(schedule, subscribed, executing=worker is not None,
             control_lock=control_lock, control_probe=control_probe, now=clock(), wall=time.time(),
             active_exchanges=tuple(snapshot or ()) if worker is not None else ()))
 

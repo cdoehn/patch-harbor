@@ -43,9 +43,9 @@ def test_watcher_instances_have_independent_files_and_shutdown(tmp_path, monkeyp
             initial = wait_for(lambda: instance(publication.instance_id))
             assert initial['phase'] == 'starting' and 'targets' not in initial['data']
         first.update(phase='watching', targets=[{'directory': '/one'}])
-        second.update(phase='applying', targets=[{'directory': '/two'}])
+        second.update(phase='executing', targets=[{'directory': '/two'}])
         first_row = wait_for(lambda: updated(first, 'watching', '/one'))
-        second_row = wait_for(lambda: updated(second, 'applying', '/two'))
+        second_row = wait_for(lambda: updated(second, 'executing', '/two'))
         assert first_row['instance_id'] != second_row['instance_id']
         assert first_row['live'] and second_row['live']
         assert not first_row['completed'] and not second_row['completed']
@@ -53,7 +53,7 @@ def test_watcher_instances_have_independent_files_and_shutdown(tmp_path, monkeyp
         final = wait_for(lambda: (row if row['completed'] else None)
                          if (row := instance(first.instance_id)) else None)
         assert not final['live'] and final['data']['targets'] == first_row['data']['targets']
-        remaining = wait_for(lambda: updated(second, 'applying', '/two'))
+        remaining = wait_for(lambda: updated(second, 'executing', '/two'))
         assert remaining['live'] and not remaining['completed']
     finally:
         first.close()
@@ -301,7 +301,7 @@ def test_watcher_publishes_observed_targets_and_quiet_deadlines(tmp_path):
         target_provider=h.provider, control_provider=lambda: h.controls,
         readiness=h.readiness, source_factory=h.factory, clock=h.clock,
         worker_factory=InlineWorker, publication_factory=Recorder)
-    assert any(row.get('phase') == 'applying' for row in updates)
+    assert any(row.get('phase') == 'executing' for row in updates)
     target = next(row['targets'][0] for row in updates if row.get('targets'))
     assert target['directory'] == str(h.a) and target['quiet_until'] > 0
     assert target['blocked_on'] is None

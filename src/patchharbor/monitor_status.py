@@ -33,8 +33,8 @@ def activity(row):
         primary = data.get('primary_result') or {}
         if (data.get('origin') == 'automatic' and not primary.get('entrypoint_started')
                 and primary.get('kind') == 'validation_error' and data.get('result_status') == 'not_attempted'
-                and data.get('message') == 'No eligible patch remains after content, scope, state and replay checks'):
-            code, status, message = 'no-candidate', 'waiting', 'Kein ausführbarer Patch gefunden'
+                and data.get('message') == 'No eligible task remains after content, scope, state and replay checks'):
+            code, status, message = 'no-candidate', 'waiting', 'Kein ausführbarer Task gefunden'
         elif primary or data.get('result_status') == 'failed':
             status = 'success' if primary.get('success') and data.get('result_status') != 'failed' else 'failure'
             message = 'Execute erfolgreich abgeschlossen' if status == 'success' else 'Execute fehlgeschlagen'
@@ -43,8 +43,8 @@ def activity(row):
     elif row['kind'] == 'watcher':
         targets = data.get('targets', [])
         lock = data.get('control_lock') or next((t.get('blocked_on') for t in targets if t.get('blocked_on')), None)
-        code = phase if phase == 'applying' else lock['kind'] + '-lock' if lock else 'quiet' if any(t.get('dirty') for t in targets) else phase
-        status, message = ('running' if code in ('starting', 'applying') else 'waiting'), WATCH_LABELS.get(code, 'Watcher-Zustand unbekannt')
+        code = phase if phase == 'executing' else lock['kind'] + '-lock' if lock else 'quiet' if any(t.get('dirty') for t in targets) else phase
+        status, message = ('running' if code in ('starting', 'executing') else 'waiting'), WATCH_LABELS.get(code, 'Watcher-Zustand unbekannt')
     elif data.get('effective_timeout_seconds') is not None and data.get('process_state') is None:
         code, status, message = 'entrypoint', 'running', 'Entrypoint läuft'
     elif phase in PHASES:
@@ -70,10 +70,10 @@ def package_label(data, full=False):
     number = data.get('bundle_number')
     digest = data.get('task_sha256') or data.get('sha256')
     if number:
-        return 'Patch #' + number + (' · ' + short_id(digest, full) if digest else '')
+        return 'Task #' + number + (' · ' + short_id(digest, full) if digest else '')
     if digest:
-        return 'Patch ' + short_id(digest, full)
-    return 'Patch ' + basename(data['task_path']) if data.get('task_path') else 'Patch-Suche'
+        return 'Task ' + short_id(digest, full)
+    return 'Task ' + basename(data['task_path']) if data.get('task_path') else 'Task-Suche'
 
 
 def operation(row, full=False):
@@ -156,8 +156,8 @@ def exchange_status(repo, document, now=None):
     if summary_current(summary, now):
         if summary.get('candidate'):
             number = summary['candidate'].get('bundle_number')
-            return ('Patch #' + number if number else 'Task') + ' passend', 'title'
-        return 'kein Patch passend', 'waiting'
+            return ('Task #' + number if number else 'Task') + ' passend', 'title'
+        return 'kein Task passend', 'waiting'
     if summary.get('incomplete') or summary.get('errors'):
         return 'Bestand unklar', 'unknown'
     if summary.get('stale') or summary.get('error') or summary.get('observed_at'):

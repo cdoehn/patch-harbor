@@ -98,7 +98,7 @@ def parse_live(content, name):
             _uuid(data[key])
     if data.get('task_sha256') is not None and (type(data['task_sha256']) is not str or
             len(data['task_sha256']) != 64 or any(c not in '0123456789abcdef' for c in data['task_sha256'])):
-        raise ValueError('invalid patch digest')
+        raise ValueError('invalid task digest')
     for key in ('dry_run', 'targets_truncated', 'completion_unknown'):
         if key in data and type(data[key]) is not bool:
             raise ValueError('invalid live boolean')

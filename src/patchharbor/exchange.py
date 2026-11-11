@@ -188,7 +188,7 @@ def _classify_content(
         activity("SKIP", f"{path.name}: not a valid PatchHarbor patch ({exc})", "detail")
         return _ContentClassification(kind=ExchangeArtifactKind.OTHER)
 
-    activity("PATCH", f"{path.name}: validated PatchHarbor package", "success")
+    activity("TASK", f"{path.name}: validated PatchHarbor package", "success")
     return _ContentClassification(
         kind=ExchangeArtifactKind.TASK_BUNDLE,
         selection=ExchangeTaskSelection.from_manifest(package.manifest),

@@ -92,7 +92,7 @@ class Publication:
             code, status = 'completed', 'success' if report.success else 'failure'
             message = ('Result-Bundle' if self.document['kind'] == 'bundle' else 'Execute') + (' erfolgreich abgeschlossen' if report.success else ' fehlgeschlagen')
             if automatic == 'no_candidate':
-                code, status, message = 'no-candidate', 'waiting', 'Kein ausführbarer Patch gefunden'
+                code, status, message = 'no-candidate', 'waiting', 'Kein ausführbarer Task gefunden'
             elif automatic == 'locked':
                 code, status = report.automatic.blocked_on.kind.value + '-lock', 'waiting'
                 message = WATCH_LABELS[code]

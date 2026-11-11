@@ -35,7 +35,7 @@ def repository_rows(document, session, *, width, height, now, frame):
             data = run['data']
             label = operation(run)
             if data.get('bundle_number'):
-                label = ('Result zu #' if label.startswith('Result') else 'Patch #') + data['bundle_number']
+                label = ('Result zu #' if label.startswith('Result') else 'Task #') + data['bundle_number']
                 if data.get('task_sha256'):
                     label += ' ' + short_id(data['task_sha256'])
             if data.get('entrypoint_name') and run.get('activity', {}).get('code', run.get('phase')) == 'entrypoint':

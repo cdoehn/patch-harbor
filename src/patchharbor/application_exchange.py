@@ -498,7 +498,7 @@ def discover_exchange_task(
         _require_watch_target_unchanged(target)
 
     if not matches:
-        activity("SELECT", "No eligible patch remains after content, scope, state and replay checks", "warning")
+        activity("SELECT", "No eligible task remains after content, scope, state and replay checks", "warning")
         message = (
             "no state-bound patch package matches the current registered "
             "repository"

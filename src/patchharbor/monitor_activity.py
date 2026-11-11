@@ -15,9 +15,9 @@ WATCH_LABELS = {
     'changed': 'Änderung im Exchange erkannt', 'quiet': 'Wartet auf Ruhe im Exchange',
     'ready': 'Exchange-Prüfung bereit', 'overflow': 'Ereignisüberlauf; erneute Prüfung',
     'replaced': 'Verzeichnis geändert; Überwachung erneuern',
-    'worker-start': 'Execute-Prozess wird gestartet', 'applying': 'Execute aktiv',
+    'worker-start': 'Execute-Prozess wird gestartet', 'executing': 'Execute aktiv',
     'completion': 'Execute-Rückmeldung wird ausgewertet',
-    'no-candidate': 'Kein ausführbarer Patch gefunden', 'pending': 'Weitere Prüfung vorgemerkt',
+    'no-candidate': 'Kein ausführbarer Task gefunden', 'pending': 'Weitere Prüfung vorgemerkt',
     'waiting-change': 'Wartet nach Fehler auf eine neue Änderung',
     'registry-lock': 'Wartet auf Registrierungssperre',
     'repository-lock': 'Wartet auf Repository-Sperre',
@@ -33,12 +33,12 @@ PHASES = {
     'DISCOVER': ('discovery', 'Exchange-Konfiguration wird gelesen'),
     'SCAN': ('scan', 'Exchange wird durchsucht'),
     'IDENTIFY': ('package-check', 'Bundle-Inhalt wird geprüft'),
-    'MANIFEST': ('package-check', 'Patch-Manifest wird geprüft'),
+    'MANIFEST': ('package-check', 'Task-Manifest wird geprüft'),
     'HANDOFF': ('package-check', 'Bundle-Begleitdaten werden geprüft'),
     'SHA256': ('digest', 'Bundle-Prüfsumme geprüft'),
-    'PATCH': ('package-check', 'Patch-Bundle geprüft'),
-    'SELECT': ('selection', 'Passender Patch wird ausgewählt'),
-    'MATCH': ('selection', 'Passender Patch gefunden'),
+    'TASK': ('package-check', 'Task-Bundle geprüft'),
+    'SELECT': ('selection', 'Passender Task wird ausgewählt'),
+    'MATCH': ('selection', 'Passender Task gefunden'),
     'SKIP': ('skipped', 'Bundle übersprungen'),
     'REPO': ('repository', 'Zielrepository wird ermittelt'),
     'LOCK': ('repository-lock', 'Repository-Sperre wird geprüft'),
@@ -47,7 +47,7 @@ PHASES = {
     'RECHECK': ('recheck', 'Zustand wird vor Übernahme erneut geprüft'),
     'PREPARE': ('prepare', 'Entrypoint wird vorbereitet'),
     'SCRIPT': ('interpreter', 'Entrypoint und Interpreter werden geprüft'),
-    'PAYLOAD': ('payload', 'Patch-Dateien werden übernommen'),
+    'PAYLOAD': ('payload', 'Task-Dateien werden übernommen'),
     'EXEC': ('entrypoint', 'Entrypoint läuft'),
     'TIMEOUT': ('entrypoint', 'Entrypoint wegen Zeitüberschreitung beendet'),
     'INTERRUPT': ('entrypoint', 'Entrypoint unterbrochen'),
@@ -100,14 +100,14 @@ def activity_event(event):
     elif event.phase == 'RESULT-ZIP':
         # Success of one ZIP member is not success of the entire Result.
         status = 'running'
-    elif event.phase == 'SELECT' and event.message.startswith('No eligible patch'):
-        code, label, status = 'no-candidate', 'Kein ausführbarer Patch gefunden', 'waiting'
+    elif event.phase == 'SELECT' and event.message.startswith('No eligible task'):
+        code, label, status = 'no-candidate', 'Kein ausführbarer Task gefunden', 'waiting'
     elif event.phase == 'SKIP':
         status = 'unknown'
     elif event.phase == 'PUBLISH' and event.level == 'success':
         label = 'Result-Bundle veröffentlicht'
     elif event.phase == 'PAYLOAD' and event.level == 'success':
-        label = 'Patch-Dateien übernommen'
+        label = 'Task-Dateien übernommen'
     elif event.phase == 'BINDING' and event.level == 'success':
         label = 'Repository-Bindung stimmt überein'
     elif event.phase == 'BINDING' and event.level == 'error':
