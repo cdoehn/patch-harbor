@@ -2,6 +2,7 @@
 from concurrent.futures import Future
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone
+from hashlib import sha256
 import json
 from uuid import uuid4
 
@@ -204,7 +205,7 @@ def test_version_one_is_readable_and_malformed_history_is_rejected(tmp_path, mon
         parse_live(json.dumps(row).encode(), name)
 
 
-def test_native_apply_reports_bundle_number_entrypoint_repo_and_exit(tmp_path, monkeypatch):
+def test_native_execute_reports_bundle_number_entrypoint_repo_and_exit(tmp_path, monkeypatch):
     (root, context), = registered(tmp_path, monkeypatch)
     path = tmp_path/'exchange'/'patch.zip'
     _write_custom_package(path, {k: str(getattr(context, k)) for k in ('repo_id', 'base_commit', 'state_fingerprint')},
@@ -217,6 +218,9 @@ def test_native_apply_reports_bundle_number_entrypoint_repo_and_exit(tmp_path, m
     assert row['data']['bundle_number'] == '082'
     assert row['data']['entrypoint_name'] in ('run.sh', 'run.ps1')
     assert row['data']['repo_id'] == str(context.repo_id)
+    assert row['kind'] == 'execute'
+    assert row['data']['task_sha256'] == sha256(path.read_bytes()).hexdigest()
+    assert row['data']['run_id'] == str(report.run_id)
     assert any(e['code'] == 'entrypoint' and e['status'] == 'success' for e in row['history'])
 
 
@@ -228,6 +232,7 @@ def test_manual_result_bundle_is_a_separate_observed_operation(tmp_path, monkeyp
     assert row['data']['repo_id'] == str(context.repo_id)
     assert row['activity']['status'] == 'success'
     assert not row['data'].get('entrypoint_started_at')
+    assert not row['data'].get('task_sha256') and not row['data'].get('bundle_number')
 
 
 def test_empty_automatic_scan_is_waiting_not_a_failed_apply(tmp_path, monkeypatch):

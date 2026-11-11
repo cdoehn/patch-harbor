@@ -748,3 +748,19 @@ tatsächlichen Ausführungsdaten ab. Development bleibt ausschließlich statisch
 Push, Tag und CI bleiben aus. Bestätigt sind 4/38 Schritte; die sechs Schritte
 dieses Bundles gelten erst nach ihren tatsächlichen Commit- und Result-Nachweisen
 als abgeschlossen.
+
+### Vorbereiteter Right-Schritt 200-03.R in Bundle 093
+
+Die neuen Vertragsfälle prüfen Watcher-Beobachtung bei allen drei Sperrarten,
+unveränderte Scheduler-Daten und die aktive Exchange-Bindung während eines
+laufenden Poll-Workers. Erfolg, Fehler und fehlender Kandidat bleiben getrennte
+maschinelle Ereignisse. Der Watcher erfindet keine Task-Kennung oder Commitdaten.
+Alte und unbekannte Live-Generationen, gemischte Patch-/Task-Felder und der alte
+Apply-Instanztyp werden abgelehnt. Der vorhandene native Ausführungstest bindet
+die Beobachtung zusätzlich an den vollständigen Task-Hash und die echte Run-ID;
+ein manuelles Result erhält keine erfundene Task-Bindung.
+
+Die bestehende Polling-, Replay-, Timeout-, CIFS- und Plattformabdeckung bleibt
+Teil der vollständigen parallelen Apply-Suite. Die Vorbereitung führt keine
+Tests aus und behauptet keine native Windows-Abnahme. Keine neuen Prüfungen
+auf Farben, Spinner, Konsolenwortlaut oder Layout.
