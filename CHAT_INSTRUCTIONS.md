@@ -345,6 +345,12 @@ RESOURCES = {'patchharbor/_runtime/CHAT_INSTRUCTIONS.md',
              'patchharbor/_runtime/python-api.md', 'patchharbor/_runtime/LICENSE', MAIN_PATH}
 RECIPE_FIELDS = {'marker','format_version','distribution','version','requires_python','profile',
                  'content_id_algorithm','content_id','source_commit','entries'}
+# BEGIN GENERATED RUNTIME CAPABILITIES
+OPERATIONS = ('inspect_task', 'validate_task', 'pack_task')
+TASK_FORMATS = (2,)
+RESULT_FORMATS = (4,)
+# END GENERATED RUNTIME CAPABILITIES
+
 _WINDOWS = sys.platform == 'win32'
 HEX = re.compile(r'[0-9a-f]{64}')
 METADATA_FIELDS = {'marker','format_version','status','reason','distribution','version',
@@ -798,12 +804,12 @@ def assess(reference, *, trusted_source_sha256=None):
                  'unsupported PYZ profile or Python requirement')
         capabilities = metadata['capabilities']
         _require(type(capabilities) is dict and set(capabilities) == {'operations','task_formats','result_formats'}
-                 and capabilities['operations'] == ['inspect_task','validate_task','pack_task'],
+                 and capabilities['operations'] == list(OPERATIONS),
                  'unsupported runtime capabilities')
-        for key, choices in (('task_formats',([2],)), ('result_formats',([4],))):
+        for key, expected in (('task_formats', TASK_FORMATS), ('result_formats', RESULT_FORMATS)):
             values = capabilities[key]
             _require(type(values) is list and all(type(v) is int for v in values)
-                     and values in choices, 'unsupported runtime read versions')
+                     and values == list(expected), 'unsupported runtime read versions')
         provenance = metadata['provenance']
         _require(metadata['runtime_dependencies'] == [] and type(provenance) is dict
                  and set(provenance) == {'mode','source_commit','recipe_format_version'}

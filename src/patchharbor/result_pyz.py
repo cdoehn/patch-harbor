@@ -10,6 +10,7 @@ from patchharbor.result_runtime_metadata import (
     read_descriptor as _descriptor, require_metadata as _require,
 )
 from patchharbor import runtime_pyz as pyz
+from patchharbor.runtime_contract import OPERATIONS, TASK_FORMATS, RESULT_FORMATS
 from patchharbor.runtime_profile import VERSION_PATTERN as _VERSION, SHA256_PATTERN as _HEX
 
 
@@ -53,12 +54,12 @@ def _artifact(value: object, *, version: str, files: dict[str, bytes]) -> Runtim
 def _capabilities(value: object) -> tuple[tuple[str, ...], tuple[int, ...], tuple[int, ...]]:
     _require(type(value) is dict and set(value) == {'operations','task_formats','result_formats'},
              'invalid PYZ capabilities schema')
-    _require(value['operations'] == ['inspect_task','validate_task','pack_task'],
+    _require(value['operations'] == list(OPERATIONS),
              'unsupported PYZ operations')
-    for key, choices in (('task_formats',([2],)), ('result_formats',([4],))):
+    for key, expected in (('task_formats', TASK_FORMATS), ('result_formats', RESULT_FORMATS)):
         versions = value[key]
         _require(type(versions) is list and all(type(v) is int for v in versions)
-                 and versions in choices, 'unsupported PYZ read versions')
+                 and versions == list(expected), 'unsupported PYZ read versions')
     return tuple(value['operations']), tuple(value['task_formats']), tuple(value['result_formats'])
 
 

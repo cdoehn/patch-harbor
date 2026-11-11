@@ -13,6 +13,8 @@ from tests.embedded_pyz_support import bootstrap_program
 from tests.platform_support import PROJECT_ROOT
 
 SOURCE = b'raise AssertionError("build checks must not execute the bootstrap")\n'
+SOURCE = (generator.CAP_BEGIN + b"OPERATIONS = ('inspect_task', 'validate_task', 'pack_task')\n"
+          b"TASK_FORMATS = (2,)\nRESULT_FORMATS = (4,)\n" + generator.CAP_END + b'\n' + SOURCE)
 PREFIX = b"independently maintained prefix\n"
 SUFFIX = b"\nindependently maintained suffix\n"
 TEMPLATE = PREFIX + generator.BEGIN + b"obsolete executable bytes\n" + generator.END + SUFFIX
@@ -22,6 +24,9 @@ TEMPLATE = PREFIX + generator.BEGIN + b"obsolete executable bytes\n" + generator
 def workspace(tmp_path):
     root = tmp_path / "source"
     (root / "scripts").mkdir(parents=True)
+    (root / 'src/patchharbor').mkdir(parents=True)
+    shutil.copyfile(PROJECT_ROOT / 'src/patchharbor/runtime_contract.py',
+                    root / 'src/patchharbor/runtime_contract.py')
     (root / "scripts/pyz_bootstrap.py").write_bytes(SOURCE)
     shutil.copyfile(PROJECT_ROOT / "scripts/render_chat_bootstrap.py",
                     root / "scripts/render_chat_bootstrap.py")

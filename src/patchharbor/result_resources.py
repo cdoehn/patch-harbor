@@ -15,6 +15,7 @@ from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY, ResourcePolicy
 from patchharbor.result_runtime_metadata import METADATA_PATH, UNAVAILABLE_REASONS
 from patchharbor.pyz_artifact import PyzArtifact, PyzProvider, own_pyz_profile_present
 from patchharbor import runtime_pyz
+from patchharbor.runtime_contract import capabilities_document
 from patchharbor.platform.filesystem import FileChangedDuringRead, FileReadLimitExceeded, UnsupportedFileTypeError
 
 if TYPE_CHECKING:
@@ -85,8 +86,7 @@ def runtime_payload(artifact: PyzArtifact | None, *, reason: str | None = None) 
                content_id_algorithm=runtime_pyz.CONTENT_ALGORITHM,
                artifact=dict(type='pyz',**_descriptor(path,artifact.pyz_bytes)),runtime_dependencies=[],
                provenance=dict(mode='canonical_resources',source_commit=recipe.source_commit,recipe_format_version=1),
-               capabilities=dict(operations=['inspect_task','validate_task','pack_task'],
-                                 task_formats=[2],result_formats=[4]))
+               capabilities=capabilities_document())
     with ZipFile(BytesIO(artifact.pyz_bytes)) as archive:
         inner_bytes = sum(info.file_size for info in archive.infolist())
     return ResultRuntimePayload('embedded',None,serialize_json_document(doc).encode(),
