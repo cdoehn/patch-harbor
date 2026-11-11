@@ -10,7 +10,7 @@ import pytest
 
 from tests.platform_support import PROJECT_ROOT
 from tests.profiling_support import profile_cli, profile_run
-from tools.profiling.application import database
+from tools.profiling.storage import database
 
 
 def seeded(path):
