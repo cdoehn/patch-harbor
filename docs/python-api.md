@@ -581,21 +581,16 @@ from bootstrap checks; no installation or subprocess is needed for these calls.
 Result-4 production uses the same shared Core and request-local resource capture.
 
 
-## Historical reader-first introduction of Result 3 (PP-05A)
+## Current Result protocol
 
-At PP-05A, `validate_task(..., reference_bundle=...)` and `pack_task` began using the same
-full reader for Result formats 1, 2 and 3. The new format verifies its PYZ as
-strict data, without importing it. Public signatures/scopes are unchanged;
-corrupt references retain source-error category 4. A private repository-only
-diagnostic fallback is never a successful full reference or a `pack` input.
-See [Result format 3](result-format-3.md). Production uses this format from PP-06B;
-the earlier legacy-reader support promise is now replaced by the 1.4.0
-compatibility baseline. Public validation scopes remain unchanged.
+Only Result 4 is a valid reference. The strict reader validates every repository
+and runtime descriptor without importing archive code. Earlier Result formats
+are retained only as rejection/provenance fixtures. See [the 2.0 protocol](protocol-2.md).
 
-## Verified Result snapshots (integration contract 1)
+## Verified Result snapshots (integration contract 2)
 
 `api.integration_capabilities()` returns immutable contract-version fields.
-Check `snapshot_contract_version == 1` before calling
+Check `snapshot_contract_version == 2` before calling
 `api.read_result_snapshot(result, expected_sha256=full_sha256)`. The immutable
 result provides `sha256`, `format_version`, `context`, `run_id`, `operation`,
 `dry_run`, `primary_result`, `warnings`, `runtime` and five `SnapshotLayer` values:
@@ -620,12 +615,12 @@ or dry-run Result is returned with its actual facts. Integrity does not prove
 authenticity, a historical commit tree or an independently recomputed dirty
 fingerprint; the existing four binding values are preserved.
 
-## Guarded host Execute (integration contract 1)
+## Guarded host Execute (integration contract 2)
 
 `api.execute_guarded(patch, *, expected_sha256, expected_repository, admission,
 output_directory=None, timeout=DEFAULT_TIMEOUT_SECONDS, output=None, observer=None)`
 uses the ordinary Execute core. Check
-`api.integration_capabilities().guarded_execute_contract_version == 1`.
+`api.integration_capabilities().guarded_execute_contract_version == 2`.
 Unlike the unchanged `execute`, the new operation requires one explicit package,
 its full lowercase SHA-256, the expected repository root, and a trusted callback.
 The existing `execute(patch=..., repository=...)` remains invalid.
@@ -822,7 +817,7 @@ without changing runtime bytes.
 `monitor_snapshot(repository=None, exchange=None, include_state=True) -> MonitorSnapshot` reads the
 registry and independently observes repository/configuration/Git facts. Select a
 full repository ID or path; optional Exchange is a path. The frozen snapshot has
-`observed_at`, `repositories`, `exchanges`, `errors`; `document()` returns format 1
+`observed_at`, `repositories`, `exchanges`, `errors`; `document()` returns format 2
 JSON-compatible data (`kind: patchharbor-monitor`). Observations neither acquire
 Execute locks nor change source files or replay state. Unknown facts remain null.
 `MonitorRepository` and `MonitorExchange` are exported through the facade.

@@ -1,4 +1,4 @@
-"""Pure parsing and validation for the closed format-1 patch manifest."""
+"""Pure parsing and validation for the closed format-2 Task manifest."""
 
 from __future__ import annotations
 
@@ -28,7 +28,7 @@ _TASK_MANIFEST_FIELDS = frozenset(
 
 @dataclass(frozen=True)
 class TaskManifest:
-    """One validated closed format-1 patch manifest."""
+    """One validated closed format-2 Task manifest."""
 
     marker: str
     format_version: int
@@ -90,7 +90,7 @@ def parse_task_manifest(payload: bytes) -> TaskManifest:
     document = _parse_json_object(payload)
     if set(document) != _TASK_MANIFEST_FIELDS:
         raise task_bundle_error(
-            "task.json must contain exactly the seven format-1 fields"
+            "task.json must contain exactly the seven format-2 fields"
         )
 
     marker = _require_string(document, "marker")

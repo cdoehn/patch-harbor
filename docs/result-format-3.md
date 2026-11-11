@@ -1,5 +1,7 @@
 # Result format 3: PYZ runtime metadata 2
 
+> Historical contract. PatchHarbor 2.0 rejects this format; see [Task / Execute / Result](protocol-2.md).
+
 Normal production uses Result 3. PP-05A/B established the full reader and
 consumer compatibility before PP-06B activated that writer. Standard installations
 prepare the Core-PYZ

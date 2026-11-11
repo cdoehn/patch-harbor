@@ -11,7 +11,7 @@ from patchharbor import api
 from patchharbor.archive_evidence import CLEAN_FINGERPRINT
 from patchharbor.run_report import PrimaryResult
 
-from tests.patch_inspection_support import MANIFEST, write_package
+from tests.task_inspection_support import MANIFEST, write_package
 from tests.result_runtime_support import attach_pyz, edit_document
 from tests.runtime_pyz_support import prepared
 

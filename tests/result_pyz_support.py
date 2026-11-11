@@ -14,7 +14,7 @@ def canonical():
     return prepared(payloads)[2]
 
 
-def format3(raw, **options):
+def format4(raw, **options):
     files,binding = reference_entries(handoff=True,**options)
     return attach_pyz(files,raw), binding
 

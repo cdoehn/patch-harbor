@@ -191,7 +191,7 @@ def test_report_and_reference_are_explicit_child_arguments(tmp_path):
         "tests/test_pack_cli.py",
         "tests/test_result_runtime_roundtrip.py",
         "tests/test_runtime_packaging.py",
-        "tests/test_result3_publication_policy.py",
+        "tests/test_result4_publication_policy.py",
         "tests/test_result_runtime_publication.py",
         "tests/test_pack_exchange_e2e.py",
         "tests/test_runtime_export.py",

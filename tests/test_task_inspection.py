@@ -19,7 +19,7 @@ from patchharbor.cli import main
 from patchharbor.exit_status import exit_code_for_error
 from patchharbor.task_inspection import inspect_task
 from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY
-from tests.patch_inspection_support import MANIFEST, write_package
+from tests.task_inspection_support import MANIFEST, write_package
 
 
 def test_inspection_reports_all_roles_and_exact_bytes_without_payload_copies(tmp_path, capsys):

@@ -1,4 +1,4 @@
-"""Closed version-1 observation contract shared by publishers and readers."""
+"""Closed version-3 observation contract shared by publishers and readers."""
 from datetime import datetime
 import math
 from uuid import UUID
@@ -33,12 +33,11 @@ def parse_live(content, name):
     fields = {'format_version', 'kind', 'instance_id', 'pid', 'process_identity',
               'started_at', 'updated_at', 'facts_updated_at', 'completed', 'phase', 'data', 'log_tail'}
     version = row.get('format_version')
-    if version == 3:
-        fields |= {'activity', 'history'}
+    fields |= {'activity', 'history'}
     if set(row) != fields or type(version) is not int or version != 3:
         raise ValueError('unsupported live observation schema')
     _uuid(row['instance_id'])
-    if row['kind'] not in (('execute', 'watcher', 'bundle') if version == 3 else ('execute', 'watcher')) or name != row['kind'] + '-' + row['instance_id'] + '.json':
+    if row['kind'] not in ('execute', 'watcher', 'bundle') or name != row['kind'] + '-' + row['instance_id'] + '.json':
         raise ValueError('live filename and identity disagree')
     if type(row['pid']) is not int or not 0 < row['pid'] <= 2**32-1:
         raise ValueError('invalid publisher PID')
@@ -49,30 +48,28 @@ def parse_live(content, name):
         raise ValueError('invalid publisher lifecycle')
     if type(row['log_tail']) is not str or len(row['log_tail'].encode('utf-8')) > 3*32768:
         raise ValueError('invalid bounded log tail')
-    if version == 3:
-        if type(row['history']) is not list or len(row['history']) > HISTORY_LIMIT:
-            raise ValueError('invalid bounded activity history')
-        sequence = 0
-        for event in [*row['history'], row['activity']]:
-            if type(event) is not dict or set(event) != {'sequence', 'at', 'since', 'code', 'status', 'message'}:
-                raise ValueError('invalid activity record')
-            if type(event['sequence']) is not int or not sequence < event['sequence']:
-                raise ValueError('invalid activity sequence')
-            sequence = event['sequence']
-            _stamp(event['at']); _stamp(event['since'])
-            if type(event['code']) is not str or not 0 < len(event['code']) <= 64 or type(event['status']) is not str or event['status'] not in STATUSES:
-                raise ValueError('invalid activity identity/status')
-            if type(event['message']) is not str or len(event['message']) > 512:
-                raise ValueError('invalid activity message')
+    if type(row['history']) is not list or len(row['history']) > HISTORY_LIMIT:
+        raise ValueError('invalid bounded activity history')
+    sequence = 0
+    for event in [*row['history'], row['activity']]:
+        if type(event) is not dict or set(event) != {'sequence', 'at', 'since', 'code', 'status', 'message'}:
+            raise ValueError('invalid activity record')
+        if type(event['sequence']) is not int or not sequence < event['sequence']:
+            raise ValueError('invalid activity sequence')
+        sequence = event['sequence']
+        _stamp(event['at']); _stamp(event['since'])
+        if type(event['code']) is not str or not 0 < len(event['code']) <= 64 or type(event['status']) is not str or event['status'] not in STATUSES:
+            raise ValueError('invalid activity identity/status')
+        if type(event['message']) is not str or len(event['message']) > 512:
+            raise ValueError('invalid activity message')
     data = row['data']
     allowed = {'message', 'task_path', 'repo_id', 'repository_path', 'base_commit', 'fingerprint',
         'run_id', 'origin', 'dry_run', 'requested_timeout_seconds', 'effective_timeout_seconds',
         'entrypoint_started_at', 'entrypoint_exit_code', 'process_state', 'primary_result',
         'result_status', 'result_path', 'task_sha256', 'subscriptions', 'targets',
         'targets_truncated', 'control_lock', 'control_probe_at', 'last_error', 'completion_unknown'}
-    if version == 3:
-        allowed |= {'entrypoint_name', 'bundle_number', 'active_exchanges', 'automatic_status'}
-        allowed |= {'watcher_mode', 'poll_interval_seconds', 'next_poll_at'}
+    allowed |= {'entrypoint_name', 'bundle_number', 'active_exchanges', 'automatic_status'}
+    allowed |= {'watcher_mode', 'poll_interval_seconds', 'next_poll_at'}
     if type(data) is not dict or set(data) - allowed:
         raise ValueError('unknown live observation data')
     if 'watcher_mode' in data and (row['kind'] != 'watcher' or data['watcher_mode'] not in ('events', 'poll')):

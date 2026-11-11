@@ -19,9 +19,9 @@ from patchharbor.exit_status import exit_code_for_error
 from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY
 from patchharbor.result_reader import capture_result_reference
 from tests.compatibility_140_support import (
-    BINDING_FIELDS, FIXTURES, PATCH_CASES, PYZ_SHA256, RESULT_CASES, artifact,
+    FIXTURES, PATCH_CASES, PYZ_SHA256, RESULT_CASES, artifact,
     corrupt_reference, json_bytes, prepared_pyz, provenance, result_members,
-    rewrite_zip, sha256,
+    sha256,
 )
 from tests.registration_support import create_repository, git
 
@@ -137,7 +137,7 @@ def test_original_partial_progress_and_dirty_snapshot_are_not_clean_success():
 ])
 def test_all_four_binding_components_remain_required(tmp_path, field, value, code):
     from tests.reference_support import reference_entries, write_reference
-    from tests.patch_inspection_support import MANIFEST, write_package
+    from tests.task_inspection_support import MANIFEST, write_package
     files, binding = reference_entries()
     reference = tmp_path / 'current-result.zip'
     write_reference(reference, files)

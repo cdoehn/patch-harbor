@@ -16,7 +16,7 @@ from patchharbor.errors import registry_error, repository_busy_error, state_mism
 from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY
 from patchharbor.result_reader import read_result_reference
 from patchharbor.run_report import PrimaryResult
-from tests.result_pyz_support import canonical, format3
+from tests.result_pyz_support import canonical, format4
 from tests.result_runtime_support import descriptor, edit_metadata
 from tests.reference_support import bound_package, edit_document, reference_runtime, write_reference
 
@@ -24,7 +24,7 @@ from tests.reference_support import bound_package, edit_document, reference_runt
 @pytest.mark.parametrize("make_error", [state_mismatch_error, repository_busy_error,
                                        registry_error, unsupported_repository_state_error])
 def test_categorized_tool_failure_remains_a_reference_and_can_be_published(canonical, tmp_path, make_error):
-    files, binding = format3(canonical, kind="mismatch")
+    files, binding = format4(canonical, kind="mismatch")
     primary = PrimaryResult.from_tool_error(make_error("diagnostic failure"))
     edit_document(files, "manifest.json", lambda d: d.update(primary_result=primary.kind.value))
     edit_document(files, "logs/run.json", lambda d: d.update(
@@ -52,7 +52,7 @@ def test_categorized_tool_failure_remains_a_reference_and_can_be_published(canon
 @pytest.mark.parametrize("kind,dirty", [("bundle", False), ("success", False), ("success", True),
                                        ("failure", True), ("dry_run", False)])
 def test_format3_reference_preserves_binding_and_separates_success_policy(canonical, tmp_path, status, kind, dirty):
-    files, binding = format3(canonical if status == "embedded" else None, kind=kind, dirty=dirty)
+    files, binding = format4(canonical if status == "embedded" else None, kind=kind, dirty=dirty)
     ref = tmp_path / "result.zip"; write_reference(ref, files)
     patch = tmp_path / "patch.zip"; bound_package(patch, binding)
     facts, digest = read_result_reference(ref)
@@ -71,7 +71,7 @@ def test_format3_reference_preserves_binding_and_separates_success_policy(canoni
             parse_archive_evidence(ref.read_bytes(), ref)
 
 def test_inner_bytes_share_the_remaining_outer_request_budget(canonical, tmp_path, monkeypatch):
-    files, _ = format3(canonical)
+    files, _ = format4(canonical)
     ref = tmp_path / "result.zip"; write_reference(ref, files)
     outer = sum(map(len, files.values()))
     with ZipFile(BytesIO(canonical)) as archive:
@@ -88,7 +88,7 @@ def test_inner_bytes_share_the_remaining_outer_request_budget(canonical, tmp_pat
         read_result_reference(ref, resource_policy=replace(policy, max_zip_total_bytes=outer + inner - 1))
 
 def test_inner_entry_count_uses_request_limit_before_resource_reads(canonical, tmp_path, monkeypatch):
-    files, _ = format3(canonical)
+    files, _ = format4(canonical)
     with ZipFile(BytesIO(canonical)) as archive:
         count = len(archive.infolist())
     assert count > len(files)
@@ -105,7 +105,7 @@ def test_inner_entry_count_uses_request_limit_before_resource_reads(canonical, t
         read_result_reference(ref, resource_policy=replace(policy, max_zip_entries=count - 1))
 
 def test_metadata_budget_is_enforced_before_json_parse(tmp_path, monkeypatch):
-    files, _ = format3(None)
+    files, _ = format4(None)
     name = "runtime/runtime.json"
     files[name] += b" " * (result_pyz.MAX_METADATA_BYTES + 1 - len(files[name]))
     edit_document(files, "manifest.json", lambda doc: doc["runtime"].update(metadata=descriptor(name, files[name])))
@@ -114,7 +114,7 @@ def test_metadata_budget_is_enforced_before_json_parse(tmp_path, monkeypatch):
     with pytest.raises(api.PatchHarborError): read_result_reference(ref)
 
 def test_repository_runtime_path_is_not_the_embedded_namespace(canonical, tmp_path):
-    files, binding = format3(canonical)
+    files, binding = format4(canonical)
     files["base/runtime/runtime.json"] = files.pop("base/tracked.txt")
     edit_document(files, "manifest.json", lambda doc: doc["base_entries"][0].update(path="runtime/runtime.json"))
     ref = tmp_path / "result.zip"; write_reference(ref, files)
@@ -124,7 +124,7 @@ def test_repository_runtime_path_is_not_the_embedded_namespace(canonical, tmp_pa
 def test_snapshot_unicode_paths_work_for_classifier_and_archive_without_relaxing_patches(canonical, tmp_path):
     from patchharbor.result_reader import read_result_or_task_payloads
     from patchharbor.zip_payloads import ZipPayloadError
-    files, binding = format3(canonical)
+    files, binding = format4(canonical)
     name = "base/runtime/Grüße dir/Datei.py"
     files[name] = files.pop("base/tracked.txt")
     edit_document(files, "manifest.json", lambda doc: doc["base_entries"][0].update(path=name.removeprefix("base/")))
@@ -139,7 +139,7 @@ def test_snapshot_unicode_paths_work_for_classifier_and_archive_without_relaxing
     with pytest.raises(ZipPayloadError): read_result_or_task_payloads(patch.read_bytes())
 
 def test_reader_does_not_import_execute_or_write_runtime(tmp_path, monkeypatch):
-    files, binding = format3(reference_runtime())
+    files, binding = format4(reference_runtime())
     ref = tmp_path / "result.zip"; write_reference(ref, files)
     patch = tmp_path / "patch.zip"; bound_package(patch, binding)
     before = {p: p.read_bytes() for p in tmp_path.iterdir()}
@@ -155,7 +155,7 @@ def test_reader_does_not_import_execute_or_write_runtime(tmp_path, monkeypatch):
 
 @pytest.mark.parametrize("version", [1, 2, 3, True])
 def test_result_classification_is_only_a_type_hint_and_never_a_patch(canonical, tmp_path, version):
-    files, _ = format3(canonical)
+    files, _ = format4(canonical)
     edit_document(files, "manifest.json", lambda doc: doc.update(format_version=version))
     ref = tmp_path / "looks-like-a-patch.zip"; write_reference(ref, files)
     classification = _classify_content(ref, ref.read_bytes(), resource_policy=DEFAULT_RESOURCE_POLICY)
@@ -164,7 +164,7 @@ def test_result_classification_is_only_a_type_hint_and_never_a_patch(canonical, 
 
 @pytest.mark.parametrize("status", ["embedded", "unavailable"])
 def test_publication_verifies_format3_bytes_and_detects_corruption(canonical, tmp_path, status):
-    files, _ = format3(canonical if status == "embedded" else None)
+    files, _ = format4(canonical if status == "embedded" else None)
     ref = tmp_path / "result.zip"; write_reference(ref, files)
     publication._verify_result_bundle(ref, execution_present=False)
     files["runtime/runtime.json"] += b" "
@@ -174,7 +174,7 @@ def test_publication_verifies_format3_bytes_and_detects_corruption(canonical, tm
     assert caught.value.reason is api.FailureReason.RESULT_BUNDLE_ERROR
 
 def test_cli_reference_validation_accepts_format3(canonical, tmp_path):
-    files, binding = format3(canonical)
+    files, binding = format4(canonical)
     ref = tmp_path / "result.zip"; write_reference(ref, files)
     patch = tmp_path / "patch.zip"; bound_package(patch, binding)
     out = StringIO()

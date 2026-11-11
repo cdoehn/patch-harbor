@@ -16,7 +16,7 @@ import pytest
 
 from scripts.build_release import _copy_release_inputs
 from tests.runtime_permissions import readonly_tree
-from tests.patch_inspection_support import write_package
+from tests.task_inspection_support import write_package
 from tests.registration_support import create_repository
 from tests.runtime_installation_support import _run, _venv
 

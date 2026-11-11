@@ -66,7 +66,7 @@ class ResultRuntimePayload:
 
 
 def runtime_payload(artifact: PyzArtifact | None, *, reason: str | None = None) -> ResultRuntimePayload:
-    """Prepare the sole production Runtime-2/PYZ payload for Result format 4."""
+    """Prepare the sole production Runtime-3/PYZ payload for Result format 4."""
     doc = {
         'marker':'patch-harbor-runtime', 'format_version':3,
         'status':'unavailable', 'reason':reason, 'distribution':'patchharbor',

@@ -10,7 +10,7 @@ from patchharbor.result_reader import capture_result_reference
 from scripts import pyz_bootstrap as bootstrap
 from tests.pack_support import request_files
 from tests.reference_support import bound_package, write_reference
-from tests.result_pyz_support import canonical, format3
+from tests.result_pyz_support import canonical, format4
 from tests.result_runtime_support import edit_metadata
 
 
@@ -30,7 +30,7 @@ def no_runtime_execution(monkeypatch):
 def test_closed_capabilities_keep_reference_bytes_binding_and_static_pack(
     canonical, request_files, tmp_path, result_formats,
 ):
-    files, binding = format3(canonical)
+    files, binding = format4(canonical)
     edit_metadata(files, lambda doc: doc['capabilities'].update(result_formats=result_formats))
     reference = tmp_path / 'result.zip'
     write_reference(reference, files)
@@ -95,7 +95,7 @@ def assert_invalid_reference(files, binding, request_files, tmp_path):
 def test_other_result_capabilities_are_rejected_without_output(
     canonical, request_files, tmp_path, result_formats,
 ):
-    files, binding = format3(canonical)
+    files, binding = format4(canonical)
     edit_metadata(files, lambda doc: doc['capabilities'].update(result_formats=result_formats))
     assert_invalid_reference(files, binding, request_files, tmp_path)
 
@@ -106,7 +106,7 @@ def test_other_result_capabilities_are_rejected_without_output(
 def test_result_capability_choice_does_not_relax_patch_format_validation(
     canonical, request_files, tmp_path, result_formats, task_formats,
 ):
-    files, binding = format3(canonical)
+    files, binding = format4(canonical)
     edit_metadata(files, lambda doc: doc['capabilities'].update(
         result_formats=result_formats, task_formats=task_formats))
     assert_invalid_reference(files, binding, request_files, tmp_path)
@@ -116,7 +116,7 @@ def test_result_capability_choice_does_not_relax_patch_format_validation(
 def test_unavailable_runtime_cannot_claim_either_capability_profile(
     request_files, tmp_path, result_formats,
 ):
-    files, binding = format3(None)
+    files, binding = format4(None)
     edit_metadata(files, lambda doc: doc.update(capabilities={
         'operations': ['inspect_task','validate_task','pack_task'],
         'task_formats': [2], 'result_formats': result_formats,

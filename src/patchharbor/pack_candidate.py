@@ -148,7 +148,7 @@ def prepare_candidate(sources: CapturedSources,
         raise _failure('cannot render own canonical template', FailureReason.PAYLOAD_PREPARATION_ERROR) from exc
     entries = [(file.relative_path, file.content, file.unix_mode) for file in sources.files]
     entries.append(('task.json', serialize_json_document(manifest).encode('utf-8'), 0o644))
-    entries.extend((path, content, 0o644) for path, content in handoff.entries(patch=True))
+    entries.extend((path, content, 0o644) for path, content in handoff.entries(task=True))
     if (len(entries) > resource_policy.max_zip_entries
             or any(len(content) > resource_policy.max_content_bytes for _, content, _ in entries)
             or sum(len(content) for _, content, _ in entries) > resource_policy.max_zip_total_bytes):

@@ -1,4 +1,4 @@
-"""Resolve one fully prevalidated format-1 patch package."""
+"""Resolve one fully prevalidated format-2 Task Bundle."""
 
 from __future__ import annotations
 
@@ -33,7 +33,7 @@ from patchharbor.zip_payloads import (
 
 @dataclass(frozen=True, slots=True)
 class ValidatedTaskBundle:
-    """One fully read and classified format-1 patch package."""
+    """One fully read and classified format-2 Task Bundle."""
 
     manifest: TaskManifest
     entrypoint: BundlePayload
@@ -52,9 +52,9 @@ class ValidatedTaskBundle:
             raise ValueError("package digest must be a complete lowercase SHA-256")
 
 
-def _unsafe_patch_zip(path: Path, detail: object) -> PatchHarborError:
+def _unsafe_task_zip(path: Path, detail: object) -> PatchHarborError:
     return PatchHarborError(
-        f"unsafe or unreadable patch ZIP {path}: {detail}",
+        f"unsafe or unreadable Task ZIP {path}: {detail}",
         FailureReason.SOURCE_ERROR,
     )
 
@@ -66,7 +66,7 @@ def parse_task_entrypoint(entrypoint: BundlePayload) -> ParsedScript:
         return parse_script(entrypoint.content.decode("utf-8"))
     except (UnicodeError, ScriptFormatError) as exc:
         raise PatchHarborError(
-            "patch package entrypoint is not a valid PatchHarbor script",
+            "Task Bundle entrypoint is not a valid PatchHarbor script",
             FailureReason.NO_VALID_SCRIPT,
         ) from exc
 
@@ -92,7 +92,7 @@ def resolve_task_payloads(
     )
     if manifest_payload is None:
         raise task_bundle_error(
-            "patch package must contain exactly one regular root task.json"
+            "Task Bundle must contain exactly one regular root task.json"
         )
 
     activity("MANIFEST", "Validate exact schema, marker and full repository binding")
@@ -103,7 +103,7 @@ def resolve_task_payloads(
     try:
         entrypoint_path = normalize_bundle_path(manifest.entrypoint)
     except BundlePathError as exc:
-        raise _unsafe_patch_zip(package_path, exc) from exc
+        raise _unsafe_task_zip(package_path, exc) from exc
 
     entrypoint: BundlePayload | None = None
     package_payloads: list[BundlePayload] = []
@@ -144,12 +144,12 @@ def resolve_task_bundle(
     resource_policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY,
     expected_identity: os.stat_result | None = None,
 ) -> ValidatedTaskBundle:
-    """Read every ZIP member, then execute format-1 package roles."""
+    """Read every ZIP member, then classify format-2 Task roles."""
     activity("OPEN", f"Open explicit patch and capture stable content with SHA-256: {path}")
     try:
         target = path.resolve(strict=True) if expected_identity is None else path
         if target.lstat().st_size > resource_policy.max_input_artifact_bytes:
-            raise _unsafe_patch_zip(path, "input artifact exceeds the resource limit")
+            raise _unsafe_task_zip(path, "input artifact exceeds the resource limit")
         owned = ({} if expected_identity is None else
                  {'expected_identity': expected_identity, 'max_bytes': resource_policy.max_input_artifact_bytes})
         captured = read_stable_regular_file_with_sha256(
@@ -157,13 +157,13 @@ def resolve_task_bundle(
             allow_path_identity_fallback=expected_identity is None, **owned,
         )
         if captured.content is None:
-            raise _unsafe_patch_zip(path, "input artifact exceeds the resource limit")
+            raise _unsafe_task_zip(path, "input artifact exceeds the resource limit")
         payloads = read_zip_payload_bytes(captured.content, policy=resource_policy)
     except NotZipArchiveError as exc:
-        raise task_bundle_error("patch package is not a ZIP archive") from exc
+        raise task_bundle_error("Task Bundle is not a ZIP archive") from exc
     except (ZipPayloadError, FileChangedDuringRead, FileReadLimitExceeded, FileSystemOperationError,
             UnsupportedFileTypeError, OSError, RuntimeError, UnicodeError) as exc:
-        raise _unsafe_patch_zip(path, exc) from exc
+        raise _unsafe_task_zip(path, exc) from exc
 
     return resolve_task_payloads(
         payloads,

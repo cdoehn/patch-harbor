@@ -198,7 +198,7 @@ def test_internal_validation_does_not_skip_any_binding_comparison(tmp_path, fiel
 
 
 def test_internal_validation_uses_actual_package_bytes_and_original_error_categories(tmp_path):
-    from tests.patch_inspection_support import MANIFEST, write_package
+    from tests.task_inspection_support import MANIFEST, write_package
     path, _, binding = _reference(tmp_path)
     captured = reader.capture_result_reference(path)
     patch = tmp_path / "patch.zip"

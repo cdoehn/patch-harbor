@@ -59,7 +59,7 @@ def _write_patch(path: Path, context: dict[str, object], environment: dict[str, 
     with zipfile.ZipFile(path, "w") as archive:
         archive.writestr("task.json", json.dumps(_manifest(context)))
         archive.writestr(native_value("run.sh", "run.ps1"), entrypoint)
-        for name, raw in handoff.entries(patch=True):
+        for name, raw in handoff.entries(task=True):
             archive.writestr(name, raw)
         if root_payload:
             archive.writestr(CHAT_INSTRUCTIONS_NAME, "actual project documentation\n")

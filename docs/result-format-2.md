@@ -1,5 +1,7 @@
 # Result-Format 2: historischer Leservertrag
 
+> Historical contract. PatchHarbor 2.0 rejects this format; see [Task / Execute / Result](protocol-2.md).
+
 RF-06B hat den Format-2-Reader entfernt. Die nachfolgende Beschreibung ist historisch;
 aktuelle Reader lehnen Result 1/2 ab. [Result 3](result-format-3.md) und unveränderte
 Artefakte ab PatchHarbor 1.4.0 bleiben die unterstützte Grundlage.

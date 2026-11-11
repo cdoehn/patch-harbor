@@ -9,7 +9,7 @@ import pytest
 from patchharbor import api
 from patchharbor.cli import main
 from tests.apply_support import repository
-from tests.patch_inspection_support import MANIFEST, write_package
+from tests.task_inspection_support import MANIFEST, write_package
 from tests.platform_support import native_python_script, native_value
 from tests.reference_support import reference_entries, write_reference
 from tests.registration_support import git
@@ -30,7 +30,7 @@ def test_removed_python_aliases_are_not_exported_or_callable(name):
     'mixed_patch', 'mixed_result', 'duplicate_field',
 ])
 def test_invalid_generations_never_reach_repository_or_execution(tmp_path, monkeypatch, fault):
-    from patchharbor import application, application_execute
+    from patchharbor import application_execute
     task = tmp_path / 'renamed_Task_Bundle.zip'
     manifest = dict(MANIFEST)
     if fault == 'old_marker': manifest['marker'] = 'patch-harbor'

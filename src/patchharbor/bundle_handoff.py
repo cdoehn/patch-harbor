@@ -1,4 +1,4 @@
-"""Passive bundle handoff documents and optional format-1 patch metadata roles."""
+"""Passive bundle handoff documents and optional format-2 Task metadata roles."""
 
 from __future__ import annotations
 
@@ -28,8 +28,8 @@ class BundleHandoff:
     instructions: bytes
     environment: bytes
 
-    def entries(self, *, patch: bool = False) -> tuple[tuple[str, bytes], ...]:
-        prefix = f"{TASK_HANDOFF_DIRECTORY}/" if patch else ""
+    def entries(self, *, task: bool = False) -> tuple[tuple[str, bytes], ...]:
+        prefix = f"{TASK_HANDOFF_DIRECTORY}/" if task else ""
         return (
             (prefix + CHAT_INSTRUCTIONS_NAME, self.instructions),
             (prefix + ENVIRONMENT_NAME, self.environment),
@@ -64,7 +64,7 @@ def split_task_handoff(
         if payload.relative_path.split("/", 1)[0].casefold() == TASK_HANDOFF_DIRECTORY.casefold()
     )
     if not metadata:
-        return payloads, None  # Existing format-1 packages remain unchanged.
+        return payloads, None  # Handoff remains optional; Task binding is always mandatory.
     expected = {prefix + CHAT_INSTRUCTIONS_NAME, prefix + ENVIRONMENT_NAME}
     if {item.relative_path for item in metadata} != expected or len(metadata) != 2:
         raise task_bundle_error("patch handoff must contain exactly the two reserved metadata files")

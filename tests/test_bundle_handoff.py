@@ -329,7 +329,7 @@ def test_uv_probe_retains_only_a_version(monkeypatch: pytest.MonkeyPatch, output
 def test_patch_handoff_is_not_payload_and_root_instructions_stay_payload(tmp_path: Path) -> None:
     handoff = render_chat_handoff(patch_environment())
     path = tmp_path / "patch.zip"
-    write_handoff_patch(path, dict(handoff.entries(patch=True)))
+    write_handoff_patch(path, dict(handoff.entries(task=True)))
     package = resolve_task_bundle(path)
     assert package.handoff == handoff
     assert {payload.relative_path for payload in package.payloads} == {"actual-payload.txt", "CHAT_INSTRUCTIONS.md"}
@@ -339,7 +339,7 @@ def test_patch_handoff_is_not_payload_and_root_instructions_stay_payload(tmp_pat
 
 @pytest.mark.parametrize("fault", ["missing", "extra", "binding", "type", "version", "duplicate", "nan", "bom", "encoding", "size", "entrypoint", "case"])
 def test_invalid_reserved_metadata_is_rejected_before_mutation(tmp_path: Path, fault: str) -> None:
-    entries = dict(render_chat_handoff(patch_environment()).entries(patch=True))
+    entries = dict(render_chat_handoff(patch_environment()).entries(task=True))
     env_name = f"{TASK_HANDOFF_DIRECTORY}/{ENVIRONMENT_NAME}"
     chat_name = f"{TASK_HANDOFF_DIRECTORY}/{CHAT_INSTRUCTIONS_NAME}"
     doc = json.loads(entries[env_name])
