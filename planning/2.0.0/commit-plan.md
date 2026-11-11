@@ -2,8 +2,8 @@
 
 **Plan-ID:** `PH-200` · **Revision:** 1 · **Stand:** 11. November 2026<br>
 **Zielversion:** **2.0.0**<br>
-**Status:** Apply 088 vor Commit gescheitert; Korrekturbundle 089 für `200-01.W` vorbereitet.<br>
-**Fortschritt:** **0 / 36 Umsetzungscommits**, zwölf Schritte mit je W, R und C.<br>
+**Status:** `200-01.W` durch Apply 089 bestätigt; Bundle 090 für `200-01.R` vorbereitet.<br>
+**Fortschritt:** **1 / 36 Umsetzungscommits**, zwölf Schritte mit je W, R und C.<br>
 **Aktiver Planpfad:** `planning/2.0.0/commit-plan.md`<br>
 **Zugehöriger Detailentwurf:** [Lokale Testmessung und Profiling](test-profiling.md).
 Dieser Detailentwurf gehört zu diesem Plan; er ist kein konkurrierender Plan.
@@ -97,8 +97,9 @@ hergestellt, weil seine Komponenten gemeinsam geprüft werden müssen; nicht um
 einen parallelen 1.x-Produktionsbetrieb zu ermöglichen.
 
 Jeder Commit entsteht erst nach seinem Gate im Apply-Repository und wird durch
-das tatsächliche Result bestätigt. Development führt nur änderungsbezogene
-parallele Tests aus, Apply vor jedem Commit die vollständige parallele Suite.
+das tatsächliche Result bestätigt. Nach der Nutzerpräzisierung vom 11. November
+2026 führt Development ausschließlich statische Analyse durch; Tests laufen nur
+im Apply, vor jedem Commit als vollständige parallele Suite.
 Diagnostisches Profiling einzelner Tests ist **kein serielles Commit-Gate**.
 Keine Vollsuite in Development, keine abgeschwächten Gates, keine Wiederholung
 unveränderter grüner Prüfungen ohne neuen Anlass.
@@ -201,7 +202,10 @@ wenn dafür tatsächliche Informationen vorliegen.
 | 200-11 | README, Badges, aktuelle Anleitungen und Integrationshinweise | 200-10.C |
 | 200-12 | Finalen 2.0.0-Stand herstellen und vollständig abnehmen | 200-11.C |
 
-Alle folgenden Positionen sind in der Apply-Historie **OFFEN**; `200-01.W` wartet auf den erfolgreichen Korrektur-Apply 089. Die Commit-Subjects sind verbindliche
+`200-01.W` ist durch Commit `3670347923c107c8ae2b76d0d4c65ce2516fa63c`
+und Result `fd6fce0a-0f4f-46e9-ab51-3cfdd8591c28` bestätigt. Die übrigen
+35 Positionen sind **OFFEN**; `200-01.R` ist mit Bundle 090 vorbereitet.
+Die Commit-Subjects sind verbindliche
 Planvorlagen; Fortschritt wird erst mit tatsächlichem Commit und Result eingetragen.
 
 | Position | Kennung | Commit-Subject |
@@ -568,7 +572,7 @@ Acceptance- und Publish-Skripte mit voller Commit-/Artefaktbindung.
 | A-13 | Finales 2.0.0, alle Plattformnachweise auf exaktem Endcommit, Originalartefakte gebunden | 12 |
 
 Zu jedem später bestätigten Plancommit werden Commit-SHA, tatsächliches Result,
-Bundle-SHA, ausgewählte Development-Prüfungen und vollständiges Apply-Gate
+Bundle-SHA, statische Development-Prüfung und vollständiges Apply-Gate
 nachgetragen. Externe CI und eine spätere Veröffentlichung werden separat
 nachgewiesen. Der Planstatus bleibt bis dahin offen.
 
@@ -618,5 +622,33 @@ und führt die vollständige Suite parallel mit vier Workern aus. Erst dann ents
 der noch offene Commit `200-01.W` mit seinem ursprünglichen Subject. Kein Push,
 Tag, CI-Start, Release oder Hostupdate im Entrypoint.
 
-Der Planfortschritt bleibt 0/36 bestätigt, bis das tatsächliche Result den
-Commit belegt. Der vorbereitete Stand ist kein erfolgreicher Apply.
+**Ergebnis:** Result `fd6fce0a-0f4f-46e9-ab51-3cfdd8591c28` bestätigt den
+erfolgreichen Apply 089: 3.743 bestandene Tests, 16 Skips, vier Worker und den
+lokalen Commit `3670347923c107c8ae2b76d0d4c65ce2516fa63c`. Die 29 Commitdateien
+stimmen mit der geplanten Lieferung überein; der Worktree ist sauber. Kein Push
+oder Tag. Damit ist genau Position 1/36 bestätigt.
+
+## Lieferung 090 – 200-01.R
+
+Referenz ist das erfolgreiche Result 089 auf dem oben genannten Commit.
+Der Right-Schritt ergänzt Verhaltenstests über die öffentliche `run_scripts`-API:
+
+- Echte ZIP-Dateien und Binärstreams: Nutzdateien stehen dem ersten Skript
+  bytegenau bereit; Exitcodes 17, 124 und 130 bleiben normale Skriptergebnisse
+  und verhindern die Ausführung des zweiten Skripts.
+- Ein echter Timeout bleibt ein Toolfehler mit `FailureReason.TIMEOUT` und
+  beendet das Bundle vor dem folgenden Skript.
+- Traversal, Groß-/Kleinschreibungskollisionen und Symlinks im Archiv werden
+  vor Nutzdateischreibzugriffen und Skriptausführung abgewiesen.
+- Fehlende Marker, kollidierende Zielverzeichnisse und nach der Auswahl
+  veränderte Verzeichniskandidaten erhalten ihre Sicherheitsgrenzen.
+- Eingabestreams und Ausgabesenken bleiben im Besitz des Aufrufers. Ein
+  paralleler CLI-Aufruf unterdrückt keine Warnung eines anderen API-Threads;
+  `KeyboardInterrupt` und `SystemExit` stellen den Warnkontext wieder her.
+
+Die 17 neuen parametrisierten Fälle sind ausschließlich statisch geprüft;
+kein Development-Testlauf. Bestehende Runner- und Release-Gates bleiben erhalten.
+Der Entrypoint verlangt die vollständige parallele Apply-Suite vor genau einem
+lokalen Commit mit dem geplanten Subject für `200-01.R`. Push, Tag und CI bleiben
+aus. Vor dessen tatsächlichem Result bleibt der Fortschritt 1/36; als Nächstes
+folgt nach erfolgreichem Right-Stand `200-01.C`.
