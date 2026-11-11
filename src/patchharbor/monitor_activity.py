@@ -16,7 +16,7 @@ WATCH_LABELS = {
     'ready': 'Exchange-Prüfung bereit', 'overflow': 'Ereignisüberlauf; erneute Prüfung',
     'replaced': 'Verzeichnis geändert; Überwachung erneuern',
     'worker-start': 'Execute-Prozess wird gestartet', 'executing': 'Execute aktiv',
-    'completion': 'Execute-Rückmeldung wird ausgewertet',
+    'completion': 'Execute-Rückmeldung wird ausgewertet', 'execute-completed': 'Execute beendet',
     'no-candidate': 'Kein ausführbarer Task gefunden', 'pending': 'Weitere Prüfung vorgemerkt',
     'waiting-change': 'Wartet nach Fehler auf eine neue Änderung',
     'registry-lock': 'Wartet auf Registrierungssperre',

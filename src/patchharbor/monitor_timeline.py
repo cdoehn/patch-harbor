@@ -1,5 +1,6 @@
 """Five fixed activity rows: two observations, current state, two forecasts."""
 from patchharbor.monitor_format import age, fit, human_text, local_time, symbol
+from patchharbor.monitor_projection import observe
 from patchharbor.monitor_status import activity, activity_text, active_runs, instances, live, operation, repo_name
 
 
@@ -101,7 +102,8 @@ def timeline(document, session, *, now=None, frame=0, width=120):
                      (symbol(status) + '  ' + human_text(label, full=full, now=now), status)])
     while len(rows) < 2:
         rows.insert(0, [('--:--:--    ·  Kein früherer Schritt beobachtet', 'unknown')])
-    status = current['status']
+    observation = observe(row, document, now)
+    status = observation.status
     text = activity_text(row, now)
     if row['kind'] != 'watcher':
         label = operation(row, full)
@@ -112,10 +114,8 @@ def timeline(document, session, *, now=None, frame=0, width=120):
             if current['code'] == 'entrypoint' and current['status'] == 'running':
                 text = (data.get('entrypoint_name') or 'Entrypoint') + ' läuft'
         text = repo_name(row, document) + ' · ' + label + ' · ' + text
-    if not live(row, document, now) and not row.get('completed'):
-        status, text = 'unknown', 'VERALTET · ' + text
-    elif row.get('completed') and status == 'running':
-        status = 'unknown'
+    if observation.stale:
+        text = 'VERALTET · ' + text
     rows.append([(fit(local_time(current['at'], now), 12), 'unknown'),
                  (symbol(status, frame) + '  ' + human_text(text, full=full, now=now), status)])
     rows += [[(fit('--:--:--', 12), 'unknown'), ('   ' + text, style)] for text, style in forecast(row, document, now)]

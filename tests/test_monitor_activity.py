@@ -11,11 +11,11 @@ import pytest
 from patchharbor import api
 from patchharbor.monitor_activity import declared_bundle_number, HISTORY_LIMIT
 from patchharbor.monitor_display import render
-from patchharbor.monitor_format import duration, human_text, short_id, SPINNER, cell_width
+from patchharbor.monitor_format import human_text, SPINNER, cell_width
 from patchharbor.monitor_live_schema import parse_live
 from patchharbor.monitor_session import MonitorSession, VIEWS
 from patchharbor.monitor_status import activity, active_runs, exchange_status, last_result, repository_status
-from patchharbor.monitor_timeline import timeline, forecast
+from patchharbor.monitor_timeline import forecast
 from tests.test_monitor import registered
 from tests.test_monitor_live import wait_for, instance
 from tests.test_monitor_artifacts import patch
@@ -184,7 +184,7 @@ def test_published_history_survives_late_monitor_start_and_is_bounded(tmp_path, 
     assert row['activity']['status'] == 'waiting'
 
 
-def test_version_one_is_readable_and_malformed_history_is_rejected(tmp_path, monkeypatch):
+def test_version_one_and_malformed_history_are_rejected(tmp_path, monkeypatch):
     registered(tmp_path, monkeypatch)
     publication = api.watcher_observation()
     row = wait_for(lambda: instance(publication.instance_id))
@@ -245,9 +245,9 @@ def test_empty_automatic_scan_is_waiting_not_a_failed_apply(tmp_path, monkeypatc
     assert activity(row)['code'] == 'no-candidate'
     legacy = {k: v for k, v in row.items() if k not in ('activity', 'history')}
     legacy['data'].pop('automatic_status')
-    assert activity(legacy)['status'] == 'waiting'
+    assert activity(legacy)['status'] == 'unknown'
     legacy['data']['message'] = 'A different validation failure'
-    assert activity(legacy)['status'] == 'failure'
+    assert activity(legacy)['status'] == 'unknown'
 
 
 def test_overview_summaries_observe_unselected_repositories_with_full_binding(tmp_path, monkeypatch):

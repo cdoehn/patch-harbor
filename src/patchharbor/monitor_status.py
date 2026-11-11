@@ -3,15 +3,14 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from patchharbor.monitor_activity import PHASES, WATCH_LABELS
+from patchharbor.monitor_activity import WATCH_LABELS
+from patchharbor.monitor_projection import (activity as projected_activity,
+    operation as projected_operation, observe, result_outcome)
 from patchharbor.monitor_format import age, duration, elapsed, short_id, timestamp
 
 
 def live(row, document, now=None):
-    stamp = timestamp(row.get('updated_at'))
-    age_seconds = ((now or datetime.now(timezone.utc)) - stamp).total_seconds() if stamp else None
-    return bool(row.get('live') and not row.get('stale') and not document.get('live_view', {}).get('stale')
-                and age_seconds is not None and 0 <= age_seconds <= 15)
+    return observe(row, document, now).current
 
 
 def instances(document):
@@ -25,35 +24,7 @@ def active_runs(document, repo_id=None, now=None):
 
 
 def activity(row):
-    if row.get('activity'):
-        return row['activity']
-    data, phase = row.get('data', {}), row.get('phase', 'starting')
-    status, message, code = 'unknown', 'Aktivität unbekannt', phase
-    if row.get('completed'):
-        primary = data.get('primary_result') or {}
-        if (data.get('origin') == 'automatic' and not primary.get('entrypoint_started')
-                and primary.get('kind') == 'validation_error' and data.get('result_status') == 'not_attempted'
-                and data.get('message') == 'No eligible task remains after content, scope, state and replay checks'):
-            code, status, message = 'no-candidate', 'waiting', 'Kein ausführbarer Task gefunden'
-        elif primary or data.get('result_status') == 'failed':
-            status = 'success' if primary.get('success') and data.get('result_status') != 'failed' else 'failure'
-            message = 'Execute erfolgreich abgeschlossen' if status == 'success' else 'Execute fehlgeschlagen'
-        elif row['kind'] == 'watcher' and phase == 'stopped':
-            status, message = ('failure' if data.get('last_error') else 'success'), 'Watcher beendet'
-    elif row['kind'] == 'watcher':
-        targets = data.get('targets', [])
-        lock = data.get('control_lock') or next((t.get('blocked_on') for t in targets if t.get('blocked_on')), None)
-        code = phase if phase == 'executing' else lock['kind'] + '-lock' if lock else 'quiet' if any(t.get('dirty') for t in targets) else phase
-        status, message = ('running' if code in ('starting', 'executing') else 'waiting'), WATCH_LABELS.get(code, 'Watcher-Zustand unbekannt')
-    elif data.get('effective_timeout_seconds') is not None and data.get('process_state') is None:
-        code, status, message = 'entrypoint', 'running', 'Entrypoint läuft'
-    elif phase in PHASES:
-        code, message = PHASES[phase]
-        status = 'failure' if phase in ('TIMEOUT', 'INTERRUPT') else 'running'
-    elif phase == 'starting':
-        code, status, message = 'starting', 'running', 'PatchHarbor startet'
-    return dict(code=code, status=status, message=message, sequence=0,
-                at=row.get('facts_updated_at'), since=data.get('entrypoint_started_at') or row.get('facts_updated_at'))
+    return projected_activity(row).document()
 
 
 def basename(path):
@@ -77,15 +48,16 @@ def package_label(data, full=False):
 
 
 def operation(row, full=False):
-    item, data = activity(row), row.get('data', {})
-    if row['kind'] == 'watcher':
+    value = projected_operation(row)
+    if value.kind == 'watcher':
         return 'Watcher'
-    if item['code'] == 'no-candidate':
+    if value.activity.code == 'no-candidate':
         return 'Exchange-Prüfung'
-    if row['kind'] == 'bundle':
-        return 'Result-Bundle · Lauf ' + short_id(data.get('run_id'), full)
-    label = package_label(data, full)
-    return 'Result zu ' + label if item['code'].startswith('result-') else label
+    if value.kind == 'bundle':
+        return 'Result-Bundle · Lauf ' + short_id(value.run_id, full)
+    label = package_label(dict(bundle_number=value.bundle_number,
+        task_sha256=value.task_sha256, task_path=value.task_path), full)
+    return 'Result zu ' + label if value.producing_result else label
 
 
 def activity_text(row, now=None):
@@ -181,6 +153,6 @@ def last_result(repo, document, now=None):
         return '—', 'unknown'
     stamp, data, uncertain = max(candidates, key=lambda item: timestamp(item[0]) or datetime.min.replace(tzinfo=timezone.utc))
     primary = data.get('primary_result') or {}
-    status = 'unknown' if uncertain or not primary else 'success' if primary.get('success') and data.get('result_status') != 'failed' else 'failure'
+    status = result_outcome(data, uncertain=uncertain)
     detail = 'Result fehlgeschlagen' if data.get('result_status') == 'failed' else ('Exit ' + str(primary['entrypoint_exit_code'])) if status == 'failure' and primary.get('entrypoint_exit_code') is not None else ''
     return (detail + ' · ' if detail else '') + age(stamp, now), status

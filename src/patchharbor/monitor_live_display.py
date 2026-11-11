@@ -3,14 +3,15 @@ from datetime import datetime, timezone
 import time
 
 from patchharbor.monitor_session import result_semantic
-from patchharbor.monitor_format import age, duration, elapsed, symbol
+from patchharbor.monitor_projection import observe
+from patchharbor.monitor_format import age, duration, symbol
 from patchharbor.monitor_status import activity, activity_text, live, operation, repo_name
 
 
 def watcher_summary(document):
     view = document.get('live_view', {})
     rows = [r for r in view.get('instances', []) if r['kind'] == 'watcher']
-    active = sum(r.get('live', False) for r in rows)
+    active = sum(observe(r, document).current for r in rows)
     return f'{active} aktuell beobachtet' if active and not view.get('stale') else 'unbekannt / keine aktuelle Beobachtung'
 
 
@@ -22,12 +23,12 @@ def live_lines(document, session, *, height):
         index = rows.index(selected) if selected else 0
         first = max(0, index - 2)
         for row in rows[first:first+3]:
-            current = live(row, document)
-            status = 'running' if current and activity(row)['status'] == 'running' else activity(row)['status'] if row.get('completed') or current else 'unknown'
+            observation = observe(row, document)
+            status = observation.status
             label = operation(row, session.full_identifiers) + ' · ' + activity_text(row)
             if row['kind'] != 'watcher':
                 label = repo_name(row, document) + ' · ' + label
-            if not current and not row.get('completed'):
+            if observation.stale:
                 label = 'VERALTET · ' + label
             lines.append((('› ' if row is selected else '  ') + symbol(status, int(time.monotonic()*8)) + ' ' + label, status))
     if selected:

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from patchharbor.monitor_projection import result_outcome
 
 VIEWS = ('overview', 'exchanges', 'bundles', 'history', 'logs', 'live', 'live-logs')
 
@@ -100,16 +101,7 @@ def artifact_key(row):
 
 
 def result_semantic(row):
-    if row.get('stale'):
-        return 'unknown'
-    if row.get('error') or row.get('result_status') == 'failed':
-        return 'dirty'
-    primary = row.get('primary_result')
-    if primary:
-        return 'clean' if primary.get('success') is True else 'dirty'
-    if row.get('replay_status') == 'failed':
-        return 'dirty'
-    return 'unknown'
+    return {'success': 'clean', 'failure': 'dirty'}.get(result_outcome(row), 'unknown')
 
 
 def git_semantic(row):

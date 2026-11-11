@@ -2,8 +2,8 @@
 
 **Plan-ID:** `PH-200` · **Revision:** 2 · **Stand:** 11. November 2026<br>
 **Zielversion:** **2.0.0**<br>
-**Status:** `200-02.W1` durch Apply 092 bestätigt; Bundle 093 repariert `200-02.W2` und setzt die Folgephasen fort.<br>
-**Fortschritt:** **4 / 38 Umsetzungscommits**, zwölf WRC-Schritte; die Protokoll-Work-Phase besteht aus drei Teilcommits.<br>
+**Status:** Bundle 094 scheiterte vor seinem ersten Commit am Packaging-Dateiinventar. Bundle 095 repariert den erhaltenen Stand und übernimmt weiterhin Positionen 11–17.<br>
+**Fortschritt:** **10 / 38 Umsetzungscommits**, zwölf WRC-Schritte; die Protokoll-Work-Phase besteht aus drei Teilcommits.<br>
 **Aktiver Planpfad:** `planning/2.0.0/commit-plan.md`<br>
 **Zugehöriger Detailentwurf:** [Lokale Testmessung und Profiling](test-profiling.md).
 Dieser Detailentwurf gehört zu diesem Plan; er ist kein konkurrierender Plan.
@@ -210,9 +210,12 @@ wenn dafür tatsächliche Informationen vorliegen.
 `682b042407048f5e0b6da23f70aad5c845ce0f37` bestätigt. `200-02.W1` ist durch
 Commit `c7fe8f991fd877c10acd4c73f3d6f1b9d229792a` und Result
 `86c0251b-7102-4bd4-95d0-099e695053f6` bestätigt. Der folgende W2-Lauf
-scheiterte vor dem Commit; sein tatsächlicher uncommitteter Zustand ist die
-gebundene Ausgangsbasis. Die übrigen 34 Positionen sind **OFFEN**;
-Bundle 093 bereitet die reparierten Positionen 5–10 vor.
+scheiterte vor dem Commit. Bundle 093 hat die reparierten Positionen 5–10
+anschließend erfolgreich übernommen: Result `38b6e72e-c15f-4273-817f-c37a3b5cd914`,
+Endcommit `5ff1e71c5c5f0854554633493393b5e85fa5e4c3`. Alle sechs vollständigen
+Apply-Gates waren erfolgreich; im letzten Lauf 3.814 bestandene Tests und
+16 Skips. Die übrigen 28 Positionen bleiben **OFFEN**; das Reparaturbundle 095 übernimmt
+Positionen 11–17.
 Die Commit-Subjects sind verbindliche
 Planvorlagen; Fortschritt wird erst mit tatsächlichem Commit und Result eingetragen.
 
@@ -764,3 +767,48 @@ Die bestehende Polling-, Replay-, Timeout-, CIFS- und Plattformabdeckung bleibt
 Teil der vollständigen parallelen Apply-Suite. Die Vorbereitung führt keine
 Tests aus und behauptet keine native Windows-Abnahme. Keine neuen Prüfungen
 auf Farben, Spinner, Konsolenwortlaut oder Layout.
+
+
+## Bundle 094 – Übernahme des freigegebenen Drafts
+
+Result `38b6e72e-c15f-4273-817f-c37a3b5cd914` bestätigt den zuvor angenommenen
+Endbaum `6fd935de32d28228a2ce331e59f0d69925ee794f` von Bundle 093 exakt.
+Das Result ist sauber, erfolgreich und vollständig geprüft; sein SHA-256 ist
+`0ed4264591423313877803bf8567ee357089cae20627f6a1fa7bbf49377a8ac7`.
+Bestätigt sind 10/38 Schritte. Die sieben folgenden Schritte sind erst nach
+ihren tatsächlichen Apply-Commits und einem passenden Result bestätigt.
+
+Bundle 094 enthält `200-03.C`, `200-04.W/R/C` und `200-05.W/R/C`: gemeinsame
+typisierte Beobachtungsprojektionen, installierte/offline Runtime-Übergaben
+und getrennte Setup-/Call-/Teardown-Messung. Vor jedem Commit läuft die
+vollständige parallele Apply-Suite. Der freigegebene Entrypoint verwendet
+`--workers auto`, ohne feste Workerzahl oder zusätzliche Obergrenze; geerbte
+Overrides von `PYTEST_XDIST_AUTO_NUM_WORKERS` werden nur für diesen Testprozess
+entfernt. Der Erfolgsvalidator prüft weiterhin alle tatsächlich gestarteten Worker.
+Tests laufen ausschließlich in Apply. Push, Tag und CI bleiben aus.
+
+`200-03.C`: Immutable Activity-/Operation-/Observation-Daten vereinheitlichen
+Live-Ansicht, Verlauf und Ergebnisdarstellung. Aktuelle Prozesse, bestätigte
+Abschlüsse und veraltete Daten verwenden dieselbe Projektion. Fehlende aktuelle
+Aktivitätsdaten bleiben unbekannt; Logprosa erzeugt keinen Ersatzstatus. Beobachtung
+enthält keinerlei Core-Ausführung oder I/O und erfindet keine Commitabsicht.
+
+## Apply 094 und Reparaturbundle 095
+
+Result `240b3748-f6f8-49a2-8026-52bf0c8960e8` bestätigt den fehlgeschlagenen
+ersten Schritt `200-03.C`: 3.819 bestandene Tests, zwei Fehler und 16 Skips
+mit zwölf automatisch gewählten Workern. Der HEAD blieb unverändert auf
+`5ff1e71c5c5f0854554633493393b5e85fa5e4c3`; bestätigt bleiben 10/38 Schritte.
+Das Result enthält die tatsächlich übernommenen, uncommitteten C-Dateien.
+
+Beide Fehler kommen aus dem expliziten Packaging-Inventar:
+`patchharbor/monitor_projection.py` fehlt dort. Bundle 095 ergänzt den
+Eintrag in jedem Folgestand und außerdem `patchharbor/runtime_contract.py`
+ab seiner Einführung in `200-04.C`. Die Allowlist bleibt ausdrücklich
+aufgezählt; keine dynamische Ableitung der erwarteten Wheel-Inhalte und
+keine Abschwächung der bestehenden Abnahmeprüfungen.
+
+Bundle 095 bindet das neue Result einschließlich seines Dirty-Fingerprints
+und führt dieselben sieben Schritte mit jeweils vollständigem Apply-Gate
+vor dem Commit weiter. Worker bleiben `auto` ohne zusätzliche Obergrenze.
+In Dev erfolgt nur statische Analyse. Push, Tag und CI bleiben aus.
