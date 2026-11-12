@@ -2,8 +2,8 @@
 
 **Plan-ID:** `PH-200` · **Revision:** 2 · **Stand:** 11. November 2026<br>
 **Zielversion:** **2.0.0**<br>
-**Status:** Apply 100 bestätigt 28/38 Schritte. Reparaturbundle 101 enthält den verbleibenden Stand 200-09.C; Bestätigung ausschließlich durch Apply.<br>
-**Fortschritt:** **28 / 38 Umsetzungscommits**, zwölf WRC-Schritte; die Protokoll-Work-Phase besteht aus drei Teilcommits.<br>
+**Status:** Apply 101 bestätigt 29/38 Schritte. Reparaturbundle 103 enthält die neun verbleibenden Stände; Bestätigung ausschließlich durch Apply.<br>
+**Fortschritt:** **29 / 38 Umsetzungscommits**, zwölf WRC-Schritte; die Protokoll-Work-Phase besteht aus drei Teilcommits.<br>
 **Aktiver Planpfad:** `planning/2.0.0/commit-plan.md`<br>
 **Zugehöriger Detailentwurf:** [Lokale Testmessung und Profiling](test-profiling.md).
 Dieser Detailentwurf gehört zu diesem Plan; er ist kein konkurrierender Plan.
@@ -933,3 +933,23 @@ Identitätsfelder ohne Änderung der gelesenen Datenbank. In Dev findet nur
 statische Analyse statt; vor dem tatsächlichen Commit läuft in Apply erneut
 die vollständige parallele Suite mit automatischer Workerzahl ohne Zusatzlimit.
 Push, Tag und abschließende native Release-Abnahme bleiben ausstehend.
+
+## Reparatur nach Bundle 102
+
+Apply 101 bestätigt 29/38 Umsetzungscommits. Bundle 102 stoppte im ersten
+Stand `200-10.W`, bevor ein neuer Commit angelegt wurde: Die drei zusätzlichen
+Summary-Schritte enthielten `continue-on-error`, während der bestehende
+Workflow-Vertrag Fehlerausnahmen für Jobs und Schritte ausschließt.
+
+Reparaturbundle 103 entfernt diese Ausnahmen in allen neun Folgeständen.
+Nur der diagnostische Summary-Befehl erhält den ausdrücklichen Modus
+`--best-effort`: erkannte Berichts-/Ausgabefehler werden gemeldet und ändern
+nicht den Exit-Status der vorherigen Test-, Artefakt- oder Release-Gates.
+Ohne diese Option bleibt der bisherige strenge CLI-Fehlerstatus erhalten.
+Fehlerhafte Kommandoargumente bleiben auch mit der Option Fehler. Die
+Originalberichte und ihre strengen Erfolgsvalidatoren werden nicht verändert.
+Regressionen prüfen beide CLI-Modi, echte Schreib-/Zuordnungsfehler und
+unveränderte fehlgeschlagene Testnachweise. Die vorhandenen Workflow-Tests
+bleiben bytegleich. Dev führt nur statische Analyse durch; Apply prüft jeden
+der neun echten Zwischenstände mit der vollständigen parallelen Suite vor
+seinem Commit. Push, Tag und die abschließende native Abnahme stehen aus.

@@ -6,7 +6,8 @@ import json
 def cell(value, limit=300):
     value = 'unknown' if value is None else str(value)
     value = ''.join(character if character.isprintable() else ' ' for character in value)
-    return html.escape(value[:limit], quote=False).replace('|', '&#124;').replace('`', '&#96;')
+    value = html.escape(value[:limit], quote=False)
+    return ''.join('&#'+str(ord(c))+';' if c in '|`*_[]()!#~' + chr(92) else c for c in value)
 
 
 def table(columns, rows, *, limit=100):

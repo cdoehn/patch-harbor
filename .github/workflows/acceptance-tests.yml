@@ -147,6 +147,7 @@ jobs:
           --report "${{ runner.temp }}/patchharbor-packaging-tests.json"
 
       - name: Upload native packaging evidence
+        id: test-artifacts
         if: always()
         uses: actions/upload-artifact@v7
         with:
@@ -159,6 +160,13 @@ jobs:
             ${{ runner.temp }}/patchharbor-packaging-tests.json
           if-no-files-found: error
           retention-days: 14
+
+      - name: Summarize existing test evidence
+        if: always()
+        env:
+          PH_SUMMARY_ARTIFACT: ${{ matrix.artifact }}
+          PH_SUMMARY_ARTIFACT_URL: ${{ steps.test-artifacts.outputs.artifact-url }}
+        run: python scripts/summarize_ci_tests.py --best-effort --reports-dir "${{ runner.temp }}"
 
   windows-powershell7-acceptance:
     if: ${{ inputs.release_action == 'none' || inputs.release_action == '' }}
@@ -222,6 +230,7 @@ jobs:
           --report "${{ runner.temp }}/patchharbor-windows-tests.json"
 
       - name: Upload native Windows evidence
+        id: test-artifacts
         if: always()
         uses: actions/upload-artifact@v7
         with:
@@ -231,6 +240,13 @@ jobs:
             ${{ runner.temp }}/patchharbor-windows-tests.json
           if-no-files-found: error
           retention-days: 14
+
+      - name: Summarize existing test evidence
+        if: always()
+        env:
+          PH_SUMMARY_ARTIFACT: ${{ matrix.artifact }}
+          PH_SUMMARY_ARTIFACT_URL: ${{ steps.test-artifacts.outputs.artifact-url }}
+        run: python scripts/summarize_ci_tests.py --best-effort --reports-dir "${{ runner.temp }}"
 
   ubuntu-docker-integration:
     if: ${{ inputs.release_action == 'none' || inputs.release_action == '' }}
@@ -274,6 +290,7 @@ jobs:
           ./scripts/run_docker_integration_tests.sh "${{ matrix.ubuntu }}"
 
       - name: Upload Docker integration diagnostics
+        id: test-artifacts
         if: always()
         uses: actions/upload-artifact@v7
         with:
@@ -283,6 +300,13 @@ jobs:
             !${{ runner.temp }}/patchharbor-docker-integration/ubuntu-${{ matrix.ubuntu }}/patchharbor-build-artifacts/**
           if-no-files-found: error
           retention-days: 14
+
+      - name: Summarize existing test evidence
+        if: always()
+        env:
+          PH_SUMMARY_ARTIFACT: ${{ matrix.artifact }}
+          PH_SUMMARY_ARTIFACT_URL: ${{ steps.test-artifacts.outputs.artifact-url }}
+        run: python scripts/summarize_ci_tests.py --best-effort --reports-dir "${{ runner.temp }}/patchharbor-docker-integration/ubuntu-${{ matrix.ubuntu }}"
 
   release-prepare:
     name: Prepare verified runtime release
