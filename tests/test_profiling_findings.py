@@ -5,7 +5,8 @@ from types import SimpleNamespace
 import pytest
 
 from tools.profiling.findings import derive_findings
-from tools.profiling.reporting import compare_runs, rankings
+from tools.profiling.reporting import compare_runs, report_run
+from tools.profiling.queries import rankings
 from tools.profiling.storage import database
 
 
@@ -27,6 +28,29 @@ def seeded_history(path):
 
 def comparison_args(path):
     return SimpleNamespace(database=path, before='before', after='after', phase='call')
+
+
+@pytest.mark.parametrize('duplicate_identity', [False, True])
+def test_report_preserves_payloads_and_uses_row_identity_read_only(tmp_path, duplicate_identity):
+    path = tmp_path / 'measure.sqlite3'
+    seeded_history(path)
+    fixture = {'id': 'fixture-1', 'scope': 'session', 'setup_s': 0.5}
+    finding = {'kind': 'slow-call', 'value': 2.0}
+    if duplicate_identity:
+        fixture.update(measurement_id='other-measurement', worker='other-worker')
+        finding.update(nodeid='other-test', phase='setup', worker='other-worker')
+    with database(path, writable=True) as connection, connection:
+        connection.execute('INSERT INTO fixtures VALUES(?,?,?,?,?)',
+            ('beforebaseline0', None, 'setup', 'gw0', json.dumps(fixture)))
+        connection.execute('INSERT INTO findings VALUES(?,?,?,?,?)',
+            ('beforebaseline0', 'test.py::test_a', 'call', 'gw0', json.dumps(finding)))
+    before = path.read_bytes()
+    result = report_run(SimpleNamespace(database=path, run='before', mode='baseline', phase='call', top=10))
+    assert result['fixtures'] == [{'id': 'fixture-1', 'scope': 'session', 'setup_s': 0.5,
+                                   'measurement_id': 'beforebaseline0', 'worker': 'gw0'}]
+    assert result['findings'] == [{'kind': 'slow-call', 'value': 2.0,
+                                   'nodeid': 'test.py::test_a', 'phase': 'call', 'worker': 'gw0'}]
+    assert path.read_bytes() == before
 
 
 def test_warmups_profiles_and_preparation_cannot_inflate_baseline_rankings(tmp_path):

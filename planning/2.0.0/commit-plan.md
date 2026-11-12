@@ -2,8 +2,8 @@
 
 **Plan-ID:** `PH-200` · **Revision:** 2 · **Stand:** 11. November 2026<br>
 **Zielversion:** **2.0.0**<br>
-**Status:** Apply 098 bestätigt Positionen 16–17. Bundle 099 bereitet die zwölf Profiling-Schritte 18–29 vor; Bestätigung ausschließlich durch Apply.<br>
-**Fortschritt:** **17 / 38 Umsetzungscommits**, zwölf WRC-Schritte; die Protokoll-Work-Phase besteht aus drei Teilcommits.<br>
+**Status:** Apply 100 bestätigt 28/38 Schritte. Reparaturbundle 101 enthält den verbleibenden Stand 200-09.C; Bestätigung ausschließlich durch Apply.<br>
+**Fortschritt:** **28 / 38 Umsetzungscommits**, zwölf WRC-Schritte; die Protokoll-Work-Phase besteht aus drei Teilcommits.<br>
 **Aktiver Planpfad:** `planning/2.0.0/commit-plan.md`<br>
 **Zugehöriger Detailentwurf:** [Lokale Testmessung und Profiling](test-profiling.md).
 Dieser Detailentwurf gehört zu diesem Plan; er ist kein konkurrierender Plan.
@@ -916,3 +916,20 @@ Das Korrekturbundle 100 bindet an diesen Zustand, repariert Collector-Metadaten
 und Regression und nimmt die acht verbliebenen Stände bis `200-09.C` erneut
 mit je vollständigem parallelem Apply-Gate auf. Der Abschluss-Draft bleibt
 zurückgehalten und wird mit derselben Korrektur fortgeführt.
+
+## Reparatur nach Bundle 100
+
+Apply 100 hat die sieben Stände `200-07.R` bis `200-09.R` mit jeweils
+vollständiger paralleler Testsuite übernommen. Damit sind 28/38 Schritte
+bestätigt. Der letzte Stand `200-09.C` blieb nach einem Fehler beim
+Fixture-Bericht uncommittet: Das JSON-Payload enthielt bereits `worker`,
+welches der Bericht nochmals als Schlüsselwortargument übergab.
+
+Bundle 101 repariert die Zusammenführung von Fixture- und Finding-Daten.
+Die expliziten Datenbankspalten bestimmen die Messungs-, Test-, Phasen-
+und Worker-Zuordnung, während zusätzliche Payload-Felder erhalten bleiben.
+Regressionen prüfen reale lokale Fixture-Daten sowie doppelte und fehlende
+Identitätsfelder ohne Änderung der gelesenen Datenbank. In Dev findet nur
+statische Analyse statt; vor dem tatsächlichen Commit läuft in Apply erneut
+die vollständige parallele Suite mit automatischer Workerzahl ohne Zusatzlimit.
+Push, Tag und abschließende native Release-Abnahme bleiben ausstehend.

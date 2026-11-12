@@ -9,6 +9,7 @@ from tools.profiling.capture import run
 from tools.profiling.common import count, encoded, positive
 from tools.profiling.reporting import compare_runs, report_run
 from tools.test_policy import PROJECT_ROOT
+from tools.report_rendering import render_profile
 
 
 def parser():
@@ -28,7 +29,7 @@ def parser():
         read = commands.add_parser(name, allow_abbrev=False)
         read.add_argument('--database', type=Path, default=PROJECT_ROOT / 'build/test-profile/measurements.sqlite3')
         read.add_argument('--phase', choices=('setup', 'call', 'teardown'), default='call')
-        read.add_argument('--format', choices=('json',), default='json')
+        read.add_argument('--format', choices=('json','text','markdown'), default='json')
         if name == 'report':
             read.add_argument('--run', default='latest')
             read.add_argument('--mode', choices=('baseline','cprofile','memory','strace'), default='baseline')
@@ -48,7 +49,7 @@ def main(argv=None):
             result, code = run(args)
         else:
             result, code = (report_run(args) if args.command == 'report' else compare_runs(args)), 0
-        print(encoded(result))
+        print(encoded(result) if args.command == 'run' else render_profile(result, args.format))
         return code
     except (OSError, ValueError, sqlite3.Error) as exc:
         print(encoded({'status': 'error', 'error': str(exc)}))

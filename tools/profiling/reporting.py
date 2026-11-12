@@ -2,26 +2,13 @@
 from __future__ import annotations
 
 import json
-import statistics
 
 from tools.profiling.storage import database
+from tools.profiling.queries import load_run, rankings
 
 
-def load_run(connection, identity):
-    row = connection.execute('SELECT id,started,ended,status,metadata FROM runs ORDER BY rowid DESC LIMIT 1').fetchone() if identity == 'latest' else connection.execute('SELECT id,started,ended,status,metadata FROM runs WHERE id=?', (identity,)).fetchone()
-    if row is None:
-        raise ValueError('unknown profiling run')
-    return dict(zip(('run_id', 'started', 'ended', 'status', 'metadata'), (*row[:4], json.loads(row[4]))))
 
 
-def rankings(connection, identity, phase):
-    groups = {}
-    for nodeid, seconds in connection.execute('SELECT p.nodeid,p.duration_s FROM phases p JOIN measurements m ON m.id=p.measurement_id WHERE m.run_id=? AND m.mode=? AND m.warmup=0 AND m.status=? AND p.phase=? AND p.state=? AND p.duration_s IS NOT NULL',
-                                              (identity, 'baseline', 'complete', phase, 'measured')):
-        groups.setdefault(nodeid, []).append(seconds)
-    return sorted(({'nodeid': key, 'phase': phase, 'samples': len(values), 'median_s': statistics.median(values),
-                    'min_s': min(values), 'max_s': max(values)} for key, values in groups.items()),
-                  key=lambda row: (-row['median_s'], row['nodeid']))
 
 
 def report_run(args):
@@ -29,9 +16,13 @@ def report_run(args):
         result = load_run(connection, args.run)
         result['ranking'] = rankings(connection, result['run_id'], args.phase)[:args.top]
         result['ranking_mode'] = 'baseline'
-        result['findings'] = [dict(nodeid=n, phase=p, worker=w, **json.loads(d)) for n,p,w,d in connection.execute(
+        # Indexed row identities take precedence over duplicated payload fields.
+        result['findings'] = [{**json.loads(d), 'nodeid': n, 'phase': p, 'worker': w} for n,p,w,d in connection.execute(
             'SELECT f.nodeid,f.phase,f.worker,f.data FROM findings f JOIN measurements m ON m.id=f.measurement_id WHERE m.run_id=? AND m.warmup=0 AND m.status=? AND m.mode=? AND (f.phase=? OR f.phase IS NULL) ORDER BY f.rowid LIMIT ?',
             (result['run_id'], 'complete', args.mode, args.phase, args.top))]
+        result['fixtures'] = [{**json.loads(d), 'measurement_id': m, 'worker': w} for m,w,d in connection.execute(
+            'SELECT f.measurement_id,f.worker,f.data FROM fixtures f JOIN measurements m ON m.id=f.measurement_id WHERE m.run_id=? AND m.mode=? AND m.warmup=0 ORDER BY f.rowid LIMIT 1000',
+            (result['run_id'], args.mode))]
         result['finding_count'] = connection.execute(
             'SELECT count(*) FROM findings f JOIN measurements m ON m.id=f.measurement_id WHERE m.run_id=?', (result['run_id'],)).fetchone()[0]
         result['coverage'] = {'startup': 'recorded where observable', 'subprocess_python_profiles': 'unobserved',

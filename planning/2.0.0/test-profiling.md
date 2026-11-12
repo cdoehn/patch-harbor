@@ -331,6 +331,61 @@ Benchmark-Pflicht in allen Releasejobs. Hardwareabhängige Aussagen benötigen
 lokale Messbelege; reine Parser-Tests ersetzen keine echte Collector-Abnahme.
 
 
+## Lokaler Befehl und Messgrenzen (Bundle 099, Apply noch offen)
+
+```sh
+python tools/profile_tests.py run --modes baseline,cprofile,memory,strace --workers auto --repetitions 5 --profile-repetitions 1 --warmups 1 -- tests/test_selected.py
+python tools/profile_tests.py report --phase setup --format markdown
+python tools/profile_tests.py report --phase call --mode cprofile --format json
+python tools/profile_tests.py report --phase teardown --mode memory --format text
+python tools/profile_tests.py compare --before RUN_ID_A --after RUN_ID_B
+```
+
+Ohne `run` entsteht keine Messung. Standard ist ausschließlich `baseline`;
+Testpfade oder Node-IDs sind Pflicht. Datenbank und Rohdaten bleiben unter
+`build/test-profile/` oder beim expliziten `--database`-Pfad. `report` und
+`compare` öffnen die Datenbank nur lesend. Es gibt keinen CI-Profilingjob,
+keinen Upload, keine neue Core-Abhängigkeit und keine Profilingmodule in der PYZ.
+
+Setup, Call und Teardown werden separat gespeichert. Fixtures haben ihre
+eigene Lebensdauer und Verbraucher; gemeinsame Fixturekosten werden nicht
+jedem Test vollständig zugerechnet. Fixture-Finalisierungsdauer bleibt unbekannt,
+auch wenn die übergeordnete Test-Teardownphase gemessen wurde. Start-/Collection-
+Messungen enthalten nur beobachtete Intervalle; fehlende Werte bleiben unbekannt.
+
+cProfile misst instrumentierte Intervalle: unter CPython 3.10/3.11 im
+aktuellen Thread, unter CPython 3.12–3.14 interpreterweit. Funktions- und
+Callerwerte sind nicht nach Threads getrennt; die Thread-ID bezeichnet den
+Beobachter der Phasengrenzen. Parallele Hintergrundarbeit ist damit keine
+exklusive Testzeit. Andere Backends bleiben hinsichtlich Threadumfang unbekannt.
+CPU-Exklusivzeit aller Kinder wird nicht behauptet. Prozess-CPU-Zähler umfassen gegebenenfalls andere
+Threads und werden als eigener Messumfang gekennzeichnet. tracemalloc misst
+Python-Allokationen seit dem expliziten Collectorstart; Peak und Nettoänderung
+sind verschieden und beweisen kein Speicherleck. Native Allokationen und RSS
+bleiben unbekannt. Andere bereits aktive Profiler werden nicht übernommen.
+
+strace ist optional und nur unter Linux verfügbar. Es startet ausschließlich
+einen neuen Testprozess samt Nachkommen, hängt sich nicht an laufende Prozesse
+an und installiert nichts. Rohargumente enthalten Adressen statt dekodierter
+Puffer. Prozess-/Threadkennung, UTC-Intervall und monotone Dauer müssen für
+eine Testzuordnung eindeutig sein. Unbekannte Kinder, PID-Wiederverwendung,
+überlappende Phasen und auffällige Uhrsprünge bleiben unzugeordnet. Syscall-
+Wartezeiten können prozessübergreifend überlappen und sind keine CPU-Zeit.
+
+Zeitlimit (`--timeout`) und Artefaktbudget (`--max-bytes`) gelten je Messung.
+Abbruch, fehlendes strace, unvollständige Daten, Datenbankfehler und Testfehler
+werden sichtbar gespeichert. Ein tatsächlicher Test-Exitcode wird unabhängig
+von einem Collectorfehler bewahrt; ein fehlender Testbericht hat keinen erfundenen
+Exitcode. Historie wird weder gelöscht noch mit inkompatiblem Schema überschrieben.
+
+Vergleiche benutzen ausschließlich erfolgreiche, vollständige Baseline-Messungen
+ohne Warmups. Host, Python/pytest/xdist, Collectorquellen, Testauswahl samt
+Testquellen, Optionen und beobachtete Workerbelegung müssen übereinstimmen.
+Produktquellen dürfen sich ändern und bleiben über die Bindung nachvollziehbar.
+Berichtet werden Anzahl, Median, Minimum, Maximum, Differenz und gegebenenfalls
+Verhältnis; keine erfundenen Perzentile oder garantierten Einsparungen.
+
+
 ## Korrektur des Threadumfangs nach Bundle 099
 
 Der Apply von 099 bestätigte die ersten vier Stände bis `200-07.W`; beim

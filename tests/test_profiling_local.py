@@ -21,9 +21,19 @@ def test_two_local_runs_preserve_history_and_separate_phase_records(tmp_path):
         assert set(row[0] for row in connection.execute('SELECT DISTINCT phase FROM phases')) == {'setup','call','teardown'}
         assert connection.execute('SELECT count(*) FROM phases WHERE duration_s IS NULL').fetchone() == (0,)
         assert connection.execute('SELECT count(*) FROM artifacts').fetchone()[0] >= 4
+        fixture_rows = connection.execute(
+            'SELECT f.measurement_id,f.worker,f.data FROM fixtures f JOIN measurements m ON m.id=f.measurement_id WHERE m.run_id=? ORDER BY f.rowid',
+            (a['run_id'],)).fetchall()
+        assert fixture_rows
     before = path.read_bytes()
     shown, report = profile_cli('report', '--database', path, '--run', a['run_id'])
     assert shown.returncode == 0 and report['ranking'][0]['phase'] == 'call'
+    assert len(report['fixtures']) == len(fixture_rows)
+    for fixture, (measurement, worker, raw) in zip(report['fixtures'], fixture_rows):
+        stored = json.loads(raw)
+        assert fixture['measurement_id'] == measurement
+        assert fixture['worker'] == worker == stored['worker']
+        assert all(fixture[key] == value for key, value in stored.items())
     compared, comparison = profile_cli('compare', '--database', path, '--before', a['run_id'], '--after', b['run_id'])
     assert compared.returncode == 0 and len(comparison['comparisons']) == 1
     assert path.read_bytes() == before
