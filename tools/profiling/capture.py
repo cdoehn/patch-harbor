@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import hashlib
+from dataclasses import asdict
 import importlib.metadata
 import json
 import os
@@ -14,6 +15,7 @@ import time
 import uuid
 
 from tools.profiling.common import encoded, local_path, utc
+from tools.profiling.budgets import default_limits, exceeded, require_budget
 from tools.profiling.storage import database, store_report
 from tools.test_policy import PROJECT_ROOT, process_exit_code
 from tools.test_runner import prepare_invocation
@@ -104,8 +106,15 @@ def artifact_size(directory):
     return size, count
 
 
-def wait_child(command, environment, directory, timeout, max_bytes):
+def wait_child(command, environment, directory, timeout, max_bytes, max_files=None):
+    max_files = default_limits().artifact_files if max_files is None else max_files
     started = time.monotonic()
+
+    def limit_reason(size, count):
+        return (exceeded('elapsed seconds', time.monotonic() - started, timeout, '--timeout')
+                or exceeded('artifact bytes', size, max_bytes, '--max-bytes')
+                or exceeded('artifact files', count, max_files, '--max-files'))
+
     with (directory / 'process.log').open('xb') as stream:
         process = subprocess.Popen(command, cwd=PROJECT_ROOT, env=environment, stdout=stream,
                                    stderr=subprocess.STDOUT, start_new_session=os.name == 'posix')
@@ -113,8 +122,9 @@ def wait_child(command, environment, directory, timeout, max_bytes):
         try:
             while process.poll() is None:
                 size, count = artifact_size(directory)
-                if time.monotonic() - started > timeout or size > max_bytes or count > 4096:
-                    status, reason = 'partial', 'time or artifact budget exceeded'
+                reason = limit_reason(size, count)
+                if reason:
+                    status = 'partial'
                     stop_process(process)
                     break
                 time.sleep(.1)
@@ -125,8 +135,10 @@ def wait_child(command, environment, directory, timeout, max_bytes):
             stop_process(process)
             raise
     size, count = artifact_size(directory)
-    if status == 'complete' and (size > max_bytes or count > 4096):
-        status, reason = 'partial', 'artifact budget exceeded'
+    if status == 'complete':
+        reason = limit_reason(size, count)
+        if reason:
+            status = 'partial'
     return process_exit_code(process.returncode), status, reason, time.monotonic() - started
 
 
@@ -147,7 +159,8 @@ def capture(connection, run_id, mode, iteration, warmup, directory, metadata, ar
     environment['PH_TEST_PROCESS_START_UTC'] = utc()
     if mode in ('cprofile', 'memory', 'strace'):
         command.extend(['-p', 'tools.profiling.collector'])
-        environment.update(PH_PROFILE_MODE=mode, PH_PROFILE_DIRECTORY=str(output), PH_PROFILE_MEASUREMENT=identity)
+        environment.update(PH_PROFILE_MODE=mode, PH_PROFILE_DIRECTORY=str(output), PH_PROFILE_MEASUREMENT=identity,
+                           PH_PROFILE_LIMITS=encoded(asdict(args.limits)))
     trace_info = None
     unavailable = None
     if mode == 'strace':
@@ -159,17 +172,20 @@ def capture(connection, run_id, mode, iteration, warmup, directory, metadata, ar
     if unavailable:
         code, status, reason, elapsed = 2, 'unavailable', unavailable, 0.
     else:
-        code, status, reason, elapsed = wait_child(command, environment, output, args.timeout, args.max_bytes)
+        code, status, reason, elapsed = wait_child(command, environment, output, args.timeout,
+                                                  args.max_bytes, args.max_files)
     details = {'reason': reason, 'command': command, 'collector': mode, 'process_exit_code': code,
                'scope': 'pytest phases; subprocess CPU and native memory are not measured',
-               'artifact_directory': str(output), 'strace': trace_info}
+               'artifact_directory': str(output), 'strace': trace_info, 'budgets': asdict(args.limits)}
     test_exit = None
     try:
         from tools.test_evidence import input_binding
         if input_binding() != metadata['binding'] or selection_facts(metadata['selection']) != metadata['selection_sources']:
             raise ValueError('source inputs changed during measurement')
-        if not report_path.is_file() or report_path.stat().st_size > min(args.max_bytes, 64 * 1024 * 1024):
-            raise ValueError('missing or oversized test report')
+        if not report_path.is_file() or report_path.is_symlink():
+            raise ValueError('missing or unsafe test report')
+        require_budget('test report bytes', report_path.stat().st_size,
+                       min(args.max_bytes, args.limits.report_bytes), '--max-bytes / --budget-scale')
         report = json.loads(report_path.read_text(encoding='utf-8'))
         if type(report.get('exitstatus')) is not int:
             raise ValueError('test exit status is unknown')
@@ -221,7 +237,9 @@ def run(args):
     selection = [str(Path(s.split('::', 1)[0]).resolve()) + ('::' + s.split('::', 1)[1] if '::' in s else '') for s in selection]
     identity = str(uuid.uuid4())
     path = local_path(args.database)
-    options = {key: getattr(args, key) for key in ('workers', 'repetitions', 'profile_repetitions', 'warmups', 'timeout', 'max_bytes')}
+    options = {key: getattr(args, key) for key in ('workers', 'repetitions', 'profile_repetitions',
+                                                  'warmups', 'timeout', 'max_bytes', 'max_files', 'budget_scale')}
+    options['budgets'] = asdict(args.limits)
     metadata = provenance(selection, dict(options, modes=modes))
     with database(path, writable=True) as connection:
         directory = local_path(path.parent / 'runs' / identity)
