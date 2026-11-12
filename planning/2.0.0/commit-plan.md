@@ -917,6 +917,31 @@ und Regression und nimmt die acht verbliebenen Stände bis `200-09.C` erneut
 mit je vollständigem parallelem Apply-Gate auf. Der Abschluss-Draft bleibt
 zurückgehalten und wird mit derselben Korrektur fortgeführt.
 
+
+## Vorbereiteter Abschluss-Draft nach Korrekturbundle 100
+
+Der lokal zurückgehaltene Draft 101 enthält neun echte Folgestände `200-10.W` bis
+`200-12.C` (Positionen 30–38). Er baut auf dem geplanten vollständigen
+korrigierten Profiling-Endstand von Bundle 100 auf. Vor einer Auslieferung ist das tatsächliche
+Result von 100 vollständig zu prüfen und der Draft auf dessen tatsächlichen
+Stand zu binden; Fehler oder Teilfortschritte werden zuerst übernommen und
+repariert. Für diesen Draft ist noch kein Result verbraucht.
+
+Vorbereitet sind additive Actions-Summaries, die aktuellen Anleitungen und
+Beispiele, Paketversion 2.0.0, die erweiterte installierte Zwei-Runden-Prüfung
+sowie die lokale Vorbereitung der fünf vorgesehenen Release-Artefakte.
+Die gemeinsame lesende Quellprüfung vermeidet abweichende Prüfpfade zwischen
+lokalem Kandidaten und GitHub-Release. Die strengeren Remote-/CI-/Tagprüfungen
+bleiben im bestehenden Veröffentlichungspfad erhalten.
+
+Alle neun Stände sind Entwicklungsentwürfe, keine bestätigten Commits. Der
+finale Kandidat benötigt nach dem letzten vollständigen Apply-Gate zusätzlich
+seinen tatsächlichen lokalen Artefaktnachweis. Die gesamte native Plattform-,
+Python-, Shell- und CIFS-Abnahme bleibt bis zu ihren eigenen tatsächlichen
+Nachweisen offen; neun lokale Commitprüfungen allein schließen Abschnitt 200-12
+nicht ab. Push, Tag, Main, Veröffentlichung und Installation sind hier nicht
+ausgeführt. Der Draft liegt ausschließlich in Dev.
+
 ## Reparatur nach Bundle 100
 
 Apply 100 hat die sieben Stände `200-07.R` bis `200-09.R` mit jeweils

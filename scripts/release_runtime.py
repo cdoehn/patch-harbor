@@ -14,6 +14,7 @@ ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
 from scripts import run_handoff_ci as ci
 from scripts.build_release import build_release
+from scripts.release_source import source_checkout
 from scripts.release_artifacts import names, require, verify_assets, verify_distributions, write_manifest
 
 
@@ -31,17 +32,7 @@ def github(route, *, method='GET', body=None, binary=False, missing=False):
 
 
 def checkout(version, commit):
-    names(version)
-    def git(*args):return subprocess.check_output(['git','--no-optional-locks',*args],cwd=ROOT,text=True).strip()
-    require(len(commit)==40 and all(c in '0123456789abcdef' for c in commit),'full commit required')
-    require(git('rev-parse','HEAD')==commit,'checkout differs from expected release commit')
-    require(not git('status','--porcelain=v1','--untracked-files=all'),'release checkout is dirty')
-    # Read source version without importing a possibly prepared local distribution.
-    import ast
-    module=ast.parse((ROOT/'src/patchharbor/__init__.py').read_text())
-    versions=[ast.literal_eval(n.value) for n in module.body if isinstance(n,ast.Assign)
-              and any(isinstance(t,ast.Name) and t.id=='__version__' for t in n.targets)]
-    require(versions==[version],'source version differs from requested release')
+    source_checkout(version,commit,root=ROOT)
     observed=github('commits/'+commit)
     require(observed['sha']==commit,'release commit is not on GitHub')
 

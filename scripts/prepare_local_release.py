@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import argparse
-import ast
 from hashlib import sha256
 import json
 from pathlib import Path
@@ -14,20 +13,10 @@ if not __package__:
     sys.path.insert(0,str(ROOT))
 
 from scripts.build_release import build_release
+from scripts.release_source import source_checkout
 from scripts.release_artifacts import names, require, verify_distributions, write_manifest
 
 
-def source_checkout(version, commit):
-    names(version)
-    require(len(commit)==40 and all(c in '0123456789abcdef' for c in commit),'full commit required')
-    def git(*arguments):
-        return subprocess.check_output(['git','--no-optional-locks',*arguments],cwd=ROOT,text=True).strip()
-    require(git('rev-parse','HEAD')==commit,'checkout differs from expected candidate commit')
-    require(not git('status','--porcelain=v1','--untracked-files=all'),'candidate checkout is dirty')
-    source = ast.parse((ROOT/'src/patchharbor/__init__.py').read_text())
-    versions = [ast.literal_eval(n.value) for n in source.body if isinstance(n,ast.Assign)
-                and any(isinstance(t,ast.Name) and t.id=='__version__' for t in n.targets)]
-    require(versions==[version],'source version differs from candidate')
 
 
 def prepare(version, commit, output, workspace):
