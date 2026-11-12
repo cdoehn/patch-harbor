@@ -18,6 +18,9 @@ pytestmark = pytest.mark.packaging
 ROUNDTRIP = r'''
 from hashlib import sha256
 import json, socket, subprocess, sys
+from io import BytesIO
+from zipfile import ZipFile
+import patchharbor
 from pathlib import Path
 from patchharbor import api
 from patchharbor.result_reader import read_result_reference
@@ -39,6 +42,13 @@ initial, _ = read_result_reference(reference.path)
 assert initial.format_version == 4 and initial.operation == 'bundle'
 assert initial.runtime.status == 'embedded' and initial.runtime.task_formats == (2,)
 assert initial.runtime.result_formats == (4,)
+assert patchharbor.__version__ == '2.0.0'
+with ZipFile(reference.path) as outer:
+    runtime_bytes = outer.read(initial.runtime.artifact.path)
+assert sha256(runtime_bytes).hexdigest() == initial.runtime.artifact.sha256
+with ZipFile(BytesIO(runtime_bytes)) as core:
+    assert not any(name.startswith(('tools/', 'tests/', 'patchharbor_watcher/', 'pytest/', 'xdist/')) for name in core.namelist())
+    assert not any(name.endswith(('.sqlite3', '.prof', '.log')) for name in core.namelist())
 first = api.pack_task(contents, reference_bundle=reference.path, entrypoint=entrypoint,
                       output_directory=exchange)
 checked = api.validate_task(first.path, reference_bundle=reference.path)
