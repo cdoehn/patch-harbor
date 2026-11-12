@@ -4,7 +4,7 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue)](docs/install-and-update.md)
 [![MIT license](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-This is the unpublished 2.0.0 development source. The release badge follows
+This is the unpublished 2.0.0 release candidate source. The release badge follows
 the latest published GitHub release; it does not certify this checkout.
 
 **A bridge between AI coding assistants and local Git repositories.**

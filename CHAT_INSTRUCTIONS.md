@@ -1,4 +1,4 @@
-# PatchHarbor 2.0.0 (Entwicklung) – Chat-Initialisierung
+# PatchHarbor 2.0.0 – Chat-Initialisierung
 
 Für diesen Entwicklungsstand gilt der Task-/Execute-/Result-Vertrag 2.
 `apply` ist nur ein deprecated CLI-Alias für `execute`; Hinweise stehen auf stderr.

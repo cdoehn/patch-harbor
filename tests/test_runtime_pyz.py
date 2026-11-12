@@ -64,8 +64,12 @@ def test_producer_content_and_artifact_ids_follow_distinct_finite_contracts():
     assert pyz.sha256(new_artifact) != pyz.sha256(artifact)
 
 
-def test_materializer_reads_each_bounded_resource_once_and_rejects_wrong_capture():
-    recipe, payloads, _ = prepared()
+@pytest.mark.parametrize(('version', 'other_version'), [
+    ('2.0.0', '2.0.0.dev0'), ('2.0.0.dev0', '2.0.0'),
+])
+def test_materializer_reads_each_bounded_resource_once_and_rejects_wrong_capture(version, other_version):
+    recipe, payloads, _ = prepared(version=version)
+    assert recipe.version == version and other_version != recipe.version
     calls = []
     def capture(name, size):
         calls.append((name, size)); assert len(payloads[name]) == size; return payloads[name]
@@ -75,7 +79,7 @@ def test_materializer_reads_each_bounded_resource_once_and_rejects_wrong_capture
     with pytest.raises(pyz.RuntimeDataError):
         pyz.materialize(recipe, lambda name,size: b'x' * size)
     with pytest.raises(pyz.RuntimeDataError):
-        pyz.materialize(replace(recipe, version='2.0.0'), capture)
+        pyz.materialize(replace(recipe, version=other_version), capture)
 
 
 @pytest.mark.parametrize('name', [

@@ -2,8 +2,8 @@
 
 **Plan-ID:** `PH-200` · **Revision:** 2 · **Stand:** 11. November 2026<br>
 **Zielversion:** **2.0.0**<br>
-**Status:** Apply 101 bestätigt 29/38 Schritte. Reparaturbundle 103 enthält die neun verbleibenden Stände; Bestätigung ausschließlich durch Apply.<br>
-**Fortschritt:** **29 / 38 Umsetzungscommits**, zwölf WRC-Schritte; die Protokoll-Work-Phase besteht aus drei Teilcommits.<br>
+**Status:** Apply 103 bestätigt 35/38 Schritte. Reparaturbundle 104 enthält die drei verbleibenden Release-Stände; Bestätigung ausschließlich durch Apply.<br>
+**Fortschritt:** **35 / 38 Umsetzungscommits**, zwölf WRC-Schritte; die Protokoll-Work-Phase besteht aus drei Teilcommits.<br>
 **Aktiver Planpfad:** `planning/2.0.0/commit-plan.md`<br>
 **Zugehöriger Detailentwurf:** [Lokale Testmessung und Profiling](test-profiling.md).
 Dieser Detailentwurf gehört zu diesem Plan; er ist kein konkurrierender Plan.
@@ -953,3 +953,23 @@ unveränderte fehlgeschlagene Testnachweise. Die vorhandenen Workflow-Tests
 bleiben bytegleich. Dev führt nur statische Analyse durch; Apply prüft jeden
 der neun echten Zwischenstände mit der vollständigen parallelen Suite vor
 seinem Commit. Push, Tag und die abschließende native Abnahme stehen aus.
+
+## Reparatur nach Bundle 103
+
+Apply 103 bestätigt die sechs Stände `200-10.W` bis `200-11.C` mit jeweils
+vollständiger paralleler Testsuite: 35/38 Schritte sind damit übernommen.
+Der erste Release-Stand `200-12.W` stoppte vor dem Commit an drei veralteten
+Testannahmen. Der Pakettest erwartete weiterhin `2.0.0.dev0`, während der
+vorbereitete Release korrekt `2.0.0` heißt. Ein negativer PYZ-Test ersetzte
+die nun tatsächliche Version `2.0.0` durch denselben Wert und erzeugte dadurch
+keinen abweichenden Datensatz mehr.
+
+Bundle 104 setzt die unabhängige Release-Erwartung auf `2.0.0` und prüft
+den PYZ-Versionskonflikt ausdrücklich in beiden Richtungen zwischen
+Release- und Entwicklungsversion. Die falschen Bytes und die geänderte
+Rezeptversion müssen weiterhin abgelehnt werden; alle Größen-, Inventar-,
+Installations- und Erfolgsprüfungen bleiben erhalten. Die Korrekturen liegen
+in allen drei verbleibenden WRC-Ständen. Dev führt nur statische Analyse
+durch; Apply führt vor jedem tatsächlichen Commit die vollständige parallele
+Testsuite mit automatischer Workerzahl ohne Zusatzlimit aus. Veröffentlichung,
+Push, Tag und native Release-Abnahme stehen weiterhin aus.

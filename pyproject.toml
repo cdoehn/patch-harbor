@@ -6,8 +6,8 @@ backend-path = ["."]
 [project]
 name = "patchharbor"
 dynamic = ["version"]
-description = "Controlled cross-platform runner for generated Bash and PowerShell scripts and ZIP ScriptBundles."
-keywords = ["bash", "cli", "script-bundle", "powershell", "script-runner", "zip"]
+description = "Repository-bound Task Bundle execution and verified Result snapshots for AI-assisted development."
+keywords = ["python", "git", "cli", "developer-tools", "automation", "ai-assisted-development"]
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
@@ -25,6 +25,8 @@ classifiers = [
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
   "Topic :: System :: Shells",
 ]
 

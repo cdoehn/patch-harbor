@@ -1,7 +1,7 @@
 # Task / Execute / Result in PatchHarbor 2.0
 
-Dieser Vertrag gilt für die unveröffentlichte Entwicklung `2.0.0.dev0` ab
-`200-02.W3`. Er ersetzt frühere Bundle-, API- und Ausführungsverträge. Eine
+Dieser Vertrag beschreibt PatchHarbor `2.0.0`. Er ersetzt frühere Bundle-,
+API- und Ausführungsverträge. Die Versionsangabe beweist keine Veröffentlichung. Eine
 Produktversion ist keine Formatnummer. Alte Bundle-Formate werden abgelehnt;
 es gibt keinen Konverter und keine alten Python-API-Aliase.
 
