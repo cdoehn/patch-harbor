@@ -201,7 +201,8 @@ def capture(connection, run_id, mode, iteration, warmup, directory, metadata, ar
                                                            max_bytes=args.max_bytes, limits=args.limits)
                 if mode == 'strace':
                     from tools.profiling.tracing import import_trace
-                    details['syscalls'] = import_trace(connection, identity, output, max_bytes=args.max_bytes)
+                    details['syscalls'] = import_trace(connection, identity, output,
+                                                       max_bytes=args.max_bytes, limits=args.limits)
         if observed != 'complete' and status == 'complete':
             status, details['reason'] = 'partial', 'incomplete phase telemetry'
     except (OSError, ValueError, KeyError, TypeError) as exc:

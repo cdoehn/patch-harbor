@@ -6,6 +6,7 @@ import shutil
 import subprocess
 
 from tools.profiling.common import encoded
+from tools.profiling.budgets import default_limits, require_budget
 from tools.profiling.trace_parser import parse_trace
 from tools.profiling.trace_model import assign_phase
 
@@ -24,15 +25,18 @@ def trace_command(command, output):
              'scope': 'new test process and descendants only; syscall elapsed time is not CPU time'})
 
 
-def import_trace(connection, measurement, directory, *, max_bytes):
+def import_trace(connection, measurement, directory, *, max_bytes, limits=None):
+    limits = default_limits() if limits is None else limits
     spans = [json.loads(row[0]) for row in connection.execute(
         'SELECT data FROM processes WHERE measurement_id=? AND phase IS NOT NULL', (measurement,))]
     files = sorted(directory.glob('trace.*'))
-    if not files or len(files) > 4096:
-        raise ValueError('strace produced no usable files or too many processes')
+    if not files:
+        raise ValueError('strace produced no usable files')
+    require_budget('strace process files', len(files), limits.artifact_files, '--max-files')
+    if any(path.is_symlink() or not path.is_file() for path in files):
+        raise ValueError('unsafe strace artifacts')
     total = sum(path.stat().st_size for path in files)
-    if total > max_bytes or any(path.is_symlink() or not path.is_file() for path in files):
-        raise ValueError('unsafe or excessive strace artifacts')
+    require_budget('strace bytes', total, max_bytes, '--max-bytes')
     groups = defaultdict(lambda: {'count': 0, 'errors': 0, 'elapsed_ns': 0})
     process_events = []
     count = 0
@@ -43,12 +47,10 @@ def import_trace(connection, measurement, directory, *, max_bytes):
         segment = 0
         for event in parse_trace(path, pid):
             count += 1
-            if count > 1_000_000:
-                raise ValueError('strace event budget exceeded')
+            require_budget('strace events', count, limits.trace_events)
             if event['kind'] != 'syscall':
                 process_events.append(dict(event, exec_segment=segment))
-                if len(groups) + len(process_events) > 250_000:
-                    raise ValueError('normalized strace row budget exceeded')
+                require_budget('normalized strace rows', len(groups) + len(process_events), limits.trace_rows)
                 continue
             if event['name'] in ('execve', 'execveat') and event['result'] == 0:
                 segment += 1
@@ -63,8 +65,7 @@ def import_trace(connection, measurement, directory, *, max_bytes):
             aggregate['count'] += 1
             aggregate['errors'] += int(event['error'])
             aggregate['elapsed_ns'] += event['duration_ns']
-            if len(groups) + len(process_events) > 250_000:
-                raise ValueError('normalized strace row budget exceeded')
+            require_budget('normalized strace rows', len(groups) + len(process_events), limits.trace_rows)
     for (pid, segment, nodeid, phase, worker, name, group), totals in groups.items():
         data = dict(totals, pid=pid, exec_segment=segment, syscall=name, group=group,
                     attribution='observed interval' if phase else 'unassigned',
