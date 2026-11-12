@@ -113,7 +113,7 @@ class Collector:
 def observer(config):
     collector = getattr(config, '_ph_local_profile', None)
     if collector is None:
-        if os.environ.get('PH_PROFILE_MODE') not in ('cprofile', 'memory'):
+        if os.environ.get('PH_PROFILE_MODE') not in ('cprofile', 'memory', 'strace'):
             raise ValueError('profiling plugin requires an explicit local run')
         collector = config._ph_local_profile = Collector(config)
     return collector
