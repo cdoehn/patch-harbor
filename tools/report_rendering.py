@@ -1,6 +1,7 @@
 """Small bounded standard-library rendering shared by local and Actions reports."""
 import html
 import json
+from urllib.parse import urlsplit
 
 
 def cell(value, limit=300):
@@ -44,3 +45,31 @@ def render_profile(document, format_name):
     if format_name == 'text':
         rendered = html.unescape(rendered)
     return rendered[:65536]
+
+
+def render_ci(document):
+    lines = ['## PatchHarbor test results', '', cell(document['lane']),
+             'Commit: ' + cell(document['commit']),
+             'Run / attempt: ' + cell(document['run_id']) + ' / ' + cell(document['attempt']),
+             'Lane platform / Python / shell: ' + ' / '.join(cell(document[k]) for k in ('platform','python','shell')),
+             '', 'Counts are test executions per suite. Total job walltime is unmeasured.', '']
+    url = document['artifact_url']
+    parts = urlsplit(url)
+    if parts.scheme=='https' and parts.hostname and not any(c in url for c in '()\r\n<> '):
+        lines.extend(['[Full test artifacts](' + url + ')', ''])
+    for suite in document['suites']:
+        lines.extend(['### ' + cell(suite['suite']) + ' — ' + cell(suite['status']), ''])
+        counts = suite['counts']
+        if counts is not None:
+            lines.extend([table(counts.keys(),[counts.values()]), '',
+                'Observed platform / Python: ' + cell(suite['binding'].get('platform')) + ' / ' + cell(suite['binding'].get('python')),
+                'Observed controller interval (seconds): ' + cell(suite['controller_observed_s']),
+                'Timing completeness: ' + cell(suite['timing_status']),
+                'Collection outcomes: ' + cell(json.dumps(suite['collection_outcomes'],sort_keys=True)),
+                'Preparation: ' + cell(json.dumps(suite['preparation'],sort_keys=True),3000), '',
+                table(('Test','Setup seconds','Call seconds','Teardown seconds'),
+                    ((c['nodeid'],*(c['phases'][p]['duration_s'] for p in ('setup','call','teardown'))) for c in suite['top']))])
+        lines.extend(['', 'Evidence: ' + cell(suite['report'])])
+        lines.extend(cell(error) for error in suite['errors'])
+        lines.append('')
+    return '\n'.join(lines)[:128*1024] + '\n'

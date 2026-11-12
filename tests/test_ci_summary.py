@@ -1,7 +1,8 @@
 """Semantic diagnostic summaries do not replace the strict release validator."""
 import pytest
 
-from scripts.summarize_ci_tests import count_cases, summarize_document, summarize, read_json, main
+from scripts.summarize_ci_tests import main
+from tools.ci_summary import count_cases, summarize_document, summarize, read_json
 from tools.acceptance_catalog import LANES
 from tools.test_results import validate
 
