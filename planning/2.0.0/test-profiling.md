@@ -372,7 +372,14 @@ eine Testzuordnung eindeutig sein. Unbekannte Kinder, PID-Wiederverwendung,
 überlappende Phasen und auffällige Uhrsprünge bleiben unzugeordnet. Syscall-
 Wartezeiten können prozessübergreifend überlappen und sind keine CPU-Zeit.
 
-Zeitlimit (`--timeout`) und Artefaktbudget (`--max-bytes`) gelten je Messung.
+Zeitlimit (`--timeout`), Artefaktbudget (`--max-bytes`) und Dateianzahl
+(`--max-files`) gelten je Messung. Die nach dem vollständigen Suiteumfang
+überarbeiteten Vorgaben enthalten Faktor zehn Reserve auf konservative
+Kapazitätsannahmen; `--budget-scale` erhöht auch die internen Collector- und
+Importgrenzen. Explizite Einzelwerte bleiben von diesem Faktor unabhängig.
+Annahmen, Werte und Bedienung stehen in der
+[Kapazitätsübersicht](../../docs/test-diagnostics.md#full-suite-profiling-and-capacity).
+Die tatsächlich gewählten Grenzen werden lokal mit jeder Messung gespeichert.
 Abbruch, fehlendes strace, unvollständige Daten, Datenbankfehler und Testfehler
 werden sichtbar gespeichert. Ein tatsächlicher Test-Exitcode wird unabhängig
 von einem Collectorfehler bewahrt; ein fehlender Testbericht hat keinen erfundenen

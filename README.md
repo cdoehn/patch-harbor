@@ -385,3 +385,11 @@ stay local under `build/test-profile/`; `--database` selects another local path.
 No collector runs on import, during a normal user command, or in a separate
 CI profiling job. Reports distinguish preparation, test body, cleanup,
 measurement modes and unknown coverage. See [test diagnostics](docs/test-diagnostics.md).
+
+For the complete suite on Linux, use
+`python tools/profile_tests.py run --modes baseline,cprofile,memory,strace -- tests`
+with strace installed. Full-suite budgets include tenfold estimated headroom;
+`--budget-scale 2` doubles all defaults. Override individual allowances with
+`--timeout`, `--max-bytes` or `--max-files`. The
+[capacity table and examples](docs/test-diagnostics.md#full-suite-profiling-and-capacity)
+describe the estimates and the locally recorded diagnostics.
