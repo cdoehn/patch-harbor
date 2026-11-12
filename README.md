@@ -1,13 +1,11 @@
-# PatchHarbor 2.0.0 development
+# PatchHarbor 2.0.0
 
-The active [2.0.0 WRC plan](planning/2.0.0/commit-plan.md) starts with
-`200-01.W`: the independent script/ZIP model is `ScriptBundle`, and its Python
-entrypoint is `api.run_scripts`. The old `api.run` name is removed. This script
-path and `fs run` are deprecated; they retain their execution semantics.
-This source is `2.0.0.dev0`, an unpublished development state. The Task/Execute/
-Result protocol switch follows in `200-02`; the repository commands below still
-describe the currently implemented protocol. The latest published baseline is
-1.9.1. These intermediate states are not intended for production use.
+[![Latest GitHub release](https://img.shields.io/github/v/release/cdoehn/patch-harbor)](https://github.com/cdoehn/patch-harbor/releases/latest)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue)](docs/install-and-update.md)
+[![MIT license](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+
+This is the unpublished 2.0.0 development source. The release badge follows
+the latest published GitHub release; it does not certify this checkout.
 
 **A bridge between AI coding assistants and local Git repositories.**
 
@@ -19,8 +17,8 @@ It bridges these separate environments using verified ZIP packages, allowing AI 
 
 1. **Export:** PatchHarbor captures the current Git repository state in a *Result Bundle*.
 2. **AI development:** The bundle is provided to an AI assistant, which analyzes the project and prepares changes.
-3. **Patch delivery:** The AI produces a *Patch package* bound to the exact repository state.
-4. **Local application:** PatchHarbor verifies the package before applying its changes to the local repository.
+3. **Task preparation:** The AI prepares a *Task Bundle* bound to the exact repository state. The user downloads or transfers the verified ZIP to the local Exchange.
+4. **Execute:** PatchHarbor verifies the Task Bundle, writes its declared payloads, and runs its entrypoint in the local repository.
 5. **Feedback:** A new Result Bundle captures the updated repository and execution results, enabling the next development iteration.
 
 ### Key features
@@ -69,13 +67,13 @@ For the normal CLI **and watcher**, install a reviewed wheel or source checkout.
 For example, with an existing Python 3.10+ and pipx:
 
 ```bash
-pipx install --python python3 /absolute/path/patchharbor-1.9.1-py3-none-any.whl
+pipx install --python python3 /absolute/path/patchharbor-VERSION-py3-none-any.whl
 patchharbor --version
 patchharbor --help
 ```
 
 The wheel path is an artifact you obtain and verify; this command does not assume
-that version 1.9.1 has been published on a package index. **pipx is optional**:
+that any version has been published on a package index. **pipx is optional**:
 a dedicated virtual environment is another installation route. Wheel and sdist
 remain supported for normal installations; the PYZ replaces the runtime embedded
 in new Results, not the installed watcher. See
@@ -122,7 +120,7 @@ The entrypoint defines the target project's tests, commits and optional push.
 The watcher does not invent that policy. Do not run a second watcher or another
 Execute orchestrator for the same repositories.
 
-## Build and check a patch
+## Build and check a Task Bundle
 
 Prepare an explicit contents directory containing only the desired payloads and
 the entrypoint. The output directory must already exist outside that contents
@@ -169,14 +167,17 @@ provides `import_api(prepared)` for API use without installing PatchHarbor.
 
 ## Use the runtime supplied in a Result
 
-New Results use **Format 3**. When runtime embedding succeeds, they contain
-exactly one `runtime/patchharbor-<version>.pyz`. A valid `unavailable` status
-instead contains runtime metadata and a warning, with no executable artifact.
-This checkout reads **Result format 3**, preserving unchanged valid artifacts
-from **1.4.0 onward**. RF-06 removed the Result-1/2 readers, embedded runtime-wheel
-provider and wheel-installation bootstrap. Patch format 1 remains supported.
-Original 1.4.0 producer capabilities `[1, 2, 3]` remain valid metadata; the current
-producer declares `[3]`. Neither fact makes Result 1/2 a supported reference.
+New Results use **format 4**, Task Bundles use **format 2**, and Execute JSON
+uses **version 2**. When runtime embedding succeeds, a Result contains exactly
+one `runtime/patchharbor-<version>.pyz` with runtime metadata format 3. A valid
+`unavailable` status contains metadata and a reason, without executable bytes.
+
+Version 2 rejects old Patch/Result formats and removed Python API names.
+Generate a fresh Result from the actual repository after a deliberate upgrade;
+do not relabel an old archive. `apply` remains a deprecated CLI alias for
+`execute`. The independent `ScriptBundle` / `api.run_scripts` and `fs run` path
+is deprecated and has no repository-state binding. See the
+[protocol](docs/protocol-2.md) and [integration upgrade](docs/version-2-integration.md).
 
 Use the executable bootstrap from the trusted Result's handoff, or a separately
 reviewed copy of `scripts/pyz_bootstrap.py`, to assess and prepare its exact PYZ.
@@ -331,7 +332,7 @@ does not replace repository-bound Execute.
 - [Repository configuration, archives, retries and permissions](docs/repository-workflow.md)
 - [Troubleshooting](docs/troubleshooting.md)
 - [Pack](docs/pack.md), [examples](docs/pack-examples.md), [Python API](docs/python-api.md)
-- [Runtime bootstrap](docs/runtime-bootstrap.md), [Result 3](docs/result-format-3.md)
+- [Runtime bootstrap](docs/runtime-bootstrap.md), [Task / Execute / Result protocol](docs/protocol-2.md)
 - [Watcher](docs/watcher-events.md), [CIFS publication](docs/result-publication-cifs.md)
 - [Development tests and manual CI policy](docs/test-parallelism.md)
 - Joint requirements: [main specification](spec/SPECIFICATION.md),
@@ -359,7 +360,7 @@ source, actual Execute and external acceptance.
 
 ```sh
 patchharbor runtime export --output-dir /absolute/existing/output --json
-python -I -S -B patchharbor-1.9.1.pyz runtime export --output-dir /another/existing/output --json
+python -I -S -B patchharbor-VERSION.pyz runtime export --output-dir /another/existing/output --json
 ```
 
 This exports the running distribution's canonical PYZ without Git, a Result,
@@ -372,3 +373,23 @@ and SHA256SUMS. Version strings alone are not a publication or platform proof.
 See [the release plan](planning/runtime-release/commit-plan.md) and main spec §44.
 
 The read-only [Monitor](docs/monitor.md) observes registered repositories and Exchanges; run `patchharbor monitor`.
+
+## Local test measurements
+
+Start collection explicitly from a development checkout with the development
+dependencies installed:
+
+```bash
+python tools/profile_tests.py run --modes baseline -- tests/test_selected.py
+python tools/profile_tests.py report --phase setup --format markdown
+python tools/profile_tests.py report --phase call --format markdown
+python tools/profile_tests.py report --phase teardown --format markdown
+```
+
+Replace the selection with your actual test path or node ID. Worker selection
+defaults to `auto`. Add `cprofile`, `memory` or Linux-only `strace` to `--modes`
+only when you want that diagnostic overhead. The SQLite history and raw data
+stay local under `build/test-profile/`; `--database` selects another local path.
+No collector runs on import, during a normal user command, or in a separate
+CI profiling job. Reports distinguish preparation, test body, cleanup,
+measurement modes and unknown coverage. See [test diagnostics](docs/test-diagnostics.md).
