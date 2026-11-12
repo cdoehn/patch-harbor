@@ -38,6 +38,44 @@ def test_phase_assignment_does_not_guess_child_or_overlapping_call():
     assert assign_phase(event, [span(end_ns=1_100)]) is None
 
 
+@pytest.mark.parametrize('body', [
+    '1.000000 read(0x1, 0x2, 0x3 <unfinished ...>\n',
+    '1.000000 <... read resumed>) = 0x1 <0.1>\n',
+    'not a supported trace\n',
+    '1.000000 read(0x1) = 0x1 <..1>\n',
+    '1.000000 ' + 'x' * 65536 + '\n',
+])
+def test_partial_or_unsupported_trace_cannot_be_complete(tmp_path, body):
+    path = tmp_path / 'trace.42'
+    path.write_text(body)
+    with pytest.raises(ValueError):
+        list(parse_trace(path, 42))
+
+
+def test_raw_process_events_preserve_fork_exec_and_exit(tmp_path):
+    path = tmp_path / 'trace.42'
+    path.write_text('1.100000 clone(0x0, 0x0) = 0x2b <0.001000>\n'
+                    '1.200000 execve(0x123, 0x456, 0x789) = 0x0 <0.002000>\n'
+                    '1.300000 exit_group(0x0) = ?\n'
+                    '1.300010 +++ exited with 0 +++\n')
+    rows = list(parse_trace(path, 42))
+    assert rows[0]['result'] == 43 and rows[1]['result'] == 0
+    assert rows[0]['group'] == rows[1]['group'] == 'process'
+    assert [r['kind'] for r in rows[2:]] == ['exit_call', 'exit']
+
+
+def test_strace_missing_dependency_is_recorded_without_starting_tests(tmp_path, monkeypatch):
+    monkeypatch.setenv('PATH', str(tmp_path))
+    test = tmp_path / 'test_never.py'
+    test.write_text('raise AssertionError("must not be imported without strace")\n')
+    path = tmp_path / 'history.sqlite3'
+    result, document = profile_run(path, test, '--modes', 'strace')
+    assert result.returncode == 2 and document['status'] == 'unavailable'
+    with database(path) as connection:
+        assert connection.execute('SELECT status,test_exit_code FROM measurements').fetchone() == ('unavailable', None)
+        assert connection.execute('SELECT count(*) FROM phases').fetchone() == (0,)
+
+
 @pytest.mark.skipif(platform.system() != 'Linux' or shutil.which('strace') is None, reason='explicit strace backend unavailable')
 def test_local_strace_keeps_raw_artifacts_and_phase_evidence(tmp_path):
     test = tmp_path / 'test_trace_probe.py'

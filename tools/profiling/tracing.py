@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 import json
 import platform
 import re
@@ -14,6 +14,16 @@ from tools.profiling.common import encoded
 LINE = re.compile(r'^(\d+\.\d+)\s+(.*)$')
 CALL = re.compile(r'^([A-Za-z_][A-Za-z_0-9]*)\((.*)\)\s+=\s+(.*?)\s+<([0-9.]+)>$')
 RESUMED = re.compile(r'^<\.\.\. ([A-Za-z_][A-Za-z_0-9]*) resumed>(.*)$')
+
+
+def nanoseconds(raw):
+    try:
+        value = Decimal(raw)
+        if not value.is_finite() or value < 0 or value > Decimal('100000000000'):
+            raise ValueError('invalid strace time')
+        return int(value * 1_000_000_000)
+    except InvalidOperation:
+        raise ValueError('invalid strace decimal time') from None
 
 
 def trace_command(command, output):
@@ -50,13 +60,18 @@ def parse_trace(path, pid):
     """Stream one -ff file, retaining unfinished/resumed calls and process events."""
     pending = None
     with path.open(encoding='utf-8', errors='strict') as stream:
-        for line_number, line in enumerate(stream, 1):
+        line_number = 0
+        while True:
+            line = stream.readline(65537)
+            if not line:
+                break
+            line_number += 1
             if len(line) > 65536:
                 raise ValueError('oversized strace line')
             match = LINE.match(line.rstrip('\n'))
             if not match:
                 raise ValueError(f'unsupported strace line {line_number}')
-            start = int(Decimal(match[1]) * 1_000_000_000)
+            start = nanoseconds(match[1])
             body = match[2]
             if body.startswith(('--- ', '+++ ')):
                 yield {'kind': 'signal' if body.startswith('--- ') else 'exit', 'pid': pid, 'start_ns': start}
@@ -79,7 +94,7 @@ def parse_trace(path, pid):
             call = CALL.match(body)
             if not call:
                 raise ValueError(f'unsupported syscall at strace line {line_number}')
-            duration = int(Decimal(call[4]) * 1_000_000_000)
+            duration = nanoseconds(call[4])
             result = call[3].split()[0]
             try:
                 returned = int(result, 0)
@@ -133,6 +148,8 @@ def import_trace(connection, measurement, directory, *, max_bytes):
                 raise ValueError('strace event budget exceeded')
             if event['kind'] != 'syscall':
                 process_events.append(dict(event, exec_segment=segment))
+                if len(groups) + len(process_events) > 250_000:
+                    raise ValueError('normalized strace row budget exceeded')
                 continue
             if event['name'] in ('execve', 'execveat') and event['result'] == 0:
                 segment += 1
