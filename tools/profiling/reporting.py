@@ -28,6 +28,15 @@ def report_run(args):
     with database(args.database) as connection:
         result = load_run(connection, args.run)
         result['ranking'] = rankings(connection, result['run_id'], args.phase)[:args.top]
+        result['ranking_mode'] = 'baseline'
+        result['findings'] = [dict(nodeid=n, phase=p, worker=w, **json.loads(d)) for n,p,w,d in connection.execute(
+            'SELECT f.nodeid,f.phase,f.worker,f.data FROM findings f JOIN measurements m ON m.id=f.measurement_id WHERE m.run_id=? AND m.warmup=0 AND m.status=? AND m.mode=? AND (f.phase=? OR f.phase IS NULL) ORDER BY f.rowid LIMIT ?',
+            (result['run_id'], 'complete', args.mode, args.phase, args.top))]
+        result['coverage'] = {'startup': 'recorded where observable', 'subprocess_python_profiles': 'unobserved',
+                              'native_memory': 'unobserved', 'fixture_teardown': 'unobserved; test teardown is measured'}
+        result['artifacts'] = [dict(zip(('measurement_id','path','role','sha256','size','status'), row)) for row in connection.execute(
+            'SELECT a.* FROM artifacts a JOIN measurements m ON m.id=a.measurement_id WHERE m.run_id=? ORDER BY a.rowid LIMIT 10000', (result['run_id'],))]
+
         result['measurements'] = [dict(zip(('id', 'mode', 'warmup', 'status', 'test_exit_code', 'elapsed_s', 'details'), (*row[:6], json.loads(row[6]))))
             for row in connection.execute('SELECT id,mode,warmup,status,test_exit_code,elapsed_s,details FROM measurements WHERE run_id=? ORDER BY rowid', (result['run_id'],))]
     return result

@@ -199,6 +199,9 @@ def capture(connection, run_id, mode, iteration, warmup, directory, metadata, ar
                      digest.hexdigest(), path.stat().st_size, status))
         connection.execute('UPDATE measurements SET status=?,test_exit_code=?,elapsed_s=?,details=? WHERE id=?',
                            (status, test_exit, elapsed, encoded(details), identity))
+        if status == 'complete' and not warmup:
+            from tools.profiling.findings import derive_findings
+            derive_findings(connection, identity, mode)
     return (code if status == 'complete' else 130 if status == 'interrupted' else 2), status
 
 

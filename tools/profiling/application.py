@@ -31,6 +31,7 @@ def parser():
         read.add_argument('--format', choices=('json',), default='json')
         if name == 'report':
             read.add_argument('--run', default='latest')
+            read.add_argument('--mode', choices=('baseline','cprofile','memory','strace'), default='baseline')
             read.add_argument('--top', type=count, default=10)
         else:
             read.add_argument('--before', required=True)
