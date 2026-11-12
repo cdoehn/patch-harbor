@@ -8,7 +8,7 @@ import subprocess
 from tools.profiling.common import encoded
 from tools.profiling.budgets import default_limits, require_budget
 from tools.profiling.trace_parser import parse_trace
-from tools.profiling.trace_model import assign_phase
+from tools.profiling.trace_model import PhaseIndex
 
 
 def trace_command(command, output):
@@ -29,6 +29,7 @@ def import_trace(connection, measurement, directory, *, max_bytes, limits=None):
     limits = default_limits() if limits is None else limits
     spans = [json.loads(row[0]) for row in connection.execute(
         'SELECT data FROM processes WHERE measurement_id=? AND phase IS NOT NULL', (measurement,))]
+    phase_index = PhaseIndex(spans)
     files = sorted(directory.glob('trace.*'))
     if not files:
         raise ValueError('strace produced no usable files')
@@ -58,7 +59,7 @@ def import_trace(connection, measurement, directory, *, max_bytes, limits=None):
             if event['name'] in ('clone', 'clone3', 'fork', 'vfork') and event['result'] is not None and event['result'] > 0:
                 process_events.append(dict(event, child_pid=event['result'], exec_segment=segment,
                                            child_kind='unknown process or thread'))
-            span = assign_phase(event, spans)
+            span = phase_index.assign(event)
             key = (pid, segment, span['nodeid'] if span else None, span['phase'] if span else None,
                    span['worker'] if span else None, event['name'], event['group'])
             aggregate = groups[key]
