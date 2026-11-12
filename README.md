@@ -1,61 +1,55 @@
-# PatchHarbor 2.0.0
+# PatchHarbor
 
 [![Latest GitHub release](https://img.shields.io/github/v/release/cdoehn/patch-harbor)](https://github.com/cdoehn/patch-harbor/releases/latest)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue)](docs/install-and-update.md)
 [![MIT license](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![Platforms: Linux and Windows](https://img.shields.io/badge/platforms-Linux%20%7C%20Windows-lightgrey)](docs/install-and-update.md)
 
-This is the unpublished 2.0.0 release candidate source. The release badge follows
-the latest published GitHub release; it does not certify this checkout.
+**Let an AI coding assistant work on your local Git repository through verified ZIP bundles.**
 
-**A bridge between AI coding assistants and local Git repositories.**
+PatchHarbor connects an assistant running elsewhere with a repository on your
+Linux or Windows machine. Send the assistant a repository snapshot as a
+**Result Bundle**; receive a **Task Bundle** containing code changes and an
+entrypoint. PatchHarbor checks the bundle against the intended repository state,
+executes it locally, and returns updated files and execution logs for the next
+iteration.
 
-PatchHarbor enables AI-assisted software development with tools such as **ChatGPT, Claude, GitHub Copilot, and other AI coding assistants** — even when the AI operates in an isolated, cloud-hosted Linux environment while the actual Git repository resides on a local Linux or Windows machine.
+Use it when your coding assistant cannot access the repository directly, or when
+you want an explicit, reviewable handoff between development and execution.
+The entrypoint defines the project's tests, commits and optional push.
 
-It bridges these separate environments using verified ZIP packages, allowing AI assistants to inspect real repository states, prepare code changes, and deliver patches that can be safely applied to the local project.
+[Install](#requirements-and-installation) · [Quick start](#quick-start) ·
+[Monitor](docs/monitor.md) · [Python API](docs/python-api.md)
 
-### How it works
+## How it works
 
-1. **Export:** PatchHarbor captures the current Git repository state in a *Result Bundle*.
-2. **AI development:** The bundle is provided to an AI assistant, which analyzes the project and prepares changes.
-3. **Task preparation:** The AI prepares a *Task Bundle* bound to the exact repository state. The user downloads or transfers the verified ZIP to the local Exchange.
-4. **Execute:** PatchHarbor verifies the Task Bundle, writes its declared payloads, and runs its entrypoint in the local repository.
-5. **Feedback:** A new Result Bundle captures the updated repository and execution results, enabling the next development iteration.
+1. **Export:** Run `patchharbor bundle` to capture the repository in a Result Bundle.
+2. **Develop:** Give that bundle to the assistant so it can inspect the actual files and prepare changes.
+3. **Transfer:** Pack a Task Bundle bound to that Result and place the verified ZIP in the local Exchange directory.
+4. **Execute:** Run `patchharbor execute`, or let the watcher validate the bundle, write its payloads and run its entrypoint.
+5. **Review:** Read the new Result Bundle and execution log before starting the next iteration.
 
-### Key features
+## What you get
 
-- `bundle` captures the repository state for AI-assisted development.
-- `pack` creates verified Task Bundles from selected files and a Result reference.
-- `execute` validates and executes explicitly prepared patches.
-- `api.read_result_snapshot` returns complete verified file layers without Git or writes.
-- `api.execute_guarded` requires explicit package/target binding and trusted host approval before payloads.
-- `inspect` and `validate` examine packages without executing their code.
-- An optional watcher automatically applies incoming patches after five seconds of filesystem quiet, or polls explicitly every four seconds when native notifications are unavailable.
-- `monitor` shows repository and Exchange activity, a persistent five-line event history, active entrypoints and optional bundle numbers in a read-only TUI.
-- Result Bundles normally include an installation-free **Core-PYZ (without the watcher)**, allowing compatible AI Linux environments to work with PatchHarbor without installing it separately.
-- `runtime export` supplies the installed canonical Core-PYZ without a Result or Git.
-- CLI and Python integrations share the same public API.
+- **Verified handoffs:** `pack`, `inspect` and `validate` check package integrity and repository binding before execution.
+- **Useful feedback:** Result Bundles contain repository snapshots, changes and execution diagnostics.
+- **Manual or watched execution:** Use filesystem notifications or explicit polling for CIFS and other mounts without reliable notifications.
+- **Live visibility:** `patchharbor monitor` displays repository and Exchange activity, a five-line event history, active entrypoints and bundle numbers in a read-only terminal UI.
+- **Portable runtime:** Results normally include a Core-PYZ that compatible Python environments can use without installing PatchHarbor. The watcher comes with the full installation.
+- **Python integration:** The public API supports verified snapshot reading, bundle creation and guarded execution for host applications.
 
-The existing [monitor](docs/monitor.md) shows live
-watcher activity, operational repository states, readable times and switchable
-short/full identifiers. It retains the public
-`patchharbor runtime export --output-dir ...` command and `api.export_runtime`.
-Every official build emits the canonical Core-PYZ alongside wheel and sdist;
-complete releases include these files, a runtime manifest and checksums.
-See [runtime export and direct library use](docs/runtime-export.md),
-[the release procedure](docs/release-runtime.md) and
-[the historical 1.9.1 release plan](planning/1.9.1/commit-plan.md).
-The existing [safe reference export](docs/safe-reference-integration.md) and
-safe-export semantics remain unchanged; other integration boundaries follow
-[the version-2 contract](docs/version-2-integration.md). Safe export remains limited to
-Linux x86-64 with CPython 3.10–3.14.
+### Version and compatibility
 
-**CPython 3.10 or newer is required.** Core-PYZ has no watcher; the normal
-wheel and sdist include it. A version string establishes neither a published
-release/tag nor an upgraded installation. Native CI and downstream acceptance
-remain separate from local tests and actual Execute. Historical
-[1.5.0 refactoring](planning/1.5.0/commit-plan.md) and
-[1.6.0 integration](planning/specroad-integration/commit-plan.md) records remain
-available; their original artifacts and evidence are unchanged.
+This checkout contains the **unpublished 2.0.0 release candidate**. The release
+badge links to the latest published GitHub release; it is not a test-status badge
+for this checkout. See the [2.0 integration guide](docs/version-2-integration.md)
+before upgrading: Task and Result formats and the Python API have changed.
+
+PatchHarbor requires **CPython 3.10+**. Official builds provide a wheel, sdist and
+Core-PYZ, with a runtime manifest and checksums for complete releases. See
+[runtime export](docs/runtime-export.md) and the [release procedure](docs/release-runtime.md).
+The specialized [safe reference export](docs/safe-reference-integration.md)
+supports Linux x86-64 with CPython 3.10–3.14.
 
 ## Requirements and installation
 
@@ -325,16 +319,13 @@ does not replace repository-bound Execute.
 
 ## Documentation and development
 
-- [Historical 1.5.0 refactoring plan](planning/1.5.0/commit-plan.md) and
-  [cleanup evidence](planning/1.5.0/rf12-documentation-cleanup.md): confirmed
-  progress, remaining acceptance and reproducible source measurements.
-  [Release acceptance](planning/1.5.0/release-acceptance.md) is tracked separately from source version 1.5.0.
 - [Installation and updates](docs/install-and-update.md)
 - [Repository configuration, archives, retries and permissions](docs/repository-workflow.md)
 - [Troubleshooting](docs/troubleshooting.md)
 - [Pack](docs/pack.md), [examples](docs/pack-examples.md), [Python API](docs/python-api.md)
 - [Runtime bootstrap](docs/runtime-bootstrap.md), [Task / Execute / Result protocol](docs/protocol-2.md)
-- [Watcher](docs/watcher-events.md), [CIFS publication](docs/result-publication-cifs.md)
+- [Monitor](docs/monitor.md), [watcher](docs/watcher-events.md), [CIFS publication](docs/result-publication-cifs.md)
+- [2.0 integration and upgrade](docs/version-2-integration.md), [release procedure](docs/release-runtime.md)
 - [Development tests and manual CI policy](docs/test-parallelism.md)
 - Joint requirements: [main specification](spec/SPECIFICATION.md),
   [PYZ/PACK extension](spec/SPECIFICATION_EXTENSION_PYZ_PACK.md) and
