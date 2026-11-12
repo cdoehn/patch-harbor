@@ -7,7 +7,8 @@ import pytest
 
 from tests.profiling_support import profile_run
 from tools.profiling.storage import database
-from tools.profiling.tracing import assign_phase, parse_trace
+from tools.profiling.trace_model import assign_phase
+from tools.profiling.trace_parser import parse_trace
 
 
 def span(pid=42, **changes):
