@@ -1,9 +1,9 @@
 """Validate locally produced phase collector records before one-controller import."""
 import json
-import math
 
 from tools.profiling.common import encoded
 from tools.profiling.coverage import collector_coverage
+from tools.profiling.profiles import validate_function
 
 
 def import_python(connection, measurement, directory, mode, *, max_bytes=64 * 1024 * 1024):
@@ -46,9 +46,7 @@ def import_python(connection, measurement, directory, mode, *, max_bytes=64 * 10
                 imported += 1 + len(function.get('callers', []))
                 if imported > 250_000:
                     raise ValueError('normalized profile row budget exceeded')
-                for field in ('self_s','cumulative_s'):
-                    if type(function.get(field)) not in (int,float) or not math.isfinite(function[field]) or function[field] < 0:
-                        raise ValueError('invalid function time')
+                validate_function(function)
                 connection.execute('INSERT INTO python_functions VALUES(?,?,?,?,?)', (*prefix, encoded(dict({k:v for k,v in function.items() if k!='callers'}, coverage=row['coverage']))))
                 for caller in function['callers']:
                     connection.execute('INSERT INTO python_callers VALUES(?,?,?,?,?)', (*prefix, encoded(dict(callee={k:function[k] for k in ('file','line','function')},caller=caller,coverage=row['coverage']))))

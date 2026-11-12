@@ -17,6 +17,8 @@ import pytest
 
 from tools.profiling.coverage import collector_coverage
 
+from tools.profiling.profiles import function_rows, memory_record
+
 
 class Collector:
     def __init__(self, config):
@@ -87,25 +89,15 @@ class Collector:
                     raw = 'python-' + self.process + '-' + str(self.sequence) + '.prof'
                     profiler.dump_stats(str(self.directory / raw))
                     row['raw_profile'] = raw
-                    functions = []
-                    for (file, line, name), (primitive, calls, own, cumulative, callers) in pstats.Stats(profiler).stats.items():
-                        functions.append(dict(file=file, line=line, function=name, primitive_calls=primitive,
-                            calls=calls, self_s=own, cumulative_s=cumulative,
-                            callers=[dict(file=k[0], line=k[1], function=k[2], metrics=v) for k, v in callers.items()]))
-                    if len(functions) > 10_000:
+                    functions, truncated = function_rows(pstats.Stats(profiler).stats)
+                    if truncated:
                         row.update(status='partial', reason='function inventory limit')
-                    row['functions'] = sorted(functions, key=lambda r: (-r['self_s'], r['file'], r['line']))[:10_000]
+                    row['functions'] = functions
                 if snapshot is not None:
                     current, peak = tracemalloc.get_traced_memory()
                     after = tracemalloc.take_snapshot()
                     difference = after.compare_to(snapshot, 'traceback')
-                    row['memory'] = dict(method='tracemalloc', unit='bytes', before=before,
-                        current=current, peak=peak, net_bytes=current-before,
-                        scope='Python allocations since explicit plugin start; peak includes earlier live objects; native memory and RSS unknown',
-                        differences=[dict(size_diff=d.size_diff, count_diff=d.count_diff,
-                            traceback=[dict(file=f.filename, line=f.lineno) for f in d.traceback])
-                            for d in difference[:200]],
-                        differences_truncated=len(difference) > 200)
+                    row['memory'] = memory_record(before, current, peak, difference)
             except Exception as exc:
                 row.update(status='partial', reason='collector end: ' + type(exc).__name__)
             finally:
