@@ -139,9 +139,10 @@ no warnings or dry run, the appropriate expected binding and, for recovery,
 the existing receipt, local digest and Git evidence. Their conservative ZIP
 path policy is unchanged. Current writers emit format 4 with one verified Core-PYZ
 or a declared runtime-only restriction. This checkout reads Result 4 only;
-RF-06 removed the Result-1/2 readers and runtime-wheel path. Unchanged valid
-1.4.0 artifacts remain supported, including their original producer capabilities.
-Public signatures, result fields, validation scopes and error codes are unchanged.
+Old Result 1/2/3 and Patch formats are rejected. Public Python names and
+integration capability versions follow the [version-2 contract](protocol-2.md);
+there are no old Python aliases. Historical producer capabilities do not
+change the current reader boundary.
 Full reference validation rejects a corrupt declared runtime. The separately
 reviewed [bootstrap and previous handoff procedure](runtime-bootstrap.md) can
 check repository evidence independently when only that optional addition fails.

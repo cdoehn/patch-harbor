@@ -1,6 +1,7 @@
 # PYZ in erzeugten Results
 
-Ab PP-06B erzeugt der gemeinsame Core Result-Format 3 mit Runtime-Metadaten 2.
+Version 2 erzeugt Result-Format 4 mit Runtime-Metadaten 3; siehe
+[aktueller Protokollvertrag](protocol-2.md).
 Eine normale Wheel-, Source- oder sdist-Installation enthält die vorbereiteten
 Ressourcen für genau eine kanonische Core-PYZ ohne Watcher. Neue Results betten
 kein zusätzliches Runtime-Wheel ein. Der normale Installationsvertrag mit Wheel,

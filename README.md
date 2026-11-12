@@ -45,7 +45,8 @@ See [runtime export and direct library use](docs/runtime-export.md),
 [the release procedure](docs/release-runtime.md) and
 [the historical 1.9.1 release plan](planning/1.9.1/commit-plan.md).
 The existing [safe reference export](docs/safe-reference-integration.md) and
-public integration contracts remain unchanged. Safe export remains limited to
+safe-export semantics remain unchanged; other integration boundaries follow
+[the version-2 contract](docs/version-2-integration.md). Safe export remains limited to
 Linux x86-64 with CPython 3.10–3.14.
 
 **CPython 3.10 or newer is required.** Core-PYZ has no watcher; the normal

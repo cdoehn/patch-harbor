@@ -1,7 +1,7 @@
 # Kanonisches Core-PYZ-Profil und historische Wheel-Dokumentation
 
 Die nachfolgenden Runtime-Wheel-Pfade sind historisch. RF-06B hat deren
-Reader, Provider und Build-Rezepte entfernt. Aktuell gelten die [Result-3-PYZ](result-format-3.md)
+Reader, Provider und Build-Rezepte entfernt. Aktuell gelten die [Result-4-PYZ](protocol-2.md)
 und die normale Wheel-/sdist-Installation; das Installations-Wheel bleibt erhalten.
 
 

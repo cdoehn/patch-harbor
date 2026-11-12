@@ -102,7 +102,7 @@ Grundlagen: [CIFS-Mountoptionen](https://man7.org/linux/man-pages/man8/mount.cif
 
 ## Format-3 activation (PP-06B)
 
-Result 3 passes the new PYZ or unavailable payload through this same publication
+Result 4 passes the PYZ or unavailable payload through this same publication
 boundary. Its typed finite retries, shared budget, sync/no-follow operations,
 owned cleanup and verified SHA publication are unchanged. The expanded tests
 exercise both runtime states; an integrity failure still cannot become a retry

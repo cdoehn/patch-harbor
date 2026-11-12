@@ -2,7 +2,7 @@
 
 The former wheel bootstrap and its installation commands below are historical.
 RF-06B removed `scripts/runtime_bootstrap.py`; those old commands are not available in this checkout. Use the reviewed PYZ bootstrap
-in `scripts/pyz_bootstrap.py` and [current Result guidance](result-format-3.md).
+in `scripts/pyz_bootstrap.py` and [current Result guidance](protocol-2.md).
 The uv proof now installs the normal distribution wheel and uses its Core-PYZ.
 
 
@@ -12,13 +12,11 @@ The uv proof now installs the normal distribution wheel and uses its Core-PYZ.
 or a public application subcommand. It has no import-time PatchHarbor dependency.
 Use a trusted copy of the helper and an explicitly trusted Result. A digest
 copied from an unknown archive does not authenticate its sender. The current
-production writer emits Format 3 with exactly one Core-PYZ when runtime
-embedding succeeds. A valid `unavailable` result instead contains runtime
-metadata and a warning, with no executable artifact. The 1.5.0 contract retains
-valid 1.4.0 artifacts; Result 1/2 and earlier runtime wheels no longer require
-support. RF-06 implemented that boundary; RF-07 established one maintained
-bootstrap source. Upgrading repository files does not restart
-or replace an already running older global installation.
+production writer emits Format 4 with runtime metadata 3 and exactly one
+Core-PYZ when embedding succeeds. A valid `unavailable` Result instead contains
+metadata and a reason, without executable bytes. Old Result 1/2/3, old Patch
+formats and runtime wheels are historical evidence, not accepted references.
+Upgrading repository files does not restart or replace a running installation.
 
 Result snapshots support up to 250,000 stored repository files, with ten further
 outer ZIP slots for auxiliary data. The Core reader and stdlib bootstrap accept
@@ -56,10 +54,9 @@ Differing meanings of path and handle `ctime` must not reject unchanged files.
 These checks add no retry,
 identity fallback or exception to the trusted digest requirement.
 
-The supported 1.4.0 baseline uses the exact closed requirement `>=3.10`.
+The standard build uses the exact closed requirement `>=3.10`.
 The current data validator and helper also recognize the existing closed
-`>=3.12` recipe variant; this does not restore Result-1/2 or general pre-1.4.0
-support. Unknown variants are not inferred from a product version. No original
+`>=3.12` recipe variant; this does not restore old Result formats. Unknown variants are not inferred from a product version. No original
 artifact is relabeled. Unknown requirements and rehashed mixed variants remain
 invalid. Native 3.10/3.11 acceptance remains a separate gate.
 A new private directory is required. On Windows it is created atomically with

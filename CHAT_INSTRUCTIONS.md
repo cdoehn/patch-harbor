@@ -25,7 +25,7 @@ PatchHarbor registriert lokale Git-Instanzen per UUID v4, prüft Base-Commit und
 vollständigen Fingerprint, validiert sichere ZIP-Pakete, ordnet sie per repo_id
 zu und schreibt geprüfte Payloads vor genau einem Bash-/PowerShell-Entrypoint.
 Es erfasst stdout/stderr, Exit-Code, Laufzeit, Abbruch und Toolfehler, erzeugt
-Result Bundles und unterscheidet diese von Task-Bundlesn. Exchange-Auswahl und
+Result Bundles und unterscheidet diese von Task-Bundles. Exchange-Auswahl und
 Archivierung folgen den unten beschriebenen Regeln.
 
 Die für diesen Vertrag relevanten öffentlichen Befehle sind:
@@ -239,16 +239,12 @@ Ein fehlgeschlagener Patch kann Dateien geändert oder neu erzeugt haben. Arbeit
 immer auf dem tatsächlich zurückgegebenen Snapshot weiter und unterstelle keine
 globale Rückabwicklung.
 
-### Installationsfreier Start aus dem vorliegenden Format-3-Result
+### Installationsfreier Start aus dem vorliegenden Format-4-Result
 
-Die Kompatibilitätsbasis für die Entwicklung ab 1.5.0 sind unveränderte gültige
-1.4.0-Results mit Format 3. Bei `embedded` verwende genau deren Core-PYZ mit
-Python >=3.10; `unavailable` bleibt eine gültige Referenz ohne Werkzeugzugabe.
-Result 1/2 und ursprüngliche 1.3.0-PYZs sind keine Supportpflicht mehr.
-Nicht unterstützte Formate sind kein Anlass, alte Wheel-Laufzeiten zu installieren.
-Bestehende 1.4.0-Capabilities `[1, 2, 3]` bleiben gültig; neue bereinigte
-Produzenten deklarieren `[3]`. Angaben beschreiben den jeweiligen Produzenten,
-nicht die Lesepflicht des aktuellen Werkzeugs. Originalbytes bleiben unverändert.
+Verwende ein geprüftes Result 4 mit Runtime-Metadaten 3. Bei `embedded` wird
+genau seine Core-PYZ mit Python >=3.10 verwendet; `unavailable` bleibt eine
+gültige Referenz ohne Werkzeugzugabe. Task 2 und Result 4 sind die aktuellen
+Formate. Alte Archive werden weder konvertiert noch umbenannt oder ausgeführt.
 
 Der folgende ausführbare Bootstrap prüft unterstützte Result-4-Daten.
 Nicht unterstützte Resultformate sind keine Grundlage für eine Ersatz-Ausführung.
@@ -1005,7 +1001,7 @@ if __name__ == '__main__':
 ### Runtime-Ausfall und bisheriger sicherer Übergabeweg
 
 Dieser Fallback gilt für eine fehlende oder technisch unbenutzbare Werkzeugzugabe
-einer unterstützten Repositoryreferenz. Result 1/2 und alte Runtime-Wheels sind
+einer unterstützten Repositoryreferenz. Result 1/2/3 und alte Runtime-Wheels sind
 historische Daten, kein automatischer Ersatzweg. Unbekannte Formate und ungültige
 Pflichtdaten werden nicht durch Runtime-Installation oder Umdeklaration geheilt.
 Das frühere Wheel-Beispiel in `docs/runtime-bootstrap.md` ist ausdrücklich Historie.
@@ -1056,21 +1052,19 @@ Normsatz: spec/SPECIFICATION.md
           spec/SPECIFICATION_EXTENSION_CPYTHON_310_311.md
 ```
 
-Aktueller vorbereiteter Schritt ist `200-01.W` / Bundle 088. Er benennt den
-ungebundenen Skripttyp in `ScriptBundle` und dessen API in `run_scripts` um;
-`api.run` entfällt ohne Alias. `fs run` und `run_scripts` sind deprecated.
-Quellversion `2.0.0.dev0` bezeichnet keinen produktiven Zwischenrelease.
-Der repositorygebundene Task-/Execute-/Result-Wechsel folgt erst in `200-02`;
-für diese erste Übergabe bleiben Patchformat 1, Resultformat 3 und die vorhandene
-native Pack-/Execute-Grenze maßgeblich. Eine neue Produktversion darf nicht
-vortäuschen, dass die folgenden Planfähigkeiten schon implementiert sind.
+Der Implementierungsstand verwendet `ScriptBundle` und `api.run_scripts` für
+den eigenständigen deprecated Skriptweg. Repositorygebundene Übergaben verwenden
+Task 2, Execute JSON 2 und Result 4. Python-API-Rückwärtskompatibilität ist nicht
+vorgesehen; die ausdrücklich dokumentierten deprecated CLI-Aliase ändern daran
+nichts. Der lokale Messbefehl ist `python tools/profile_tests.py run` mit einer
+expliziten Testauswahl. SQLite, Profile und Traces bleiben lokal; Vorbereitung,
+Testkörper und Aufräumen werden getrennt ausgewiesen.
 
-Python-API-Rückwärtskompatibilität ist ausdrücklich nicht verlangt. Die im Plan
-vorgesehenen CLI-Ausnahmen sind davon getrennt. Profiling startet später nur
-per lokalem Befehl; SQLite, Profile und Traces bleiben lokal. Vorbereitung,
-Testkörper und Aufräumen sind getrennt zu messen. Bestehende Sicherheits- und
-Testregeln bleiben erhalten. Tatsächlicher Fortschritt wird ausschließlich aus
-den Resultnachweisen abgeleitet. Frühere SRI-/SAFE-/Releasepläne bleiben Historie.
+Fortschritt und Abnahme werden ausschließlich aus tatsächlichen Result- und
+Testnachweisen abgeleitet. Eine Quellversion oder ein vorbereiteter Commit
+beweist weder erfolgreichen Execute noch native CI oder eine Veröffentlichung.
+Der aktive Plan enthält die offenen Nachweise; frühere SRI-/SAFE-/Releasepläne
+bleiben historische Belege.
 
 Der frühere PYZ/PACK-Plan ist mit 16/16 Positionen, Korrektur 046 und grüner
 manueller CI auf `30e5de1d67a2d725ff192a0b97e50c2b0336bfcb` abgeschlossen.
