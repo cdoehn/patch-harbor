@@ -6,7 +6,8 @@ from pathlib import Path
 import sqlite3
 
 from tools.profiling.capture import run
-from tools.profiling.common import count, encoded, positive
+from tools.profiling.common import count, encoded, positive, positive_integer
+from tools.profiling.budgets import requested_limits
 from tools.profiling.reporting import compare_runs, report_run
 from tools.test_policy import PROJECT_ROOT
 from tools.report_rendering import render_profile
@@ -22,8 +23,14 @@ def parser():
     capture_parser.add_argument('--repetitions', type=count, default=5)
     capture_parser.add_argument('--profile-repetitions', type=count, default=1)
     capture_parser.add_argument('--warmups', type=int, default=1, choices=range(0, 101))
-    capture_parser.add_argument('--timeout', type=positive, default=3600.)
-    capture_parser.add_argument('--max-bytes', type=int, default=64 * 1024 * 1024)
+    capture_parser.add_argument('--budget-scale', type=positive_integer, default=1,
+                                help='multiply all default budgets (default: 1, already includes 10x headroom)')
+    capture_parser.add_argument('--timeout', type=positive,
+                                help='seconds per measurement (default: 432000, scaled by --budget-scale)')
+    capture_parser.add_argument('--max-bytes', type=positive_integer,
+                                help='artifact bytes per measurement (default: 343597383680 = 320 GiB, scaled)')
+    capture_parser.add_argument('--max-files', type=positive_integer,
+                                help='artifact files per measurement (default: 1500000, scaled)')
     capture_parser.add_argument('selection', nargs=argparse.REMAINDER)
     for name in ('report', 'compare'):
         read = commands.add_parser(name, allow_abbrev=False)
@@ -44,8 +51,10 @@ def main(argv=None):
     args = parser().parse_args(argv)
     try:
         if args.command == 'run':
-            if args.max_bytes < 1024 or args.max_bytes > 4 * 1024**3:
-                raise ValueError('artifact budget must be between 1 KiB and 4 GiB')
+            args.limits = requested_limits(args)
+            args.timeout = args.limits.timeout_s
+            args.max_bytes = args.limits.artifact_bytes
+            args.max_files = args.limits.artifact_files
             result, code = run(args)
         else:
             result, code = (report_run(args) if args.command == 'report' else compare_runs(args)), 0

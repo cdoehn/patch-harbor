@@ -37,3 +37,10 @@ def count(value):
     if not 1 <= number <= 1000:
         raise argparse.ArgumentTypeError('must be between 1 and 1000')
     return number
+
+
+def positive_integer(value):
+    number = int(value)
+    if number < 1:
+        raise argparse.ArgumentTypeError('must be a positive integer')
+    return number
