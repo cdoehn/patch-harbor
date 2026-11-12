@@ -5,6 +5,7 @@ import argparse
 from collections import Counter
 import json
 import os
+import re
 from pathlib import Path
 import sys
 from urllib.parse import urlsplit
@@ -24,7 +25,16 @@ MAX_ROWS = 250_000
 def read_json(path):
     if path.is_symlink() or not path.is_file() or path.stat().st_size > MAX_BYTES:
         raise ValueError('missing, linked or oversized report')
-    value = json.loads(path.read_text(encoding='utf-8'))
+    def unique(pairs):
+        result = {}
+        for key,value in pairs:
+            if key in result:
+                raise ValueError('duplicate JSON field')
+            result[key] = value
+        return result
+    def reject_constant(value):
+        raise ValueError('non-finite JSON value: ' + value)
+    value = json.loads(path.read_text(encoding='utf-8'), object_pairs_hook=unique, parse_constant=reject_constant)
     if not isinstance(value, dict):
         raise ValueError('report must be an object')
     return value
@@ -40,6 +50,8 @@ def count_cases(document):
         if not isinstance(collection, list) or len(collection) > MAX_ROWS or any(not isinstance(n,str) for n in collection):
             raise ValueError('invalid collected test identities')
         nodes.update(collection)
+        if len(nodes) > MAX_ROWS:
+            raise ValueError('too many distinct test identities')
     grouped = {}
     for row in reports:
         if (not isinstance(row,dict) or row.get('nodeid') not in nodes
@@ -72,10 +84,10 @@ def count_cases(document):
 
 def summarize_document(document, build, commit):
     result = {'counts': count_cases(document), 'exitstatus': document.get('exitstatus'),
-              'status': 'incomplete', 'binding': document.get('binding'), 'errors': [],
+              'status': 'incomplete', 'binding': document.get('binding') if isinstance(document.get('binding'),dict) else {}, 'errors': [],
               'controller_observed_s': None, 'job_walltime_s': None, 'top': [],
               'timing_status': 'unavailable', 'preparation': [],
-              'collection_outcomes': dict(Counter(r.get('outcome','unknown') for r in document.get('collection_reports',[]) if isinstance(r,dict)))}
+              'collection_outcomes': dict(Counter(str(r.get('outcome','unknown')) for r in document.get('collection_reports',[]) if isinstance(r,dict)))}
     try:
         validate(document)
         result['status'] = 'passed'
@@ -83,7 +95,7 @@ def summarize_document(document, build, commit):
         result['errors'].append(str(exc))
         if document.get('exitstatus') or result['counts']['failed']:
             result['status'] = 'failed'
-    result['commit_binding_verified'] = bool(build and build.get('commit') == commit and build.get('binding') == document.get('binding'))
+    result['commit_binding_verified'] = bool(re.fullmatch(r'[0-9a-f]{40}', commit) and build and build.get('commit') == commit and build.get('binding') == document.get('binding'))
     if not result['commit_binding_verified']:
         result['errors'].append('report is not bound to the build evidence for this commit')
         if result['status'] == 'passed':
@@ -133,7 +145,7 @@ def render(document):
     lines = ['## PatchHarbor test results', '', cell(document['lane']),
              'Commit: ' + cell(document['commit']),
              'Run / attempt: ' + cell(document['run_id']) + ' / ' + cell(document['attempt']),
-             'Platform / Python / shell: ' + ' / '.join(cell(document[k]) for k in ('platform','python','shell')),
+             'Lane platform / Python / shell: ' + ' / '.join(cell(document[k]) for k in ('platform','python','shell')),
              '', 'Counts are test executions per suite. Total job walltime is unmeasured.', '']
     url = document['artifact_url']
     parts = urlsplit(url)
@@ -144,6 +156,7 @@ def render(document):
         counts = suite['counts']
         if counts is not None:
             lines.extend([table(counts.keys(),[counts.values()]), '',
+                'Observed platform / Python: ' + cell(suite['binding'].get('platform')) + ' / ' + cell(suite['binding'].get('python')),
                 'Observed controller interval (seconds): ' + cell(suite['controller_observed_s']),
                 'Timing completeness: ' + cell(suite['timing_status']),
                 'Collection outcomes: ' + cell(json.dumps(suite['collection_outcomes'],sort_keys=True)),
