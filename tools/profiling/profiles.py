@@ -1,8 +1,12 @@
 """Normalized Python profile values, independent of pytest and persistence."""
 import math
 
+from tools.profiling.budgets import default_limits, require_budget
 
-def validate_function(row):
+DEFAULTS = default_limits()
+
+
+def validate_function(row, *, max_callers=DEFAULTS.callers):
     if not isinstance(row, dict) or not isinstance(row.get('file'), str) or not isinstance(row.get('function'), str):
         raise ValueError('invalid profile source identity')
     for field in ('line', 'primitive_calls', 'calls'):
@@ -14,8 +18,9 @@ def validate_function(row):
         if type(row.get(field)) not in (int,float) or not math.isfinite(row[field]) or row[field] < 0:
             raise ValueError('invalid function time')
     callers = row.get('callers')
-    if not isinstance(callers, list) or len(callers) > 10_000:
+    if not isinstance(callers, list):
         raise ValueError('invalid caller inventory')
+    require_budget('callers per function', len(callers), max_callers)
     for caller in callers:
         if not isinstance(caller, dict) or not isinstance(caller.get('file'), str) or not isinstance(caller.get('function'), str) or type(caller.get('line')) is not int:
             raise ValueError('invalid caller source')
@@ -27,13 +32,13 @@ def validate_function(row):
     return row
 
 
-def function_rows(stats, limit=10_000):
+def function_rows(stats, limit=DEFAULTS.functions, *, max_callers=DEFAULTS.callers):
     functions = []
     for (file,line,name), (primitive,calls,own,cumulative,callers) in stats.items():
         row = dict(file=file,line=line,function=name,primitive_calls=primitive,calls=calls,
                    self_s=own,cumulative_s=cumulative,
                    callers=[dict(file=k[0],line=k[1],function=k[2],metrics=v) for k,v in callers.items()])
-        functions.append(validate_function(row))
+        functions.append(validate_function(row, max_callers=max_callers))
     return sorted(functions,key=lambda r:(-r['self_s'],r['file'],r['line']))[:limit], len(functions)>limit
 
 

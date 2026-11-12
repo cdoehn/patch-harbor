@@ -197,7 +197,8 @@ def capture(connection, run_id, mode, iteration, warmup, directory, metadata, ar
             observed = store_report(connection, identity, report, metadata['binding'])
             if mode in ('cprofile', 'memory', 'strace') and status == 'complete':
                 from tools.profiling.python_data import import_python
-                details['phase_collector'] = import_python(connection, identity, output, mode, max_bytes=args.max_bytes)
+                details['phase_collector'] = import_python(connection, identity, output, mode,
+                                                           max_bytes=args.max_bytes, limits=args.limits)
                 if mode == 'strace':
                     from tools.profiling.tracing import import_trace
                     details['syscalls'] = import_trace(connection, identity, output, max_bytes=args.max_bytes)

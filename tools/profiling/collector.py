@@ -16,6 +16,7 @@ import uuid
 import pytest
 
 from tools.profiling.coverage import collector_coverage
+from tools.profiling.budgets import Limits, default_limits, exceeded
 
 from tools.profiling.profiles import function_rows, memory_record
 
@@ -26,6 +27,8 @@ class Collector:
         self.mode = os.environ['PH_PROFILE_MODE']
         self.directory = Path(os.environ['PH_PROFILE_DIRECTORY'])
         self.measurement = os.environ['PH_PROFILE_MEASUREMENT']
+        configured = os.environ.get('PH_PROFILE_LIMITS')
+        self.limits = Limits(**json.loads(configured)) if configured else default_limits()
         self.process = str(uuid.uuid4())
         self.sequence = 0
         self.memory_owned = False
@@ -42,8 +45,9 @@ class Collector:
     def write(self, row):
         path = self.directory / ('collector-' + self.process + '-' + str(self.sequence) + '.json')
         content = json.dumps(row, sort_keys=True, allow_nan=False).encode()
-        if len(content) > 4 * 1024 * 1024:
-            row.update(status='partial', reason='collector record byte limit', functions=[], memory={})
+        reason = exceeded('collector record bytes', len(content), self.limits.record_bytes)
+        if reason:
+            row.update(status='partial', reason=reason, functions=[], memory={})
             content = json.dumps(row, sort_keys=True, allow_nan=False).encode()
         with path.open('xb') as stream:
             stream.write(content)
@@ -89,9 +93,12 @@ class Collector:
                     raw = 'python-' + self.process + '-' + str(self.sequence) + '.prof'
                     profiler.dump_stats(str(self.directory / raw))
                     row['raw_profile'] = raw
-                    functions, truncated = function_rows(pstats.Stats(profiler).stats)
+                    stats = pstats.Stats(profiler).stats
+                    functions, truncated = function_rows(stats, self.limits.functions,
+                                                         max_callers=self.limits.callers)
                     if truncated:
-                        row.update(status='partial', reason='function inventory limit')
+                        row.update(status='partial', reason=exceeded('functions per record', len(stats),
+                                                                     self.limits.functions))
                     row['functions'] = functions
                 if snapshot is not None:
                     current, peak = tracemalloc.get_traced_memory()
@@ -99,7 +106,8 @@ class Collector:
                     difference = after.compare_to(snapshot, 'traceback')
                     row['memory'] = memory_record(before, current, peak, difference)
             except Exception as exc:
-                row.update(status='partial', reason='collector end: ' + type(exc).__name__)
+                row.update(status='partial', reason='collector end: ' + type(exc).__name__
+                           + (': ' + str(exc) if isinstance(exc, ValueError) else ''))
             finally:
                 row['serialization_preparation_ns'] = time.perf_counter_ns() - overhead
                 try:

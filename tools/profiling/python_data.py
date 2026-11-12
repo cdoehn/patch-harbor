@@ -4,17 +4,25 @@ import json
 from tools.profiling.common import encoded
 from tools.profiling.coverage import collector_coverage
 from tools.profiling.profiles import validate_function
+from tools.profiling.budgets import default_limits, require_budget
 
 
-def import_python(connection, measurement, directory, mode, *, max_bytes=64 * 1024 * 1024):
-    records = []
-    consumed = 0
+def import_python(connection, measurement, directory, mode, *, max_bytes=None, limits=None):
+    limits = default_limits() if limits is None else limits
+    max_bytes = limits.artifact_bytes if max_bytes is None else max_bytes
+    expected = set(connection.execute("SELECT nodeid,phase,worker FROM phases WHERE measurement_id=? AND state='measured'", (measurement,)))
+    observed = set()
+    consumed = imported = records = 0
+    # The controller owns the transaction. Retain identities, not every parsed
+    # function and caller from the full suite, and roll back on any incomplete input.
     for path in sorted(directory.glob('collector-*.json')):
+        if path.is_symlink() or not path.is_file():
+            raise ValueError('unsafe collector record')
         consumed += path.stat().st_size
-        if consumed > max_bytes:
-            raise ValueError('collector data byte budget exceeded')
-        if path.is_symlink() or path.stat().st_size > 4 * 1024 * 1024:
-            raise ValueError('unsafe or oversized collector record')
+        require_budget('collector data bytes', consumed, max_bytes, '--max-bytes')
+        require_budget('collector record bytes', path.stat().st_size, limits.record_bytes)
+        records += 1
+        require_budget('collector records', records, limits.collector_records)
         row = json.loads(path.read_text(encoding='utf-8'))
         if row.get('format_version') != 2 or row.get('measurement_id') != measurement or row.get('mode') != mode:
             raise ValueError('foreign collector record')
@@ -27,26 +35,22 @@ def import_python(connection, measurement, directory, mode, *, max_bytes=64 * 10
                 raise ValueError('invalid collector identity or timestamp')
         if row['end_ns'] < row['start_ns']:
             raise ValueError('reversed collector interval')
-        records.append(row)
-    if not records or len(records) > 20_000:
-        raise ValueError('collector records missing or excessive')
-    expected = set(connection.execute("SELECT nodeid,phase,worker FROM phases WHERE measurement_id=? AND state='measured'", (measurement,)))
-    observed = [(row['nodeid'], row['phase'], row['worker']) for row in records if row['nodeid'] is not None]
-    if len(set(observed)) != len(observed) or set(observed) != expected:
-        raise ValueError('Python collector coverage differs from observed phases')
-    imported = 0
-    for row in records:
+        if row['nodeid'] is not None:
+            identity = row['nodeid'], row['phase'], row['worker']
+            if identity not in expected or identity in observed:
+                raise ValueError('Python collector coverage differs from observed phases')
+            observed.add(identity)
         prefix = (measurement, row['nodeid'], row['phase'], row['worker'])
         connection.execute('INSERT INTO processes VALUES(?,?,?,?,?)', (*prefix, encoded({k:v for k,v in row.items() if k not in ('functions','memory')})))
         if mode == 'cprofile':
             functions = row.get('functions')
-            if not isinstance(functions, list) or len(functions) > 10_000:
+            if not isinstance(functions, list):
                 raise ValueError('invalid function inventory')
+            require_budget('functions per record', len(functions), limits.functions)
             for function in functions:
+                validate_function(function, max_callers=limits.callers)
                 imported += 1 + len(function.get('callers', []))
-                if imported > 250_000:
-                    raise ValueError('normalized profile row budget exceeded')
-                validate_function(function)
+                require_budget('normalized profile rows', imported, limits.profile_rows)
                 connection.execute('INSERT INTO python_functions VALUES(?,?,?,?,?)', (*prefix, encoded(dict({k:v for k,v in function.items() if k!='callers'}, coverage=row['coverage']))))
                 for caller in function['callers']:
                     connection.execute('INSERT INTO python_callers VALUES(?,?,?,?,?)', (*prefix, encoded(dict(callee={k:function[k] for k in ('file','line','function')},caller=caller,coverage=row['coverage']))))
@@ -55,4 +59,7 @@ def import_python(connection, measurement, directory, mode, *, max_bytes=64 * 10
             if not isinstance(memory, dict) or any(type(memory.get(k)) is not int for k in ('before','current','peak','net_bytes')):
                 raise ValueError('invalid memory observation')
             connection.execute('INSERT INTO memory_observations VALUES(?,?,?,?,?)', (*prefix, encoded(memory)))
-    return {'records': len(records), 'coverage': 'Observer intervals only; function rows retain backend thread scope, with no per-thread or exclusive-test ownership'}
+    if not records or observed != expected:
+        raise ValueError('Python collector coverage differs from observed phases or records are missing')
+    return {'records': records, 'normalized_rows': imported,
+            'coverage': 'Observer intervals only; function rows retain backend thread scope, with no per-thread or exclusive-test ownership'}
