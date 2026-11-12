@@ -32,6 +32,8 @@ def report_run(args):
         result['findings'] = [dict(nodeid=n, phase=p, worker=w, **json.loads(d)) for n,p,w,d in connection.execute(
             'SELECT f.nodeid,f.phase,f.worker,f.data FROM findings f JOIN measurements m ON m.id=f.measurement_id WHERE m.run_id=? AND m.warmup=0 AND m.status=? AND m.mode=? AND (f.phase=? OR f.phase IS NULL) ORDER BY f.rowid LIMIT ?',
             (result['run_id'], 'complete', args.mode, args.phase, args.top))]
+        result['finding_count'] = connection.execute(
+            'SELECT count(*) FROM findings f JOIN measurements m ON m.id=f.measurement_id WHERE m.run_id=?', (result['run_id'],)).fetchone()[0]
         result['coverage'] = {'startup': 'recorded where observable', 'subprocess_python_profiles': 'unobserved',
                               'native_memory': 'unobserved', 'fixture_teardown': 'unobserved; test teardown is measured'}
         result['artifacts'] = [dict(zip(('measurement_id','path','role','sha256','size','status'), row)) for row in connection.execute(
@@ -48,13 +50,22 @@ def compare_runs(args):
         for run_info in (before, after):
             if run_info['status'] != 'complete':
                 raise ValueError('comparison requires complete successful runs')
-        for key in ('host', 'selection', 'options'):
+        for key in ('host', 'selection', 'selection_sources', 'options', 'tool_version', 'dependencies', 'collector_sources'):
             if before['metadata'][key] != after['metadata'][key]:
                 raise ValueError('incomparable run ' + key)
+        worker_counts = []
+        for info in (before, after):
+            worker_counts.append(sorted(row[0] for row in connection.execute(
+                'SELECT count(DISTINCT p.worker) FROM processes p JOIN measurements m ON m.id=p.measurement_id WHERE m.run_id=? AND m.mode=? AND m.warmup=0 AND m.status=? GROUP BY m.id',
+                (info['run_id'], 'baseline', 'complete'))))
+        if not worker_counts[0] or worker_counts[0] != worker_counts[1]:
+            raise ValueError('incomparable observed worker counts')
         a, b = ({row['nodeid']: row for row in rankings(connection, r['run_id'], args.phase)} for r in (before, after))
         if not a or set(a) != set(b):
             raise ValueError('comparison needs the same measured baseline cases')
         rows = [{'nodeid': nodeid, 'phase': args.phase, 'before': a[nodeid], 'after': b[nodeid],
-                 'difference_s': b[nodeid]['median_s'] - a[nodeid]['median_s']} for nodeid in sorted(a)]
+                 'difference_s': b[nodeid]['median_s'] - a[nodeid]['median_s'],
+                 'ratio': b[nodeid]['median_s'] / a[nodeid]['median_s'] if a[nodeid]['median_s'] else None} for nodeid in sorted(a)]
         return {'before': before, 'after': after, 'comparisons': rows,
-                'limitation': 'Observed baseline difference; no causal speedup or savings claim.'}
+                'limitation': 'Observed baseline difference; no causal speedup or savings claim. No percentile estimate for small samples.',
+                'comparison_scope': 'Same host, selection and selected sources, collectors, dependencies, options and observed worker counts; product revision may differ.'}

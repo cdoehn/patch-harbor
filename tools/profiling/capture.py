@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import hashlib
+import importlib.metadata
 import json
 import os
 from pathlib import Path
@@ -64,7 +65,10 @@ def provenance(selection, options):
             'selection_sources': selection_facts(selection), 'options': options,
             'host': {'system': platform.system(), 'release': platform.release(),
                      'machine': platform.machine(), 'hostname': platform.node(),
-                     'python': platform.python_version()}, 'tool_version': 1}
+                     'python': platform.python_version()}, 'tool_version': 1,
+            'dependencies': {name: importlib.metadata.version(name) for name in ('pytest', 'pytest-xdist')},
+            'collector_sources': {p.name: hashlib.sha256(p.read_bytes()).hexdigest()
+                                  for p in sorted(Path(__file__).parent.glob('*.py'))}}
 
 
 def stop_process(process):
