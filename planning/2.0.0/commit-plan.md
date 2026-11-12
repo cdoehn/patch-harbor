@@ -904,3 +904,15 @@ zwölf echten WRC-Stände `200-06.W` bis `200-09.C`. Vollständiges paralleles
 Apply-Gate vor jedem Commit; Dev ausschließlich statisch. Workerstandard
 bleibt auf Nutzerwunsch `auto`, auch beim expliziten Diagnosebefehl. Push,
 Tag und CI bleiben aus. Das Folgepaket wird nur als Draft vorbereitet.
+
+
+## Reparatur nach Bundle 099
+
+Result `f6ce4d89-5c64-4174-8a22-2003a9ed03d9` bestätigt vier tatsächliche
+Commits bis `200-07.W` (21/38 Planpositionen). `200-07.R` brach vor dem Commit
+mit einem fehlgeschlagenen Threadumfang-Test ab; 3.902 Tests bestanden, 16
+wurden übersprungen. Die geänderten Dateien sind im tatsächlichen Result erhalten.
+Das Korrekturbundle 100 bindet an diesen Zustand, repariert Collector-Metadaten
+und Regression und nimmt die acht verbliebenen Stände bis `200-09.C` erneut
+mit je vollständigem parallelem Apply-Gate auf. Der Abschluss-Draft bleibt
+zurückgehalten und wird mit derselben Korrektur fortgeführt.

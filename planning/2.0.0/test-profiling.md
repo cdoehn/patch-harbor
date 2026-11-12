@@ -329,3 +329,24 @@ ergänzt um deterministische Parser-/DB-Fixtures. Keine absoluten CPU-/Speicher-
 Schwellen für unbekannte CI-Runner, keine langen Sleeps und keine neue
 Benchmark-Pflicht in allen Releasejobs. Hardwareabhängige Aussagen benötigen
 lokale Messbelege; reine Parser-Tests ersetzen keine echte Collector-Abnahme.
+
+
+## Korrektur des Threadumfangs nach Bundle 099
+
+Der Apply von 099 bestätigte die ersten vier Stände bis `200-07.W`; beim
+folgenden Regressionstest wurde unter Python 3.14 eine falsche Threadannahme
+sichtbar. CPython verwendet seit 3.12 für cProfile interpreterweite Monitoring-
+Events statt des früheren threadlokalen Profilers. Collectorformat 2 beschreibt
+diesen Unterschied ausdrücklich. Funktionen und Caller behalten den geprüften
+Messumfang; ein Phasenbezug ist ein Beobachtungsintervall und beweist keine
+exklusive Zuordnung von Hintergrundarbeit zum Test.
+
+Der Regressionstest prüft weiterhin echte Hauptthread-, Hintergrundthread- und
+Kindprozessarbeit. Bekannte CPython-Backends müssen die tatsächlich beobachtete
+Threadabdeckung liefern; Kinder werden weiterhin nicht als profiliert behauptet.
+Die Erfolgsgates werden nicht abgeschwächt. Die Korrektur wird in alle folgenden
+Profilingstände und den zurückgehaltenen Abschluss-Draft übernommen.
+
+Primärbelege: [CPython 3.11](https://github.com/python/cpython/blob/v3.11.14/Modules/_lsprof.c),
+[CPython 3.12](https://github.com/python/cpython/blob/v3.12.12/Modules/_lsprof.c) und
+[CPython 3.14](https://github.com/python/cpython/blob/v3.14.4/Modules/_lsprof.c).

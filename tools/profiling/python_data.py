@@ -3,6 +3,7 @@ import json
 import math
 
 from tools.profiling.common import encoded
+from tools.profiling.coverage import collector_coverage
 
 
 def import_python(connection, measurement, directory, mode, *, max_bytes=64 * 1024 * 1024):
@@ -15,8 +16,10 @@ def import_python(connection, measurement, directory, mode, *, max_bytes=64 * 10
         if path.is_symlink() or path.stat().st_size > 4 * 1024 * 1024:
             raise ValueError('unsafe or oversized collector record')
         row = json.loads(path.read_text(encoding='utf-8'))
-        if row.get('format_version') != 1 or row.get('measurement_id') != measurement or row.get('mode') != mode:
+        if row.get('format_version') != 2 or row.get('measurement_id') != measurement or row.get('mode') != mode:
             raise ValueError('foreign collector record')
+        if row.get('coverage') != collector_coverage(mode) or row.get('thread_id_role') != 'boundary-observer':
+            raise ValueError('missing or inconsistent collector coverage')
         if row.get('status') != 'complete':
             raise ValueError('partial collector: ' + str(row.get('reason')))
         for key in ('start_ns', 'end_ns', 'start_utc_ns', 'end_utc_ns', 'pid', 'thread_id'):
@@ -46,12 +49,12 @@ def import_python(connection, measurement, directory, mode, *, max_bytes=64 * 10
                 for field in ('self_s','cumulative_s'):
                     if type(function.get(field)) not in (int,float) or not math.isfinite(function[field]) or function[field] < 0:
                         raise ValueError('invalid function time')
-                connection.execute('INSERT INTO python_functions VALUES(?,?,?,?,?)', (*prefix, encoded({k:v for k,v in function.items() if k!='callers'})))
+                connection.execute('INSERT INTO python_functions VALUES(?,?,?,?,?)', (*prefix, encoded(dict({k:v for k,v in function.items() if k!='callers'}, coverage=row['coverage']))))
                 for caller in function['callers']:
-                    connection.execute('INSERT INTO python_callers VALUES(?,?,?,?,?)', (*prefix, encoded(dict(callee={k:function[k] for k in ('file','line','function')},caller=caller))))
+                    connection.execute('INSERT INTO python_callers VALUES(?,?,?,?,?)', (*prefix, encoded(dict(callee={k:function[k] for k in ('file','line','function')},caller=caller,coverage=row['coverage']))))
         elif mode == 'memory':
             memory = row.get('memory')
             if not isinstance(memory, dict) or any(type(memory.get(k)) is not int for k in ('before','current','peak','net_bytes')):
                 raise ValueError('invalid memory observation')
             connection.execute('INSERT INTO memory_observations VALUES(?,?,?,?,?)', (*prefix, encoded(memory)))
-    return {'records': len(records), 'coverage': 'pytest processes and threads explicitly instrumented; other processes unknown'}
+    return {'records': len(records), 'coverage': 'Observer intervals only; function rows retain backend thread scope, with no per-thread or exclusive-test ownership'}

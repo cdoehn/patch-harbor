@@ -15,6 +15,8 @@ import uuid
 
 import pytest
 
+from tools.profiling.coverage import collector_coverage
+
 
 class Collector:
     def __init__(self, config):
@@ -47,15 +49,16 @@ class Collector:
     @contextmanager
     def span(self, phase, nodeid=None):
         self.sequence += 1
-        row = dict(format_version=1, measurement_id=self.measurement, mode=self.mode,
+        row = dict(format_version=2, measurement_id=self.measurement, mode=self.mode,
                    process_id=self.process, pid=os.getpid(), parent_pid=os.getppid(),
                    thread_id=threading.get_ident(), native_thread_id=threading.get_native_id(),
                    worker=getattr(self.config, 'workerinput', {}).get('workerid'),
                    nodeid=nodeid, phase=phase, status='complete', reason=None,
                    start_ns=time.perf_counter_ns(), start_utc_ns=time.time_ns(),
-                   coverage={'python_threads': 'all' if self.mode == 'memory' else 'current',
-                             'children': 'unobserved', 'rss': 'unobserved',
-                             'initial_interpreter_imports': 'unobserved', 'phase_includes_hooks': True},
+                   start_process_cpu_ns=time.process_time_ns(),
+                   cpu_scope='whole pytest process, including other threads; excludes children',
+                   coverage=collector_coverage(self.mode),
+                   thread_id_role='boundary-observer',
                    timer='perf_counter; profile time is not a benchmark or CPU time')
         profiler, snapshot, before = None, None, None
         try:
@@ -75,7 +78,8 @@ class Collector:
         try:
             yield
         finally:
-            row.update(end_ns=time.perf_counter_ns(), end_utc_ns=time.time_ns())
+            row.update(end_ns=time.perf_counter_ns(), end_utc_ns=time.time_ns(),
+                       end_process_cpu_ns=time.process_time_ns())
             overhead = time.perf_counter_ns()
             try:
                 if profiler is not None:
