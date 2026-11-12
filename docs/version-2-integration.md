@@ -37,3 +37,37 @@ Integrationen müssen ihre Aufrufer, erwarteten Format-/Capability-Versionen und
 gepinnten vollständigen Hashes bewusst umstellen. Laufende Aufträge behalten
 ihre zu Beginn erfasste Runtime und Vorlage. Dieser Leitfaden und die Tests
 ändern weder SpecRoad/Control noch globale Installationen oder Dienste.
+
+## Bewusster Umstieg einer Installation
+
+Zuerst laufende Aufträge auslaufen lassen und den alten Watcher vor dem Austausch
+seiner Installation stoppen. Quellen, Wheel und Core-PYZ sind unterschiedliche
+Installationswege; eine neue PYZ ersetzt keinen laufenden Watcher. Danach Version,
+Capability-Verträge, die tatsächlich gestartete ausführbare Datei und die
+Dienstargumente prüfen. Erst dann den gewünschten Event- oder Pollingbetrieb
+wieder aufnehmen. Keine alte Runtime oder Vorlage während eines laufenden
+Auftrags austauschen.
+
+`patchharbor watcher poll` scannt standardmäßig alle vier Sekunden;
+`patchharbor watcher poll --interval 2.5` wählt ausdrücklich das Intervall.
+Das benötigt keine inotify-Ereignisse und eignet sich für entsprechende
+CIFS-Mounts. Publikations- und Sperrprüfungen bleiben erforderlich. Eine
+Konfigurationsänderung alleine beweist keine neue Dienstlaufzeit.
+
+Result-/Task-Suffixe gehören zur Repositorykonfiguration. Beispielsweise kann
+`patchharbor configure bundle-suffix .txt` eine zusätzliche Dateiendung erzeugen;
+zum Packen, Prüfen und Execute immer den tatsächlich zurückgegebenen Pfad
+verwenden. Suffixe ersetzen weder ZIP-Inhalt noch Hash- oder Formatprüfung.
+
+Das ausführbare [Vorbereitungsbeispiel](examples/prepare_task.py) prüft ein Result
+mit einer extern vertrauenswürdig erhaltenen vollständigen SHA-256 und erzeugt
+eine native Task-ZIP in einem privaten, nicht überwachten Ausgabeverzeichnis.
+Es führt keine Payload aus. Der Benutzer überträgt anschließend genau diese
+geprüften Bytes oder startet ausdrücklich `patchharbor execute TASKPFAD`.
+Die vorhandenen installierten CLI-/PYZ-Beispiele und Pollingtests decken die
+Ausführungswege ab; die veralteten CLI-Namen akzeptieren keine alten Formate.
+
+Alte Python-Aufrufer einschließlich `api.run` müssen geändert werden. Der
+eigenständige Skriptweg heißt `api.run_scripts` mit `ScriptBundle` und bleibt
+deprecated. Weder dieser Weg noch der CLI-Alias `apply` ist eine Migration für
+alte Patch-Bundles. Alte Results bleiben unveränderte historische Belege.
