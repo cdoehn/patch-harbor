@@ -32,7 +32,9 @@ BINDING = {
 
 
 def patch_environment(**overrides: object) -> dict[str, object]:
-    helper = (PROJECT_ROOT / "tools/pyz_bootstrap.py").read_bytes()
+    # Metadata describes the emitted helper, whose source newlines are LF.
+    # Archives or user-created source trees need not honor .gitattributes.
+    helper = (PROJECT_ROOT / "tools/pyz_bootstrap.py").read_text(encoding="utf-8").encode("utf-8")
     return {
         "marker": ENVIRONMENT_MARKER, "format_version": 3,
         "bootstrap": {"path": "tools/pyz_bootstrap.py", "size": len(helper), "sha256": sha256(helper).hexdigest()},
@@ -150,6 +152,36 @@ def test_explicit_template_line_endings_are_lf_and_environment_is_unchanged(
     assert json.loads(handoff.environment) == document
     assert b"```json" not in handoff.instructions
     assert document["note"] == "exact\r\nvalue\rpreserved"
+
+
+@pytest.mark.parametrize("line_ending", [b"\n", b"\r\n", b"\r"], ids=["lf", "crlf", "cr"])
+@pytest.mark.parametrize("bundle_type", ["Task", "Result"])
+def test_source_helper_line_endings_match_handoff_without_rewriting_source(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, line_ending: bytes, bundle_type: str,
+) -> None:
+    module = tmp_path / "src/patchharbor/chat_instructions.py"
+    module.parent.mkdir(parents=True)
+    module.touch()
+    helper = tmp_path / "tools/pyz_bootstrap.py"
+    helper.parent.mkdir()
+    canonical = b"# Passive helper fixture\nraise RuntimeError('must not execute')\n"
+    raw = canonical.replace(b"\n", line_ending)
+    helper.write_bytes(raw)
+    monkeypatch.setattr(instructions_module, "__file__", str(module))
+    monkeypatch.setattr(instructions_module, "own_pyz_profile_present", lambda: False)
+    document = patch_environment(bundle_type=bundle_type, note="exact\r\nvalue\rpreserved")
+    original = json.loads(json.dumps(document))
+    handoff = render_chat_handoff(document, template="contract\n")
+    assert handoff.bootstrap == canonical
+    assert json.loads(handoff.environment) == {
+        **document, "bootstrap": {
+            "path": "tools/pyz_bootstrap.py", "size": len(canonical),
+            "sha256": sha256(canonical).hexdigest(),
+        },
+    }
+    assert dict(handoff.entries())["tools/pyz_bootstrap.py"] == canonical
+    assert document == original
+    assert helper.read_bytes() == raw
 
 
 @pytest.mark.parametrize("line_ending", [b"\n", b"\r\n", b"\r"], ids=["lf", "crlf", "cr"])

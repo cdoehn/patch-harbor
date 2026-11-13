@@ -2,6 +2,6 @@
 /README.md text eol=lf
 # Canonical Core-PYZ input bytes must survive native Windows checkouts.
 /src/patchharbor/**/*.py text eol=lf
+/tools/pyz_bootstrap.py text eol=lf
 /docs/python-api.md text eol=lf
 /LICENSE text eol=lf
-# Immutable fixture provenance and its byte-pinned capture program.
