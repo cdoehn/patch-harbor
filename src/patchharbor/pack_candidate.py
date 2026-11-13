@@ -10,6 +10,7 @@ from typing import BinaryIO
 from uuid import UUID
 from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
 
+from patchharbor import __version__
 from patchharbor.bundle_handoff import (
     ENVIRONMENT_FORMAT_VERSION, ENVIRONMENT_MARKER, MAX_HANDOFF_ENTRY_BYTES,
     TASK_FILENAME_SCHEMA, RESULT_FILENAME_SCHEMA,
@@ -37,7 +38,7 @@ def _binding(reference: CapturedResultReference) -> dict[str, str]:
 
 def _target_environment(reference: CapturedResultReference) -> tuple[dict, tuple[str, ...]]:
     if reference.handoff is None:
-        raise _failure('Result 4 requires recorded handoff data', FailureReason.SOURCE_ERROR)
+        raise _failure('Result 5 requires recorded handoff data', FailureReason.SOURCE_ERROR)
     # These exact immutable bytes came from the complete native reader.
     return parse_json_document(reference.handoff.environment), ()
 
@@ -133,7 +134,7 @@ def prepare_candidate(sources: CapturedSources,
                     template: str, *, bootstrap: bytes | None = None, resource_policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY
                     ) -> PackCandidate:
     """Prepare bounded exact entries before reserving an output file."""
-    manifest = {'marker': 'patch-harbor-task-bundle', 'format_version': 2,
+    manifest = {'marker': 'patch-harbor-task-bundle', 'format_version': 3, 'patchharbor_version': __version__,
                 **_binding(reference), 'entrypoint': sources.entrypoint}
     document = parse_json_document(metadata.environment)
     try:

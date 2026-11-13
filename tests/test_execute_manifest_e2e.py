@@ -24,6 +24,7 @@ pytestmark = pytest.mark.e2e
 
 _VALID_MANIFEST = {
     "marker": TASK_MARKER,
+    "patchharbor_version": "2.0.0",
     "format_version": TASK_FORMAT_VERSION,
     "repo_id": "a3f9c2e1-7b4d-4a91-9d2e-5c6f8a1b2c3d",
     "base_commit": "f4e9c2a7b8c9d01234567890abcdef1234567890",

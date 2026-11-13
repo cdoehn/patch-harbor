@@ -29,7 +29,7 @@ def reference_entries(*, kind="bundle", dirty=False, object_format="sha1", hando
                "timeout": PrimaryResult.timeout_result, "interrupted": PrimaryResult.interrupted_result}[kind]()
     raw = b"base\x00\xff\n"
     blob = hashlib.new(object_format, b"blob " + str(len(raw)).encode() + b"\0" + raw).hexdigest()
-    manifest = {"marker": "patch-harbor-result-bundle", "format_version": 4, **binding,
+    manifest = {"patchharbor_version": "2.0.0", "marker": "patch-harbor-result-bundle", "format_version": 5, **binding,
                 "created_at": stamp, "run_id": run_id, "dirty": dirty, "dry_run": kind == "dry_run",
                 "entrypoint_started": primary.entrypoint_started, "execution_present": primary.entrypoint_started,
                 "primary_result": primary.kind.value, "result_bundle_status": "created",

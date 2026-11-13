@@ -13,6 +13,7 @@ def inspection_json_result(info: TaskInspection) -> dict[str, object]:
         "package_size": info.package_size,
         "manifest": {
             "marker": manifest.marker, "format_version": manifest.format_version,
+            "patchharbor_version": manifest.patchharbor_version,
             "repo_id": str(manifest.repo_id), "base_commit": str(manifest.base_commit),
             "state_fingerprint": manifest.state_fingerprint,
             "fingerprint_algorithm": manifest.fingerprint_algorithm,

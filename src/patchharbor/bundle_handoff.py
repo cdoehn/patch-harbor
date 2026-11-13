@@ -1,4 +1,4 @@
-"""Passive bundle handoff documents and optional format-2 Task metadata roles."""
+"""Passive bundle handoff documents and optional format-3 Task metadata roles."""
 
 from __future__ import annotations
 

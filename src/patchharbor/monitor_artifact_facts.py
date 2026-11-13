@@ -60,7 +60,9 @@ class ArtifactCache:
         try:
             package = resolve_task_payloads(payloads, resource_policy=POLICY, package_path=path,
                 package_sha256=captured.sha256, package_size=captured.size)
-        except PatchHarborError:
+        except PatchHarborError as exc:
+            if 'unsupported PatchHarbor package version' in str(exc):
+                return {'kind': 'other', 'error': str(exc)}, None
             return {'kind': 'other'}, None
         return {'kind': 'task_bundle', 'bundle_number': declared_bundle_number(package.entrypoint.content),
                 'entrypoint_name': package.entrypoint.relative_path}, ExchangeTaskSelection.from_manifest(package.manifest)

@@ -507,7 +507,10 @@ def merge_exchange_classifications(
         changed = False
         for candidate in pending:
             existing = by_identity.get(candidate.identity)
-            if existing is None:
+            if existing is None or (existing.kind == "other" and existing.execute_status is None
+                                    and not existing.same_classification(candidate)):
+                # A previously unrecognized file has no execution proof to lose.
+                # Recognition under today's contract is not state-schema migration.
                 by_identity[candidate.identity] = candidate
                 changed = True
                 continue

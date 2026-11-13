@@ -103,12 +103,12 @@ def _package_command(
     except PatchHarborError as exc:
         return _write_command_error(
             command, exc, json_output=json_output, stdout=stdout, stderr=stderr,
-            output_version=3,
+            output_version=4,
         )
     if json_output:
         result = inspection_json_result(info) if report is None else validation_json_result(report)
         _write_json_document(_json_envelope(command, result=result, error=None,
-                                            process_exit_code=0, output_version=3), stdout)
+                                            process_exit_code=0, output_version=4), stdout)
     else:
         print(f"package_sha256: {info.package_sha256}", file=stdout)
         print(f"package_size: {info.package_size}", file=stdout)
@@ -154,7 +154,7 @@ def _pack_command(args: argparse.Namespace, *, stdout: TextIO, stderr: TextIO) -
         if args.json_output:
             _write_json_document(_json_envelope(
                 'pack', result=None if packed is None else pack_json_result(packed),
-                error=error, process_exit_code=code, output_version=3,
+                error=error, process_exit_code=code, output_version=4,
             ), stdout)
         elif packed is not None:
             print(str(packed.path), file=stdout)

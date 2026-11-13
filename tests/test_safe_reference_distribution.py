@@ -91,7 +91,7 @@ else:
     for layer, files in expected.items():
         assert {name: {'mode': file.mode, 'sha256': file.sha256, 'size': file.size}
                 for name, file in getattr(snapshot, layer).files.items()} == files, layer
-    assert snapshot.format_version == 4 and snapshot.runtime.status == 'embedded'
+    assert snapshot.format_version == 5 and snapshot.runtime.status == 'embedded'
     assert snapshot.runtime.artifact_sha256 == runtime_sha
     assert snapshot.runtime.requires_python == '>=3.10'
     with ZipFile(bundle.path) as archive:

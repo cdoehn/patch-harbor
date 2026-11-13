@@ -1,8 +1,9 @@
-"""Closed Result-4/PYZ metadata reader; described code is never imported."""
+"""Closed Result-5/PYZ metadata reader; described code is never imported."""
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from patchharbor.bundle_version import require_bundle_version
 from patchharbor.json_document import parse_json_document
 from patchharbor.resource_policy import ResourcePolicy
 from patchharbor.result_runtime_metadata import (
@@ -66,7 +67,7 @@ def _capabilities(value: object) -> tuple[tuple[str, ...], tuple[int, ...], tupl
 def read_result_pyz(value: object, files: dict[str, bytes], *, resource_policy: ResourcePolicy) -> ResultPyzRuntime:
     """Check exact namespaces, metadata, descriptors and shared outer/inner budget."""
     _require(type(value) is dict and set(value) == {'status','reason','metadata','artifact'},
-             'invalid Result-4 runtime schema')
+             'invalid Result-5 runtime schema')
     metadata = _descriptor(value['metadata'], path=METADATA_PATH, limit=MAX_METADATA_BYTES, files=files)
     doc = parse_json_document(files[METADATA_PATH])
     _require(set(doc) == _FIELDS and doc['marker'] == 'patch-harbor-runtime'
@@ -76,6 +77,7 @@ def read_result_pyz(value: object, files: dict[str, bytes], *, resource_policy: 
              and doc['artifact'] == value['artifact'], 'inconsistent PYZ runtime metadata')
     actual = {name for name in files if name.startswith('runtime/')}
     version, requires = doc['version'], doc['requires_python']
+    require_bundle_version(version)
     _require(version is None or (type(version) is str and _VERSION.fullmatch(version) is not None),
              'invalid PYZ runtime version')
     _require(requires is None or (type(requires) is str and requires in pyz.PYTHON_REQUIREMENTS),

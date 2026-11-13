@@ -7,7 +7,7 @@ from collections.abc import Callable
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 import signal
-from threading import Event
+from queue import Empty, SimpleQueue
 from types import FrameType
 
 
@@ -15,7 +15,8 @@ from types import FrameType
 class WatcherStopController:
     """Coordinate graceful watcher termination without core coupling."""
 
-    _event: Event = field(default_factory=Event)
+    _notifications: SimpleQueue[None] = field(default_factory=SimpleQueue)
+    _requested: bool = field(default=False, init=False)
     _signal_number: int | None = field(default=None, init=False)
     _wake: Callable[[], None] | None = field(default=None, init=False)
 
@@ -26,7 +27,13 @@ class WatcherStopController:
     ) -> None:
         if self._signal_number is None and _signal_number is not None:
             self._signal_number = _signal_number
-        self._event.set()
+        if self._requested:
+            return
+        self._requested = True
+        # CPython SimpleQueue.put is reentrant even when a signal interrupts
+        # get. Event.set can deadlock on the interrupted Event.wait lock.
+        # https://docs.python.org/3.10/library/queue.html#queue.SimpleQueue.put
+        self._notifications.put(None)
         if self._wake is not None:
             self._wake()
 
@@ -36,10 +43,18 @@ class WatcherStopController:
             wake()
 
     def stop_requested(self) -> bool:
-        return self._event.is_set()
+        return self._requested
 
     def wait(self, timeout_seconds: float) -> bool:
-        return self._event.wait(timeout_seconds)
+        if self._requested:
+            return True
+        try:
+            self._notifications.get(timeout=max(0.0, timeout_seconds))
+        except Empty:
+            return self._requested
+        # Leave a stop token for any other waiter already blocked in get.
+        self._notifications.put(None)
+        return self._requested
 
     def was_interrupted(self) -> bool:
         return self._signal_number == signal.SIGINT

@@ -41,7 +41,7 @@ class ResultRuntimePayload:
 
     @property
     def result_format(self) -> int:
-        return 4
+        return 5
 
     def entries(self) -> tuple[tuple[str, bytes], ...]:
         result = ((METADATA_PATH, self.metadata),)

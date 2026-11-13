@@ -119,8 +119,8 @@ repo=Path(sys.argv[1]);api.register(repo)
 api.configure_exchange_directory(repo.parent/(repo.name+'-results'),repository=repo)
 tracemalloc.start();bundle=api.bundle(repo);peak=tracemalloc.get_traced_memory()[1];tracemalloc.stop()
 facts,digest=read_result_reference(bundle.path)
-assert facts.format_version==4 and facts.runtime.status=='embedded'
-assert facts.runtime.result_formats==(4,)
+assert facts.format_version==5 and facts.runtime.status=='embedded'
+assert facts.runtime.result_formats==(5,)
 assert not facts.warnings and facts.context.repository_path==str(repo)
 with ZipFile(bundle.path) as archive:
     raw=archive.read(facts.runtime.artifact.path)

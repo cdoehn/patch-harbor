@@ -1,4 +1,4 @@
-"""Resolve one fully prevalidated format-2 Task Bundle."""
+"""Resolve one fully prevalidated format-3 Task Bundle."""
 
 from __future__ import annotations
 
@@ -33,7 +33,7 @@ from patchharbor.zip_payloads import (
 
 @dataclass(frozen=True, slots=True)
 class ValidatedTaskBundle:
-    """One fully read and classified format-2 Task Bundle."""
+    """One fully read and classified format-3 Task Bundle."""
 
     manifest: TaskManifest
     entrypoint: BundlePayload
@@ -144,7 +144,7 @@ def resolve_task_bundle(
     resource_policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY,
     expected_identity: os.stat_result | None = None,
 ) -> ValidatedTaskBundle:
-    """Read every ZIP member, then classify format-2 Task roles."""
+    """Read every ZIP member, then classify format-3 Task roles."""
     activity("OPEN", f"Open explicit patch and capture stable content with SHA-256: {path}")
     try:
         target = path.resolve(strict=True) if expected_identity is None else path

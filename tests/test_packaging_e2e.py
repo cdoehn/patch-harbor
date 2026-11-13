@@ -91,6 +91,7 @@ EXPECTED_RUNTIME_FILES = {
     "patchharbor/execute_preflight.py",
     "patchharbor/execute_repository.py",
     "patchharbor/bundle_paths.py",
+    "patchharbor/bundle_version.py",
     "patchharbor/bundle_names.py",
     "patchharbor/bundle_handoff.py",
     "patchharbor/chat_instructions.py",
@@ -340,9 +341,9 @@ def _write_release_patch_package(
     context: dict[str, object],
 ) -> str:
     entrypoint_name = native_value("run.sh", "run.ps1")
-    manifest = {
+    manifest = {"patchharbor_version": "2.0.0",
         "marker": "patch-harbor-task-bundle",
-        "format_version": 2,
+        "format_version": 3,
         "repo_id": context["repo_id"],
         "base_commit": context["base_commit"],
         "state_fingerprint": context["state_fingerprint"],
@@ -962,7 +963,7 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
     assert (worker_repository / "release-applied.txt").read_text(encoding="utf-8") == "entrypoint-ok"
     assert not (worker_repository / worker_entrypoint).exists()
     with zipfile.ZipFile(worker_result["result_bundle"]["path"]) as result_archive:
-        assert json.loads(result_archive.read('manifest.json'))['format_version'] == 4
+        assert json.loads(result_archive.read('manifest.json'))['format_version'] == 5
         runtime_metadata = json.loads(result_archive.read('runtime/runtime.json'))
         assert runtime_metadata['format_version'] == 3 and runtime_metadata['status'] == 'embedded'
         assert runtime_metadata['artifact']['type'] == 'pyz'

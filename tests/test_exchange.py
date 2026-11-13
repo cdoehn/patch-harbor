@@ -27,6 +27,7 @@ from tests.registration_support import set_isolated_user_environment
 
 _MANIFEST = {
     "marker": TASK_MARKER,
+    "patchharbor_version": "2.0.0",
     "format_version": TASK_FORMAT_VERSION,
     "repo_id": "a3f9c2e1-7b4d-4a91-9d2e-5c6f8a1b2c3d",
     "base_commit": "f4e9c2a7b8c9d01234567890abcdef1234567890",
@@ -193,29 +194,48 @@ def test_scan_reports_an_unreadable_or_missing_directory(tmp_path: Path) -> None
         scan_exchange_directory(tmp_path / "missing")
 
 
-def test_persistent_classification_cache_is_reused_only_for_same_identity(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_persistent_replay_identity_never_replaces_current_package_validation(tmp_path, monkeypatch):
     set_isolated_user_environment(monkeypatch, tmp_path / "user")
     paths = registration_user_paths()
     patch = tmp_path / "patch.package"
     _write_patch(patch)
-
     first = scan_exchange_directory(tmp_path, paths=paths)
-    assert first[0].kind is ExchangeArtifactKind.TASK_BUNDLE
+    original = exchange_module._classify_content
+    calls = []
+    def observed(*args, **kwargs):
+        calls.append(args[0])
+        return original(*args, **kwargs)
+    monkeypatch.setattr(exchange_module, "_classify_content", observed)
+    current = scan_exchange_directory(tmp_path, paths=paths)
+    assert calls == [patch] and current[0].identity == first[0].identity
+    assert current[0].package is not None
 
-    def fail_reclassification(*_args: object, **_kwargs: object):
-        raise AssertionError("unchanged identity was reclassified")
 
-    monkeypatch.setattr(exchange_module, "_classify_content", fail_reclassification)
-    cached = scan_exchange_directory(tmp_path, paths=paths)
-    assert cached[0].identity == first[0].identity
-    assert cached[0].package is None
+def test_version_change_cannot_reuse_a_persisted_task_classification(tmp_path, monkeypatch):
+    from patchharbor import bundle_version
+    set_isolated_user_environment(monkeypatch, tmp_path / "user")
+    paths = registration_user_paths()
+    patch = tmp_path / "task.zip"
+    _write_patch(patch)
+    assert scan_exchange_directory(tmp_path, paths=paths)[0].kind is ExchangeArtifactKind.TASK_BUNDLE
+    before = paths.exchange_state_path.read_bytes()
+    monkeypatch.setattr(bundle_version, "__version__", "2.0.1")
+    assert scan_exchange_directory(tmp_path, paths=paths) == ()
+    assert paths.exchange_state_path.read_bytes() == before and patch.exists()
 
-    patch.write_bytes(patch.read_bytes() + b"changed")
-    with pytest.raises(AssertionError, match="reclassified"):
-        scan_exchange_directory(tmp_path, paths=paths)
+
+def test_previous_unknown_classification_does_not_hide_a_current_task(tmp_path, monkeypatch):
+    from patchharbor import bundle_version
+    set_isolated_user_environment(monkeypatch, tmp_path / "user")
+    paths = registration_user_paths()
+    patch = tmp_path / "task.zip"
+    _write_patch(patch)
+    with monkeypatch.context() as changed:
+        changed.setattr(bundle_version, "__version__", "2.0.1")
+        assert scan_exchange_directory(tmp_path, paths=paths)[0].kind is ExchangeArtifactKind.OTHER
+    current = scan_exchange_directory(tmp_path, paths=paths)
+    assert current[0].kind is ExchangeArtifactKind.TASK_BUNDLE
+    assert current[0].execute_status is None
 
 
 def test_selected_patch_is_reopened_and_rejected_after_byte_replacement(

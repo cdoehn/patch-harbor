@@ -6,8 +6,8 @@ Aktuelle ausdrückliche Nutzeranweisungen haben Vorrang vor dieser Vorlage.
 
 | Vertrag | Gültiger Wert |
 | --- | --- |
-| Task | Marker `patch-harbor-task-bundle`, Format 2 |
-| Result | Marker `patch-harbor-result-bundle`, Format 4 |
+| Task | Marker `patch-harbor-task-bundle`, Format 3 |
+| Result | Marker `patch-harbor-result-bundle`, Format 5 |
 | Runtime-Metadaten | Format 3, Core-PYZ ohne Watcher |
 | Begleitdaten | `patch-harbor-environment`, Format 3 mit separatem Helfer |
 | Fingerprint | `patchharbor-state-v1` |
@@ -213,12 +213,13 @@ danach frisches Result. Kein zusätzlicher Schalter bei execute/bundle, kein
 Suffixfeld in `task.json`; bei separatem Kontext die Präferenz gesondert übergeben,
 sonst kein Suffix. Das geschlossene Kontext-CLI-Schema bleibt unverändert.
 
-Genau eine Root-`task.json`, exakt sieben Felder:
+Genau eine Root-`task.json`, exakt acht Felder:
 
 ```json
 {
   "marker": "patch-harbor-task-bundle",
-  "format_version": 2,
+  "format_version": 3,
+  "patchharbor_version": "2.0.0",
   "repo_id": "<unverändert aus context.json>",
   "base_commit": "<unverändert aus context.json>",
   "state_fingerprint": "<unverändert aus context.json>",

@@ -17,7 +17,7 @@ from tools import pyz_bootstrap as bootstrap
 from tests.platform_support import project_environment, run_cli
 from tests.result_pyz_support import attach_pyz
 from tests.reference_support import edit_document, write_reference
-from tests.result_pyz_support import canonical, format4
+from tests.result_pyz_support import canonical, current_result
 
 
 
@@ -39,7 +39,7 @@ def test_actual_readers_keep_unproven_format3_and_standalone_pyz(
     write_reference(old, legacy)
     files = attach_pyz(files, None if state == 'unavailable' else canonical)
     if state == 'corrupt': files['runtime/runtime.json'] += b'corrupt'
-    elif state == 'future': edit_document(files, 'manifest.json', lambda d:d.update(format_version=5))
+    elif state == 'future': edit_document(files, 'manifest.json', lambda d:d.update(format_version=6))
     reference = exchange/'new-result-disguised-as-patch.zip';write_reference(reference,files)
     standalone = exchange/'standalone-disguised-as-patch.zip';standalone.write_bytes(canonical)
     before = {path:path.read_bytes() for path in (old,reference,standalone)}
@@ -68,7 +68,7 @@ def test_real_recovery_requires_full_format3_success(canonical,tmp_path,state):
     with ZipFile(result) as archive:files={name:archive.read(name) for name in archive.namelist()}
     files=attach_pyz(files,None if state=='unavailable' else canonical)
     if state=='corrupt':files['runtime/runtime.json']+=b'changed'
-    elif state=='future':edit_document(files,'manifest.json',lambda d:d.update(format_version=5))
+    elif state=='future':edit_document(files,'manifest.json',lambda d:d.update(format_version=6))
     elif state in ('old1','old2'):edit_document(files,'manifest.json',lambda d:d.update(format_version=int(state[-1])))
     write_reference(result,files)
     _edit_record(env,patch,lambda row:row.update(result_sha256=hashlib.sha256(result.read_bytes()).hexdigest()))
@@ -85,7 +85,7 @@ def test_real_recovery_requires_full_format3_success(canonical,tmp_path,state):
 
 @pytest.mark.parametrize('status',['embedded','unavailable'])
 def test_result3_publication_and_bootstrap_keep_strict_format_boundaries(canonical,tmp_path,status):
-    files,_=format4(canonical if status=='embedded' else None)
+    files,_=current_result(canonical if status=='embedded' else None)
     reference=tmp_path/'result.zip';write_reference(reference,files)
     publication._verify_result_bundle(reference,execution_present=False)
     if status=='embedded':
@@ -100,7 +100,7 @@ def test_result3_publication_and_bootstrap_keep_strict_format_boundaries(canonic
 
 
 def test_format3_unicode_snapshot_and_standalone_pyz_classification(canonical,tmp_path):
-    files,_=format4(canonical)
+    files,_=current_result(canonical)
     name='runtime/Grüße dir/Datei.py'
     files['base/'+name]=files.pop('base/tracked.txt')
     edit_document(files,'manifest.json',lambda d:d['base_entries'][0].update(path=name))

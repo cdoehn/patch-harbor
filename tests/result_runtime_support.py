@@ -1,4 +1,4 @@
-"""Synthetic Result-4 runtime metadata, including independently forged descriptors."""
+"""Synthetic Result-5 runtime metadata, including independently forged descriptors."""
 from io import BytesIO
 import hashlib
 import json
@@ -23,7 +23,7 @@ def edit_metadata(files, mutate):
 
 def attach_pyz(files, raw, *, reason='source_not_prepared'):
     files = {name:data for name,data in files.items() if not name.startswith('runtime/')}
-    manifest = json.loads(files['manifest.json']); manifest['format_version'] = 4
+    manifest = json.loads(files['manifest.json']); manifest['format_version'] = 5
     doc = dict(marker='patch-harbor-runtime', format_version=3, status='unavailable', reason=reason,
                distribution='patchharbor', version=__version__, requires_python='>=3.10',
                profile=None, content_id=None, content_id_algorithm=None, artifact=None,
@@ -37,7 +37,7 @@ def attach_pyz(files, raw, *, reason='source_not_prepared'):
                    artifact=artifact, runtime_dependencies=[],
                    provenance=dict(mode='canonical_resources',source_commit=recipe.source_commit,recipe_format_version=1),
                    capabilities=dict(operations=['inspect_task','validate_task','pack_task'],
-                                     task_formats=[2], result_formats=[4]))
+                                     task_formats=[3], result_formats=[5]))
     metadata_path = 'runtime/runtime.json';files[metadata_path] = json.dumps(doc).encode()
     manifest['runtime'] = dict(status=doc['status'],reason=doc['reason'],
                               metadata=descriptor(metadata_path,files[metadata_path]),artifact=doc['artifact'])

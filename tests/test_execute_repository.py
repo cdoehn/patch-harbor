@@ -103,6 +103,7 @@ def _write_package_zip(
     document = {
         "marker": manifest.marker,
         "format_version": manifest.format_version,
+        "patchharbor_version": manifest.patchharbor_version,
         "repo_id": str(manifest.repo_id),
         "base_commit": str(manifest.base_commit),
         "state_fingerprint": manifest.state_fingerprint,

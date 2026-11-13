@@ -7,8 +7,8 @@ import stat
 from zipfile import ZipFile, ZipInfo
 
 
-MANIFEST = {
-    "marker": "patch-harbor-task-bundle", "format_version": 2,
+MANIFEST = {"patchharbor_version": "2.0.0",
+    "marker": "patch-harbor-task-bundle", "format_version": 3,
     "repo_id": "01234567-89ab-4cde-8fab-0123456789ab",
     "base_commit": "12" * 20, "state_fingerprint": "0123456789abcdef",
     "fingerprint_algorithm": "patchharbor-state-v1", "entrypoint": "run.sh",

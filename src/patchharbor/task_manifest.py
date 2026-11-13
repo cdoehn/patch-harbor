@@ -1,10 +1,12 @@
-"""Pure parsing and validation for the closed format-2 Task manifest."""
+"""Pure parsing and validation for the closed format-3 Task manifest."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 import json
 
+from patchharbor import __version__
+from patchharbor.bundle_version import require_bundle_version
 from patchharbor.errors import task_bundle_error
 from patchharbor.models import GitObjectFormat, GitObjectId, RepositoryId
 from patchharbor.state_fingerprint import FINGERPRINT_ALGORITHM
@@ -12,10 +14,11 @@ from patchharbor.state_fingerprint import FINGERPRINT_ALGORITHM
 
 TASK_MANIFEST_NAME = "task.json"
 TASK_MARKER = "patch-harbor-task-bundle"
-TASK_FORMAT_VERSION = 2
+TASK_FORMAT_VERSION = 3
 _TASK_MANIFEST_FIELDS = frozenset(
     {
         "marker",
+        "patchharbor_version",
         "format_version",
         "repo_id",
         "base_commit",
@@ -28,7 +31,7 @@ _TASK_MANIFEST_FIELDS = frozenset(
 
 @dataclass(frozen=True)
 class TaskManifest:
-    """One validated closed format-2 Task manifest."""
+    """One validated closed format-3 Task manifest."""
 
     marker: str
     format_version: int
@@ -37,6 +40,7 @@ class TaskManifest:
     state_fingerprint: str
     fingerprint_algorithm: str
     entrypoint: str
+    patchharbor_version: str = __version__
 
 
 def _unique_json_object(
@@ -88,9 +92,13 @@ def _require_string(document: dict[str, object], field: str) -> str:
 def parse_task_manifest(payload: bytes) -> TaskManifest:
     """Parse manifest bytes without performing I/O or repository access."""
     document = _parse_json_object(payload)
+    try:
+        require_bundle_version(document.get("patchharbor_version"))
+    except ValueError as exc:
+        raise task_bundle_error(str(exc)) from exc
     if set(document) != _TASK_MANIFEST_FIELDS:
         raise task_bundle_error(
-            "task.json must contain exactly the seven format-2 fields"
+            "task.json must contain exactly the eight format-3 fields"
         )
 
     marker = _require_string(document, "marker")
@@ -140,6 +148,7 @@ def parse_task_manifest(payload: bytes) -> TaskManifest:
 
     return TaskManifest(
         marker=marker,
+        patchharbor_version=document["patchharbor_version"],
         format_version=format_version,
         repo_id=repo_id,
         base_commit=base_commit,

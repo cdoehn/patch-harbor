@@ -28,7 +28,7 @@ def json_cli_failure(path, command, code):
     stdout, stderr = StringIO(), StringIO()
     assert main([command, str(path), '--json'], stdout=stdout, stderr=stderr) == code
     result = json.loads(stdout.getvalue())
-    assert result['output_version'] == 3 and result['command'] == command
+    assert result['output_version'] == 4 and result['command'] == command
     assert result['success'] is False and result['result'] is None
     assert result['process_exit_code'] == result['error']['patchharbor_error_code'] == code
     assert stderr.getvalue() == ''

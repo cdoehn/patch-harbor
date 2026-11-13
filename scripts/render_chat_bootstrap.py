@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import argparse
 import ast
+import re
 from pathlib import Path
 import sys
 
@@ -57,6 +58,15 @@ def _contents(root: Path) -> tuple[tuple[Path, bytes, bytes], ...]:
         raise ValueError("invalid standalone bootstrap")
     source.decode("utf-8")
     program = render_capabilities(source, (root / 'src/patchharbor/runtime_contract.py').read_bytes())
+    version_tree = ast.parse((root / 'src/patchharbor/__init__.py').read_bytes())
+    versions = [ast.literal_eval(n.value) for n in version_tree.body if isinstance(n, ast.Assign)
+                and any(isinstance(t, ast.Name) and t.id == '__version__' for t in n.targets)]
+    if len(versions) != 1 or type(versions[0]) is not str:
+        raise ValueError('ambiguous producer version')
+    program, count = re.subn(rb"(?m)^PATCHHARBOR_VERSION = [^\n]+$",
+                            ('PATCHHARBOR_VERSION = ' + repr(versions[0])).encode(), program)
+    if count != 1:
+        raise ValueError('missing standalone helper version')
     template = (root / "CHAT_INSTRUCTIONS.md").read_bytes()
     if not template or len(template) > 128 * 1024 or template.startswith(b"\xef\xbb\xbf"):
         raise ValueError("invalid chat template")

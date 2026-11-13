@@ -84,7 +84,7 @@ if fault == 'publication':
     print(json.dumps(dict(publication='failed', primary_success=report.primary_result.success)))
 else:
     facts, _ = read_result_reference(report.result_bundle.path)
-    assert facts.format_version == 4 and facts.context.dirty and facts.completed_commit is None
+    assert facts.format_version == 5 and facts.context.dirty and facts.completed_commit is None
     assert facts.primary_result.timed_out is (fault == 'timeout')
     assert facts.runtime.status == ('unavailable' if fault == 'runtime_budget' else 'embedded')
     if fault == 'runtime_budget': assert facts.runtime.reason == 'resource_limit'
@@ -156,4 +156,4 @@ def test_installed_runtime_operates_readonly_with_no_writable_cache(version2_run
         proof = json.loads(_run(version2_runtime.library(FRESH_RESULT, repo, tmp_path / 'exchange'),
                                 outside, environment))
         facts, _ = read_result_reference(Path(proof['path']))
-        assert facts.format_version == 4 and facts.runtime.status == 'embedded'
+        assert facts.format_version == 5 and facts.runtime.status == 'embedded'

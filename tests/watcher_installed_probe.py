@@ -23,7 +23,7 @@ def main():
     entrypoint = 'run.ps1' if sys.platform == 'win32' else 'run.sh'
     body = '# PATCHHARBOR\nexit 0\n' if sys.platform == 'win32' else '#!/usr/bin/env bash\n# PATCHHARBOR\nexit 0\n'
     with ZipFile(exchange / 'native-worker.bin', 'w') as z:
-        z.writestr('task.json', json.dumps({'marker': 'patch-harbor-task-bundle', 'format_version': 2,
+        z.writestr('task.json', json.dumps({"patchharbor_version": "2.0.0", 'marker': 'patch-harbor-task-bundle', 'format_version': 3,
             'repo_id': str(context.repo_id), 'base_commit': str(context.base_commit),
             'state_fingerprint': context.state_fingerprint, 'fingerprint_algorithm': context.fingerprint_algorithm,
             'entrypoint': entrypoint}))

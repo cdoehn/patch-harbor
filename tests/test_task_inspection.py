@@ -144,7 +144,7 @@ def test_api_and_json_cli_share_security_errors(tmp_path, changes, code, command
     stdout, stderr = StringIO(), StringIO()
     assert main([command, str(path), "--json", "--verbose"], stdout=stdout, stderr=stderr) == code
     document = json.loads(stdout.getvalue())
-    assert document["output_version"] == 3 and document["command"] == command
+    assert document["output_version"] == 4 and document["command"] == command
     assert document["success"] is False and document["result"] is None
     assert document["process_exit_code"] == document["error"]["patchharbor_error_code"] == code
     assert stderr.getvalue() == ""
@@ -165,7 +165,7 @@ def test_json_cli_uses_public_api_and_complete_typed_facts(tmp_path, monkeypatch
     assert calls == [path]
     document = json.loads(stdout.getvalue())
     assert set(document) == {"output_version", "command", "success", "result", "error", "process_exit_code"}
-    assert document["output_version"] == 3 and document["error"] is None
+    assert document["output_version"] == 4 and document["error"] is None
     assert document["command"] == command and document["success"] is True
     result = document["result"]
     if command == "validate":

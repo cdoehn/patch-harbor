@@ -67,8 +67,8 @@ if COUNT:
     entrypoint = native_value("run.sh", "run.ps1")
     patch = tmp_path / "handoff.zip"
     with ZipFile(patch, "w") as archive:
-        archive.writestr("task.json", json.dumps({
-            "marker": "patch-harbor-task-bundle", "format_version": 2,
+        archive.writestr("task.json", json.dumps({"patchharbor_version": "2.0.0",
+            "marker": "patch-harbor-task-bundle", "format_version": 3,
             **{key: str(getattr(context, key)) for key in
                ("repo_id", "base_commit", "state_fingerprint", "fingerprint_algorithm")},
             "entrypoint": entrypoint,

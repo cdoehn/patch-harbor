@@ -293,7 +293,7 @@ def test_bootstrap_rejects_noncanonical_runtime_metadata_before_import(reference
 @pytest.mark.parametrize('fault',['unknown_result','unavailable_claim'])
 def test_unknown_format_and_invalid_unavailable_are_errors_not_legacy_fallback(reference,fault):
     path,files,_=reference
-    if fault=='unknown_result':edit_document(files,'manifest.json',lambda d:d.update(format_version=5))
+    if fault=='unknown_result':edit_document(files,'manifest.json',lambda d:d.update(format_version=6))
     else:
         files=attach_pyz(files,None)
         edit_metadata(files,lambda d:d.update(profile=pyz.PROFILE))

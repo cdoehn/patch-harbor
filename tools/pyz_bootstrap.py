@@ -32,6 +32,7 @@ MAX_INNER_ENTRIES = 1000
 RECIPE_PATH = 'patchharbor/_runtime/pyz-recipe.json'
 MAIN_PATH = 'patchharbor/_runtime/pyz-main.py'
 IDENTITY_PATH = 'patchharbor/_pyz_identity.py'
+PATCHHARBOR_VERSION = '2.0.0'
 PYTHON_MINIMA = {'>=3.10': (3, 10)}
 BOOTSTRAP_PATH = 'patchharbor/_runtime/tools/pyz_bootstrap.py'
 RESOURCES = {BOOTSTRAP_PATH,'patchharbor/_runtime/CHAT_INSTRUCTIONS.md',
@@ -40,8 +41,8 @@ RECIPE_FIELDS = {'marker','format_version','distribution','version','requires_py
                  'content_id_algorithm','content_id','source_commit','entries'}
 # BEGIN GENERATED RUNTIME CAPABILITIES
 OPERATIONS = ('inspect_task', 'validate_task', 'pack_task')
-TASK_FORMATS = (2,)
-RESULT_FORMATS = (4,)
+TASK_FORMATS = (3,)
+RESULT_FORMATS = (5,)
 # END GENERATED RUNTIME CAPABILITIES
 
 _WINDOWS = sys.platform == 'win32'
@@ -456,7 +457,10 @@ def assess(reference, *, trusted_source_sha256=None):
         manifest = _json(_read(archive, 'manifest.json', MAX_INPUT))
         _require(manifest.get('marker') == 'patch-harbor-result-bundle'
                  and type(manifest.get('format_version')) is int, 'not a supported Result')
-        _require(manifest['format_version'] == 4, 'unsupported Result version')
+        _require(manifest['format_version'] == 5, 'unsupported Result version')
+        _require(type(manifest.get('patchharbor_version')) is str
+                 and manifest['patchharbor_version'] == PATCHHARBOR_VERSION,
+                 'unsupported PatchHarbor package version; expected ' + PATCHHARBOR_VERSION)
         runtime = manifest.get('runtime')
         _require(type(runtime) is dict and set(runtime) == {'status','reason','metadata','artifact'},
                  'outer runtime schema')
@@ -470,6 +474,7 @@ def assess(reference, *, trusted_source_sha256=None):
                  and metadata.get('artifact') == runtime['artifact'], 'runtime descriptor disagreement')
         runtime_names = {name for name in names if name.startswith('runtime/')}
         version, requires = metadata.get('version'), metadata.get('requires_python')
+        _require(version == PATCHHARBOR_VERSION, 'runtime and package product versions differ')
         _require(version is None or (type(version) is str and VERSION.fullmatch(version)), 'runtime version profile')
         if requires is not None:
             _minimum(requires)

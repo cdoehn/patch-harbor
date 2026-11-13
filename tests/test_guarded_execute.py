@@ -27,7 +27,7 @@ def package(host,*,body=None,payloads=None,path=None):
     repo,exchange=host;context=api.context(repo)
     entrypoint=native_value('run.sh','run.ps1')
     body=body or native_script("printf 'approved' > execution-marker", "[IO.File]::WriteAllText('execution-marker','approved')")
-    contents={'task.json':json.dumps({'marker':'patch-harbor-task-bundle','format_version':2,'entrypoint':entrypoint,
+    contents={'task.json':json.dumps({"patchharbor_version": "2.0.0", 'marker':'patch-harbor-task-bundle','format_version':3,'entrypoint':entrypoint,
         **{key:str(getattr(context,key)) for key in ('repo_id','base_commit','state_fingerprint','fingerprint_algorithm')}}).encode(),
         entrypoint:body.encode()}
     contents.update({'stage/item':b'approved payload'} if payloads is None else payloads)

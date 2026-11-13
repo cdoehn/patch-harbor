@@ -1,4 +1,4 @@
-"""Reader-first Result 4: closed PYZ data, strict references and shared budgets."""
+"""Reader-first Result 5: closed PYZ data, strict references and shared budgets."""
 from dataclasses import FrozenInstanceError, replace
 import hashlib
 from io import BytesIO
@@ -17,7 +17,7 @@ from patchharbor.result_reader import (
 from patchharbor.zip_payloads import read_zip_payload_bytes
 from tests.result_runtime_support import descriptor, edit_metadata
 from tests.reference_support import bound_package, write_reference, edit_document
-from tests.result_pyz_support import canonical, format4
+from tests.result_pyz_support import canonical, current_result
 
 
 @pytest.mark.parametrize('status',['embedded','unavailable'])
@@ -25,10 +25,10 @@ from tests.result_pyz_support import canonical, format4
                                        ('failure',True),('dry_run',False),('mismatch',False),
                                        ('timeout',True),('interrupted',True)])
 def test_new_reference_keeps_actual_state_and_explicit_full_runtime_facts(canonical,tmp_path,status,kind,dirty):
-    files,binding = format4(canonical if status=='embedded' else None,kind=kind,dirty=dirty)
+    files,binding = current_result(canonical if status=='embedded' else None,kind=kind,dirty=dirty)
     path=tmp_path/'result.zip';write_reference(path,files)
     facts,digest=read_result_reference(path)
-    assert facts.format_version==4 and facts.runtime.status==status
+    assert facts.format_version==5 and facts.runtime.status==status
     assert facts.context.dirty is dirty
     assert digest==hashlib.sha256(path.read_bytes()).hexdigest()
     assert capture_result_reference(path).facts==facts
@@ -43,7 +43,7 @@ def test_new_reference_keeps_actual_state_and_explicit_full_runtime_facts(canoni
         assert facts.runtime.artifact.sha256==hashlib.sha256(canonical).hexdigest()
         assert facts.runtime.profile==pyz.PROFILE
         assert facts.runtime.operations==('inspect_task','validate_task','pack_task')
-        assert facts.runtime.result_formats==(4,)
+        assert facts.runtime.result_formats==(5,)
         assert not hasattr(facts.runtime,'wheel')
     else: assert facts.runtime.artifact is None and facts.runtime.profile is None
 
@@ -51,15 +51,15 @@ def test_new_reference_keeps_actual_state_and_explicit_full_runtime_facts(canoni
 @pytest.mark.parametrize('reason',sorted(result_pyz.UNAVAILABLE_REASONS))
 @pytest.mark.parametrize('known',[False,True])
 def test_unavailable_runtime_preserves_known_or_unknown_producer_data(tmp_path,reason,known):
-    files,_=format4(None)
-    edit_metadata(files,lambda d:d.update(reason=reason,version='1.2.1' if known else None,
+    files,_=current_result(None)
+    edit_metadata(files,lambda d:d.update(reason=reason,version='2.0.0',
                                          requires_python='>=3.10' if known else None))
     edit_document(files,'manifest.json',lambda d:d['runtime'].update(reason=reason))
     path=tmp_path/'result.zip';write_reference(path,files)
     runtime=read_result_reference(path)[0].runtime
     assert runtime.reason==reason and runtime.artifact is None
     assert runtime.operations==() and runtime.content_id is None
-    assert runtime.version==('1.2.1' if known else None)
+    assert runtime.version=='2.0.0'
 
 
 @pytest.mark.parametrize('fault',[
@@ -73,7 +73,7 @@ def test_unavailable_runtime_preserves_known_or_unknown_producer_data(tmp_path,r
     'inconsistent_status','missing_handoff','foreign_path','empty_pyz','extra_tags',
 ])
 def test_corrupt_format3_never_becomes_a_full_native_reference(canonical,tmp_path,fault):
-    files,binding=format4(canonical);doc=json.loads(files['runtime/runtime.json']);name=doc['artifact']['path']
+    files,binding=current_result(canonical);doc=json.loads(files['runtime/runtime.json']);name=doc['artifact']['path']
     if fault=='missing_metadata':files.pop('runtime/runtime.json')
     elif fault=='missing_pyz':files.pop(name)
     elif fault=='metadata_hash':files['runtime/runtime.json'] += b' '
@@ -97,7 +97,7 @@ def test_corrupt_format3_never_becomes_a_full_native_reference(canonical,tmp_pat
     elif fault=='unknown_capability_field':edit_metadata(files,lambda d:d['capabilities'].update(unknown=1))
     elif fault=='missing_handoff':files.pop('CHAT_INSTRUCTIONS.md');files.pop('environment.json')
     elif fault.startswith('result_version_'):
-        edit_document(files,'manifest.json',lambda d:d.update(format_version=True if fault.endswith('bool') else 5))
+        edit_document(files,'manifest.json',lambda d:d.update(format_version=True if fault.endswith('bool') else 6))
     elif fault in ('foreign_path','empty_pyz'):
         item={**doc['artifact'],'path':'../outside.pyz'} if fault=='foreign_path' else dict(type='pyz',**descriptor(name,b''))
         if fault=='empty_pyz':files[name]=b''
@@ -119,7 +119,7 @@ def test_corrupt_format3_never_becomes_a_full_native_reference(canonical,tmp_pat
 
 @pytest.mark.parametrize('fault',['unknown_reason','no_warning','hash_claim','profile_claim','capability_claim','extra_pyz'])
 def test_unavailable_is_not_a_permissive_repair_contract(tmp_path,fault):
-    files,_=format4(None)
+    files,_=current_result(None)
     if fault=='no_warning':edit_document(files,'logs/run.json',lambda d:d.update(warnings=[]))
     elif fault=='extra_pyz':files['runtime/extra.pyz']=b'extra'
     else:
@@ -139,17 +139,17 @@ def payloads(files):
 
 
 def test_shared_outer_inner_budget_is_exact_and_precedes_unbounded_expansion(canonical):
-    files,_=format4(canonical);entries=payloads(files)
+    files,_=current_result(canonical);entries=payloads(files)
     with ZipFile(BytesIO(canonical)) as archive:inner=sum(info.file_size for info in archive.infolist())
     maximum=sum(len(raw) for raw in files.values())+inner
     policy=replace(DEFAULT_RESOURCE_POLICY,max_zip_total_bytes=maximum)
-    assert parse_result_payloads(entries,resource_policy=policy).format_version==4
+    assert parse_result_payloads(entries,resource_policy=policy).format_version==5
     with pytest.raises(ValueError):parse_result_payloads(entries,resource_policy=replace(policy,max_zip_total_bytes=maximum-1))
 
 
 def test_private_diagnostic_fallback_retains_every_nonruntime_requirement(canonical):
-    files,_=format4(canonical);files['runtime/runtime.json']=b'damaged optional runtime'
-    assert _parse_repository_payloads(payloads(files)).format_version==4
+    files,_=current_result(canonical);files['runtime/runtime.json']=b'damaged optional runtime'
+    assert _parse_repository_payloads(payloads(files)).format_version==5
     with pytest.raises(ValueError):parse_result_payloads(payloads(files))
     files['base/tracked.txt'] += b'changed snapshot'
     with pytest.raises(ValueError):_parse_repository_payloads(payloads(files))
@@ -157,7 +157,7 @@ def test_private_diagnostic_fallback_retains_every_nonruntime_requirement(canoni
 
 def test_pack_uses_full_reader_and_never_the_private_diagnostic_fallback(canonical,tmp_path,monkeypatch):
     from patchharbor import result_reader
-    files,_=format4(canonical);path=tmp_path/'result.zip';write_reference(path,files)
+    files,_=current_result(canonical);path=tmp_path/'result.zip';write_reference(path,files)
     contents=tmp_path/'contents';contents.mkdir();(contents/'run.sh').write_bytes(b'#!/usr/bin/env bash\n# PATCHHARBOR\nexit 0\n')
     output=tmp_path/'output';output.mkdir()
     monkeypatch.setattr(result_reader,'_parse_repository_payloads',lambda *a,**k:pytest.fail('pack used weak fallback'))

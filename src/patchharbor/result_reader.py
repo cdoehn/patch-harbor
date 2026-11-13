@@ -1,4 +1,4 @@
-"""Read complete Result-4 facts without imposing archival success policy."""
+"""Read complete Result-5 facts without imposing archival success policy."""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -9,6 +9,8 @@ import os
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from uuid import UUID
 
+from patchharbor import __version__
+from patchharbor.bundle_version import require_bundle_version
 from patchharbor.bundle_handoff import (
     BOOTSTRAP_NAME, handoff_names, validate_bootstrap,
     BundleHandoff, CHAT_INSTRUCTIONS_NAME, ENVIRONMENT_NAME, ENVIRONMENT_MARKER,
@@ -40,7 +42,7 @@ CLEAN_FINGERPRINT = state_fingerprint_digest(
 _RESULT_MARKER = "patch-harbor-result-bundle"
 _BINDING_FIELDS = {"repo_id", "base_commit", "state_fingerprint", "fingerprint_algorithm"}
 _MANIFEST_FIELDS = _BINDING_FIELDS | {
-    "marker", "format_version", "created_at", "run_id", "dirty", "dry_run",
+    "marker", "patchharbor_version", "format_version", "created_at", "run_id", "dirty", "dry_run",
     "entrypoint_started", "execution_present", "primary_result",
     "result_bundle_status", "base_entries", "untracked_entries",
 }
@@ -101,9 +103,10 @@ class ResultFacts:
     expected: ExchangeTaskSelection | None
     task_sha256: str | None
     completed_commit: GitObjectId | None
-    format_version: int = 4
+    format_version: int = 5
     runtime: ResultPyzRuntime | None = None
     handoff_present: bool = False
+    patchharbor_version: str = __version__
 
 
 @dataclass(frozen=True, slots=True)
@@ -265,12 +268,16 @@ def _parse_result_payloads(payloads: tuple[BundlePayload, ...], *,
              and sum(len(raw) for raw in files.values()) <= resource_policy.max_zip_total_bytes,
              "Result payload budget exceeded")
     manifest = _document(files["manifest.json"])
+    try:
+        require_bundle_version(manifest.get("patchharbor_version"))
+    except ValueError as exc:
+        _require(False, str(exc))
     context = _document(files["context.json"])
     run = _document(files["logs/run.json"])
     version = manifest.get("format_version")
     manifest_fields = _MANIFEST_FIELDS | {"runtime"}
     _require(manifest.get("marker") == _RESULT_MARKER
-             and type(version) is int and version == 4
+             and type(version) is int and version == 5
              and set(manifest) in (manifest_fields, manifest_fields | _EXECUTE_FIELDS,
                                    manifest_fields | _EXECUTE_FIELDS | _RECEIPT_FIELDS)
              and set(context) in (_BINDING_FIELDS | {"dirty", "created_at"},
@@ -346,7 +353,7 @@ def _parse_result_payloads(payloads: tuple[BundlePayload, ...], *,
         expected_files.add("logs/execution.log")
     handoff = _handoff(files, context, run)
     _require({"environment.json", CHAT_INSTRUCTIONS_NAME} <= handoff,
-             "Result 4 requires passive handoff data")
+             "Result 5 requires passive handoff data")
     expected_files.update(handoff)
     runtime = None
     if verify_runtime:

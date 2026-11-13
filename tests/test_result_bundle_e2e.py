@@ -242,7 +242,7 @@ def test_manual_bundle_materializes_committed_blobs_without_export_rules(
     assert run_id.version == 4
     assert str(run_id) == manifest["run_id"]
     assert manifest["marker"] == "patch-harbor-result-bundle"
-    assert manifest["format_version"] == 4
+    assert manifest["format_version"] == 5
     assert manifest["dirty"] is False
     assert manifest["execution_present"] is False
     assert manifest["primary_result"] == "success"

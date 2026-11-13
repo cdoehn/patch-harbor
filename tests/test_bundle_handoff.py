@@ -49,7 +49,7 @@ def patch_environment(**overrides: object) -> dict[str, object]:
 
 def write_handoff_patch(path: Path, entries: dict[str, bytes], *, entrypoint: str | None = None) -> None:
     selected = entrypoint or native_value("run.sh", "run.ps1")
-    manifest = {"marker": "patch-harbor-task-bundle", "format_version": 2, **BINDING, "entrypoint": selected}
+    manifest = {"patchharbor_version": "2.0.0", "marker": "patch-harbor-task-bundle", "format_version": 3, **BINDING, "entrypoint": selected}
     with zipfile.ZipFile(path, "w") as archive:
         archive.writestr("task.json", json.dumps(manifest))
         if selected not in entries:

@@ -15,7 +15,7 @@ def variant(requirement):
     payloads = inputs()
     payloads['__main__.py'] = payloads[pyz.MAIN_PATH] = pyz.main_bytes(requirement)
     payloads['patchharbor/api.py'] = b'raise AssertionError("data reader executed described API")\n'
-    recipe, identity = pyz.create_recipe(payloads, version='1.3.0', requires_python=requirement)
+    recipe, identity = pyz.create_recipe(payloads, version='2.0.0', requires_python=requirement)
     payloads[pyz.IDENTITY_PATH] = identity
     return pyz.materialize(recipe, lambda name, size: payloads[name])
 

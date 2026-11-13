@@ -39,9 +39,9 @@ if sys.argv[5] == 'True':
     (repo / 'untracked.bin').write_bytes(b'\x00untracked\xff')
 reference = api.bundle(repo)
 initial, _ = read_result_reference(reference.path)
-assert initial.format_version == 4 and initial.operation == 'bundle'
-assert initial.runtime.status == 'embedded' and initial.runtime.task_formats == (2,)
-assert initial.runtime.result_formats == (4,)
+assert initial.format_version == 5 and initial.operation == 'bundle'
+assert initial.runtime.status == 'embedded' and initial.runtime.task_formats == (3,)
+assert initial.runtime.result_formats == (5,)
 assert patchharbor.__version__ == '2.0.0'
 with ZipFile(reference.path) as outer:
     runtime_bytes = outer.read(initial.runtime.artifact.path)
@@ -53,11 +53,11 @@ first = api.pack_task(contents, reference_bundle=reference.path, entrypoint=entr
                       output_directory=exchange)
 checked = api.validate_task(first.path, reference_bundle=reference.path)
 assert checked.binding_matches and checked.reference_sha256 == sha256(reference.path.read_bytes()).hexdigest()
-assert api.inspect_task(first.path).manifest.format_version == 2
+assert api.inspect_task(first.path).manifest.format_version == 3
 report = api.execute(first.path, timeout=30)
 assert report.success and report.primary_result.entrypoint_exit_code == 0
 returned, _ = read_result_reference(report.result_bundle.path)
-assert returned.format_version == 4 and returned.operation == 'execute'
+assert returned.format_version == 5 and returned.operation == 'execute'
 assert returned.task_sha256 == sha256(first.path.read_bytes()).hexdigest()
 assert returned.completed_commit is None and returned.context.base_commit == initial.context.base_commit
 assert returned.runtime.artifact.sha256 == initial.runtime.artifact.sha256

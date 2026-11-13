@@ -58,8 +58,8 @@ def test_installed_self_update_pins_old_runtime_and_template_but_new_repository(
     body = native_python_script(code)
     patch = outside / "self-update.patch.zip"
     with ZipFile(patch, "w") as archive:
-        archive.writestr("task.json", json.dumps({
-            "marker": "patch-harbor-task-bundle", "format_version": 2,
+        archive.writestr("task.json", json.dumps({"patchharbor_version": "2.0.0",
+            "marker": "patch-harbor-task-bundle", "format_version": 3,
             **{key: str(getattr(context, key)) for key in
                ("repo_id", "base_commit", "state_fingerprint", "fingerprint_algorithm")},
             "entrypoint": entrypoint,

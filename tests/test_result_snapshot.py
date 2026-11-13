@@ -23,7 +23,7 @@ def test_layers_match_independent_original_states(tmp_path,monkeypatch,kind,obje
     case=produce_case(tmp_path,monkeypatch,kind=kind,object_format=object_format,quoted=quoted)
     raw=case.result.read_bytes()
     snapshot=api.read_result_snapshot(case.result,expected_sha256=hashlib.sha256(raw).hexdigest())
-    assert snapshot.format_version==4 and snapshot.context.dirty==(kind!='clean')
+    assert snapshot.format_version==5 and snapshot.context.dirty==(kind!='clean')
     assert snapshot.sha256==hashlib.sha256(raw).hexdigest()
     assert snapshot.context==api.ReferenceContext(**{name:getattr(api.context(case.repository),name)
         for name in ('repo_id','base_commit','dirty','state_fingerprint','fingerprint_algorithm')},repository_path=str(case.repository.resolve()))

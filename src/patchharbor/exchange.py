@@ -283,7 +283,7 @@ def scan_exchange_directory(
     paths: RegistrationUserPaths | None = None,
     resource_policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY,
 ) -> tuple[ExchangeArtifact, ...]:
-    """Classify top-level files with persistent identity and cached content kind."""
+    """Revalidate current package contracts; preserve persistent replay evidence."""
     activity("SCAN", f"Scan Exchange directory: {directory}", "heading")
     initial_state = (
         load_exchange_state(paths)
@@ -313,23 +313,18 @@ def scan_exchange_directory(
             # hash-verified again before any repository mutation.
             continue
         cached = initial_records.get(snapshot.identity)
-        if cached is not None:
-            activity("CACHE", f"{path.name}: same verified content; reuse {cached.kind} classification", "detail")
-            artifacts.append(
-                _artifact_from_record(
-                    path,
-                    cached,
-                    mtime_ns=snapshot.mtime_ns,
-                )
-            )
-            continue
-
+        # Replay history is evidence of prior attempts, never authority for the
+        # current tool's package/version admission. Recheck the captured bytes.
         classification = _classify_content(
             snapshot.identity.path,
             snapshot.content,
             resource_policy=resource_policy,
         )
         record = _record_from_classification(snapshot, classification)
+        if (cached is not None and cached.kind == "task_bundle"
+                and classification.kind is not ExchangeArtifactKind.TASK_BUNDLE):
+            activity("SKIP", f"{path.name}: no longer supported; retain prior replay evidence", "warning")
+            continue
         uncached_records.append(record)
         artifacts.append(
             _artifact_from_record(

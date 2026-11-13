@@ -10,6 +10,7 @@ import os
 from pathlib import Path
 from uuid import UUID
 
+from patchharbor import __version__
 from patchharbor.archive_git import completed_commit_for_context
 from patchharbor.bundle_handoff import BundleHandoff
 from patchharbor.configuration_context import configuration_paths_for_id
@@ -188,6 +189,7 @@ def _manifest_document(
         raise ValueError("successful Result Bundle report has no context")
     document: dict[str, object] = {
         "marker": _RESULT_MARKER,
+        "patchharbor_version": __version__,
         "format_version": runtime.result_format,
         "created_at": report.timing.started_at_text,
         "run_id": report.run_id_text,

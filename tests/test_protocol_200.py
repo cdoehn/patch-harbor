@@ -35,7 +35,7 @@ def test_invalid_generations_never_reach_repository_or_execution(tmp_path, monke
     manifest = dict(MANIFEST)
     if fault == 'old_marker': manifest['marker'] = 'patch-harbor'
     if fault == 'old_version': manifest['format_version'] = 1
-    if fault == 'future_version': manifest['format_version'] = 3
+    if fault == 'future_version': manifest['format_version'] = 4
     if fault == 'boolean_version': manifest['format_version'] = True
     encoded = json.dumps(manifest).encode()
     if fault == 'duplicate_field':
@@ -68,7 +68,7 @@ def test_invalid_generations_never_reach_repository_or_execution(tmp_path, monke
         assert result['result']['repository_resolved'] is False
 
 
-@pytest.mark.parametrize('version', [1, 2, 3, 5, True])
+@pytest.mark.parametrize('version', [1, 2, 3, 4, 6, True])
 def test_old_or_future_result_cannot_be_used_to_pack_a_task(tmp_path, version):
     files, _ = reference_entries()
     manifest = json.loads(files['manifest.json'])
@@ -119,7 +119,7 @@ def test_result_task_execute_result_roundtrip_keeps_actual_outcome(
         manifest = json.loads(archive.read('manifest.json'))
         run = json.loads(archive.read('logs/run.json'))
         environment = json.loads(archive.read('environment.json'))
-        assert manifest['format_version'] == 4
+        assert manifest['format_version'] == 5
         assert manifest['task_sha256'] == sha256(task.path.read_bytes()).hexdigest()
         assert manifest['completed_commit'] is None
         assert run['operation'] == 'execute' and run['dry_run'] is dry_run

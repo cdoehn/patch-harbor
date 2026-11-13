@@ -10,8 +10,8 @@ import pytest
 from scripts import render_chat_bootstrap as generator
 from tests.platform_support import PROJECT_ROOT
 
-SOURCE = (generator.CAP_BEGIN + b"OPERATIONS = ('inspect_task', 'validate_task', 'pack_task')\n"
-          b"TASK_FORMATS = (2,)\nRESULT_FORMATS = (4,)\n" + generator.CAP_END +
+SOURCE = (b"PATCHHARBOR_VERSION = '2.0.0'\n" + generator.CAP_BEGIN + b"OPERATIONS = ('inspect_task', 'validate_task', 'pack_task')\n"
+          b"TASK_FORMATS = (3,)\nRESULT_FORMATS = (5,)\n" + generator.CAP_END +
           b'\nraise AssertionError("build must not execute helper")\n')
 TEMPLATE = b"Read tools/pyz_bootstrap.py from this handoff.\n"
 
@@ -23,6 +23,7 @@ def workspace(tmp_path):
         (root / name).mkdir(parents=True)
     shutil.copyfile(PROJECT_ROOT / 'src/patchharbor/runtime_contract.py', root / 'src/patchharbor/runtime_contract.py')
     shutil.copyfile(PROJECT_ROOT / 'scripts/render_chat_bootstrap.py', root / 'scripts/render_chat_bootstrap.py')
+    (root / 'src/patchharbor/__init__.py').write_text("__version__ = '2.0.0'\n")
     (root / 'tools/pyz_bootstrap.py').write_bytes(SOURCE)
     (root / 'CHAT_INSTRUCTIONS.md').write_bytes(TEMPLATE)
     return root
@@ -47,7 +48,7 @@ def test_capability_generation_is_deterministic_and_readonly(workspace, ending):
 
 def test_cli_refreshes_only_stale_capabilities_without_executing_helper(workspace, tmp_path):
     helper = workspace / 'tools/pyz_bootstrap.py'
-    helper.write_bytes(SOURCE.replace(b'TASK_FORMATS = (2,)', b'TASK_FORMATS = (99,)'))
+    helper.write_bytes(SOURCE.replace(b'TASK_FORMATS = (3,)', b'TASK_FORMATS = (99,)'))
     outside = tmp_path / 'outside'; outside.mkdir()
     (outside / 'patchharbor.py').write_text('raise AssertionError("foreign Core")\n')
     prefix = [sys.executable, '-I', '-S', '-B', str(workspace / 'scripts/render_chat_bootstrap.py'), '--root', str(workspace)]
@@ -104,7 +105,7 @@ else:
 def test_build_rejects_invalid_resources_before_artifacts(workspace, tmp_path, hook, fault):
     helper = workspace / 'tools/pyz_bootstrap.py'
     template = workspace / 'CHAT_INSTRUCTIONS.md'
-    if fault == 'stale': helper.write_bytes(SOURCE.replace(b'TASK_FORMATS = (2,)', b'TASK_FORMATS = (99,)'))
+    if fault == 'stale': helper.write_bytes(SOURCE.replace(b'TASK_FORMATS = (3,)', b'TASK_FORMATS = (99,)'))
     elif fault == 'missing_source': helper.unlink()
     elif fault == 'missing_checker': (workspace / 'scripts/render_chat_bootstrap.py').unlink()
     elif fault == 'syntax': helper.write_bytes(b'def broken(\n')

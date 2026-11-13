@@ -1,4 +1,4 @@
-"""Synthetic Result-4 fixtures; no production writer activation is implied."""
+"""Synthetic Result-5 fixtures; no production writer activation is implied."""
 import pytest
 from patchharbor import runtime_pyz as pyz
 from patchharbor.pyz_artifact import PyzArtifact
@@ -14,7 +14,7 @@ def canonical():
     return prepared(payloads)[2]
 
 
-def format4(raw, **options):
+def current_result(raw, **options):
     files,binding = reference_entries(handoff=True,**options)
     return attach_pyz(files,raw), binding
 

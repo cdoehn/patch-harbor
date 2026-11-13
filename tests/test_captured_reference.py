@@ -71,7 +71,7 @@ def test_capture_and_passive_bytes_cannot_be_changed_by_a_renderer(tmp_path):
 def test_unavailable_runtime_is_still_a_complete_reference(tmp_path, kind, dirty):
     path, files, _ = _reference(tmp_path, kind=kind, dirty=dirty)
     captured = reader.capture_result_reference(path)
-    assert captured.facts.format_version == 4
+    assert captured.facts.format_version == 5
     assert captured.facts.runtime.status == "unavailable"
     assert captured.facts.warnings
     assert captured.handoff.environment == files["environment.json"]

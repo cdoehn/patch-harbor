@@ -45,7 +45,7 @@ def test_new_runtime_states_keep_typed_retry_and_hash_publication_boundary(tmp_p
         actual=target.final_path.read_bytes()
         assert published==[sha256(actual).hexdigest()]
         facts,digest=reader.read_result_reference(target.final_path)
-        assert facts.format_version==4 and facts.runtime.status==state and digest==published[0]
+        assert facts.format_version==5 and facts.runtime.status==state and digest==published[0]
         with ZipFile(target.final_path) as archive:
             assert not any(n.startswith('runtime/') and n.endswith('.whl') for n in archive.namelist())
         assert not target.temporary_path.exists()

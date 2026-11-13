@@ -16,7 +16,7 @@ from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY
 from patchharbor.result_reader import read_result_reference
 from tests.platform_support import run_cli
 from tests.result_runtime_support import replace_pyz
-from tests.result_pyz_support import canonical, format4
+from tests.result_pyz_support import canonical, current_result
 from tests.reference_support import edit_document, write_reference
 
 
@@ -36,7 +36,7 @@ def test_inner_directory_is_bounded_before_zipfile_allocates_members(canonical, 
     elif fault == "comment": struct.pack_into("<H", raw, offset + 32, 1)
     elif fault == "directory_size": struct.pack_into("<I", raw, end + 12, 2**32 - 1)
     elif fault == "directory_offset": struct.pack_into("<I", raw, end + 16, 2**32 - 1)
-    files, _ = format4(canonical)
+    files, _ = current_result(canonical)
     replace_pyz(files, bytes(raw))
     path = tmp_path / "result.zip"; write_reference(path, files)
     monkeypatch.setattr(pyz, "ZipFile", lambda *a, **k: pytest.fail("unbounded directory allocated ZipInfo objects"))
@@ -47,7 +47,7 @@ def test_inner_directory_is_bounded_before_zipfile_allocates_members(canonical, 
 
 @pytest.mark.parametrize("limit", ["pyz", "recipe"])
 def test_pyz_and_recipe_limits_precede_their_reads(canonical, tmp_path, monkeypatch, limit):
-    files, _ = format4(canonical)
+    files, _ = current_result(canonical)
     path = tmp_path / "result.zip"; write_reference(path, files)
     if limit == "pyz":
         monkeypatch.setattr(pyz, "MAX_PYZ_BYTES", len(canonical) - 1)
@@ -67,7 +67,7 @@ def test_pyz_and_recipe_limits_precede_their_reads(canonical, tmp_path, monkeypa
 
 @pytest.mark.parametrize("unicode_path", [False, True])
 def test_deep_json_cannot_abort_exchange_classification(tmp_path, monkeypatch, unicode_path):
-    files, _ = format4(None)
+    files, _ = current_result(None)
     files["manifest.json"] = (b'{"marker":"patch-harbor-result-bundle","nested":' +
                               b'[' * 2000 + b'0' + b']' * 2000 + b'}')
     if unicode_path: files["base/Grüße.txt"] = files.pop("base/tracked.txt")
@@ -84,7 +84,7 @@ def test_deep_json_cannot_abort_exchange_classification(tmp_path, monkeypatch, u
 @pytest.mark.parametrize("fault", ["duplicate", "case_file", "case_directory", "extra_wheel", "nested_archive", "traversal", "both_markers"])
 def test_outer_runtime_inventory_failures_never_become_patch_candidates(canonical, tmp_path, fault):
     from tests.task_inspection_support import MANIFEST
-    files, _ = format4(canonical)
+    files, _ = current_result(canonical)
     if fault == "case_file": files["runtime/Runtime.json"] = files["runtime/runtime.json"]
     elif fault == "case_directory": files["Runtime/other.txt"] = b"ambiguous directory"
     elif fault == "extra_wheel": files["runtime/second.whl"] = canonical
@@ -112,7 +112,7 @@ def test_mixed_exchange_selects_only_real_patch_and_writer_produces_current_form
     from tests.exchange_support import _write_custom_package
     env, exchange, repo, context = _world(tmp_path)
     for name, data in (("embedded.zip", canonical), ("unavailable.zip", None)):
-        files, _ = format4(data)
+        files, _ = current_result(data)
         write_reference(exchange / name, files)
     (exchange / "standalone.zip").write_bytes(canonical)
     patch = exchange / "actual.patch.zip"
@@ -124,6 +124,6 @@ def test_mixed_exchange_selects_only_real_patch_and_writer_produces_current_form
     document = json.loads(result.stdout)
     produced = Path(document["result"]["result_bundle"]["path"])
     with ZipFile(produced) as archive:
-        assert json.loads(archive.read("manifest.json"))["format_version"] == 4
+        assert json.loads(archive.read("manifest.json"))["format_version"] == 5
         assert json.loads(archive.read("runtime/runtime.json"))["reason"] == "source_not_prepared"
     assert (exchange / "embedded.zip").is_file() and (exchange / "unavailable.zip").is_file()
