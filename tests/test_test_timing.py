@@ -82,14 +82,26 @@ def test_unobserved_phase_and_collection_only_are_distinct():
 @pytest.mark.parametrize('workers', ['0', '2'])
 def test_real_phase_boundaries_and_shared_fixture_are_separate(tmp_path, workers):
     suite = make_suite(tmp_path, '''
+        import json
+        import os
+        from pathlib import Path
         import time
         import pytest
+
+        def measured_sleep(seconds):
+            start = time.perf_counter_ns()
+            time.sleep(seconds)
+            return (time.perf_counter_ns() - start) / 1e9
+
         @pytest.fixture(scope='module')
         def shared():
-            time.sleep(.02)
-            yield object()
-            time.sleep(.03)
-        def test_first(shared): time.sleep(.04)
+            observed = {'setup': measured_sleep(.02)}
+            yield observed
+            observed['teardown'] = measured_sleep(.03)
+            path = Path(__file__).with_name(f'observed-{os.getpid()}.json')
+            path.write_text(json.dumps(observed), encoding='utf-8')
+
+        def test_first(shared): shared['call'] = measured_sleep(.04)
         def test_second(shared): pass
     ''')
     path = tmp_path / 'report.json'
@@ -101,15 +113,24 @@ def test_real_phase_boundaries_and_shared_fixture_are_separate(tmp_path, workers
     cases = case_timings(report)
     assert len(cases) == 2
     first = next(c for c in cases if c['nodeid'].endswith('test_first'))
-    assert first['phases']['setup']['duration_s'] >= .02
-    assert first['phases']['call']['duration_s'] >= .04
+    # Sleep is only a workload. Its requested duration is not the clock oracle
+    # (notably on Windows/Python 3.10); each pytest phase must enclose the
+    # independently measured work that actually ran inside it.
+    observed = [json.loads(p.read_text(encoding='utf-8')) for p in suite.glob('observed-*.json')]
+    first_observations = [item for item in observed if 'call' in item]
+    assert len(first_observations) == 1
+    first_observed = first_observations[0]
+    assert all(value > 0 for item in observed for value in item.values())
+    assert first['phases']['setup']['duration_s'] >= first_observed['setup']
+    assert first['phases']['call']['duration_s'] >= first_observed['call']
     summaries = list(data['workers'].values()) if workers != '0' else [data['controller']]
     fixtures = [f for summary in summaries for f in summary['fixtures'] if f['name'] == 'shared']
     assert len(fixtures) == 1 if workers == '0' else 1 <= len(fixtures) <= 2
+    assert len(observed) == len(fixtures)
     assert sum(len(f['consumers']) for f in fixtures) == 2
     assert all(f['scope'] == 'module' and f['finalized_ns'] >= f['setup_end_ns']
                and f['teardown_s'] is None and f['teardown_reason'] for f in fixtures)
-    assert sum(c['phases']['teardown']['duration_s'] for c in cases) >= .03
+    assert sum(c['phases']['teardown']['duration_s'] for c in cases) >= sum(item['teardown'] for item in observed)
     assert all(c['total_s'] == pytest.approx(sum(v['duration_s'] for v in c['phases'].values())) for c in cases)
     assert data['controller']['observed_elapsed_ns'] > 0
 

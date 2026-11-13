@@ -1096,3 +1096,29 @@ P118-02 vervollständigt den aktuellen Paketvertrag und die Spezifikation.
 Beide Schritte enthalten alle Reparaturen. Status: vorbereitet; vollständige
 Tests mit `--workers auto` und Commits erfolgen ausschließlich in Execute.
 Kein Push, Tag oder Release ist Bestandteil des Bundles.
+
+
+## Bundle 119 – Windows-CI: Helfer-Zeilenenden und Phasenmessung
+
+CI-Lauf 43412710175 für `36242f9` ist in den drei nativen Windows-Jobs
+fehlgeschlagen. Je 17 Handoff-Tests verglichen die CRLF-Quelldatei des Helfers
+mit den Metadaten seiner kanonischen LF-Ausgabe. Python 3.10 meldete zusätzlich
+19,432 ms Setup statt der vom Test anhand von `sleep(.02)` erwarteten 20 ms.
+Alle Linux-, Docker- und PowerShell-7-Jobs waren erfolgreich.
+
+P119-01 schreibt LF für den versionierten Starthelfer vor und bindet die
+Test-Metadaten an dessen kanonische Ausgabe. Regressionstests für Task und
+Result prüfen LF, CRLF und CR unabhängig vom Host, die unveränderten übrigen
+Metadaten und die unveränderte Quelldatei.
+
+P119-02 vergleicht die erfassten Setup-, Call- und Teardown-Zeiten mit separat
+gemessenen Intervallen innerhalb der echten Phasen. Die Prüfungen für
+geteilte Fixtures, parallele Worker, Verbraucher und Phasensummen bleiben
+erhalten. Es werden weder Plattformen übersprungen noch Prüfgrenzen oder
+Release-Gates abgesenkt.
+
+Beide Schritte werden ausschließlich in Apply mit der vollständigen Suite
+und `--workers auto` getestet und danach committet. Im Dev erfolgen nur
+statische Prüfungen. Nach erfolgreichem Result wird der geprüfte Stand auf
+`dev` gepusht und die CI ohne Release-Aktion neu gestartet; dafür liegt die
+ausdrückliche Freigabe aus dem Chat vor. Kein Tag oder Release ist vorgesehen.
