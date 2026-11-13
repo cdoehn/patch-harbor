@@ -13,10 +13,13 @@ Aktuelle ausdrückliche Nutzeranweisungen haben Vorrang vor dieser Vorlage.
 | Fingerprint | `patchharbor-state-v1` |
 | Entrypoint-Pflichtmarker | `# PATCHHARBOR` |
 
-Begleitdatenformat 2 aus bestehenden 2.0-Resultaten bleibt lesbar. Neue Erzeuger
-liefern Format 3. Produkt-, Task-, Result- und Begleitdatenversion sind unabhängig.
+Task und Result müssen `patchharbor_version` exakt passend zum ausführenden
+Werkzeug tragen und das aktuelle Format verwenden. Keine Migration, Konvertierung
+oder Leser für ältere/neue Versionen. Nur Begleitdatenformat 3 ist zulässig.
+Produktversion und Formatnummer werden unabhängig geprüft.
 Vor-2.0-Bundles und alte Python-API-Namen sind kein Ersatzweg. `apply` ist ein
-deprecated CLI-Alias für `execute` mit Hinweis auf stderr.
+deprecated CLI-Alias für `execute` mit Hinweis auf stderr. ScriptBundle und
+der eigenständige Skriptrunner bleiben ausdrücklich nicht versionsgebunden.
 
 ## 1. Eingaben, Zuständigkeit und feste Grenzen
 
@@ -253,8 +256,8 @@ verwendet werden; niemals eine alte generierte Anleitung als statische Vorlage.
 Core validiert die reservierte Struktur, führt sie nicht aus und schreibt sie
 nicht ins Repository. Keine weiteren Dateien/Entrypoints im reservierten Namensraum.
 Je Datei höchstens 128 KiB, nicht leer, UTF-8 ohne BOM; JSON ohne doppelte Schlüssel
-oder nicht endliche Zahlen. Task 2 ohne Begleitdaten und das bisherige Format-2-Paar
-bleiben lesbar. Fehlende neue Helfer nicht durch fremden Code ersetzen.
+oder nicht endliche Zahlen. Task 3 darf ohne Begleitdaten vorliegen. Wenn Begleitdaten vorhanden sind,
+ist ausschließlich Format 3 mit vollständigem Helfer zulässig. Fehlende neue Helfer nicht durch fremden Code ersetzen.
 
 Alle übrigen sicheren regulären Dateien sind Payloads: Core schreibt sie vor dem
 Entrypoint bytegenau an den relativen Zielpfad. Archive werden nicht rekursiv als

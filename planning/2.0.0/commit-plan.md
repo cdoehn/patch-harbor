@@ -998,3 +998,101 @@ in allen drei verbleibenden WRC-Ständen. Dev führt nur statische Analyse
 durch; Apply führt vor jedem tatsächlichen Commit die vollständige parallele
 Testsuite mit automatischer Workerzahl ohne Zusatzlimit aus. Veröffentlichung,
 Push, Tag und native Release-Abnahme stehen weiterhin aus.
+
+
+## Bundle 114 – Versionsbindung und Entfernung interner Altpfade
+
+Status: vorbereitet, vollständige Tests und Commits ausschließlich in Execute.
+Kein Push, Tag oder Release ist Teil dieser Lieferung.
+
+| Commit | Änderung |
+| --- | --- |
+| P114-01 | Result 113 reparieren; ausstehende kompakte Chat-Anleitung abschließen |
+| P114-02 | Historische Runtime-Matrix entfernen, aktuelle Sicherheitsprüfungen erhalten |
+| P114-03 | Interne Execute-Namen; keine Replay-Migration; explizite Worker-Aufträge |
+| P114-04 | Ein PYZ-Profil und ausschließlich eigene aktuelle Installationsressourcen |
+| P114-05 | Aktuelles Handoff mit verpflichtendem separatem Helfer |
+| P114-06 | Exakte Produktversion in Task 3 / Result 5, native Leser und Bootstrap |
+| P114-07 | Verbindliche Spezifikation und konsistente aktuelle Dokumentation |
+
+Jeder Commit erhält vor dem Commit einen vollständigen Testlauf mit `--workers auto`.
+Frühere fehlerhafte Zwischenstände werden bereits in den entsprechenden Phasen
+korrigiert. Historische Nachweisdateien bleiben historische Nachweise.
+
+
+## Bundle 115 – Reparatur und Fortsetzung von Bundle 114
+
+Bundle 114 wurde vor seinem ersten Commit gestoppt: 4002 Tests bestanden,
+16 übersprungen, sechs fehlgeschlagen. Drei Ursachen werden in allen betroffenen
+Folgeschritten korrigiert: die Prozessumgebung im PYZ-End-to-End-Test, der
+verpflichtende Helfer in der erwarteten Result-Dateiliste und der öffentliche
+Fehlertyp bei einer überschrittenen Lesebudgetgrenze. Ab dem verpflichtenden
+Helferformat prüft auch der bisherige Alt-PYZ-Test die Ablehnung fehlender Helfer.
+
+P115-01 übernimmt die ausstehenden Änderungen samt Reparatur. P115-02 bis
+P115-07 führen die sechs übrigen Schritte von P114-02 bis P114-07 fort, jeweils
+einschließlich aller Reparaturen. Jeder Commit setzt einen bestandenen
+vollständigen Testlauf in Execute mit `--workers auto` voraus. Dev führt nur
+statische Prüfungen aus. Kein Push, Tag oder Release ist Bestandteil des Bundles.
+Status: vorbereitet; Testnachweise und Commit-IDs entstehen erst in Execute.
+
+
+## Bundle 116 – Konsistente Zustandsdiagnose und fünf verbleibende Schritte
+
+P115-01 und P115-02 sind mit jeweils vollständigem Testlauf abgeschlossen:
+4009 beziehungsweise 3958 Tests bestanden, jeweils 16 übersprungen.
+P115-03 stoppte vor seinem Commit mit 3950 bestandenen, 16 übersprungenen
+und drei fehlgeschlagenen Tests. Die Ablehnung alter Zustandsschemata war
+korrekt; lediglich die Diagnose verwendete einen abweichenden Begriff.
+
+P116-01 vereinheitlicht die Diagnose auf `exchange processing state` und
+schließt die ausstehenden internen Execute-Umbenennungen ab. P116-02 bis
+P116-05 setzen die übrigen Schritte aus P115-04 bis P115-07 fort. Die Korrektur
+ist in sämtlichen Folgeschritten enthalten. Die strikte Schema-Prüfung,
+das Migrationsverbot und alle bestehenden Tests bleiben erhalten.
+
+Status: vorbereitet. Jeder der fünf noch erforderlichen Commits setzt einen
+vollständigen Testlauf ausschließlich in Execute mit `--workers auto` voraus.
+Kein Push, Tag oder Release ist Bestandteil dieses Bundles.
+
+
+## Bundle 117 – Aktuelle ZIP-Grenzprüfung und drei verbleibende Schritte
+
+P116-01 und P116-02 sind mit jeweils vollständigem Testlauf abgeschlossen:
+3953 beziehungsweise 3931 Tests bestanden, jeweils 16 übersprungen. Damit sind
+vier der ursprünglich sieben Schritte committet. P116-03 stoppte vor seinem
+Commit mit 3929 bestandenen, 16 übersprungenen und einem fehlgeschlagenen Test.
+
+Das minimale Result enthält durch den verpflichtenden Starthelfer neun statt
+acht ZIP-Einträge. Der Grenztest erwartet nun diese neun Einträge und setzt
+sein absichtlich zu kleines Testbudget auf acht. Die Prüfung des Fehlertyps,
+des sofortigen Abbruchs ohne Wiederholung und der Bereinigung bleibt erhalten.
+Produktive Limits und Sicherheitsmechanismen werden nicht verändert.
+
+P117-01 schließt das aktuelle Handoff ab; P117-02 übernimmt die exakte
+Produktversionsbindung; P117-03 vervollständigt die Spezifikation. Die Reparatur
+ist in allen drei Schritten enthalten. Status: vorbereitet; Tests und Commits
+erfolgen ausschließlich in Execute mit vollständiger Suite und `--workers auto`.
+Kein Push, Tag oder Release ist Bestandteil des Bundles.
+
+
+## Bundle 118 – Aktuelle Testpakete, Windows-Katalog und Watcher-Stop
+
+P117-01 wurde mit 3930 bestandenen und 16 übersprungenen Tests committet;
+damit sind fünf der ursprünglich sieben Schritte abgeschlossen. P117-02
+stoppte vor dem Commit mit 3950 bestandenen, 16 übersprungenen und drei
+fehlgeschlagenen Tests.
+
+P118-01 ergänzt die Produktversion im Testpaket des JSON-Notfallpfads und
+aktualisiert den Windows-Testkatalog auf den umbenannten Result-5-Test.
+Der Stop-Controller nutzt für seine Benachrichtigung eine reentrante
+SimpleQueue statt Event.set im Signalhandler; die Event-Sperre kann von
+einem unterbrochenen wait gehalten sein. Die bestehenden echten SIGINT- und
+SIGTERM-Tests bleiben unverändert, ebenso ihr Zeitbudget. Ergänzt werden
+Prüfungen für Timeout ohne Stop und für gleichzeitige sowie spätere Wartende.
+Die Lifecycle-Tests werden auch in die Windows-Auswahl aufgenommen.
+
+P118-02 vervollständigt den aktuellen Paketvertrag und die Spezifikation.
+Beide Schritte enthalten alle Reparaturen. Status: vorbereitet; vollständige
+Tests mit `--workers auto` und Commits erfolgen ausschließlich in Execute.
+Kein Push, Tag oder Release ist Bestandteil des Bundles.

@@ -42,9 +42,9 @@ print(report.success, report.result_bundle.status)
 | `unregister(selector, cwd=".")` | `unregister` | `UnregisterResult` |
 | `repositories()` | `registry list` | `RegistryListResult` |
 | `context(repository=".", capture_mode="git")` | `context` | `RepositoryContext` |
-| `inspect_task(patch)` | `inspect TASK_ZIP` | `PatchInspection` |
-| `validate_task(patch, repository=None, reference_bundle=None)` | `validate TASK_ZIP` | `PatchValidationResult` |
-| `pack_task(content_directory, reference_bundle=..., entrypoint=..., output=None, output_directory=None, modes=None)` | `pack CONTENT_DIRECTORY` | `PatchPackResult` |
+| `inspect_task(patch)` | `inspect TASK_ZIP` | `TaskInspection` |
+| `validate_task(patch, repository=None, reference_bundle=None)` | `validate TASK_ZIP` | `TaskValidationResult` |
+| `pack_task(content_directory, reference_bundle=..., entrypoint=..., output=None, output_directory=None, modes=None)` | `pack CONTENT_DIRECTORY` | `TaskPackResult` |
 | `bundle(repository=".", output_directory=None, capture_mode="git", export_plan=None)` | `bundle` | `BundleResult` |
 | `execute(patch=None, repository=None, dry_run=False, ...)` | manual `execute` | `RunReport` |
 | `dry_run(patch=None, repository=None, ...)` | `execute --dry-run` | `RunReport` |
@@ -76,7 +76,7 @@ repositories.
 ## Static package inspection (RIV development addition)
 
 This development line implements package/binding validation, portable offline
-runtime, `pack_task` and Result Format 4; no release is implied. The existing
+runtime, `pack_task` and Result Format 5; no release is implied. The existing
 `dry_run` keeps its Execute semantics and still creates a Result Bundle.
 
 ```python
@@ -87,7 +87,7 @@ print(info.package_sha256, info.package_size, info.entrypoint)
 for entry in info.entries:
     print(entry.path, entry.role.value, entry.size, entry.sha256, entry.unix_mode)
 report = api.validate_task("patch.zip")
-assert report.scope is api.PatchValidationScope.PACKAGE
+assert report.scope is api.TaskValidationScope.PACKAGE
 assert report.binding_matches is None
 ```
 
@@ -102,17 +102,17 @@ uses the existing registration, bounded lock effects and controlled Git queries.
 The request-local `observer=None` has
 the usual silent-library and best-effort observation semantics.
 
-`PatchInspection` is frozen and contains `package_sha256` (full lowercase SHA-256),
+`TaskInspection` is frozen and contains `package_sha256` (full lowercase SHA-256),
 `package_size` (archive bytes), typed `manifest`, normalized `entrypoint`, and
-tuples `entries`, `messages`, `warnings`. Every frozen `PatchEntry` has `path`,
-`role` (`PatchEntryRole`: `manifest`, `entrypoint`, `payload`, `handoff`), `size`
+tuples `entries`, `messages`, `warnings`. Every frozen `TaskEntry` has `path`,
+`role` (`TaskEntryRole`: `manifest`, `entrypoint`, `payload`, `handoff`), `size`
 (uncompressed bytes), full content `sha256`, and `unix_mode` (integer permission
 bits, or `None` if absent). Entries are sorted by normalized path; explicit ZIP
-directories are checked but omitted. The frozen `PatchManifest` retains all
-seven manifest fields, with typed repository and Git IDs. `PatchMessage` has
+directories are checked but omitted. The frozen `TaskManifest` retains all
+eight manifest fields including `patchharbor_version`, with typed repository and Git IDs. `PatchMessage` has
 `name` and `text`. No payload bytes are retained in these public facts.
 
-`PatchValidationResult` is frozen and contains `inspection`, `scope`,
+`TaskValidationResult` is frozen and contains `inspection`, `scope`,
 `binding_matches`, `context`, `reference_sha256`, `checked_at`, and `not_checked`.
 For `package` scope, binding/context/reference are `None`.
 `checked_at` is an aware UTC `datetime`; `not_checked` is a tuple of identifiers:
@@ -126,7 +126,7 @@ computed observations, not new declared hashes in format-2 `task.json`.
 frozen `ReferenceContext`. Its fields are `repo_id`, `base_commit` (the existing
 typed IDs), `state_fingerprint`, `fingerprint_algorithm`, `dirty` and
 `repository_path` (recorded text, including foreign Windows paths; never resolved
-on this machine). The supported Result-4 reader checks the complete inventory, blob IDs,
+on this machine). The supported Result-5 reader checks the complete inventory, blob IDs,
 untracked SHA-256 and metadata consistency, accepting consistent dirty, failure
 and dry-run Results. It uses actual context, never the previous expected binding.
 Repository snapshot paths retain the existing portable UTF-8 repository rules;
@@ -138,7 +138,7 @@ successful Execute: those consumers still require a clean, completed success,
 no warnings or dry run, the appropriate expected binding and, for recovery,
 the existing receipt, local digest and Git evidence. Their conservative ZIP
 path policy is unchanged. Current writers emit format 4 with one verified Core-PYZ
-or a declared runtime-only restriction. This checkout reads Result 4 only;
+or a declared runtime-only restriction. This checkout reads Result 5 only;
 Old Result 1/2/3 and Patch formats are rejected. Public Python names and
 integration capability versions follow the [version-2 contract](protocol-2.md);
 there are no old Python aliases. Historical producer capabilities do not
@@ -187,15 +187,15 @@ complete string IDs and a boolean `dirty`. Reference paths remain foreign text.
 
 CLI examples: `patchharbor inspect patch.zip --json` and
 `patchharbor validate patch.zip --json`. Both also accept `--help`, `--verbose`
-(`-v`), `--no-color` and `--plain`. Their JSON envelope has `output_version: 2`,
+(`-v`), `--no-color` and `--plain`. Their JSON envelope has `output_version: 4`,
 `command: "inspect"` or `"validate"`, and the existing `success`, `result`,
 `error`, `process_exit_code` fields. After successful argument parsing stdout
 contains exactly one JSON object, including known error outcomes; JSON never
 contains progress output. Older commands keep output version 1.
 
 The inspect `result` has exactly the inspection fields above. `manifest` uses
-the seven task.json field names and complete string identifiers; `entries` use
-the five PatchEntry field names; `messages` use `name` and `text`. Tuples become
+the eight task.json field names and complete string identifiers; `entries` use
+the five TaskEntry field names; `messages` use `name` and `text`. Tuples become
 arrays and enums become their string values. The validate `result` has exactly
 the validation fields above, with nested `inspection`, null optional values,
 and a UTC ISO-8601 `checked_at` ending in `Z`. A failure has `result: null` and
@@ -552,7 +552,7 @@ already exist outside the content tree. Existing targets are never replaced,
 including targets created by concurrent requests. No registry, Git, shell,
 build, installation, tests or network is used by this operation.
 
-`PatchPackResult` is frozen and contains an absolute `path`, a request-local
+`TaskPackResult` is frozen and contains an absolute `path`, a request-local
 UUID-v4 `package_id`, UTC `created_at`, complete `validation` with reference scope
 and matching binding, and an immutable `warnings` tuple. `package_sha256`,
 `package_size` and `reference_sha256` derive from that same validation evidence.
@@ -579,12 +579,12 @@ PatchHarbor modules, and never clears module caches to fake a version switch.
 Afterwards use the returned `api.inspect_task`, `api.validate_task` and
 `api.pack_task` normally. Full native reference validation remains separate
 from bootstrap checks; no installation or subprocess is needed for these calls.
-Result-4 production uses the same shared Core and request-local resource capture.
+Result-5 production uses the same shared Core and request-local resource capture.
 
 
 ## Current Result protocol
 
-Only Result 4 is a valid reference. The strict reader validates every repository
+Only Result 5 is a valid reference. The strict reader validates every repository
 and runtime descriptor without importing archive code. Earlier Result formats
 are retained only as rejection/provenance fixtures. See [the 2.0 protocol](protocol-2.md).
 
@@ -627,7 +627,7 @@ its full lowercase SHA-256, the expected repository root, and a trusted callback
 The existing `execute(patch=..., repository=...)` remains invalid.
 
 The callback receives immutable `api.PatchAdmission`: `.inspection` is the full
-`PatchInspection`, `.contents` maps every archive member to its captured bytes
+`TaskInspection`, `.contents` maps every archive member to its captured bytes
 (including manifest, entrypoint, payloads and optional handoff), and `.context`
 is the locked `RepositoryContext`. Only the actual Boolean True accepts.
 Require your own approved entrypoint hash, complete allowed inventory, binding
@@ -761,7 +761,7 @@ assume-unchanged and skip-worktree), symlinks, submodules and incomplete/promiso
 object stores remain unsupported. These checks do not execute a helper to test
 whether it is harmless. Ordinary clean/staged/unstaged/mixed/untracked states,
 binary/empty files, rename/deletion and file modes retain state-v1 and native
-Result-4 semantics. Ignored files are preserved in place and excluded by policy.
+Result-5 semantics. Ignored files are preserved in place and excluded by policy.
 
 `SafeExportError` extends `PatchHarborError`. Its enum `code` is one of
 `unsupported_host`, `unsupported_conversion`, `repository`, `configuration`,

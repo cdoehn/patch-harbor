@@ -1,8 +1,8 @@
 # Kompakte Chat-Anleitung und separater Starthelfer
 
-Der aktive Vertrag ergänzt Task 2 / Result 4 um Begleitdatenformat 3.
-Produktversion und Formatnummern sind unabhängig. Vor-2.0-Kompatibilität ist keine
-Anforderung; bestehende 2.0-Begleitdaten bleiben als Format-2-Paar lesbar.
+Der aktive Vertrag verwendet Task 3 / Result 5 und Begleitdatenformat 3.
+Es gilt [genau eine Produktversion, keine Migration](../spec/CURRENT_PACKAGE_CONTRACT.md).
+Frühere Begleitdatenpaare werden abgelehnt.
 Leser, die Format 3 nicht kennen, lehnen es ab. Es gibt kein stilles Entfernen
 der Zusatzdatei, keinen Konverter und keine Lockerung von Bindung oder Replay.
 
@@ -19,8 +19,8 @@ Environment 3 verlangt genau diesen relativen Helferdeskriptor:
 Die Größe ist die Bytezahl, kein Boolean; der Hash ist SHA-256 über die exakten
 Helferbytes. Zusätzliche/fehlende reservierte Dateien, falsche Großschreibung,
 abweichende Pfade, ungültige UTF-8-/BOM-/Größenwerte oder falsche Hashes sind Fehler.
-Je Begleitdatei gelten höchstens 128 KiB. Version 2 hat exakt das bisherige Paar
-und keinen Helferdeskriptor. Task-Metadaten dürfen vollständig fehlen.
+Je Begleitdatei gelten höchstens 128 KiB. Task-Metadaten dürfen vollständig fehlen; teilweise oder ältere Begleitdaten
+werden abgelehnt.
 
 Die Dateien sind passive Metadaten, keine Entrypoints und keine Repository-Payloads.
 Normale Root-Dateien eines Tasks sind Payloads; deshalb den Helfer dort niemals
@@ -76,7 +76,7 @@ inhaltlichen Prüfung; ihr Archiv wird nicht automatisch in den Prompt geladen.
 
 | Bisheriger Abschnitt | Aktuelle Stelle / Behandlung |
 | --- | --- |
-| Einleitung, Formate | Einleitung; Task 2 / Result 4 erhalten, Environment 3 ausdrücklich ergänzt |
+| Einleitung, Formate | Einleitung; Task 3 / Result 5 erhalten, Environment 3 ausdrücklich ergänzt |
 | 1 Aufgaben, Core-Nutzung, keine Sandbox | §1; keine erfundenen APIs, keine rekursive Ausführung, kein zweiter Writer |
 | 1 POSIX-Modi/Selbstupgrade | §4 Modi; §1 privater Schritt-Core; 0600, Sonderbits, ACL-Grenzen erhalten |
 | 1 Repositorykonfiguration | §6; lokaler geschlossener Vertrag, kein globaler Fallback/Metadatenersatz |
@@ -94,8 +94,8 @@ inhaltlichen Prüfung; ihr Archiv wird nicht automatisch in den Prompt geladen.
 | 5 Scope/Projektregeln/Diagnosebundle | §3; Nutzervorrang, keine Scope-Ausweitung, null Commits weiterhin zulässig |
 | 6 PLAN/FIX/OFF-PLAN/WRC | §3; Kennungen, Messages, Zähler und echte Zwischenstände erhalten |
 | 7 Pack/ZIP/Dateiname/Suffix | §4; falsches Wort Patch im Task-Namensschema korrigiert |
-| 7 Manifest/Entrypoint/Pfade/Modi | §4; sieben geschlossene Felder, volle Bindung, private Ausführung, Pfadgrenzen |
-| 7 Begleitpaar/Umgebung | §4; `bundle_type: Task`, explizites Format 3; bisheriges Format 2 weiter lesbar |
+| 7 Manifest/Entrypoint/Pfade/Modi | §4; acht geschlossene Felder einschließlich Produktversion, volle Bindung, private Ausführung, Pfadgrenzen |
+| 7 Begleitpaar/Umgebung | §4; `bundle_type: Task`, explizites Format 3; frühere Formate werden abgelehnt |
 | 7 erstmaliger Vor-2.0-Runner-Workaround | Nur Archiv; nicht mehr Bestandteil des aktiven Vertrags |
 | 7 Ressourcen | §4; unzutreffenden Format-1-Titel entfernt, genau ein Begleitplatz ergänzt |
 | 8 Testpolicy/Gates/Sequenz | §5; nach Zielprojekt, echte Reihenfolge, rotes Gate stoppt Folge, fremde Änderungen erhalten |

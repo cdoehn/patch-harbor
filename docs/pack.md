@@ -18,7 +18,7 @@ patchharbor pack ./patch-inhalt --reference-bundle ./result.zip \
 oder `--output` sind Pflicht. `--mode` ist wiederholbar und verlangt genau vier
 oktale Ziffern; doppelte Pfade sind Nutzungsfehler. Die CLI korrigiert keine
 unsicheren Paketpfade oder Modi und bietet kein Überschreib-/Validierungs-Aus-Flag.
-Ohne `--json` werden Pfad und Hash ausgegeben. JSON verwendet `output_version: 2`,
+Ohne `--json` werden Pfad und Hash ausgegeben. JSON verwendet `output_version: 4`,
 `command: "pack"` und enthält den vollständigen Validierungsnachweis samt Warnungen.
 Fehlende Optionen/Modussyntax ergeben Exit 2, fachliche Fehler behalten die
 bestehenden Codes. Scheitert nach Veröffentlichung nur die Ausgabe oder ihr Flush,
@@ -67,7 +67,7 @@ Manifest und Handoff sind neue Dateien. Die Vorlage stammt aus den verifizierten
 Ressourcen des ausführenden Packers; die schon gerenderte Referenzanleitung wird
 nicht als neue Vorlage eingesetzt. Bekannte Zielpfade, Runtimeinformationen und
 Erfassungszeit bleiben erhalten. Zulässige unbekannte Umgebungswerte bleiben `null`; Pflichtdaten einer
-unterstützten Result-4-Referenz dürfen nicht fehlen.
+unterstützten Result-5-Referenz dürfen nicht fehlen.
 Fremde Pfade werden als Text verwendet und nicht auf dem Pack-Rechner aufgelöst.
 
 ## Ausgabe und Veröffentlichung

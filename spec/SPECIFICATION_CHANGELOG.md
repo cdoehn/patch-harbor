@@ -1706,3 +1706,14 @@ Ausführung/Releasefreigabe werden durch diese Änderung nicht behauptet.
 Define the permanent public runtime export and complete GitHub release contract,
 version 1.8.0; reuse canonical PYZ and native no-replace publication. Actual Apply,
 exact-commit CI and release download remain required external evidence.
+
+
+## 2026-11-13 – Aktueller Paketvertrag ohne Migration (Bundle 114)
+
+Task 3 und Result 5 tragen die exakte Produktversion. Nur Environment 3,
+Replay-Schema 5 und das aktuelle PYZ-Profil bleiben. Alte Zustandsleser,
+Installationsrückfälle und eingefrorene historische Runtime-Testmatrizen entfallen.
+Öffentliche CLI-Aliase, ScriptBundle und der separate Skriptrunner bleiben.
+Interne Execute-Namen und ausdrückliche Worker-Aufträge ersetzen Altbezeichnungen.
+Die unvollständige Lieferung 113 wird einschließlich Wheel-Größenprüfung repariert.
+Testnachweise entstehen ausschließlich im Execute-Repository, ohne Worker-Obergrenze.

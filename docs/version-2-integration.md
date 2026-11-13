@@ -1,7 +1,7 @@
 # Integration mit PatchHarbor 2.0
 
-Version 2 verwendet Task-Bundles (Format 2), Execute-Berichte (JSON-Version 2)
-und Result-Bundles (Format 4). Ein bisheriges Result wird nicht durch Umbenennen
+Version 2 verwendet Task-Bundles (Format 3), Execute-Berichte (JSON-Version 2)
+und Result-Bundles (Format 5). Ein bisheriges Result wird nicht durch Umbenennen
 zu einem gültigen neuen Result. Die Installation oder der Import aktualisiert
 keine andere Anwendung, keinen laufenden Watcher und keine gespeicherten Pins.
 
@@ -15,7 +15,7 @@ keine andere Anwendung, keinen laufenden Watcher und keine gespeicherten Pins.
 | CLI `patchharbor apply` | `patchharbor execute`; `apply` ist nur ein veralteter CLI-Alias |
 
 Nach einer bewusst vorgenommenen Installation erzeugt `patchharbor bundle REPO`
-ein frisches Result 4 direkt aus dem tatsächlichen Repository. Dafür ist kein
+ein frisches Result 5 direkt aus dem tatsächlichen Repository. Dafür ist kein
 altes Result nötig. Die üblichen Registrierungs-, Exchange- und Sperrprüfungen
 gelten weiterhin. Ein schmutziger Stand wird als solcher erfasst.
 
