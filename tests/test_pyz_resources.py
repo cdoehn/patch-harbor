@@ -217,3 +217,55 @@ def test_missing_loaded_pyz_identity_cannot_select_the_legacy_pack_provider(monk
     monkeypatch.setattr(task_pack, 'read_stable_regular_file_bounded', forbidden)
     with pytest.raises(PatchHarborError) as caught: task_pack.capture_pack_template()
     assert caught.value.reason is FailureReason.PAYLOAD_PREPARATION_ERROR
+
+
+@pytest.mark.parametrize('kind', ['directory', 'zip'])
+def test_helper_is_pinned_and_never_executed(monkeypatch, tmp_path, kind):
+    payloads = inputs()
+    helper = b'raise AssertionError("helper must remain passive")\n'
+    payloads[pyz.BOOTSTRAP_PATH] = helper
+    provider, source, _, _ = provider_for(monkeypatch, tmp_path, kind=kind, payloads=payloads)
+    assert provider.capture_required_bootstrap() == helper
+    (source.archive if kind == 'zip' else source.root / pyz.BOOTSTRAP_PATH).unlink()
+    assert provider.capture_required_bootstrap() == helper
+    assert provider.capture().artifact.bootstrap == helper
+
+
+@pytest.mark.parametrize('kind', ['directory', 'zip'])
+def test_old_pyz_remains_readable_but_cannot_supply_a_separate_helper(monkeypatch, tmp_path, kind):
+    payloads = inputs()
+    payloads.pop(pyz.BOOTSTRAP_PATH, None)
+    provider, _, _, _ = provider_for(monkeypatch, tmp_path, kind=kind, payloads=payloads)
+    assert provider.capture().status == 'embedded'
+    with pytest.raises(pyz.RuntimeDataError, match='helper missing'):
+        provider.capture_required_bootstrap()
+
+
+@pytest.mark.parametrize('kind,replacement', [
+    ('directory', b'# foreign helper\n'),
+    ('directory', b'# bad helper\n'),
+    ('zip', None),
+])
+def test_runtime_failure_still_requires_helper_from_pinned_producer(monkeypatch, tmp_path, kind, replacement):
+    payloads = inputs()
+    helper = b'# own helper\n'
+    payloads[pyz.BOOTSTRAP_PATH] = helper
+    provider, source, _, _ = provider_for(monkeypatch, tmp_path, kind=kind, payloads=payloads)
+    # Corrupt only optional API documentation before capturing the provider.
+    if kind == 'directory':
+        (source.root / pyz.DOC_PATH).unlink()
+    else:
+        raw = bytearray(source.archive.read_bytes())
+        with ZipFile(BytesIO(raw)) as archive:
+            info = archive.getinfo(pyz.DOC_PATH)
+            offset = info.header_offset + 30 + len(info.filename.encode()) + len(info.extra)
+        raw[offset] ^= 1
+        source.archive.write_bytes(raw)
+    assert provider.capture().artifact is None
+    assert provider.capture_required_bootstrap() == helper
+    if kind == 'directory':
+        (source.root / pyz.BOOTSTRAP_PATH).write_bytes(replacement)
+    else:
+        source.archive.unlink()
+    with pytest.raises((OSError, pyz.RuntimeDataError)):
+        provider.capture_required_bootstrap()

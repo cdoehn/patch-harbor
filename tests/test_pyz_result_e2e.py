@@ -40,6 +40,10 @@ print(json.dumps({'path':str(result.path)}))
     assert facts.format_version==4 and facts.runtime.status=='embedded' and not facts.warnings
     with ZipFile(reference) as archive:
         template=archive.read('CHAT_INSTRUCTIONS.md')
+        helper_bytes=archive.read('tools/pyz_bootstrap.py')
+        handoff_environment=json.loads(archive.read('environment.json'))
+        assert handoff_environment['bootstrap']['sha256']==hashlib.sha256(helper_bytes).hexdigest()
+        assert b'# PATCHHARBOR-PYZ-BOOTSTRAP' not in template
         raw=archive.read(facts.runtime.artifact.path)
         assert {n for n in archive.namelist() if n.startswith('runtime/')}=={
             'runtime/runtime.json',facts.runtime.artifact.path}
@@ -50,7 +54,7 @@ print(json.dumps({'path':str(result.path)}))
         assert archive.read('__main__.py') == archive.read(pyz.MAIN_PATH) == pyz.MAIN_BYTES_310
         assert not any(n.startswith(('patchharbor_watcher/', 'tomli/', 'tomllib/')) for n in archive.namelist())
     # E-10: executable bootstrap taken only from THIS Result's root handoff.
-    helper=tmp_path/'reviewed-instruction.py';helper.write_text(bootstrap_program(template))
+    helper=tmp_path/'reviewed-instruction.py';helper.write_text(bootstrap_program(helper_bytes))
     outside=tmp_path/'outside';outside.mkdir()
     (outside/'patchharbor.py').write_text('raise AssertionError("foreign import")\n')
     contents=tmp_path/'contents';contents.mkdir();output=tmp_path/'patches';output.mkdir()

@@ -7,8 +7,8 @@ from dataclasses import dataclass
 
 _MIB = 1024 * 1024
 MAX_RESULT_FILES = 250_000
-# Manifest, context, run/execution logs, handoff pair, diffs and runtime pair.
-RESULT_AUXILIARY_ENTRIES = 10
+# Manifest, context, run/execution logs, handoff triple, diffs and runtime pair.
+RESULT_AUXILIARY_ENTRIES = 11
 
 
 class ResultSnapshotLimitError(ValueError):

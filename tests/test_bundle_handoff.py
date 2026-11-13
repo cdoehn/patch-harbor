@@ -175,8 +175,8 @@ def test_explicit_template_line_endings_are_lf_and_environment_is_unchanged(
     assert handoff.instructions.endswith(expected.encode("utf-8"))
     assert b"\r" not in handoff.instructions
     assert json.loads(handoff.environment) == document
-    data = handoff.instructions.decode("utf-8").split("```json\n", 1)[1].split("\n```", 1)[0]
-    assert json.loads(data) == document
+    assert b"```json" not in handoff.instructions
+    assert document["note"] == "exact\r\nvalue\rpreserved"
 
 
 @pytest.mark.parametrize("line_ending", [b"\n", b"\r\n", b"\r"], ids=["lf", "crlf", "cr"])
@@ -219,9 +219,10 @@ def test_renderer_preserves_exact_values_and_quotes_local_commands() -> None:
     text = handoff.instructions.decode()
     assert text.endswith("STATIC CONTRACT\n")
     assert "cd -- '/home/example/My Project'\"'\"'s repo' && patchharbor bundle" in text
-    assert BINDING["base_commit"] in text
-    assert BINDING["repo_id"] in text
-    assert "/sdcard/Download" in text
+    assert BINDING["base_commit"] not in text
+    assert BINDING["repo_id"] not in text
+    assert "/sdcard/Download" not in text
+    assert "environment.json" in text
     assert dict(handoff.entries())[CHAT_INSTRUCTIONS_NAME] == handoff.instructions
 
 
@@ -233,10 +234,12 @@ def test_unknown_or_control_paths_are_not_executable_examples(path: str | None) 
 
 
 def test_markdown_fences_in_metadata_remain_data() -> None:
-    document = patch_environment(exchange_directory="/tmp/```/evil")
+    document = patch_environment(repository_name="repo```\nforged", exchange_directory="/tmp/```/evil")
     text = render_chat_handoff(document, template="contract\n").instructions.decode()
     assert "\\u0060\\u0060\\u0060" in text
-    assert text.count("```json") == 1
+    assert text.count("```json") == 0
+    assert "repo```\nforged" not in text
+    assert "\\nforged" in text
     assert json.loads(render_chat_handoff(document, template="contract\n").environment) == document
 
 
@@ -374,3 +377,72 @@ def test_invalid_reserved_metadata_is_rejected_before_mutation(tmp_path: Path, f
     write_handoff_patch(path, entries, entrypoint=entrypoint)
     with pytest.raises(PatchHarborError):
         resolve_task_bundle(path)
+
+
+@pytest.mark.parametrize("fault", [None, "missing", "hash", "size", "path", "bom", "extra", "entrypoint", "downgrade"])
+def test_version3_helper_is_passive_and_strictly_bound(tmp_path, fault):
+    from patchharbor.bundle_handoff import BOOTSTRAP_NAME
+    helper = b'raise AssertionError("metadata must not execute")\n'
+    handoff = render_chat_handoff(patch_environment(format_version=3), bootstrap=helper)
+    entries = dict(handoff.entries(task=True))
+    name = TASK_HANDOFF_DIRECTORY + '/' + BOOTSTRAP_NAME
+    env_name = TASK_HANDOFF_DIRECTORY + '/' + ENVIRONMENT_NAME
+    doc = json.loads(entries[env_name])
+    selected = None
+    if fault == "missing": entries.pop(name)
+    elif fault == "hash": entries[name] += b'# changed\n'
+    elif fault == "size": doc['bootstrap']['size'] = True
+    elif fault == "path": doc['bootstrap']['path'] = '../escape.py'
+    elif fault == "bom": entries[name] = b'\xef\xbb\xbf' + helper
+    elif fault == "extra": entries[name + '.extra'] = helper
+    elif fault == "entrypoint": selected = name
+    elif fault == "downgrade": doc['format_version'] = 2
+    entries[env_name] = json.dumps(doc).encode()
+    path = tmp_path / 'task.zip'
+    write_handoff_patch(path, entries, entrypoint=selected)
+    if fault:
+        with pytest.raises(PatchHarborError): resolve_task_bundle(path)
+    else:
+        package = resolve_task_bundle(path)
+        assert package.handoff.bootstrap == helper
+        assert {p.relative_path for p in package.payloads} == {'actual-payload.txt', 'CHAT_INSTRUCTIONS.md'}
+        assert json.loads(handoff.environment)['bootstrap']['size'] == len(helper)
+
+
+@pytest.mark.parametrize('fault', [None, 'missing', 'changed', 'extra', 'downgrade'])
+def test_result_reader_preserves_and_verifies_separate_helper(tmp_path, fault):
+    from patchharbor.bundle_handoff import BOOTSTRAP_NAME
+    from patchharbor.result_reader import capture_result_reference
+    from tests.reference_support import reference_entries, write_reference
+    files, _ = reference_entries()
+    document = json.loads(files[ENVIRONMENT_NAME])
+    document['format_version'] = 3
+    handoff = render_chat_handoff(document, template='contract\n', bootstrap=b'# passive\n')
+    files.update(dict(handoff.entries()))
+    if fault == 'missing': files.pop(BOOTSTRAP_NAME)
+    elif fault == 'changed': files[BOOTSTRAP_NAME] += b'changed'
+    elif fault == 'extra': files['tools/another.py'] = b'# unwanted'
+    elif fault == 'downgrade':
+        document = json.loads(files[ENVIRONMENT_NAME]); document['format_version'] = 2
+        files[ENVIRONMENT_NAME] = json.dumps(document).encode()
+    path = tmp_path / 'result.zip'; write_reference(path, files)
+    if fault:
+        with pytest.raises(PatchHarborError): capture_result_reference(path)
+    else:
+        assert capture_result_reference(path).handoff == handoff
+
+
+def test_compact_header_keeps_all_environment_fields_without_repeating_them():
+    document = patch_environment(note='detail-' * 9000, future_field={'nested': [None, 'exact\r\nvalue']})
+    original = json.loads(json.dumps(document))
+    handoff = render_chat_handoff(document, template='contract\n')
+    assert json.loads(handoff.environment) == original == document
+    assert len(handoff.instructions) < 2000
+    assert b'detail-' not in handoff.instructions
+    assert b'future_field' not in handoff.instructions
+
+
+def test_compact_header_still_enforces_full_environment_budget():
+    document = patch_environment(note='x' * MAX_HANDOFF_ENTRY_BYTES)
+    with pytest.raises(PatchHarborError, match='size limit'):
+        render_chat_handoff(document, template='contract\n')

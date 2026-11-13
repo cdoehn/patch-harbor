@@ -26,12 +26,16 @@ def test_own_embedded_bootstrap_runs_in_fresh_process_and_pack_uses_same_result(
     files,_=reference_entries(handoff=True)
     files=attach_pyz(files,raw)
     edit_metadata(files,lambda doc:doc['capabilities'].update(result_formats=result_formats))
-    files['CHAT_INSTRUCTIONS.md']=(built_result_source/pyz.CHAT_PATH).read_bytes()
+    from patchharbor.chat_instructions import render_chat_handoff
+    document=json.loads(files['environment.json']);document['format_version']=3
+    handoff=render_chat_handoff(document, template=(built_result_source/pyz.CHAT_PATH).read_text(),
+                                bootstrap=(built_result_source/pyz.BOOTSTRAP_PATH).read_bytes())
+    files.update(dict(handoff.entries()))
     if corrupt_snapshot:files['base/tracked.txt']+=b'changed after snapshot'
     reference=tmp_path/'actual-reference.zip';write_reference(reference,files)
     # The executable program comes only from the handoff carried by this Result.
     helper=tmp_path/'reviewed-from-result.py'
-    helper.write_text(bootstrap_program(files['CHAT_INSTRUCTIONS.md']))
+    helper.write_text(bootstrap_program(files['tools/pyz_bootstrap.py']))
     outside=tmp_path/'outside';outside.mkdir()
     (outside/'patchharbor.py').write_text('raise AssertionError("foreign CWD")\n')
     contents,_,output=request_files

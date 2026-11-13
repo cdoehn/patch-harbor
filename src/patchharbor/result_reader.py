@@ -10,6 +10,7 @@ from pathlib import Path, PurePosixPath, PureWindowsPath
 from uuid import UUID
 
 from patchharbor.bundle_handoff import (
+    BOOTSTRAP_NAME, handoff_names, validate_bootstrap,
     BundleHandoff, CHAT_INSTRUCTIONS_NAME, ENVIRONMENT_NAME, ENVIRONMENT_MARKER,
     MAX_HANDOFF_ENTRY_BYTES,
 )
@@ -177,6 +178,9 @@ def _handoff(files: dict[str, bytes], context: dict, run: dict) -> set[str]:
     names = {"environment.json", CHAT_INSTRUCTIONS_NAME}
     if not names.intersection(files):
         return set()
+    environment = _document(files["environment.json"])
+    names = handoff_names(environment)
+    validate_bootstrap(environment, files.get(BOOTSTRAP_NAME))
     for name in names:
         raw = files[name]
         _require(bool(raw) and len(raw) <= MAX_HANDOFF_ENTRY_BYTES and not raw.startswith(b"\xef\xbb\xbf"),
@@ -184,7 +188,7 @@ def _handoff(files: dict[str, bytes], context: dict, run: dict) -> set[str]:
         raw.decode("utf-8")
     environment = _document(files["environment.json"])
     _require(environment.get("marker") == ENVIRONMENT_MARKER
-             and type(environment.get("format_version")) is int and environment["format_version"] == 2
+             and type(environment.get("format_version")) is int and environment["format_version"] in (2, 3)
              and environment.get("bundle_type") == "Result"
              and environment.get("repository_context") == {k: context[k] for k in _BINDING_FIELDS}
              and environment.get("run_id") == run["run_id"]
@@ -341,7 +345,7 @@ def _parse_result_payloads(payloads: tuple[BundlePayload, ...], *,
     if primary.entrypoint_started:
         expected_files.add("logs/execution.log")
     handoff = _handoff(files, context, run)
-    _require(handoff == {"environment.json", CHAT_INSTRUCTIONS_NAME},
+    _require({"environment.json", CHAT_INSTRUCTIONS_NAME} <= handoff,
              "Result 4 requires passive handoff data")
     expected_files.update(handoff)
     runtime = None
@@ -449,9 +453,9 @@ def capture_result_reference(path: Path, *, resource_policy: ResourcePolicy = DE
     captured = capture_result_payloads(path, resource_policy=resource_policy,
                                        expected_identity=expected_identity)
     selected = {entry.relative_path: entry.content for entry in captured.payloads
-                if entry.relative_path in {"context.json", CHAT_INSTRUCTIONS_NAME, ENVIRONMENT_NAME}}
+                if entry.relative_path in {"context.json", CHAT_INSTRUCTIONS_NAME, ENVIRONMENT_NAME, BOOTSTRAP_NAME}}
     suffix = _document(selected["context.json"]).get("bundle_suffix", "")
-    handoff = (BundleHandoff(selected[CHAT_INSTRUCTIONS_NAME], selected[ENVIRONMENT_NAME])
+    handoff = (BundleHandoff(selected[CHAT_INSTRUCTIONS_NAME], selected[ENVIRONMENT_NAME], selected.get(BOOTSTRAP_NAME))
                if captured.facts.handoff_present else None)
     return CapturedResultReference(captured.facts, captured.sha256, suffix, handoff)
 

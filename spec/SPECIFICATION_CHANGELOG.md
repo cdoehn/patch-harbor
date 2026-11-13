@@ -1,5 +1,18 @@
 # PatchHarbor – Spezifikations-Changelog
 
+## 2026-11-13 – CH-113: kompakte Anleitung und separater Starthelfer
+
+- `tools/pyz_bootstrap.py` ersetzt den eingebetteten Programmblock; eine Quelle
+  für Repository, Wheel, sdist, PYZ und passive Bundle-Begleitdaten.
+- Environment 3 beschreibt den Helfer mit Pfad, Größe und SHA-256; bestehende
+  2.0-Environment-2-Paare bleiben lesbar. Task 2 / Result 4 bleiben unverändert.
+- Vollständige Umgebungsdaten nur in JSON; generische Anleitung ohne historische
+  Projektstände. Regelzuordnung und Archiv unter `docs/chat-handoff.md`.
+- Elf äußere Begleiteinträge erhalten die Kapazität von 250.000 Snapshot-Dateien.
+- Vorlagen-/Helferbytes vor Execute eingefroren; Metadaten niemals Payload/Entrypoint.
+- Entwicklungsprüfung statisch; neue und bestehende Tests ausschließlich in Apply.
+  Dieser Eintrag behauptet noch keinen erfolgreichen Apply oder Release.
+
 ## 2026-11-11 – 200-01.W / Bundle 088: ScriptBundle und 2.0.0-Entwicklung
 
 - Aktiver W/R/C-Plan für 2.0.0 mit 36 echten Commitpositionen; dieser erste

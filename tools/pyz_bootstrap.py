@@ -23,7 +23,7 @@ from zipimport import zipimporter
 
 MAX_INPUT = 256 * 1024 * 1024
 MAX_TOTAL = 512 * 1024 * 1024
-MAX_ENTRIES = 250_010  # 250,000 snapshot files plus at most ten auxiliary members.
+MAX_ENTRIES = 250_011  # 250,000 snapshot files plus at most eleven auxiliary members.
 MAX_PYZ = 16 * 1024 * 1024
 MAX_METADATA = 128 * 1024
 MAX_RECIPE = 1024 * 1024
@@ -33,7 +33,8 @@ RECIPE_PATH = 'patchharbor/_runtime/pyz-recipe.json'
 MAIN_PATH = 'patchharbor/_runtime/pyz-main.py'
 IDENTITY_PATH = 'patchharbor/_pyz_identity.py'
 PYTHON_MINIMA = {'>=3.12': (3, 12), '>=3.10': (3, 10)}
-RESOURCES = {'patchharbor/_runtime/CHAT_INSTRUCTIONS.md',
+BOOTSTRAP_PATH = 'patchharbor/_runtime/tools/pyz_bootstrap.py'
+RESOURCES = {BOOTSTRAP_PATH,'patchharbor/_runtime/CHAT_INSTRUCTIONS.md',
              'patchharbor/_runtime/python-api.md', 'patchharbor/_runtime/LICENSE', MAIN_PATH}
 RECIPE_FIELDS = {'marker','format_version','distribution','version','requires_python','profile',
                  'content_id_algorithm','content_id','source_commit','entries'}
@@ -408,7 +409,7 @@ def _pyz_precheck(raw, expected, remaining=MAX_INNER_TOTAL):
         _require(list(inventory) == sorted(inventory) and set(inventory) | {RECIPE_PATH} == names,
                  'PYZ inventory differs from archive')
         _require(not (folded & set(directories)), 'PYZ file/directory collision')
-        required = RESOURCES | {IDENTITY_PATH,'__main__.py','patchharbor/__init__.py',
+        required = (RESOURCES - {BOOTSTRAP_PATH}) | {IDENTITY_PATH,'__main__.py','patchharbor/__init__.py',
                                 'patchharbor/api.py','patchharbor/cli.py','patchharbor/py.typed'}
         _require(required <= inventory.keys(), 'incomplete PYZ inventory')
         for name in ('__main__.py', MAIN_PATH):
@@ -419,7 +420,7 @@ def _pyz_precheck(raw, expected, remaining=MAX_INNER_TOTAL):
         identity = ('# Generated for the PatchHarbor PYZ profile.\nRESOURCE_ID = "' +
                     sha256(_canonical(producer)).hexdigest() + '"\n').encode('ascii')
         _require(_read(archive, IDENTITY_PATH, len(identity)) == identity, 'PYZ producer identity mismatch')
-        for name in RESOURCES - {MAIN_PATH}:
+        for name in (RESOURCES - {MAIN_PATH}) & names:
             data = _read(archive, name, MAX_METADATA)
             _require(data and not data.startswith(b'\xef\xbb\xbf'), 'invalid PYZ document resource')
             data.decode('utf-8')

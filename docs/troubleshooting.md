@@ -61,7 +61,7 @@ require the lock and complete pinned evidence. Leave uncertain attempts intact.
 
 ## Large snapshots and shared storage
 
-The current reader and writer allow 250,000 stored repository files and 250,010
+The current reader and writer allow 250,000 stored repository files and 250,011
 outer ZIP entries, with unchanged byte and inner-runtime limits. A message such
 as `more than 1000 entries` can identify an older installed outer-ZIP reader;
 check the executable, version and artifact actually used. Merely changing a Git

@@ -128,6 +128,7 @@ def test_prepared_runtime_and_template_are_frozen_before_mutation(repository,mon
     original=application.execute_prepared_script_with_log
     def mutate(*args,**kwargs):
         damage(source,'directory',pyz.CHAT_PATH)
+        damage(source,'directory',pyz.BOOTSTRAP_PATH)
         monkeypatch.setattr(pyz_artifact.PyzProvider,'capture',lambda *a:pytest.fail('late runtime capture'))
         return original(*args,**kwargs)
     monkeypatch.setattr(application,'execute_prepared_script_with_log',mutate)
@@ -137,6 +138,7 @@ def test_prepared_runtime_and_template_are_frozen_before_mutation(repository,mon
     assert facts.runtime.artifact.sha256==expected.pyz_sha256
     with ZipFile(report.result_bundle.path) as archive:
         assert archive.read('CHAT_INSTRUCTIONS.md').endswith(expected.chat_template)
+        assert archive.read('tools/pyz_bootstrap.py') == expected.bootstrap
 
 
 def test_required_template_failure_still_preserves_actual_error_diagnostics(repository,monkeypatch,tmp_path):

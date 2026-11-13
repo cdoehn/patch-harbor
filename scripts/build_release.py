@@ -205,6 +205,20 @@ def _packaged_chat_instructions(
             )
         source_document = source_file.read()
 
+    expected = (PROJECT_ROOT / "tools/pyz_bootstrap.py").read_bytes()
+    normalize = lambda raw: raw.replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+    with zipfile.ZipFile(wheel) as archive:
+        names = [n for n in archive.namelist()
+                 if n.endswith(".data/data/share/patchharbor/tools/pyz_bootstrap.py")]
+        if len(names) != 1 or normalize(archive.read(names[0])) != normalize(expected):
+            raise RuntimeError("wheel must carry its canonical standalone helper")
+        if archive.read("patchharbor/_runtime/tools/pyz_bootstrap.py") != normalize(expected):
+            raise RuntimeError("prepared runtime helper differs from source")
+    with tarfile.open(source_distribution, "r:gz") as archive:
+        member = archive.getmember(f"{root}/tools/pyz_bootstrap.py")
+        stream = archive.extractfile(member)
+        if not member.isfile() or stream is None or stream.read() != expected:
+            raise RuntimeError("source distribution must carry its canonical standalone helper")
     return wheel_document, source_document
 
 

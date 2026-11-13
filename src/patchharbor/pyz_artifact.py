@@ -13,7 +13,7 @@ from patchharbor.platform.filesystem import (
 )
 from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY
 from patchharbor.runtime_pyz import (
-    CHAT_PATH, DOC_PATH, LICENSE_PATH, RECIPE_PATH, MAX_RECIPE_BYTES,
+    CHAT_PATH, DOC_PATH, LICENSE_PATH, BOOTSTRAP_PATH, RECIPE_PATH, MAX_RECIPE_BYTES,
     MAX_PYZ_BYTES, MAX_CONTENT_BYTES, PyzRecipe, RuntimeDataError, RuntimeLimitError,
     materialize, parse_recipe, producer_id, read_pyz, sha256,
 )
@@ -42,6 +42,7 @@ class PyzArtifact:
     chat_template: bytes
     api_documentation: bytes
     license: bytes
+    bootstrap: bytes | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -71,9 +72,20 @@ class PyzProvider:
         This narrower fallback checks only this loaded producer's pinned recipe
         and template entry. It never claims a complete runtime or Result proof.
         """
+        return self._capture_required_resource(CHAT_PATH)
+
+    def capture_required_bootstrap(self) -> bytes:
+        """Pin the helper as data; importing it is never a capture side effect."""
+        return self._capture_required_resource(BOOTSTRAP_PATH)
+
+    def _capture_required_resource(self, name: str) -> bytes:
         provision = self.capture()
         if provision.artifact is not None:
-            return provision.artifact.chat_template
+            raw = (provision.artifact.chat_template if name == CHAT_PATH
+                   else provision.artifact.bootstrap)
+            if raw is None:
+                raise RuntimeDataError('required helper missing from own producer')
+            return raw
         if self._producer_id is None:
             raise RuntimeDataError('no prepared PYZ template identity')
         source = own_resources()
@@ -88,8 +100,8 @@ class PyzProvider:
                     infos = archive.infolist()
                     if len({info.filename for info in infos}) != len(infos):
                         raise RuntimeDataError('ambiguous own ZIP template inventory')
-                    def read(name, maximum):
-                        info = archive.getinfo(name)
+                    def read(member, maximum):
+                        info = archive.getinfo(member)
                         if (info.filename != info.orig_filename or info.is_dir()
                                 or info.file_size > maximum or info.compress_type != ZIP_STORED
                                 or info.file_size != info.compress_size or info.flag_bits
@@ -100,16 +112,20 @@ class PyzProvider:
                         if len(data) != info.file_size or len(data) > maximum:
                             raise RuntimeDataError('own ZIP template size mismatch')
                         return data
-                    return self._checked_template(read)
-            return self._checked_template(source.read)
+                    return self._checked_template(read, name)
+            return self._checked_template(source.read, name)
+        except FileReadLimitExceeded as exc:
+            raise RuntimeLimitError('own required PYZ resource exceeds read budget') from exc
         except (BadZipFile, KeyError) as exc:
             raise RuntimeDataError('cannot verify own required PYZ template') from exc
 
-    def _checked_template(self, read) -> bytes:
+    def _checked_template(self, read, name=CHAT_PATH) -> bytes:
         recipe = parse_recipe(read(RECIPE_PATH, MAX_RECIPE_BYTES))
         if recipe.version != __version__ or producer_id(recipe) != self._producer_id:
             raise RuntimeDataError('required template belongs to another producer')
-        entry = next(item for item in recipe.entries if item.path == CHAT_PATH)
+        entry = next((item for item in recipe.entries if item.path == name), None)
+        if entry is None:
+            raise RuntimeDataError('required helper missing from pinned recipe')
         if not 0 < entry.size <= 128 * 1024:
             raise RuntimeLimitError('required template exceeds document budget')
         raw = read(entry.source, entry.size)
@@ -139,8 +155,9 @@ class PyzProvider:
             # profile. Read the exact documents from these pinned canonical bytes.
             with ZipFile(BytesIO(raw)) as archive:
                 documents = tuple(archive.read(name) for name in (CHAT_PATH, DOC_PATH, LICENSE_PATH))
+                bootstrap = archive.read(BOOTSTRAP_PATH) if BOOTSTRAP_PATH in archive.namelist() else None
             return PyzProvision('embedded', None,
-                                PyzArtifact(recipe, raw, sha256(raw), *documents))
+                                PyzArtifact(recipe, raw, sha256(raw), *documents, bootstrap))
         except FileNotFoundError:
             return PyzProvision('unavailable', 'resources_missing', None)
         except (RuntimeLimitError, FileReadLimitExceeded):

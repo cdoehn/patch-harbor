@@ -108,7 +108,7 @@ def test_own_bootstrap_and_native_reader_reject_unknown_capabilities(version2_ru
     with ZipFile(original['path']) as archive:
         files = {name: archive.read(name) for name in archive.namelist()}
     helper = tmp_path / 'own-reviewed-bootstrap.py'
-    helper.write_text(bootstrap_program(files['CHAT_INSTRUCTIONS.md']), encoding='utf-8')
+    helper.write_text(bootstrap_program(files['tools/pyz_bootstrap.py']), encoding='utf-8')
     def damage(document):
         capabilities = document['capabilities']
         if fault == 'operations': capabilities['operations'].append('unknown_operation')

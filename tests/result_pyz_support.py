@@ -26,4 +26,4 @@ def artifact():
     fixture_inputs["patchharbor/budget_fixture.py"] = b"# Runtime budget fixture\n" * 10000
     recipe,payloads,raw=prepared(fixture_inputs)
     return PyzArtifact(recipe,raw,pyz.sha256(raw),payloads[pyz.CHAT_PATH],
-                       payloads[pyz.DOC_PATH],payloads[pyz.LICENSE_PATH])
+                       payloads[pyz.DOC_PATH],payloads[pyz.LICENSE_PATH],payloads[pyz.BOOTSTRAP_PATH])

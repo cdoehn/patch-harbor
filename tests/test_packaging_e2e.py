@@ -25,7 +25,7 @@ from tests.registration_support import isolated_user_environment
 
 pytestmark = pytest.mark.packaging
 
-MAX_WHEEL_BYTES = 448 * 1024  # Operational monitor/history (measured 444591 B); runtime limits unchanged.
+MAX_WHEEL_BYTES = 512 * 1024  # Standalone helper packaging measured 475382 B in Execute 113.
 RELEASE_VERSION = "2.0.0"
 EXPECTED_RUNTIME_FILES = {
     'patchharbor/application_monitor.py',
@@ -419,10 +419,10 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
     pyz_raw = pyz_artifacts[0].read_bytes()
     pyz_recipe = runtime_pyz.read_pyz(pyz_raw, policy=DEFAULT_RESOURCE_POLICY,
                                       remaining_bytes=runtime_pyz.MAX_CONTENT_BYTES)
-    from tests.embedded_pyz_support import bootstrap_program
     expected_program = (release_source / "tools/pyz_bootstrap.py").read_text(encoding="utf-8")
     with zipfile.ZipFile(pyz_artifacts[0]) as portable:
-        assert bootstrap_program(portable.read(runtime_pyz.CHAT_PATH)) + "\n" == expected_program
+        assert b'# PATCHHARBOR-PYZ-BOOTSTRAP' not in portable.read(runtime_pyz.CHAT_PATH)
+        assert portable.read(runtime_pyz.BOOTSTRAP_PATH).decode() == expected_program
         assert not any(name.startswith("scripts/") for name in portable.namelist())
     with zipfile.ZipFile(wheels[0]) as transport:
         assert transport.read(runtime_pyz.RECIPE_PATH) == pyz_recipe.data
@@ -447,6 +447,7 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
             "patchharbor/_runtime/LICENSE",
             "patchharbor/_runtime/CHAT_INSTRUCTIONS.md",
             "patchharbor/_runtime/python-api.md",
+            "patchharbor/_runtime/tools/pyz_bootstrap.py",
         }
         assert not any(name.startswith("scripts/") for name in names)
         assert "patchharbor/input.py" not in names

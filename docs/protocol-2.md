@@ -9,7 +9,7 @@ es gibt keinen Konverter und keine alten Python-API-Aliase.
 | --- | --- |
 | Task | `task.json`, Marker `patch-harbor-task-bundle`, Format 2 |
 | Result | `manifest.json`, Marker `patch-harbor-result-bundle`, Format 4 |
-| Environment | Marker `patch-harbor-environment`, Format 2, `bundle_type: Task` bzw. `Result`, `filename_schemas.Task` |
+| Environment | Marker `patch-harbor-environment`, Format 3 mit separatem Helfer (Format 2 weiter lesbar), `bundle_type: Task` bzw. `Result`, `filename_schemas.Task` |
 | Runtime-Metadaten | Format 3, `task_formats: [2]`, `result_formats: [4]`, Operationen `inspect_task`, `validate_task`, `pack_task` |
 | Execute JSON | `output_version: 2`, `command: execute` |
 | Pack / Inspect / Validate JSON | `output_version: 3` |
@@ -55,3 +55,10 @@ Die physischen Lockidentitäten werden durch neue Python-Typnamen nicht verände
 Git-Deltas, `git apply`, `PatchHarbor`, `PATCHHARBOR_META` und `# PATCHHARBOR`
 behalten ihre fachlich richtigen Namen. Die PYZ-Rezeptversion und das Core-Profil
 ohne Watcher bleiben unverändert.
+
+Die Begleitressourcen sind in [Chat-Handoff](chat-handoff.md) festgelegt.
+Neue Resultate tragen `tools/pyz_bootstrap.py` im Root; Tasks ausschließlich unter
+`PATCHHARBOR_META/tools/pyz_bootstrap.py`. Begleitdatenformat 3 hat einen Pflicht-
+Deskriptor `bootstrap: {path, size, sha256}`. Hashprüfung authentifiziert keinen
+Absender. Vorhandene 2.0-Paare bleiben gültig, ältere Leser lehnen neue Handoffs ab.
+Task 2, Result 4 und Replay 5 werden dafür nicht umnummeriert.

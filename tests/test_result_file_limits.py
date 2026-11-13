@@ -2,7 +2,6 @@
 from dataclasses import replace
 from hashlib import sha256
 from io import BytesIO
-import json
 import struct
 import sys
 import types
@@ -14,7 +13,7 @@ from patchharbor import result_bundle_publication as publication
 from patchharbor import result_verification as verification
 from patchharbor import resource_policy as policy
 from patchharbor.archive_evidence import parse_archive_evidence
-from patchharbor.bundle_handoff import BundleHandoff
+from patchharbor.chat_instructions import render_chat_handoff
 from patchharbor.errors import PatchHarborError
 from patchharbor.models import GitObjectFormat, GitObjectId
 from patchharbor.pyz_artifact import PyzArtifact
@@ -45,9 +44,9 @@ def publication_inputs(tmp_path, count):
     recipe, payloads, raw = prepared()
     from patchharbor import runtime_pyz as pyz
     runtime = runtime_payload(PyzArtifact(recipe, raw, sha256(raw).hexdigest(),
-        payloads[pyz.CHAT_PATH], payloads[pyz.DOC_PATH], payloads[pyz.LICENSE_PATH]))
+        payloads[pyz.CHAT_PATH], payloads[pyz.DOC_PATH], payloads[pyz.LICENSE_PATH], payloads[pyz.BOOTSTRAP_PATH]))
     context = _context_document(report)
-    environment = dict(marker='patch-harbor-environment', format_version=2, bundle_type='Result',
+    environment = dict(marker='patch-harbor-environment', format_version=3, bundle_type='Result',
         repository_context={k: context[k] for k in
             ('repo_id', 'base_commit', 'state_fingerprint', 'fingerprint_algorithm')},
         run_id=report.run_id_text, bundle_suffix='')
@@ -55,7 +54,7 @@ def publication_inputs(tmp_path, count):
     for key in ('base_commit', 'state_fingerprint', 'fingerprint_algorithm'):
         manifest['actual_' + key] = manifest['expected_' + key] = context[key]
     return path, dict(manifest=manifest,
-        context_document=context, handoff=BundleHandoff(b'contract\n', json.dumps(environment).encode()),
+        context_document=context, handoff=render_chat_handoff(environment, template='contract\n', bootstrap=payloads[pyz.BOOTSTRAP_PATH]),
         run_report=report, snapshot=snapshot, runtime=runtime, execution_log=b'success\n')
 
 
@@ -71,14 +70,14 @@ def test_real_publication_and_reference_accept_snapshot_capacity(tmp_path, monke
     raw = path.read_bytes()
     assert digest == sha256(raw).hexdigest()
     with ZipFile(BytesIO(raw)) as archive:
-        assert len(archive.infolist()) == count + 10
+        assert len(archive.infolist()) == count + 11
         assert len([n for n in archive.namelist() if n.startswith('base/')]) == count
     assert (b'PK\x06\x06' in raw) == (count > 65535)
     assert parse_archive_evidence(raw, path).kind == 'result_bundle'
     assert bootstrap.assess(path).pyz_bytes == arguments['runtime'].artifact_bytes
     # Exercise the actual executable handoff resource too, not just its source helper.
     from pathlib import Path
-    template = (Path(__file__).resolve().parents[1] / 'CHAT_INSTRUCTIONS.md').read_bytes()
+    template = (Path(__file__).resolve().parents[1] / 'tools/pyz_bootstrap.py').read_bytes()
     module = types.ModuleType('capacity_bootstrap')
     monkeypatch.setitem(sys.modules, module.__name__, module)
     exec(compile(bootstrap_program(template), '<handoff>', 'exec'), module.__dict__)
@@ -89,7 +88,7 @@ def test_real_publication_and_reference_accept_snapshot_capacity(tmp_path, monke
             read_result_reference(path)
         failure = caught.value.__cause__
         assert failure.resource == 'zip_entries'
-        assert failure.actual == 250_011 and failure.limit == 250_010
+        assert failure.actual == 250_012 and failure.limit == 250_011
 
 
 def test_over_capacity_is_rejected_before_writer_opens_destination(tmp_path):
@@ -164,7 +163,7 @@ def test_zip64_directory_is_accepted_without_allocating_zip_members():
 def test_malformed_zip64_is_rejected_before_zipfile_allocation(tmp_path, monkeypatch, fault):
     raw, end = zip64_fixture()
     if fault == 'limit':
-        struct.pack_into('<2Q', raw, end + 24, 250_011, 250_011)
+        struct.pack_into('<2Q', raw, end + 24, 250_012, 250_012)
     elif fault == 'locator': struct.pack_into('<Q', raw, end + 64, len(raw))
     elif fault == 'disk': struct.pack_into('<L', raw, end + 16, 1)
     elif fault == 'size': struct.pack_into('<Q', raw, end + 4, 45)

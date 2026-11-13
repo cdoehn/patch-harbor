@@ -14,6 +14,7 @@ import re
 
 RESOURCE_ROOT = "patchharbor/_runtime/"
 CHAT_PATH = RESOURCE_ROOT + "CHAT_INSTRUCTIONS.md"
+BOOTSTRAP_PATH = RESOURCE_ROOT + "tools/pyz_bootstrap.py"
 DOC_PATH = RESOURCE_ROOT + "python-api.md"
 SHA256_PATTERN = re.compile(r"[0-9a-f]{64}\Z")
 VERSION_PATTERN = re.compile(r"[0-9]+(?:\.[0-9]+)*(?:(?:a|b|rc)[0-9]+)?(?:\.post[0-9]+)?(?:\.dev[0-9]+)?\Z")

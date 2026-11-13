@@ -219,6 +219,7 @@ def test_manual_bundle_materializes_committed_blobs_without_export_rules(
             name.encode("utf-8") for name in base_names_in_archive_order
         )
         assert names == expected_base_names | {
+            "tools/pyz_bootstrap.py",
             "manifest.json",
             "context.json",
             "CHAT_INSTRUCTIONS.md",

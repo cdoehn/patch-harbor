@@ -357,24 +357,22 @@ records the selected repository's configured values, not a substituted Exchange
 path inferred from the output directory. `context.json`, `task.json`,
 fingerprints and replay identities do not gain environment-dependent fields.
 
-External chat-generated Patch packages carry the same passive documents under
-`PATCHHARBOR_META/CHAT_INSTRUCTIONS.md` and `PATCHHARBOR_META/environment.json`.
-The root `CHAT_INSTRUCTIONS.md` remains available as a genuine repository payload
-when a documentation change requires it. The reserved metadata pair is validated
-and excluded from mutation and execution; it cannot be an entrypoint. Existing
-packages without it still work. Each metadata file is UTF-8 without BOM, at most
-128 KiB, with the ordinary ZIP safety/resource rules still enforced. Unknown or
-incomplete reserved entries and metadata bindings that differ from `task.json`
-are rejected. This is passive documentation, not authentication or orchestration.
+External Task packages carry `CHAT_INSTRUCTIONS.md`, `environment.json` and
+`tools/pyz_bootstrap.py` under `PATCHHARBOR_META/`. These passive resources are
+validated, excluded from repository mutation and never selected as an entrypoint.
+The corresponding Result files live at its root. Repository-owned root files in
+a Task remain payloads, so helper metadata must not be placed there.
 
-The chat generates a fresh handoff for each Patch using the latest target
-machine's environment snapshot, retaining its capture time and unknown values,
-not probing the chat sandbox as if it were the development machine. PatchHarbor
-Core creates Result Bundles and `pack` creates Task Bundles from explicitly
-prepared contents. Pack does not choose changes, write the entrypoint, or edit
-a received package. See the chat contract for the first-upgrade bootstrap rule for older
-runners. The installed shared template is required; if missing, publication
-fails cleanly instead of emitting an apparently self-contained incomplete bundle.
+New environment format 3 binds the helper path, byte count and SHA-256; old 2.0
+format-2 pairs and Tasks without metadata remain readable. Unknown or incomplete
+reserved inventories fail. Each resource is nonempty UTF-8 without BOM, at most
+128 KiB. Full ZIP safety and repository binding still apply.
+
+The producer captures its own template and helper before mutation and creates
+fresh instructions with recorded target facts and the original capture time.
+Full environment data stays in `environment.json`, not duplicated in Markdown.
+A missing required resource fails publication; no old-runner cleanup workaround
+or foreign helper fallback is used. See [Chat handoff](chat-handoff.md).
 
 ## Manual workflow
 

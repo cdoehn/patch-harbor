@@ -75,7 +75,7 @@ def test_candidate_profile_is_ordered_reproducible_and_uses_explicit_modes(tmp_p
     assert first==second
     with ZipFile(BytesIO(first[1])) as archive:
         assert archive.namelist()==sorted(archive.namelist())
-        assert archive.comment==b'' and len(archive.infolist())==5
+        assert archive.comment==b'' and len(archive.infolist())==6
         for info in archive.infolist():
             assert not info.is_dir() and info.compress_type==ZIP_DEFLATED
             assert info.date_time==(1980,1,1,0,0,0)

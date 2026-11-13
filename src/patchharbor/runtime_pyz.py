@@ -18,7 +18,7 @@ from .runtime_profile import (
     require_recipe as _require, unique_recipe_object as _unique,
     reject_recipe_constant as _constant, SHA256_PATTERN as _HEX,
     VERSION_PATTERN as _VERSION, PATH_SEGMENT_PATTERN as _SEGMENT,
-    RESOURCE_ROOT, CHAT_PATH, DOC_PATH,
+    RESOURCE_ROOT, CHAT_PATH, DOC_PATH, BOOTSTRAP_PATH,
 )
 from .runtime_zip import bounded_directory
 
@@ -34,10 +34,10 @@ MAX_RECIPE_BYTES = 1024 * 1024
 MAX_PYZ_BYTES = 16 * 1024 * 1024
 MAX_CONTENT_BYTES = 32 * 1024 * 1024
 MAX_ENTRIES = 1000
-RESOURCES = frozenset({CHAT_PATH, DOC_PATH, LICENSE_PATH, MAIN_PATH})
+RESOURCES = frozenset({CHAT_PATH, DOC_PATH, LICENSE_PATH, MAIN_PATH, BOOTSTRAP_PATH})
 FIELDS = frozenset({'marker', 'format_version', 'distribution', 'version', 'requires_python',
                    'profile', 'content_id_algorithm', 'content_id', 'source_commit', 'entries'})
-REQUIRED = RESOURCES | {IDENTITY_PATH, '__main__.py', 'patchharbor/__init__.py',
+REQUIRED = (RESOURCES - {BOOTSTRAP_PATH}) | {IDENTITY_PATH, '__main__.py', 'patchharbor/__init__.py',
                        'patchharbor/api.py', 'patchharbor/cli.py', 'patchharbor/py.typed'}
 MAIN_BYTES = b'''"""PatchHarbor Core ZIP application; no Watcher launcher."""
 import sys
@@ -220,7 +220,7 @@ def materialize(recipe: PyzRecipe, read: Callable[[str, int], bytes]) -> bytes:
     _require(payloads[IDENTITY_PATH] == identity_module(producer_id(recipe)), 'PYZ producer identity mismatch')
     _require(payloads['__main__.py'] == payloads[MAIN_PATH] == main_bytes(recipe.requires_python),
              'PYZ entrypoint/resource/requirement mismatch')
-    for name in (CHAT_PATH, DOC_PATH, LICENSE_PATH):
+    for name in sorted((RESOURCES - {MAIN_PATH}) & payloads.keys()):
         raw = payloads[name]
         _require(0 < len(raw) <= 128 * 1024 and not raw.startswith(b'\xef\xbb\xbf'), 'invalid PYZ document resource')
         try: raw.decode('utf-8')

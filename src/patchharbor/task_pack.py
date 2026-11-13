@@ -34,7 +34,7 @@ def _error(message: str, reason: FailureReason, exc: BaseException) -> PatchHarb
     return PatchHarborError(message + ': ' + str(exc), reason)
 
 
-def capture_pack_template() -> str:
+def capture_pack_template(*, with_bootstrap: bool = False) -> str | tuple[str, bytes]:
     """Pin the executing producer's verified template without foreign fallback."""
     try:
         selected_pyz = own_pyz_profile_present()
@@ -58,7 +58,17 @@ def capture_pack_template() -> str:
             raise FileReadLimitExceeded('own template exceeds handoff budget')
         if not raw or raw.startswith(b'\xef\xbb\xbf'):
             raise ValueError('empty or BOM-prefixed canonical template')
-        return raw.decode('utf-8')
+        template = raw.decode('utf-8')
+        if not with_bootstrap:
+            return template
+        if provision.artifact is not None:
+            helper = provision.artifact.bootstrap
+            if helper is None:
+                raise ValueError('own producer has no standalone helper')
+        else:
+            from patchharbor.chat_instructions import load_bootstrap
+            helper = load_bootstrap()
+        return template, helper
     except FileReadLimitExceeded as exc:
         raise _error('cannot capture pack template',FailureReason.SOURCE_ERROR,exc) from exc
     except (OSError,ValueError,FileChangedDuringRead,UnsupportedFileTypeError) as exc:
@@ -82,7 +92,7 @@ def pack_task(content_directory: Path, *, reference_bundle: Path, entrypoint: st
                 raise FileChangedDuringRead('reference changed during capture')
         except (OSError, ValueError, FileChangedDuringRead, UnsupportedFileTypeError) as exc:
             raise _error('cannot capture pack reference', FailureReason.SOURCE_ERROR, exc) from exc
-        template = capture_pack_template()
+        template, bootstrap = capture_pack_template(with_bootstrap=True)
         metadata = prepare_metadata(reference, package_id, created_at,
                                     filename=None if output is None else output.name)
         target = resolve_output_target(
@@ -91,7 +101,7 @@ def pack_task(content_directory: Path, *, reference_bundle: Path, entrypoint: st
         )
         activity('CAPTURE', 'Capture explicitly selected pack contents')
         sources = capture_sources(content_root, entrypoint, modes=modes, resolved_root=content_root)
-        candidate = prepare_candidate(sources, reference, metadata, template)
+        candidate = prepare_candidate(sources, reference, metadata, template, bootstrap=bootstrap)
         try:
             with open_output_directory(target.parent) as directory:
                 owned = None

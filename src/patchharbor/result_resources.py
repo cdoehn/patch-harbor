@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 from zipfile import ZipFile
 
 from patchharbor import __version__
-from patchharbor.chat_instructions import load_chat_template
+from patchharbor.chat_instructions import load_chat_template, load_bootstrap
 from patchharbor.errors import PatchHarborError, result_bundle_error
 from patchharbor.json_document import serialize_json_document
 from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY, ResourcePolicy
@@ -98,6 +98,12 @@ class PinnedResultResources:
     runtime: ResultRuntimePayload
     template: str | None
     template_error: str | None = None
+    bootstrap: bytes | None = None
+
+    def require_bootstrap(self) -> bytes:
+        if self.bootstrap is None:
+            raise result_bundle_error(self.template_error or "pinned bootstrap is unavailable")
+        return self.bootstrap
 
     def require_template(self) -> str:
         if self.template is None:
@@ -115,16 +121,18 @@ def capture_result_resources() -> PinnedResultResources:
     try:
         if provision.artifact is not None or own_pyz_profile_present():
             template = provider.capture_required_template().decode('utf-8')
+            bootstrap = provider.capture_required_bootstrap()
         else:
             # A source checkout has no prepared PYZ identity. Its
             # existing anchored mandatory template is still needed for diagnosis.
             template = load_chat_template()
+            bootstrap = load_bootstrap()
         if not template or template.startswith('\ufeff'):
             raise runtime_pyz.RuntimeDataError('invalid pinned PYZ template')
     except (PatchHarborError, OSError, UnicodeError, runtime_pyz.RuntimeDataError,
             FileChangedDuringRead, FileReadLimitExceeded, UnsupportedFileTypeError) as exc:
         return PinnedResultResources(runtime,None,str(exc))
-    return PinnedResultResources(runtime,template)
+    return PinnedResultResources(runtime,template,bootstrap=bootstrap)
 
 
 def runtime_fits(

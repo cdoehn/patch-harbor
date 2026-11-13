@@ -19,7 +19,7 @@ from patchharbor.run_report import RunReport
 
 
 def create_result_handoff(report: RunReport, target: ResultBundleTarget, *,
-                          template: str | None = None) -> BundleHandoff:
+                          template: str | None = None, bootstrap: bytes | None = None) -> BundleHandoff:
     """Use the actually resolved repository and the revalidated output target."""
     context = report.context
     if context is None:
@@ -46,4 +46,4 @@ def create_result_handoff(report: RunReport, target: ResultBundleTarget, *,
         "filename_timezone": "UTC",
         "runtime": {**capture_runtime_environment(), "patchharbor_version": __version__},
     }
-    return render_chat_handoff(document, template=template)
+    return render_chat_handoff(document, template=template, bootstrap=bootstrap)

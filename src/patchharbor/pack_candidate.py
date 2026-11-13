@@ -130,14 +130,14 @@ class _BoundedOutput:
 
 def prepare_candidate(sources: CapturedSources,
                     reference: CapturedResultReference, metadata: PackMetadata,
-                    template: str, *, resource_policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY
+                    template: str, *, bootstrap: bytes | None = None, resource_policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY
                     ) -> PackCandidate:
     """Prepare bounded exact entries before reserving an output file."""
     manifest = {'marker': 'patch-harbor-task-bundle', 'format_version': 2,
                 **_binding(reference), 'entrypoint': sources.entrypoint}
     document = parse_json_document(metadata.environment)
     try:
-        handoff = render_chat_handoff(document, template=template)
+        handoff = render_chat_handoff(document, template=template, bootstrap=bootstrap)
     except PatchHarborError as exc:
         if isinstance(exc.__cause__, FileReadLimitExceeded):
             raise _failure('generated handoff exceeds budget', FailureReason.SOURCE_ERROR) from exc
@@ -172,9 +172,9 @@ def write_prepared_candidate(stream: BinaryIO, candidate: PackCandidate, *,
 
 def write_candidate(stream: BinaryIO, sources: CapturedSources,
                     reference: CapturedResultReference, metadata: PackMetadata,
-                    template: str, *, resource_policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY
+                    template: str, *, bootstrap: bytes | None = None, resource_policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY
                     ) -> tuple[str, ...]:
     candidate = prepare_candidate(sources, reference, metadata, template,
-                                  resource_policy=resource_policy)
+                                  bootstrap=bootstrap, resource_policy=resource_policy)
     write_prepared_candidate(stream, candidate, resource_policy=resource_policy)
     return candidate.warnings

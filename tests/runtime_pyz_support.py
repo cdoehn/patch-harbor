@@ -25,6 +25,7 @@ def provider_for(monkeypatch, tmp_path, *, kind='directory', payloads=None):
 def inputs():
     payloads = {name: b'# fixture module\n' for name in pyz.REQUIRED - {pyz.IDENTITY_PATH}}
     payloads['patchharbor/py.typed'] = b''
+    payloads[pyz.BOOTSTRAP_PATH] = b'# passive fixture helper\n'
     payloads[pyz.CHAT_PATH] = b'controlled template\n'
     payloads[pyz.DOC_PATH] = b'controlled API documentation\n'
     payloads[pyz.LICENSE_PATH] = b'controlled license\n'

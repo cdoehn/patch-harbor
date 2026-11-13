@@ -1,4 +1,4 @@
-"""Executable-byte generation and PEP 517 gates, independent of document prose."""
+"""Standalone resources and PEP 517 gates never execute helper code."""
 from __future__ import annotations
 
 import json
@@ -7,93 +7,60 @@ import subprocess
 import sys
 
 import pytest
-
 from scripts import render_chat_bootstrap as generator
-from tests.embedded_pyz_support import bootstrap_program
 from tests.platform_support import PROJECT_ROOT
 
-SOURCE = b'raise AssertionError("build checks must not execute the bootstrap")\n'
 SOURCE = (generator.CAP_BEGIN + b"OPERATIONS = ('inspect_task', 'validate_task', 'pack_task')\n"
-          b"TASK_FORMATS = (2,)\nRESULT_FORMATS = (4,)\n" + generator.CAP_END + b'\n' + SOURCE)
-PREFIX = b"independently maintained prefix\n"
-SUFFIX = b"\nindependently maintained suffix\n"
-TEMPLATE = PREFIX + generator.BEGIN + b"obsolete executable bytes\n" + generator.END + SUFFIX
+          b"TASK_FORMATS = (2,)\nRESULT_FORMATS = (4,)\n" + generator.CAP_END +
+          b'\nraise AssertionError("build must not execute helper")\n')
+TEMPLATE = b"Read tools/pyz_bootstrap.py from this handoff.\n"
 
 
 @pytest.fixture
 def workspace(tmp_path):
     root = tmp_path / "source"
-    (root / "scripts").mkdir(parents=True)
-    (root / "tools").mkdir()
-    (root / 'src/patchharbor').mkdir(parents=True)
-    shutil.copyfile(PROJECT_ROOT / 'src/patchharbor/runtime_contract.py',
-                    root / 'src/patchharbor/runtime_contract.py')
-    (root / "tools/pyz_bootstrap.py").write_bytes(SOURCE)
-    shutil.copyfile(PROJECT_ROOT / "scripts/render_chat_bootstrap.py",
-                    root / "scripts/render_chat_bootstrap.py")
-    (root / "CHAT_INSTRUCTIONS.md").write_bytes(generator.render(TEMPLATE, SOURCE))
+    for name in ('scripts', 'tools', 'src/patchharbor'):
+        (root / name).mkdir(parents=True)
+    shutil.copyfile(PROJECT_ROOT / 'src/patchharbor/runtime_contract.py', root / 'src/patchharbor/runtime_contract.py')
+    shutil.copyfile(PROJECT_ROOT / 'scripts/render_chat_bootstrap.py', root / 'scripts/render_chat_bootstrap.py')
+    (root / 'tools/pyz_bootstrap.py').write_bytes(SOURCE)
+    (root / 'CHAT_INSTRUCTIONS.md').write_bytes(TEMPLATE)
     return root
 
 
 def snapshot(root):
     return {p.relative_to(root): (p.read_bytes(), p.stat().st_mode, p.stat().st_mtime_ns)
-            for p in root.rglob("*") if p.is_file()}
+            for p in root.rglob('*') if p.is_file()}
 
 
-@pytest.mark.parametrize("ending", [b"\n", b"\r\n", b"\r", b""])
-def test_generation_is_deterministic_and_only_replaces_executable_bytes(ending):
-    source = SOURCE.rstrip(b"\n") + ending
-    generated = generator.render(TEMPLATE, source)
-    assert bootstrap_program(generated).encode() + b"\n" == SOURCE
-    assert generated.partition(generator.BEGIN)[0] == PREFIX
-    assert generated.partition(generator.END)[2] == SUFFIX
-    assert generator.render(generated, source) == generated
-
-
-@pytest.mark.parametrize("fault", ["missing_begin", "missing_end", "duplicate_begin",
-                                    "duplicate_end", "unmarked_code", "reversed", "syntax", "encoding", "empty", "fence"])
-def test_invalid_region_or_source_cannot_be_written(workspace, fault):
-    target = workspace / "CHAT_INSTRUCTIONS.md"
-    if fault == "missing_begin":
-        target.write_bytes(target.read_bytes().replace(generator.BEGIN, b""))
-    elif fault == "missing_end":
-        target.write_bytes(target.read_bytes().replace(generator.END, b""))
-    elif fault == "duplicate_begin":
-        target.write_bytes(generator.BEGIN + target.read_bytes())
-    elif fault == "duplicate_end":
-        target.write_bytes(target.read_bytes() + generator.END)
-    elif fault == "unmarked_code":
-        target.write_bytes(target.read_bytes() + generator.CODE_PREFIX + SOURCE + b"```\n")
-    elif fault == "reversed":
-        target.write_bytes(generator.END + generator.BEGIN)
-    else:
-        invalid = {"syntax": b"def broken(\n", "encoding": b"\xff", "empty": b"\n", "fence": b'"""\n```\n"""\n'}
-        (workspace / "tools/pyz_bootstrap.py").write_bytes(invalid[fault])
+@pytest.mark.parametrize('ending', [b'\n', b'\r\n', b'\r'])
+def test_capability_generation_is_deterministic_and_readonly(workspace, ending):
+    path = workspace / 'tools/pyz_bootstrap.py'
+    path.write_bytes(SOURCE.replace(b'\n', ending))
     before = snapshot(workspace)
-    with pytest.raises((ValueError, SyntaxError)):
-        generator.main(["--write", "--root", str(workspace)])
+    generator.check(workspace)
     assert snapshot(workspace) == before
+    generator.main(['--write', '--root', str(workspace)])
+    assert path.read_bytes() == SOURCE
+    assert (workspace / 'CHAT_INSTRUCTIONS.md').read_bytes() == TEMPLATE
 
 
-def test_cli_check_is_readonly_and_generation_requires_explicit_write(workspace, tmp_path):
-    target = workspace / "CHAT_INSTRUCTIONS.md"
-    target.write_bytes(TEMPLATE)
-    outside = tmp_path / "outside"
-    outside.mkdir()
-    (outside / "patchharbor.py").write_text('raise AssertionError("foreign Core imported")\n')
-    (outside / "render_chat_bootstrap.py").write_text('raise AssertionError("foreign checker imported")\n')
-    prefix = [sys.executable, "-I", "-S", "-B", str(workspace / "scripts/render_chat_bootstrap.py"),
-              "--root", str(workspace)]
+def test_cli_refreshes_only_stale_capabilities_without_executing_helper(workspace, tmp_path):
+    helper = workspace / 'tools/pyz_bootstrap.py'
+    helper.write_bytes(SOURCE.replace(b'TASK_FORMATS = (2,)', b'TASK_FORMATS = (99,)'))
+    outside = tmp_path / 'outside'; outside.mkdir()
+    (outside / 'patchharbor.py').write_text('raise AssertionError("foreign Core")\n')
+    prefix = [sys.executable, '-I', '-S', '-B', str(workspace / 'scripts/render_chat_bootstrap.py'), '--root', str(workspace)]
     before = snapshot(workspace)
-    checked = subprocess.run([*prefix, "--check"], cwd=outside, capture_output=True, timeout=30)
-    assert checked.returncode == 1 and snapshot(workspace) == before
-    written = subprocess.run([*prefix, "--write"], cwd=outside, capture_output=True, timeout=30)
+    assert subprocess.run([*prefix, '--check'], cwd=outside, capture_output=True, timeout=30).returncode == 1
+    assert snapshot(workspace) == before
+    written = subprocess.run([*prefix, '--write'], cwd=outside, capture_output=True, timeout=30)
     assert written.returncode == 0, written.stderr
-    assert target.read_bytes() == generator.render(TEMPLATE, SOURCE)
+    assert helper.read_bytes() == SOURCE
+    assert (workspace / 'CHAT_INSTRUCTIONS.md').read_bytes() == TEMPLATE
     after = snapshot(workspace)
-    for action in ("--check", "--write"):
-        repeated = subprocess.run([*prefix, action], cwd=outside, capture_output=True, timeout=30)
-        assert repeated.returncode == 0 and snapshot(workspace) == after
+    assert subprocess.run([*prefix, '--check'], cwd=outside, capture_output=True, timeout=30).returncode == 0
+    assert snapshot(workspace) == after
 
 
 def invoke_build(root, hook, args, *, reject):
@@ -131,36 +98,30 @@ else:
     assert json.loads(completed.stdout) == {"rejected": reject}
 
 
-@pytest.mark.parametrize("hook", ["build_wheel", "build_sdist", "build_editable"])
-@pytest.mark.parametrize("fault", ["stale", "missing_source", "missing_checker", "ambiguous", "syntax"])
-def test_build_rejects_invalid_bootstrap_before_creating_artifacts(workspace, tmp_path, hook, fault):
-    if fault == "stale":
-        (workspace / "tools/pyz_bootstrap.py").write_bytes(SOURCE + b"# modified source\n")
-    elif fault == "missing_source":
-        (workspace / "tools/pyz_bootstrap.py").unlink()
-    elif fault == "missing_checker":
-        (workspace / "scripts/render_chat_bootstrap.py").unlink()
-    elif fault == "ambiguous":
-        target = workspace / "CHAT_INSTRUCTIONS.md"
-        target.write_bytes(target.read_bytes() + generator.END)
-    else:
-        (workspace / "tools/pyz_bootstrap.py").write_bytes(b"def broken(\n")
-    output = tmp_path / "not-created"
-    before = snapshot(workspace)
+
+@pytest.mark.parametrize('hook', ['build_wheel', 'build_sdist', 'build_editable'])
+@pytest.mark.parametrize('fault', ['stale', 'missing_source', 'missing_checker', 'syntax', 'encoding', 'bom', 'oversize', 'missing_link', 'embedded', 'template_bom'])
+def test_build_rejects_invalid_resources_before_artifacts(workspace, tmp_path, hook, fault):
+    helper = workspace / 'tools/pyz_bootstrap.py'
+    template = workspace / 'CHAT_INSTRUCTIONS.md'
+    if fault == 'stale': helper.write_bytes(SOURCE.replace(b'TASK_FORMATS = (2,)', b'TASK_FORMATS = (99,)'))
+    elif fault == 'missing_source': helper.unlink()
+    elif fault == 'missing_checker': (workspace / 'scripts/render_chat_bootstrap.py').unlink()
+    elif fault == 'syntax': helper.write_bytes(b'def broken(\n')
+    elif fault == 'encoding': helper.write_bytes(b'\xff')
+    elif fault == 'bom': helper.write_bytes(b'\xef\xbb\xbf' + SOURCE)
+    elif fault == 'oversize': helper.write_bytes(SOURCE + b' ' * (128 * 1024))
+    elif fault == 'missing_link': template.write_bytes(b'no helper reference')
+    elif fault == 'embedded': template.write_bytes(TEMPLATE + b'# PATCHHARBOR-PYZ-BOOTSTRAP\n')
+    elif fault == 'template_bom': template.write_bytes(b'\xef\xbb\xbf' + TEMPLATE)
+    before = snapshot(workspace); output = tmp_path / 'not-created'
     invoke_build(workspace, hook, [str(output)], reject=True)
     assert snapshot(workspace) == before and not output.exists()
 
 
-@pytest.mark.parametrize("hook", ["build_sdist", "build_editable"])
-def test_checked_build_preserves_frontend_arguments_without_importing_bootstrap(workspace, hook):
-    args = ["output", {"key": "value"}] + (["metadata"] if hook == "build_editable" else [])
+@pytest.mark.parametrize('hook', ['build_sdist', 'build_editable'])
+def test_build_preserves_frontend_arguments(workspace, hook):
+    args = ['output', {'key': 'value'}] + (['metadata'] if hook == 'build_editable' else [])
     before = snapshot(workspace)
     invoke_build(workspace, hook, args, reject=False)
     assert snapshot(workspace) == before
-
-
-def test_current_executable_handoff_is_generated_from_its_only_source():
-    template = (PROJECT_ROOT / "CHAT_INSTRUCTIONS.md").read_bytes()
-    source = (PROJECT_ROOT / "tools/pyz_bootstrap.py").read_text(encoding="utf-8").encode()
-    assert generator.render(template, source) == template
-    assert bootstrap_program(template).encode() + b"\n" == source

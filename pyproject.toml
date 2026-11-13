@@ -71,3 +71,4 @@ patchharbor = ["py.typed"]
 
 [tool.setuptools.data-files]
 "share/patchharbor" = ["CHAT_INSTRUCTIONS.md", "docs/python-api.md"]
+"share/patchharbor/tools" = ["tools/pyz_bootstrap.py"]

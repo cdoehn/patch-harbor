@@ -99,7 +99,7 @@ payload = {name:bytes.fromhex(raw) for name,raw in json.loads(
     (build_backend._ROOT / 'input.json').read_bytes()).items()}
 try:
     built = build_backend._prepare_pyz_transport(payload, version='1.4.0', requires_python='>=3.12',
-        chat=b'controlled template\\n', documentation=b'controlled API documentation\\n',
+        chat=b'controlled template\\n', bootstrap=b'# controlled helper\\n', documentation=b'controlled API documentation\\n',
         license=b'controlled license\\n')
 except ModuleNotFoundError:
     assert sys.argv[4] != 'present'

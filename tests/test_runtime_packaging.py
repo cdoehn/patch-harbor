@@ -124,6 +124,12 @@ assert facts.runtime.result_formats==(4,)
 assert not facts.warnings and facts.context.repository_path==str(repo)
 with ZipFile(bundle.path) as archive:
     raw=archive.read(facts.runtime.artifact.path)
+    helper=archive.read('tools/pyz_bootstrap.py')
+    environment=json.loads(archive.read('environment.json'))
+    assert environment['format_version']==3
+    assert environment['bootstrap']['sha256']==hashlib.sha256(helper).hexdigest()
+    with ZipFile(io.BytesIO(raw)) as inner:
+        assert inner.read('patchharbor/_runtime/tools/pyz_bootstrap.py')==helper
     assert len(raw)==facts.runtime.artifact.size and hashlib.sha256(raw).hexdigest()==facts.runtime.artifact.sha256
     assert not any(n.startswith('runtime/') and n.endswith('.whl') for n in archive.namelist())
     baseline=io.BytesIO()

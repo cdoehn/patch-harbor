@@ -101,7 +101,7 @@ Pack startet selbst keinen Watcher und hat keinen impliziten Exchange-Ausgabeort
 ## Grenzen und Nachweise
 
 Die Inhaltsaufnahme ist auf 10.000 Dateisystemknoten (Dateien und Verzeichnisse)
-begrenzt. Daneben gilt die gemeinsame äußere ZIP-Grenze von 250.010 Einträgen,
+begrenzt. Daneben gilt die gemeinsame äußere ZIP-Grenze von 250.011 Einträgen,
 einschließlich der drei generierten Dateien; sie hebt die engere Scan-Grenze
 nicht auf. Es gelten weiterhin 256 MiB je Inhalt/fertigem ZIP und 512 MiB
 unkomprimiert. Die Result-Referenz darf bis zu 250.000 Base-/Untracked-Dateien

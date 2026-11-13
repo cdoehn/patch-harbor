@@ -239,7 +239,8 @@ def _publication_documents(
     receipt: dict[str, object] | None = None, execution_log: bytes | None = None,
 ) -> _ResultDocuments:
     """Choose a complete runtime payload before opening the publication ZIP."""
-    handoff = create_result_handoff(report, target, template=resources.require_template())
+    handoff = create_result_handoff(report, target, template=resources.require_template(),
+                                    bootstrap=resources.require_bootstrap())
     context = _context_document(report, bundle_suffix=target.bundle_suffix)
 
     def assemble(runtime: ResultRuntimePayload) -> _ResultDocuments:

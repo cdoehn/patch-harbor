@@ -76,13 +76,13 @@ def _wheel_record(inventory, record_path):
 
 
 def _prepare_pyz_transport(transport: dict[str, bytes], *, version: str,
-                           requires_python: str, chat: bytes, documentation: bytes,
+                           requires_python: str, chat: bytes, bootstrap: bytes, documentation: bytes,
                            license: bytes) -> dict[str, bytes]:
     pyz = _pyz_recipe_module()
     canonical = {name: raw for name, raw in transport.items()
                  if name.startswith('patchharbor/') and not name.startswith(pyz.RESOURCE_ROOT)
                  and name not in {pyz.IDENTITY_PATH, 'patchharbor/_runtime_identity.py'}}
-    canonical.update({pyz.CHAT_PATH: chat, pyz.DOC_PATH: documentation,
+    canonical.update({pyz.BOOTSTRAP_PATH: bootstrap, pyz.CHAT_PATH: chat, pyz.DOC_PATH: documentation,
                       pyz.LICENSE_PATH: license, pyz.MAIN_PATH: pyz.main_bytes(requires_python),
                       '__main__.py': pyz.main_bytes(requires_python)})
     recipe, identity = pyz.create_recipe(canonical, version=version, requires_python=requires_python)
@@ -147,6 +147,7 @@ def build_wheel(wheel_directory, config_settings=None, metadata_directory=None):
         transport = _prepare_pyz_transport(
             transport, version=version, requires_python=requires,
             chat=(source / "CHAT_INSTRUCTIONS.md").read_bytes(),
+            bootstrap=(source / "tools/pyz_bootstrap.py").read_bytes().replace(b"\r\n", b"\n").replace(b"\r", b"\n"),
             documentation=(source / "docs/python-api.md").read_bytes(),
             license=(source / "LICENSE").read_bytes(),
         )

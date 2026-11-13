@@ -41,10 +41,13 @@ def _read_result(path: Path) -> dict[str, object]:
         assert environment["bundle_suffix"] == context["bundle_suffix"]
         for field in ("repo_id", "base_commit", "state_fingerprint", "fingerprint_algorithm"):
             assert environment["repository_context"][field] == context[field]
-            assert context[field] in instructions
-        # Metadata roundtrips exactly between machine and Markdown data blocks.
-        data = instructions.split("```json\n", 1)[1].split("\n```", 1)[0]
-        assert json.loads(data) == environment
+        assert 'environment.json' in instructions
+        assert environment['repository_context']['base_commit'] not in instructions
+        assert environment['format_version'] == 3
+        helper = archive.read('tools/pyz_bootstrap.py')
+        from hashlib import sha256
+        assert environment['bootstrap'] == {'path': 'tools/pyz_bootstrap.py',
+                                           'size': len(helper), 'sha256': sha256(helper).hexdigest()}
         assert "base/environment.json" not in archive.namelist()
         return environment
 

@@ -174,8 +174,9 @@ do not relabel an old archive. `apply` remains a deprecated CLI alias for
 is deprecated and has no repository-state binding. See the
 [protocol](docs/protocol-2.md) and [integration upgrade](docs/version-2-integration.md).
 
-Use the executable bootstrap from the trusted Result's handoff, or a separately
-reviewed copy of `tools/pyz_bootstrap.py`, to assess and prepare its exact PYZ.
+Use `tools/pyz_bootstrap.py` beside `CHAT_INSTRUCTIONS.md` in the trusted Result
+to assess and prepare its exact PYZ. The instructions contain no embedded program;
+full target facts live in `environment.json`. See the [handoff contract](docs/chat-handoff.md).
 After source trust and integrity checks, Python 3.10+ can run it directly:
 
 ```bash

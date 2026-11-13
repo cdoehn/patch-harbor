@@ -22,7 +22,8 @@ def test_release_entry_point_and_runtime_dependency_contract_are_exact() -> None
         assert callable(getattr(import_module(module), function))
     assert project["dependencies"] == []
     assert configuration["tool"]["setuptools"]["data-files"] == {
-        "share/patchharbor": ["CHAT_INSTRUCTIONS.md", "docs/python-api.md"]
+        "share/patchharbor": ["CHAT_INSTRUCTIONS.md", "docs/python-api.md"],
+        "share/patchharbor/tools": ["tools/pyz_bootstrap.py"]
     }
     for resources in configuration["tool"]["setuptools"]["data-files"].values():
         for resource in resources:
