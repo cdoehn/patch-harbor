@@ -7,7 +7,7 @@ import pytest
 
 from patchharbor import api
 from patchharbor.result_reader import capture_result_reference
-from scripts import pyz_bootstrap as bootstrap
+from tools import pyz_bootstrap as bootstrap
 from tests.pack_support import request_files
 from tests.reference_support import bound_package, write_reference
 from tests.result_pyz_support import canonical, format4

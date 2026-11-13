@@ -11,7 +11,7 @@ from time import sleep
 
 import pytest
 
-from scripts import pyz_bootstrap as bootstrap
+from tools import pyz_bootstrap as bootstrap
 from tests.windows_creation_support import assert_private_creation
 from tests.pyz_variant_support import variant
 from tests.pyz_variant_support import result_file

@@ -14,7 +14,7 @@ from zipfile import ZipFile, ZipInfo
 
 import pytest
 
-from scripts import pyz_bootstrap as bootstrap
+from tools import pyz_bootstrap as bootstrap
 from patchharbor import api, runtime_pyz as pyz
 from tests.result_pyz_support import attach_pyz
 from tests.result_runtime_support import edit_metadata

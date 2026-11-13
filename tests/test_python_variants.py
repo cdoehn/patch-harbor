@@ -16,7 +16,7 @@ from patchharbor.archive_evidence import parse_archive_evidence
 from patchharbor.exit_status import exit_code_for_error
 from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY
 from patchharbor.result_reader import read_result_reference
-from scripts import pyz_bootstrap as bootstrap
+from tools import pyz_bootstrap as bootstrap
 from tests.pyz_variant_support import variant, rewrite
 from tests.result_pyz_support import attach_pyz
 from tests.result_runtime_support import edit_metadata

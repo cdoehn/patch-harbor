@@ -420,7 +420,7 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
     pyz_recipe = runtime_pyz.read_pyz(pyz_raw, policy=DEFAULT_RESOURCE_POLICY,
                                       remaining_bytes=runtime_pyz.MAX_CONTENT_BYTES)
     from tests.embedded_pyz_support import bootstrap_program
-    expected_program = (release_source / "scripts/pyz_bootstrap.py").read_text(encoding="utf-8")
+    expected_program = (release_source / "tools/pyz_bootstrap.py").read_text(encoding="utf-8")
     with zipfile.ZipFile(pyz_artifacts[0]) as portable:
         assert bootstrap_program(portable.read(runtime_pyz.CHAT_PATH)) + "\n" == expected_program
         assert not any(name.startswith("scripts/") for name in portable.namelist())
@@ -520,7 +520,7 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
             f"{root}/pyproject.toml",
             f"{root}/build_backend.py",
             f"{root}/MANIFEST.in",
-            f"{root}/scripts/pyz_bootstrap.py",
+            f"{root}/tools/pyz_bootstrap.py",
             f"{root}/scripts/render_chat_bootstrap.py",
             f"{root}/src/patchharbor/cli.py",
             f"{root}/src/patchharbor/api.py",
@@ -539,9 +539,9 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
             assert required in names
         # Only the two offline build inputs belong in the source distribution.
         # Release/CI/maintenance commands remain excluded, as do all scripts in wheels.
-        assert {name for name in names if name.startswith(f"{root}/scripts/")} == {
-            f"{root}/scripts/pyz_bootstrap.py", f"{root}/scripts/render_chat_bootstrap.py"}
-        for helper in ("scripts/pyz_bootstrap.py", "scripts/render_chat_bootstrap.py"):
+        assert {name for name in names if name.startswith((f"{root}/scripts/", f"{root}/tools/"))} == {
+            f"{root}/tools/pyz_bootstrap.py", f"{root}/scripts/render_chat_bootstrap.py"}
+        for helper in ("tools/pyz_bootstrap.py", "scripts/render_chat_bootstrap.py"):
             source_file = source_distribution.extractfile(f"{root}/{helper}")
             assert source_file is not None
             assert source_file.read() == (release_source / helper).read_bytes()

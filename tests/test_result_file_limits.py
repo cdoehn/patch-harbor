@@ -25,7 +25,7 @@ from patchharbor.result_reader import read_result_reference, parse_result_payloa
 from patchharbor.result_resources import runtime_payload, runtime_fits
 from patchharbor.run_report import PrimaryResult, RunOperation
 from patchharbor.zip_payloads import read_zip_payload_bytes
-from scripts import pyz_bootstrap as bootstrap
+from tools import pyz_bootstrap as bootstrap
 from tests.embedded_pyz_support import bootstrap_program
 from tests.run_report_support import successful_bundle_run_report
 from tests.reference_support import reference_entries, edit_document

@@ -24,10 +24,11 @@ TEMPLATE = PREFIX + generator.BEGIN + b"obsolete executable bytes\n" + generator
 def workspace(tmp_path):
     root = tmp_path / "source"
     (root / "scripts").mkdir(parents=True)
+    (root / "tools").mkdir()
     (root / 'src/patchharbor').mkdir(parents=True)
     shutil.copyfile(PROJECT_ROOT / 'src/patchharbor/runtime_contract.py',
                     root / 'src/patchharbor/runtime_contract.py')
-    (root / "scripts/pyz_bootstrap.py").write_bytes(SOURCE)
+    (root / "tools/pyz_bootstrap.py").write_bytes(SOURCE)
     shutil.copyfile(PROJECT_ROOT / "scripts/render_chat_bootstrap.py",
                     root / "scripts/render_chat_bootstrap.py")
     (root / "CHAT_INSTRUCTIONS.md").write_bytes(generator.render(TEMPLATE, SOURCE))
@@ -67,7 +68,7 @@ def test_invalid_region_or_source_cannot_be_written(workspace, fault):
         target.write_bytes(generator.END + generator.BEGIN)
     else:
         invalid = {"syntax": b"def broken(\n", "encoding": b"\xff", "empty": b"\n", "fence": b'"""\n```\n"""\n'}
-        (workspace / "scripts/pyz_bootstrap.py").write_bytes(invalid[fault])
+        (workspace / "tools/pyz_bootstrap.py").write_bytes(invalid[fault])
     before = snapshot(workspace)
     with pytest.raises((ValueError, SyntaxError)):
         generator.main(["--write", "--root", str(workspace)])
@@ -134,16 +135,16 @@ else:
 @pytest.mark.parametrize("fault", ["stale", "missing_source", "missing_checker", "ambiguous", "syntax"])
 def test_build_rejects_invalid_bootstrap_before_creating_artifacts(workspace, tmp_path, hook, fault):
     if fault == "stale":
-        (workspace / "scripts/pyz_bootstrap.py").write_bytes(SOURCE + b"# modified source\n")
+        (workspace / "tools/pyz_bootstrap.py").write_bytes(SOURCE + b"# modified source\n")
     elif fault == "missing_source":
-        (workspace / "scripts/pyz_bootstrap.py").unlink()
+        (workspace / "tools/pyz_bootstrap.py").unlink()
     elif fault == "missing_checker":
         (workspace / "scripts/render_chat_bootstrap.py").unlink()
     elif fault == "ambiguous":
         target = workspace / "CHAT_INSTRUCTIONS.md"
         target.write_bytes(target.read_bytes() + generator.END)
     else:
-        (workspace / "scripts/pyz_bootstrap.py").write_bytes(b"def broken(\n")
+        (workspace / "tools/pyz_bootstrap.py").write_bytes(b"def broken(\n")
     output = tmp_path / "not-created"
     before = snapshot(workspace)
     invoke_build(workspace, hook, [str(output)], reject=True)
@@ -160,6 +161,6 @@ def test_checked_build_preserves_frontend_arguments_without_importing_bootstrap(
 
 def test_current_executable_handoff_is_generated_from_its_only_source():
     template = (PROJECT_ROOT / "CHAT_INSTRUCTIONS.md").read_bytes()
-    source = (PROJECT_ROOT / "scripts/pyz_bootstrap.py").read_text(encoding="utf-8").encode()
+    source = (PROJECT_ROOT / "tools/pyz_bootstrap.py").read_text(encoding="utf-8").encode()
     assert generator.render(template, source) == template
     assert bootstrap_program(template).encode() + b"\n" == source

@@ -118,7 +118,7 @@ def build_wheel(wheel_directory, config_settings=None, metadata_directory=None):
         source.mkdir()
         for name in ("pyproject.toml", "README.md", "LICENSE", "CHAT_INSTRUCTIONS.md",
                      "MANIFEST.in", "build_backend.py", "setup.cfg",
-                     "scripts/pyz_bootstrap.py", "scripts/render_chat_bootstrap.py"):
+                     "tools/pyz_bootstrap.py", "scripts/render_chat_bootstrap.py"):
             if (_ROOT / name).is_file():
                 (source / name).parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(_ROOT / name, source / name)

@@ -175,7 +175,7 @@ is deprecated and has no repository-state binding. See the
 [protocol](docs/protocol-2.md) and [integration upgrade](docs/version-2-integration.md).
 
 Use the executable bootstrap from the trusted Result's handoff, or a separately
-reviewed copy of `scripts/pyz_bootstrap.py`, to assess and prepare its exact PYZ.
+reviewed copy of `tools/pyz_bootstrap.py`, to assess and prepare its exact PYZ.
 After source trust and integrity checks, Python 3.10+ can run it directly:
 
 ```bash

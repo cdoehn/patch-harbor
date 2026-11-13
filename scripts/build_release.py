@@ -32,7 +32,7 @@ _RELEASE_INPUT_FILES = (
     "pyproject.toml",
     "build_backend.py",
     "MANIFEST.in",
-    "scripts/pyz_bootstrap.py",
+    "tools/pyz_bootstrap.py",
     "scripts/render_chat_bootstrap.py",
 )
 _RELEASE_INPUT_TREES = ("src", "docs")

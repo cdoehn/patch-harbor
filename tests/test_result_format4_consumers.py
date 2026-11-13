@@ -13,7 +13,7 @@ from patchharbor import api, result_bundle_publication as publication
 from patchharbor.archive_evidence import parse_archive_evidence
 from patchharbor.exchange import ExchangeArtifactKind, _classify_content
 from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY
-from scripts import pyz_bootstrap as bootstrap
+from tools import pyz_bootstrap as bootstrap
 from tests.platform_support import project_environment, run_cli
 from tests.result_pyz_support import attach_pyz
 from tests.reference_support import edit_document, write_reference

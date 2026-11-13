@@ -573,7 +573,7 @@ at a later Execute. See [pack details](pack.md).
 The public API is shared with the built Core-only PYZ. Before importing it,
 perform the stdlib descriptor/trust precheck described in
 [runtime bootstrap](runtime-bootstrap.md) and privately prepare the selected
-artifact. `scripts/pyz_bootstrap.py` supplies the reviewed example
+artifact. `tools/pyz_bootstrap.py` supplies the reviewed example
 `import_api(prepared)`: it retains the checked path, rejects preloaded foreign
 PatchHarbor modules, and never clears module caches to fake a version switch.
 Afterwards use the returned `api.inspect_task`, `api.validate_task` and

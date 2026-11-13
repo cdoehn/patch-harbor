@@ -299,7 +299,7 @@ schwächere Referenz. Eine falsche Bindung bleibt blockierend.
 Der folgende Code entspricht dem geprüften Repository-Helfer; ein Checkout ist
 für seine Nutzung nicht nötig.
 
-<!-- BEGIN GENERATED PYZ BOOTSTRAP: scripts/pyz_bootstrap.py -->
+<!-- BEGIN GENERATED PYZ BOOTSTRAP: tools/pyz_bootstrap.py -->
 ```python
 # PATCHHARBOR-PYZ-BOOTSTRAP
 """Reviewed stdlib-only PYZ bootstrap; a precheck is not native Result validation.

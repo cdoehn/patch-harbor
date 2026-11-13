@@ -2,7 +2,7 @@
 
 This is a stdlib-only development/build tool, never a Core runtime dependency.
 It parses but never executes the bootstrap source. Builds call check(), while
-maintainers explicitly use --write after editing scripts/pyz_bootstrap.py.
+maintainers explicitly use --write after editing tools/pyz_bootstrap.py.
 """
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ import ast
 from pathlib import Path
 import sys
 
-BEGIN = b"<!-- BEGIN GENERATED PYZ BOOTSTRAP: scripts/pyz_bootstrap.py -->\n"
+BEGIN = b"<!-- BEGIN GENERATED PYZ BOOTSTRAP: tools/pyz_bootstrap.py -->\n"
 END = b"<!-- END GENERATED PYZ BOOTSTRAP -->"
 CODE_PREFIX = b"```python\n# PATCHHARBOR-PYZ-BOOTSTRAP\n"
 CAP_BEGIN = b"# BEGIN GENERATED RUNTIME CAPABILITIES\n"
@@ -63,7 +63,7 @@ def render(template: bytes, source: bytes) -> bytes:
     # Git checkouts may use CRLF for Python sources. The generated program has
     # canonical LF bytes; the independently maintained document is untouched.
     program = source.decode("utf-8").replace("\r\n", "\n").replace("\r", "\n")
-    ast.parse(program, filename="scripts/pyz_bootstrap.py", feature_version=(3, 10))
+    ast.parse(program, filename="tools/pyz_bootstrap.py", feature_version=(3, 10))
     if not program.strip() or any(line.startswith("```") for line in program.splitlines()):
         raise ValueError("bootstrap source is empty or would terminate its code block")
     if BEGIN.decode().strip() in program or END.decode() in program:
@@ -77,7 +77,7 @@ def render(template: bytes, source: bytes) -> bytes:
 
 
 def _contents(root: Path) -> tuple[tuple[Path, bytes, bytes], ...]:
-    script = root / 'scripts/pyz_bootstrap.py'
+    script = root / 'tools/pyz_bootstrap.py'
     source = script.read_bytes()
     program = render_capabilities(source, (root / 'src/patchharbor/runtime_contract.py').read_bytes())
     target = root / "CHAT_INSTRUCTIONS.md"
