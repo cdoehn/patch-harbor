@@ -18,7 +18,7 @@ def nodes_for(suite, platform):
     nodes = [f'tests/test_probe.py::test_{suite}']
     if suite in ('packaging', 'windows'):
         nodes += ['tests/test_runtime_export_distribution.py::test_wheel_sdist_pyz_public_export_byte_equality']
-        nodes += [f'tests/test_pyz_result_e2e.py::test_first_production_result_uses_own_instruction_then_regular_pyz_apply[{kind}]' for kind in ('full', 'diff', 'mixed')]
+        nodes += [f'tests/test_pyz_result_e2e.py::test_first_production_result_uses_own_instruction_then_regular_pyz_execute[{kind}]' for kind in ('full', 'diff', 'mixed')]
         nodes += [f'tests/test_runtime_packaging.py::test_standard_installation_and_three_offline_canonical_generations[{route}]' for route in ('wheel', 'source', 'sdist')]
         nodes += ['tests/test_packaging_e2e.py::test_release_distributions_run_after_pipx_installation',
                   'tests/test_python_variants.py::test_built_reader_variant_bootstraps_and_packs_in_fresh_stdlib_process[>=3.10]',
@@ -270,7 +270,7 @@ def test_current_proof_contract_cannot_hide_missing_cases_or_downgrade_evidence(
     build = json.loads(files['patchharbor-build.json'])
     name = 'patchharbor-packaging-tests.json'
     doc = json.loads(files[name])
-    node = next(n for n, proof in doc['proofs'].items() if proof == {'id': 'pyz.own-instruction-apply', 'variant': 'mixed'})
+    node = next(n for n, proof in doc['proofs'].items() if proof == {'id': 'pyz.own-instruction-execute', 'variant': 'mixed'})
     if fault == 'missing_variant': del doc['proofs'][node]
     if fault == 'skipped_variant':
         next(row for row in doc['reports'] if row['nodeid'] == node and row['when'] == 'call').update(outcome='skipped', reason='not checked')

@@ -61,7 +61,7 @@ def test_watcher_instances_have_independent_files_and_shutdown(tmp_path, monkeyp
 
 
 @pytest.mark.parametrize('startup_delay', [0, 8.5], ids=['native-start', 'delayed-start'])
-def test_actual_apply_publishes_effective_timeout_output_and_result(tmp_path, monkeypatch, startup_delay):
+def test_actual_execute_publishes_effective_timeout_output_and_result(tmp_path, monkeypatch, startup_delay):
     if startup_delay:
         from patchharbor import execution
         create_process_tree = execution.create_process_tree
@@ -126,7 +126,7 @@ def test_optional_chunk_observer_cannot_change_required_raw_output():
     assert destination.getvalue() == original
 
 
-def test_publication_io_failure_cannot_fail_apply(tmp_path, monkeypatch):
+def test_publication_io_failure_cannot_fail_execute(tmp_path, monkeypatch):
     (root, context), = registered(tmp_path, monkeypatch)
     path = tmp_path / 'exchange' / 'simple.zip'
     _write_custom_package(path, {k: str(getattr(context, k)) for k in ('repo_id', 'base_commit', 'state_fingerprint')},

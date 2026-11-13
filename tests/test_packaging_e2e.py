@@ -244,6 +244,7 @@ def _run(
     cwd: Path,
     environment: dict[str, str] | None = None,
     timeout: int = 180,
+    input_text: str | None = None,
 ) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         command,
@@ -253,6 +254,7 @@ def _run(
         capture_output=True,
         text=True,
         timeout=timeout,
+        input=input_text,
     )
 
 
@@ -892,10 +894,10 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
         encoding="utf-8"
     ) == "entrypoint-ok"
     assert not (repository / entrypoint_name).exists()
-    apply_bundle = Path(str(execute_result["result_bundle"]["path"]))
-    assert apply_bundle.parent == exchange_directory.resolve()
-    assert apply_bundle.is_file()
-    with zipfile.ZipFile(apply_bundle) as archive:
+    execute_bundle = Path(str(execute_result["result_bundle"]["path"]))
+    assert execute_bundle.parent == exchange_directory.resolve()
+    assert execute_bundle.is_file()
+    with zipfile.ZipFile(execute_bundle) as archive:
         assert "logs/execution.log" in archive.namelist()
         assert archive.read("untracked/nested/release.bin") == (
             b"\x00release-payload\xff"
@@ -951,6 +953,7 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
     worker = _run(
         [str(installed_python), "-m", "patchharbor_watcher.worker"],
         cwd=empty_workdir, environment=runtime_environment,
+        input_text='{"version":1,"exchanges":null}',
     )
     worker_result = _successful_json_result(worker)
     assert worker_result["repo_id"] == worker_context["repo_id"]
@@ -979,4 +982,4 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
                   cwd=empty_workdir, environment=event_environment, timeout=90)
     assert native.returncode == 0, native.stdout + native.stderr
     evidence = json.loads(native.stdout)
-    assert evidence["native_wait"] and evidence["actual_worker_apply"] and evidence["quiet_seconds"] == 5
+    assert evidence["native_wait"] and evidence["actual_worker_execute"] and evidence["quiet_seconds"] == 5

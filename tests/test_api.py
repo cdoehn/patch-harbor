@@ -75,12 +75,12 @@ def test_empty_or_nul_path_is_rejected(path: str) -> None:
         api.context(path)
 
 
-def test_conflicting_apply_targets_are_rejected() -> None:
+def test_conflicting_execute_targets_are_rejected() -> None:
     with pytest.raises(ValueError):
         api.execute("some.zip", repository="another-repo")
 
 
-def test_manual_and_automatic_apply_share_core_but_keep_distinct_scopes(
+def test_manual_and_automatic_execute_share_core_but_keep_distinct_scopes(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
 ) -> None:
     calls = []

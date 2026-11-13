@@ -13,7 +13,7 @@ from patchharbor.platform.filesystem import FileSystemOperationError
 from patchharbor.state_fingerprint import FINGERPRINT_ALGORITHM
 from patchharbor.user_paths import registration_user_paths
 from tests.registration_support import set_isolated_user_environment
-from tests.exchange_support import _identity, _selection, _record
+from tests.exchange_support import _selection, _record
 
 
 def test_classification_and_execute_lifecycle_are_persisted_in_closed_v5_state(
@@ -85,7 +85,7 @@ def test_classification_and_execute_lifecycle_are_persisted_in_closed_v5_state(
         )
 
 
-def test_failed_apply_can_be_reopened_only_by_an_explicit_retry_transition(
+def test_failed_execute_can_be_reopened_only_by_an_explicit_retry_transition(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -135,7 +135,7 @@ def test_failed_apply_can_be_reopened_only_by_an_explicit_retry_transition(
     assert reopened.execute_status is ExchangeExecuteStatus.ATTEMPTED
 
 
-def test_successful_apply_is_persisted_as_a_distinct_terminal_state(
+def test_successful_execute_is_persisted_as_a_distinct_terminal_state(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -167,59 +167,6 @@ def test_successful_apply_is_persisted_as_a_distinct_terminal_state(
     assert document["entries"][0]["execute_status"] == "succeeded"
 
 
-def test_legacy_attempt_flags_load_conservatively_and_migrate_on_next_write(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    set_isolated_user_environment(monkeypatch, tmp_path / "user")
-    paths = registration_user_paths()
-    paths.exchange_state_directory.mkdir()
-    patch = (tmp_path / "exchange" / "legacy.zip").resolve()
-    legacy_entries = []
-    for character, attempted in (("a", False), ("d", True)):
-        legacy_entries.append(
-            {
-                "attempted": attempted,
-                "kind": "patch_package",
-                "manifest": {
-                    "base_commit": "b" * 40,
-                    "fingerprint_algorithm": FINGERPRINT_ALGORITHM,
-                    "repo_id": "a3f9c2e1-7b4d-4a91-9d2e-5c6f8a1b2c3d",
-                    "state_fingerprint": "c" * 16,
-                },
-                "path": str(patch),
-                "sha256": character * 64,
-            }
-        )
-    paths.exchange_state_path.write_text(
-        json.dumps(
-            {"entries": legacy_entries, "format_version": 1},
-            separators=(",", ":"),
-        )
-        + "\n",
-        encoding="utf-8",
-    )
-
-    loaded = load_exchange_state(paths)
-
-    assert loaded.record_for(_identity(patch, "a")).execute_status is None  # type: ignore[union-attr]
-    assert (  # type: ignore[union-attr]
-        loaded.record_for(_identity(patch, "d")).execute_status
-        is ExchangeExecuteStatus.ATTEMPTED
-    )
-
-    merge_exchange_classifications(paths, (_record(patch, "e"),))
-    migrated = json.loads(paths.exchange_state_path.read_text(encoding="utf-8"))
-    assert migrated["format_version"] == 5
-    statuses = {
-        entry["sha256"]: entry["execute_status"]
-        for entry in migrated["entries"]
-    }
-    assert statuses == {
-        "a" * 64: None,
-        "d" * 64: "attempted",
-        "e" * 64: None,
-    }
 
 
 def test_changed_bytes_at_the_same_path_form_an_independent_identity(
@@ -386,42 +333,6 @@ def test_inconsistent_completion_receipts_are_rejected(tmp_path, monkeypatch, st
         load_exchange_state(paths)
 
 
-@pytest.mark.parametrize("old_kind", ["patch_package", "task_package"])
-@pytest.mark.parametrize("status", [None, "attempted", "failed", "succeeded"])
-def test_v4_ledger_preserves_identity_status_and_receipts_on_v5_write(
-    tmp_path, monkeypatch, old_kind, status,
-):
-    set_isolated_user_environment(monkeypatch, tmp_path / "user")
-    paths = registration_user_paths()
-    paths.exchange_state_directory.mkdir()
-    path = (tmp_path / "task.zip").resolve()
-    run_id = "84c316e6-2710-4b9c-9232-229bc02aa8c4" if status else None
-    completed = "e" * 40 if status == "succeeded" else None
-    result_sha = "f" * 64 if status == "succeeded" else None
-    old = dict(path=str(path), sha256="a" * 64, kind=old_kind,
-        manifest=dict(repo_id="a3f9c2e1-7b4d-4a91-9d2e-5c6f8a1b2c3d",
-            base_commit="b" * 40, state_fingerprint="c" * 16,
-            fingerprint_algorithm=FINGERPRINT_ALGORITHM),
-        apply_status=status, completed_commit=completed,
-        attempt_run_id=run_id, result_sha256=result_sha)
-    before = json.dumps(dict(format_version=4, entries=[old])).encode()
-    paths.exchange_state_path.write_bytes(before)
-
-    record = load_exchange_state(paths).record_for(_identity(path, "a"))
-    assert record.kind == "task_bundle"
-    assert record.manifest == _selection()
-    assert (record.execute_status.value if record.execute_status else None) == status
-    assert record.attempt_run_id == run_id and record.result_sha256 == result_sha
-    assert (str(record.completed_commit) if record.completed_commit else None) == completed
-    assert paths.exchange_state_path.read_bytes() == before
-
-    merge_exchange_classifications(paths, (_record(tmp_path / "other.zip", "d"),))
-    document = json.loads(paths.exchange_state_path.read_bytes())
-    assert document["format_version"] == 5
-    migrated = next(row for row in document["entries"] if row["sha256"] == "a" * 64)
-    expected = {key: value for key, value in old.items() if key not in {"kind", "apply_status"}}
-    assert migrated == dict(expected, kind="task_bundle", execute_status=status)
-    assert load_exchange_state(paths).record_for(record.identity) == record
 
 
 @pytest.mark.parametrize("mutation", ["old-status", "mixed-status", "old-kind", "future"])
@@ -444,3 +355,20 @@ def test_v5_ledger_rejects_mixed_or_unknown_generations(tmp_path, monkeypatch, m
     with pytest.raises(PatchHarborError):
         load_exchange_state(paths)
     assert paths.exchange_state_path.read_bytes() == before
+
+
+@pytest.mark.parametrize("version", [1, 2, 3, 4, 6, True, "5"])
+def test_other_state_schemas_are_never_migrated_or_reset(tmp_path, monkeypatch, version):
+    set_isolated_user_environment(monkeypatch, tmp_path / "user")
+    paths = registration_user_paths()
+    record = _record(tmp_path / "task.zip")
+    merge_exchange_classifications(paths, (record,))
+    document = json.loads(paths.exchange_state_path.read_bytes())
+    document["format_version"] = version
+    before = json.dumps(document).encode()
+    paths.exchange_state_path.write_bytes(before)
+    for operation in (lambda: load_exchange_state(paths),
+                      lambda: merge_exchange_classifications(paths, (record,))):
+        with pytest.raises(PatchHarborError, match="migration is not supported"):
+            operation()
+        assert paths.exchange_state_path.read_bytes() == before

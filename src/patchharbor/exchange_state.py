@@ -40,18 +40,10 @@ from patchharbor.state_fingerprint import FINGERPRINT_ALGORITHM
 from patchharbor.user_paths import RegistrationUserPaths
 
 
-_LEGACY_FORMAT_VERSION = 1
 _FORMAT_VERSION = 5
 _DOCUMENT_FIELDS = frozenset({"entries", "format_version"})
-_LEGACY_ENTRY_FIELDS = frozenset(
-    {"attempted", "kind", "manifest", "path", "sha256"}
-)
-_VERSION_2_ENTRY_FIELDS = frozenset(
-    {"apply_status", "kind", "manifest", "path", "sha256"}
-)
-_VERSION_3_ENTRY_FIELDS = _VERSION_2_ENTRY_FIELDS | {"completed_commit"}
-_VERSION_4_ENTRY_FIELDS = _VERSION_3_ENTRY_FIELDS | {"attempt_run_id", "result_sha256"}
-_ENTRY_FIELDS = (_VERSION_4_ENTRY_FIELDS - {"apply_status"}) | {"execute_status"}
+_ENTRY_FIELDS = frozenset({"execute_status", "kind", "manifest", "path", "sha256",
+                           "completed_commit", "attempt_run_id", "result_sha256"})
 _MANIFEST_FIELDS = frozenset(
     {
         "base_commit",
@@ -303,33 +295,13 @@ def _parse_execute_status(value: object) -> ExchangeExecuteStatus | None:
         raise ValueError("exchange state execute status is invalid") from exc
 
 
-def _parse_record(value: object, *, format_version: int) -> ExchangeStateRecord:
-    expected_fields = (
-        _LEGACY_ENTRY_FIELDS
-        if format_version == _LEGACY_FORMAT_VERSION
-        else _VERSION_2_ENTRY_FIELDS if format_version == 2
-        else _VERSION_3_ENTRY_FIELDS if format_version == 3
-        else _VERSION_4_ENTRY_FIELDS if format_version == 4 else _ENTRY_FIELDS
-    )
-    if type(value) is not dict or set(value) != expected_fields:
+def _parse_record(value: object) -> ExchangeStateRecord:
+    if type(value) is not dict or set(value) != _ENTRY_FIELDS:
         raise ValueError("exchange state entry is invalid")
     path_text = _require_string(value, "path")
     sha256 = _require_string(value, "sha256")
     kind = _require_string(value, "kind")
-    if format_version < 5:
-        # Preserve identities, attempt status and receipts. This translates only
-        # the ledger vocabulary, never accepts or converts an old input bundle.
-        if kind not in {"other", "patch_package", "task_package", "result_bundle"}:
-            raise ValueError("legacy exchange state kind is invalid")
-        if kind in {"patch_package", "task_package"}:
-            kind = "task_bundle"
-    if format_version == _LEGACY_FORMAT_VERSION:
-        attempted = value["attempted"]
-        if type(attempted) is not bool:
-            raise ValueError("exchange state attempted flag is invalid")
-        execute_status = ExchangeExecuteStatus.ATTEMPTED if attempted else None
-    else:
-        execute_status = _parse_execute_status(value["execute_status" if format_version == 5 else "apply_status"])
+    execute_status = _parse_execute_status(value["execute_status"])
     if value.get("completed_commit") is not None and type(value["completed_commit"]) is not str:
         raise ValueError("exchange completed commit is invalid")
     path = Path(path_text)
@@ -369,21 +341,15 @@ def _parse_state(content: bytes) -> ExchangeStateSnapshot:
     if type(document) is not dict or set(document) != _DOCUMENT_FIELDS:
         raise _error("exchange processing state has an invalid schema")
     format_version = document["format_version"]
-    if type(format_version) is not int or format_version not in {
-        _LEGACY_FORMAT_VERSION,
-        2,
-        3,
-        4,
-        _FORMAT_VERSION,
-    }:
-        raise _error("exchange processing state format_version is invalid")
+    if type(format_version) is not int or format_version != _FORMAT_VERSION:
+        raise _error("unsupported exchange processing state schema; migration is not supported")
     entries = document["entries"]
     if type(entries) is not list:
         raise _error("exchange processing state entries are invalid")
     try:
         return ExchangeStateSnapshot(
             records=tuple(
-                _parse_record(entry, format_version=format_version)
+                _parse_record(entry)
                 for entry in entries
             )
         )
@@ -632,20 +598,6 @@ def mark_exchange_execute_finished(
         _write_unlocked(paths, ExchangeStateSnapshot(next_records))
 
 
-def mark_exchange_attempted(
-    paths: RegistrationUserPaths,
-    identity: ExchangeFileIdentity,
-    selection: ExchangeTaskSelection,
-    *,
-    verify_identity: Callable[[], None],
-) -> None:
-    """Compatibility alias for the explicit execute-start transition."""
-    mark_exchange_execute_started(
-        paths,
-        identity,
-        selection,
-        verify_identity=verify_identity,
-    )
 
 
 def record_exchange_result_digest(

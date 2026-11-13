@@ -14,7 +14,7 @@ def _write_stub(path: Path, body: str) -> None:
     path.write_text(body, encoding="utf-8")
 
 
-def test_default_apply_boundary_uses_the_current_installation() -> None:
+def test_default_execute_boundary_uses_the_current_installation() -> None:
     assert DEFAULT_EXECUTE_COMMAND == (
         sys.executable,
         "-m",
@@ -22,7 +22,7 @@ def test_default_apply_boundary_uses_the_current_installation() -> None:
     )
 
 
-def test_public_apply_boundary_supports_only_parameterless_exchange_discovery(
+def test_public_execute_boundary_supports_only_parameterless_exchange_discovery(
     tmp_path: Path,
 ) -> None:
     stub = tmp_path / "stub.py"
@@ -47,7 +47,7 @@ raise SystemExit(9)
     assert completion.invalid_response_text is None
 
 
-def test_public_apply_boundary_preserves_non_object_response_as_invalid(
+def test_public_execute_boundary_preserves_non_object_response_as_invalid(
     tmp_path: Path,
 ) -> None:
     stub = tmp_path / "stub.py"

@@ -235,7 +235,7 @@ def test_manual_result_bundle_is_a_separate_observed_operation(tmp_path, monkeyp
     assert not row['data'].get('task_sha256') and not row['data'].get('bundle_number')
 
 
-def test_empty_automatic_scan_is_waiting_not_a_failed_apply(tmp_path, monkeypatch):
+def test_empty_automatic_scan_is_waiting_not_a_failed_execute(tmp_path, monkeypatch):
     registered(tmp_path, monkeypatch)
     report = api.execute_next()
     assert report.automatic.status.value == 'no_candidate'

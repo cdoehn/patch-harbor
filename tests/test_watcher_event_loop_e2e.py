@@ -23,7 +23,7 @@ from patchharbor_watcher.loop import run_repository_watcher
 from patchharbor_watcher.platform import open_event_source
 from tests.platform_support import project_environment
 from tests.registration_support import create_repository, set_isolated_user_environment
-from tests.apply_support import write_package
+from tests.execute_support import write_package
 from tests.watcher_support import completion, target
 
 pytestmark = [pytest.mark.e2e,
@@ -100,11 +100,11 @@ def test_real_event_loop_preserves_changes_during_worker_and_remains_idle_after_
             assert not first.wait(4.6)
             assert first.wait(5)
             assert calls[0][0] >= latest_write + 5
-            during_apply = monotonic()
+            during_execute = monotonic()
             item.replace(root / 'ready.zip')
             release.set()
             assert second.wait(10)
-            assert calls[1][0] >= during_apply + 5
+            assert calls[1][0] >= during_execute + 5
             assert all(scope == (observed,) for _, scope in calls)
             # Pure reads and existing nested directory content do not start work.
             (root / 'ready.zip').read_bytes()

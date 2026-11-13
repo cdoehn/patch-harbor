@@ -12,7 +12,7 @@ import pytest
 from patchharbor import api
 from tests.platform_support import native_script, native_value
 from tests.registration_support import create_repository, git, set_isolated_user_environment
-from tests.apply_support import write_package
+from tests.execute_support import write_package
 
 pytestmark = pytest.mark.e2e
 
@@ -66,7 +66,7 @@ def test_new_id_registration_is_explicit_and_path_unregister_accepts_cwd(workspa
     assert (repo / "tracked.txt").read_bytes() == b"base\n"
 
 
-def test_apply_preserves_complete_raw_log_report_and_full_events(workspace, capfd) -> None:
+def test_execute_preserves_complete_raw_log_report_and_full_events(workspace, capfd) -> None:
     repo, context, exchange = workspace
     patch = exchange / "candidate.zip"
     write_package(patch, context)

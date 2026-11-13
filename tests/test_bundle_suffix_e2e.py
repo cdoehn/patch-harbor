@@ -100,7 +100,7 @@ def test_no_per_invocation_suffix_option_is_added(tmp_path: Path, command: str) 
 
 @pytest.mark.parametrize("explicit_package", [False, True])
 @pytest.mark.parametrize("extension", [".zip", ".zip.txt"])
-def test_apply_accepts_old_and_suffixed_packages_and_publishes_suffixed_result(
+def test_execute_accepts_old_and_suffixed_packages_and_publishes_suffixed_result(
     tmp_path: Path, explicit_package: bool, extension: str,
 ) -> None:
     repository, environment, exchange, context = _configured(tmp_path)
@@ -151,9 +151,9 @@ def test_watcher_accepts_suffixed_patch_but_does_not_loop_after_failure(tmp_path
     _, environment, exchange, context = _configured(tmp_path)
     environment["PH_SUFFIX_READY"] = str(tmp_path / "never-ready")
     _write_no_mutation_package(exchange / "watcher.zip.txt", context, fail_once=True)
-    apply_environment = project_environment(environment)
+    execute_environment = project_environment(environment)
     def delegate():
-        return delegate_to_automatic_execute(environment=apply_environment)
+        return delegate_to_automatic_execute(environment=execute_environment)
     state = SharedWatcherEventState()
     first_log = StringIO()
     first = poll_repositories_once(state, delegate=delegate, log_stream=first_log, error_stream=StringIO())
@@ -214,7 +214,7 @@ def test_newest_valid_suffixed_patch_is_selected_only_for_current_repository(tmp
 
 @pytest.mark.parametrize("dry_run", [False, True])
 @pytest.mark.parametrize("explicit_output", [False, True])
-def test_apply_result_suffix_covers_dry_run_and_output_override(
+def test_execute_result_suffix_covers_dry_run_and_output_override(
     tmp_path: Path, dry_run: bool, explicit_output: bool,
 ) -> None:
     repository, environment, exchange, context = _configured(tmp_path)

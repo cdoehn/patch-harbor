@@ -268,7 +268,7 @@ def test_dry_run_accepts_a_full_sha256_object_id(tmp_path: Path) -> None:
     assert completed.returncode == 0
 
 
-def test_dry_run_rejects_a_non_zip_with_closed_apply_result(
+def test_dry_run_rejects_a_non_zip_with_closed_execute_result(
     tmp_path: Path,
 ) -> None:
     package = tmp_path / "patch.zip"
@@ -391,7 +391,7 @@ def test_dry_run_propagates_closed_manifest_violations(tmp_path: Path) -> None:
     assert completed.returncode == 10
 
 
-def test_apply_without_dry_run_reaches_repository_resolution(tmp_path: Path) -> None:
+def test_execute_without_dry_run_reaches_repository_resolution(tmp_path: Path) -> None:
     package = tmp_path / "patch.zip"
     _write_package(package)
 

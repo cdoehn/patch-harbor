@@ -163,7 +163,7 @@ def _assert_repository_unmodified(repository: Path) -> None:
 
 
 @pytest.mark.parametrize("force_plain", (False, True))
-def test_apply_noninteractive_output_is_sanitized_while_log_remains_raw(
+def test_execute_noninteractive_output_is_sanitized_while_log_remains_raw(
     tmp_path: Path,
     force_plain: bool,
 ) -> None:
@@ -216,7 +216,7 @@ def test_apply_noninteractive_output_is_sanitized_while_log_remains_raw(
         assert archive.read("logs/execution.log") == raw_output
 
 
-def test_apply_timeout_bundles_output_and_exit_code(
+def test_execute_timeout_bundles_output_and_exit_code(
     tmp_path: Path,
 ) -> None:
     repository = create_repository(tmp_path / "repository")
@@ -272,7 +272,7 @@ def test_apply_timeout_bundles_output_and_exit_code(
     assert run_report["process_exit_code"] == int(ExitCode.TIMEOUT)
 
 
-def test_apply_timeout_preserves_output_after_entrypoint_ready(tmp_path, monkeypatch):
+def test_execute_timeout_preserves_output_after_entrypoint_ready(tmp_path, monkeypatch):
     import io
     import threading
 
@@ -319,7 +319,7 @@ def test_apply_timeout_preserves_output_after_entrypoint_ready(tmp_path, monkeyp
     assert run["process_exit_code"] == int(ExitCode.TIMEOUT)
 
 
-def test_apply_interrupt_bundles_output_and_exit_code(
+def test_execute_interrupt_bundles_output_and_exit_code(
     tmp_path: Path,
 ) -> None:
     repository = create_repository(tmp_path / "repository")
@@ -478,7 +478,7 @@ def test_matching_manifest_resolves_exact_registered_repository_without_mutation
         ),
     ),
 )
-def test_apply_requires_valid_exchange_configuration_without_override(
+def test_execute_requires_valid_exchange_configuration_without_override(
     tmp_path: Path,
     configuration_state: str,
     expected_message: str,
@@ -526,7 +526,7 @@ def test_apply_requires_valid_exchange_configuration_without_override(
 
 
 @pytest.mark.parametrize("configuration_state", ("missing", "invalid"))
-def test_apply_explicit_output_requires_valid_local_configuration(
+def test_execute_explicit_output_requires_valid_local_configuration(
     tmp_path: Path,
     configuration_state: str,
 ) -> None:

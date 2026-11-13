@@ -16,7 +16,7 @@ import patchharbor.api as api
 from patchharbor_watcher.protocol import MAX_REQUEST_BYTES, decode_scope, progress_document
 
 
-def main(*, request: bytes = b'', stdout: TextIO | None = None, stderr: TextIO | None = None) -> int:
+def main(*, request: bytes, stdout: TextIO | None = None, stderr: TextIO | None = None) -> int:
     """Perform exactly one global automatic poll and return its completion code.
 
     Known failures already arrive as RunReport objects. Unexpected exceptions

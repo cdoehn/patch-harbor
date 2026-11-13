@@ -87,7 +87,7 @@
   },
   "proofs": [
     {
-      "id": "pyz.own-instruction-apply",
+      "id": "pyz.own-instruction-execute",
       "variants": [
         "full",
         "diff",
@@ -99,7 +99,7 @@
         "mixed"
       ],
       "scope": "all",
-      "legacy_format1_node": "tests/test_pyz_result_e2e.py::test_first_production_result_uses_own_instruction_then_regular_pyz_apply[{variant}]"
+      "legacy_format1_node": "tests/test_pyz_result_e2e.py::test_first_production_result_uses_own_instruction_then_regular_pyz_execute[{variant}]"
     },
     {
       "id": "installation.three-generations",

@@ -115,7 +115,7 @@ def test_mixed_legacy_fields_are_rejected_without_changing_task_identity(old_fie
     assert row == before
 
 
-def test_apply_kind_is_not_an_alias_for_execute_observation():
+def test_retired_kind_is_not_an_alias_for_execute_observation():
     row = _execution_document()
     row['kind'] = 'apply'
     with pytest.raises(ValueError):

@@ -201,7 +201,7 @@ def test_read_queries_do_not_start_fsmonitor_filters_textconv_or_hooks(tmp_path,
     assert files(tmp_path)==before
 
 
-def test_validate_does_not_authorize_later_apply_of_changed_state(tmp_path,monkeypatch):
+def test_validate_does_not_authorize_later_execute_of_changed_state(tmp_path,monkeypatch):
     repo,patch,_=world(tmp_path,monkeypatch)
     assert api.validate_task(patch,repository=repo).binding_matches
     (repo/'later.txt').write_bytes(b'user change after validation')

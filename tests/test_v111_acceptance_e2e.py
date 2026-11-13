@@ -382,7 +382,7 @@ def test_v111_acceptance_bundle_failure_after_success_returns_eleven(
     assert emergency_run["process_exit_code"] == int(ExitCode.RESULT_BUNDLE_ERROR)
 
 
-def test_v111_acceptance_watcher_delegates_to_real_apply_once(
+def test_v111_acceptance_watcher_delegates_to_real_execute_once(
     tmp_path: Path,
 ) -> None:
     repository = create_repository(tmp_path / "repository")
@@ -403,11 +403,11 @@ def test_v111_acceptance_watcher_delegates_to_real_apply_once(
     package_bytes = package.read_bytes()
     log_stream = StringIO()
     error_stream = StringIO()
-    apply_environment = project_environment(environment)
+    execute_environment = project_environment(environment)
 
     def delegate():
         return delegate_to_automatic_execute(
-            environment=apply_environment,
+            environment=execute_environment,
         )
 
     first = poll_repositories_once(
@@ -433,9 +433,9 @@ def test_v111_acceptance_watcher_delegates_to_real_apply_once(
     records = [json.loads(line) for line in log_stream.getvalue().splitlines()]
     assert len(records) == 1
     assert records[0]["process_exit_code"] == 0
-    apply_envelope = records[0]["execute_result"]
-    assert isinstance(apply_envelope, dict)
-    assert apply_envelope["command"] == "execute"
-    assert apply_envelope["success"] is True
-    assert _result_bundle_path(apply_envelope).is_file()
+    execute_envelope = records[0]["execute_result"]
+    assert isinstance(execute_envelope, dict)
+    assert execute_envelope["command"] == "execute"
+    assert execute_envelope["success"] is True
+    assert _result_bundle_path(execute_envelope).is_file()
     assert error_stream.getvalue() == ""

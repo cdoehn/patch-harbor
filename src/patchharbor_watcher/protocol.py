@@ -68,8 +68,6 @@ def encode_scope(targets) -> bytes:
 
 
 def decode_scope(raw: bytes):
-    if not raw:  # Legacy explicit one-shot worker still requests global automatic Execute.
-        return None
     if len(raw) > MAX_REQUEST_BYTES:
         raise ValueError('worker scope exceeds request limit')
     def reject_constant(value):

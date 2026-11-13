@@ -38,7 +38,7 @@ class Harness:
         self.probes, self.fail, self.woken = [], None, False
         self.controller = WatcherStopController()
         self.log, self.errors = StringIO(), StringIO()
-        self.on_apply = lambda targets: completion()
+        self.on_execute = lambda targets: completion()
         self.on_probe = lambda lock: None
 
     def clock(self):
@@ -88,7 +88,7 @@ class Harness:
 
     def delegate(self, *, exchanges):
         self.calls.append((self.now, exchanges))
-        return self.on_apply(exchanges)
+        return self.on_execute(exchanges)
 
     def readiness(self, lock):
         self.probes.append((self.now, lock))
@@ -127,14 +127,14 @@ def test_busy_root_does_not_delay_an_independent_quiet_root(tmp_path):
     assert [(t, tuple(v.directory for v in targets)) for t, targets in h.calls] == [(5, (h.a,)), (12, (h.b,))]
 
 
-def test_events_during_apply_survive_completion_of_the_previous_generation(tmp_path):
+def test_events_during_execute_survive_completion_of_the_previous_generation(tmp_path):
     h = Harness(tmp_path)
     def execute(targets):
         if len(h.calls) == 1:
             h.now = 6
             h.at(6)
         return completion()
-    h.on_apply = execute
+    h.on_execute = execute
     h.run()
     assert [t for t, _ in h.calls] == [5, 11]
 
@@ -142,7 +142,7 @@ def test_events_during_apply_survive_completion_of_the_previous_generation(tmp_p
 def test_confirmed_attempt_drains_existing_work_then_goes_idle(tmp_path):
     h = Harness(tmp_path)
     outcomes = iter([completion('attempted', code=23), completion('attempted', code=0), completion()])
-    h.on_apply = lambda targets: next(outcomes)
+    h.on_execute = lambda targets: next(outcomes)
     h.run()
     assert [t for t, _ in h.calls] == [5, 5, 5]
     assert h.reads[-1] == (5, None)
@@ -151,7 +151,7 @@ def test_confirmed_attempt_drains_existing_work_then_goes_idle(tmp_path):
 def test_lock_uses_readiness_backoff_without_scan_and_resumes_after_release(tmp_path):
     h = Harness(tmp_path)
     lock = LockReference('exchange_state')
-    h.on_apply = lambda targets: completion('locked', lock) if len(h.calls) == 1 else completion()
+    h.on_execute = lambda targets: completion('locked', lock) if len(h.calls) == 1 else completion()
     h.on_probe = lambda known: lock if len(h.probes) == 1 else None
     h.run()
     assert [t for t, _ in h.calls] == [5, 20]
@@ -182,7 +182,7 @@ def test_configuration_switch_discards_old_scope_and_initializes_new_one(tmp_pat
     assert len(h.sources) == 2
 
 
-def test_broken_configuration_suspends_apply_until_repair_event(tmp_path):
+def test_broken_configuration_suspends_execute_until_repair_event(tmp_path):
     h = Harness(tmp_path)
     h.at(2, h.registry.parent, h.registry.name, action=lambda: setattr(h, 'fail', configuration_error('broken')))
     h.at(9, h.registry.parent, h.registry.name, action=lambda: setattr(h, 'fail', None))
@@ -223,7 +223,7 @@ def test_overflow_rebinds_and_restarts_quiet_period(tmp_path):
 @pytest.mark.parametrize('status', ['error', 'dry_run'])
 def test_no_speculative_followup_without_consumed_identity(tmp_path, status):
     h = Harness(tmp_path)
-    h.on_apply = lambda targets: completion(status)
+    h.on_execute = lambda targets: completion(status)
     h.run()
     assert len(h.calls) == 1
 
@@ -239,7 +239,7 @@ def test_worker_exception_propagates_and_releases_resources(tmp_path):
     h = Harness(tmp_path)
     def fail(targets):
         raise OSError('worker failed')
-    h.on_apply = fail
+    h.on_execute = fail
     with pytest.raises(OSError):
         h.run()
     assert all(source.closed for _, source in h.sources)
@@ -268,7 +268,7 @@ def test_registry_lock_during_refresh_uses_readiness_and_then_new_start_deadline
     assert [t for t, _ in h.calls] == [10]
 
 
-def test_rebinding_during_apply_prevents_old_idle_completion_from_clearing_new_work(tmp_path):
+def test_rebinding_during_execute_prevents_old_idle_completion_from_clearing_new_work(tmp_path):
     h = Harness(tmp_path)
     def execute(targets):
         if len(h.calls) == 1:
@@ -276,7 +276,7 @@ def test_rebinding_during_apply_prevents_old_idle_completion_from_clearing_new_w
             h.at(6, h.registry.parent, h.registry.name,
                  action=lambda: setattr(h, 'targets', (target(h.b),)))
         return completion()
-    h.on_apply = execute
+    h.on_execute = execute
     h.run()
     assert [(t, scope[0].directory) for t, scope in h.calls] == [(5, h.a), (11, h.b)]
 
@@ -286,6 +286,6 @@ def test_stop_during_worker_prevents_progress_driven_followup(tmp_path):
     def execute(targets):
         h.controller.request_stop()
         return completion('attempted', code=0)
-    h.on_apply = execute
+    h.on_execute = execute
     h.run()
     assert len(h.calls) == 1

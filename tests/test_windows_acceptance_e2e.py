@@ -112,7 +112,7 @@ def _manifest(context: dict[str, object], entrypoint: str) -> dict[str, object]:
     }
 
 
-def _write_apply_package(
+def _write_execute_package(
     package: Path,
     context: dict[str, object],
     script: str,
@@ -333,7 +333,7 @@ def test_windows_powershell_engine_uses_fixed_noninteractive_contract(
     )
 
 
-def test_windows_apply_json_is_utf8_and_execution_log_remains_raw(
+def test_windows_execute_json_is_utf8_and_execution_log_remains_raw(
     tmp_path: Path,
 ) -> None:
     shebang, _expected_edition = _selected_engine()
@@ -341,7 +341,7 @@ def test_windows_apply_json_is_utf8_and_execution_log_remains_raw(
     repository = create_repository(tmp_path / "repository-ä")
     context = _register_context(repository, environment)
     package = tmp_path / "windows-execute.zip"
-    _write_apply_package(
+    _write_execute_package(
         package,
         context,
         (

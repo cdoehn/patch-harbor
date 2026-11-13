@@ -14,7 +14,7 @@ from patchharbor.result_reader import read_result_reference
 from patchharbor.pyz_artifact import PyzProvision
 from tests.registration_support import git
 from tests.result_pyz_support import artifact
-from tests.apply_support import repository, package
+from tests.execute_support import repository, package
 
 
 @pytest.mark.parametrize("route", ["bundle", "execute", "dry_run", "failure", "watcher"])
@@ -57,7 +57,7 @@ def test_all_result_routes_embed_same_producer_runtime(repository, artifact, mon
     ("resources_missing", "artifact_missing"), ("resources_invalid", "artifact_corrupt"),
     ("resource_limit", "resource_limit"),
 ])
-def test_runtime_failure_preserves_actual_failed_apply_and_log(repository, monkeypatch, reason, expected):
+def test_runtime_failure_preserves_actual_failed_execute_and_log(repository, monkeypatch, reason, expected):
     root, exchange = repository
     monkeypatch.setattr(resources.PyzProvider, "capture",
                         lambda self: PyzProvision("unavailable", reason, None))

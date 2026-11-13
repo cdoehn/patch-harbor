@@ -17,7 +17,7 @@ from patchharbor.pyz_artifact import PyzProvision
 from tests.platform_support import native_script, native_value
 from tests.registration_support import git
 from tests.result_pyz_support import artifact
-from tests.apply_support import repository, package
+from tests.execute_support import repository, package
 
 
 @pytest.mark.parametrize("route", ["bundle", "execute", "failure"])

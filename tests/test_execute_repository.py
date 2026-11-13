@@ -13,8 +13,8 @@ import zipfile
 import pytest
 
 import patchharbor.application_execute as application_module
-import patchharbor.execute_mutation as apply_mutation_module
-import patchharbor.execute_preflight as apply_preflight_module
+import patchharbor.execute_mutation as execute_mutation_module
+import patchharbor.execute_preflight as execute_preflight_module
 import patchharbor.payload_files as payload_files_module
 import patchharbor.result_bundle_publication as publication_module
 from patchharbor.cli import main as cli_main
@@ -367,7 +367,7 @@ def test_primary_failure_keeps_its_exit_code_when_bundle_also_fails(
         ),
     ),
 )
-def test_apply_result_matrix_preserves_emergency_execution_diagnostics(
+def test_execute_result_matrix_preserves_emergency_execution_diagnostics(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     scenario: str,
@@ -445,7 +445,7 @@ def test_apply_result_matrix_preserves_emergency_execution_diagnostics(
     "scenario",
     ("success", "entrypoint-exit", "timeout", "interrupted"),
 )
-def test_apply_removes_private_resources_after_every_process_outcome(
+def test_execute_removes_private_resources_after_every_process_outcome(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     scenario: str,
@@ -491,7 +491,7 @@ def test_apply_removes_private_resources_after_every_process_outcome(
     assert tuple(private_temp.iterdir()) == ()
 
 
-def test_apply_json_is_closed_and_preserves_emergency_execution_files(
+def test_execute_json_is_closed_and_preserves_emergency_execution_files(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -642,7 +642,7 @@ def test_repository_change_after_preflight_is_bundled_without_payload_write(
         ),
     )
     original_capture = (
-        apply_mutation_module.capture_consistent_repository_snapshot
+        execute_mutation_module.capture_consistent_repository_snapshot
     )
     capture_count = 0
 
@@ -659,7 +659,7 @@ def test_repository_change_after_preflight_is_bundled_without_payload_write(
         return original_capture(captured_repository)
 
     monkeypatch.setattr(
-        apply_mutation_module,
+        execute_mutation_module,
         "capture_consistent_repository_snapshot",
         change_repository_before_second_capture,
     )
@@ -724,7 +724,7 @@ def test_second_capture_failure_is_bundled_before_releasing_repository_lock(
         original_replace(source, target)
 
     monkeypatch.setattr(
-        apply_mutation_module,
+        execute_mutation_module,
         "capture_consistent_repository_snapshot",
         fail_second_capture,
     )
@@ -772,7 +772,7 @@ def test_parent_replaced_after_second_context_is_rejected_before_staging(
             ),
         ),
     )
-    original_write = apply_mutation_module.write_bundle_payloads
+    original_write = execute_mutation_module.write_bundle_payloads
 
     def replace_parent_before_first_stage(
         payloads: Iterable[BundlePayload],
@@ -784,7 +784,7 @@ def test_parent_replaced_after_second_context_is_rejected_before_staging(
         original_write(payloads, cwd=cwd)
 
     monkeypatch.setattr(
-        apply_mutation_module,
+        execute_mutation_module,
         "write_bundle_payloads",
         replace_parent_before_first_stage,
     )
@@ -1028,7 +1028,7 @@ def test_private_entrypoint_uses_the_resolved_interpreter_suffix(
         executable_path="powershell.exe",
     )
     monkeypatch.setattr(
-        apply_preflight_module,
+        execute_preflight_module,
         "resolve_script_interpreter",
         lambda _script_text: resolved,
     )
@@ -1101,7 +1101,7 @@ def test_interpreter_availability_is_checked_before_private_writes(
     repository = create_repository(tmp_path / "repository")
     context = register_repository(repository)
     private_writes: list[Path] = []
-    original_write = apply_preflight_module.write_private_bytes
+    original_write = execute_preflight_module.write_private_bytes
 
     def record_private_write(path: Path, content: bytes) -> None:
         private_writes.append(path)
@@ -1114,12 +1114,12 @@ def test_interpreter_availability_is_checked_before_private_writes(
         )
 
     monkeypatch.setattr(
-        apply_preflight_module,
+        execute_preflight_module,
         "write_private_bytes",
         record_private_write,
     )
     monkeypatch.setattr(
-        apply_preflight_module,
+        execute_preflight_module,
         "resolve_script_interpreter",
         missing_interpreter,
     )

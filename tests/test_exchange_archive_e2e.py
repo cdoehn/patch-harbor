@@ -160,7 +160,9 @@ def test_success_without_commit_and_legacy_success_are_not_commit_proofs(tmp_pat
         entry.pop("attempt_run_id")
         entry.pop("result_sha256")
     state_path.write_text(json.dumps(state))
-    _scan(repo, env)
+    before = state_path.read_bytes()
+    assert _scan(repo, env).returncode != 0
+    assert state_path.read_bytes() == before
     assert package.exists()
 
 
@@ -313,9 +315,11 @@ def test_legacy_success_loses_no_data_and_invents_no_completion_receipt(tmp_path
         record.pop("attempt_run_id")
         record.pop("result_sha256")
     state_path.write_text(json.dumps(state))
-    _scan(repo, env)
+    before = state_path.read_bytes()
+    assert _scan(repo, env).returncode != 0
+    assert state_path.read_bytes() == before
     assert package.exists()
-    assert _identity_record(env, package)["completed_commit"] is None
+    assert all("completed_commit" not in row for row in json.loads(before)["entries"])
 
 
 def test_sha256_repository_supports_real_blob_and_commit_evidence(tmp_path):
@@ -363,7 +367,7 @@ def test_replacement_refs_prevent_an_otherwise_valid_archive_proof(tmp_path):
     assert old.exists()
 
 
-def test_unavailable_archive_folder_does_not_break_apply_or_lose_bundles(tmp_path):
+def test_unavailable_archive_folder_does_not_break_execute_or_lose_bundles(tmp_path):
     env, exchange, repo, context = _world(tmp_path)
     (exchange / ARCHIVE).write_bytes(b"unrelated file occupies folder name")
     package = exchange / "valid.zip"

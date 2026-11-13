@@ -30,7 +30,7 @@ def _completion(
     )
 
 
-def _automatic_apply_envelope(
+def _automatic_execute_envelope(
     *,
     success: bool,
     process_exit_code: int,
@@ -73,7 +73,7 @@ def test_shared_poll_delegates_to_core_and_deduplicates_idle_records(
         calls += 1
         return _completion(
             exit_code=10,
-            result=_automatic_apply_envelope(
+            result=_automatic_execute_envelope(
                 success=False,
                 process_exit_code=10,
                 error_kind="task_bundle_error",
@@ -118,7 +118,7 @@ def test_shared_poll_records_success_and_distinct_core_error(
     completions = iter(
         (
             _completion(
-                result=_automatic_apply_envelope(
+                result=_automatic_execute_envelope(
                     success=True,
                     process_exit_code=0,
                     run_id="applied-run",
@@ -126,7 +126,7 @@ def test_shared_poll_records_success_and_distinct_core_error(
             ),
             _completion(
                 exit_code=10,
-                result=_automatic_apply_envelope(
+                result=_automatic_execute_envelope(
                     success=False,
                     process_exit_code=10,
                     error_kind="task_bundle_error",
@@ -170,7 +170,7 @@ def test_repeated_identical_core_error_is_logged_once(
 ) -> None:
     completion = _completion(
         exit_code=4,
-        result=_automatic_apply_envelope(
+        result=_automatic_execute_envelope(
             success=False,
             process_exit_code=4,
             error_kind="configuration_error",

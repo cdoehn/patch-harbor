@@ -20,7 +20,7 @@ from tests.registration_support import (
     create_repository, set_isolated_user_environment,
     start_repository_lock_holder, release_repository_lock_holder, stop_repository_lock_holder,
 )
-from tests.apply_support import write_package
+from tests.execute_support import write_package
 
 pytestmark = pytest.mark.e2e
 
@@ -105,7 +105,7 @@ def test_invalid_live_configuration_fails_closed_but_controls_remain_readable(pa
     assert roots[1] / ".patchharbor/config.json" in api.watch_control_paths().configuration_paths
 
 
-def test_scoped_apply_never_scans_hashes_or_maintains_other_exchange(pair, monkeypatch):
+def test_scoped_execute_never_scans_hashes_or_maintains_other_exchange(pair, monkeypatch):
     _, contexts, exchanges = pair
     write_package(exchanges[0] / "ready.zip", contexts[0])
     downloading = exchanges[1] / "download.zip"
@@ -186,7 +186,7 @@ def test_root_replacement_between_selection_and_mutation_is_rejected(pair, tmp_p
     _, contexts, exchanges = pair
     target = api.watch_targets().exchanges[0]
     write_package(exchanges[0] / "ready.zip", contexts[0])
-    apply_package = application_execute.execute_task_bundle
+    execute_package = application_execute.execute_task_bundle
 
     def replace_root():
         moved = tmp_path / "old-root"
@@ -196,7 +196,7 @@ def test_root_replacement_between_selection_and_mutation_is_rejected(pair, tmp_p
     if boundary == "before_replay":
         def compete(package, **kwargs):
             replace_root()
-            return apply_package(package, **kwargs)
+            return execute_package(package, **kwargs)
         monkeypatch.setattr(application_execute, "execute_task_bundle", compete)
     else:
         read_identity = application_exchange.require_exchange_identity_unchanged
@@ -274,7 +274,7 @@ def test_lock_readiness_has_no_bundle_work_and_releases_every_lock(pair, monkeyp
         pass
 
 
-def test_repository_lock_retry_uses_real_other_process_and_scoped_apply(pair):
+def test_repository_lock_retry_uses_real_other_process_and_scoped_execute(pair):
     _, contexts, exchanges = pair
     target = api.watch_targets().exchanges[0]
     write_package(exchanges[0] / "ready.zip", contexts[0])

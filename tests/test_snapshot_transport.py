@@ -94,7 +94,7 @@ print(json.dumps({'origin':api.__file__,'package':str(packed.path),'sha256':pack
 
 
 @pytest.mark.parametrize('route',['wheel','pyz'])
-def test_guarded_host_apply_runs_from_actual_built_artifact(
+def test_guarded_host_execute_runs_from_actual_built_artifact(
         built_result_source,prepared_result_producer,tmp_path,monkeypatch,route):
     from patchharbor import api
     from tests.registration_support import create_repository,set_isolated_user_environment

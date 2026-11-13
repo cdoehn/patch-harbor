@@ -53,7 +53,7 @@ def main():
         report = json.loads(z.read('logs/run.json'))
         assert report['execution_present'] and report['primary_result']['success'] and not report['dry_run']
         assert report['repo_id'] == str(context.repo_id)
-    print(json.dumps({'native_wait': True, 'quiet_seconds': 5, 'actual_worker_apply': True,
+    print(json.dumps({'native_wait': True, 'quiet_seconds': 5, 'actual_worker_execute': True,
                       'installation': str(Path(patchharbor.__file__).resolve())}))
 
 

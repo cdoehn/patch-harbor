@@ -20,7 +20,7 @@ def test_empty_and_global_scope_remain_distinct():
     assert decode_scope(encode_scope(None)) is None
 
 
-@pytest.mark.parametrize('raw', [b'[]', b'{}', b'{"version":1,"version":1,"exchanges":[]}',
+@pytest.mark.parametrize('raw', [b'', b'[]', b'{}', b'{"version":1,"version":1,"exchanges":[]}',
     b'{"version":true,"exchanges":[]}', b'{"version":1,"exchanges":{}}',
     b'{"version":1,"exchanges":NaN}',
     # pytest copies the node ID into PYTEST_CURRENT_TEST; keep the large payload

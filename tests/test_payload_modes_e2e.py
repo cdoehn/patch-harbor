@@ -105,7 +105,7 @@ def test_special_existing_target_rejected_without_entrypoint(tmp_path: Path, dry
     assert not (repo / "tools").exists()
 
 
-def test_unsafe_zip_rejected_before_any_apply_mutation(tmp_path: Path) -> None:
+def test_unsafe_zip_rejected_before_any_execute_mutation(tmp_path: Path) -> None:
     repo = create_repository(tmp_path / "repo")
     context = register_repository(repo)
     with pytest.raises(PatchHarborError) as raised:

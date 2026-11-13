@@ -59,7 +59,7 @@ class NoCli(importlib.abc.MetaPathFinder):
         return None
 sys.meta_path.insert(0, NoCli())
 from patchharbor_watcher.worker import main
-raise SystemExit(main())
+raise SystemExit(main(request=sys.stdin.buffer.read()))
 ''', encoding="utf-8")
     completion = delegate_to_automatic_execute(
         execute_command=(sys.executable, str(launcher)), environment=project_environment(),
@@ -88,9 +88,13 @@ def test_worker_interrupt_stops_script_and_publishes_failure_result(tmp_path, mo
     )
     process = subprocess.Popen(
         [sys.executable, "-m", "patchharbor_watcher.worker"],
-        cwd=tmp_path, env=project_environment(), stdin=subprocess.DEVNULL,
+        cwd=tmp_path, env=project_environment(), stdin=subprocess.PIPE,
         stdout=subprocess.PIPE, stderr=subprocess.PIPE,
     )
+    assert process.stdin is not None
+    process.stdin.write(b'{"version":1,"exchanges":null}')
+    process.stdin.close()
+    process.stdin = None
     pid = None
     try:
         # Readiness, not a guessed sleep: don't interrupt before the child starts.

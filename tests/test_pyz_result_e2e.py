@@ -20,10 +20,10 @@ from tests.runtime_installation_support import _run
 from tests.runtime_installation_support import installed_producer
 
 
-@pytest.mark.proof('pyz.own-instruction-apply', parameter='payload_kind')
+@pytest.mark.proof('pyz.own-instruction-execute', parameter='payload_kind')
 @pytest.mark.packaging
 @pytest.mark.parametrize('payload_kind',['full','diff','mixed'])
-def test_first_production_result_uses_own_instruction_then_regular_pyz_apply(installed_producer,tmp_path,payload_kind):
+def test_first_production_result_uses_own_instruction_then_regular_pyz_execute(installed_producer,tmp_path,payload_kind):
     repo=create_repository(tmp_path/'repository');exchange=tmp_path/'exchange'
     environment={k:v for k,v in os.environ.items() if k not in ('PYTHONPATH','PYTHONHOME')}
     produced=json.loads(_run([str(installed_producer),'-I','-B','-c',r'''

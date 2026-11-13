@@ -131,7 +131,7 @@ def test_explicit_output_rejects_missing_or_corrupt_local_configuration(tmp_path
 
 
 @pytest.mark.parametrize("automatic", [False, True])
-def test_apply_failure_retry_and_dry_run_all_embed_fresh_handoff(tmp_path: Path, automatic: bool) -> None:
+def test_execute_failure_retry_and_dry_run_all_embed_fresh_handoff(tmp_path: Path, automatic: bool) -> None:
     environment, exchange = _configure_user(tmp_path)
     repository = create_repository(tmp_path / "repository")
     context = _register_context(repository, environment)
@@ -198,9 +198,9 @@ def test_watcher_regenerates_local_handoff_and_does_not_loop(tmp_path: Path) -> 
     _, initial = _bundle(repository, environment)
     environment["PH_HANDOFF_READY"] = str(tmp_path / "not-ready")
     _write_patch(exchange / "watcher.zip", context, initial, fail_once=True)
-    apply_environment = project_environment(environment)
+    execute_environment = project_environment(environment)
     def delegate():
-        return delegate_to_automatic_execute(environment=apply_environment)
+        return delegate_to_automatic_execute(environment=execute_environment)
     state = SharedWatcherEventState()
     before = set(exchange.glob("*_Result_Bundle_*.zip"))
     assert poll_repositories_once(state, delegate=delegate, log_stream=StringIO(), error_stream=StringIO()) is WatcherPollOutcome.ERROR

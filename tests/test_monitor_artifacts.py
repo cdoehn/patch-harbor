@@ -70,7 +70,7 @@ def test_native_result_and_log_are_observed_by_full_hash(tmp_path, monkeypatch):
         api.monitor_log(result_path, expected_sha256='0'*64)
 
 
-def test_archive_is_opt_in_and_never_an_apply_candidate(tmp_path, monkeypatch):
+def test_archive_is_opt_in_and_never_an_execute_candidate(tmp_path, monkeypatch):
     (root, context), = registered(tmp_path, monkeypatch)
     path = patch(root, context)
     archive = path.parent / 'PatchHarbor-Archive'

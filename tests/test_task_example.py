@@ -8,12 +8,12 @@ import pytest
 from docs.examples.prepare_task import prepare_task
 from patchharbor import api
 from patchharbor.cli import main
-from tests import apply_support
+from tests import execute_support
 from tests.platform_support import native_python_script, native_value
 from tests.registration_support import git
 
 
-repository = apply_support.repository
+repository = execute_support.repository
 
 
 @pytest.mark.e2e

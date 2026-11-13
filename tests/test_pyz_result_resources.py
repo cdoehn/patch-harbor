@@ -13,7 +13,7 @@ from patchharbor.result_reader import read_result_reference
 from patchharbor.resource_policy import ResourcePolicy
 from tests.runtime_pyz_support import provider_for
 from tests.reference_support import reference_entries, write_reference, edit_document
-from tests.apply_support import repository, package
+from tests.execute_support import repository, package
 
 
 @pytest.mark.parametrize('kind',['directory','zip'])

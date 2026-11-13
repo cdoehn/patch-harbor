@@ -28,7 +28,7 @@ def test_catalog_preserves_existing_lanes_and_adds_linux_python_313():
         assert {v for i, v in proofs if i == 'reference.safe-distribution'} == (
             {r + '-' + k for r in ('wheel', 'pyz') for k in ('clean', 'mixed', 'filter')}
             if lane.platform == 'Linux' else set())
-        assert {v for i, v in proofs if i == 'pyz.own-instruction-apply'} == {'full', 'diff', 'mixed'}
+        assert {v for i, v in proofs if i == 'pyz.own-instruction-execute'} == {'full', 'diff', 'mixed'}
         assert {v for i, v in proofs if i == 'installation.three-generations'} == {'wheel', 'source', 'sdist'}
         assert {v for i, v in proofs if i == 'pyz.stdlib-variant'} == {'>=3.10'}
         assert (('installation.uv', 'default') in proofs) == (lane.platform == 'Linux' and lane.python == '3.14')

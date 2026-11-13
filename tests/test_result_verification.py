@@ -17,7 +17,7 @@ from patchharbor.platform import filesystem
 from patchharbor.platform.cifs import cache_wait_budget
 from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY
 from tests.result_publication_support import _publish
-from tests.apply_support import repository, package
+from tests.execute_support import repository, package
 from tests.result_publication_support import destination, sleeps
 
 

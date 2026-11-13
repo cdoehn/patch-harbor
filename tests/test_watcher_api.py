@@ -12,6 +12,7 @@ from patchharbor import api
 from patchharbor import application, application_configuration
 from patchharbor_watcher import cli as watcher_cli
 from patchharbor_watcher import worker
+from patchharbor_watcher.protocol import encode_scope
 from tests.platform_support import create_symlink_or_skip
 from tests.registration_support import create_repository, set_isolated_user_environment
 
@@ -37,7 +38,7 @@ def test_worker_calls_public_automatic_api_once_and_transports_report(monkeypatc
 
     monkeypatch.setattr(api, "execute_next", automatic)
     output = StringIO()
-    assert worker.main(stdout=output, stderr=StringIO()) == code
+    assert worker.main(request=encode_scope(None), stdout=output, stderr=StringIO()) == code
     assert calls == [((), {})]  # no path, no manual retry, no visible script sinks
     document = json.loads(output.getvalue())
     assert document.pop("watcher_progress") == {"version": 1, "status": "attempted", "blocked_on": None}
@@ -52,7 +53,7 @@ def test_worker_never_disguises_unexpected_errors_as_idle(monkeypatch, failure):
         raise failure
     monkeypatch.setattr(api, "execute_next", automatic)
     with pytest.raises(type(failure)):
-        worker.main(stdout=StringIO(), stderr=StringIO())
+        worker.main(request=encode_scope(None), stdout=StringIO(), stderr=StringIO())
 
 
 def test_watcher_startup_validates_registry_not_global_configuration(monkeypatch):

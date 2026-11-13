@@ -8,7 +8,7 @@ import pytest
 
 from patchharbor import api
 from patchharbor.cli import main
-from tests.apply_support import repository
+from tests.execute_support import repository
 from tests.task_inspection_support import MANIFEST, write_package
 from tests.platform_support import native_python_script, native_value
 from tests.reference_support import reference_entries, write_reference

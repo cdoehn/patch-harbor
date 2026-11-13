@@ -242,7 +242,7 @@ def test_run_report_redacts_secret_environment_values(
         ),
     ),
 )
-def test_apply_primary_outcome_maps_tool_errors_once(
+def test_execute_primary_outcome_maps_tool_errors_once(
     error: PatchHarborError,
     expected_kind: PrimaryResultKind,
 ) -> None:
@@ -338,7 +338,7 @@ def test_completed_process_exit_code_preserves_primary_result_priority(
     ) == expected_exit
 
 
-def test_apply_primary_outcome_models_entrypoint_exit_timeout_and_interrupt() -> None:
+def test_execute_primary_outcome_models_entrypoint_exit_timeout_and_interrupt() -> None:
     entrypoint_exit = ExecutePrimaryOutcome.entrypoint_exit(23)
     timeout = ExecutePrimaryOutcome.from_execution_result(
         entrypoint_started=True,
@@ -523,7 +523,7 @@ def test_run_timestamps_uuid_and_paths_are_canonical(tmp_path: Path) -> None:
     )
 
 
-def test_resolved_apply_report_cannot_leave_bundle_unattempted(
+def test_resolved_execute_report_cannot_leave_bundle_unattempted(
     tmp_path: Path,
 ) -> None:
     repository = tmp_path / "repository"
@@ -549,7 +549,7 @@ def test_resolved_apply_report_cannot_leave_bundle_unattempted(
         )
 
 
-def test_apply_report_is_single_source_for_completion_representations(
+def test_execute_report_is_single_source_for_completion_representations(
     tmp_path: Path,
 ) -> None:
     repository = tmp_path / "repository"
@@ -667,7 +667,7 @@ def test_bundle_failure_becomes_effective_error_only_after_primary_success(
     ("repository_present", "repo_id_present"),
     ((True, False), (False, True)),
 )
-def test_apply_report_rejects_partial_repository_resolution(
+def test_execute_report_rejects_partial_repository_resolution(
     tmp_path: Path,
     repository_present: bool,
     repo_id_present: bool,
@@ -702,7 +702,7 @@ def test_apply_report_rejects_partial_repository_resolution(
             primary_tool_error=outcome.tool_error,
         )
 
-def test_apply_result_reports_dry_run_without_execution(tmp_path: Path) -> None:
+def test_execute_result_reports_dry_run_without_execution(tmp_path: Path) -> None:
     repository = tmp_path / "repository"
     repository.mkdir()
     context = _context(repository)

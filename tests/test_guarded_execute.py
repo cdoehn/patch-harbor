@@ -217,7 +217,7 @@ def test_result_publication_failure_keeps_actual_executed_outcome(host,monkeypat
     assert (repo/'execution-marker').read_text()=='approved'
 
 
-def test_signatures_are_explicit_and_old_apply_contract_unchanged(host):
+def test_signatures_are_explicit_and_old_execute_contract_unchanged(host):
     repo,_=host;path,digest,_=package(host)
     assert list(inspect.signature(api.execute_guarded).parameters)==['task','expected_sha256','expected_repository','admission','output_directory','timeout','output','observer']
     assert typing.get_type_hints(api.execute_guarded)['return'] is api.RunReport

@@ -12,7 +12,7 @@ from patchharbor import api
 from patchharbor import application_exchange as application
 from patchharbor.user_paths import registration_user_paths
 from tests.registration_support import create_repository, git, set_isolated_user_environment
-from tests.apply_support import write_package
+from tests.execute_support import write_package
 
 pytestmark = pytest.mark.e2e
 
@@ -134,7 +134,7 @@ def test_automatic_discovery_never_routes_a_patch_from_the_wrong_exchange(repos,
 
 
 @pytest.mark.parametrize("shared", [False, True])
-def test_manual_subdirectory_is_local_but_explicit_apply_uses_manifest_target(repos, tmp_path, monkeypatch, shared):
+def test_manual_subdirectory_is_local_but_explicit_execute_uses_manifest_target(repos, tmp_path, monkeypatch, shared):
     a, b, ca, cb, ea, eb = _configured(repos, tmp_path, shared=shared)
     api.configure_bundle_suffix(".A", repository=a)
     api.configure_bundle_suffix(".B", repository=b)

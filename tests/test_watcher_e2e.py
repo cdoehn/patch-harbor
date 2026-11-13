@@ -101,16 +101,16 @@ def test_watcher_retries_after_core_repository_lock_is_released(
     exchange = configured_exchange_directory(environment)
     package = exchange / "patch.zip"
     _write_lock_protected_package(package, context)
-    apply_environment = project_environment(environment)
+    execute_environment = project_environment(environment)
 
     def delegate():
         return delegate_to_automatic_execute(
-            environment=apply_environment,
+            environment=execute_environment,
         )
 
     holder = start_repository_lock_holder(
         str(context["repo_id"]),
-        environment=apply_environment,
+        environment=execute_environment,
     )
     locked_log = StringIO()
     try:
@@ -226,11 +226,11 @@ def test_shared_watcher_delegates_discovery_identity_and_retry_to_core(
     (exchange / "unrelated.txt").write_text("other", encoding="utf-8")
     (exchange / "unfinished.crdownload").write_bytes(b"incomplete")
 
-    apply_environment = project_environment(environment)
+    execute_environment = project_environment(environment)
 
     def delegate():
         return delegate_to_automatic_execute(
-            environment=apply_environment,
+            environment=execute_environment,
         )
 
     first_log = StringIO()
@@ -351,10 +351,10 @@ def test_watcher_does_not_loop_after_a_failed_entrypoint(
         )
         archive.writestr(entrypoint_name, entrypoint.encode("utf-8"))
 
-    apply_environment = project_environment(environment)
+    execute_environment = project_environment(environment)
 
     def delegate():
-        return delegate_to_automatic_execute(environment=apply_environment)
+        return delegate_to_automatic_execute(environment=execute_environment)
 
     first = poll_repositories_once(
         SharedWatcherEventState(),

@@ -13,7 +13,7 @@ from patchharbor.user_paths import registration_user_paths
 from patchharbor_watcher.execute_boundary import delegate_to_automatic_execute
 from tests.platform_support import native_script, native_value, project_environment
 from tests.registration_support import create_repository, git, set_isolated_user_environment
-from tests.apply_support import write_package
+from tests.execute_support import write_package
 
 pytestmark = [pytest.mark.e2e, pytest.mark.acceptance]
 
@@ -60,7 +60,7 @@ def _commit_package(path, context):
 
 
 @pytest.mark.parametrize("shared", [False, True])
-def test_actual_apply_from_nested_cwd_and_explicit_other_target(pair, tmp_path, monkeypatch, shared):
+def test_actual_execute_from_nested_cwd_and_explicit_other_target(pair, tmp_path, monkeypatch, shared):
     a, b, ca, cb, ea, eb = _configure(pair, tmp_path, shared)
     write_package(ea / "a.zip", ca)
     external = tmp_path / "external-b.zip"

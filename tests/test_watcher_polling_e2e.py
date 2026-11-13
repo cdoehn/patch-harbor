@@ -11,7 +11,7 @@ import pytest
 from patchharbor import api
 from patchharbor_watcher.execute_boundary import delegate_to_automatic_execute
 from patchharbor_watcher.polling import run_polling_watcher
-from tests.apply_support import write_package
+from tests.execute_support import write_package
 from tests.platform_support import project_environment
 from tests.registration_support import create_repository, set_isolated_user_environment
 from tests.test_watcher_polling import Publication

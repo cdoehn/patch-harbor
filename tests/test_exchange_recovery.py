@@ -34,33 +34,6 @@ def _identified_attempt(tmp_path, monkeypatch):
     return paths, record, run_id
 
 
-@pytest.mark.parametrize("version", [1, 2, 3, 4])
-def test_old_state_reads_without_rewriting_or_inventing_proofs(tmp_path, monkeypatch, version):
-    paths, record, attempt_run = _identified_attempt(tmp_path, monkeypatch)
-    data = json.loads(paths.exchange_state_path.read_bytes())
-    data["format_version"] = version
-    for row in data["entries"]:
-        row["kind"] = "patch_package" if row["kind"] == "task_bundle" else row["kind"]
-        row["apply_status"] = row.pop("execute_status")
-        if version < 4:
-            row.pop("attempt_run_id")
-            row.pop("result_sha256")
-        if version < 3:
-            row.pop("completed_commit")
-        if version == 1:
-            row["attempted"] = row.pop("apply_status") is not None
-    paths.exchange_state_path.write_text(json.dumps(data), encoding="utf-8")
-    before = paths.exchange_state_path.read_bytes()
-    restored = ledger.load_exchange_state(paths).record_for(record.identity)
-    assert restored.execute_status is ledger.ExchangeExecuteStatus.ATTEMPTED
-    assert restored.attempt_run_id == (attempt_run if version == 4 else None)
-    assert restored.result_sha256 is None
-    assert paths.exchange_state_path.read_bytes() == before
-    ledger.merge_exchange_classifications(paths, (_record(tmp_path / "other.zip", "c"),))
-    assert json.loads(paths.exchange_state_path.read_bytes())["format_version"] == 5
-    restored = ledger.load_exchange_state(paths).record_for(record.identity)
-    assert restored.attempt_run_id == (attempt_run if version == 4 else None)
-    assert restored.result_sha256 is None
 
 
 @pytest.mark.parametrize("field,value", [("attempt_run_id", "not-a-uuid"), ("attempt_run_id", 42),

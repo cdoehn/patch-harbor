@@ -65,7 +65,7 @@ def _write_result_bundle_marker(path: Path, *, include_patch: bool = False) -> N
             archive.writestr("task.json", b"{}")
 
 
-def _parameterless_apply(
+def _parameterless_execute(
     cwd: Path,
     environment: dict[str, str],
     *,
@@ -159,7 +159,7 @@ def test_dry_run_from_repository_subdirectory_discovers_top_level_package(
 
     caller = repository / "tests" / "unit"
     caller.mkdir(parents=True)
-    completed = _parameterless_apply(
+    completed = _parameterless_execute(
         caller,
         environment,
         dry_run=True,
@@ -177,7 +177,7 @@ def test_dry_run_from_repository_subdirectory_discovers_top_level_package(
     assert not (repository / "files" / "generated.bin").exists()
 
 
-def test_manual_parameterless_apply_only_selects_current_repository_package(
+def test_manual_parameterless_execute_only_selects_current_repository_package(
     tmp_path: Path,
 ) -> None:
     environment, exchange = _configure_user(tmp_path)
@@ -190,7 +190,7 @@ def test_manual_parameterless_apply_only_selects_current_repository_package(
     _write_package(first_package, first_context, result_text="first")
     _write_package(second_package, second_context, result_text="second")
 
-    completed = _parameterless_apply(first, environment)
+    completed = _parameterless_execute(first, environment)
 
     assert completed.returncode == 0
     result = json.loads(completed.stdout)["result"]
@@ -202,7 +202,7 @@ def test_manual_parameterless_apply_only_selects_current_repository_package(
     assert _identity_record(environment, second_package)["execute_status"] is None
 
 
-def test_newer_foreign_repository_package_is_irrelevant_to_manual_apply(
+def test_newer_foreign_repository_package_is_irrelevant_to_manual_execute(
     tmp_path: Path,
 ) -> None:
     environment, exchange = _configure_user(tmp_path)
@@ -217,7 +217,7 @@ def test_newer_foreign_repository_package_is_irrelevant_to_manual_apply(
     os.utime(first_package, ns=(1_700_000_000_100_000_000,) * 2)
     os.utime(second_package, ns=(1_700_000_000_900_000_000,) * 2)
 
-    completed = _parameterless_apply(first, environment)
+    completed = _parameterless_execute(first, environment)
 
     assert completed.returncode == 0
     assert (first / "automatic-result.txt").read_text(encoding="utf-8") == "first"
@@ -243,7 +243,7 @@ def test_no_matching_candidate_fails_without_repository_mutation_or_bundle(
     unknown_context["repo_id"] = str(uuid4())
     _write_package(exchange / "unknown.zip", unknown_context)
 
-    completed = _parameterless_apply(repository, environment)
+    completed = _parameterless_execute(repository, environment)
 
     _assert_unresolved_selection_failure(
         completed,
@@ -266,7 +266,7 @@ def test_multiple_matching_candidates_select_the_newest_mtime_ns(
     os.utime(first, ns=(1_700_000_000_200_000_000,) * 2)
     os.utime(second, ns=(1_700_000_000_100_000_000,) * 2)
 
-    completed = _parameterless_apply(repository, environment)
+    completed = _parameterless_execute(repository, environment)
 
     assert completed.returncode == 0
     assert (repository / "automatic-result.txt").read_text(
@@ -293,7 +293,7 @@ def test_newer_state_mismatch_does_not_block_older_matching_package(
     os.utime(matching, ns=(1_700_000_000_100_000_000,) * 2)
     os.utime(mismatched, ns=(1_700_000_000_900_000_000,) * 2)
 
-    completed = _parameterless_apply(repository, environment)
+    completed = _parameterless_execute(repository, environment)
 
     assert completed.returncode == 0
     assert (repository / "automatic-result.txt").read_text(
@@ -324,7 +324,7 @@ def test_equal_mtime_uses_deterministic_normalized_filename_tie_breaker(
     for package in exchange.glob("*.zip"):
         os.utime(package, ns=(tied_mtime_ns, tied_mtime_ns))
 
-    completed = _parameterless_apply(repository, environment)
+    completed = _parameterless_execute(repository, environment)
 
     assert completed.returncode == 0
     assert (repository / "automatic-result.txt").read_text(
@@ -366,8 +366,8 @@ def test_newer_succeeded_package_does_not_block_older_eligible_package(
     os.utime(older, ns=(1_700_000_000_100_000_000,) * 2)
     os.utime(newer, ns=(1_700_000_000_900_000_000,) * 2)
 
-    first = _parameterless_apply(repository, environment)
-    second = _parameterless_apply(repository, environment)
+    first = _parameterless_execute(repository, environment)
+    second = _parameterless_execute(repository, environment)
 
     assert first.returncode == 0
     assert second.returncode == 0
@@ -412,7 +412,7 @@ def test_unregistered_current_repository_does_not_fall_back_to_other_package(
     _write_package(package, registered_context, result_text="must-not-run")
     unregistered = create_repository(tmp_path / "unregistered")
 
-    completed = _parameterless_apply(unregistered, environment)
+    completed = _parameterless_execute(unregistered, environment)
 
     _assert_unresolved_repository_failure(completed)
     assert not (registered / "automatic-result.txt").exists()
@@ -448,7 +448,7 @@ def test_explicit_patch_path_may_target_another_registered_repository(
     assert not (current / "automatic-result.txt").exists()
 
 
-def test_automatic_parameterless_apply_remains_global_across_repositories(
+def test_automatic_parameterless_execute_remains_global_across_repositories(
     tmp_path: Path,
 ) -> None:
     environment, exchange = _configure_user(tmp_path)
@@ -463,7 +463,7 @@ def test_automatic_parameterless_apply_remains_global_across_repositories(
     os.utime(first_package, ns=(1_700_000_000_100_000_000,) * 2)
     os.utime(second_package, ns=(1_700_000_000_900_000_000,) * 2)
 
-    completed = _parameterless_apply(
+    completed = _parameterless_execute(
         tmp_path / "watcher-caller",
         environment,
         automatic=True,
@@ -489,7 +489,7 @@ def test_automatic_parameterless_apply_remains_global_across_repositories(
         ),
     ),
 )
-def test_parameterless_apply_requires_valid_exchange_configuration(
+def test_parameterless_execute_requires_valid_exchange_configuration(
     tmp_path: Path,
     configuration_state: str,
     expected_message: str,
@@ -508,7 +508,7 @@ def test_parameterless_apply_requires_valid_exchange_configuration(
     else:
         path.unlink()
 
-    completed = _parameterless_apply(repository, environment)
+    completed = _parameterless_execute(repository, environment)
 
     assert completed.returncode == int(ExitCode.SOURCE_ERROR)
     envelope = json.loads(completed.stdout)
@@ -533,7 +533,7 @@ def test_manual_selection_fails_closed_when_current_repository_is_busy(
         environment=project_environment(environment),
     )
     try:
-        completed = _parameterless_apply(
+        completed = _parameterless_execute(
             repository,
             environment,
             dry_run=True,
@@ -553,7 +553,7 @@ def test_manual_selection_fails_closed_when_current_repository_is_busy(
     assert not (repository / "automatic-result.txt").exists()
 
 
-def test_dry_run_does_not_consume_but_parameterless_apply_does(
+def test_dry_run_does_not_consume_but_parameterless_execute_does(
     tmp_path: Path,
 ) -> None:
     environment, exchange = _configure_user(tmp_path)
@@ -571,12 +571,12 @@ def test_dry_run_does_not_consume_but_parameterless_apply_does(
         payloads={"files/generated.bin": b"payload"},
     )
 
-    first_dry_run = _parameterless_apply(
+    first_dry_run = _parameterless_execute(
         repository,
         environment,
         dry_run=True,
     )
-    second_dry_run = _parameterless_apply(
+    second_dry_run = _parameterless_execute(
         repository,
         environment,
         dry_run=True,
@@ -587,13 +587,13 @@ def test_dry_run_does_not_consume_but_parameterless_apply_does(
     assert _identity_record(environment, package)["execute_status"] is None
     assert not (repository / "automatic-runs.txt").exists()
 
-    applied = _parameterless_apply(repository, environment)
+    applied = _parameterless_execute(repository, environment)
 
     assert applied.returncode == 0
     assert _identity_record(environment, package)["execute_status"] == "succeeded"
     assert (repository / "automatic-runs.txt").read_text(encoding="utf-8") == "x"
 
-    repeated = _parameterless_apply(repository, environment)
+    repeated = _parameterless_execute(repository, environment)
     _assert_unresolved_selection_failure(
         repeated,
         message=_MANUAL_NO_MATCH,
@@ -632,7 +632,7 @@ def test_changed_bytes_at_the_same_exchange_path_are_a_new_identity(
     )
     first_hash = sha256(package.read_bytes()).hexdigest()
 
-    first = _parameterless_apply(repository, environment)
+    first = _parameterless_execute(repository, environment)
     assert first.returncode == 0
 
     _write_custom_package(
@@ -646,7 +646,7 @@ def test_changed_bytes_at_the_same_exchange_path_are_a_new_identity(
     second_hash = sha256(package.read_bytes()).hexdigest()
     assert second_hash != first_hash
 
-    second = _parameterless_apply(repository, environment)
+    second = _parameterless_execute(repository, environment)
 
     assert second.returncode == 0
     assert (repository / "automatic-runs.txt").read_text(encoding="utf-8") == "12"
@@ -678,8 +678,8 @@ def test_preflight_failure_remains_retryable_without_attempt_mark(
         )
         archive.writestr(entrypoint_name, b"not a PatchHarbor script\n")
 
-    first = _parameterless_apply(repository, environment)
-    second = _parameterless_apply(repository, environment)
+    first = _parameterless_execute(repository, environment)
+    second = _parameterless_execute(repository, environment)
 
     assert first.returncode == int(ExitCode.NO_VALID_SCRIPT)
     assert second.returncode == int(ExitCode.NO_VALID_SCRIPT)
@@ -687,7 +687,7 @@ def test_preflight_failure_remains_retryable_without_attempt_mark(
     assert package.is_file()
 
 
-def test_failed_parameterless_apply_can_be_retried_manually_and_then_succeeds(
+def test_failed_parameterless_execute_can_be_retried_manually_and_then_succeeds(
     tmp_path: Path,
 ) -> None:
     environment, exchange = _configure_user(tmp_path)
@@ -712,7 +712,7 @@ def test_failed_parameterless_apply_can_be_retried_manually_and_then_succeeds(
         ),
     )
 
-    first = _parameterless_apply(repository, environment)
+    first = _parameterless_execute(repository, environment)
 
     assert first.returncode == 23
     assert _identity_record(environment, package)["execute_status"] == "failed"
@@ -727,7 +727,7 @@ def test_failed_parameterless_apply_can_be_retried_manually_and_then_succeeds(
     assert json.loads(current.stdout)["result"] == context
 
     trigger.write_text("ready\n", encoding="utf-8")
-    second = _parameterless_apply(repository, environment)
+    second = _parameterless_execute(repository, environment)
 
     assert second.returncode == 0
     assert _identity_record(environment, package)["execute_status"] == "succeeded"
@@ -735,7 +735,7 @@ def test_failed_parameterless_apply_can_be_retried_manually_and_then_succeeds(
         encoding="utf-8"
     ) == "x"
 
-    third = _parameterless_apply(
+    third = _parameterless_execute(
         tmp_path / "third-automatic",
         environment,
         automatic=True,
@@ -778,12 +778,12 @@ def test_failed_newer_automatic_candidate_does_not_block_older_package(
     os.utime(older, ns=(1_700_000_000_100_000_000,) * 2)
     os.utime(newer, ns=(1_700_000_000_900_000_000,) * 2)
 
-    first = _parameterless_apply(
+    first = _parameterless_execute(
         tmp_path / "automatic-first",
         environment,
         automatic=True,
     )
-    second = _parameterless_apply(
+    second = _parameterless_execute(
         tmp_path / "automatic-second",
         environment,
         automatic=True,
@@ -796,7 +796,7 @@ def test_failed_newer_automatic_candidate_does_not_block_older_package(
     assert _identity_record(environment, older)["execute_status"] == "succeeded"
 
 
-def test_automatic_apply_does_not_repeat_a_failed_package(
+def test_automatic_execute_does_not_repeat_a_failed_package(
     tmp_path: Path,
 ) -> None:
     environment, exchange = _configure_user(tmp_path)
@@ -814,12 +814,12 @@ def test_automatic_apply_does_not_repeat_a_failed_package(
         ),
     )
 
-    first = _parameterless_apply(
+    first = _parameterless_execute(
         tmp_path / "automatic-first",
         environment,
         automatic=True,
     )
-    second = _parameterless_apply(
+    second = _parameterless_execute(
         tmp_path / "automatic-second",
         environment,
         automatic=True,
@@ -852,7 +852,7 @@ def test_failed_manual_retry_still_requires_the_original_repository_state(
         posix_entrypoint="exit 23",
         powershell_entrypoint="exit 23",
     )
-    failed = _parameterless_apply(repository, environment)
+    failed = _parameterless_execute(repository, environment)
 
     assert failed.returncode == 23
     assert _identity_record(environment, package)["execute_status"] == "failed"
@@ -863,7 +863,7 @@ def test_failed_manual_retry_still_requires_the_original_repository_state(
         git(repository, "add", "tracked.txt")
         git(repository, "commit", "--quiet", "-m", "change repository state")
 
-    mismatched = _parameterless_apply(repository, environment)
+    mismatched = _parameterless_execute(repository, environment)
 
     _assert_unresolved_selection_failure(
         mismatched,
@@ -914,7 +914,7 @@ def test_result_bundle_failure_still_consumes_automatic_identity(
     assert (repository / "automatic-runs.txt").read_text(encoding="utf-8") == "x"
     assert output_directory.is_file()
 
-    repeated = _parameterless_apply(repository, environment)
+    repeated = _parameterless_execute(repository, environment)
     _assert_unresolved_selection_failure(
         repeated,
         message=_MANUAL_NO_MATCH,

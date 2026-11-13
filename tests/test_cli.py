@@ -78,7 +78,7 @@ def test_public_cli_rejects_abbreviated_options(
         (("execute", "--json", "--automatic"), True),
     ),
 )
-def test_parameterless_apply_propagates_manual_or_automatic_origin(
+def test_parameterless_execute_propagates_manual_or_automatic_origin(
     monkeypatch: pytest.MonkeyPatch,
     arguments: tuple[str, ...],
     expected_automatic: bool,
@@ -86,16 +86,16 @@ def test_parameterless_apply_propagates_manual_or_automatic_origin(
     observed: list[tuple[Path | None, bool]] = []
     report = SimpleNamespace(warnings=())
 
-    def fake_apply(path=None, **options):
+    def fake_execute(path=None, **options):
         observed.append((path, False))
         return report
 
-    def fake_apply_next(**options):
+    def fake_execute_next(**options):
         observed.append((None, True))
         return report
 
-    monkeypatch.setattr(cli.api, "execute", fake_apply)
-    monkeypatch.setattr(cli.api, "execute_next", fake_apply_next)
+    monkeypatch.setattr(cli.api, "execute", fake_execute)
+    monkeypatch.setattr(cli.api, "execute_next", fake_execute_next)
     monkeypatch.setattr(
         cli_commands,
         "_write_execute_completion",

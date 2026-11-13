@@ -61,7 +61,7 @@ def test_validation_separates_static_validity_binding_and_authenticity(tmp_path)
 
 
 @pytest.mark.parametrize("operation", [api.inspect_task, api.validate_task])
-def test_package_mode_performs_no_writes_lookup_subprocess_or_apply(tmp_path, monkeypatch, operation):
+def test_package_mode_performs_no_writes_lookup_subprocess_or_execute(tmp_path, monkeypatch, operation):
     path = tmp_path / "patch.zip"
     write_package(path, handoff=True)
     monkeypatch.chdir(tmp_path)

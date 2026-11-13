@@ -144,7 +144,7 @@ def test_stop_wakes_idle_poll_even_with_huge_interval():
     assert not thread.is_alive() and not errors and publication.closed
 
 
-def test_stop_during_apply_waits_for_that_worker_and_never_starts_another(tmp_path):
+def test_stop_during_execute_waits_for_that_worker_and_never_starts_another(tmp_path):
     stop = WatcherStopController()
     entered, release = Event(), Event()
     h = PollHarness((target(tmp_path),))

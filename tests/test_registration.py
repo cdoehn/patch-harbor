@@ -206,7 +206,7 @@ def test_identity_and_registry_publication_share_the_global_lock(
     observed: list[str] = []
 
     from patchharbor.repository import (
-        execute_local_registration as real_apply_local_registration,
+        execute_local_registration as real_execute_local_registration,
     )
     from patchharbor.registry import write_registry as real_write_registry
 
@@ -216,10 +216,10 @@ def test_identity_and_registry_publication_share_the_global_lock(
                 raise AssertionError("nested registry lock must not be acquired")
         assert exit_code_for_error(captured.value) is ExitCode.REPOSITORY_ERROR
 
-    def apply_while_locked(*args: object, **kwargs: object) -> None:
+    def execute_while_locked(*args: object, **kwargs: object) -> None:
         assert_registry_is_locked()
         observed.append("local")
-        real_apply_local_registration(*args, **kwargs)
+        real_execute_local_registration(*args, **kwargs)
 
     def write_while_locked(*args: object, **kwargs: object) -> None:
         assert_registry_is_locked()
@@ -228,7 +228,7 @@ def test_identity_and_registry_publication_share_the_global_lock(
 
     monkeypatch.setattr(
         "patchharbor.registration.execute_local_registration",
-        apply_while_locked,
+        execute_while_locked,
     )
     monkeypatch.setattr(
         "patchharbor.registration.write_registry",
@@ -402,11 +402,11 @@ def test_failed_identity_rollback_is_reported_as_registry_inconsistency(
     set_isolated_user_environment(monkeypatch, tmp_path / "user")
 
     from patchharbor.repository import (
-        execute_local_registration as real_apply_local_registration,
+        execute_local_registration as real_execute_local_registration,
     )
 
     def mutate_then_fail(*args: object, **kwargs: object) -> None:
-        real_apply_local_registration(*args, **kwargs)
+        real_execute_local_registration(*args, **kwargs)
         raise PatchHarborError(
             "injected mutation failure",
             FailureReason.REPOSITORY_ERROR,

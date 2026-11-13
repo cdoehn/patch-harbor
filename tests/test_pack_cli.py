@@ -214,7 +214,7 @@ raise SystemExit(main(sys.argv[1:]))
 
 @pytest.mark.e2e
 @pytest.mark.parametrize('change_target', [False, True])
-def test_packed_payload_uses_regular_apply_and_rechecks_later_repository_state(tmp_path, monkeypatch, change_target):
+def test_packed_payload_uses_regular_execute_and_rechecks_later_repository_state(tmp_path, monkeypatch, change_target):
     from tests.registration_support import create_repository, set_isolated_user_environment
     from tests.platform_support import native_script, native_value
     set_isolated_user_environment(monkeypatch,tmp_path/'user')
