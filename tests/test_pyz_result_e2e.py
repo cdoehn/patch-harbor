@@ -51,7 +51,7 @@ print(json.dumps({'path':str(result.path)}))
     with ZipFile(BytesIO(raw)) as archive:
         recipe = pyz.parse_recipe(archive.read(pyz.RECIPE_PATH))
         assert recipe.requires_python == '>=3.10'
-        assert archive.read('__main__.py') == archive.read(pyz.MAIN_PATH) == pyz.MAIN_BYTES_310
+        assert archive.read('__main__.py') == archive.read(pyz.MAIN_PATH) == pyz.MAIN_BYTES
         assert not any(n.startswith(('patchharbor_watcher/', 'tomli/', 'tomllib/')) for n in archive.namelist())
     # E-10: executable bootstrap taken only from THIS Result's root handoff.
     helper=tmp_path/'reviewed-instruction.py';helper.write_text(bootstrap_program(helper_bytes))

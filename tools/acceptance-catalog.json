@@ -130,8 +130,7 @@
     {
       "id": "pyz.stdlib-variant",
       "variants": [
-        ">=3.10",
-        ">=3.12"
+        ">=3.10"
       ],
       "required_variants": [
         ">=3.10"

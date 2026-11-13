@@ -53,7 +53,7 @@ def test_new_reference_keeps_actual_state_and_explicit_full_runtime_facts(canoni
 def test_unavailable_runtime_preserves_known_or_unknown_producer_data(tmp_path,reason,known):
     files,_=format4(None)
     edit_metadata(files,lambda d:d.update(reason=reason,version='1.2.1' if known else None,
-                                         requires_python='>=3.12' if known else None))
+                                         requires_python='>=3.10' if known else None))
     edit_document(files,'manifest.json',lambda d:d['runtime'].update(reason=reason))
     path=tmp_path/'result.zip';write_reference(path,files)
     runtime=read_result_reference(path)[0].runtime

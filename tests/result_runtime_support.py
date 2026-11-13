@@ -25,7 +25,7 @@ def attach_pyz(files, raw, *, reason='source_not_prepared'):
     files = {name:data for name,data in files.items() if not name.startswith('runtime/')}
     manifest = json.loads(files['manifest.json']); manifest['format_version'] = 4
     doc = dict(marker='patch-harbor-runtime', format_version=3, status='unavailable', reason=reason,
-               distribution='patchharbor', version=__version__, requires_python='>=3.12',
+               distribution='patchharbor', version=__version__, requires_python='>=3.10',
                profile=None, content_id=None, content_id_algorithm=None, artifact=None,
                runtime_dependencies=None, provenance=None, capabilities=None)
     if raw is not None:

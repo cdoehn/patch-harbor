@@ -35,7 +35,7 @@ def inputs():
 
 def prepared(payloads=None, *, version=__version__, **kwargs):
     payloads = inputs() if payloads is None else payloads
-    recipe, identity = pyz.create_recipe(payloads, version=version, requires_python='>=3.12', **kwargs)
+    recipe, identity = pyz.create_recipe(payloads, version=version, requires_python='>=3.10', **kwargs)
     payloads = {**payloads, pyz.IDENTITY_PATH: identity}
     artifact = pyz.materialize(recipe, lambda name, size: payloads[name])
     return recipe, payloads, artifact

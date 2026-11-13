@@ -56,7 +56,7 @@ def rewrite(raw, *, payload_changes=None, recipe_changes=None, identity_bytes=No
 def attach_unchecked(files, raw):
     # Start with a valid metadata skeleton, then bind exactly the deliberately
     # forged bytes. Do not let a production parser reject the test setup first.
-    files = attach_pyz(files, variant('>=3.12'))
+    files = attach_pyz(files, variant('>=3.10'))
     with ZipFile(BytesIO(raw)) as archive:
         recipe = json.loads(archive.read(pyz.RECIPE_PATH))
     name = 'runtime/patchharbor-' + recipe['version'] + '.pyz'

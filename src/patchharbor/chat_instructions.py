@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from importlib import metadata
 import json
 from hashlib import sha256
 from pathlib import Path
@@ -35,20 +34,6 @@ def _template_path() -> Path:
         source_template = module.parents[2] / CHAT_INSTRUCTIONS_NAME
         if source_template.is_file():
             return source_template
-    try:
-        distribution = metadata.distribution("patchharbor")
-        # A legacy shared-data layout is valid only for the distribution that
-        # owns this exact loaded module, never a same-named foreign installation.
-        if Path(distribution.locate_file("patchharbor/chat_instructions.py")).resolve() != module:
-            raise result_bundle_error("chat template belongs to a different distribution")
-        matches = tuple(
-            entry for entry in distribution.files or ()
-            if entry.as_posix().endswith("share/patchharbor/" + CHAT_INSTRUCTIONS_NAME)
-        )
-        if len(matches) == 1:
-            return Path(distribution.locate_file(matches[0]))
-    except (metadata.PackageNotFoundError, OSError, ValueError):
-        pass
     raise result_bundle_error("installed chat-instructions template is missing")
 
 

@@ -78,35 +78,8 @@ def test_template_is_read_fresh_and_missing_or_bad_template_fails(tmp_path: Path
         load_chat_template()
 
 
-def test_installed_template_is_resolved_from_distribution_file_record(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    module = tmp_path / "site-packages" / "patchharbor" / "chat_instructions.py"
-    module.parent.mkdir(parents=True)
-    module.touch()
-    template = tmp_path / "share" / "patchharbor" / CHAT_INSTRUCTIONS_NAME
-    template.parent.mkdir(parents=True)
-    template.write_text("installed canonical contract\n")
-    monkeypatch.setattr(instructions_module, "__file__", str(module))
-    entry = Path("../../../share/patchharbor") / CHAT_INSTRUCTIONS_NAME
-    distribution = SimpleNamespace(files=[entry], locate_file=lambda item: module if str(item) == "patchharbor/chat_instructions.py" else template)
-    monkeypatch.setattr(instructions_module.metadata, "distribution", lambda name: distribution)
-    assert load_chat_template() == "installed canonical contract\n"
-    distribution.files = []
-    with pytest.raises(PatchHarborError):
-        load_chat_template()
 
 
-def test_legacy_template_rejects_distribution_metadata_for_a_foreign_module(tmp_path, monkeypatch):
-    module = tmp_path / "own" / "patchharbor" / "chat_instructions.py"
-    module.parent.mkdir(parents=True); module.touch()
-    foreign = tmp_path / "foreign" / "patchharbor" / "chat_instructions.py"
-    foreign.parent.mkdir(parents=True); foreign.touch()
-    template = tmp_path / "foreign" / "template.md"; template.write_bytes(b"foreign contract")
-    monkeypatch.setattr(instructions_module, "__file__", str(module))
-    entry = Path("../../../share/patchharbor") / CHAT_INSTRUCTIONS_NAME
-    distribution = SimpleNamespace(files=[entry], locate_file=lambda item: (
-        foreign if str(item) == "patchharbor/chat_instructions.py" else template))
-    monkeypatch.setattr(instructions_module.metadata, "distribution", lambda name: distribution)
-    with pytest.raises(PatchHarborError): load_chat_template()
 
 
 @pytest.mark.parametrize("directory", ["src", "site-packages"])
@@ -122,9 +95,6 @@ def test_prepared_template_owns_lookup_even_in_directory_named_src(tmp_path, mon
         template.write_bytes(b"own prepared producer\n")
     monkeypatch.setattr(instructions_module, "__file__", str(module))
     monkeypatch.chdir(tmp_path)
-    def forbidden(*args):
-        pytest.fail("prepared installation searched legacy distribution metadata")
-    monkeypatch.setattr(instructions_module.metadata, "distribution", forbidden)
     if available:
         assert load_chat_template() == "own prepared producer\n"
     else:
@@ -186,14 +156,11 @@ def test_installed_template_line_endings_are_lf(
     module = tmp_path / "site-packages" / "patchharbor" / "chat_instructions.py"
     module.parent.mkdir(parents=True)
     module.touch()
-    template = tmp_path / "share" / "patchharbor" / CHAT_INSTRUCTIONS_NAME
+    template = module.parent / "_runtime" / CHAT_INSTRUCTIONS_NAME
     template.parent.mkdir(parents=True)
     raw = b"installed canonical contract" + line_ending
     template.write_bytes(raw)
     monkeypatch.setattr(instructions_module, "__file__", str(module))
-    entry = Path("../../../share/patchharbor") / CHAT_INSTRUCTIONS_NAME
-    distribution = SimpleNamespace(files=[entry], locate_file=lambda item: module if str(item) == "patchharbor/chat_instructions.py" else template)
-    monkeypatch.setattr(instructions_module.metadata, "distribution", lambda name: distribution)
     assert load_chat_template() == "installed canonical contract\n"
     assert render_chat_handoff(patch_environment()).instructions.endswith(b"installed canonical contract\n")
     assert template.read_bytes() == raw

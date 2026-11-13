@@ -30,7 +30,7 @@ def reference(tmp_path):
     from tests.pyz_variant_support import rewrite
     recipe, _, raw = prepared(payloads)
     raw = rewrite(raw, recipe_changes={'requires_python': '>=3.10'},
-                  payload_changes={n: pyz.MAIN_BYTES_310 for n in ('__main__.py', pyz.MAIN_PATH)})
+                  payload_changes={n: pyz.MAIN_BYTES for n in ('__main__.py', pyz.MAIN_PATH)})
     files, _ = reference_entries(handoff=True)
     files = attach_pyz(files, raw)
     path = tmp_path/'result.zip';write_reference(path,files)

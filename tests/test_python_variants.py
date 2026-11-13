@@ -28,7 +28,7 @@ def read(raw):
     return pyz.read_pyz(raw, policy=DEFAULT_RESOURCE_POLICY, remaining_bytes=pyz.MAX_CONTENT_BYTES)
 
 
-@pytest.mark.parametrize('requirement', ['>=3.12', '>=3.10'])
+@pytest.mark.parametrize('requirement', ['>=3.10'])
 def test_both_closed_variants_pass_static_reference_and_bootstrap_without_import(tmp_path, monkeypatch, requirement):
     raw = variant(requirement)
     recipe = read(raw)
@@ -44,7 +44,7 @@ def test_both_closed_variants_pass_static_reference_and_bootstrap_without_import
     assert bootstrap._main_bytes(requirement) == pyz.main_bytes(requirement)
 
 
-@pytest.mark.parametrize('requirement', ['>=3.9', '>=3.11', '>=3.100', '>=3.10,<4', ' >=3.10',
+@pytest.mark.parametrize('requirement', ['>=3.9', '>=3.11', '>=3.12', '>=3.100', '>=3.10,<4', ' >=3.10',
                                          '3.10', None, True, 3.10, [], {}])
 def test_unknown_python_contract_is_rejected_even_with_recomputed_ids(tmp_path, requirement):
     raw = rewrite(variant('>=3.10'), recipe_changes={'requires_python': requirement})
@@ -56,16 +56,17 @@ def test_unknown_python_contract_is_rejected_even_with_recomputed_ids(tmp_path, 
     with pytest.raises(ValueError): bootstrap.assess(path)
 
 
-@pytest.mark.parametrize('requirement', ['>=3.12', '>=3.10'])
+@pytest.mark.parametrize('requirement', ['>=3.10'])
 @pytest.mark.parametrize('fault', ['both_other_start', 'one_other_start', 'custom_start', 'extra_recipe',
                                   'recipe_profile', 'identity', 'metadata_requirement', 'metadata_version',
                                   'metadata_content', 'metadata_commit'])
 def test_rehashed_variant_disagreements_never_become_valid_references(tmp_path, requirement, fault):
     raw = variant(requirement)
-    other = '>=3.10' if requirement == '>=3.12' else '>=3.12'
+    other = '>=3.12'
+    other_main = pyz.MAIN_BYTES.replace(b'(3, 10)', b'(3, 12)')
     if fault == 'both_other_start':
-        raw = rewrite(raw, payload_changes={n: pyz.main_bytes(other) for n in ('__main__.py', pyz.MAIN_PATH)})
-    elif fault == 'one_other_start': raw = rewrite(raw, payload_changes={'__main__.py': pyz.main_bytes(other)})
+        raw = rewrite(raw, payload_changes={n: other_main for n in ('__main__.py', pyz.MAIN_PATH)})
+    elif fault == 'one_other_start': raw = rewrite(raw, payload_changes={'__main__.py': other_main})
     elif fault == 'custom_start':
         raw = rewrite(raw, payload_changes={n: b'raise AssertionError("unexpected start")\n'
                                            for n in ('__main__.py', pyz.MAIN_PATH)})
@@ -91,7 +92,7 @@ def test_unavailable_metadata_retains_only_known_closed_requirements(tmp_path, r
     files = attach_pyz(files, None)
     edit_metadata(files, lambda d: d.update(requires_python=requirement))
     path = tmp_path / 'unavailable.zip'; write_reference(path, files)
-    if requirement == '>=3.11':
+    if requirement in ('>=3.11', '>=3.12'):
         with pytest.raises(api.PatchHarborError): read_result_reference(path)
         with pytest.raises(ValueError): bootstrap.assess(path)
     else:
@@ -102,7 +103,7 @@ def test_unavailable_metadata_retains_only_known_closed_requirements(tmp_path, r
 
 
 
-@pytest.mark.parametrize('requirement', ['>=3.12', '>=3.10'])
+@pytest.mark.parametrize('requirement', ['>=3.10'])
 @pytest.mark.parametrize('version', [(3, 9), (3, 10), (3, 11), (3, 12), (3, 14)])
 def test_bootstrap_separates_static_readability_from_selected_runtime_minimum(tmp_path, monkeypatch, requirement, version):
     path, _, _ = result_file(tmp_path, variant(requirement))
@@ -120,7 +121,7 @@ def test_bootstrap_separates_static_readability_from_selected_runtime_minimum(tm
         assert prepared.path.read_bytes() == assessment.pyz_bytes
 
 
-@pytest.mark.parametrize('requirement', ['>=3.12', '>=3.10'])
+@pytest.mark.parametrize('requirement', ['>=3.10'])
 @pytest.mark.parametrize('version', [(3, 9), (3, 10), (3, 11), (3, 12)])
 def test_both_canonical_entrypoints_guard_before_core_import(requirement, version):
     imports = []
@@ -138,10 +139,10 @@ def test_both_canonical_entrypoints_guard_before_core_import(requirement, versio
 
 
 def test_relabelled_assessment_cannot_bypass_original_artifact_minimum(tmp_path, monkeypatch):
-    path, _, _ = result_file(tmp_path, variant('>=3.12'))
+    path, _, _ = result_file(tmp_path, variant('>=3.10'))
     assessment = bootstrap.assess(path, trusted_source_sha256=pyz.sha256(path.read_bytes()))
     monkeypatch.setattr(bootstrap, 'sys', SimpleNamespace(version_info=(3, 10)))
-    assessment = replace(assessment, requires_python='>=3.10')
+    assessment = replace(assessment, requires_python='>=3.12')
     with pytest.raises(ValueError): bootstrap.prepare(assessment, tmp_path / 'unused')
     assert not (tmp_path / 'unused').exists()
 
@@ -170,7 +171,7 @@ def test_writer_uses_python310_requirement_and_start_bytes(built_result_source):
     from patchharbor.result_resources import runtime_payload
     recipe = pyz.parse_recipe((built_result_source / pyz.RECIPE_PATH).read_bytes())
     assert recipe.requires_python == '>=3.10'
-    assert (built_result_source / pyz.MAIN_PATH).read_bytes() == pyz.MAIN_BYTES_310
+    assert (built_result_source / pyz.MAIN_PATH).read_bytes() == pyz.MAIN_BYTES
     assert json.loads(runtime_payload(None, reason='source_not_prepared').metadata)['requires_python'] == '>=3.10'
 
 
@@ -178,13 +179,11 @@ def test_writer_uses_python310_requirement_and_start_bytes(built_result_source):
 
 @pytest.mark.proof('pyz.stdlib-variant', parameter='requirement')
 @pytest.mark.packaging
-@pytest.mark.parametrize('requirement', ['>=3.12', '>=3.10'])
+@pytest.mark.parametrize('requirement', ['>=3.10'])
 def test_built_reader_variant_bootstraps_and_packs_in_fresh_stdlib_process(built_result_source, tmp_path, requirement):
     recipe = pyz.parse_recipe((built_result_source / pyz.RECIPE_PATH).read_bytes())
     raw = pyz.materialize(recipe, lambda name, size: (built_result_source / name).read_bytes())
     # Explicit variant fixture; the normal writer now produces >=3.10.
-    if requirement == '>=3.12' and sys.version_info < (3, 12):
-        pytest.skip('legacy variant execution requires Python 3.12; static reading is tested separately')
     raw = rewrite(raw, recipe_changes={'requires_python': requirement},
                   payload_changes={n: pyz.main_bytes(requirement) for n in ('__main__.py', pyz.MAIN_PATH)})
     reference, _, _ = result_file(tmp_path, raw)

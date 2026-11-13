@@ -49,7 +49,7 @@ def test_producer_content_and_artifact_ids_follow_distinct_finite_contracts():
     document = json.loads(recipe.data)
     entries = [entry for entry in document['entries'] if entry['path'] != pyz.IDENTITY_PATH]
     identity_input = dict(algorithm='patchharbor-pyz-producer-v1', version='1.2.1',
-                          requires_python='>=3.12', profile='patchharbor-core-no-watcher-v1',
+                          requires_python='>=3.10', profile='patchharbor-core-no-watcher-v1',
                           source_commit='a'*40, entries=entries)
     producer = pyz.sha256((json.dumps(identity_input, ensure_ascii=True, sort_keys=True,
                                     separators=(',', ':'), allow_nan=False)+'\n').encode('ascii'))
@@ -214,7 +214,7 @@ def test_normal_wheel_prepares_distinct_finite_profiles_without_watcher_in_pyz(b
         assert 'patchharbor/runtime_wheel.py' not in archive.namelist()
 
 
-@pytest.mark.parametrize('version', [(3, 8), (3, 11)])
+@pytest.mark.parametrize('version', [(3, 8), (3, 9)])
 def test_generated_entrypoint_rejects_old_python_before_any_core_import(version):
     from io import StringIO
     from types import SimpleNamespace

@@ -32,7 +32,7 @@ MAX_INNER_ENTRIES = 1000
 RECIPE_PATH = 'patchharbor/_runtime/pyz-recipe.json'
 MAIN_PATH = 'patchharbor/_runtime/pyz-main.py'
 IDENTITY_PATH = 'patchharbor/_pyz_identity.py'
-PYTHON_MINIMA = {'>=3.12': (3, 12), '>=3.10': (3, 10)}
+PYTHON_MINIMA = {'>=3.10': (3, 10)}
 BOOTSTRAP_PATH = 'patchharbor/_runtime/tools/pyz_bootstrap.py'
 RESOURCES = {BOOTSTRAP_PATH,'patchharbor/_runtime/CHAT_INSTRUCTIONS.md',
              'patchharbor/_runtime/python-api.md', 'patchharbor/_runtime/LICENSE', MAIN_PATH}

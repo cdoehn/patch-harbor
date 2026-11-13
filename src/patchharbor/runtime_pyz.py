@@ -42,16 +42,6 @@ REQUIRED = (RESOURCES - {BOOTSTRAP_PATH}) | {IDENTITY_PATH, '__main__.py', 'patc
 MAIN_BYTES = b'''"""PatchHarbor Core ZIP application; no Watcher launcher."""
 import sys
 
-if sys.version_info < (3, 12):
-    sys.stderr.write("PatchHarbor requires Python 3.12 or newer.\\n")
-    raise SystemExit(2)
-
-from patchharbor.cli import main
-raise SystemExit(main())
-'''
-MAIN_BYTES_310 = b'''"""PatchHarbor Core ZIP application; no Watcher launcher."""
-import sys
-
 if sys.version_info < (3, 10):
     sys.stderr.write("PatchHarbor requires Python 3.10 or newer.\\n")
     raise SystemExit(2)
@@ -59,14 +49,14 @@ if sys.version_info < (3, 10):
 from patchharbor.cli import main
 raise SystemExit(main())
 '''
-PYTHON_REQUIREMENTS = frozenset({'>=3.12', '>=3.10'})
+PYTHON_REQUIREMENTS = frozenset({'>=3.10'})
 
 
 def main_bytes(requires_python: str) -> bytes:
-    """Select one closed variant; MAIN_BYTES retains the original 1.3.0 bytes."""
+    """Validate the sole current Python profile."""
     _require(type(requires_python) is str and requires_python in PYTHON_REQUIREMENTS,
              'unsupported PYZ Python requirement')
-    return MAIN_BYTES if requires_python == '>=3.12' else MAIN_BYTES_310
+    return MAIN_BYTES
 
 
 @dataclass(frozen=True, slots=True)

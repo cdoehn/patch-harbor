@@ -28,6 +28,6 @@ def test_built_distribution_and_pyz_agree_on_installation_boundary(built_result_
     # Native execution of 3.10/3.11 is a CI gate, not implied by metadata checks.
     raw = pyz.materialize(recipe, lambda name, size: (built_result_source / name).read_bytes())
     with ZipFile(BytesIO(raw)) as archive:
-        assert archive.read('__main__.py') == archive.read(pyz.MAIN_PATH) == pyz.MAIN_BYTES_310
+        assert archive.read('__main__.py') == archive.read(pyz.MAIN_PATH) == pyz.MAIN_BYTES
         assert not any(name.startswith(('tomli/', 'tomllib/', 'patchharbor_watcher/'))
                        or '.dist-info/' in name for name in archive.namelist())
