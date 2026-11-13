@@ -409,7 +409,7 @@ def _pyz_precheck(raw, expected, remaining=MAX_INNER_TOTAL):
         _require(list(inventory) == sorted(inventory) and set(inventory) | {RECIPE_PATH} == names,
                  'PYZ inventory differs from archive')
         _require(not (folded & set(directories)), 'PYZ file/directory collision')
-        required = (RESOURCES - {BOOTSTRAP_PATH}) | {IDENTITY_PATH,'__main__.py','patchharbor/__init__.py',
+        required = RESOURCES | {IDENTITY_PATH,'__main__.py','patchharbor/__init__.py',
                                 'patchharbor/api.py','patchharbor/cli.py','patchharbor/py.typed'}
         _require(required <= inventory.keys(), 'incomplete PYZ inventory')
         for name in ('__main__.py', MAIN_PATH):

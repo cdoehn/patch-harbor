@@ -231,14 +231,11 @@ def test_helper_is_pinned_and_never_executed(monkeypatch, tmp_path, kind):
     assert provider.capture().artifact.bootstrap == helper
 
 
-@pytest.mark.parametrize('kind', ['directory', 'zip'])
-def test_old_pyz_remains_readable_but_cannot_supply_a_separate_helper(monkeypatch, tmp_path, kind):
+def test_current_pyz_requires_the_separate_helper():
     payloads = inputs()
-    payloads.pop(pyz.BOOTSTRAP_PATH, None)
-    provider, _, _, _ = provider_for(monkeypatch, tmp_path, kind=kind, payloads=payloads)
-    assert provider.capture().status == 'embedded'
-    with pytest.raises(pyz.RuntimeDataError, match='helper missing'):
-        provider.capture_required_bootstrap()
+    payloads.pop(pyz.BOOTSTRAP_PATH)
+    with pytest.raises(pyz.RuntimeDataError, match='incomplete PYZ inventory'):
+        prepared(payloads)
 
 
 @pytest.mark.parametrize('kind,replacement', [

@@ -90,7 +90,7 @@ def test_snapshot_bytes_drive_manifest_and_zip_in_canonical_order(
             bundle_file,
             manifest={},
             context_document={},
-        handoff=BundleHandoff(b"contract\n", b"{}\n"),
+        handoff=BundleHandoff(b"contract\n", b"{}\n", b"# passive\n"),
             run_report=successful_bundle_run_report(
                 tmp_path / "repository",
                 destination,

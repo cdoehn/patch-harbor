@@ -35,7 +35,8 @@ def test_inspection_reports_all_roles_and_exact_bytes_without_payload_copies(tmp
     assert [entry.path for entry in info.entries] == sorted(entries)
     expected_roles = {"task.json": "manifest", "run.sh": "entrypoint", "docs/data.bin": "payload",
                       "PATCHHARBOR_META/CHAT_INSTRUCTIONS.md": "handoff",
-                      "PATCHHARBOR_META/environment.json": "handoff"}
+                      "PATCHHARBOR_META/environment.json": "handoff",
+                      "PATCHHARBOR_META/tools/pyz_bootstrap.py": "handoff"}
     for entry in info.entries:
         assert entry.role.value == expected_roles[entry.path]
         assert entry.size == len(entries[entry.path])
@@ -177,7 +178,7 @@ def test_json_cli_uses_public_api_and_complete_typed_facts(tmp_path, monkeypatch
     assert result["package_sha256"] == hashlib.sha256(path.read_bytes()).hexdigest()
     assert result["package_size"] == path.stat().st_size
     assert result["messages"] == [{"name": "Notice", "text": "Facts only"}]
-    assert len(result["entries"]) == 5 and stderr.getvalue() == ""
+    assert len(result["entries"]) == 6 and stderr.getvalue() == ""
 
 
 @pytest.mark.parametrize("command", ["inspect", "validate"])

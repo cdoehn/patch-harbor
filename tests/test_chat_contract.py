@@ -27,11 +27,11 @@ def test_canonical_contract_can_be_loaded_and_rendered_without_execution(monkeyp
     raw = (PROJECT_ROOT / "CHAT_INSTRUCTIONS.md").read_bytes()
     template = load_chat_template()
     assert template == raw.decode("utf-8").replace("\r\n", "\n").replace("\r", "\n")
-    document = {"repository_path": "/example/repo", "runtime": {"system": "Linux"}}
+    document = {"format_version": 3, "repository_path": "/example/repo", "runtime": {"system": "Linux"}}
     handoff = render_chat_handoff(document)
     assert handoff.instructions.endswith(template.encode("utf-8"))
     assert 0 < len(handoff.instructions) <= MAX_HANDOFF_ENTRY_BYTES
-    assert json.loads(handoff.environment) == document
+    assert {k: v for k, v in json.loads(handoff.environment).items() if k != "bootstrap"} == document
 
 
 def test_documented_patch_manifest_validates_against_a_real_reference(tmp_path, monkeypatch) -> None:

@@ -133,7 +133,7 @@ def test_reference_rendered_instructions_are_not_the_new_template(tmp_path):
     path,_,_=_reference(tmp_path)
     reference=capture_result_reference(path)
     # Reference passive instructions were already validated; no later reading.
-    reference=replace(reference,handoff=BundleHandoff(b'OLD_RENDERED_CONTEXT',reference.handoff.environment))
+    reference=replace(reference,handoff=BundleHandoff(b'OLD_RENDERED_CONTEXT',reference.handoff.environment,reference.handoff.bootstrap))
     _,raw,_=build(tmp_path,reference,inputs(tmp_path))
     with ZipFile(BytesIO(raw)) as archive:
         instruction=archive.read('PATCHHARBOR_META/CHAT_INSTRUCTIONS.md')

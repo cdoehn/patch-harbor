@@ -29,7 +29,7 @@ class BundleHandoff:
 
     instructions: bytes
     environment: bytes
-    bootstrap: bytes | None = None
+    bootstrap: bytes
 
     def entries(self, *, task: bool = False) -> tuple[tuple[str, bytes], ...]:
         prefix = f"{TASK_HANDOFF_DIRECTORY}/" if task else ""
@@ -37,22 +37,19 @@ class BundleHandoff:
             (prefix + CHAT_INSTRUCTIONS_NAME, self.instructions),
             (prefix + ENVIRONMENT_NAME, self.environment),
         )
-        return entries if self.bootstrap is None else entries + ((prefix + BOOTSTRAP_NAME, self.bootstrap),)
+        return entries + ((prefix + BOOTSTRAP_NAME, self.bootstrap),)
 
 
 def handoff_names(document: dict) -> set[str]:
     version = document.get("format_version")
-    if type(version) is not int or version not in (2, 3):
+    if type(version) is not int or version != ENVIRONMENT_FORMAT_VERSION:
         raise ValueError("unsupported handoff version")
-    return {CHAT_INSTRUCTIONS_NAME, ENVIRONMENT_NAME} | ({BOOTSTRAP_NAME} if version == 3 else set())
+    return {CHAT_INSTRUCTIONS_NAME, ENVIRONMENT_NAME, BOOTSTRAP_NAME}
 
 
 def validate_bootstrap(document: dict, raw: bytes | None) -> None:
     """Check passive helper integrity; this does not authenticate its author."""
-    if document["format_version"] == 2:
-        if raw is not None or "bootstrap" in document:
-            raise ValueError("unexpected helper in handoff 2")
-        return
+    handoff_names(document)
     descriptor = document.get("bootstrap")
     if (raw is None or not raw or len(raw) > MAX_HANDOFF_ENTRY_BYTES
             or raw.startswith(b"\xef\xbb\xbf") or type(descriptor) is not dict
@@ -110,14 +107,14 @@ def split_task_handoff(
             type(environment) is not dict
             or environment.get("marker") != ENVIRONMENT_MARKER
             or type(environment.get("format_version")) is not int
-            or environment["format_version"] not in (2, 3)
+            or environment["format_version"] != ENVIRONMENT_FORMAT_VERSION
             or environment.get("bundle_type") != "Task"
         ):
             raise ValueError("invalid environment document")
         expected = {prefix + name for name in handoff_names(environment)}
         if set(content) != expected or len(metadata) != len(expected):
             raise ValueError("handoff inventory differs from its version")
-        validate_bootstrap(environment, content.get(prefix + BOOTSTRAP_NAME))
+        validate_bootstrap(environment, content[prefix + BOOTSTRAP_NAME])
         # Supplementary metadata must agree, but cannot replace the manifest.
         if environment.get("repository_context") != {
             "repo_id": str(manifest.repo_id),
@@ -131,5 +128,5 @@ def split_task_handoff(
     return (
         tuple(payload for payload in payloads if payload not in metadata),
         BundleHandoff(content[prefix + CHAT_INSTRUCTIONS_NAME], content[prefix + ENVIRONMENT_NAME],
-                      content.get(prefix + BOOTSTRAP_NAME)),
+                      content[prefix + BOOTSTRAP_NAME]),
     )

@@ -2,12 +2,11 @@
 from __future__ import annotations
 
 from dataclasses import replace
-import json
 from uuid import UUID
 
 import pytest
 
-from patchharbor.bundle_handoff import BundleHandoff
+from tests.handoff_support import handoff
 from patchharbor.result_bundle_publication import ResultBundlePublication, prepare_result_bundle_publication, publish_result_bundle
 from patchharbor.result_bundle_snapshot import build_result_bundle_snapshot
 from patchharbor import result_verification as verification
@@ -26,7 +25,7 @@ def _publish(publication: ResultBundlePublication, *, runtime=None, **options) -
     snapshot = build_result_bundle_snapshot(base_entries=(), staged_patch=b"", unstaged_patch=b"", untracked_entries=())
     context = _context_document(report)
     environment = {
-        "marker": "patch-harbor-environment", "format_version": 2, "bundle_type": "Result",
+        "marker": "patch-harbor-environment", "format_version": 3, "bundle_type": "Result",
         "repository_context": {k: context[k] for k in ("repo_id", "base_commit", "state_fingerprint", "fingerprint_algorithm")},
         "run_id": report.run_id_text, "bundle_suffix": "",
     }
@@ -34,7 +33,7 @@ def _publish(publication: ResultBundlePublication, *, runtime=None, **options) -
         publication,
         manifest=_manifest_document(report=report, snapshot=snapshot, runtime=runtime),
         context_document=context,
-        handoff=BundleHandoff(b"contract\n", json.dumps(environment).encode()),
+        handoff=handoff(environment, b"contract\n"),
         run_report=report,
         snapshot=snapshot,
         runtime=runtime,

@@ -57,10 +57,10 @@ def reference_entries(*, kind="bundle", dirty=False, object_format="sha1", hando
         # Opaque legacy deltas are not applied or claimed to have an independent hash.
         files["changes/unstaged.patch"] = b"opaque captured delta\n"
     if handoff:
-        files["CHAT_INSTRUCTIONS.md"] = b"# Passive reference\n"
-        files["environment.json"] = json.dumps({"marker": "patch-harbor-environment", "format_version": 2,
-                                                "bundle_type": "Result", "repository_context": binding,
-                                                "run_id": run_id, "bundle_suffix": ""}).encode()
+        from tests.handoff_support import handoff as make_handoff
+        document = dict(marker="patch-harbor-environment", bundle_type="Result",
+                        repository_context=binding, run_id=run_id, bundle_suffix="")
+        files.update(dict(make_handoff(document).entries()))
     files.update({name: json.dumps(doc).encode() for name, doc in
                   (("manifest.json", manifest), ("context.json", context), ("logs/run.json", run))})
     return attach_pyz(files, reference_runtime()), binding

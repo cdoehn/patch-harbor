@@ -188,7 +188,7 @@ def _handoff(files: dict[str, bytes], context: dict, run: dict) -> set[str]:
         raw.decode("utf-8")
     environment = _document(files["environment.json"])
     _require(environment.get("marker") == ENVIRONMENT_MARKER
-             and type(environment.get("format_version")) is int and environment["format_version"] in (2, 3)
+             and type(environment.get("format_version")) is int and environment["format_version"] == 3
              and environment.get("bundle_type") == "Result"
              and environment.get("repository_context") == {k: context[k] for k in _BINDING_FIELDS}
              and environment.get("run_id") == run["run_id"]
@@ -455,7 +455,7 @@ def capture_result_reference(path: Path, *, resource_policy: ResourcePolicy = DE
     selected = {entry.relative_path: entry.content for entry in captured.payloads
                 if entry.relative_path in {"context.json", CHAT_INSTRUCTIONS_NAME, ENVIRONMENT_NAME, BOOTSTRAP_NAME}}
     suffix = _document(selected["context.json"]).get("bundle_suffix", "")
-    handoff = (BundleHandoff(selected[CHAT_INSTRUCTIONS_NAME], selected[ENVIRONMENT_NAME], selected.get(BOOTSTRAP_NAME))
+    handoff = (BundleHandoff(selected[CHAT_INSTRUCTIONS_NAME], selected[ENVIRONMENT_NAME], selected[BOOTSTRAP_NAME])
                if captured.facts.handoff_present else None)
     return CapturedResultReference(captured.facts, captured.sha256, suffix, handoff)
 

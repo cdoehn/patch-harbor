@@ -121,13 +121,12 @@ def render_chat_handoff(
         load_chat_template() if template is None else _normalize_line_endings(template)
     )
     document = dict(document)
-    if document.get("format_version") == 3:
-        bootstrap = load_bootstrap() if bootstrap is None else bootstrap
-        document["bootstrap"] = {"path": BOOTSTRAP_NAME, "size": len(bootstrap),
-                                 "sha256": sha256(bootstrap).hexdigest()}
-        validate_bootstrap(document, bootstrap)
-    else:
-        bootstrap = None
+    if type(document.get("format_version")) is not int or document["format_version"] != 3:
+        raise result_bundle_error("unsupported handoff schema; migration is not supported")
+    bootstrap = load_bootstrap() if bootstrap is None else bootstrap
+    document["bootstrap"] = {"path": BOOTSTRAP_NAME, "size": len(bootstrap),
+                             "sha256": sha256(bootstrap).hexdigest()}
+    validate_bootstrap(document, bootstrap)
     # Only a small orientation is repeated. Full target facts remain in JSON.
     # JSON-quoted scalars escape controls; escaped backticks cannot close Markdown.
     summary = "\n".join(

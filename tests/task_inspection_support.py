@@ -25,12 +25,12 @@ def write_package(path: Path, *, changes: dict[str, bytes] | None = None,
                "docs/data.bin": b"\x00\xff\r\nbyte-exact"}
     if handoff:
         environment = {
-            "marker": "patch-harbor-environment", "format_version": 2, "bundle_type": "Task",
+            "marker": "patch-harbor-environment", "format_version": 3, "bundle_type": "Task",
             "repository_context": {k: MANIFEST[k] for k in
                                    ("repo_id", "base_commit", "state_fingerprint", "fingerprint_algorithm")},
         }
-        entries.update({"PATCHHARBOR_META/CHAT_INSTRUCTIONS.md": b"# Passive\n",
-                        "PATCHHARBOR_META/environment.json": json.dumps(environment).encode()})
+        from tests.handoff_support import handoff as make_handoff
+        entries.update(dict(make_handoff(environment).entries(task=True)))
     entries.update(changes or {})
     with ZipFile(path, "w") as archive:
         directory = ZipInfo("docs/")

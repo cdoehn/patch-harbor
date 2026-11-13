@@ -131,14 +131,15 @@ def test_publication_preserves_typed_limit_and_never_waits(tmp_path, monkeypatch
     destination = publication.prepare_result_bundle_publication(path, run_id=UUID(int=123))
     original = publication.read_result_reference
     def read(*args, **kwargs):
-        return original(*args, **kwargs, resource_policy=replace(policy.DEFAULT_RESOURCE_POLICY, max_zip_entries=7))
+        return original(*args, **kwargs, resource_policy=replace(policy.DEFAULT_RESOURCE_POLICY, max_zip_entries=8))
     monkeypatch.setattr(publication, 'read_result_reference', read)
     monkeypatch.setattr(verification, 'sleep', lambda delay: pytest.fail('resource failure retried'))
     with pytest.raises(verification.ResultVerificationError) as caught:
         _publish(destination)
     details = caught.value.diagnostics
     assert details['verification_error_type'] == 'ZipResourceLimitError'
-    assert details['resource_limit'] == dict(resource='zip_entries', actual=8, limit=7)
+    # The minimal current Result has nine members, including the separate helper.
+    assert details['resource_limit'] == dict(resource='zip_entries', actual=9, limit=8)
     assert details['verification_attempts'] == 1 and details['waited_seconds'] == 0
     assert not path.exists() and not destination.temporary_path.exists()
 

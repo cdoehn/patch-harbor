@@ -42,7 +42,7 @@ class PyzArtifact:
     chat_template: bytes
     api_documentation: bytes
     license: bytes
-    bootstrap: bytes | None = None
+    bootstrap: bytes
 
 
 @dataclass(frozen=True, slots=True)
@@ -155,7 +155,7 @@ class PyzProvider:
             # profile. Read the exact documents from these pinned canonical bytes.
             with ZipFile(BytesIO(raw)) as archive:
                 documents = tuple(archive.read(name) for name in (CHAT_PATH, DOC_PATH, LICENSE_PATH))
-                bootstrap = archive.read(BOOTSTRAP_PATH) if BOOTSTRAP_PATH in archive.namelist() else None
+                bootstrap = archive.read(BOOTSTRAP_PATH)
             return PyzProvision('embedded', None,
                                 PyzArtifact(recipe, raw, sha256(raw), *documents, bootstrap))
         except FileNotFoundError:

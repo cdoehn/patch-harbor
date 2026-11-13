@@ -37,7 +37,7 @@ MAX_ENTRIES = 1000
 RESOURCES = frozenset({CHAT_PATH, DOC_PATH, LICENSE_PATH, MAIN_PATH, BOOTSTRAP_PATH})
 FIELDS = frozenset({'marker', 'format_version', 'distribution', 'version', 'requires_python',
                    'profile', 'content_id_algorithm', 'content_id', 'source_commit', 'entries'})
-REQUIRED = (RESOURCES - {BOOTSTRAP_PATH}) | {IDENTITY_PATH, '__main__.py', 'patchharbor/__init__.py',
+REQUIRED = RESOURCES | {IDENTITY_PATH, '__main__.py', 'patchharbor/__init__.py',
                        'patchharbor/api.py', 'patchharbor/cli.py', 'patchharbor/py.typed'}
 MAIN_BYTES = b'''"""PatchHarbor Core ZIP application; no Watcher launcher."""
 import sys

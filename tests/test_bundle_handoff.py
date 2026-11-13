@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from hashlib import sha256
 from io import BytesIO
 import json
 from pathlib import Path
@@ -31,8 +32,10 @@ BINDING = {
 
 
 def patch_environment(**overrides: object) -> dict[str, object]:
+    helper = (PROJECT_ROOT / "tools/pyz_bootstrap.py").read_bytes()
     return {
-        "marker": ENVIRONMENT_MARKER, "format_version": 2,
+        "marker": ENVIRONMENT_MARKER, "format_version": 3,
+        "bootstrap": {"path": "tools/pyz_bootstrap.py", "size": len(helper), "sha256": sha256(helper).hexdigest()},
         "bundle_type": "Task", "bundle_filename": "repo_Task_Bundle_120000_0908_abcdef.zip.txt",
         "repository_context": BINDING,
         "repository_path": "/home/example/My Project's repo",
@@ -162,7 +165,7 @@ def test_installed_template_line_endings_are_lf(
     template.write_bytes(raw)
     monkeypatch.setattr(instructions_module, "__file__", str(module))
     assert load_chat_template() == "installed canonical contract\n"
-    assert render_chat_handoff(patch_environment()).instructions.endswith(b"installed canonical contract\n")
+    assert render_chat_handoff(patch_environment(), bootstrap=(PROJECT_ROOT / "tools/pyz_bootstrap.py").read_bytes()).instructions.endswith(b"installed canonical contract\n")
     assert template.read_bytes() == raw
 
 
