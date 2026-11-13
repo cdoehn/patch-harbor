@@ -12,7 +12,7 @@
 **Dateiname:** `SPECIFICATION.md`<br>
 **Historischer Basisvertrag – Versionsangabe nur für dessen ursprünglichen Stand:**<br>
 **Produktversion:** `1.2.1`<br>
-**Aktuelle Quellversion:** `2.0.0`; Bundle 114 ergänzt den aktuellen Paketvertrag, ohne einen neuen Release zu behaupten.<br>
+**Aktuelle Quellversion:** `2.0.1`; [Release-Umfang und Versionswechsel](../docs/release-2.0.1.md). Veröffentlichung nur nach den vollständigen Release-Gates.<br>
 **Spezifikationsstand:** 2026-11-11 · PH-200: ScriptBundle und eigenständiger deprecated Skriptaufruf.<br>
 **Status:** Verbindlicher Bestands- und Zielvertrag mit den unten erklärten Ergänzungen. Aktueller Fortschritt steht im Plan PH-200; historische Nachweise bleiben erhalten.<br>
 **RIV-Status:** 18/18 Umsetzungsschritte samt Abschlusskorrektur durch Bundle 015 und CI-Run 37306630290 auf `a02391dc045d42e317b3e766f0b1e9fa8dfadec1` bestätigt; Plan abgeschlossen.<br>

@@ -1,4 +1,5 @@
 from __future__ import annotations
+from patchharbor import __version__
 
 import base64
 import json
@@ -103,7 +104,7 @@ def _register_context(
 def _manifest(context: dict[str, object], entrypoint: str) -> dict[str, object]:
     return {
         "marker": TASK_MARKER,
-    "patchharbor_version": "2.0.0",
+    "patchharbor_version": __version__,
         "format_version": TASK_FORMAT_VERSION,
         "repo_id": context["repo_id"],
         "base_commit": context["base_commit"],

@@ -40,10 +40,14 @@ The entrypoint defines the project's tests, commits and optional push.
 
 ### Version and compatibility
 
-This checkout contains the **unpublished 2.0.0 release candidate**. The release
-badge links to the latest published GitHub release; it is not a test-status badge
-for this checkout. See the [2.0 integration guide](docs/version-2-integration.md)
-before upgrading: Task and Result formats and the Python API have changed.
+This source tree is **PatchHarbor 2.0.1**. The release badge links to the latest
+published GitHub release; it is not a test-status badge for this checkout.
+See the [2.0.1 release notes](docs/release-2.0.1.md) and the
+[integration guide](docs/version-2-integration.md) before upgrading.
+
+Task and Result Bundles must match the exact product version of the tool
+processing them. Older packages are not migrated. After updating the tool,
+run `patchharbor bundle` in the repository to start from a fresh Result.
 
 PatchHarbor requires **CPython 3.10+**. Official builds provide a wheel, sdist and
 Core-PYZ, with a runtime manifest and checksums for complete releases. See

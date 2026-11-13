@@ -1,5 +1,6 @@
 """Shared patch inspection fixtures and behavior probes."""
 from __future__ import annotations
+from patchharbor import __version__
 
 import json
 from pathlib import Path
@@ -7,7 +8,7 @@ import stat
 from zipfile import ZipFile, ZipInfo
 
 
-MANIFEST = {"patchharbor_version": "2.0.0",
+MANIFEST = {"patchharbor_version": __version__,
     "marker": "patch-harbor-task-bundle", "format_version": 3,
     "repo_id": "01234567-89ab-4cde-8fab-0123456789ab",
     "base_commit": "12" * 20, "state_fingerprint": "0123456789abcdef",

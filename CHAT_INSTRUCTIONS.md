@@ -222,7 +222,7 @@ Genau eine Root-`task.json`, exakt acht Felder:
 {
   "marker": "patch-harbor-task-bundle",
   "format_version": 3,
-  "patchharbor_version": "2.0.0",
+  "patchharbor_version": "2.0.1",
   "repo_id": "<unverändert aus context.json>",
   "base_commit": "<unverändert aus context.json>",
   "state_fingerprint": "<unverändert aus context.json>",

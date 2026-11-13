@@ -1,5 +1,6 @@
 """Real in-place self-update while an installed producer owns an Execute request."""
 from __future__ import annotations
+from patchharbor import __version__
 
 import json
 import os
@@ -58,7 +59,7 @@ def test_installed_self_update_pins_old_runtime_and_template_but_new_repository(
     body = native_python_script(code)
     patch = outside / "self-update.patch.zip"
     with ZipFile(patch, "w") as archive:
-        archive.writestr("task.json", json.dumps({"patchharbor_version": "2.0.0",
+        archive.writestr("task.json", json.dumps({"patchharbor_version": __version__,
             "marker": "patch-harbor-task-bundle", "format_version": 3,
             **{key: str(getattr(context, key)) for key in
                ("repo_id", "base_commit", "state_fingerprint", "fingerprint_algorithm")},

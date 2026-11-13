@@ -1,5 +1,6 @@
 """Installed-process API handoff and interruption, not console presentation."""
 from __future__ import annotations
+from patchharbor import __version__
 
 import json
 import os
@@ -31,7 +32,7 @@ def _prepare(tmp_path, monkeypatch, posix_body, windows_body):
     entrypoint = native_value("run.sh", "run.ps1")
     package = exchange / "worker-package.zip"
     with zipfile.ZipFile(package, "w") as archive:
-        archive.writestr("task.json", json.dumps({"patchharbor_version": "2.0.0",
+        archive.writestr("task.json", json.dumps({"patchharbor_version": __version__,
             "marker": "patch-harbor-task-bundle", "format_version": 3,
             "repo_id": str(context.repo_id), "base_commit": str(context.base_commit),
             "state_fingerprint": context.state_fingerprint,

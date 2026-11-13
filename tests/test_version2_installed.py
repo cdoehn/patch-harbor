@@ -1,4 +1,5 @@
 """Two real Task/Execute/Result rounds outside the development checkout."""
+from patchharbor import __version__
 from hashlib import sha256
 import json
 from pathlib import Path
@@ -42,7 +43,7 @@ initial, _ = read_result_reference(reference.path)
 assert initial.format_version == 5 and initial.operation == 'bundle'
 assert initial.runtime.status == 'embedded' and initial.runtime.task_formats == (3,)
 assert initial.runtime.result_formats == (5,)
-assert patchharbor.__version__ == '2.0.0'
+assert patchharbor.__version__ == sys.argv[6]
 with ZipFile(reference.path) as outer:
     runtime_bytes = outer.read(initial.runtime.artifact.path)
 assert sha256(runtime_bytes).hexdigest() == initial.runtime.artifact.sha256
@@ -91,7 +92,7 @@ def test_installed_api_then_cli_complete_two_bound_rounds(version2_runtime, tmp_
         "assert Path('requested.txt').read_bytes()==b'payload precedes entrypoint'\n"
         "with Path('rounds.txt').open('ab') as stream: stream.write(b'round\\n')\n"), encoding='utf-8')
     proof = json.loads(_run(version2_runtime.library(ROUNDTRIP, repository, tmp_path / 'exchange',
-                                                   contents, entrypoint, dirty), outside, environment))
+                                                   contents, entrypoint, dirty, __version__), outside, environment))
     assert proof['initial_dirty'] is dirty
     assert Path(proof['api_origin']).is_absolute()
     assert (repository / 'rounds.txt').read_bytes() == b'round\n'

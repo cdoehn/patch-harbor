@@ -1,4 +1,5 @@
 from __future__ import annotations
+from patchharbor import __version__
 
 from hashlib import sha256
 import json
@@ -27,7 +28,7 @@ from tests.registration_support import set_isolated_user_environment
 
 _MANIFEST = {
     "marker": TASK_MARKER,
-    "patchharbor_version": "2.0.0",
+    "patchharbor_version": __version__,
     "format_version": TASK_FORMAT_VERSION,
     "repo_id": "a3f9c2e1-7b4d-4a91-9d2e-5c6f8a1b2c3d",
     "base_commit": "f4e9c2a7b8c9d01234567890abcdef1234567890",
@@ -219,7 +220,7 @@ def test_version_change_cannot_reuse_a_persisted_task_classification(tmp_path, m
     _write_patch(patch)
     assert scan_exchange_directory(tmp_path, paths=paths)[0].kind is ExchangeArtifactKind.TASK_BUNDLE
     before = paths.exchange_state_path.read_bytes()
-    monkeypatch.setattr(bundle_version, "__version__", "2.0.1")
+    monkeypatch.setattr(bundle_version, "__version__", __version__ + ".post1")
     assert scan_exchange_directory(tmp_path, paths=paths) == ()
     assert paths.exchange_state_path.read_bytes() == before and patch.exists()
 
@@ -231,7 +232,7 @@ def test_previous_unknown_classification_does_not_hide_a_current_task(tmp_path, 
     patch = tmp_path / "task.zip"
     _write_patch(patch)
     with monkeypatch.context() as changed:
-        changed.setattr(bundle_version, "__version__", "2.0.1")
+        changed.setattr(bundle_version, "__version__", __version__ + ".post1")
         assert scan_exchange_directory(tmp_path, paths=paths)[0].kind is ExchangeArtifactKind.OTHER
     current = scan_exchange_directory(tmp_path, paths=paths)
     assert current[0].kind is ExchangeArtifactKind.TASK_BUNDLE

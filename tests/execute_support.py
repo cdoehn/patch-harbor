@@ -1,5 +1,6 @@
 """Shared execute fixtures and behavior probes."""
 from __future__ import annotations
+from patchharbor import __version__
 
 import json
 from pathlib import Path
@@ -16,7 +17,7 @@ from tests.registration_support import create_repository
 
 def write_package(path: Path, context: api.RepositoryContext, *, exit_code: int = 0) -> None:
     entrypoint = native_value("run.sh", "run.ps1")
-    manifest = {"patchharbor_version": "2.0.0",
+    manifest = {"patchharbor_version": __version__,
         "marker": "patch-harbor-task-bundle", "format_version": 3,
         "repo_id": str(context.repo_id), "base_commit": str(context.base_commit),
         "state_fingerprint": context.state_fingerprint,
@@ -43,7 +44,7 @@ def repository(tmp_path):
 def package(repository, exchange, *, exit_code=0):
     context = api.context(repository)
     entrypoint = native_value("run.sh", "run.ps1")
-    manifest = {"patchharbor_version": "2.0.0", "marker": "patch-harbor-task-bundle", "format_version": 3,
+    manifest = {"patchharbor_version": __version__, "marker": "patch-harbor-task-bundle", "format_version": 3,
                 **{key: str(getattr(context, key)) for key in
                    ("repo_id", "base_commit", "state_fingerprint", "fingerprint_algorithm")},
                 "entrypoint": entrypoint}

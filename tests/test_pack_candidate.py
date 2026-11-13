@@ -1,4 +1,5 @@
 """Pack metadata, exact payloads, ZIP profile and shared reference validation."""
+from patchharbor import __version__
 from dataclasses import replace
 from datetime import datetime, timezone
 from io import BytesIO
@@ -53,7 +54,7 @@ def test_candidate_preserves_exact_binding_and_is_natively_valid(tmp_path,kind,d
     assert validated.binding_matches and validated.reference_sha256==reference.sha256
     with ZipFile(BytesIO(raw)) as archive:
         manifest=json.loads(archive.read('task.json'))
-        assert manifest=={"patchharbor_version": "2.0.0", 'marker':'patch-harbor-task-bundle','format_version':3,**binding,'entrypoint':'run.sh'}
+        assert manifest=={"patchharbor_version": __version__, 'marker':'patch-harbor-task-bundle','format_version':3,**binding,'entrypoint':'run.sh'}
         assert archive.read('run.sh')==SCRIPT
         assert archive.read('binary')==b'\x00\xff\r\n'
         env=json.loads(archive.read('PATCHHARBOR_META/environment.json'))

@@ -1,13 +1,12 @@
 # PatchHarbor – public Python API
 
 Use `from patchharbor import api`. This is the only supported public Python
-namespace; implementation modules remain internal. This is the 2.0.0 development
-line, with no Python API backwards-compatibility requirement. The first step
-(`200-01.W`) replaces `api.run` with `api.run_scripts` without an alias and
-renames the independent script container to `ScriptBundle`. Repository-bound
-Task/Execute/Result APIs follow in `200-02`; the operations below describe the
-currently implemented state, not the final 2.0.0 API. See the
-[implementation plan](../planning/2.0.0/commit-plan.md).
+namespace; implementation modules remain internal. This document describes
+PatchHarbor 2.0.1 and its Task/Execute/Result API. There is no Python API
+backwards-compatibility requirement. The independent `ScriptBundle` runner
+remains available through the deprecated `api.run_scripts` operation.
+Task and Result Bundles require the exact product version and current
+formats; see the [package contract](../spec/CURRENT_PACKAGE_CONTRACT.md).
 Additional enum values or diagnostic event wording must not be treated as an
 exhaustive state machine. Private modules and undocumented helpers remain free
 to evolve.

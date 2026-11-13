@@ -1,5 +1,6 @@
 """Actual zero/one/multiple-commit handoffs in owned repositories and a local remote."""
 from __future__ import annotations
+from patchharbor import __version__
 
 import json
 from pathlib import Path
@@ -67,7 +68,7 @@ if COUNT:
     entrypoint = native_value("run.sh", "run.ps1")
     patch = tmp_path / "handoff.zip"
     with ZipFile(patch, "w") as archive:
-        archive.writestr("task.json", json.dumps({"patchharbor_version": "2.0.0",
+        archive.writestr("task.json", json.dumps({"patchharbor_version": __version__,
             "marker": "patch-harbor-task-bundle", "format_version": 3,
             **{key: str(getattr(context, key)) for key in
                ("repo_id", "base_commit", "state_fingerprint", "fingerprint_algorithm")},

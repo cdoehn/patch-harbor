@@ -26,7 +26,7 @@ from tests.registration_support import isolated_user_environment
 pytestmark = pytest.mark.packaging
 
 MAX_WHEEL_BYTES = 512 * 1024  # Standalone helper packaging measured 475382 B in Execute 113.
-RELEASE_VERSION = "2.0.0"
+RELEASE_VERSION = "2.0.1"
 EXPECTED_RUNTIME_FILES = {
     'patchharbor/application_monitor.py',
     'patchharbor/application_monitor_artifacts.py',
@@ -341,7 +341,7 @@ def _write_release_patch_package(
     context: dict[str, object],
 ) -> str:
     entrypoint_name = native_value("run.sh", "run.ps1")
-    manifest = {"patchharbor_version": "2.0.0",
+    manifest = {"patchharbor_version": __version__,
         "marker": "patch-harbor-task-bundle",
         "format_version": 3,
         "repo_id": context["repo_id"],

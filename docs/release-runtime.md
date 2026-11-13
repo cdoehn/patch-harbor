@@ -53,9 +53,10 @@ network and subprocess operations on every platform.
    artifacts. Prefer a normal fast-forward when applicable; verify both heads
    immediately before an authorized update. Never force a branch or tag.
 
-The [2.0.0 candidate guide](release-2.0.0.md) lists outstanding acceptance.
-Its local candidate command does not replace any GitHub gate. No earlier
-release request authorizes a new publication or installation.
+The [2.0.1 release notes](release-2.0.1.md) describe the current source and
+package-version transition. The earlier [2.0.0 candidate guide](release-2.0.0.md)
+records its historical preparation; local candidates never replace GitHub
+gates. Each publication or installation requires its own authorization.
 
 Example preparation and acceptance dispatches (set the actual full values):
 

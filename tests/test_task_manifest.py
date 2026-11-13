@@ -1,4 +1,5 @@
 from __future__ import annotations
+from patchharbor import __version__
 
 import json
 
@@ -19,7 +20,7 @@ from patchharbor.state_fingerprint import FINGERPRINT_ALGORITHM
 _REPO_ID = "a3f9c2e1-7b4d-4a91-9d2e-5c6f8a1b2c3d"
 _VALID_DOCUMENT: dict[str, object] = {
     "marker": TASK_MARKER,
-    "patchharbor_version": "2.0.0",
+    "patchharbor_version": __version__,
     "format_version": TASK_FORMAT_VERSION,
     "repo_id": _REPO_ID,
     "base_commit": "f4e9c2a7b8c9d01234567890abcdef1234567890",

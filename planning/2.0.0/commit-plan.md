@@ -1122,3 +1122,25 @@ und `--workers auto` getestet und danach committet. Im Dev erfolgen nur
 statische Prüfungen. Nach erfolgreichem Result wird der geprüfte Stand auf
 `dev` gepusht und die CI ohne Release-Aktion neu gestartet; dafür liegt die
 ausdrückliche Freigabe aus dem Chat vor. Kein Tag oder Release ist vorgesehen.
+
+
+## Bundle 120 – Release 2.0.1 auf dev
+
+Der Nutzer beauftragt ausdrücklich Version 2.0.1 und ihre Veröffentlichung auf
+`dev`. Ein zusammenhängender Release-Commit aktualisiert Produktversion,
+generierten Starthelfer, aktuelles Manifestbeispiel, Release-Dokumentation und
+versionsgebundene Testdaten. Gültige Testpakete verwenden die tatsächliche
+Werkzeugversion; Ablehnungstests decken 2.0.0 und 2.0.2 getrennt ab.
+
+Dev führt nur statische Prüfungen aus. Apply prüft die vollständige Suite mit
+`--workers auto` vor dem Commit. Das Update-Task und sein Execute-Result werden
+noch mit dem geprüften 2.0.0-Werkzeug erzeugt. Nach dem Versionswechsel wird ein
+frisches 2.0.1-Result direkt aus dem Repository exportiert; alte Results werden
+weder konvertiert noch als 2.0.1 umetikettiert.
+
+Danach: normaler Push nach dev, Vorbereitung der fünf Release-Dateien über den
+bestehenden GitHub-Workflow, vollständige Acceptance-CI auf genau diesem Commit,
+Tag v2.0.1 auf dem erfolgreichen Commit und Veröffentlichung der vorbereiteten
+Originaldateien über den vorhandenen Publish-Schritt. Abschließend werden Tag,
+Release und erneut heruntergeladene Artefakte verifiziert. Dieser Auftrag
+enthält keine Integration nach main und keine Systeminstallation.

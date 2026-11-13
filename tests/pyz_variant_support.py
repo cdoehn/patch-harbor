@@ -1,4 +1,5 @@
 """Closed and deliberately forged PYZ data; never execute described fixtures."""
+from patchharbor import __version__
 from io import BytesIO
 import json
 from zipfile import ZipFile, ZipInfo
@@ -15,7 +16,7 @@ def variant(requirement):
     payloads = inputs()
     payloads['__main__.py'] = payloads[pyz.MAIN_PATH] = pyz.main_bytes(requirement)
     payloads['patchharbor/api.py'] = b'raise AssertionError("data reader executed described API")\n'
-    recipe, identity = pyz.create_recipe(payloads, version='2.0.0', requires_python=requirement)
+    recipe, identity = pyz.create_recipe(payloads, version=__version__, requires_python=requirement)
     payloads[pyz.IDENTITY_PATH] = identity
     return pyz.materialize(recipe, lambda name, size: payloads[name])
 

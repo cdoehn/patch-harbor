@@ -1,4 +1,5 @@
 """Reader-first Result 5: closed PYZ data, strict references and shared budgets."""
+from patchharbor import __version__
 from dataclasses import FrozenInstanceError, replace
 import hashlib
 from io import BytesIO
@@ -52,14 +53,14 @@ def test_new_reference_keeps_actual_state_and_explicit_full_runtime_facts(canoni
 @pytest.mark.parametrize('known',[False,True])
 def test_unavailable_runtime_preserves_known_or_unknown_producer_data(tmp_path,reason,known):
     files,_=current_result(None)
-    edit_metadata(files,lambda d:d.update(reason=reason,version='2.0.0',
+    edit_metadata(files,lambda d:d.update(reason=reason,version=__version__,
                                          requires_python='>=3.10' if known else None))
     edit_document(files,'manifest.json',lambda d:d['runtime'].update(reason=reason))
     path=tmp_path/'result.zip';write_reference(path,files)
     runtime=read_result_reference(path)[0].runtime
     assert runtime.reason==reason and runtime.artifact is None
     assert runtime.operations==() and runtime.content_id is None
-    assert runtime.version=='2.0.0'
+    assert runtime.version==__version__
 
 
 @pytest.mark.parametrize('fault',[

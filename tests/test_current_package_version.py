@@ -14,7 +14,7 @@ from tests.task_inspection_support import MANIFEST, write_package
 from tools import pyz_bootstrap
 
 
-@pytest.mark.parametrize('version', [None, True, 2, '', '1.9.1', '2.0.1', '99.0.0'])
+@pytest.mark.parametrize('version', [None, True, 2, '', '1.9.1', '2.0.0', '2.0.2', '99.0.0'])
 def test_foreign_task_version_never_reaches_repository_resolution(tmp_path, monkeypatch, version):
     from patchharbor import application_execute
     task = tmp_path / 'task.zip'
@@ -39,7 +39,7 @@ def test_foreign_task_version_never_reaches_repository_resolution(tmp_path, monk
     assert task.read_bytes() == original and not (tmp_path / 'SHOULD_NOT_EXIST').exists()
 
 
-@pytest.mark.parametrize('version', [None, True, '', '1.9.1', '2.0.1', '99.0.0'])
+@pytest.mark.parametrize('version', [None, True, '', '1.9.1', '2.0.0', '2.0.2', '99.0.0'])
 def test_foreign_result_never_becomes_reference_or_bootstrap(tmp_path, version):
     files, binding = reference_entries()
     manifest = json.loads(files['manifest.json'])
@@ -68,7 +68,7 @@ def test_foreign_result_never_becomes_reference_or_bootstrap(tmp_path, version):
 
 
 @pytest.mark.parametrize('embedded', [False, True])
-@pytest.mark.parametrize('version', [None, '1.9.1', '2.0.1'])
+@pytest.mark.parametrize('version', [None, '1.9.1', '2.0.0', '2.0.2'])
 def test_runtime_version_must_match_current_result_even_when_unavailable(tmp_path, embedded, version):
     from tests.result_pyz_support import attach_pyz
     files, _ = reference_entries()
