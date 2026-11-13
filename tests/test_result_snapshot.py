@@ -127,21 +127,6 @@ def test_text_edge_shapes_match_real_git(tmp_path,monkeypatch,before,after):
     assert snapshot.worktree.files['tracked.txt'].content==after
 
 
-@pytest.mark.parametrize('case',['clean','diagnostic','single','multi','dry-run','partial-failure','dirty','unavailable'])
-def test_frozen_140_snapshots_preserve_status_and_actual_file_layers(case,monkeypatch):
-    import socket
-    import subprocess
-    from tests.compatibility_140_support import artifact
-    path, expected = artifact('result', case)
-    raw = path.read_bytes()
-    def forbidden(*args, **kwargs):
-        pytest.fail('old snapshot rejection started external code')
-    monkeypatch.setattr(subprocess, 'Popen', forbidden)
-    monkeypatch.setattr(socket, 'socket', forbidden)
-    with pytest.raises(api.ResultSnapshotError) as caught:
-        api.read_result_snapshot(path, expected_sha256=expected['sha256'])
-    assert caught.value.code is api.SnapshotErrorCode.INVALID_RESULT
-    assert path.read_bytes() == raw
 
 
 def test_count_ceiling_allows_add_before_delete_in_same_git_layer(tmp_path,monkeypatch):

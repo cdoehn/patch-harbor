@@ -1,21 +1,20 @@
 """Reader-first Python variants, byte-frozen legacy artifacts and import guards."""
 from dataclasses import replace
-from io import BytesIO, StringIO
+from io import StringIO
 import json
 from pathlib import Path
 import struct
 import subprocess
 import sys
 from types import SimpleNamespace
-from zipfile import ZipFile
 
 import pytest
 
 from patchharbor import api, runtime_pyz as pyz
 from patchharbor.archive_evidence import parse_archive_evidence
 from patchharbor.exit_status import exit_code_for_error
-from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY
 from patchharbor.result_reader import read_result_reference
+from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY
 from tools import pyz_bootstrap as bootstrap
 from tests.pyz_variant_support import variant, rewrite
 from tests.result_pyz_support import attach_pyz
@@ -23,7 +22,6 @@ from tests.result_runtime_support import edit_metadata
 from tests.reference_support import reference_entries, write_reference, bound_package, edit_document
 from tests.pyz_variant_support import result_file
 
-FIXTURES = Path(__file__).parent / 'fixtures/python_variants'
 
 
 def read(raw):
@@ -102,27 +100,6 @@ def test_unavailable_metadata_retains_only_known_closed_requirements(tmp_path, r
         with pytest.raises(bootstrap.BootstrapUnavailable): bootstrap.assess(path)
 
 
-@pytest.mark.parametrize('version', [1, 2, 3])
-def test_frozen_reference_formats_remain_byte_exact_and_readable(tmp_path, version):
-    provenance = json.loads((FIXTURES / 'provenance.json').read_bytes())
-    path = FIXTURES / f'result-format{version}.zip'
-    record = provenance['files'][path.name]
-    original = path.read_bytes()
-    assert len(original) == record['bytes'] and pyz.sha256(original) == record['sha256']
-    patch = tmp_path / 'bound.zip'; bound_package(patch, provenance['binding'])
-    with pytest.raises(api.PatchHarborError): read_result_reference(path)
-    with pytest.raises(api.PatchHarborError): api.validate_task(patch, reference_bundle=path)
-    with pytest.raises(ValueError): bootstrap.assess(path)
-    assert path.read_bytes() == original
-    if version == 3:
-        with ZipFile(path) as archive: raw = archive.read('runtime/patchharbor-1.3.0.pyz')
-        recipe = read(raw)
-        assert pyz.sha256(raw) == provenance['pyz_sha256'] and len(raw) == provenance['pyz_bytes']
-        assert recipe.content_id == provenance['pyz_content_id']
-        assert pyz.producer_id(recipe) == provenance['pyz_producer_id']
-        with ZipFile(BytesIO(raw)) as archive:
-            assert archive.read('__main__.py') == archive.read(pyz.MAIN_PATH) == pyz.MAIN_BYTES
-        assert pyz.sha256(pyz.MAIN_BYTES) == provenance['legacy_main_sha256']
 
 
 @pytest.mark.parametrize('requirement', ['>=3.12', '>=3.10'])

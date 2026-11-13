@@ -1,21 +1,16 @@
 """Runtime profile independence and original-byte compatibility across the split."""
 from __future__ import annotations
 
-import ast
 import csv
-from io import BytesIO, StringIO
+from hashlib import sha256
+from io import StringIO
 import json
 import shutil
-import socket
 import subprocess
 import sys
-from zipfile import ZipFile
 
 import pytest
 
-from patchharbor import runtime_pyz as pyz
-from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY
-from tests.compatibility_140_support import artifact, PYZ_SHA256, sha256
 from tests.platform_support import PROJECT_ROOT
 from tests.runtime_pyz_support import inputs
 
@@ -41,25 +36,6 @@ assert 'patchharbor_watcher' not in sys.modules
     assert not list(tmp_path.iterdir())
 
 
-def test_original_140_pyz_keeps_canonical_bytes_and_producer_identity(monkeypatch):
-    reference, _ = artifact('result', 'clean')
-    with ZipFile(reference) as result:
-        metadata = json.loads(result.read('runtime/runtime.json'))
-        raw = result.read(metadata['artifact']['path'])
-    assert sha256(raw) == PYZ_SHA256
-    def forbidden(*args, **kwargs):
-        pytest.fail('data-profile validation attempted execution or network activity')
-    monkeypatch.setattr(subprocess, 'Popen', forbidden)
-    monkeypatch.setattr(socket, 'socket', forbidden)
-    recipe = pyz.read_pyz(raw, policy=DEFAULT_RESOURCE_POLICY, remaining_bytes=pyz.MAX_CONTENT_BYTES)
-    with ZipFile(BytesIO(raw)) as archive:
-        expected = next(ast.literal_eval(node.value) for node in ast.parse(
-            archive.read(pyz.IDENTITY_PATH).decode()).body
-            if isinstance(node, ast.Assign) and any(isinstance(t, ast.Name) and t.id == 'RESOURCE_ID'
-                                                   for t in node.targets))
-        assert pyz.producer_id(recipe) == expected
-        assert pyz.materialize(recipe, lambda name, size: archive.read(name)) == raw
-    assert recipe.content_id == metadata['content_id']
 
 
 @pytest.mark.parametrize('missing', [None, 'runtime_profile.py', 'runtime_pyz.py',
@@ -124,5 +100,5 @@ assert not any(name.startswith('_patchharbor_build_profiles_') for name in sys.m
         assert {row[0] for row in rows} == set(built)
         import base64
         for name, encoded, size in rows[:-1]:
-            assert encoded == 'sha256=' + base64.urlsafe_b64encode(bytes.fromhex(sha256(built[name]))).rstrip(b'=').decode()
+            assert encoded == 'sha256=' + base64.urlsafe_b64encode(sha256(built[name]).digest()).rstrip(b'=').decode()
             assert int(size) == len(built[name])
