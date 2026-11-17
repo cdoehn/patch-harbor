@@ -59,7 +59,7 @@ def test_native_result_and_log_are_observed_by_full_hash(tmp_path, monkeypatch):
     patch(root, context)
     result = api.monitor_artifacts(str(root))
     rows = result['artifacts']
-    reference = next(r for r in rows if r['kind'] == 'result_bundle')
+    reference = next(r for r in rows if r['kind'] == 'state_bundle')
     assert reference['repo_id'] == str(context.repo_id)
     assert reference['result_status'] == 'created'
     assert reference['primary_result']['success'] is True

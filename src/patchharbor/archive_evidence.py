@@ -53,7 +53,7 @@ def _result_evidence(payloads: tuple[BundlePayload, ...]) -> ArchiveEvidence:
         # The reader has already validated the entire receipt and actual context.
         assert facts.task_sha256 is not None and facts.expected is not None
         receipt = ExecuteReceipt(facts.task_sha256, facts.run_id, facts.expected, facts.completed_commit)
-    return ArchiveEvidence("result_bundle", selection, facts.base_entries, receipt)
+    return ArchiveEvidence(facts.bundle_kind.artifact_kind, selection, facts.base_entries, receipt)
 
 
 def parse_archive_evidence(content: bytes, path: Path) -> ArchiveEvidence:

@@ -36,7 +36,7 @@ def _read_result(path: Path) -> dict[str, object]:
         context = json.loads(archive.read("context.json"))
         instructions = archive.read(CHAT_INSTRUCTIONS_NAME).decode("utf-8")
         assert instructions.endswith((PROJECT_ROOT / CHAT_INSTRUCTIONS_NAME).read_text(encoding="utf-8"))
-        assert environment["bundle_type"] == "Result"
+        assert environment["bundle_type"] == ("State" if json.loads(archive.read("logs/run.json"))["operation"] == "bundle" else "Result")
         assert environment["bundle_filename"] == path.name
         assert environment["bundle_suffix"] == context["bundle_suffix"]
         for field in ("repo_id", "base_commit", "state_fingerprint", "fingerprint_algorithm"):
@@ -232,7 +232,7 @@ def test_configuration_change_during_handoff_is_revalidated(tmp_path: Path, monk
     monkeypatch.setattr(result_handoff_module, "capture_runtime_environment", capture_and_change)
     with pytest.raises(PatchHarborError, match="bundle suffix changed"):
         create_manual_result_bundle(repository)
-    assert not list(exchange.glob("*_Result_Bundle_*"))
+    assert not list(exchange.glob("*_State_Bundle_*"))
     assert not list(exchange.glob(".*.tmp"))
 
 
@@ -249,7 +249,7 @@ def test_template_failure_publishes_no_incomplete_bundle(
     with pytest.raises(PatchHarborError) as failure:
         create_manual_result_bundle(repository)
     assert failure.value.reason.value == "result_bundle_error"
-    assert not list(exchange.glob("*_Result_Bundle_*"))
+    assert not list(exchange.glob("*_State_Bundle_*"))
     assert not list(exchange.glob(".*.tmp"))
     assert git(repository, "status", "--porcelain").stdout == ""
 
@@ -275,7 +275,7 @@ def test_result_bundle_normalizes_generated_instructions_not_repository_bytes(
         monkeypatch.setenv(key, value)
     monkeypatch.setattr(template_module, "_template_path", lambda: template)
     create_manual_result_bundle(repository)
-    paths = list(exchange.glob("*_Result_Bundle_*.zip"))
+    paths = list(exchange.glob("*_State_Bundle_*.zip"))
     assert len(paths) == 1
     with zipfile.ZipFile(paths[0]) as archive:
         assert archive.testzip() is None

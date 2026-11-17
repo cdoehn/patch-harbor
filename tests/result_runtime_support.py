@@ -37,7 +37,7 @@ def attach_pyz(files, raw, *, reason='source_not_prepared'):
                    artifact=artifact, runtime_dependencies=[],
                    provenance=dict(mode='canonical_resources',source_commit=recipe.source_commit,recipe_format_version=1),
                    capabilities=dict(operations=['inspect_task','validate_task','pack_task'],
-                                     task_formats=[3], result_formats=[5]))
+                                     task_formats=[3], result_formats=[5], state_formats=[5]))
     metadata_path = 'runtime/runtime.json';files[metadata_path] = json.dumps(doc).encode()
     manifest['runtime'] = dict(status=doc['status'],reason=doc['reason'],
                               metadata=descriptor(metadata_path,files[metadata_path]),artifact=doc['artifact'])

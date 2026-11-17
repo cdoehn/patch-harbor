@@ -28,6 +28,7 @@ pytestmark = pytest.mark.packaging
 MAX_WHEEL_BYTES = 512 * 1024  # Standalone helper packaging measured 475382 B in Execute 113.
 RELEASE_VERSION = "2.0.1"
 EXPECTED_RUNTIME_FILES = {
+    "patchharbor/reference_kind.py",
     'patchharbor/application_monitor.py',
     'patchharbor/application_monitor_artifacts.py',
     'patchharbor/cli_monitor.py',
@@ -280,6 +281,7 @@ def _copy_project_for_release(tmp_path: Path) -> Path:
             "*.log",
             "*_Task_Bundle_*.zip",
             "*_Result_Bundle_*.zip",
+            "*_State_Bundle_*.zip",
         ),
     )
 

@@ -119,6 +119,6 @@ def test_unavailable_runtime_cannot_claim_either_capability_profile(
     files, binding = current_result(None)
     edit_metadata(files, lambda doc: doc.update(capabilities={
         'operations': ['inspect_task','validate_task','pack_task'],
-        'task_formats': [3], 'result_formats': result_formats,
+        'task_formats': [3], 'result_formats': result_formats, 'state_formats': [5],
     }))
     assert_invalid_reference(files, binding, request_files, tmp_path)

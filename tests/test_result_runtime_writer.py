@@ -128,4 +128,4 @@ def test_missing_mandatory_template_remains_a_result_error(repository, monkeypat
     assert report.primary_result.entrypoint_exit_code == 27
     assert report.result_bundle.status is api.ResultBundleStatus.FAILED
     assert report.result_bundle.emergency_diagnostics_path.is_dir()
-    assert not tuple(exchange.glob("*_Result_Bundle_*.zip"))
+    assert not tuple(exchange.glob("*_[RS]*_Bundle_*.zip"))

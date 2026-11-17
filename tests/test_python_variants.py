@@ -37,7 +37,7 @@ def test_both_closed_variants_pass_static_reference_and_bootstrap_without_import
     patch = tmp_path / 'patch.zip'; bound_package(patch, binding)
     monkeypatch.setattr(bootstrap.importlib, 'import_module', lambda *a, **k: pytest.fail('data imported'))
     assert api.validate_task(patch, reference_bundle=path).binding_matches
-    assert parse_archive_evidence(path.read_bytes(), path).kind == 'result_bundle'
+    assert parse_archive_evidence(path.read_bytes(), path).kind == 'state_bundle'
     assessment = bootstrap.assess(path)
     assert assessment.requires_python == requirement and assessment.pyz_bytes == raw
     assert not assessment.full_reference_valid and not assessment.source_trusted

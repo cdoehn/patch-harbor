@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from patchharbor.reference_kind import ReferenceBundleKind
+
 from contextlib import contextmanager
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -76,10 +78,11 @@ def result_bundle_filename(
     session: RunSession,
     *,
     repository_name: str,
+    kind: ReferenceBundleKind = ReferenceBundleKind.RESULT,
 ) -> str:
     """Return the human-oriented final filename for one Result Bundle."""
     return (
-        f"{repository_name}_Result_Bundle_{session.filename_timestamp}_"
+        f"{repository_name}_{kind.label}_Bundle_{session.filename_timestamp}_"
         f"{shorten_identifier(session.run_id, with_ellipsis=False)}.zip"
     )
 

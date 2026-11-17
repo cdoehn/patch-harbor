@@ -39,7 +39,7 @@ from patchharbor.zip_payloads import InvalidZipArchiveError, NotZipArchiveError,
 CLEAN_FINGERPRINT = state_fingerprint_digest(
     staged_records=(), unstaged_records=(), untracked_records=(),
 )[:16]
-_RESULT_MARKER = "patch-harbor-result-bundle"
+from patchharbor.reference_kind import ReferenceBundleKind, kind_for_marker, kind_for_operation
 _BINDING_FIELDS = {"repo_id", "base_commit", "state_fingerprint", "fingerprint_algorithm"}
 _MANIFEST_FIELDS = _BINDING_FIELDS | {
     "marker", "patchharbor_version", "format_version", "created_at", "run_id", "dirty", "dry_run",
@@ -107,6 +107,10 @@ class ResultFacts:
     runtime: ResultPyzRuntime | None = None
     handoff_present: bool = False
     patchharbor_version: str = __version__
+
+    @property
+    def bundle_kind(self) -> ReferenceBundleKind:
+        return kind_for_operation(self.operation)
 
 
 @dataclass(frozen=True, slots=True)
@@ -192,7 +196,7 @@ def _handoff(files: dict[str, bytes], context: dict, run: dict) -> set[str]:
     environment = _document(files["environment.json"])
     _require(environment.get("marker") == ENVIRONMENT_MARKER
              and type(environment.get("format_version")) is int and environment["format_version"] == 3
-             and environment.get("bundle_type") == "Result"
+             and environment.get("bundle_type") == kind_for_operation(run["operation"]).label
              and environment.get("repository_context") == {k: context[k] for k in _BINDING_FIELDS}
              and environment.get("run_id") == run["run_id"]
              and environment.get("bundle_suffix") == context.get("bundle_suffix", ""),
@@ -216,11 +220,16 @@ def _handoff(files: dict[str, bytes], context: dict, run: dict) -> set[str]:
 
 def has_result_marker(payloads: tuple[BundlePayload, ...]) -> bool:
     """One strict marker hint for classification, never a validity claim."""
+    return reference_kind_hint(payloads) is not None
+
+
+def reference_kind_hint(payloads: tuple[BundlePayload, ...]) -> ReferenceBundleKind | None:
+    """Classify a marker only; never treat this hint as validated evidence."""
     manifest = next((p.content for p in payloads if p.relative_path == "manifest.json"), None)
     try:
-        return manifest is not None and _document(manifest).get("marker") == _RESULT_MARKER
+        return kind_for_marker(_document(manifest).get("marker")) if manifest is not None else None
     except (ValueError, RecursionError):
-        return False
+        return None
 
 
 def read_result_or_task_payloads(content: bytes, *,
@@ -276,7 +285,7 @@ def _parse_result_payloads(payloads: tuple[BundlePayload, ...], *,
     run = _document(files["logs/run.json"])
     version = manifest.get("format_version")
     manifest_fields = _MANIFEST_FIELDS | {"runtime"}
-    _require(manifest.get("marker") == _RESULT_MARKER
+    _require(kind_for_marker(manifest.get("marker")) is not None
              and type(version) is int and version == 5
              and set(manifest) in (manifest_fields, manifest_fields | _EXECUTE_FIELDS,
                                    manifest_fields | _EXECUTE_FIELDS | _RECEIPT_FIELDS)
@@ -318,6 +327,8 @@ def _parse_result_payloads(payloads: tuple[BundlePayload, ...], *,
              "inconsistent process status")
     operation = run["operation"]
     _require(operation in ("bundle", "execute"), "unsupported operation")
+    _require(kind_for_marker(manifest["marker"]) is kind_for_operation(operation),
+             "reference kind and operation disagree")
     if operation == "bundle":
         _require(not run["dry_run"] and not primary.entrypoint_started
                  and primary.kind is PrimaryResultKind.SUCCESS and not _EXECUTE_FIELDS.intersection(manifest),

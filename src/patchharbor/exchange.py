@@ -35,7 +35,7 @@ from patchharbor.platform.filesystem import (
 from patchharbor.platform.paths import physically_canonicalize
 from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY, ResourcePolicy
 from patchharbor.user_paths import RegistrationUserPaths
-from patchharbor.result_reader import has_result_marker, read_result_or_task_payloads
+from patchharbor.result_reader import reference_kind_hint, read_result_or_task_payloads
 from patchharbor.zip_payloads import ZipPayloadError
 
 
@@ -49,6 +49,7 @@ class ExchangeArtifactKind(str, Enum):
     """Content class relevant to automatic Exchange selection."""
 
     TASK_BUNDLE = "task_bundle"
+    STATE_BUNDLE = "state_bundle"
     RESULT_BUNDLE = "result_bundle"
     OTHER = "other"
 
@@ -171,10 +172,11 @@ def _classify_content(
         activity("SKIP", f"{path.name}: not a supported safe ZIP ({exc})", "detail")
         return _ContentClassification(kind=ExchangeArtifactKind.OTHER)
 
-    activity("IDENTIFY", f"Check PatchHarbor Result marker: {path.name}")
-    if has_result_marker(payloads):
-        activity("RESULT", f"{path.name}: Result Bundle, not an executable patch", "detail")
-        return _ContentClassification(kind=ExchangeArtifactKind.RESULT_BUNDLE)
+    activity("IDENTIFY", f"Check PatchHarbor reference marker: {path.name}")
+    reference_kind = reference_kind_hint(payloads)
+    if reference_kind is not None:
+        activity("REFERENCE", f"{path.name}: {reference_kind.label} Bundle", "detail")
+        return _ContentClassification(kind=ExchangeArtifactKind(reference_kind.artifact_kind))
 
     try:
         package = resolve_task_payloads(

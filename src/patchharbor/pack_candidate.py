@@ -13,7 +13,7 @@ from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
 from patchharbor import __version__
 from patchharbor.bundle_handoff import (
     ENVIRONMENT_FORMAT_VERSION, ENVIRONMENT_MARKER, MAX_HANDOFF_ENTRY_BYTES,
-    TASK_FILENAME_SCHEMA, RESULT_FILENAME_SCHEMA,
+    TASK_FILENAME_SCHEMA, RESULT_FILENAME_SCHEMA, STATE_FILENAME_SCHEMA,
 )
 from patchharbor.bundle_names import is_browser_temporary_name, validate_bundle_suffix
 from patchharbor.bundle_paths import _is_safe_path_segment
@@ -92,7 +92,7 @@ def prepare_metadata(reference: CapturedResultReference, package_id: UUID,
         marker=ENVIRONMENT_MARKER, format_version=ENVIRONMENT_FORMAT_VERSION,
         bundle_type='Task', bundle_filename=filename,
         repository_context=_binding(reference), bundle_suffix=suffix,
-        filename_schemas={'Task': TASK_FILENAME_SCHEMA, 'Result': RESULT_FILENAME_SCHEMA},
+        filename_schemas={'Task': TASK_FILENAME_SCHEMA, 'State': STATE_FILENAME_SCHEMA, 'Result': RESULT_FILENAME_SCHEMA},
         filename_timezone='UTC',
     )
     raw = serialize_json_document(document).encode('utf-8')

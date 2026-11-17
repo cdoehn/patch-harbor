@@ -30,7 +30,7 @@ def reference_entries(*, kind="bundle", dirty=False, object_format="sha1", hando
                "timeout": PrimaryResult.timeout_result, "interrupted": PrimaryResult.interrupted_result}[kind]()
     raw = b"base\x00\xff\n"
     blob = hashlib.new(object_format, b"blob " + str(len(raw)).encode() + b"\0" + raw).hexdigest()
-    manifest = {"patchharbor_version": __version__, "marker": "patch-harbor-result-bundle", "format_version": 5, **binding,
+    manifest = {"patchharbor_version": __version__, "marker": "patch-harbor-state-bundle" if kind == "bundle" else "patch-harbor-result-bundle", "format_version": 5, **binding,
                 "created_at": stamp, "run_id": run_id, "dirty": dirty, "dry_run": kind == "dry_run",
                 "entrypoint_started": primary.entrypoint_started, "execution_present": primary.entrypoint_started,
                 "primary_result": primary.kind.value, "result_bundle_status": "created",
@@ -59,7 +59,7 @@ def reference_entries(*, kind="bundle", dirty=False, object_format="sha1", hando
         files["changes/unstaged.patch"] = b"opaque captured delta\n"
     if handoff:
         from tests.handoff_support import handoff as make_handoff
-        document = dict(marker="patch-harbor-environment", bundle_type="Result",
+        document = dict(marker="patch-harbor-environment", bundle_type="State" if kind == "bundle" else "Result",
                         repository_context=binding, run_id=run_id, bundle_suffix="")
         files.update(dict(make_handoff(document).entries()))
     files.update({name: json.dumps(doc).encode() for name, doc in

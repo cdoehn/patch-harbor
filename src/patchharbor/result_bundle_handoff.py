@@ -10,12 +10,13 @@ from patchharbor.bundle_handoff import (
     ENVIRONMENT_MARKER,
     ENVIRONMENT_FORMAT_VERSION,
     TASK_FILENAME_SCHEMA,
-    RESULT_FILENAME_SCHEMA,
+    RESULT_FILENAME_SCHEMA, STATE_FILENAME_SCHEMA,
 )
 from patchharbor.chat_instructions import render_chat_handoff
 from patchharbor.platform.environment import capture_runtime_environment
 from patchharbor.result_bundle_target import ResultBundleTarget
 from patchharbor.run_report import RunReport
+from patchharbor.reference_kind import kind_for_operation
 
 
 def create_result_handoff(report: RunReport, target: ResultBundleTarget, *,
@@ -28,7 +29,7 @@ def create_result_handoff(report: RunReport, target: ResultBundleTarget, *,
         "marker": ENVIRONMENT_MARKER,
         "format_version": ENVIRONMENT_FORMAT_VERSION,
         "captured_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
-        "bundle_type": "Result",
+        "bundle_type": kind_for_operation(report.operation).label,
         "bundle_filename": target.final_path.name,
         "run_id": report.run_id_text,
         "repository_name": context.repository_path.value.name,
@@ -42,7 +43,7 @@ def create_result_handoff(report: RunReport, target: ResultBundleTarget, *,
         "exchange_directory": str(target.exchange_directory) if target.exchange_directory is not None else None,
         "output_directory": str(target.directory),
         "bundle_suffix": target.bundle_suffix,
-        "filename_schemas": {"Task": TASK_FILENAME_SCHEMA, "Result": RESULT_FILENAME_SCHEMA},
+        "filename_schemas": {"Task": TASK_FILENAME_SCHEMA, "State": STATE_FILENAME_SCHEMA, "Result": RESULT_FILENAME_SCHEMA},
         "filename_timezone": "UTC",
         "runtime": {**capture_runtime_environment(), "patchharbor_version": __version__},
     }

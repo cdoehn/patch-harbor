@@ -37,7 +37,8 @@ def test_valid_reference_is_independent_of_clean_success_policy(tmp_path, kind, 
         with pytest.raises(ValueError):
             parse_archive_evidence(reference.read_bytes(), reference)
     else:
-        assert parse_archive_evidence(reference.read_bytes(), reference).kind == "result_bundle"
+        expected_kind = "state_bundle" if kind == "bundle" else "result_bundle"
+        assert parse_archive_evidence(reference.read_bytes(), reference).kind == expected_kind
 
 
 @pytest.mark.parametrize("object_format", ["sha1", "sha256"])

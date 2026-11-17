@@ -105,6 +105,6 @@ def test_format3_unicode_snapshot_and_standalone_pyz_classification(canonical,tm
     files['base/'+name]=files.pop('base/tracked.txt')
     edit_document(files,'manifest.json',lambda d:d['base_entries'][0].update(path=name))
     path=tmp_path/'looks-like-patch.zip';write_reference(path,files)
-    assert _classify_content(path,path.read_bytes(),resource_policy=DEFAULT_RESOURCE_POLICY).kind is ExchangeArtifactKind.RESULT_BUNDLE
+    assert _classify_content(path,path.read_bytes(),resource_policy=DEFAULT_RESOURCE_POLICY).kind is ExchangeArtifactKind.STATE_BUNDLE
     assert parse_archive_evidence(path.read_bytes(),path).base_entries[0][0]==name
     assert _classify_content(path,canonical,resource_policy=DEFAULT_RESOURCE_POLICY).kind is ExchangeArtifactKind.OTHER

@@ -67,7 +67,7 @@ from patchharbor.temporary_resources import (
 from patchharbor.user_paths import registration_user_paths
 
 
-_RESULT_MARKER = "patch-harbor-result-bundle"
+from patchharbor.reference_kind import ReferenceBundleKind, kind_for_operation
 
 
 @dataclass(frozen=True)
@@ -188,7 +188,7 @@ def _manifest_document(
     if context is None:
         raise ValueError("successful Result Bundle report has no context")
     document: dict[str, object] = {
-        "marker": _RESULT_MARKER,
+        "marker": kind_for_operation(report.operation).marker,
         "patchharbor_version": __version__,
         "format_version": runtime.result_format,
         "created_at": report.timing.started_at_text,
@@ -544,7 +544,7 @@ def _create_manual_result_bundle(path, *, output_directory, session, observation
                 observation.update(repo_id=str(repo_id), repository_path=str(repository.value))
                 filename = result_bundle_filename(
                     session,
-                    repository_name=repository.value.name,
+                    repository_name=repository.value.name, kind=ReferenceBundleKind.STATE,
                 )
                 target = prepare_result_bundle_target(
                     output_directory,

@@ -65,7 +65,7 @@ def test_format3_reference_preserves_binding_and_separates_success_policy(canoni
     with pytest.raises(FrozenInstanceError):
         facts.runtime.status = "forged"
     if status == "embedded" and kind in {"bundle", "success"} and not dirty:
-        assert parse_archive_evidence(ref.read_bytes(), ref).kind == "result_bundle"
+        assert parse_archive_evidence(ref.read_bytes(), ref).kind == ("state_bundle" if kind == "bundle" else "result_bundle")
     else:
         with pytest.raises(ValueError):
             parse_archive_evidence(ref.read_bytes(), ref)
@@ -130,7 +130,7 @@ def test_snapshot_unicode_paths_work_for_classifier_and_archive_without_relaxing
     edit_document(files, "manifest.json", lambda doc: doc["base_entries"][0].update(path=name.removeprefix("base/")))
     ref = tmp_path / "result.zip"; write_reference(ref, files)
     classification = _classify_content(ref, ref.read_bytes(), resource_policy=DEFAULT_RESOURCE_POLICY)
-    assert classification.kind is ExchangeArtifactKind.RESULT_BUNDLE
+    assert classification.kind is ExchangeArtifactKind.STATE_BUNDLE
     assert parse_archive_evidence(ref.read_bytes(), ref).base_entries[0][0] == name.removeprefix("base/")
     patch = tmp_path / "patch.zip"; bound_package(patch, binding)
     with ZipFile(patch, "a") as archive:
@@ -159,7 +159,7 @@ def test_result_classification_is_only_a_type_hint_and_never_a_patch(canonical, 
     edit_document(files, "manifest.json", lambda doc: doc.update(format_version=version))
     ref = tmp_path / "looks-like-a-patch.zip"; write_reference(ref, files)
     classification = _classify_content(ref, ref.read_bytes(), resource_policy=DEFAULT_RESOURCE_POLICY)
-    assert classification.kind is ExchangeArtifactKind.RESULT_BUNDLE and classification.package is None
+    assert classification.kind is ExchangeArtifactKind.STATE_BUNDLE and classification.package is None
     assert _classify_content(tmp_path / "runtime.pyz", canonical, resource_policy=DEFAULT_RESOURCE_POLICY).kind is ExchangeArtifactKind.OTHER
 
 @pytest.mark.parametrize("status", ["embedded", "unavailable"])

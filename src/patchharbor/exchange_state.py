@@ -52,7 +52,7 @@ _MANIFEST_FIELDS = frozenset(
         "state_fingerprint",
     }
 )
-_ALLOWED_KINDS = frozenset({"other", "task_bundle", "result_bundle"})
+_ALLOWED_KINDS = frozenset({"other", "task_bundle", "state_bundle", "result_bundle"})
 
 
 class ExchangeExecuteStatus(str, Enum):

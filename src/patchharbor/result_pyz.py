@@ -11,7 +11,7 @@ from patchharbor.result_runtime_metadata import (
     read_descriptor as _descriptor, require_metadata as _require,
 )
 from patchharbor import runtime_pyz as pyz
-from patchharbor.runtime_contract import OPERATIONS, TASK_FORMATS, RESULT_FORMATS
+from patchharbor.runtime_contract import OPERATIONS, TASK_FORMATS, RESULT_FORMATS, STATE_FORMATS
 from patchharbor.runtime_profile import VERSION_PATTERN as _VERSION, SHA256_PATTERN as _HEX
 
 
@@ -41,6 +41,7 @@ class ResultPyzRuntime:
     operations: tuple[str, ...]
     task_formats: tuple[int, ...]
     result_formats: tuple[int, ...]
+    state_formats: tuple[int, ...]
 
 
 def _artifact(value: object, *, version: str, files: dict[str, bytes]) -> RuntimePyzFile:
@@ -52,16 +53,16 @@ def _artifact(value: object, *, version: str, files: dict[str, bytes]) -> Runtim
     return RuntimePyzFile(data.path, data.size, data.sha256)
 
 
-def _capabilities(value: object) -> tuple[tuple[str, ...], tuple[int, ...], tuple[int, ...]]:
-    _require(type(value) is dict and set(value) == {'operations','task_formats','result_formats'},
+def _capabilities(value: object) -> tuple[tuple[str, ...], tuple[int, ...], tuple[int, ...], tuple[int, ...]]:
+    _require(type(value) is dict and set(value) == {'operations','task_formats','result_formats','state_formats'},
              'invalid PYZ capabilities schema')
     _require(value['operations'] == list(OPERATIONS),
              'unsupported PYZ operations')
-    for key, expected in (('task_formats', TASK_FORMATS), ('result_formats', RESULT_FORMATS)):
+    for key, expected in (('task_formats', TASK_FORMATS), ('result_formats', RESULT_FORMATS), ('state_formats', STATE_FORMATS)):
         versions = value[key]
         _require(type(versions) is list and all(type(v) is int for v in versions)
                  and versions == list(expected), 'unsupported PYZ read versions')
-    return tuple(value['operations']), tuple(value['task_formats']), tuple(value['result_formats'])
+    return tuple(value['operations']), tuple(value['task_formats']), tuple(value['result_formats']), tuple(value['state_formats'])
 
 
 def read_result_pyz(value: object, files: dict[str, bytes], *, resource_policy: ResourcePolicy) -> ResultPyzRuntime:
@@ -88,7 +89,7 @@ def read_result_pyz(value: object, files: dict[str, bytes], *, resource_policy: 
         _require(actual == {METADATA_PATH} and all(doc[key] is None for key in (
             'artifact','profile','content_id','content_id_algorithm','runtime_dependencies','provenance','capabilities')),
             'unavailable PYZ contains artifact claims')
-        return ResultPyzRuntime('unavailable',doc['reason'],metadata,None,version,requires,None,None,None,(),(),())
+        return ResultPyzRuntime('unavailable',doc['reason'],metadata,None,version,requires,None,None,None,(),(),(),())
     _require(doc['status'] == 'embedded' and doc['reason'] is None
              and version is not None and requires is not None, 'invalid embedded PYZ status')
     descriptor = _artifact(value['artifact'], version=version, files=files)

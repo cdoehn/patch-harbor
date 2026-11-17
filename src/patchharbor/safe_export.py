@@ -1,6 +1,8 @@
 """Explicit source-safe bundle orchestration using the existing native Result core."""
 from __future__ import annotations
 
+from patchharbor.reference_kind import ReferenceBundleKind
+
 from contextlib import ExitStack
 import json
 import os
@@ -65,7 +67,7 @@ def _export_reference(path: Path, *, plan: SafeExportPlan, output_directory: Pat
             captured = capture_safe_result(source.repository, source.repo_id)
             if captured.context != plan.context:
                 raise SafeExportError(SafeExportErrorCode.STALE, 'captured source differs from the approved safe plan')
-            filename = result_bundle_filename(session, repository_name=source.repository.value.name) + source.configuration.bundle_suffix
+            filename = result_bundle_filename(session, repository_name=source.repository.value.name, kind=ReferenceBundleKind.STATE) + source.configuration.bundle_suffix
             target = ResultBundleTarget(output.path, output.path / filename, False,
                 source.configuration.bundle_suffix, source.configuration.exchange_directory, source.configuration_paths)
             report = RunReport(timing=session.finish(), operation=RunOperation.BUNDLE, dry_run=False,

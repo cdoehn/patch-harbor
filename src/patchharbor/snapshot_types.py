@@ -9,6 +9,7 @@ from patchharbor.errors import FailureReason, PatchHarborError
 from patchharbor.models import GitObjectId
 from patchharbor.result_reader import ReferenceContext
 from patchharbor.run_report import PrimaryResult
+from patchharbor.reference_kind import ReferenceBundleKind, kind_for_operation
 
 
 class SnapshotErrorCode(str, Enum):
@@ -79,6 +80,10 @@ class ResultSnapshot:
     worktree: SnapshotLayer
     untracked: SnapshotLayer
     effective: SnapshotLayer
+
+    @property
+    def bundle_kind(self) -> ReferenceBundleKind:
+        return kind_for_operation(self.operation)
 
 
 @dataclass(frozen=True, slots=True)

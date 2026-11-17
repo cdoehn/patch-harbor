@@ -11,7 +11,7 @@ from scripts import render_chat_bootstrap as generator
 from tests.platform_support import PROJECT_ROOT
 
 SOURCE = (b"PATCHHARBOR_VERSION = '2.0.0'\n" + generator.CAP_BEGIN + b"OPERATIONS = ('inspect_task', 'validate_task', 'pack_task')\n"
-          b"TASK_FORMATS = (3,)\nRESULT_FORMATS = (5,)\n" + generator.CAP_END +
+          b"TASK_FORMATS = (3,)\nRESULT_FORMATS = (5,)\nSTATE_FORMATS = (5,)\n" + generator.CAP_END +
           b'\nraise AssertionError("build must not execute helper")\n')
 TEMPLATE = b"Read tools/pyz_bootstrap.py from this handoff.\n"
 

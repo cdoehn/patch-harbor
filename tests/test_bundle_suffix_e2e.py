@@ -33,9 +33,9 @@ def _configured(tmp_path: Path):
     return repository, environment, exchange, context
 
 
-def _assert_result(path: Path, suffix: str) -> dict[str, object]:
+def _assert_result(path: Path, suffix: str, *, kind: str = "Result") -> dict[str, object]:
     assert path.is_file()
-    assert re.fullmatch(r"repository_Result_Bundle_\d{6}_\d{4}_[a-f0-9]{6}\.zip" + re.escape(suffix), path.name)
+    assert re.fullmatch(rf"repository_{kind}_Bundle_\d{{6}}_\d{{4}}_[a-f0-9]{{6}}\.zip" + re.escape(suffix), path.name)
     with zipfile.ZipFile(path) as archive:
         assert archive.testzip() is None
         context = json.loads(archive.read("context.json"))
@@ -70,13 +70,13 @@ def test_bundle_and_clear_use_persisted_suffix_across_processes(tmp_path: Path, 
     assert first.returncode == 0, first.stderr
     first_path = Path(json.loads(first.stdout)["result"]["result_bundle_path"])
     assert first_path.parent == output.resolve()
-    _assert_result(first_path, ".txt")
+    _assert_result(first_path, ".txt", kind="State")
     cleared = run_cli(repository, "configure", "bundle-suffix", "--clear", environment_overrides=environment)
     assert cleared.returncode == 0, cleared.stderr
     assert "bundle_suffix: \n" in cleared.stdout
     second = run_cli(repository, "bundle", "--json", *arguments, environment_overrides=environment)
     assert second.returncode == 0, second.stderr
-    _assert_result(Path(json.loads(second.stdout)["result"]["result_bundle_path"]), "")
+    _assert_result(Path(json.loads(second.stdout)["result"]["result_bundle_path"]), "", kind="State")
     assert first_path.exists()  # Never retroactively rename existing bundles.
 
 
@@ -123,7 +123,7 @@ def test_suffix_metadata_does_not_change_state_binding_or_cli_json_schema(tmp_pa
     assert after["output_version"] == 1
     assert after["result"] == before
     bundle = run_cli(repository, "bundle", "--json", environment_overrides=environment)
-    full_context = _assert_result(Path(json.loads(bundle.stdout)["result"]["result_bundle_path"]), ".txt")
+    full_context = _assert_result(Path(json.loads(bundle.stdout)["result"]["result_bundle_path"]), ".txt", kind="State")
     for key in ("repo_id", "base_commit", "state_fingerprint", "fingerprint_algorithm"):
         assert full_context[key] == before[key]
 
@@ -188,7 +188,7 @@ def test_suffix_change_during_capture_never_publishes_inconsistent_name(
     monkeypatch.setattr(capture_module, "capture_base_bundle_entries", capture_then_change)
     with pytest.raises(PatchHarborError, match="bundle suffix changed"):
         create_manual_result_bundle(repository, output_directory=output)
-    assert not tuple((output or exchange).glob("*_Result_Bundle_*"))
+    assert not tuple((output or exchange).glob("*_State_Bundle_*"))
 
 
 def test_newest_valid_suffixed_patch_is_selected_only_for_current_repository(tmp_path: Path) -> None:

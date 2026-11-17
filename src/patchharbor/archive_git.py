@@ -86,7 +86,7 @@ def is_proven_obsolete(
             is_ancestor(context.repository_path, selection.base_commit, record.completed_commit)
             and is_ancestor(context.repository_path, record.completed_commit, context.base_commit)
         )
-    if evidence.kind != "result_bundle" or selection.base_commit == context.base_commit:
+    if evidence.kind not in ("state_bundle", "result_bundle") or selection.base_commit == context.base_commit:
         return False
     return is_proven_result_state(evidence, context)
 
@@ -94,7 +94,7 @@ def is_proven_obsolete(
 def is_proven_result_state(evidence: ArchiveEvidence, context: RepositoryContext) -> bool:
     """Validate the complete result tree against original Git, including HEAD."""
     selection = evidence.selection
-    if evidence.kind != "result_bundle" or context.dirty or selection.repo_id != context.repo_id:
+    if evidence.kind not in ("state_bundle", "result_bundle") or context.dirty or selection.repo_id != context.repo_id:
         return False
     require_original_history(context.repository_path)
     if not is_ancestor(context.repository_path, selection.base_commit, context.base_commit):

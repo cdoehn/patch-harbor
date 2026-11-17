@@ -19,7 +19,7 @@ CAP_END = b"# END GENERATED RUNTIME CAPABILITIES"
 def render_capabilities(source: bytes, contract: bytes) -> bytes:
     """Copy reviewed literals without executing a bootstrap or product import."""
     tree = ast.parse(contract, feature_version=(3, 10))
-    names = ('OPERATIONS', 'TASK_FORMATS', 'RESULT_FORMATS')
+    names = ('OPERATIONS', 'TASK_FORMATS', 'RESULT_FORMATS', 'STATE_FORMATS')
     values = {}
     for node in tree.body:
         if isinstance(node, ast.Assign):

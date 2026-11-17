@@ -51,7 +51,7 @@ class ArtifactCache:
         if has_result_marker(payloads):
             facts = parse_result_payloads(payloads, resource_policy=POLICY)
             run = parse_json_document(next(p.content for p in payloads if p.relative_path == 'logs/run.json'))
-            return dict(kind='result_bundle', repo_id=str(facts.context.repo_id), context=binding(facts.context),
+            return dict(kind=facts.bundle_kind.artifact_kind, repo_id=str(facts.context.repo_id), context=binding(facts.context),
                 expected=binding(facts.expected), run_id=facts.run_id, operation=facts.operation,
                 dry_run=facts.dry_run, primary_result=facts.primary_result.as_document(),
                 result_status='created', task_sha256=facts.task_sha256,

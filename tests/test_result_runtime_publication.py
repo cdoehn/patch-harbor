@@ -106,7 +106,7 @@ def test_real_publication_failures_preserve_primary_and_latest_proven_context(
     assert document["primary_result"]["entrypoint_exit_code"] == exit_code
     assert (rescue / "execution.log").read_bytes()
     assert writes.count("manifest.json") == 1  # no unbounded retry or hidden success
-    assert not tuple(exchange.glob("*_Result_Bundle_*.zip"))
+    assert not tuple(exchange.glob("*_[RS]*_Bundle_*.zip"))
     assert not tuple(exchange.glob(".*.tmp"))
 
 
@@ -119,5 +119,5 @@ def test_publication_abort_is_not_converted_to_runtime_fallback(repository, arti
     monkeypatch.setattr(publication, "_verify_result_bundle", interrupted)
     with pytest.raises(KeyboardInterrupt):
         api.bundle(root)
-    assert not tuple(exchange.glob("*_Result_Bundle_*.zip"))
+    assert not tuple(exchange.glob("*_[RS]*_Bundle_*.zip"))
     assert not tuple(exchange.glob(".*.tmp"))

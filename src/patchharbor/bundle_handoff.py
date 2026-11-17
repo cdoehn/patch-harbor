@@ -20,6 +20,7 @@ ENVIRONMENT_FORMAT_VERSION = 3
 BOOTSTRAP_NAME = "tools/pyz_bootstrap.py"
 MAX_HANDOFF_ENTRY_BYTES = 128 * 1024
 TASK_FILENAME_SCHEMA = "<Repository>_Task_Bundle_<HHMMSS>_<MMDD>_<ID6>.zip<bundle_suffix>"
+STATE_FILENAME_SCHEMA = "<Repository>_State_Bundle_<HHMMSS>_<MMDD>_<ID6>.zip<bundle_suffix>"
 RESULT_FILENAME_SCHEMA = "<Repository>_Result_Bundle_<HHMMSS>_<MMDD>_<ID6>.zip<bundle_suffix>"
 
 
