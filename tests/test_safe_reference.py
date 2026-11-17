@@ -48,6 +48,8 @@ def test_racy_stat_cache_does_not_hide_same_size_changed_bytes(tmp_path,monkeypa
     plan=api.prepare_reference_export(repo,output_directory=output,expected_context=context)
     result=api.bundle(repo,capture_mode='safe',export_plan=plan)
     snapshot=api.read_result_snapshot(result.path)
+    assert snapshot.bundle_kind.label == 'State' and snapshot.operation == 'bundle'
+    assert '_State_Bundle_' in result.path.name
     assert snapshot.index.files['tracked.txt'].content==b'base\n'
     assert snapshot.worktree.files['tracked.txt'].content==b'next\n'
     assert source_bytes(repo)==before
