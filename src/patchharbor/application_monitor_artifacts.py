@@ -10,7 +10,7 @@ from patchharbor.exchange_state import ExchangeStateSnapshot, _parse_state
 from patchharbor.models import RepositoryId, GitObjectId, GitObjectFormat
 from patchharbor.monitor_types import observed_at
 from patchharbor.platform.filesystem import PathKind, path_kind, read_stable_regular_file_bounded
-from patchharbor.result_reader import ReferenceContext
+from patchharbor.reference_reader import ReferenceContext
 from patchharbor.user_paths import registration_user_paths
 
 from patchharbor.monitor_artifact_facts import artifact_fact, ArtifactCache, ERRORS, monitor_log

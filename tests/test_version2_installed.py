@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from patchharbor.result_reader import read_result_reference
+from patchharbor.reference_reader import read_reference
 from tests.platform_support import native_python_script, native_value
 from tests.registration_support import create_repository, git
 from tests.runtime_installation_support import _run
@@ -24,7 +24,7 @@ from zipfile import ZipFile
 import patchharbor
 from pathlib import Path
 from patchharbor import api
-from patchharbor.result_reader import read_result_reference
+from patchharbor.reference_reader import read_reference
 def no_network(*args, **kwargs):
     raise AssertionError('installed handoff attempted networking')
 socket.socket = no_network
@@ -39,7 +39,7 @@ if sys.argv[5] == 'True':
     (repo / 'tracked.txt').write_bytes(b'working\n')
     (repo / 'untracked.bin').write_bytes(b'\x00untracked\xff')
 reference = api.bundle(repo)
-initial, _ = read_result_reference(reference.path)
+initial, _ = read_reference(reference.path)
 assert initial.format_version == 5 and initial.operation == 'bundle'
 assert initial.runtime.status == 'embedded' and initial.runtime.task_formats == (3,)
 assert initial.runtime.result_formats == (5,)
@@ -57,7 +57,7 @@ assert checked.binding_matches and checked.reference_sha256 == sha256(reference.
 assert api.inspect_task(first.path).manifest.format_version == 3
 report = api.execute(first.path, timeout=30)
 assert report.success and report.primary_result.entrypoint_exit_code == 0
-returned, _ = read_result_reference(report.result_bundle.path)
+returned, _ = read_reference(report.result_bundle.path)
 assert returned.format_version == 5 and returned.operation == 'execute'
 assert returned.task_sha256 == sha256(first.path.read_bytes()).hexdigest()
 assert returned.completed_commit is None and returned.context.base_commit == initial.context.base_commit
@@ -100,7 +100,7 @@ def test_installed_api_then_cli_complete_two_bound_rounds(version2_runtime, tmp_
     assert sha256(task.read_bytes()).hexdigest() == proof['next_sha256']
     result = json.loads(_run(version2_runtime.cli('execute', task, '--json'), outside, environment))
     assert result['success'] and result['command'] == 'execute' and result['output_version'] == 2
-    final, _ = read_result_reference(Path(result['result']['result_bundle']['path']))
+    final, _ = read_reference(Path(result['result']['result_bundle']['path']))
     assert final.task_sha256 == proof['next_sha256'] and final.completed_commit is None
     assert final.runtime.artifact.sha256 == proof['runtime_sha256']
     assert (repository / 'rounds.txt').read_bytes() == b'round\nround\n'

@@ -130,7 +130,7 @@ def accept(facts):
     return True
 report=api.execute_guarded(packed.path,expected_sha256=packed.package_sha256,expected_repository=sys.argv[4],admission=accept)
 assert report.success and len(called)==1,report
-snapshot=api.read_result_snapshot(report.result_bundle.path)
+snapshot=api.read_reference_snapshot(report.result_bundle.path)
 assert snapshot.primary_result.entrypoint_exit_code==0
 assert snapshot.effective.files['payload'].content==b'built host payload'
 assert snapshot.effective.files['executed'].content==b'artifact'

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from patchharbor.reference_kind import ReferenceBundleKind
+
 from collections.abc import Iterator
 from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass
@@ -36,7 +38,7 @@ from patchharbor.result_bundle_publication import (
     ResultBundlePublication,
     release_result_bundle_publication,
     reserve_result_bundle_publication,
-    result_bundle_filename,
+    reference_bundle_filename,
 )
 from patchharbor.result_bundle_target import (
     ResultBundleTarget,
@@ -145,9 +147,9 @@ def safely_resolved_repository(
                 output_directory,
                 initial_registry,
                 configuration_paths_for_id(manifest.repo_id, initial_registry),
-                filename=result_bundle_filename(
+                filename=reference_bundle_filename(
                     session,
-                    repository_name=expected_repository.value.name,
+                    repository_name=expected_repository.value.name, kind=ReferenceBundleKind.RESULT,
                 ),
             )
             publication = reserve_result_bundle_publication(

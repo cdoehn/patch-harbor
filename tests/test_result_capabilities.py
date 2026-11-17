@@ -6,7 +6,7 @@ import subprocess
 import pytest
 
 from patchharbor import api
-from patchharbor.result_reader import capture_result_reference
+from patchharbor.reference_reader import capture_reference
 from tools import pyz_bootstrap as bootstrap
 from tests.pack_support import request_files
 from tests.reference_support import bound_package, write_reference
@@ -37,7 +37,7 @@ def test_closed_capabilities_keep_reference_bytes_binding_and_static_pack(
     original = reference.read_bytes()
     digest = hashlib.sha256(original).hexdigest()
 
-    captured = capture_result_reference(reference)
+    captured = capture_reference(reference)
     runtime = captured.facts.runtime
     assert captured.sha256 == digest
     assert runtime.result_formats == tuple(result_formats)

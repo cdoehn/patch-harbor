@@ -87,7 +87,7 @@ def test_real_recovery_requires_full_format3_success(canonical,tmp_path,state):
 def test_result3_publication_and_bootstrap_keep_strict_format_boundaries(canonical,tmp_path,status):
     files,_=current_result(canonical if status=='embedded' else None)
     reference=tmp_path/'result.zip';write_reference(reference,files)
-    publication._verify_result_bundle(reference,execution_present=False)
+    publication._verify_reference_bundle(reference,execution_present=False)
     if status=='embedded':
         assessment=bootstrap.assess(reference,trusted_source_sha256=hashlib.sha256(reference.read_bytes()).hexdigest())
         assert not assessment.full_reference_valid and assessment.pyz_bytes == canonical
@@ -95,7 +95,7 @@ def test_result3_publication_and_bootstrap_keep_strict_format_boundaries(canonic
         with pytest.raises(bootstrap.BootstrapUnavailable): bootstrap.assess(reference)
     files['runtime/runtime.json']+=b' '
     write_reference(reference,files)
-    with pytest.raises(api.PatchHarborError) as caught:publication._verify_result_bundle(reference,execution_present=False)
+    with pytest.raises(api.PatchHarborError) as caught:publication._verify_reference_bundle(reference,execution_present=False)
     assert caught.value.reason is api.FailureReason.RESULT_BUNDLE_ERROR
 
 

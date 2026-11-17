@@ -8,7 +8,7 @@ from zipfile import ZipFile
 import pytest
 
 from patchharbor import api
-from patchharbor.result_reader import read_result_reference
+from patchharbor.reference_reader import read_reference
 from tests.embedded_pyz_support import bootstrap_program
 from tests.platform_support import native_python_script, native_value
 from tests.reference_support import write_reference
@@ -60,13 +60,13 @@ def test_installed_failure_keeps_primary_outcome_and_actual_state(version2_runti
     probe = FRESH_RESULT[:FRESH_RESULT.index('print(json.dumps')]+r'''
 from patchharbor import result_bundle, result_bundle_publication as publication
 from patchharbor.errors import result_bundle_error
-from patchharbor.result_reader import read_result_reference
+from patchharbor.reference_reader import read_reference
 contents, entrypoint, fault = Path(sys.argv[3]), sys.argv[4], sys.argv[5]
 task = api.pack_task(contents, reference_bundle=result.path, entrypoint=entrypoint,
                      output_directory=exchange)
 if fault == 'publication':
     def denied(*args, **kwargs): raise result_bundle_error('injected publication denial')
-    publication._verify_result_bundle = denied
+    publication._verify_reference_bundle = denied
 if fault == 'runtime_budget':
     result_bundle.runtime_fits = lambda *args, **kwargs: False
 report = api.execute(task.path, timeout=.2 if fault == 'timeout' else 30)
@@ -83,7 +83,7 @@ if fault == 'publication':
     assert (rescue / 'execution.log').read_bytes()
     print(json.dumps(dict(publication='failed', primary_success=report.primary_result.success)))
 else:
-    facts, _ = read_result_reference(report.result_bundle.path)
+    facts, _ = read_reference(report.result_bundle.path)
     assert facts.format_version == 5 and facts.context.dirty and facts.completed_commit is None
     assert facts.primary_result.timed_out is (fault == 'timeout')
     assert facts.runtime.status == ('unavailable' if fault == 'runtime_budget' else 'embedded')
@@ -119,7 +119,7 @@ def test_own_bootstrap_and_native_reader_reject_unknown_capabilities(version2_ru
     reference = tmp_path / 'invalid-capabilities.zip'
     write_reference(reference, files)
     with pytest.raises(api.PatchHarborError):
-        read_result_reference(reference)
+        read_reference(reference)
     probe = r'''
 import hashlib, importlib.util, json, socket, subprocess, sys
 from pathlib import Path
@@ -155,5 +155,5 @@ def test_installed_runtime_operates_readonly_with_no_writable_cache(version2_run
     with readonly_tree(location, owner=owner, environment=environment):
         proof = json.loads(_run(version2_runtime.library(FRESH_RESULT, repo, tmp_path / 'exchange'),
                                 outside, environment))
-        facts, _ = read_result_reference(Path(proof['path']))
+        facts, _ = read_reference(Path(proof['path']))
         assert facts.format_version == 5 and facts.runtime.status == 'embedded'

@@ -64,7 +64,7 @@ def main():
         raise PermissionError('plan exceeds this synthetic fixture operating boundary')
     bundle=api.bundle(repository,capture_mode='safe',export_plan=plan)
     external_result_sha=sha256(bundle.path.read_bytes()).hexdigest()
-    snapshot=api.read_result_snapshot(bundle.path,expected_sha256=external_result_sha)
+    snapshot=api.read_reference_snapshot(bundle.path,expected_sha256=external_result_sha)
     assert snapshot.context.dirty==(args.case=='dirty')
     for layer,files in expected.items():
         assert {n:(f.mode,f.content) for n,f in getattr(snapshot,layer).files.items()}==files,layer

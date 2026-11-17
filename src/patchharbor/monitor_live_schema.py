@@ -4,7 +4,7 @@ import math
 from uuid import UUID
 
 from patchharbor.json_document import parse_json_document
-from patchharbor.result_reader import _primary
+from patchharbor.reference_reader import _primary
 from patchharbor.monitor_activity import HISTORY_LIMIT, STATUSES
 
 MAX_DOCUMENT = 256 * 1024

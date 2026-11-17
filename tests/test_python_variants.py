@@ -13,7 +13,7 @@ import pytest
 from patchharbor import api, runtime_pyz as pyz
 from patchharbor.archive_evidence import parse_archive_evidence
 from patchharbor.exit_status import exit_code_for_error
-from patchharbor.result_reader import read_result_reference
+from patchharbor.reference_reader import read_reference
 from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY
 from tools import pyz_bootstrap as bootstrap
 from tests.pyz_variant_support import variant, rewrite
@@ -93,10 +93,10 @@ def test_unavailable_metadata_retains_only_known_closed_requirements(tmp_path, r
     edit_metadata(files, lambda d: d.update(requires_python=requirement))
     path = tmp_path / 'unavailable.zip'; write_reference(path, files)
     if requirement in ('>=3.11', '>=3.12'):
-        with pytest.raises(api.PatchHarborError): read_result_reference(path)
+        with pytest.raises(api.PatchHarborError): read_reference(path)
         with pytest.raises(ValueError): bootstrap.assess(path)
     else:
-        facts, _ = read_result_reference(path)
+        facts, _ = read_reference(path)
         assert facts.runtime.requires_python == requirement and facts.runtime.artifact is None
         with pytest.raises(bootstrap.BootstrapUnavailable): bootstrap.assess(path)
 

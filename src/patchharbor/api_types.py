@@ -22,9 +22,10 @@ from patchharbor.task_inspection import (
 )
 from patchharbor.execute_admission import AdmissionCallback, TaskAdmission
 from patchharbor.safe_export_types import SafeExportPlan, SafeExportError, SafeExportErrorCode
-from patchharbor.result_reader import ReferenceContext
+from patchharbor.reference_reader import ReferenceContext
+from patchharbor.reference_kind import ReferenceBundleKind
 from patchharbor.snapshot_types import (
-    IntegrationCapabilities, ResultSnapshot, ResultSnapshotError, SnapshotErrorCode,
+    IntegrationCapabilities, ReferenceSnapshot, ReferenceSnapshotError, SnapshotErrorCode,
     SnapshotFile, SnapshotLayer, SnapshotRuntime,
 )
 from patchharbor.pack_types import TaskPackResult

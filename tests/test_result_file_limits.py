@@ -18,9 +18,9 @@ from patchharbor.errors import PatchHarborError
 from patchharbor.models import GitObjectFormat, GitObjectId
 from patchharbor.pyz_artifact import PyzArtifact
 from patchharbor.result_bundle import _context_document, _manifest_document
-from patchharbor.result_bundle_snapshot import build_result_bundle_snapshot
+from patchharbor.repository_bundle_snapshot import build_repository_bundle_snapshot
 from patchharbor.result_bundle_writer import write_result_bundle
-from patchharbor.result_reader import read_result_reference, parse_result_payloads, result_member_path
+from patchharbor.reference_reader import read_reference, parse_reference_payloads, reference_member_path
 from patchharbor.result_resources import runtime_payload, runtime_fits
 from patchharbor.run_report import PrimaryResult, RunOperation
 from patchharbor.zip_payloads import read_zip_payload_bytes
@@ -38,7 +38,7 @@ def publication_inputs(tmp_path, count):
                      operation=RunOperation.EXECUTE,
                      primary_result=PrimaryResult.entrypoint_success_result())
     blob = GitObjectId('e69de29bb2d1d6434b8b29ae775ad8c2e48c5391', GitObjectFormat.SHA1)
-    snapshot = build_result_bundle_snapshot(
+    snapshot = build_repository_bundle_snapshot(
         base_entries=((f'f{n:06d}'.encode(), b'100644', blob, b'') for n in range(count)),
         untracked_entries=(), staged_patch=b'', unstaged_patch=b'')
     recipe, payloads, raw = prepared()
@@ -65,7 +65,7 @@ def test_real_publication_and_reference_accept_snapshot_capacity(tmp_path, monke
     destination = publication.prepare_result_bundle_publication(path, run_id=arguments['run_report'].timing.run_id)
     publication.publish_result_bundle(destination, **arguments)
     assert not destination.temporary_path.exists()
-    facts, digest = read_result_reference(path)
+    facts, digest = read_reference(path)
     assert facts.primary_result.success
     raw = path.read_bytes()
     assert digest == sha256(raw).hexdigest()
@@ -85,7 +85,7 @@ def test_real_publication_and_reference_accept_snapshot_capacity(tmp_path, monke
     if count == 250_000:
         with ZipFile(path, 'a') as archive: archive.writestr('extra', b'')
         with pytest.raises(PatchHarborError) as caught:
-            read_result_reference(path)
+            read_reference(path)
         failure = caught.value.__cause__
         assert failure.resource == 'zip_entries'
         assert failure.actual == 250_012 and failure.limit == 250_011
@@ -99,7 +99,7 @@ def test_over_capacity_is_rejected_before_writer_opens_destination(tmp_path):
     # No filesystem tree or blob capture is needed to reject an oversized inventory.
     oversized = (None,) * 250_001
     with pytest.raises(PatchHarborError) as caught:
-        build_result_bundle_snapshot(base_entries=oversized, untracked_entries=(),
+        build_repository_bundle_snapshot(base_entries=oversized, untracked_entries=(),
                                      staged_patch=b'', unstaged_patch=b'')
     assert isinstance(caught.value.__cause__, policy.ResultSnapshotLimitError)
     _, arguments = publication_inputs(tmp_path, 0)
@@ -118,9 +118,9 @@ def test_reader_rejects_snapshot_over_capacity_before_inventory_expansion():
     output = BytesIO()
     with ZipFile(output, 'w') as archive:
         for name, raw in files.items(): archive.writestr(name, raw)
-    payloads = read_zip_payload_bytes(output.getvalue(), path_normalizer=result_member_path)
+    payloads = read_zip_payload_bytes(output.getvalue(), path_normalizer=reference_member_path)
     with pytest.raises(policy.ResultSnapshotLimitError) as caught:
-        parse_result_payloads(payloads)
+        parse_reference_payloads(payloads)
     assert caught.value.resource == 'result_snapshot_files'
     assert caught.value.actual == 250_001 and caught.value.limit == 250_000
 
@@ -129,10 +129,10 @@ def test_publication_preserves_typed_limit_and_never_waits(tmp_path, monkeypatch
     from uuid import UUID
     path = tmp_path / 'result.zip'
     destination = publication.prepare_result_bundle_publication(path, run_id=UUID(int=123))
-    original = publication.read_result_reference
+    original = publication.read_reference
     def read(*args, **kwargs):
         return original(*args, **kwargs, resource_policy=replace(policy.DEFAULT_RESOURCE_POLICY, max_zip_entries=8))
-    monkeypatch.setattr(publication, 'read_result_reference', read)
+    monkeypatch.setattr(publication, 'read_reference', read)
     monkeypatch.setattr(verification, 'sleep', lambda delay: pytest.fail('resource failure retried'))
     with pytest.raises(verification.ResultVerificationError) as caught:
         _publish(destination)

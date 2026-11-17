@@ -10,7 +10,7 @@ from patchharbor import api
 import patchharbor.application_execute as application
 import patchharbor.result_bundle as result_bundle
 import patchharbor.result_resources as resources
-from patchharbor.result_reader import read_result_reference
+from patchharbor.reference_reader import read_reference
 from patchharbor.pyz_artifact import PyzProvision
 from tests.registration_support import git
 from tests.result_pyz_support import artifact
@@ -35,7 +35,7 @@ def test_all_result_routes_embed_same_producer_runtime(repository, artifact, mon
         report = api.execute(patch, dry_run=route == "dry_run")
     assert len(calls) == 1
     assert report.process_exit_code == (27 if route == "failure" else 0)
-    facts, _ = read_result_reference(report.result_bundle.path)
+    facts, _ = read_reference(report.result_bundle.path)
     assert facts.format_version == 5 and facts.runtime.status == "embedded"
     assert facts.runtime.artifact.sha256 == artifact.pyz_sha256
     assert facts.runtime.content_id == artifact.recipe.content_id
@@ -63,7 +63,7 @@ def test_runtime_failure_preserves_actual_failed_execute_and_log(repository, mon
                         lambda self: PyzProvision("unavailable", reason, None))
     report = api.execute(package(root, exchange, exit_code=23))
     assert report.process_exit_code == 23
-    facts, _ = read_result_reference(report.result_bundle.path)
+    facts, _ = read_reference(report.result_bundle.path)
     assert facts.runtime.status == "unavailable" and facts.runtime.reason == expected
     assert facts.warnings and facts.primary_result.entrypoint_exit_code == 23
     with ZipFile(report.result_bundle.path) as archive:
@@ -90,7 +90,7 @@ def test_runtime_and_template_are_pinned_before_actual_entrypoint(repository, ar
     monkeypatch.setattr(application, "execute_prepared_script_with_log", changed_installation)
     report = api.execute(package(root, exchange))
     assert report.process_exit_code == 0
-    facts, _ = read_result_reference(report.result_bundle.path)
+    facts, _ = read_reference(report.result_bundle.path)
     assert facts.runtime.artifact.sha256 == artifact.pyz_sha256
     with ZipFile(report.result_bundle.path) as archive:
         # Template byte identity is a provenance contract, not a prose snapshot.
@@ -106,7 +106,7 @@ def test_runtime_budget_falls_back_without_losing_snapshot(repository, artifact,
                         policy=ResourcePolicy(max_zip_total_bytes=128 * 1024)))
     report = api.execute(package(root, exchange))
     assert report.process_exit_code == 0
-    facts, _ = read_result_reference(report.result_bundle.path)
+    facts, _ = read_reference(report.result_bundle.path)
     assert facts.runtime.status == "unavailable" and facts.runtime.reason == "resource_limit"
     assert facts.warnings and facts.base_entries
 

@@ -1,4 +1,4 @@
-"""Capture all bytes of one consistent PatchHarbor Result Bundle."""
+"""Capture all bytes of one consistent State/Result repository snapshot."""
 
 from __future__ import annotations
 
@@ -19,9 +19,9 @@ from patchharbor.repository_state import (
     capture_consistent_repository_snapshot,
     repository_context_from_snapshot,
 )
-from patchharbor.result_bundle_snapshot import (
-    ResultBundleSnapshot,
-    build_result_bundle_snapshot,
+from patchharbor.repository_bundle_snapshot import (
+    RepositoryBundleSnapshot,
+    build_repository_bundle_snapshot,
 )
 
 
@@ -31,7 +31,7 @@ class CapturedResultBundle:
 
     repository_snapshot: RepositorySnapshot
     context: RepositoryContext
-    bundle_snapshot: ResultBundleSnapshot
+    bundle_snapshot: RepositoryBundleSnapshot
 
 
 def capture_result_bundle(
@@ -56,7 +56,7 @@ def capture_result_bundle(
         repository,
         before.base_commit,
     )
-    bundle_snapshot = build_result_bundle_snapshot(
+    bundle_snapshot = build_repository_bundle_snapshot(
         base_entries=(
             (
                 entry.path.original_bytes,

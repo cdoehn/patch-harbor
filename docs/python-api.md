@@ -591,7 +591,7 @@ are retained only as rejection/provenance fixtures. See [the 2.0 protocol](proto
 
 `api.integration_capabilities()` returns immutable contract-version fields.
 Check `snapshot_contract_version == 2` before calling
-`api.read_result_snapshot(result, expected_sha256=full_sha256)`. The immutable
+`api.read_reference_snapshot(result, expected_sha256=full_sha256)`. The immutable
 result provides `sha256`, `format_version`, `context`, `run_id`, `operation`,
 `dry_run`, `primary_result`, `warnings`, `runtime` and five `SnapshotLayer` values:
 `base`, `index`, `worktree`, `untracked`, `effective`. Each `.files` is an immutable
@@ -607,8 +607,8 @@ fuzzy context. Untracked entries cannot overwrite a tracked path. Existing ZIP
 limits plus 256-MiB individual and 512-MiB cumulative reconstruction budgets
 execute, including binary programs and reverse verification.
 
-Malformed input raises `api.ResultSnapshotError` (a `PatchHarborError`, reason
-SOURCE_ERROR) with `.code` from `api.SnapshotErrorCode`. Codes are invalid_result,
+Malformed input raises `api.ReferenceSnapshotError` (a `PatchHarborError`, reason
+SOURCE_ERROR) with `.code` from `api.SnapshotErrorCode`. Codes are invalid_reference,
 digest_mismatch, invalid_patch, unsupported_patch, path_collision and resource_limit.
 Invalid API argument types/values use TypeError/ValueError. A valid failed, dirty
 or dry-run Result is returned with its actual facts. Integrity does not prove
@@ -778,7 +778,7 @@ If publication succeeds but cleanup fails, `SafeExportError.published_path`
 identifies the complete published Result while the call still fails. Inspect that
 partial outcome before retrying. Success returns the existing `BundleResult`
 (`context`, `path`, `report`, `run_id`, `publication_durability`). Hash the actual
-Result bytes externally and call `read_result_snapshot(path, expected_sha256=...)`;
+Result bytes externally and call `read_reference_snapshot(path, expected_sha256=...)`;
 compare all four binding fields with the approved context. The reader verifies
 all native inventories, hashes, sizes, paths, file types and runtime metadata.
 A self-declared hash inside the ZIP does not replace that external binding.

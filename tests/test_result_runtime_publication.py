@@ -12,7 +12,7 @@ from patchharbor import result_bundle, result_bundle_publication as publication
 from patchharbor import result_bundle_writer as writer, result_resources as resources
 from patchharbor.errors import result_bundle_error
 from patchharbor.resource_policy import ResourcePolicy
-from patchharbor.result_reader import read_result_reference
+from patchharbor.reference_reader import read_reference
 from patchharbor.pyz_artifact import PyzProvision
 from tests.platform_support import native_script, native_value
 from tests.registration_support import git
@@ -46,7 +46,7 @@ def test_dirty_snapshot_and_explicit_target_survive_runtime_restrictions(
                            output_directory=target)
     assert report.process_exit_code == (29 if route == "failure" else 0)
     assert report.result_bundle.path.parent == target
-    facts, _ = read_result_reference(report.result_bundle.path)
+    facts, _ = read_reference(report.result_bundle.path)
     assert facts.context.dirty and facts.runtime.status == (
         "embedded" if runtime_state == "embedded" else "unavailable")
     with ZipFile(report.result_bundle.path) as archive:
@@ -93,7 +93,7 @@ def test_real_publication_failures_preserve_primary_and_latest_proven_context(
         raise result_bundle_error("simulated publication failure")
 
     monkeypatch.setattr(writer, "_write_entry", write)
-    if fault == "verify": monkeypatch.setattr(publication, "_verify_result_bundle", fail)
+    if fault == "verify": monkeypatch.setattr(publication, "_verify_reference_bundle", fail)
     if fault == "replace": monkeypatch.setattr(publication, "replace_path", fail)
     report = api.execute(patch)
     assert report.primary_result.entrypoint_exit_code == exit_code
@@ -116,7 +116,7 @@ def test_publication_abort_is_not_converted_to_runtime_fallback(repository, arti
                         lambda self: PyzProvision("embedded", None, artifact))
     def interrupted(*args, **kwargs):
         raise KeyboardInterrupt
-    monkeypatch.setattr(publication, "_verify_result_bundle", interrupted)
+    monkeypatch.setattr(publication, "_verify_reference_bundle", interrupted)
     with pytest.raises(KeyboardInterrupt):
         api.bundle(root)
     assert not tuple(exchange.glob("*_[RS]*_Bundle_*.zip"))

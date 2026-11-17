@@ -10,7 +10,7 @@ from dataclasses import replace
 from patchharbor.progress import activity
 
 from patchharbor.archive_evidence import ArchiveEvidence, parse_archive_evidence
-from patchharbor.archive_git import is_ancestor, is_proven_result_state
+from patchharbor.archive_git import is_ancestor, is_proven_reference_state
 from patchharbor.configuration import (
     RepositoryConfiguration, load_configuration, revalidate_exchange_directory,
 )
@@ -60,7 +60,7 @@ def _matches_receipt(record: ExchangeStateRecord, evidence: ArchiveEvidence) -> 
 def _proven_result(
     record: ExchangeStateRecord, evidence: ArchiveEvidence, context: RepositoryContext,
 ) -> bool:
-    if not _matches_receipt(record, evidence) or not is_proven_result_state(evidence, context):
+    if not _matches_receipt(record, evidence) or not is_proven_reference_state(evidence, context):
         return False
     assert record.manifest is not None and evidence.receipt is not None
     return is_ancestor(context.repository_path, record.manifest.base_commit,

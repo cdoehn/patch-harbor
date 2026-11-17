@@ -25,7 +25,7 @@ from patchharbor.platform.filesystem import (
 )
 from patchharbor.platform.pack_output import open_output_directory
 from patchharbor.progress import activity
-from patchharbor.result_reader import capture_result_reference
+from patchharbor.reference_reader import capture_reference
 from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY
 
 
@@ -87,7 +87,7 @@ def pack_task(content_directory: Path, *, reference_bundle: Path, entrypoint: st
             reference_path = reference_bundle.resolve(strict=True)
             reference_descriptor = open_regular_nofollow(reference_path)
             reference_metadata = capture_descriptor_metadata(reference_descriptor)
-            reference = capture_result_reference(reference_path, expected_identity=reference_metadata)
+            reference = capture_reference(reference_path, expected_identity=reference_metadata)
             if not _same_open_file_state(reference_metadata, capture_descriptor_metadata(reference_descriptor)):
                 raise FileChangedDuringRead('reference changed during capture')
         except (OSError, ValueError, FileChangedDuringRead, UnsupportedFileTypeError) as exc:

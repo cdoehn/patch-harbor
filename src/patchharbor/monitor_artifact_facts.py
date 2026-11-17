@@ -11,8 +11,8 @@ from patchharbor.task_package import resolve_task_payloads
 from patchharbor.platform.filesystem import (PathKind, path_kind, regular_file_state,
     read_stable_regular_file_with_sha256)
 from patchharbor.resource_policy import ResourcePolicy
-from patchharbor.result_reader import (capture_result_payloads, read_result_or_task_payloads,
-    has_result_marker, parse_result_payloads)
+from patchharbor.reference_reader import (capture_reference_payloads, read_reference_or_task_payloads,
+    has_reference_marker, parse_reference_payloads)
 from patchharbor.zip_payloads import ZipPayloadError
 from patchharbor.monitor_types import observed_at
 from patchharbor.monitor_activity import declared_bundle_number
@@ -45,11 +45,11 @@ class ArtifactCache:
 
     def _parse(self, path, captured):
         try:
-            payloads = read_result_or_task_payloads(captured.content, policy=POLICY)
+            payloads = read_reference_or_task_payloads(captured.content, policy=POLICY)
         except ZipPayloadError:
             return {'kind': 'other'}, None
-        if has_result_marker(payloads):
-            facts = parse_result_payloads(payloads, resource_policy=POLICY)
+        if has_reference_marker(payloads):
+            facts = parse_reference_payloads(payloads, resource_policy=POLICY)
             run = parse_json_document(next(p.content for p in payloads if p.relative_path == 'logs/run.json'))
             return dict(kind=facts.bundle_kind.artifact_kind, repo_id=str(facts.context.repo_id), context=binding(facts.context),
                 expected=binding(facts.expected), run_id=facts.run_id, operation=facts.operation,
@@ -117,7 +117,7 @@ def artifact_fact(path, archived, state, cache):
 def monitor_log(path, expected_sha256):
     if path_kind(path) is not PathKind.REGULAR_FILE:
         raise ValueError('log source must be a regular Result file')
-    captured = capture_result_payloads(path, resource_policy=POLICY, expected_identity=path.lstat())
+    captured = capture_reference_payloads(path, resource_policy=POLICY, expected_identity=path.lstat())
     if captured.sha256 != expected_sha256:
         raise ValueError('selected Result identity changed; refresh the artifact list')
     logs = {p.relative_path: p.content for p in captured.payloads if p.relative_path in ('logs/execution.log', 'logs/run.json')}

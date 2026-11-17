@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, TextIO
 from patchharbor.identifier_presentation import shorten_identifier
 from patchharbor.models import RepositoryContext
 if TYPE_CHECKING:
-    from patchharbor.result_reader import ReferenceContext
+    from patchharbor.reference_reader import ReferenceContext
 
 
 def write_context_block(context: RepositoryContext, stream: TextIO) -> None:

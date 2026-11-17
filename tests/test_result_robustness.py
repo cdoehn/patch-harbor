@@ -13,7 +13,7 @@ from patchharbor import api, runtime_pyz as pyz
 from patchharbor.archive_evidence import parse_archive_evidence
 from patchharbor.exchange import ExchangeArtifactKind, _classify_content
 from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY
-from patchharbor.result_reader import read_result_reference
+from patchharbor.reference_reader import read_reference
 from tests.platform_support import run_cli
 from tests.result_runtime_support import replace_pyz
 from tests.result_pyz_support import canonical, current_result
@@ -41,7 +41,7 @@ def test_inner_directory_is_bounded_before_zipfile_allocates_members(canonical, 
     path = tmp_path / "result.zip"; write_reference(path, files)
     monkeypatch.setattr(pyz, "ZipFile", lambda *a, **k: pytest.fail("unbounded directory allocated ZipInfo objects"))
     with pytest.raises(api.PatchHarborError) as caught:
-        read_result_reference(path)
+        read_reference(path)
     assert caught.value.reason is api.FailureReason.SOURCE_ERROR
 
 
@@ -62,7 +62,7 @@ def test_pyz_and_recipe_limits_precede_their_reads(canonical, tmp_path, monkeypa
                 guard.setattr(ZipFile, "read", lambda *a, **k: pytest.fail("oversize recipe read"))
                 return original(*args, **kwargs)
         monkeypatch.setattr(pyz, "read_pyz", guarded)
-    with pytest.raises(api.PatchHarborError): read_result_reference(path)
+    with pytest.raises(api.PatchHarborError): read_reference(path)
 
 
 @pytest.mark.parametrize("unicode_path", [False, True])
@@ -75,7 +75,7 @@ def test_deep_json_cannot_abort_exchange_classification(tmp_path, monkeypatch, u
     # Interpreter recursion thresholds differ; a type hint is permissible, an
     # executable candidate is not. Exercise the overflow boundary explicitly too.
     assert _classify_content(path, path.read_bytes(), resource_policy=DEFAULT_RESOURCE_POLICY).kind is not ExchangeArtifactKind.TASK_BUNDLE
-    with pytest.raises(api.PatchHarborError): read_result_reference(path)
+    with pytest.raises(api.PatchHarborError): read_reference(path)
     def overflow(*args, **kwargs): raise RecursionError("JSON nesting limit")
     monkeypatch.setattr(json, "loads", overflow)
     assert _classify_content(path, path.read_bytes(), resource_policy=DEFAULT_RESOURCE_POLICY).kind is ExchangeArtifactKind.OTHER
@@ -98,7 +98,7 @@ def test_outer_runtime_inventory_failures_never_become_patch_candidates(canonica
         with ZipFile(path, "a") as archive, pytest.warns(UserWarning):
             archive.writestr("runtime/runtime.json", files["runtime/runtime.json"])
     assert _classify_content(path, path.read_bytes(), resource_policy=DEFAULT_RESOURCE_POLICY).kind is not ExchangeArtifactKind.TASK_BUNDLE
-    with pytest.raises(api.PatchHarborError): read_result_reference(path)
+    with pytest.raises(api.PatchHarborError): read_reference(path)
     # The archive boundary rejects instead of downgrading corrupt runtime data
     # to a successfully checked unavailable reference.
     from patchharbor.zip_payloads import ZipPayloadError

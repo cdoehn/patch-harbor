@@ -13,13 +13,13 @@ from patchharbor import api
 
 def prepare_transport(reference: Path, *, expected_result_sha256: str,
                       trusted_entrypoint: Path, workspace: Path,
-                      output_directory: Path) -> tuple[api.ResultSnapshot, api.TaskPackResult]:
+                      output_directory: Path) -> tuple[api.ReferenceSnapshot, api.TaskPackResult]:
     capabilities = api.integration_capabilities()
     if capabilities.contract_version != 2 or capabilities.snapshot_contract_version != 2:
         raise RuntimeError('snapshot integration contract 2 is required')
     if trusted_entrypoint.name == 'captured-project.zip':
         raise ValueError('entrypoint name collides with the project payload')
-    snapshot = api.read_result_snapshot(reference, expected_sha256=expected_result_sha256)
+    snapshot = api.read_reference_snapshot(reference, expected_sha256=expected_result_sha256)
     workspace.mkdir(exist_ok=False)
     contents = workspace / 'contents'
     contents.mkdir()

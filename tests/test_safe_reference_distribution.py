@@ -86,7 +86,7 @@ else:
     expected_sha = hashlib.sha256(bundle.path.read_bytes()).hexdigest()
     offline = True
     os.environ['PATH'] = ''
-    snapshot = api.read_result_snapshot(bundle.path, expected_sha256=expected_sha)
+    snapshot = api.read_reference_snapshot(bundle.path, expected_sha256=expected_sha)
     expected = json.loads((root / 'expected.json').read_bytes())
     for layer, files in expected.items():
         assert {name: {'mode': file.mode, 'sha256': file.sha256, 'size': file.size}

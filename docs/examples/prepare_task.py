@@ -6,7 +6,7 @@ from patchharbor import api
 
 def prepare_task(contents: Path, *, reference: Path, expected_result_sha256: str,
                  entrypoint: str, output_directory: Path) -> api.TaskPackResult:
-    snapshot = api.read_result_snapshot(reference, expected_sha256=expected_result_sha256)
+    snapshot = api.read_reference_snapshot(reference, expected_sha256=expected_result_sha256)
     prepared = api.pack_task(contents, reference_bundle=reference,
                             entrypoint=entrypoint, output_directory=output_directory)
     if prepared.reference_sha256 != snapshot.sha256:

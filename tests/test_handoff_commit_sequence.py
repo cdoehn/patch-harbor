@@ -10,7 +10,7 @@ from zipfile import ZipFile
 import pytest
 
 from patchharbor import api
-from patchharbor.result_reader import read_result_reference
+from patchharbor.reference_reader import read_reference
 from tests.platform_support import native_python_script, native_value
 from tests.registration_support import create_repository, git
 
@@ -77,7 +77,7 @@ if COUNT:
         archive.writestr(entrypoint, body)
         if count: archive.writestr("tracked.txt", b"state 1\n")
     report = api.execute(patch)
-    facts, digest = read_result_reference(report.result_bundle.path)
+    facts, digest = read_reference(report.result_bundle.path)
     with ZipFile(report.result_bundle.path) as archive:
         log = archive.read("logs/execution.log").decode()
     events = [json.loads(line.removeprefix("PH_SEQUENCE_JSON=")) for line in log.splitlines()

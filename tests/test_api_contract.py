@@ -34,7 +34,7 @@ PUBLIC_TYPES = {
     "PrimaryResult", "PrimaryResultKind", "ProgressEvent", "ProgressObserver",
     "RegistryListResult", "RegistryRepository", "RegistryStatus", "RepositoryContext",
     "RepositoryId", "RepositoryPath", "RepositoryResolved", "RequestStarted",
-    "ResultBundleResult", "ResultBundleStatus", "RunOperation", "RunReport", "RunTiming",
+    "ResultBundleResult", "ResultBundleStatus", "ReferenceBundleKind", "RunOperation", "RunReport", "RunTiming",
     "RunToolError", "ScriptPrepared", "ScriptResult", "UnregisterResult",
 }
 

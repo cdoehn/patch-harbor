@@ -21,9 +21,9 @@ from patchharbor.repository_state import (
     repository_context_from_snapshot,
 )
 from patchharbor.result_bundle import (
-    ManualResultBundle,
+    StateBundlePublication,
     create_execute_result_bundle,
-    create_manual_result_bundle,
+    create_state_bundle,
 )
 from patchharbor.result_resources import PinnedResultResources
 from patchharbor.run_report import ExecutePrimaryOutcome, RunReport, RunSession
@@ -172,10 +172,10 @@ def bundle_repository(
     path: Path,
     *,
     output_directory: Path | None = None,
-) -> ManualResultBundle:
-    """Create one manual Result Bundle for a registered repository."""
+) -> StateBundlePublication:
+    """Create one State Bundle for a registered repository."""
     _maintain_bundle_exchange(path)
-    return create_manual_result_bundle(
+    return create_state_bundle(
         path,
         output_directory=output_directory,
     )

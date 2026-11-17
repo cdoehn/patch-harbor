@@ -43,7 +43,7 @@ tatsächlichen Zustand gebunden. Ein Draft reserviert oder konsumiert keine Refe
 
 ## Quellfortschritt
 
-Vorbereiteter Stand: **STATE-01.R**. Apply- und Testnachweis: **ausstehend**.
+Vorbereiteter Stand: **STATE-01.C**. Apply- und Testnachweis: **ausstehend**.
 
 ## Reparatur nach Execute 121
 

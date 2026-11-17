@@ -82,7 +82,7 @@ class ResultUntrackedEntry:
 
 
 @dataclass(frozen=True)
-class ResultBundleSnapshot:
+class RepositoryBundleSnapshot:
     """One immutable set of bytes used for manifest and ZIP generation."""
 
     base_entries: tuple[ResultBaseEntry, ...]
@@ -119,7 +119,7 @@ def _require_unique_paths(paths: tuple[bytes, ...], description: str) -> None:
         raise result_bundle_error(f"snapshot contains duplicate {description} paths")
 
 
-def build_result_bundle_snapshot(
+def build_repository_bundle_snapshot(
     *,
     base_entries: Iterable[
         tuple[bytes, bytes, GitObjectId, bytes | memoryview]
@@ -127,7 +127,7 @@ def build_result_bundle_snapshot(
     staged_patch: bytes,
     unstaged_patch: bytes,
     untracked_entries: Iterable[tuple[bytes, bytes, bytes]],
-) -> ResultBundleSnapshot:
+) -> RepositoryBundleSnapshot:
     """Build one validated shared snapshot from already captured bytes."""
     raw_base_entries = tuple(base_entries)
     raw_untracked_entries = tuple(untracked_entries)
@@ -173,7 +173,7 @@ def build_result_bundle_snapshot(
             key=lambda entry: entry.path.original_bytes,
         )
     )
-    return ResultBundleSnapshot(
+    return RepositoryBundleSnapshot(
         base_entries=materialized_base,
         staged_patch=staged_patch,
         unstaged_patch=unstaged_patch,

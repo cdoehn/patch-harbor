@@ -11,7 +11,7 @@ from patchharbor.bundle_handoff import BundleHandoff
 from patchharbor.exit_status import ExitCode, exit_code_for_error
 from patchharbor.errors import PatchHarborError
 from patchharbor.models import GitObjectFormat, GitObjectId
-from patchharbor.result_bundle_snapshot import build_result_bundle_snapshot
+from patchharbor.repository_bundle_snapshot import build_repository_bundle_snapshot
 from patchharbor.result_bundle_writer import write_result_bundle
 from tests.run_report_support import successful_bundle_run_report
 
@@ -37,7 +37,7 @@ def test_snapshot_bytes_drive_manifest_and_zip_in_canonical_order(
         "artifacts/local.dat": "100644",
         "tools/local.sh": "100755",
     }
-    snapshot = build_result_bundle_snapshot(
+    snapshot = build_repository_bundle_snapshot(
         base_entries=(
             (
                 path.encode("utf-8"),
@@ -125,7 +125,7 @@ def test_snapshot_bytes_drive_manifest_and_zip_in_canonical_order(
 )
 def test_snapshot_reuses_repository_path_validation(path: bytes) -> None:
     with pytest.raises(PatchHarborError) as captured:
-        build_result_bundle_snapshot(
+        build_repository_bundle_snapshot(
             base_entries=(),
             staged_patch=b"",
             unstaged_patch=b"",
@@ -137,7 +137,7 @@ def test_snapshot_reuses_repository_path_validation(path: bytes) -> None:
 
 def test_snapshot_rejects_casefold_collisions_across_sources() -> None:
     with pytest.raises(PatchHarborError) as captured:
-        build_result_bundle_snapshot(
+        build_repository_bundle_snapshot(
             base_entries=(
                 (b"Readme.txt", b"100644", _object_id(), b"base"),
             ),
@@ -151,7 +151,7 @@ def test_snapshot_rejects_casefold_collisions_across_sources() -> None:
 
 def test_snapshot_rejects_non_regular_file_modes() -> None:
     with pytest.raises(PatchHarborError) as captured:
-        build_result_bundle_snapshot(
+        build_repository_bundle_snapshot(
             base_entries=(),
             staged_patch=b"",
             unstaged_patch=b"",

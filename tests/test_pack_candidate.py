@@ -16,7 +16,7 @@ from patchharbor.bundle_handoff import BundleHandoff, MAX_HANDOFF_ENTRY_BYTES
 from patchharbor.errors import FailureReason, PatchHarborError
 from patchharbor.pack_candidate import prepare_metadata, write_candidate
 from patchharbor.pack_sources import capture_sources
-from patchharbor.result_reader import capture_result_reference
+from patchharbor.reference_reader import capture_reference
 from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY
 from tests.pack_support import _reference
 from tests.reference_support import edit_document, write_reference
@@ -46,7 +46,7 @@ def build(tmp_path,reference,sources,*,filename=None,policy=DEFAULT_RESOURCE_POL
 @pytest.mark.parametrize('dirty',[False,True])
 def test_candidate_preserves_exact_binding_and_is_natively_valid(tmp_path,kind,dirty):
     path,_,binding=_reference(tmp_path,kind=kind,dirty=dirty)
-    reference=capture_result_reference(path)
+    reference=capture_reference(path)
     source=inputs(tmp_path)
     metadata,raw,warnings=build(tmp_path,reference,source)
     output=tmp_path/metadata.filename;output.write_bytes(raw)
@@ -71,7 +71,7 @@ def test_candidate_preserves_exact_binding_and_is_natively_valid(tmp_path,kind,d
 
 def test_candidate_profile_is_ordered_reproducible_and_uses_explicit_modes(tmp_path):
     path,_,_=_reference(tmp_path)
-    reference=capture_result_reference(path);source=inputs(tmp_path)
+    reference=capture_reference(path);source=inputs(tmp_path)
     first=build(tmp_path,reference,source);second=build(tmp_path,reference,source)
     assert first==second
     with ZipFile(BytesIO(first[1])) as archive:
@@ -94,7 +94,7 @@ def test_candidate_profile_is_ordered_reproducible_and_uses_explicit_modes(tmp_p
 def test_automatic_name_uses_own_uuid_utc_and_portable_display_prefix(tmp_path,name,expected):
     path,files,_=_reference(tmp_path)
     edit_document(files,'environment.json',lambda d:d.update(repository_name=name))
-    write_reference(path,files);reference=capture_result_reference(path)
+    write_reference(path,files);reference=capture_reference(path)
     metadata=prepare_metadata(reference,PACKAGE_ID,STAMP)
     assert metadata.filename==expected+'_Task_Bundle_172839_1007_be14e6.zip.txt'
     assert metadata.package_id==PACKAGE_ID and metadata.created_at==STAMP
@@ -108,7 +108,7 @@ def test_legacy_name_uses_recorded_path_syntax_without_local_resolution(tmp_path
     path,files,_=_reference(tmp_path)
     edit_document(files,'logs/run.json',lambda d:d.update(repository_path=recorded))
     edit_document(files,'environment.json',lambda d:d.update(repository_path=recorded,repository_name=None))
-    write_reference(path,files);reference=capture_result_reference(path)
+    write_reference(path,files);reference=capture_reference(path)
     monkeypatch.setattr(Path,'resolve',lambda *a,**k:pytest.fail('foreign path resolution'))
     metadata=prepare_metadata(reference,PACKAGE_ID,STAMP)
     assert metadata.filename.startswith(expected+'_Task_Bundle_')
@@ -117,7 +117,7 @@ def test_legacy_name_uses_recorded_path_syntax_without_local_resolution(tmp_path
 @pytest.mark.parametrize('suffix',['','.txt','.upload'])
 def test_explicit_name_is_preserved_but_request_metadata_still_exists(tmp_path,suffix):
     path,_,_=_reference(tmp_path,suffix=suffix)
-    metadata=prepare_metadata(capture_result_reference(path),PACKAGE_ID,STAMP,filename='chosen.zip'+suffix)
+    metadata=prepare_metadata(capture_reference(path),PACKAGE_ID,STAMP,filename='chosen.zip'+suffix)
     assert metadata.filename=='chosen.zip'+suffix
     assert metadata.package_id==PACKAGE_ID and metadata.created_at==STAMP
 
@@ -126,13 +126,13 @@ def test_explicit_name_is_preserved_but_request_metadata_still_exists(tmp_path,s
 def test_wrong_suffix_and_temporary_explicit_names_are_output_errors(tmp_path,name):
     path,_,_=_reference(tmp_path)
     with pytest.raises(PatchHarborError) as caught:
-        prepare_metadata(capture_result_reference(path),PACKAGE_ID,STAMP,filename=name)
+        prepare_metadata(capture_reference(path),PACKAGE_ID,STAMP,filename=name)
     assert caught.value.reason is FailureReason.PAYLOAD_PREPARATION_ERROR
 
 
 def test_reference_rendered_instructions_are_not_the_new_template(tmp_path):
     path,_,_=_reference(tmp_path)
-    reference=capture_result_reference(path)
+    reference=capture_reference(path)
     # Reference passive instructions were already validated; no later reading.
     reference=replace(reference,handoff=BundleHandoff(b'OLD_RENDERED_CONTEXT',reference.handoff.environment,reference.handoff.bootstrap))
     _,raw,_=build(tmp_path,reference,inputs(tmp_path))
@@ -144,7 +144,7 @@ def test_reference_rendered_instructions_are_not_the_new_template(tmp_path):
 
 @pytest.mark.parametrize('limit',['entry','entry_bytes','total','artifact','handoff'])
 def test_generated_contents_and_compressed_output_share_budgets(tmp_path,limit):
-    path,_,_=_reference(tmp_path);reference=capture_result_reference(path);source=inputs(tmp_path)
+    path,_,_=_reference(tmp_path);reference=capture_reference(path);source=inputs(tmp_path)
     policy=DEFAULT_RESOURCE_POLICY;template=TEMPLATE
     if limit=='entry':policy=replace(policy,max_zip_entries=4)
     elif limit=='entry_bytes':policy=replace(policy,warning_bytes=1,max_content_bytes=100)

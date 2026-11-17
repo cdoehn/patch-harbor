@@ -12,7 +12,7 @@ from patchharbor.repository_paths import RepositoryRelativePath, validate_reposi
 from patchharbor.resource_policy import MAX_RESULT_FILES
 from patchharbor.snapshot_binary import invalid, read_block
 from patchharbor.snapshot_budget import SnapshotBudget
-from patchharbor.snapshot_types import ResultSnapshotError, SnapshotErrorCode, SnapshotFile, SnapshotLayer
+from patchharbor.snapshot_types import ReferenceSnapshotError, SnapshotErrorCode, SnapshotFile, SnapshotLayer
 
 _INDEX = re.compile(rb'index ([0-9a-f]+)\.\.([0-9a-f]+)(?: (100644|100755))?\n')
 _HUNK = re.compile(rb'@@ -(0|[1-9][0-9]*)(?:,(0|[1-9][0-9]*))? \+(0|[1-9][0-9]*)(?:,(0|[1-9][0-9]*))? @@[^\n]*\n')
@@ -62,12 +62,12 @@ def _path(raw: bytes) -> str:
     try:
         return RepositoryRelativePath(raw).decoded
     except PatchHarborError as exc:
-        raise ResultSnapshotError(SnapshotErrorCode.PATH_COLLISION, 'unsafe reconstruction path') from exc
+        raise ReferenceSnapshotError(SnapshotErrorCode.PATH_COLLISION, 'unsafe reconstruction path') from exc
 
 
 def _diff_path(line: bytes) -> str:
     if not line.startswith(b'diff --git ') or not line.endswith(b'\n'):
-        raise ResultSnapshotError(SnapshotErrorCode.UNSUPPORTED_PATCH, 'expected a full Git diff header')
+        raise ReferenceSnapshotError(SnapshotErrorCode.UNSUPPORTED_PATCH, 'expected a full Git diff header')
     raw = line[len(b'diff --git '):-1]
     if raw.startswith(b'"'):
         left, tail = _quoted(raw)
@@ -80,10 +80,10 @@ def _diff_path(line: bytes) -> str:
         length = (len(raw) - 5) // 2
         name = raw[2:2 + length]
         if raw != b'a/' + name + b' b/' + name:
-            raise ResultSnapshotError(SnapshotErrorCode.UNSUPPORTED_PATCH, 'noncanonical or renamed diff path')
+            raise ReferenceSnapshotError(SnapshotErrorCode.UNSUPPORTED_PATCH, 'noncanonical or renamed diff path')
         left, right = b'a/' + name, b'b/' + name
     if not left.startswith(b'a/') or right != b'b/' + left[2:]:
-        raise ResultSnapshotError(SnapshotErrorCode.UNSUPPORTED_PATCH, 'diff requires identical a/ and b/ paths')
+        raise ReferenceSnapshotError(SnapshotErrorCode.UNSUPPORTED_PATCH, 'diff requires identical a/ and b/ paths')
     return _path(left[2:])
 
 
@@ -114,16 +114,16 @@ def file_value(path: str, mode: str, raw: bytes, algorithm: GitObjectFormat) -> 
 
 def layer(name: str, files: dict[str, SnapshotFile]) -> SnapshotLayer:
     if len(files) > MAX_RESULT_FILES:
-        raise ResultSnapshotError(SnapshotErrorCode.RESOURCE_LIMIT, 'snapshot layer has too many files')
+        raise ReferenceSnapshotError(SnapshotErrorCode.RESOURCE_LIMIT, 'snapshot layer has too many files')
     try:
         paths = validate_repository_paths(p.encode('utf-8') for p in files)
     except PatchHarborError as exc:
-        raise ResultSnapshotError(SnapshotErrorCode.PATH_COLLISION, 'nonportable snapshot collision') from exc
+        raise ReferenceSnapshotError(SnapshotErrorCode.PATH_COLLISION, 'nonportable snapshot collision') from exc
     keys = {p.collision_key for p in paths}
     for path in paths:
         parts = path.collision_key.split('/')
         if any('/'.join(parts[:i]) in keys for i in range(1, len(parts))):
-            raise ResultSnapshotError(SnapshotErrorCode.PATH_COLLISION, 'snapshot file/directory collision')
+            raise ReferenceSnapshotError(SnapshotErrorCode.PATH_COLLISION, 'snapshot file/directory collision')
     return SnapshotLayer(name, MappingProxyType({p.decoded: files[p.decoded] for p in paths}))
 
 
@@ -217,7 +217,7 @@ def apply_patch(previous: SnapshotLayer, patch: bytes, name: str,
             if _peek(stream).startswith(label):
                 raw_mode = stream.readline()[len(label):]
                 if raw_mode not in (b'100644\n', b'100755\n'):
-                    raise ResultSnapshotError(SnapshotErrorCode.UNSUPPORTED_PATCH, 'unsupported Git file mode')
+                    raise ReferenceSnapshotError(SnapshotErrorCode.UNSUPPORTED_PATCH, 'unsupported Git file mode')
                 mode = raw_mode[:-1].decode('ascii')
                 transition = label
                 if label == b'new file mode ':
@@ -270,7 +270,7 @@ def apply_patch(previous: SnapshotLayer, patch: bytes, name: str,
             _file_header(stream.readline(), b'+++ ', b'b/' + encoded if new_mode else b'/dev/null')
             raw = _text(stream, old_bytes, budget)
         elif following and not following.startswith(b'diff --git '):
-            raise ResultSnapshotError(SnapshotErrorCode.UNSUPPORTED_PATCH, 'unknown change syntax')
+            raise ReferenceSnapshotError(SnapshotErrorCode.UNSUPPORTED_PATCH, 'unknown change syntax')
         else:
             raw = old_bytes
             if transition is None:
@@ -292,5 +292,5 @@ def apply_patch(previous: SnapshotLayer, patch: bytes, name: str,
         # Adds may sort before deletes. Bound the temporary union while allowing
         # a valid final layer at its file-count ceiling. layer() checks the result.
         if len(files) > MAX_RESULT_FILES + len(previous.files):
-            raise ResultSnapshotError(SnapshotErrorCode.RESOURCE_LIMIT, 'too many reconstructed files')
+            raise ReferenceSnapshotError(SnapshotErrorCode.RESOURCE_LIMIT, 'too many reconstructed files')
     return layer(name, files)

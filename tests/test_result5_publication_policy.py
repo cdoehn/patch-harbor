@@ -4,7 +4,7 @@ from zipfile import ZipFile
 
 import pytest
 
-from patchharbor import result_bundle_writer as writer, result_reader as reader
+from patchharbor import result_bundle_writer as writer, reference_reader as reader
 from patchharbor import result_resources as resources, result_verification as verification
 from patchharbor.platform.filesystem import FileChangedDuringRead
 from tests.result_publication_support import _publish
@@ -44,7 +44,7 @@ def test_new_runtime_states_keep_typed_retry_and_hash_publication_boundary(tmp_p
         assert sleeps==[2]
         actual=target.final_path.read_bytes()
         assert published==[sha256(actual).hexdigest()]
-        facts,digest=reader.read_result_reference(target.final_path)
+        facts,digest=reader.read_reference(target.final_path)
         assert facts.format_version==5 and facts.runtime.status==state and digest==published[0]
         with ZipFile(target.final_path) as archive:
             assert not any(n.startswith('runtime/') and n.endswith('.whl') for n in archive.namelist())

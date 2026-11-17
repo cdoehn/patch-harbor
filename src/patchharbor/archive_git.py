@@ -88,10 +88,10 @@ def is_proven_obsolete(
         )
     if evidence.kind not in ("state_bundle", "result_bundle") or selection.base_commit == context.base_commit:
         return False
-    return is_proven_result_state(evidence, context)
+    return is_proven_reference_state(evidence, context)
 
 
-def is_proven_result_state(evidence: ArchiveEvidence, context: RepositoryContext) -> bool:
+def is_proven_reference_state(evidence: ArchiveEvidence, context: RepositoryContext) -> bool:
     """Validate the complete result tree against original Git, including HEAD."""
     selection = evidence.selection
     if evidence.kind not in ("state_bundle", "result_bundle") or context.dirty or selection.repo_id != context.repo_id:

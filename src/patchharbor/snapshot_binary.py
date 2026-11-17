@@ -7,13 +7,13 @@ import re
 import zlib
 
 from patchharbor.snapshot_budget import SnapshotBudget
-from patchharbor.snapshot_types import ResultSnapshotError, SnapshotErrorCode
+from patchharbor.snapshot_types import ReferenceSnapshotError, SnapshotErrorCode
 
 _HEADER = re.compile(rb'(literal|delta) (0|[1-9][0-9]*)\n')
 
 
-def invalid(message: str) -> ResultSnapshotError:
-    return ResultSnapshotError(SnapshotErrorCode.INVALID_PATCH, message)
+def invalid(message: str) -> ReferenceSnapshotError:
+    return ReferenceSnapshotError(SnapshotErrorCode.INVALID_PATCH, message)
 
 
 def _integer(data: bytes, offset: int) -> tuple[int, int]:
@@ -97,7 +97,7 @@ def read_block(stream: BytesIO, original: bytes, budget: SnapshotBudget) -> byte
         if any(decoded[count:]):
             raise invalid('nonzero binary base85 padding')
         if len(encoded) + count > budget.policy.max_content_bytes:
-            raise ResultSnapshotError(SnapshotErrorCode.RESOURCE_LIMIT, 'compressed binary block exceeds limit')
+            raise ReferenceSnapshotError(SnapshotErrorCode.RESOURCE_LIMIT, 'compressed binary block exceeds limit')
         encoded.extend(decoded[:count])
     try:
         decoder = zlib.decompressobj()

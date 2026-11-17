@@ -22,7 +22,7 @@ pytestmark = pytest.mark.e2e
 def test_layers_match_independent_original_states(tmp_path,monkeypatch,kind,object_format,quoted):
     case=produce_case(tmp_path,monkeypatch,kind=kind,object_format=object_format,quoted=quoted)
     raw=case.result.read_bytes()
-    snapshot=api.read_result_snapshot(case.result,expected_sha256=hashlib.sha256(raw).hexdigest())
+    snapshot=api.read_reference_snapshot(case.result,expected_sha256=hashlib.sha256(raw).hexdigest())
     assert snapshot.format_version==5 and snapshot.context.dirty==(kind!='clean')
     assert snapshot.sha256==hashlib.sha256(raw).hexdigest()
     assert snapshot.context==api.ReferenceContext(**{name:getattr(api.context(case.repository),name)
@@ -60,7 +60,7 @@ def test_mode_changes_preserve_bytes_and_effective_modes(tmp_path,monkeypatch):
     git(case.repository,'add','tracked.txt')
     path.chmod(0o644)
     result=api.bundle(case.repository)
-    s=api.read_result_snapshot(result.path)
+    s=api.read_reference_snapshot(result.path)
     assert [getattr(s,n).files['tracked.txt'].mode for n in ('base','index','worktree','effective')]==['100644','100755','100644','100644']
     assert all(getattr(s,n).files['tracked.txt'].content==path.read_bytes() for n in ('base','index','worktree'))
 
@@ -71,7 +71,7 @@ def test_valid_execution_facts_are_never_promoted_to_success(tmp_path,kind,dirty
     files,_=reference_entries(kind=kind,dirty=dirty)
     if dirty:files['changes/unstaged.patch']=b''  # actual untracked state, no fictional delta
     path=tmp_path/'reference.zip';write_reference(path,files)
-    s=api.read_result_snapshot(path)
+    s=api.read_reference_snapshot(path)
     assert s.context.dirty is dirty and s.dry_run==(kind=='dry_run')
     assert s.primary_result.success==(kind in ('bundle','success','dry_run'))
     assert s.primary_result.entrypoint_started==(kind in ('success','failure','timeout','interrupted'))
@@ -81,19 +81,19 @@ def test_valid_execution_facts_are_never_promoted_to_success(tmp_path,kind,dirty
 
 
 def test_public_signature_types_capabilities_and_argument_failures(tmp_path):
-    signature=inspect.signature(api.read_result_snapshot)
+    signature=inspect.signature(api.read_reference_snapshot)
     assert list(signature.parameters)==['result','expected_sha256','observer']
-    assert typing.get_type_hints(api.read_result_snapshot)['return'] is api.ResultSnapshot
-    assert {'ResultSnapshot','SnapshotLayer','SnapshotFile','SnapshotRuntime','ResultSnapshotError','SnapshotErrorCode'}<=set(api.__all__)
+    assert typing.get_type_hints(api.read_reference_snapshot)['return'] is api.ReferenceSnapshot
+    assert {'ReferenceSnapshot','SnapshotLayer','SnapshotFile','SnapshotRuntime','ReferenceSnapshotError','SnapshotErrorCode'}<=set(api.__all__)
     capability=api.integration_capabilities()
     assert capability.contract_version==capability.snapshot_contract_version==2
     for digest in ('short','A'*64,'x'*64):
-        with pytest.raises(ValueError):api.read_result_snapshot(tmp_path/'absent',expected_sha256=digest)
+        with pytest.raises(ValueError):api.read_reference_snapshot(tmp_path/'absent',expected_sha256=digest)
     for digest in (True,b'0'*64,5):
-        with pytest.raises(TypeError):api.read_result_snapshot(tmp_path/'absent',expected_sha256=digest)
-    with pytest.raises(TypeError):api.read_result_snapshot(tmp_path/'absent',observer='observer')
-    with pytest.raises(api.ResultSnapshotError) as caught:api.read_result_snapshot(tmp_path/'absent')
-    assert caught.value.code is api.SnapshotErrorCode.INVALID_RESULT
+        with pytest.raises(TypeError):api.read_reference_snapshot(tmp_path/'absent',expected_sha256=digest)
+    with pytest.raises(TypeError):api.read_reference_snapshot(tmp_path/'absent',observer='observer')
+    with pytest.raises(api.ReferenceSnapshotError) as caught:api.read_reference_snapshot(tmp_path/'absent')
+    assert caught.value.code is api.SnapshotErrorCode.INVALID_REFERENCE
 
 
 @pytest.mark.parametrize('direction',['file_to_directory','directory_to_file'])
@@ -105,7 +105,7 @@ def test_real_file_directory_transition_preserves_layers(tmp_path,monkeypatch,di
     else:
         (repo/'雪 space/a b/file').unlink();(repo/'雪 space/a b').rmdir();(repo/'雪 space').rmdir();(repo/'雪 space').write_bytes(b'file\n')
     git(repo,'add','--all')
-    s=api.read_result_snapshot(api.bundle(repo).path)
+    s=api.read_reference_snapshot(api.bundle(repo).path)
     if direction=='file_to_directory':
         assert 'tracked.txt' in s.base.files and 'tracked.txt' not in s.index.files
         assert s.effective.files['tracked.txt/child'].content==b'child\n'
@@ -121,7 +121,7 @@ def test_text_edge_shapes_match_real_git(tmp_path,monkeypatch,before,after):
     p=case.repository/'tracked.txt';p.write_bytes(before)
     git(case.repository,'add','tracked.txt');git(case.repository,'commit','--quiet','-m','text edge base')
     p.write_bytes(after)
-    snapshot=api.read_result_snapshot(api.bundle(case.repository).path)
+    snapshot=api.read_reference_snapshot(api.bundle(case.repository).path)
     assert snapshot.base.files['tracked.txt'].content==before
     assert snapshot.index.files['tracked.txt'].content==before
     assert snapshot.worktree.files['tracked.txt'].content==after
@@ -139,7 +139,7 @@ def test_count_ceiling_allows_add_before_delete_in_same_git_layer(tmp_path,monke
     (repo/'a').write_bytes(b'new\n');(repo/'z').unlink();git(repo,'add','--all')
     result=api.bundle(repo)
     monkeypatch.setattr(snapshot_delta,'MAX_RESULT_FILES',2)
-    snapshot=api.read_result_snapshot(result.path)
+    snapshot=api.read_reference_snapshot(result.path)
     assert set(snapshot.base.files)=={'tracked.txt','z'}
     assert set(snapshot.effective.files)=={'tracked.txt','a'}
     assert snapshot.effective.files['a'].content==b'new\n'

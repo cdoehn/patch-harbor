@@ -415,7 +415,7 @@ def test_version3_helper_is_passive_and_strictly_bound(tmp_path, fault):
 @pytest.mark.parametrize('fault', [None, 'missing', 'changed', 'extra', 'downgrade'])
 def test_result_reader_preserves_and_verifies_separate_helper(tmp_path, fault):
     from patchharbor.bundle_handoff import BOOTSTRAP_NAME
-    from patchharbor.result_reader import capture_result_reference
+    from patchharbor.reference_reader import capture_reference
     from tests.reference_support import reference_entries, write_reference
     files, _ = reference_entries()
     document = json.loads(files[ENVIRONMENT_NAME])
@@ -430,9 +430,9 @@ def test_result_reader_preserves_and_verifies_separate_helper(tmp_path, fault):
         files[ENVIRONMENT_NAME] = json.dumps(document).encode()
     path = tmp_path / 'result.zip'; write_reference(path, files)
     if fault:
-        with pytest.raises(PatchHarborError): capture_result_reference(path)
+        with pytest.raises(PatchHarborError): capture_reference(path)
     else:
-        assert capture_result_reference(path).handoff == handoff
+        assert capture_reference(path).handoff == handoff
 
 
 def test_compact_header_keeps_all_environment_fields_without_repeating_them():

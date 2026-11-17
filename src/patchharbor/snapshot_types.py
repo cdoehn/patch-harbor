@@ -7,13 +7,13 @@ from enum import Enum
 
 from patchharbor.errors import FailureReason, PatchHarborError
 from patchharbor.models import GitObjectId
-from patchharbor.result_reader import ReferenceContext
+from patchharbor.reference_reader import ReferenceContext
 from patchharbor.run_report import PrimaryResult
 from patchharbor.reference_kind import ReferenceBundleKind, kind_for_operation
 
 
 class SnapshotErrorCode(str, Enum):
-    INVALID_RESULT = 'invalid_result'
+    INVALID_REFERENCE = 'invalid_reference'
     DIGEST_MISMATCH = 'digest_mismatch'
     INVALID_PATCH = 'invalid_patch'
     UNSUPPORTED_PATCH = 'unsupported_patch'
@@ -21,7 +21,7 @@ class SnapshotErrorCode(str, Enum):
     RESOURCE_LIMIT = 'resource_limit'
 
 
-class ResultSnapshotError(PatchHarborError):
+class ReferenceSnapshotError(PatchHarborError):
     """Complete snapshot validation failed; no partial snapshot is returned."""
 
     def __init__(self, code: SnapshotErrorCode, message: str) -> None:
@@ -65,7 +65,7 @@ class SnapshotRuntime:
 
 
 @dataclass(frozen=True, slots=True)
-class ResultSnapshot:
+class ReferenceSnapshot:
     sha256: str
     format_version: int
     context: ReferenceContext

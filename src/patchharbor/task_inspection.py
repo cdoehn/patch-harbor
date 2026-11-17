@@ -13,8 +13,8 @@ from patchharbor.interpreters import select_interpreter
 from patchharbor.models import RepositoryContext
 from patchharbor.errors import state_mismatch_error
 from patchharbor.exchange_state import ExchangeTaskSelection
-from patchharbor.result_reader import (
-    CapturedResultReference, ReferenceContext, capture_result_reference,
+from patchharbor.reference_reader import (
+    CapturedReference, ReferenceContext, capture_reference,
 )
 from patchharbor.repository_state import capture_repository_context
 from patchharbor.parser import Message as TaskMessage
@@ -117,7 +117,7 @@ def validate_task(
         raise ValueError("repository and reference_bundle are mutually exclusive")
     inspection = inspect_task(path, resource_policy=resource_policy)
     if reference_bundle is not None:
-        reference = capture_result_reference(reference_bundle, resource_policy=resource_policy)
+        reference = capture_reference(reference_bundle, resource_policy=resource_policy)
         return _validation_result(inspection, scope=TaskValidationScope.REFERENCE,
                                   context=reference.facts.context, reference_sha256=reference.sha256)
     if repository is not None:
@@ -127,13 +127,13 @@ def validate_task(
 
 
 def validate_task_against_reference(
-    path: Path, reference: CapturedResultReference, *,
+    path: Path, reference: CapturedReference, *,
     resource_policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY,
     expected_identity: os.stat_result | None = None,
 ) -> TaskValidationResult:
     """Internal pack seam: inspect actual package bytes against one captured Result.
 
-    Callers must obtain the reference from capture_result_reference in the same
+    Callers must obtain the reference from capture_reference in the same
     request. This avoids another reference-path read, not the package inspection
     or the common binding check. Public APIs continue to accept explicit paths.
     """

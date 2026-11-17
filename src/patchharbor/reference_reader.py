@@ -1,4 +1,4 @@
-"""Read complete Result-5 facts without imposing archival success policy."""
+"""Read complete State/Result reference facts without imposing archival success policy."""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -92,7 +92,7 @@ class ReferenceContext:
 
 
 @dataclass(frozen=True, slots=True)
-class ResultFacts:
+class ReferenceFacts:
     context: ReferenceContext
     run_id: str
     operation: str
@@ -114,16 +114,16 @@ class ResultFacts:
 
 
 @dataclass(frozen=True, slots=True)
-class CapturedResultReference:
+class CapturedReference:
     """Internal request-local facts from one completely validated byte capture.
 
     The small handoff pair retains its exact immutable bytes, not mutable JSON
     objects or the full archive. Decode those bytes when rendering new metadata;
     never reopen the reference path for its suffix or target environment. This
-    value is not an authenticity token and must come from capture_result_reference.
+    value is not an authenticity token and must come from capture_reference.
     """
 
-    facts: ResultFacts
+    facts: ReferenceFacts
     sha256: str
     bundle_suffix: str
     handoff: BundleHandoff | None
@@ -166,7 +166,7 @@ def _hex_digest(value: object) -> bool:
     return type(value) is str and len(value) == 64 and all(c in "0123456789abcdef" for c in value)
 
 
-def result_member_path(raw_path: str, *, is_directory: bool = False) -> str:
+def reference_member_path(raw_path: str, *, is_directory: bool = False) -> str:
     """Snapshot paths follow repository rules; patch package paths remain unchanged."""
     prefix, separator, relative = raw_path.partition("/")
     if prefix not in ("base", "untracked") or not separator or not relative:
@@ -218,7 +218,7 @@ def _handoff(files: dict[str, bytes], context: dict, run: dict) -> set[str]:
     return names
 
 
-def has_result_marker(payloads: tuple[BundlePayload, ...]) -> bool:
+def has_reference_marker(payloads: tuple[BundlePayload, ...]) -> bool:
     """One strict marker hint for classification, never a validity claim."""
     return reference_kind_hint(payloads) is not None
 
@@ -232,7 +232,7 @@ def reference_kind_hint(payloads: tuple[BundlePayload, ...]) -> ReferenceBundleK
         return None
 
 
-def read_result_or_task_payloads(content: bytes, *,
+def read_reference_or_task_payloads(content: bytes, *,
                                   policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY) -> tuple[BundlePayload, ...]:
     """Keep the patch profile strict; allow snapshot paths only for Result hints.
 
@@ -243,31 +243,31 @@ def read_result_or_task_payloads(content: bytes, *,
     try:
         return read_zip_payload_bytes(content, policy=policy)
     except InvalidZipArchiveError as original:
-        payloads = read_zip_payload_bytes(content, policy=policy, path_normalizer=result_member_path)
-        if not has_result_marker(payloads):
+        payloads = read_zip_payload_bytes(content, policy=policy, path_normalizer=reference_member_path)
+        if not has_reference_marker(payloads):
             raise original
         return payloads
 
 
-def parse_result_payloads(payloads: tuple[BundlePayload, ...], *,
-                          resource_policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY) -> ResultFacts:
+def parse_reference_payloads(payloads: tuple[BundlePayload, ...], *,
+                          resource_policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY) -> ReferenceFacts:
     """Validate ZIP-reader output; neither execute deltas nor infer a live fingerprint."""
-    return _parse_result_payloads(payloads, resource_policy=resource_policy, verify_runtime=True)
+    return _parse_reference_payloads(payloads, resource_policy=resource_policy, verify_runtime=True)
 
 
 def _parse_repository_payloads(payloads: tuple[BundlePayload, ...], *,
-                               resource_policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY) -> ResultFacts:
+                               resource_policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY) -> ReferenceFacts:
     """Private handoff fallback: repository evidence only, never full Result validity.
 
     Outer ZIP/path/CRC limits still execute before this boundary. The original
     artifact is neither rewritten nor downgraded. Native readers and archive/
-    recovery callers always use parse_result_payloads with runtime verification.
+    recovery callers always use parse_reference_payloads with runtime verification.
     """
-    return _parse_result_payloads(payloads, resource_policy=resource_policy, verify_runtime=False)
+    return _parse_reference_payloads(payloads, resource_policy=resource_policy, verify_runtime=False)
 
 
-def _parse_result_payloads(payloads: tuple[BundlePayload, ...], *,
-                           resource_policy: ResourcePolicy, verify_runtime: bool) -> ResultFacts:
+def _parse_reference_payloads(payloads: tuple[BundlePayload, ...], *,
+                           resource_policy: ResourcePolicy, verify_runtime: bool) -> ReferenceFacts:
     files = {entry.relative_path: entry.content for entry in payloads}
     modes = {entry.relative_path: entry.unix_mode for entry in payloads}
     _require(len(files) == len(payloads), "duplicate result members")
@@ -391,7 +391,7 @@ def _parse_result_payloads(payloads: tuple[BundlePayload, ...], *,
         for entry in entries:
             _require(type(entry) is dict and set(entry) == fields, "invalid result entry schema")
             name = entry["path"]
-            _require(type(name) is str and result_member_path(kind + "/" + name) == kind + "/" + name,
+            _require(type(name) is str and reference_member_path(kind + "/" + name) == kind + "/" + name,
                      "invalid result path")
             repository_paths.append(name.encode("utf-8"))
             member = kind + "/" + name
@@ -419,23 +419,23 @@ def _parse_result_payloads(payloads: tuple[BundlePayload, ...], *,
     _require(context["dirty"] == has_changes, "inconsistent dirty state")
     if not context["dirty"]:
         _require(binding.state_fingerprint == CLEAN_FINGERPRINT, "inconsistent clean fingerprint")
-    return ResultFacts(ReferenceContext(binding.repo_id, path, binding.base_commit, context["dirty"],
+    return ReferenceFacts(ReferenceContext(binding.repo_id, path, binding.base_commit, context["dirty"],
                                         binding.state_fingerprint, binding.fingerprint_algorithm),
                        run["run_id"], operation, run["dry_run"], primary, tuple(run["warnings"]),
                        tuple(sorted(inventory)), expected, digest, completed, version, runtime, bool(handoff))
 
 
 @dataclass(frozen=True, slots=True)
-class CapturedResultPayloads:
+class CapturedReferencePayloads:
     """The complete validated payloads from one stable read; request-local only."""
 
-    facts: ResultFacts
+    facts: ReferenceFacts
     sha256: str
     payloads: tuple[BundlePayload, ...]
 
 
-def capture_result_payloads(path: Path, *, resource_policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY,
-                             expected_identity: os.stat_result | None = None) -> CapturedResultPayloads:
+def capture_reference_payloads(path: Path, *, resource_policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY,
+                             expected_identity: os.stat_result | None = None) -> CapturedReferencePayloads:
     """Own one stable read and complete validation, with no retries or fallback.
 
     Source errors retain their category. The optional identity is forwarded for
@@ -455,9 +455,9 @@ def capture_result_payloads(path: Path, *, resource_policy: ResourcePolicy = DEF
             target, retained_content_limit=resource_policy.max_input_artifact_bytes, allow_path_identity_fallback=True,
             expected_identity=expected_identity, max_bytes=resource_policy.max_input_artifact_bytes)
         _require(captured.content is not None, "reference exceeds resource limit")
-        payloads = read_zip_payload_bytes(captured.content, policy=resource_policy, path_normalizer=result_member_path)
-        facts = parse_result_payloads(payloads, resource_policy=resource_policy)
-        return CapturedResultPayloads(facts, captured.sha256, payloads)
+        payloads = read_zip_payload_bytes(captured.content, policy=resource_policy, path_normalizer=reference_member_path)
+        facts = parse_reference_payloads(payloads, resource_policy=resource_policy)
+        return CapturedReferencePayloads(facts, captured.sha256, payloads)
     except (FileChangedDuringRead, FileSystemOperationError, UnsupportedFileTypeError,
             NotZipArchiveError, ZipPayloadError, OSError, ValueError, TypeError, KeyError,
             UnicodeError, RecursionError, OverflowError, PatchHarborError) as exc:
@@ -465,22 +465,22 @@ def capture_result_payloads(path: Path, *, resource_policy: ResourcePolicy = DEF
 
 
 
-def capture_result_reference(path: Path, *, resource_policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY,
-                             expected_identity: os.stat_result | None = None) -> CapturedResultReference:
+def capture_reference(path: Path, *, resource_policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY,
+                             expected_identity: os.stat_result | None = None) -> CapturedReference:
     """Project the existing small reference from the same shared capture."""
-    captured = capture_result_payloads(path, resource_policy=resource_policy,
+    captured = capture_reference_payloads(path, resource_policy=resource_policy,
                                        expected_identity=expected_identity)
     selected = {entry.relative_path: entry.content for entry in captured.payloads
                 if entry.relative_path in {"context.json", CHAT_INSTRUCTIONS_NAME, ENVIRONMENT_NAME, BOOTSTRAP_NAME}}
     suffix = _document(selected["context.json"]).get("bundle_suffix", "")
     handoff = (BundleHandoff(selected[CHAT_INSTRUCTIONS_NAME], selected[ENVIRONMENT_NAME], selected[BOOTSTRAP_NAME])
                if captured.facts.handoff_present else None)
-    return CapturedResultReference(captured.facts, captured.sha256, suffix, handoff)
+    return CapturedReference(captured.facts, captured.sha256, suffix, handoff)
 
 
-def read_result_reference(path: Path, *, resource_policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY,
-                          expected_identity: os.stat_result | None = None) -> tuple[ResultFacts, str]:
+def read_reference(path: Path, *, resource_policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY,
+                          expected_identity: os.stat_result | None = None) -> tuple[ReferenceFacts, str]:
     """Compatibility facade: keep the existing facts/hash result and arguments."""
-    captured = capture_result_reference(path, resource_policy=resource_policy,
+    captured = capture_reference(path, resource_policy=resource_policy,
                                         expected_identity=expected_identity)
     return captured.facts, captured.sha256

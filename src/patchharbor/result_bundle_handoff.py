@@ -1,4 +1,4 @@
-"""Compose fresh local handoff data for every Result Bundle publication."""
+"""Compose fresh local handoff data for every State or Result publication."""
 
 from __future__ import annotations
 
@@ -9,8 +9,7 @@ from patchharbor.bundle_handoff import (
     BundleHandoff,
     ENVIRONMENT_MARKER,
     ENVIRONMENT_FORMAT_VERSION,
-    TASK_FILENAME_SCHEMA,
-    RESULT_FILENAME_SCHEMA, STATE_FILENAME_SCHEMA,
+    filename_schemas,
 )
 from patchharbor.chat_instructions import render_chat_handoff
 from patchharbor.platform.environment import capture_runtime_environment
@@ -43,7 +42,7 @@ def create_result_handoff(report: RunReport, target: ResultBundleTarget, *,
         "exchange_directory": str(target.exchange_directory) if target.exchange_directory is not None else None,
         "output_directory": str(target.directory),
         "bundle_suffix": target.bundle_suffix,
-        "filename_schemas": {"Task": TASK_FILENAME_SCHEMA, "State": STATE_FILENAME_SCHEMA, "Result": RESULT_FILENAME_SCHEMA},
+        "filename_schemas": filename_schemas(),
         "filename_timezone": "UTC",
         "runtime": {**capture_runtime_environment(), "patchharbor_version": __version__},
     }

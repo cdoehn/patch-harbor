@@ -30,8 +30,8 @@ from patchharbor.platform.filesystem import (
 )
 from patchharbor.platform.file_handles import open_regular_nofollow
 from patchharbor.result_verification import ResultVerification
-from patchharbor.result_bundle_snapshot import ResultBundleSnapshot
-from patchharbor.result_reader import read_result_reference
+from patchharbor.repository_bundle_snapshot import RepositoryBundleSnapshot
+from patchharbor.reference_reader import read_reference
 from patchharbor.run_report import RunReport, RunSession
 from patchharbor.result_bundle_writer import write_result_bundle
 from patchharbor.result_resources import ResultRuntimePayload
@@ -74,13 +74,13 @@ class PublishedResultBundle:
     durability: PublicationDurability
 
 
-def result_bundle_filename(
+def reference_bundle_filename(
     session: RunSession,
     *,
     repository_name: str,
-    kind: ReferenceBundleKind = ReferenceBundleKind.RESULT,
+    kind: ReferenceBundleKind,
 ) -> str:
-    """Return the human-oriented final filename for one Result Bundle."""
+    """Return the final filename for the explicitly selected reference kind."""
     return (
         f"{repository_name}_{kind.label}_Bundle_{session.filename_timestamp}_"
         f"{shorten_identifier(session.run_id, with_ellipsis=False)}.zip"
@@ -204,12 +204,12 @@ def release_result_bundle_publication(
     )
 
 
-def _verify_result_bundle(path: Path, *, execution_present: bool,
+def _verify_reference_bundle(path: Path, *, execution_present: bool,
                           expected_identity: os.stat_result | None = None) -> str:
     # The shared bounded read already verifies CRC, names and all versioned
     # inventories. Publication only adds its producer-specific obligations.
     try:
-        facts, digest = read_result_reference(path, expected_identity=expected_identity)
+        facts, digest = read_reference(path, expected_identity=expected_identity)
     except (PatchHarborError, OSError, RuntimeError, ValueError) as exc:
         raise result_bundle_error(f"Result Bundle integrity verification failed: {exc}") from exc
     if not facts.handoff_present:
@@ -280,7 +280,7 @@ def publish_result_bundle(
     context_document: dict[str, object],
     handoff: BundleHandoff,
     run_report: RunReport,
-    snapshot: ResultBundleSnapshot,
+    snapshot: RepositoryBundleSnapshot,
     execution_log: bytes | None = None,
     before_publish: Callable[[str], None] | None = None,
     runtime: ResultRuntimePayload | None = None,
@@ -348,7 +348,7 @@ def publish_result_bundle(
         activity("VERIFY", "Verify temporary Result structure, required files and CRC")
         digest = verification.run(
             "temporary-result-stable-read",
-            lambda: _verify_result_bundle(publication.temporary_path,
+            lambda: _verify_reference_bundle(publication.temporary_path,
                                          execution_present=run_report.execution_present,
                                          expected_identity=owned_stat),
         )

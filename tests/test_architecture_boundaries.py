@@ -7,7 +7,7 @@ from tests.architecture_support import assert_acyclic, import_names, workflow_vi
 
 
 KNOWN = {'patchharbor', 'patchharbor.api', 'patchharbor.application',
-         'patchharbor.application_exchange', 'patchharbor.result_reader',
+         'patchharbor.application_exchange', 'patchharbor.reference_reader',
          'patchharbor.platform', 'patchharbor.platform.filesystem'}
 
 
@@ -16,7 +16,7 @@ KNOWN = {'patchharbor', 'patchharbor.api', 'patchharbor.application',
     ('from patchharbor import application as flow', 'patchharbor.api', {'patchharbor.application'}),
     ('from . import application as flow', 'patchharbor.api', {'patchharbor.application'}),
     ('from .application import run_bundle', 'patchharbor.api', {'patchharbor.application'}),
-    ('from .. import result_reader', 'patchharbor.platform.filesystem', {'patchharbor.result_reader'}),
+    ('from .. import reference_reader', 'patchharbor.platform.filesystem', {'patchharbor.reference_reader'}),
     ('from .platform import filesystem as fs', 'patchharbor.api', {'patchharbor.platform.filesystem'}),
     ('from patchharbor import __version__, api', 'patchharbor.application', {'patchharbor', 'patchharbor.api'}),
     ('def deferred():\n    from . import application_exchange', 'patchharbor.api', {'patchharbor.application_exchange'}),
@@ -44,7 +44,7 @@ def test_workflow_can_be_split_without_moving_into_cli_or_domain(module):
 @pytest.mark.parametrize('caller,dependency', [
     ('patchharbor.cli', 'patchharbor.application'),
     ('patchharbor.cli_dispatch', 'patchharbor.application_exchange'),
-    ('patchharbor.result_reader', 'patchharbor.application_configuration'),
+    ('patchharbor.reference_reader', 'patchharbor.application_configuration'),
     ('patchharbor.application_exchange', 'patchharbor.cli_dispatch'),
     ('patchharbor.application', 'patchharbor.presentation'),
     ('patchharbor.application_configuration', 'patchharbor.exit_status'),

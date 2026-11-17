@@ -7,7 +7,7 @@ import pytest
 from patchharbor import __version__, api
 from patchharbor.cli import main
 from patchharbor.monitor_artifact_facts import ArtifactCache
-from patchharbor.result_reader import capture_result_reference
+from patchharbor.reference_reader import capture_reference
 from tests.reference_support import reference_entries, write_reference, bound_package
 from tests.result_runtime_support import edit_metadata
 from tests.task_inspection_support import MANIFEST, write_package
@@ -53,7 +53,7 @@ def test_foreign_result_never_becomes_reference_or_bootstrap(tmp_path, version):
     task = tmp_path / 'task.zip'
     bound_package(task, binding)
     with pytest.raises(api.PatchHarborError, match='package version'):
-        capture_result_reference(reference)
+        capture_reference(reference)
     with pytest.raises(api.PatchHarborError):
         api.validate_task(task, reference_bundle=reference)
     with pytest.raises(ValueError, match='package version'):
@@ -78,7 +78,7 @@ def test_runtime_version_must_match_current_result_even_when_unavailable(tmp_pat
     path = tmp_path / 'result.zip'
     write_reference(path, files)
     with pytest.raises(api.PatchHarborError):
-        capture_result_reference(path)
+        capture_reference(path)
     with pytest.raises(ValueError):
         pyz_bootstrap.assess(path)
 
@@ -87,7 +87,7 @@ def test_current_reference_and_packed_task_report_exact_product_version(tmp_path
     files, _ = reference_entries()
     path = tmp_path / 'result.zip'
     write_reference(path, files)
-    facts = capture_result_reference(path).facts
+    facts = capture_reference(path).facts
     assert facts.patchharbor_version == facts.runtime.version == __version__
     contents = tmp_path / 'contents'
     contents.mkdir()

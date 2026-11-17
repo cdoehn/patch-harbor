@@ -14,7 +14,7 @@ from patchharbor.repository import inspect_repository_root
 from patchharbor.repository_paths import validate_repository_paths
 from patchharbor.repository_state import capture_repository_snapshot, repository_context_from_snapshot
 from patchharbor.result_bundle_capture import CapturedResultBundle
-from patchharbor.result_bundle_snapshot import build_result_bundle_snapshot
+from patchharbor.repository_bundle_snapshot import build_repository_bundle_snapshot
 from patchharbor.safe_export_types import SafeExportError, SafeExportErrorCode
 from patchharbor.safe_git_patch import literal_patch
 
@@ -100,7 +100,7 @@ def capture_safe_result(repository, repo_id):
             mode = record.worktree_mode if file_modes else index_tree[record.path][0]
             worktree[record.path] = (mode, record.worktree_content)
     algorithm = before.base_commit.object_format.value
-    snapshot = build_result_bundle_snapshot(
+    snapshot = build_repository_bundle_snapshot(
         base_entries=((e.path.original_bytes, e.mode, e.object_id, e.content) for e in base),
         staged_patch=literal_patch(base_tree, index_tree, algorithm=algorithm),
         unstaged_patch=literal_patch(index_tree, worktree, algorithm=algorithm),

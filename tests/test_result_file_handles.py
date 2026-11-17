@@ -66,12 +66,12 @@ def test_reader_cannot_resolve_replaced_temporary_symlink_to_original(destinatio
     probe = displaced.with_name("probe")
     symlink_or_skip(probe, displaced)
     probe.unlink()
-    original = publication.read_result_reference
+    original = publication.read_reference
     def replace_then_read(path, **kwargs):
         path.rename(displaced)
         path.symlink_to(displaced)
         return original(path, **kwargs)
-    monkeypatch.setattr(publication, "read_result_reference", replace_then_read)
+    monkeypatch.setattr(publication, "read_reference", replace_then_read)
     with pytest.raises(publication.PatchHarborError):
         _publish(destination)
     assert sleeps == [] and destination.temporary_path.is_symlink()

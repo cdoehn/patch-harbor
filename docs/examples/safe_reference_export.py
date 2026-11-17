@@ -26,7 +26,7 @@ def export_reference(repository, *, output_directory, authorize):
         raise PermissionError('safe reference operating scope was not authorized')
     bundle = api.bundle(repository, capture_mode='safe', export_plan=plan)
     expected_sha256 = sha256(Path(bundle.path).read_bytes()).hexdigest()
-    snapshot = api.read_result_snapshot(bundle.path, expected_sha256=expected_sha256)
+    snapshot = api.read_reference_snapshot(bundle.path, expected_sha256=expected_sha256)
     fields = ('repo_id', 'base_commit', 'state_fingerprint', 'fingerprint_algorithm')
     if any(getattr(snapshot.context, name) != getattr(context, name) for name in fields):
         raise RuntimeError('published reference differs from the approved source')

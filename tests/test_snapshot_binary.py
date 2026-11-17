@@ -29,7 +29,7 @@ def encoded_block(kind,raw,*,declared=None,trailing=b''):
     b'\x03\x01\x90\x02',b'\x03\x02\x01x', # target over/underflow
 ])
 def test_invalid_delta_programs_are_rejected(program):
-    with pytest.raises(api.ResultSnapshotError) as caught:execute_delta(program,b'abc',SnapshotBudget())
+    with pytest.raises(api.ReferenceSnapshotError) as caught:execute_delta(program,b'abc',SnapshotBudget())
     assert caught.value.code is api.SnapshotErrorCode.INVALID_PATCH
 
 
@@ -50,6 +50,6 @@ def test_binary_expansion_is_bounded_and_exact(case):
     elif case=='truncated':raw=encoded_block(b'literal',b'abc')[:-3]
     elif case=='budget':raw=encoded_block(b'literal',b'x'*10000)
     else:raw=encoded_block(b'delta',b'\x03\xe8\x07\x01x') # declared target 1000
-    with pytest.raises(api.ResultSnapshotError) as caught:read_block(BytesIO(raw),b'abc',SnapshotBudget(policy))
+    with pytest.raises(api.ReferenceSnapshotError) as caught:read_block(BytesIO(raw),b'abc',SnapshotBudget(policy))
     expected=api.SnapshotErrorCode.RESOURCE_LIMIT if case in ('budget','delta_target_budget') else api.SnapshotErrorCode.INVALID_PATCH
     assert caught.value.code is expected

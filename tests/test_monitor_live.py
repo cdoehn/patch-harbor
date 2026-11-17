@@ -244,7 +244,7 @@ def test_live_distinguishes_exit_zero_from_failed_result_publication(tmp_path, m
         posix_entrypoint='exit 0', powershell_entrypoint='exit 0')
     def fail(*args, **kwargs):
         raise OSError('injected Result publication failure')
-    monkeypatch.setattr(publication, '_verify_result_bundle', fail)
+    monkeypatch.setattr(publication, '_verify_reference_bundle', fail)
     report = api.execute(path)
     assert report.primary_result.entrypoint_exit_code == 0 and not report.success
     row = wait_for(lambda: next((r for r in api.monitor_live()['instances'] if r['completed']), None))

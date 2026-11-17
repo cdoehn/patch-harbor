@@ -43,9 +43,9 @@ from patchharbor.result_bundle_publication import (
     ResultBundlePublication,
     prepare_result_bundle_publication,
     publish_result_bundle,
-    result_bundle_filename,
+    reference_bundle_filename,
 )
-from patchharbor.result_bundle_snapshot import ResultBundleSnapshot
+from patchharbor.repository_bundle_snapshot import RepositoryBundleSnapshot
 from patchharbor.result_verification import ResultVerificationError
 from patchharbor.result_bundle_target import (
     ResultBundleTarget,
@@ -71,7 +71,7 @@ from patchharbor.reference_kind import ReferenceBundleKind, kind_for_operation
 
 
 @dataclass(frozen=True)
-class ManualResultBundle:
+class StateBundlePublication:
     """One successfully created manual Result Bundle."""
 
     report: RunReport
@@ -180,7 +180,7 @@ def _registered_identity(
 def _manifest_document(
     *,
     report: RunReport,
-    snapshot: ResultBundleSnapshot,
+    snapshot: RepositoryBundleSnapshot,
     runtime: ResultRuntimePayload,
     expected_manifest: TaskManifest | None = None,
 ) -> dict[str, object]:
@@ -236,7 +236,7 @@ class _ResultDocuments:
 
 
 def _publication_documents(
-    report: RunReport, target: ResultBundleTarget, snapshot: ResultBundleSnapshot,
+    report: RunReport, target: ResultBundleTarget, snapshot: RepositoryBundleSnapshot,
     resources: PinnedResultResources, *, expected_manifest: TaskManifest | None = None,
     receipt: dict[str, object] | None = None, execution_log: bytes | None = None,
 ) -> _ResultDocuments:
@@ -264,7 +264,7 @@ def _publication_documents(
 
 def _publish_documents(
     publication: ResultBundlePublication, documents: _ResultDocuments,
-    snapshot: ResultBundleSnapshot, run_directory: Path, *, execution_log: bytes | None = None,
+    snapshot: RepositoryBundleSnapshot, run_directory: Path, *, execution_log: bytes | None = None,
     before_publish: Callable[[str], None] | None = None,
 ) -> PublishedResultBundle:
     """Publish the same prepared document set for manual and Execute requests."""
@@ -505,22 +505,22 @@ def create_execute_result_bundle(
     return report
 
 
-def create_manual_result_bundle(
+def create_state_bundle(
     path: Path,
     *,
     output_directory: Path | None = None,
-) -> ManualResultBundle:
-    """Create one Result Bundle for a registered supported repository."""
+) -> StateBundlePublication:
+    """Create one State Bundle for a registered supported repository."""
     from patchharbor.monitor_live import bundle_observation
     session = RunSession.start()
     with bundle_observation(session, path) as observation:
-        result = _create_manual_result_bundle(path, output_directory=output_directory,
+        result = _create_state_bundle(path, output_directory=output_directory,
                                               session=session, observation=observation)
         observation.finish(result.report)
         return result
 
 
-def _create_manual_result_bundle(path, *, output_directory, session, observation):
+def _create_state_bundle(path, *, output_directory, session, observation):
     try:
         run_directory = _create_private_run_directory(session.run_id)
     except (OSError, RuntimeError) as exc:
@@ -542,7 +542,7 @@ def _create_manual_result_bundle(path, *, output_directory, session, observation
                 resolved_repository = repository
                 resolved_repo_id = repo_id
                 observation.update(repo_id=str(repo_id), repository_path=str(repository.value))
-                filename = result_bundle_filename(
+                filename = reference_bundle_filename(
                     session,
                     repository_name=repository.value.name, kind=ReferenceBundleKind.STATE,
                 )
@@ -615,7 +615,7 @@ def _create_manual_result_bundle(path, *, output_directory, session, observation
         ) from exc
 
     _remove_private_run_directory(run_directory)
-    return ManualResultBundle(
+    return StateBundlePublication(
         report=report,
         publication_durability=published.durability,
     )

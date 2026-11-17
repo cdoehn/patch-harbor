@@ -11,10 +11,10 @@ from zipfile import ZipFile, ZipInfo
 import pytest
 
 from patchharbor import api
-from patchharbor import result_reader
+from patchharbor import reference_reader
 from patchharbor.platform import filesystem
 from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY
-from patchharbor.result_snapshot import read_result_snapshot
+from patchharbor.reference_snapshot import read_reference_snapshot
 from tests.reference_support import reference_entries, write_reference
 from tests.snapshot_support import produce_case, result_files, update_json
 from tests.registration_support import git
@@ -31,7 +31,7 @@ def changed_result(tmp_path,monkeypatch):
 
 def failure(path,files,modes=(),code=None):
     write_reference(path,files,executable=modes)
-    with pytest.raises(api.ResultSnapshotError) as caught:api.read_result_snapshot(path)
+    with pytest.raises(api.ReferenceSnapshotError) as caught:api.read_reference_snapshot(path)
     assert caught.value.reason is api.FailureReason.SOURCE_ERROR
     if code is not None:assert caught.value.code is code
     return caught.value
@@ -89,23 +89,23 @@ def test_shared_reader_safety_precedes_snapshot_reconstruction(tmp_path,variant)
         info.create_system=3
         info.external_attr=({'symlink':stat.S_IFLNK,'directory_payload':stat.S_IFDIR,'special':stat.S_IFIFO,'traversal':stat.S_IFREG}[variant]|0o644)<<16
         with ZipFile(path,'a') as z:z.writestr(info,b'target')
-    with pytest.raises(api.ResultSnapshotError) as caught:api.read_result_snapshot(path)
-    expected = api.SnapshotErrorCode.PATH_COLLISION if variant in ("traversal", "duplicate") else api.SnapshotErrorCode.INVALID_RESULT
+    with pytest.raises(api.ReferenceSnapshotError) as caught:api.read_reference_snapshot(path)
+    expected = api.SnapshotErrorCode.PATH_COLLISION if variant in ("traversal", "duplicate") else api.SnapshotErrorCode.INVALID_REFERENCE
     assert caught.value.code is expected
 
 
 def test_expected_digest_and_actual_single_capture(tmp_path,monkeypatch):
     files,_=reference_entries();path=tmp_path/'reference.zip';write_reference(path,files)
     raw=path.read_bytes();digest=hashlib.sha256(raw).hexdigest()
-    with pytest.raises(api.ResultSnapshotError) as caught:api.read_result_snapshot(path,expected_sha256='0'*64)
+    with pytest.raises(api.ReferenceSnapshotError) as caught:api.read_reference_snapshot(path,expected_sha256='0'*64)
     assert caught.value.code is api.SnapshotErrorCode.DIGEST_MISMATCH
-    original=result_reader.read_stable_regular_file_with_sha256;reads=[]
+    original=reference_reader.read_stable_regular_file_with_sha256;reads=[]
     def captured(*args,**kwargs):
         reads.append(args[0]);value=original(*args,**kwargs)
         path.write_bytes(b'replaced after stable capture')
         return value
-    monkeypatch.setattr(result_reader,'read_stable_regular_file_with_sha256',captured)
-    snapshot=api.read_result_snapshot(path,expected_sha256=digest)
+    monkeypatch.setattr(reference_reader,'read_stable_regular_file_with_sha256',captured)
+    snapshot=api.read_reference_snapshot(path,expected_sha256=digest)
     assert len(reads)==1 and snapshot.sha256==digest
     assert snapshot.effective.files['tracked.txt'].content==files['base/tracked.txt']
 
@@ -119,8 +119,8 @@ def test_actual_file_change_during_read_is_rejected(tmp_path,monkeypatch):
             with path.open('ab') as stream:stream.write(b'changed during read')
         return original(fd)
     monkeypatch.setattr(filesystem,'capture_descriptor_metadata',metadata)
-    with pytest.raises(api.ResultSnapshotError) as caught:api.read_result_snapshot(path)
-    assert caught.value.code is api.SnapshotErrorCode.INVALID_RESULT
+    with pytest.raises(api.ReferenceSnapshotError) as caught:api.read_reference_snapshot(path)
+    assert caught.value.code is api.SnapshotErrorCode.INVALID_REFERENCE
     assert len(calls)==2
 
 
@@ -130,8 +130,8 @@ def test_outer_archive_budget_is_reported_as_resource_limit(changed_result, limi
     policy = replace(DEFAULT_RESOURCE_POLICY, **(
         {'max_zip_entries': 3} if limit == 'entries' else
         {'max_zip_total_bytes': sum(map(len, files.values())) - 1}))
-    with pytest.raises(api.ResultSnapshotError) as caught:
-        read_result_snapshot(case.result, resource_policy=policy)
+    with pytest.raises(api.ReferenceSnapshotError) as caught:
+        read_reference_snapshot(case.result, resource_policy=policy)
     assert caught.value.code is api.SnapshotErrorCode.RESOURCE_LIMIT
 
 
@@ -149,9 +149,9 @@ def test_embedded_pyz_budget_is_reported_as_resource_limit(tmp_path, monkeypatch
     case = produce_case(tmp_path, monkeypatch, kind='clean')
     total = archive_content_bytes(case.result)
     policy = replace(DEFAULT_RESOURCE_POLICY, max_zip_total_bytes=total)
-    assert read_result_snapshot(case.result, resource_policy=policy).runtime.status == 'embedded'
-    with pytest.raises(api.ResultSnapshotError) as caught:
-        read_result_snapshot(case.result, resource_policy=replace(policy, max_zip_total_bytes=total - 1))
+    assert read_reference_snapshot(case.result, resource_policy=policy).runtime.status == 'embedded'
+    with pytest.raises(api.ReferenceSnapshotError) as caught:
+        read_reference_snapshot(case.result, resource_policy=replace(policy, max_zip_total_bytes=total - 1))
     assert caught.value.code is api.SnapshotErrorCode.RESOURCE_LIMIT
 
 
@@ -170,15 +170,15 @@ def test_reconstruction_budget_is_independent_of_outer_and_runtime_archives(tmp_
     result = api.bundle(case.repository).path
     policy = replace(DEFAULT_RESOURCE_POLICY, max_zip_total_bytes=archive_content_bytes(result))
     # The complete outer and embedded archives pass before reconstruction starts.
-    assert result_reader.capture_result_reference(result, resource_policy=policy).facts.runtime.status == runtime
-    assert api.read_result_snapshot(result).effective.files['compressible.bin'].content == expected
-    with pytest.raises(api.ResultSnapshotError) as caught:
-        read_result_snapshot(result, resource_policy=policy)
+    assert reference_reader.capture_reference(result, resource_policy=policy).facts.runtime.status == runtime
+    assert api.read_reference_snapshot(result).effective.files['compressible.bin'].content == expected
+    with pytest.raises(api.ReferenceSnapshotError) as caught:
+        read_reference_snapshot(result, resource_policy=policy)
     assert caught.value.code is api.SnapshotErrorCode.RESOURCE_LIMIT
 
 
 def test_duplicate_tree_versions_share_unchanged_content(tmp_path):
     files,_=reference_entries();path=tmp_path/'reference.zip';write_reference(path,files)
-    snapshot=api.read_result_snapshot(path)
+    snapshot=api.read_reference_snapshot(path)
     base=snapshot.base.files['tracked.txt']
     assert all(getattr(snapshot,name).files['tracked.txt'] is base for name in ('index','worktree','effective'))

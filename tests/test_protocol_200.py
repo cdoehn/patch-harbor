@@ -125,7 +125,7 @@ def test_result_task_execute_result_roundtrip_keeps_actual_outcome(
         assert run['operation'] == 'execute' and run['dry_run'] is dry_run
         assert environment['format_version'] == 3 and 'Task' in environment['filename_schemas']
         assert ('logs/execution.log' in archive.namelist()) is (not dry_run)
-    snapshot = api.read_result_snapshot(result_path)
+    snapshot = api.read_reference_snapshot(result_path)
     assert snapshot.operation == 'execute' and snapshot.dry_run is dry_run
     assert snapshot.primary_result.success is (dry_run or exit_code == 0)
     assert git(root, 'rev-parse', 'HEAD').stdout.strip() == before

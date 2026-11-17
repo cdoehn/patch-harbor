@@ -11,7 +11,7 @@ import pytest
 from patchharbor import api
 from patchharbor.errors import PatchHarborError, result_bundle_error
 from patchharbor import result_bundle_publication as publication
-from patchharbor import result_bundle_writer as writer, result_reader as reader
+from patchharbor import result_bundle_writer as writer, reference_reader as reader
 from patchharbor import result_verification as verification
 from patchharbor.platform import filesystem
 from patchharbor.platform.cifs import cache_wait_budget
@@ -48,7 +48,7 @@ def test_real_initial_open_mismatch_is_retried_after_sync(destination, sleeps, m
     _publish(destination)
     assert sleeps == [2]
     assert events[:6] == ["file-sync", "directory-sync", "compare"] * 2
-    assert reader.read_result_reference(destination.final_path)[0].primary_result.success
+    assert reader.read_reference(destination.final_path)[0].primary_result.success
     assert not destination.temporary_path.exists()
 
 
@@ -96,14 +96,14 @@ def test_integrity_failures_never_retry(destination, sleeps, monkeypatch, fault)
         elif fault == "crc":
             raw[30 + len("manifest.json")] ^= 1
         stream.write(raw)
-    original_read = publication.read_result_reference
+    original_read = publication.read_reference
     def read(*args, **kwargs):
         calls.append(True)
         if fault == "resource":
             kwargs["resource_policy"] = replace(DEFAULT_RESOURCE_POLICY, warning_bytes=1, max_input_artifact_bytes=1)
         return original_read(*args, **kwargs)
     monkeypatch.setattr(publication, "write_result_bundle", corrupt)
-    monkeypatch.setattr(publication, "read_result_reference", read)
+    monkeypatch.setattr(publication, "read_reference", read)
     with pytest.raises(PatchHarborError):
         _publish(destination)
     assert calls == [True] and sleeps == []
@@ -165,7 +165,7 @@ def test_receipt_read_shares_retry_budget_without_repeating_receipt(destination,
     monkeypatch.setattr(publication, "read_stable_regular_file_with_sha256", transient)
     _publish(destination, before_publish=receipts.append)
     assert sleeps == [2] and len(receipts) == 1 and len(attempts) == 2
-    assert reader.read_result_reference(destination.final_path)[1] == receipts[0]
+    assert reader.read_reference(destination.final_path)[1] == receipts[0]
 
 
 def test_final_read_cannot_restart_exhausted_publication_wait_budget(destination, sleeps, monkeypatch):
@@ -194,7 +194,7 @@ def test_unrelated_error_with_implicit_read_failure_context_never_retries(destin
             unstable()
         except filesystem.FileChangedDuringRead:
             raise result_bundle_error("unrelated failure")
-    monkeypatch.setattr(publication, "_verify_result_bundle", unrelated)
+    monkeypatch.setattr(publication, "_verify_reference_bundle", unrelated)
     with pytest.raises(PatchHarborError):
         _publish(destination)
     assert sleeps == [] and not destination.final_path.exists()
@@ -214,7 +214,7 @@ def test_cancellation_during_retry_cleans_only_owned_temporary_file(destination,
 def test_emergency_json_survives_real_request_failure(repository, sleeps, monkeypatch, route):
     root, exchange = repository
     # Inject only publication reads; repository state/entrypoint capture stay real.
-    monkeypatch.setattr(publication, "read_result_reference", unstable)
+    monkeypatch.setattr(publication, "read_reference", unstable)
     if route == "bundle":
         with pytest.raises(PatchHarborError) as caught:
             api.bundle(root)

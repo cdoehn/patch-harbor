@@ -112,13 +112,13 @@ from pathlib import Path
 from zipfile import ZipFile
 if sys.argv[3]!='-':sys.path.insert(0,sys.argv[3])
 from patchharbor import api
-from patchharbor.result_reader import read_result_reference
+from patchharbor.reference_reader import read_reference
 def forbidden(*args,**kwargs):raise AssertionError('Result attempted Python networking')
 socket.socket=forbidden
 repo=Path(sys.argv[1]);api.register(repo)
 api.configure_exchange_directory(repo.parent/(repo.name+'-results'),repository=repo)
 tracemalloc.start();bundle=api.bundle(repo);peak=tracemalloc.get_traced_memory()[1];tracemalloc.stop()
-facts,digest=read_result_reference(bundle.path)
+facts,digest=read_reference(bundle.path)
 assert facts.format_version==5 and facts.runtime.status=='embedded'
 assert facts.runtime.result_formats==(5,)
 assert not facts.warnings and facts.context.repository_path==str(repo)

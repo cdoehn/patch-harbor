@@ -72,7 +72,7 @@ from pathlib import Path
 from zipfile import ZipFile
 from patchharbor import api
 from patchharbor.pyz_artifact import PyzProvider
-from patchharbor.result_reader import read_result_reference
+from patchharbor.reference_reader import read_reference
 def no_network(*args, **kwargs):
     raise AssertionError('Execute producer attempted Python networking')
 socket.socket = no_network
@@ -80,7 +80,7 @@ before = PyzProvider().capture().artifact
 assert before is not None
 report = api.execute(Path(sys.argv[1]))
 assert report.process_exit_code == int(sys.argv[2])
-facts, _ = read_result_reference(report.result_bundle.path)
+facts, _ = read_reference(report.result_bundle.path)
 assert facts.runtime.status == 'embedded' and not facts.warnings
 assert facts.runtime.artifact.sha256 == before.pyz_sha256
 assert facts.runtime.content_id == before.recipe.content_id

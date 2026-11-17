@@ -9,7 +9,7 @@ import pytest
 
 from patchharbor import api, application_execute as application, result_bundle, result_resources as resources
 from patchharbor import pyz_artifact, runtime_pyz as pyz
-from patchharbor.result_reader import read_result_reference
+from patchharbor.reference_reader import read_reference
 from patchharbor.resource_policy import ResourcePolicy
 from tests.runtime_pyz_support import provider_for
 from tests.reference_support import reference_entries, write_reference, edit_document
@@ -28,7 +28,7 @@ def test_prepared_payload_matches_strict_native_reader(monkeypatch,tmp_path,kind
     edit_document(files,'manifest.json',lambda d:d.update(format_version=5,runtime=payload.document()))
     edit_document(files,'logs/run.json',lambda d:d.update(warnings=list(payload.warnings)))
     reference=tmp_path/'result.zip';write_reference(reference,files)
-    facts,_=read_result_reference(reference)
+    facts,_=read_reference(reference)
     assert facts.format_version==5 and facts.runtime.status==payload.status
     assert 'artifact' in payload.document() and 'wheel' not in payload.document()
     assert payload.result_format==5
@@ -80,7 +80,7 @@ def test_private_format3_resources_run_through_actual_existing_writer_routes(rep
     elif route=='watcher':report=api.execute_next()
     else:report=api.execute(patch,dry_run=route=='dry_run')
     assert report.process_exit_code==(23 if route=='failure' else 0)
-    facts,_=read_result_reference(report.result_bundle.path)
+    facts,_=read_reference(report.result_bundle.path)
     assert facts.format_version==5 and facts.runtime.status=='embedded'
     assert facts.runtime.artifact.sha256==artifact.pyz_sha256
     with ZipFile(report.result_bundle.path) as archive:
@@ -102,7 +102,7 @@ def test_runtime_only_failure_keeps_snapshot_and_actual_failure_log(repository,m
     write_reference(patch,files)
     report=api.execute(patch)
     assert report.process_exit_code==23
-    facts,_=read_result_reference(report.result_bundle.path)
+    facts,_=read_reference(report.result_bundle.path)
     assert facts.format_version==5 and facts.runtime.status=='unavailable'
     assert facts.warnings and facts.base_entries and facts.primary_result.entrypoint_exit_code==23
     with ZipFile(report.result_bundle.path) as archive:
@@ -115,7 +115,7 @@ def test_format3_budget_fallback_cannot_reintroduce_legacy_wheel_contract(reposi
     monkeypatch.setattr(result_bundle,'runtime_fits',partial(resources.runtime_fits,policy=ResourcePolicy(max_zip_total_bytes=1)))
     report=api.execute(package(*repository))
     assert report.process_exit_code==0
-    facts,_=read_result_reference(report.result_bundle.path)
+    facts,_=read_reference(report.result_bundle.path)
     assert facts.format_version==5 and facts.runtime.reason=='resource_limit'
     with ZipFile(report.result_bundle.path) as archive:
         doc=json.loads(archive.read('runtime/runtime.json'))
@@ -134,7 +134,7 @@ def test_prepared_runtime_and_template_are_frozen_before_mutation(repository,mon
     monkeypatch.setattr(application,'execute_prepared_script_with_log',mutate)
     report=api.execute(package(*repository))
     assert report.process_exit_code==0
-    facts,_=read_result_reference(report.result_bundle.path)
+    facts,_=read_reference(report.result_bundle.path)
     assert facts.runtime.artifact.sha256==expected.pyz_sha256
     with ZipFile(report.result_bundle.path) as archive:
         assert archive.read('CHAT_INSTRUCTIONS.md').endswith(expected.chat_template)
@@ -152,7 +152,7 @@ def test_required_template_failure_still_preserves_actual_error_diagnostics(repo
 
 def test_default_writer_retains_current_contract_until_switch(repository):
     report=api.bundle(repository[0]).report
-    assert read_result_reference(report.result_bundle.path)[0].format_version==5
+    assert read_reference(report.result_bundle.path)[0].format_version==5
 
 
 @pytest.mark.parametrize('fault',[RuntimeError('programming failure'),ValueError('programming failure'),KeyboardInterrupt(),SystemExit(9)])

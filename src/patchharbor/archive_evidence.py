@@ -8,7 +8,7 @@ from patchharbor.exchange_state import ExchangeTaskSelection
 from patchharbor.models import BundlePayload, GitObjectId
 from patchharbor.task_package import resolve_task_payloads
 from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY
-from patchharbor.result_reader import CLEAN_FINGERPRINT, parse_result_payloads, read_result_or_task_payloads
+from patchharbor.reference_reader import CLEAN_FINGERPRINT, parse_reference_payloads, read_reference_or_task_payloads
 from patchharbor.run_report import PrimaryResultKind
 
 
@@ -34,7 +34,7 @@ class ArchiveEvidence:
 
 def _result_evidence(payloads: tuple[BundlePayload, ...]) -> ArchiveEvidence:
     try:
-        facts = parse_result_payloads(payloads)
+        facts = parse_reference_payloads(payloads)
     except OverflowError as exc:
         # The reference API maps this numeric input failure to SOURCE_ERROR;
         # archival/recovery consumers retain their conservative KEEP boundary.
@@ -58,7 +58,7 @@ def _result_evidence(payloads: tuple[BundlePayload, ...]) -> ArchiveEvidence:
 
 def parse_archive_evidence(content: bytes, path: Path) -> ArchiveEvidence:
     """Validate complete bytes; errors mean 'keep', never an archival decision."""
-    payloads = read_result_or_task_payloads(content)
+    payloads = read_reference_or_task_payloads(content)
     files = {item.relative_path: item.content for item in payloads}
     if "manifest.json" in files and "task.json" in files:
         raise ValueError("ambiguous bundle kind")

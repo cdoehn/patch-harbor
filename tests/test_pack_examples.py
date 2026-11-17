@@ -9,7 +9,7 @@ from zipfile import ZipFile
 import pytest
 
 from patchharbor import api
-from patchharbor.result_reader import read_result_reference
+from patchharbor.reference_reader import read_reference
 from tests.platform_support import native_python_script, native_script, native_value
 from tests.registration_support import create_repository, git
 from tests.runtime_installation_support import installed_producer
@@ -30,7 +30,7 @@ from patchharbor import api
 api.register(sys.argv[1]);api.configure_exchange_directory(sys.argv[2],repository=sys.argv[1])
 print(json.dumps(str(api.bundle(sys.argv[1]).path)))
 ''', str(repo), str(tmp_path/'exchange')], tmp_path, environment)))
-    facts, reference_sha = read_result_reference(reference)
+    facts, reference_sha = read_reference(reference)
     assert facts.format_version == 5 and facts.runtime.status == 'embedded'
     runtime = tmp_path/'selected.pyz'
     with ZipFile(reference) as archive: runtime.write_bytes(archive.read(facts.runtime.artifact.path))
@@ -81,7 +81,7 @@ r=api.execute(sys.argv[2])
 print(json.dumps({'success':r.success,'exit_code':r.process_exit_code,
                   'result':str(r.result_bundle.path),'started':r.primary_result.entrypoint_started}))
 ''',str(runtime),str(patch)],repo,environment))
-    returned, _ = read_result_reference(Path(applied['result']))
+    returned, _ = read_reference(Path(applied['result']))
     assert applied['started'] and not returned.dry_run
     assert applied['success'] is (kind != 'broken')
     assert (applied['exit_code'] == 0) is (kind != 'broken')

@@ -35,7 +35,7 @@ from patchharbor.platform.filesystem import (
 from patchharbor.platform.paths import physically_canonicalize
 from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY, ResourcePolicy
 from patchharbor.user_paths import RegistrationUserPaths
-from patchharbor.result_reader import reference_kind_hint, read_result_or_task_payloads
+from patchharbor.reference_reader import reference_kind_hint, read_reference_or_task_payloads
 from patchharbor.zip_payloads import ZipPayloadError
 
 
@@ -167,7 +167,7 @@ def _classify_content(
         activity("SKIP", f"{path.name}: exceeds retained parsing limit", "detail")
         return _ContentClassification(kind=ExchangeArtifactKind.OTHER)
     try:
-        payloads = read_result_or_task_payloads(content, policy=resource_policy)
+        payloads = read_reference_or_task_payloads(content, policy=resource_policy)
     except ZipPayloadError as exc:
         activity("SKIP", f"{path.name}: not a supported safe ZIP ({exc})", "detail")
         return _ContentClassification(kind=ExchangeArtifactKind.OTHER)

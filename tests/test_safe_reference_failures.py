@@ -156,7 +156,7 @@ def test_cleanup_failure_reports_the_actually_published_result(tmp_path,monkeypa
     with pytest.raises(api.SafeExportError) as caught:api.bundle(repo,capture_mode='safe',export_plan=plan)
     assert caught.value.code is api.SafeExportErrorCode.CLEANUP
     assert caught.value.published_path.is_file()
-    assert api.read_result_snapshot(caught.value.published_path).context.base_commit==plan.context.base_commit
+    assert api.read_reference_snapshot(caught.value.published_path).context.base_commit==plan.context.base_commit
     assert source_bytes(repo)==before
     assert json.loads((caught.value.emergency_diagnostics_path/'failure.json').read_bytes())['published_path']==str(caught.value.published_path)
 
@@ -289,6 +289,6 @@ def test_failure_immediately_after_atomic_link_reports_real_partial_outcome(tmp_
     expected_code = api.SafeExportErrorCode.IO if failure is OSError else api.SafeExportErrorCode.INTERRUPTED
     assert error.code is expected_code
     assert error.published_path.is_file()
-    assert api.read_result_snapshot(error.published_path).context.base_commit == plan.context.base_commit
+    assert api.read_reference_snapshot(error.published_path).context.base_commit == plan.context.base_commit
     assert json.loads((error.emergency_diagnostics_path / 'failure.json').read_bytes())['published_path'] == str(error.published_path)
     assert source_bytes(repo) == before

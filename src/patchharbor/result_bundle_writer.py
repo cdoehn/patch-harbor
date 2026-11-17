@@ -1,4 +1,4 @@
-"""Write one already captured PatchHarbor Result Bundle to a ZIP."""
+"""Write one already captured State or Result Bundle to a ZIP."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from patchharbor.progress import activity
 from patchharbor.bundle_handoff import BundleHandoff, CHAT_INSTRUCTIONS_NAME, ENVIRONMENT_NAME
 from patchharbor.errors import result_bundle_error
 from patchharbor.json_document import serialize_json_document
-from patchharbor.result_bundle_snapshot import ResultBundleSnapshot
+from patchharbor.repository_bundle_snapshot import RepositoryBundleSnapshot
 from patchharbor.run_report import RunReport
 from patchharbor.result_resources import ResultRuntimePayload
 from patchharbor.resource_policy import ResultSnapshotLimitError, check_result_file_count
@@ -48,7 +48,7 @@ def write_result_bundle(
     context_document: dict[str, object],
     handoff: BundleHandoff,
     run_report: RunReport,
-    snapshot: ResultBundleSnapshot,
+    snapshot: RepositoryBundleSnapshot,
     execution_log: bytes | None = None,
     runtime: ResultRuntimePayload | None = None,
 ) -> None:

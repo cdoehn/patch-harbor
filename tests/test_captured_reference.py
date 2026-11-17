@@ -13,7 +13,7 @@ import pytest
 
 from patchharbor import api
 from patchharbor import task_inspection as inspection
-from patchharbor import result_reader as reader
+from patchharbor import reference_reader as reader
 from patchharbor.errors import FailureReason, PatchHarborError
 from patchharbor.exit_status import exit_code_for_error
 from patchharbor.json_document import parse_json_document
@@ -27,7 +27,7 @@ from tests.pack_support import _reference
 @pytest.mark.parametrize("dirty", [False, True])
 def test_capture_retains_actual_binding_suffix_and_exact_handoff(tmp_path, kind, dirty):
     path, files, binding = _reference(tmp_path, kind=kind, dirty=dirty)
-    captured = reader.capture_result_reference(path)
+    captured = reader.capture_reference(path)
     assert captured.sha256 == hashlib.sha256(path.read_bytes()).hexdigest()
     assert captured.bundle_suffix == ".txt"
     assert captured.facts.context.dirty is dirty
@@ -38,7 +38,7 @@ def test_capture_retains_actual_binding_suffix_and_exact_handoff(tmp_path, kind,
     assert captured.facts.handoff_present
     assert captured.handoff.instructions == files["CHAT_INSTRUCTIONS.md"]
     assert captured.handoff.environment == files["environment.json"]
-    legacy = reader.read_result_reference(path)
+    legacy = reader.read_reference(path)
     assert type(legacy) is tuple and len(legacy) == 2
     assert legacy == (captured.facts, captured.sha256)
 
@@ -48,13 +48,13 @@ def test_missing_legacy_suffix_is_empty_and_does_not_invent_environment(tmp_path
     edit_document(files, "context.json", lambda doc: doc.pop("bundle_suffix"))
     edit_document(files, "environment.json", lambda doc: doc.update(bundle_suffix=""))
     write_reference(path, files)
-    captured = reader.capture_result_reference(path)
+    captured = reader.capture_reference(path)
     assert captured.bundle_suffix == "" and captured.handoff is not None
 
 
 def test_capture_and_passive_bytes_cannot_be_changed_by_a_renderer(tmp_path):
     path, _, _ = _reference(tmp_path)
-    captured = reader.capture_result_reference(path)
+    captured = reader.capture_reference(path)
     with pytest.raises(FrozenInstanceError):
         captured.bundle_suffix = ".wrong"
     with pytest.raises(FrozenInstanceError):
@@ -70,7 +70,7 @@ def test_capture_and_passive_bytes_cannot_be_changed_by_a_renderer(tmp_path):
 @pytest.mark.parametrize("kind,dirty", [("bundle", False), ("success", True), ("failure", True), ("dry_run", False)])
 def test_unavailable_runtime_is_still_a_complete_reference(tmp_path, kind, dirty):
     path, files, _ = _reference(tmp_path, kind=kind, dirty=dirty)
-    captured = reader.capture_result_reference(path)
+    captured = reader.capture_reference(path)
     assert captured.facts.format_version == 5
     assert captured.facts.runtime.status == "unavailable"
     assert captured.facts.warnings
@@ -96,7 +96,7 @@ def test_capture_never_uses_weaker_repository_only_diagnostics(tmp_path, monkeyp
         pytest.fail("native capture reached the weaker diagnostics fallback")
     monkeypatch.setattr(reader, "_parse_repository_payloads", forbidden)
     with pytest.raises(PatchHarborError) as caught:
-        reader.capture_result_reference(path)
+        reader.capture_reference(path)
     assert caught.value.reason is FailureReason.SOURCE_ERROR
     assert int(exit_code_for_error(caught.value)) == 4
 
@@ -117,7 +117,7 @@ def test_one_capture_keeps_handoff_and_hash_when_path_is_replaced(tmp_path, monk
         os.replace(other, path)
         return result
     monkeypatch.setattr(reader, "read_stable_regular_file_with_sha256", capture_then_replace)
-    captured = reader.capture_result_reference(path)
+    captured = reader.capture_reference(path)
     assert calls == [path]
     assert captured.bundle_suffix == ".txt"
     assert captured.handoff.environment == files["environment.json"]
@@ -139,7 +139,7 @@ def test_unstable_capture_is_one_source_error_without_retry(tmp_path, monkeypatc
         raise FileChangedDuringRead("changed")
     monkeypatch.setattr(reader, "read_stable_regular_file_with_sha256", changed)
     with pytest.raises(PatchHarborError) as caught:
-        reader.capture_result_reference(path)
+        reader.capture_reference(path)
     assert len(calls) == 1 and caught.value.reason is FailureReason.SOURCE_ERROR
 
 
@@ -148,7 +148,7 @@ def test_capture_forwards_publication_identity_and_existing_budgets(tmp_path, mo
     identity = path.stat()
     policy = replace(DEFAULT_RESOURCE_POLICY, max_input_artifact_bytes=16 * 1024 * 1024)
     actual_read = reader.read_stable_regular_file_with_sha256
-    actual_parse = reader.parse_result_payloads
+    actual_parse = reader.parse_reference_payloads
     reads, parses = [], []
     def observed_read(target, **kwargs):
         reads.append((target, kwargs))
@@ -157,8 +157,8 @@ def test_capture_forwards_publication_identity_and_existing_budgets(tmp_path, mo
         parses.append(kwargs)
         return actual_parse(payloads, **kwargs)
     monkeypatch.setattr(reader, "read_stable_regular_file_with_sha256", observed_read)
-    monkeypatch.setattr(reader, "parse_result_payloads", observed_parse)
-    reader.read_result_reference(path, expected_identity=identity, resource_policy=policy)
+    monkeypatch.setattr(reader, "parse_reference_payloads", observed_parse)
+    reader.read_reference(path, expected_identity=identity, resource_policy=policy)
     assert len(reads) == 1 and reads[0][0] == path
     assert reads[0][1]["expected_identity"] is identity
     assert reads[0][1]["retained_content_limit"] == policy.max_input_artifact_bytes
@@ -171,13 +171,13 @@ def test_capture_does_not_open_an_extra_resource_budget(tmp_path, limit):
     path, _, _ = _reference(tmp_path)
     policy = replace(DEFAULT_RESOURCE_POLICY, warning_bytes=1, **{limit: 1})
     with pytest.raises(PatchHarborError) as caught:
-        reader.capture_result_reference(path, resource_policy=policy)
+        reader.capture_reference(path, resource_policy=policy)
     assert caught.value.reason is FailureReason.SOURCE_ERROR
 
 
 def test_internal_and_public_reference_validation_have_identical_facts(tmp_path):
     path, _, binding = _reference(tmp_path, kind="failure", dirty=True)
-    captured = reader.capture_result_reference(path)
+    captured = reader.capture_reference(path)
     patch = tmp_path / "patch.zip"
     bound_package(patch, binding)
     public = api.validate_task(patch, reference_bundle=path)
@@ -189,7 +189,7 @@ def test_internal_and_public_reference_validation_have_identical_facts(tmp_path)
                                          ("base_commit", "ff" * 20), ("state_fingerprint", "ff" * 8)])
 def test_internal_validation_does_not_skip_any_binding_comparison(tmp_path, field, value):
     path, _, binding = _reference(tmp_path)
-    captured = reader.capture_result_reference(path)
+    captured = reader.capture_reference(path)
     patch = tmp_path / "patch.zip"
     bound_package(patch, {**binding, field: value})
     with pytest.raises(PatchHarborError) as caught:
@@ -200,7 +200,7 @@ def test_internal_validation_does_not_skip_any_binding_comparison(tmp_path, fiel
 def test_internal_validation_uses_actual_package_bytes_and_original_error_categories(tmp_path):
     from tests.task_inspection_support import MANIFEST, write_package
     path, _, binding = _reference(tmp_path)
-    captured = reader.capture_result_reference(path)
+    captured = reader.capture_reference(path)
     patch = tmp_path / "patch.zip"
     bound_package(patch, binding)
     first = inspection.validate_task_against_reference(patch, captured)
@@ -219,7 +219,7 @@ def test_internal_validation_uses_actual_package_bytes_and_original_error_catego
 
 def test_internal_end_validation_honours_package_budget(tmp_path):
     path, _, binding = _reference(tmp_path)
-    captured = reader.capture_result_reference(path)
+    captured = reader.capture_reference(path)
     patch = tmp_path / "patch.zip"
     bound_package(patch, binding)
     policy = replace(DEFAULT_RESOURCE_POLICY, warning_bytes=1, max_input_artifact_bytes=1)
@@ -252,6 +252,6 @@ def test_capture_and_internal_validation_are_read_only_without_git_registry_or_n
         assert not str(target).startswith("/foreign/")
         return original_resolve(target, *args, **kwargs)
     monkeypatch.setattr(Path, "resolve", no_foreign_resolution)
-    captured = reader.capture_result_reference(path)
+    captured = reader.capture_reference(path)
     assert inspection.validate_task_against_reference(patch, captured).binding_matches
     assert {item.name: item.read_bytes() for item in tmp_path.iterdir()} == before

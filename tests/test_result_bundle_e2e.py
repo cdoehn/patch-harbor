@@ -26,7 +26,7 @@ from patchharbor.configuration import load_configuration
 from patchharbor.exit_status import ExitCode, exit_code_for_error
 from patchharbor.errors import PatchHarborError
 from patchharbor.platform.filesystem import MetadataSyncStatus
-from patchharbor.result_bundle import create_manual_result_bundle
+from patchharbor.result_bundle import create_state_bundle
 from patchharbor.user_paths import registration_user_paths
 from patchharbor.configuration_context import configuration_paths_for_id, configuration_paths_for_repository
 from patchharbor.registry import load_registry
@@ -927,7 +927,7 @@ def test_manual_bundle_rejects_repository_change_during_capture(
     _synchronize_after_base_capture(monkeypatch, mutate_repository)
 
     with pytest.raises(PatchHarborError) as captured:
-        create_manual_result_bundle(
+        create_state_bundle(
             repository,
             output_directory=output_directory,
         )
@@ -969,7 +969,7 @@ def test_manual_bundle_publishes_from_verified_temporary_zip_in_result_directory
         observe_replace,
     )
 
-    result = create_manual_result_bundle(
+    result = create_state_bundle(
         repository,
         output_directory=output_directory,
     )
@@ -1023,7 +1023,7 @@ def test_manual_bundle_leaves_no_published_or_temporary_file_after_failure(
         )
 
     with pytest.raises(PatchHarborError) as captured:
-        create_manual_result_bundle(
+        create_state_bundle(
             repository,
             output_directory=output_directory,
         )
@@ -1096,7 +1096,7 @@ def test_manual_bundle_holds_repository_lock_through_publication(
         replace_while_probing,
     )
 
-    result = create_manual_result_bundle(
+    result = create_state_bundle(
         repository,
         output_directory=tmp_path / "results",
     )
@@ -1135,7 +1135,7 @@ def test_manual_bundle_reports_best_effort_sync_outcomes(
         lambda _path: next(directory_statuses),
     )
 
-    result = create_manual_result_bundle(
+    result = create_state_bundle(
         repository,
         output_directory=tmp_path / "results",
     )
@@ -1171,7 +1171,7 @@ def test_manual_bundle_rejects_exchange_configuration_retargeted_during_capture(
     _synchronize_after_base_capture(monkeypatch, retarget_exchange_directory)
 
     with pytest.raises(PatchHarborError) as captured:
-        create_manual_result_bundle(repository)
+        create_state_bundle(repository)
 
     assert exit_code_for_error(captured.value) == ExitCode.RESULT_BUNDLE_ERROR
     assert captured.value.error_kind.value == "configuration_error"
@@ -1202,7 +1202,7 @@ def test_manual_bundle_rejects_output_directory_retargeted_during_capture(
     _synchronize_after_base_capture(monkeypatch, retarget_output_directory)
 
     with pytest.raises(PatchHarborError) as captured:
-        create_manual_result_bundle(
+        create_state_bundle(
             repository,
             output_directory=output_directory,
         )
@@ -1242,7 +1242,7 @@ def test_manual_bundle_holds_and_releases_lock_when_publication_fails(
     )
 
     with pytest.raises(PatchHarborError) as captured:
-        create_manual_result_bundle(
+        create_state_bundle(
             repository,
             output_directory=output_directory,
         )

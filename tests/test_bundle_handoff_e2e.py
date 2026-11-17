@@ -11,7 +11,7 @@ from patchharbor.bundle_handoff import CHAT_INSTRUCTIONS_NAME, ENVIRONMENT_NAME,
 from patchharbor.chat_instructions import render_chat_handoff
 from patchharbor.errors import PatchHarborError
 import patchharbor.result_bundle_handoff as result_handoff_module
-from patchharbor.result_bundle import create_manual_result_bundle
+from patchharbor.result_bundle import create_state_bundle
 from tests.platform_support import PROJECT_ROOT, native_script, native_value, run_cli
 from tests.registration_support import create_repository, git, user_configuration_path
 from tests.exchange_support import _configure_user, _register_context, _manifest
@@ -231,7 +231,7 @@ def test_configuration_change_during_handoff_is_revalidated(tmp_path: Path, monk
         return observed
     monkeypatch.setattr(result_handoff_module, "capture_runtime_environment", capture_and_change)
     with pytest.raises(PatchHarborError, match="bundle suffix changed"):
-        create_manual_result_bundle(repository)
+        create_state_bundle(repository)
     assert not list(exchange.glob("*_State_Bundle_*"))
     assert not list(exchange.glob(".*.tmp"))
 
@@ -247,7 +247,7 @@ def test_template_failure_publishes_no_incomplete_bundle(
         monkeypatch.setenv(key, value)
     monkeypatch.setattr(template_module, "_template_path", lambda: tmp_path / "missing-template.md")
     with pytest.raises(PatchHarborError) as failure:
-        create_manual_result_bundle(repository)
+        create_state_bundle(repository)
     assert failure.value.reason.value == "result_bundle_error"
     assert not list(exchange.glob("*_State_Bundle_*"))
     assert not list(exchange.glob(".*.tmp"))
@@ -274,7 +274,7 @@ def test_result_bundle_normalizes_generated_instructions_not_repository_bytes(
     for key, value in environment.items():
         monkeypatch.setenv(key, value)
     monkeypatch.setattr(template_module, "_template_path", lambda: template)
-    create_manual_result_bundle(repository)
+    create_state_bundle(repository)
     paths = list(exchange.glob("*_State_Bundle_*.zip"))
     assert len(paths) == 1
     with zipfile.ZipFile(paths[0]) as archive:

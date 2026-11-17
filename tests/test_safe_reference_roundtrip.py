@@ -22,7 +22,7 @@ def test_layers_binding_and_git_delta_oracle(tmp_path,monkeypatch,kind,object_fo
     plan=api.prepare_reference_export(case.repository,output_directory=output,expected_context=normal)
     result=api.bundle(case.repository,capture_mode='safe',export_plan=plan)
     digest=hashlib.sha256(result.path.read_bytes()).hexdigest()
-    snapshot=api.read_result_snapshot(result.path,expected_sha256=digest)
+    snapshot=api.read_reference_snapshot(result.path,expected_sha256=digest)
     assert result.context==normal
     for layer,expected in case.expected.items():
         actual=getattr(snapshot,layer).files
@@ -53,7 +53,7 @@ def test_executable_modes_follow_existing_core_filemode_contract(tmp_path,monkey
     normal=api.context(repo);before=source_bytes(repo)
     plan=api.prepare_reference_export(repo,output_directory=output,expected_context=normal)
     result=api.bundle(repo,capture_mode='safe',export_plan=plan)
-    snapshot=api.read_result_snapshot(result.path)
+    snapshot=api.read_reference_snapshot(result.path)
     assert snapshot.base.files['tracked.txt'].mode==snapshot.index.files['tracked.txt'].mode=='100755'
     assert snapshot.worktree.files['tracked.txt'].mode==('100644' if filemode else '100755')
     assert source_bytes(repo)==before

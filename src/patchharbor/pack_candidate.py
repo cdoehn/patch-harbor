@@ -13,7 +13,7 @@ from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
 from patchharbor import __version__
 from patchharbor.bundle_handoff import (
     ENVIRONMENT_FORMAT_VERSION, ENVIRONMENT_MARKER, MAX_HANDOFF_ENTRY_BYTES,
-    TASK_FILENAME_SCHEMA, RESULT_FILENAME_SCHEMA, STATE_FILENAME_SCHEMA,
+    filename_schemas,
 )
 from patchharbor.bundle_names import is_browser_temporary_name, validate_bundle_suffix
 from patchharbor.bundle_paths import _is_safe_path_segment
@@ -22,7 +22,7 @@ from patchharbor.errors import FailureReason, PatchHarborError
 from patchharbor.json_document import parse_json_document, serialize_json_document
 from patchharbor.pack_sources import CapturedSources
 from patchharbor.platform.filesystem import FileReadLimitExceeded
-from patchharbor.result_reader import CapturedResultReference
+from patchharbor.reference_reader import CapturedReference
 from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY, ResourcePolicy
 
 
@@ -30,13 +30,13 @@ def _failure(message: str, reason: FailureReason) -> PatchHarborError:
     return PatchHarborError('cannot prepare pack candidate: ' + message, reason)
 
 
-def _binding(reference: CapturedResultReference) -> dict[str, str]:
+def _binding(reference: CapturedReference) -> dict[str, str]:
     context = reference.facts.context
     return {name: str(getattr(context, name)) for name in
             ('repo_id', 'base_commit', 'state_fingerprint', 'fingerprint_algorithm')}
 
 
-def _target_environment(reference: CapturedResultReference) -> tuple[dict, tuple[str, ...]]:
+def _target_environment(reference: CapturedReference) -> tuple[dict, tuple[str, ...]]:
     if reference.handoff is None:
         raise _failure('Result 5 requires recorded handoff data', FailureReason.SOURCE_ERROR)
     # These exact immutable bytes came from the complete native reader.
@@ -71,7 +71,7 @@ class PackMetadata:
     warnings: tuple[str, ...]
 
 
-def prepare_metadata(reference: CapturedResultReference, package_id: UUID,
+def prepare_metadata(reference: CapturedReference, package_id: UUID,
                      created_at: datetime, *, filename: str | None = None) -> PackMetadata:
     """Use one request identity and only recorded target facts; never host discovery."""
     if not isinstance(package_id, UUID) or package_id.version != 4:
@@ -92,7 +92,7 @@ def prepare_metadata(reference: CapturedResultReference, package_id: UUID,
         marker=ENVIRONMENT_MARKER, format_version=ENVIRONMENT_FORMAT_VERSION,
         bundle_type='Task', bundle_filename=filename,
         repository_context=_binding(reference), bundle_suffix=suffix,
-        filename_schemas={'Task': TASK_FILENAME_SCHEMA, 'State': STATE_FILENAME_SCHEMA, 'Result': RESULT_FILENAME_SCHEMA},
+        filename_schemas=filename_schemas(),
         filename_timezone='UTC',
     )
     raw = serialize_json_document(document).encode('utf-8')
@@ -130,7 +130,7 @@ class _BoundedOutput:
 
 
 def prepare_candidate(sources: CapturedSources,
-                    reference: CapturedResultReference, metadata: PackMetadata,
+                    reference: CapturedReference, metadata: PackMetadata,
                     template: str, *, bootstrap: bytes | None = None, resource_policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY
                     ) -> PackCandidate:
     """Prepare bounded exact entries before reserving an output file."""
@@ -172,7 +172,7 @@ def write_prepared_candidate(stream: BinaryIO, candidate: PackCandidate, *,
 
 
 def write_candidate(stream: BinaryIO, sources: CapturedSources,
-                    reference: CapturedResultReference, metadata: PackMetadata,
+                    reference: CapturedReference, metadata: PackMetadata,
                     template: str, *, bootstrap: bytes | None = None, resource_policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY
                     ) -> tuple[str, ...]:
     candidate = prepare_candidate(sources, reference, metadata, template,

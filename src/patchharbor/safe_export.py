@@ -10,8 +10,8 @@ from pathlib import Path
 
 from patchharbor.errors import LockBusyError, PatchHarborError, registry_error, repository_busy_error
 from patchharbor.git_commands import safe_git_queries
-from patchharbor.result_bundle import ManualResultBundle, _publication_documents
-from patchharbor.result_bundle_publication import prepare_result_bundle_publication, publish_result_bundle, result_bundle_filename
+from patchharbor.result_bundle import StateBundlePublication, _publication_documents
+from patchharbor.result_bundle_publication import prepare_result_bundle_publication, publish_result_bundle, reference_bundle_filename
 from patchharbor.result_bundle_target import ResultBundleTarget
 from patchharbor.result_resources import capture_result_resources
 from patchharbor.run_report import RunSession, RunReport, RunOperation, PrimaryResult, ResultBundleResult
@@ -39,7 +39,7 @@ def _cleanup_diagnostics(parent: BoundDirectory, directory: BoundDirectory):
     os.rmdir(directory.path.name, dir_fd=parent.fd)
 
 
-def _export_reference(path: Path, *, plan: SafeExportPlan, output_directory: Path | None, lifecycle: dict) -> ManualResultBundle:
+def _export_reference(path: Path, *, plan: SafeExportPlan, output_directory: Path | None, lifecycle: dict) -> StateBundlePublication:
     require_host()
     if not isinstance(plan, SafeExportPlan):
         raise TypeError('safe bundle requires a SafeExportPlan')
@@ -67,7 +67,7 @@ def _export_reference(path: Path, *, plan: SafeExportPlan, output_directory: Pat
             captured = capture_safe_result(source.repository, source.repo_id)
             if captured.context != plan.context:
                 raise SafeExportError(SafeExportErrorCode.STALE, 'captured source differs from the approved safe plan')
-            filename = result_bundle_filename(session, repository_name=source.repository.value.name, kind=ReferenceBundleKind.STATE) + source.configuration.bundle_suffix
+            filename = reference_bundle_filename(session, repository_name=source.repository.value.name, kind=ReferenceBundleKind.STATE) + source.configuration.bundle_suffix
             target = ResultBundleTarget(output.path, output.path / filename, False,
                 source.configuration.bundle_suffix, source.configuration.exchange_directory, source.configuration_paths)
             report = RunReport(timing=session.finish(), operation=RunOperation.BUNDLE, dry_run=False,
@@ -93,7 +93,7 @@ def _export_reference(path: Path, *, plan: SafeExportPlan, output_directory: Pat
             except (OSError, PatchHarborError) as exc:
                 raise SafeExportError(SafeExportErrorCode.CLEANUP, 'safe export cleanup failed',
                                       published_path=published_path) from exc
-            return ManualResultBundle(documents.report, published.durability)
+            return StateBundlePublication(documents.report, published.durability)
         except LockBusyError:
             raise
         except (PatchHarborError, OSError, RuntimeError, ValueError, KeyboardInterrupt, SystemExit) as exc:
@@ -113,7 +113,7 @@ def _export_reference(path: Path, *, plan: SafeExportPlan, output_directory: Pat
             raise error from exc
 
 
-def export_reference(path: Path, *, plan: SafeExportPlan, output_directory: Path | None = None) -> ManualResultBundle:
+def export_reference(path: Path, *, plan: SafeExportPlan, output_directory: Path | None = None) -> StateBundlePublication:
     lifecycle = {}
     try:
         return _export_reference(path, plan=plan, output_directory=output_directory, lifecycle=lifecycle)

@@ -11,9 +11,9 @@ import pytest
 from patchharbor import api, result_pyz, runtime_pyz as pyz
 from patchharbor.exit_status import exit_code_for_error
 from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY
-from patchharbor.result_reader import (
-    read_result_reference, capture_result_reference, parse_result_payloads,
-    _parse_repository_payloads, result_member_path,
+from patchharbor.reference_reader import (
+    read_reference, capture_reference, parse_reference_payloads,
+    _parse_repository_payloads, reference_member_path,
 )
 from patchharbor.zip_payloads import read_zip_payload_bytes
 from tests.result_runtime_support import descriptor, edit_metadata
@@ -28,11 +28,11 @@ from tests.result_pyz_support import canonical, current_result
 def test_new_reference_keeps_actual_state_and_explicit_full_runtime_facts(canonical,tmp_path,status,kind,dirty):
     files,binding = current_result(canonical if status=='embedded' else None,kind=kind,dirty=dirty)
     path=tmp_path/'result.zip';write_reference(path,files)
-    facts,digest=read_result_reference(path)
+    facts,digest=read_reference(path)
     assert facts.format_version==5 and facts.runtime.status==status
     assert facts.context.dirty is dirty
     assert digest==hashlib.sha256(path.read_bytes()).hexdigest()
-    assert capture_result_reference(path).facts==facts
+    assert capture_reference(path).facts==facts
     for key,value in binding.items(): assert str(getattr(facts.context,key))==value
     patch=tmp_path/'patch.zip';bound_package(patch,binding)
     checked=api.validate_task(patch,reference_bundle=path)
@@ -57,7 +57,7 @@ def test_unavailable_runtime_preserves_known_or_unknown_producer_data(tmp_path,r
                                          requires_python='>=3.10' if known else None))
     edit_document(files,'manifest.json',lambda d:d['runtime'].update(reason=reason))
     path=tmp_path/'result.zip';write_reference(path,files)
-    runtime=read_result_reference(path)[0].runtime
+    runtime=read_reference(path)[0].runtime
     assert runtime.reason==reason and runtime.artifact is None
     assert runtime.operations==() and runtime.content_id is None
     assert runtime.version==__version__
@@ -129,14 +129,14 @@ def test_unavailable_is_not_a_permissive_repair_contract(tmp_path,fault):
         edit_metadata(files,lambda d:d.update(change))
         if fault=='unknown_reason':edit_document(files,'manifest.json',lambda d:d['runtime'].update(reason='invented'))
     path=tmp_path/'result.zip';write_reference(path,files)
-    with pytest.raises(api.PatchHarborError):read_result_reference(path)
+    with pytest.raises(api.PatchHarborError):read_reference(path)
 
 
 def payloads(files):
     stream=BytesIO()
     with ZipFile(stream,'w') as archive:
         for name,raw in files.items():archive.writestr(name,raw)
-    return read_zip_payload_bytes(stream.getvalue(),path_normalizer=result_member_path)
+    return read_zip_payload_bytes(stream.getvalue(),path_normalizer=reference_member_path)
 
 
 def test_shared_outer_inner_budget_is_exact_and_precedes_unbounded_expansion(canonical):
@@ -144,24 +144,24 @@ def test_shared_outer_inner_budget_is_exact_and_precedes_unbounded_expansion(can
     with ZipFile(BytesIO(canonical)) as archive:inner=sum(info.file_size for info in archive.infolist())
     maximum=sum(len(raw) for raw in files.values())+inner
     policy=replace(DEFAULT_RESOURCE_POLICY,max_zip_total_bytes=maximum)
-    assert parse_result_payloads(entries,resource_policy=policy).format_version==5
-    with pytest.raises(ValueError):parse_result_payloads(entries,resource_policy=replace(policy,max_zip_total_bytes=maximum-1))
+    assert parse_reference_payloads(entries,resource_policy=policy).format_version==5
+    with pytest.raises(ValueError):parse_reference_payloads(entries,resource_policy=replace(policy,max_zip_total_bytes=maximum-1))
 
 
 def test_private_diagnostic_fallback_retains_every_nonruntime_requirement(canonical):
     files,_=current_result(canonical);files['runtime/runtime.json']=b'damaged optional runtime'
     assert _parse_repository_payloads(payloads(files)).format_version==5
-    with pytest.raises(ValueError):parse_result_payloads(payloads(files))
+    with pytest.raises(ValueError):parse_reference_payloads(payloads(files))
     files['base/tracked.txt'] += b'changed snapshot'
     with pytest.raises(ValueError):_parse_repository_payloads(payloads(files))
 
 
 def test_pack_uses_full_reader_and_never_the_private_diagnostic_fallback(canonical,tmp_path,monkeypatch):
-    from patchharbor import result_reader
+    from patchharbor import reference_reader
     files,_=current_result(canonical);path=tmp_path/'result.zip';write_reference(path,files)
     contents=tmp_path/'contents';contents.mkdir();(contents/'run.sh').write_bytes(b'#!/usr/bin/env bash\n# PATCHHARBOR\nexit 0\n')
     output=tmp_path/'output';output.mkdir()
-    monkeypatch.setattr(result_reader,'_parse_repository_payloads',lambda *a,**k:pytest.fail('pack used weak fallback'))
+    monkeypatch.setattr(reference_reader,'_parse_repository_payloads',lambda *a,**k:pytest.fail('pack used weak fallback'))
     packed=api.pack_task(contents,reference_bundle=path,entrypoint='run.sh',output_directory=output)
     assert packed.validation.binding_matches
     files['runtime/runtime.json'] += b' ';write_reference(path,files)

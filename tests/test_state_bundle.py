@@ -7,7 +7,7 @@ import pytest
 from patchharbor import api
 from patchharbor.archive_evidence import parse_archive_evidence
 from patchharbor.exchange import classify_exchange_artifact
-from patchharbor.result_reader import read_result_reference
+from patchharbor.reference_reader import read_reference
 from tests.reference_support import reference_entries, write_reference, edit_document
 from tests.result_runtime_support import edit_metadata
 from tools import pyz_bootstrap as bootstrap
@@ -30,10 +30,10 @@ def test_both_reference_kinds_pack_and_validate_without_an_execution(
     assert json.loads(files['environment.json'])['bundle_type'] == label
     classified = classify_exchange_artifact(reference)
     assert classified.kind.value == artifact_kind and classified.package is None
-    facts, digest = read_result_reference(reference)
+    facts, digest = read_reference(reference)
     assert facts.bundle_kind.label == label
     assert digest == sha256(original).hexdigest()
-    snapshot = api.read_result_snapshot(reference, expected_sha256=digest)
+    snapshot = api.read_reference_snapshot(reference, expected_sha256=digest)
     assert snapshot.bundle_kind.label == label
     assert snapshot.effective.files['tracked.txt'].content == b'base\x00\xff\n'
     content = tmp_path / 'content'
@@ -69,7 +69,7 @@ def test_conflicting_kinds_are_rejected_before_pack_output(tmp_path, operation, 
     output = tmp_path / 'output'; output.mkdir()
     (contents / 'run.sh').write_bytes(b'#!/usr/bin/env bash\n# PATCHHARBOR\nexit 0\n')
     with pytest.raises(api.PatchHarborError):
-        read_result_reference(reference)
+        read_reference(reference)
     with pytest.raises(api.PatchHarborError):
         api.pack_task(contents, reference_bundle=reference, entrypoint='run.sh', output_directory=output)
     if fault == 'marker':
@@ -85,7 +85,7 @@ def test_state_capabilities_are_checked_by_native_and_standalone_readers(tmp_pat
     reference = tmp_path / 'state.zip'; write_reference(reference, files)
     original = reference.read_bytes()
     with pytest.raises(api.PatchHarborError):
-        read_result_reference(reference)
+        read_reference(reference)
     with pytest.raises(ValueError):
         bootstrap.assess(reference)
     assert reference.read_bytes() == original
@@ -97,7 +97,7 @@ def test_filename_cannot_relabel_reference_or_create_execute_receipt(tmp_path, k
     other = 'Result' if kind == 'bundle' else 'State'
     reference = tmp_path / ('repo_' + other + '_Bundle.zip')
     write_reference(reference, files)
-    facts, _ = read_result_reference(reference)
+    facts, _ = read_reference(reference)
     expected = 'state_bundle' if kind == 'bundle' else 'result_bundle'
     assert classify_exchange_artifact(reference).kind.value == expected
     assert facts.bundle_kind.artifact_kind == expected

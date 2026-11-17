@@ -89,7 +89,7 @@ def test_formal_argument_errors_precede_any_capture(request_files, monkeypatch, 
     options = dict(content_directory=contents, reference_bundle=reference, entrypoint='run.sh', output_directory=output)
     options[option] = value
     if option == 'output': options.pop('output_directory')
-    monkeypatch.setattr(core, 'capture_result_reference', lambda *a, **k: pytest.fail('capture on invalid arguments'))
+    monkeypatch.setattr(core, 'capture_reference', lambda *a, **k: pytest.fail('capture on invalid arguments'))
     with pytest.raises(error): api.pack_task(**options)
     assert not list(output.iterdir())
 

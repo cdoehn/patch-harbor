@@ -31,7 +31,7 @@ def test_helpers_are_never_executed(tmp_path,monkeypatch,operation,kind):
         else:
             plan=api.prepare_reference_export(repo,output_directory=output)
             result=api.bundle(repo,capture_mode='safe',export_plan=plan)
-            assert api.read_result_snapshot(result.path).effective.files['tracked.txt'].content==b'dirty source bytes\n'
+            assert api.read_reference_snapshot(result.path).effective.files['tracked.txt'].content==b'dirty source bytes\n'
     assert not calls.exists()
     assert source_bytes(repo)==before
     assert not list(exchange.iterdir())
@@ -47,7 +47,7 @@ def test_racy_stat_cache_does_not_hide_same_size_changed_bytes(tmp_path,monkeypa
     assert context.dirty
     plan=api.prepare_reference_export(repo,output_directory=output,expected_context=context)
     result=api.bundle(repo,capture_mode='safe',export_plan=plan)
-    snapshot=api.read_result_snapshot(result.path)
+    snapshot=api.read_reference_snapshot(result.path)
     assert snapshot.bundle_kind.label == 'State' and snapshot.operation == 'bundle'
     assert '_State_Bundle_' in result.path.name
     assert snapshot.index.files['tracked.txt'].content==b'base\n'
@@ -111,7 +111,7 @@ def test_crlf_and_explicit_unset_attributes_have_defined_semantics(tmp_path,monk
         plan=api.prepare_reference_export(repo,output_directory=output)
         assert plan.context==normal
         result=api.bundle(repo,capture_mode='safe',export_plan=plan)
-        assert api.read_result_snapshot(result.path).worktree.files['tracked.txt'].content==b'dirty\r\n'
+        assert api.read_reference_snapshot(result.path).worktree.files['tracked.txt'].content==b'dirty\r\n'
     else:
         with pytest.raises(api.SafeExportError) as caught:api.prepare_reference_export(repo,output_directory=output)
         assert caught.value.code is api.SafeExportErrorCode.UNSUPPORTED_CONVERSION

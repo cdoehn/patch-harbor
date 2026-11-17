@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from patchharbor.reference_kind import ReferenceBundleKind
+
 from datetime import datetime, timezone
 import errno
 from pathlib import Path
@@ -11,7 +13,7 @@ import patchharbor.result_bundle_publication as publication_module
 from patchharbor.exit_status import ExitCode, exit_code_for_error
 from patchharbor.errors import PatchHarborError
 from patchharbor.platform.filesystem import FileSystemOperationError
-from patchharbor.result_bundle_publication import ResultBundlePublication, prepare_result_bundle_publication, release_result_bundle_publication, reserve_result_bundle_publication, result_bundle_filename
+from patchharbor.result_bundle_publication import ResultBundlePublication, prepare_result_bundle_publication, release_result_bundle_publication, reserve_result_bundle_publication, reference_bundle_filename
 from patchharbor.run_report import RunSession
 from tests.result_publication_support import _publish
 
@@ -23,9 +25,9 @@ def test_result_bundle_filename_starts_with_repository_and_uses_short_run_id() -
         started_monotonic=1.0,
     )
 
-    assert result_bundle_filename(
+    assert reference_bundle_filename(
         session,
-        repository_name="patch-harbor",
+        repository_name="patch-harbor", kind=ReferenceBundleKind.RESULT,
     ) == "patch-harbor_Result_Bundle_102139_0830_123456.zip"
 
 

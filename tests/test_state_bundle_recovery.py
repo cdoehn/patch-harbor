@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from patchharbor.result_reader import read_result_reference
+from patchharbor.reference_reader import read_reference
 from tests.archive_support import _bundle, _rewrite, _scan
 from tests.exchange_support import _identity_record
 from tests.recovery_support import _pending, _edit_record
@@ -24,7 +24,7 @@ def test_state_cannot_recover_attempt_even_with_matching_run_and_pinned_digest(t
     _rewrite(state, same_run)
     if rename_as_result:
         state = state.rename(exchange / 'pretend_Result_Bundle.zip')
-    facts, digest = read_result_reference(state)
+    facts, digest = read_reference(state)
     assert facts.operation == 'bundle' and facts.run_id == attempt['attempt_run_id']
     assert facts.task_sha256 is None and facts.completed_commit is None
     _edit_record(env, task, lambda row: row.update(result_sha256=digest))

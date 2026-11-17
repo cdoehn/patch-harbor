@@ -13,7 +13,7 @@ from patchharbor import api
 from patchharbor.archive_evidence import parse_archive_evidence
 from patchharbor.cli import main
 from patchharbor.exit_status import exit_code_for_error
-from patchharbor.result_reader import read_result_reference
+from patchharbor.reference_reader import read_reference
 from tests.reference_support import reference_entries, write_reference, bound_package, edit_document
 
 

@@ -13,7 +13,7 @@ from patchharbor.exit_status import exit_code_for_error
 from patchharbor.task_inspection import validate_task
 from patchharbor.platform.filesystem import FileChangedDuringRead
 from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY
-import patchharbor.result_reader as reader
+import patchharbor.reference_reader as reader
 from tests.reference_support import reference_entries, write_reference, bound_package, edit_document
 
 
@@ -60,7 +60,7 @@ def test_closed_json_documents(tmp_path, name, fault):
     else: files[name] = b'\xff'
     ref = tmp_path / 'result.zip'; write_reference(ref, files)
     with pytest.raises(api.PatchHarborError) as caught:
-        reader.read_result_reference(ref)
+        reader.read_reference(ref)
     assert caught.value.reason is api.FailureReason.SOURCE_ERROR
 
 
@@ -88,7 +88,7 @@ def test_inventories_are_complete_typed_and_bound_to_content(tmp_path, fault):
         files.pop('untracked/new.bin'); files['changes/unstaged.patch']=b''
         edit_document(files,'manifest.json',lambda d:d.update(untracked_entries=[]))
     ref=tmp_path/'result.zip';write_reference(ref,files)
-    with pytest.raises(api.PatchHarborError) as caught: reader.read_result_reference(ref)
+    with pytest.raises(api.PatchHarborError) as caught: reader.read_reference(ref)
     assert int(exit_code_for_error(caught.value)) == 4
 
 
@@ -98,7 +98,7 @@ def test_nested_execution_booleans_are_not_integer_aliases(tmp_path, field):
     def mutate(d): d['primary_result'][field] = True if field.endswith('code') else int(d['primary_result'][field])
     edit_document(files,'logs/run.json',mutate)
     ref=tmp_path/'result.zip';write_reference(ref,files)
-    with pytest.raises(api.PatchHarborError) as caught: reader.read_result_reference(ref)
+    with pytest.raises(api.PatchHarborError) as caught: reader.read_reference(ref)
     assert int(exit_code_for_error(caught.value)) == 4
 
 
@@ -112,7 +112,7 @@ def test_optional_handoff_is_consistent_when_present(tmp_path, fault):
                  'bad_time':{'captured_at':'bad'}}
         edit_document(files,'environment.json',lambda d:d.update(changes[fault]))
     ref=tmp_path/'result.zip';write_reference(ref,files)
-    with pytest.raises(api.PatchHarborError) as caught: reader.read_result_reference(ref)
+    with pytest.raises(api.PatchHarborError) as caught: reader.read_reference(ref)
     assert int(exit_code_for_error(caught.value)) == 4
 
 
@@ -172,5 +172,5 @@ def test_path_arguments_are_anchored_before_observer_changes_cwd(tmp_path,monkey
 def test_unexpected_programmer_exception_is_not_disguised(tmp_path,monkeypatch):
     files,_=reference_entries();ref=tmp_path/'result.zip';write_reference(ref,files)
     def unexpected(*a,**k):raise RuntimeError('programming failure')
-    monkeypatch.setattr(reader,'parse_result_payloads',unexpected)
-    with pytest.raises(RuntimeError):reader.read_result_reference(ref)
+    monkeypatch.setattr(reader,'parse_reference_payloads',unexpected)
+    with pytest.raises(RuntimeError):reader.read_reference(ref)

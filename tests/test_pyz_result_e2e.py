@@ -10,7 +10,7 @@ from zipfile import ZipFile
 
 import pytest
 
-from patchharbor.result_reader import read_result_reference
+from patchharbor.reference_reader import read_reference
 from patchharbor import runtime_pyz as pyz
 from tests.embedded_pyz_support import bootstrap_program
 from tests.platform_support import native_python_script, native_value
@@ -36,7 +36,7 @@ result=api.bundle(repo)
 print(json.dumps({'path':str(result.path)}))
 ''',str(repo),str(exchange)],tmp_path,environment))
     reference=Path(produced['path']);original=reference.read_bytes()
-    facts,digest=read_result_reference(reference)
+    facts,digest=read_reference(reference)
     assert facts.format_version==5 and facts.runtime.status=='embedded' and not facts.warnings
     with ZipFile(reference) as archive:
         template=archive.read('CHAT_INSTRUCTIONS.md')
@@ -106,12 +106,12 @@ print(json.dumps({'patch':str(packed.path),'pyz':str(prepared.path),'sha256':pac
         assert command('validate',proof['patch'],'--reference-bundle',reference)['binding_matches']
         outcome=command('execute',proof['patch'])
         returned=Path(outcome['result_bundle']['path'])
-        returned_facts,_=read_result_reference(returned)
+        returned_facts,_=read_reference(returned)
         assert returned_facts.format_version==5 and returned_facts.runtime.artifact.sha256==facts.runtime.artifact.sha256
         assert (repo/'entrypoint-proof').read_bytes()==b'payloads-before-entrypoint'
         followup=tmp_path/'followup';followup.mkdir()
         fresh=command('bundle',repo,'--output-dir',followup)
-        assert read_result_reference(Path(fresh['result_bundle_path']))[0].runtime.artifact.sha256==facts.runtime.artifact.sha256
+        assert read_reference(Path(fresh['result_bundle_path']))[0].runtime.artifact.sha256==facts.runtime.artifact.sha256
         legacy=tmp_path/native_value('legacy.sh','legacy.ps1')
         legacy.write_text(native_python_script("from pathlib import Path; Path('fs-run-proof').write_bytes(b'legacy-core')"))
         _run([*prefix,'fs','run',str(legacy)],repo,environment)

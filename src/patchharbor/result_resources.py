@@ -20,7 +20,7 @@ from patchharbor.platform.filesystem import FileChangedDuringRead, FileReadLimit
 
 if TYPE_CHECKING:
     from patchharbor.bundle_handoff import BundleHandoff
-    from patchharbor.result_bundle_snapshot import ResultBundleSnapshot
+    from patchharbor.repository_bundle_snapshot import RepositoryBundleSnapshot
     from patchharbor.run_report import RunReport
 
 
@@ -137,7 +137,7 @@ def capture_result_resources() -> PinnedResultResources:
 
 def runtime_fits(
     runtime: ResultRuntimePayload, *, manifest: dict[str, object], context_document: dict[str, object],
-    handoff: BundleHandoff, run_report: RunReport, snapshot: ResultBundleSnapshot,
+    handoff: BundleHandoff, run_report: RunReport, snapshot: RepositoryBundleSnapshot,
     execution_log: bytes | None, policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY,
 ) -> bool:
     """Check the exact outer payload and the shared inner-byte budget before publication."""

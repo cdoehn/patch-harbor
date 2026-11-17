@@ -14,7 +14,7 @@ from patchharbor.cli import main
 from patchharbor.exchange import ExchangeArtifactKind, _classify_content
 from patchharbor.errors import registry_error, repository_busy_error, state_mismatch_error, unsupported_repository_state_error
 from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY
-from patchharbor.result_reader import read_result_reference
+from patchharbor.reference_reader import read_reference
 from patchharbor.run_report import PrimaryResult
 from tests.result_pyz_support import canonical, current_result
 from tests.result_runtime_support import descriptor, edit_metadata
@@ -35,10 +35,10 @@ def test_categorized_tool_failure_remains_a_reference_and_can_be_published(canon
         edit_document(files, "manifest.json", lambda d: d.update(expected_base_commit="a" * 64))
     ref = tmp_path / "result.zip"; write_reference(ref, files)
     patch = tmp_path / "patch.zip"; bound_package(patch, binding)
-    facts, _ = read_result_reference(ref)
+    facts, _ = read_reference(ref)
     assert facts.format_version == 5 and facts.primary_result == primary
     assert api.validate_task(patch, reference_bundle=ref).binding_matches
-    publication._verify_result_bundle(ref, execution_present=False)
+    publication._verify_reference_bundle(ref, execution_present=False)
     with pytest.raises(ValueError):
         parse_archive_evidence(ref.read_bytes(), ref)
     # A different numeric cause cannot silently inherit the claimed category.
@@ -46,7 +46,7 @@ def test_categorized_tool_failure_remains_a_reference_and_can_be_published(canon
     edit_document(files, "logs/run.json", lambda d: d.update(process_exit_code=7))
     write_reference(ref, files)
     with pytest.raises(api.PatchHarborError):
-        read_result_reference(ref)
+        read_reference(ref)
 
 @pytest.mark.parametrize("status", ["embedded", "unavailable"])
 @pytest.mark.parametrize("kind,dirty", [("bundle", False), ("success", False), ("success", True),
@@ -55,7 +55,7 @@ def test_format3_reference_preserves_binding_and_separates_success_policy(canoni
     files, binding = current_result(canonical if status == "embedded" else None, kind=kind, dirty=dirty)
     ref = tmp_path / "result.zip"; write_reference(ref, files)
     patch = tmp_path / "patch.zip"; bound_package(patch, binding)
-    facts, digest = read_result_reference(ref)
+    facts, digest = read_reference(ref)
     assert facts.format_version == 5 and facts.runtime.status == status
     assert facts.context.dirty is dirty and facts.operation == ("bundle" if kind == "bundle" else "execute")
     assert digest == hashlib.sha256(ref.read_bytes()).hexdigest()
@@ -77,7 +77,7 @@ def test_inner_bytes_share_the_remaining_outer_request_budget(canonical, tmp_pat
     with ZipFile(BytesIO(canonical)) as archive:
         inner = sum(info.file_size for info in archive.infolist())
     policy = replace(DEFAULT_RESOURCE_POLICY, max_zip_total_bytes=outer + inner)
-    assert read_result_reference(ref, resource_policy=policy)[0].runtime.status == "embedded"
+    assert read_reference(ref, resource_policy=policy)[0].runtime.status == "embedded"
     original = pyz.read_pyz
     def inspect_only(*args, **kwargs):
         with monkeypatch.context() as guard:
@@ -85,7 +85,7 @@ def test_inner_bytes_share_the_remaining_outer_request_budget(canonical, tmp_pat
             return original(*args, **kwargs)
     monkeypatch.setattr(pyz, "read_pyz", inspect_only)
     with pytest.raises(api.PatchHarborError):
-        read_result_reference(ref, resource_policy=replace(policy, max_zip_total_bytes=outer + inner - 1))
+        read_reference(ref, resource_policy=replace(policy, max_zip_total_bytes=outer + inner - 1))
 
 def test_inner_entry_count_uses_request_limit_before_resource_reads(canonical, tmp_path, monkeypatch):
     files, _ = current_result(canonical)
@@ -94,7 +94,7 @@ def test_inner_entry_count_uses_request_limit_before_resource_reads(canonical, t
     assert count > len(files)
     ref = tmp_path / "result.zip"; write_reference(ref, files)
     policy = replace(DEFAULT_RESOURCE_POLICY, max_zip_entries=count)
-    assert read_result_reference(ref, resource_policy=policy)[0].runtime.status == "embedded"
+    assert read_reference(ref, resource_policy=policy)[0].runtime.status == "embedded"
     original = pyz.read_pyz
     def inspect_only(*args, **kwargs):
         with monkeypatch.context() as guard:
@@ -102,7 +102,7 @@ def test_inner_entry_count_uses_request_limit_before_resource_reads(canonical, t
             return original(*args, **kwargs)
     monkeypatch.setattr(pyz, "read_pyz", inspect_only)
     with pytest.raises(api.PatchHarborError):
-        read_result_reference(ref, resource_policy=replace(policy, max_zip_entries=count - 1))
+        read_reference(ref, resource_policy=replace(policy, max_zip_entries=count - 1))
 
 def test_metadata_budget_is_enforced_before_json_parse(tmp_path, monkeypatch):
     files, _ = current_result(None)
@@ -111,7 +111,7 @@ def test_metadata_budget_is_enforced_before_json_parse(tmp_path, monkeypatch):
     edit_document(files, "manifest.json", lambda doc: doc["runtime"].update(metadata=descriptor(name, files[name])))
     ref = tmp_path / "result.zip"; write_reference(ref, files)
     monkeypatch.setattr(result_pyz, "parse_json_document", lambda *a: pytest.fail("oversize runtime JSON parsed"))
-    with pytest.raises(api.PatchHarborError): read_result_reference(ref)
+    with pytest.raises(api.PatchHarborError): read_reference(ref)
 
 def test_repository_runtime_path_is_not_the_embedded_namespace(canonical, tmp_path):
     files, binding = current_result(canonical)
@@ -122,7 +122,7 @@ def test_repository_runtime_path_is_not_the_embedded_namespace(canonical, tmp_pa
     assert api.validate_task(patch, reference_bundle=ref).binding_matches
 
 def test_snapshot_unicode_paths_work_for_classifier_and_archive_without_relaxing_patches(canonical, tmp_path):
-    from patchharbor.result_reader import read_result_or_task_payloads
+    from patchharbor.reference_reader import read_reference_or_task_payloads
     from patchharbor.zip_payloads import ZipPayloadError
     files, binding = current_result(canonical)
     name = "base/runtime/Grüße dir/Datei.py"
@@ -136,7 +136,7 @@ def test_snapshot_unicode_paths_work_for_classifier_and_archive_without_relaxing
     with ZipFile(patch, "a") as archive:
         archive.writestr(name, b"not a permitted patch payload path")
     assert _classify_content(patch, patch.read_bytes(), resource_policy=DEFAULT_RESOURCE_POLICY).kind is ExchangeArtifactKind.OTHER
-    with pytest.raises(ZipPayloadError): read_result_or_task_payloads(patch.read_bytes())
+    with pytest.raises(ZipPayloadError): read_reference_or_task_payloads(patch.read_bytes())
 
 def test_reader_does_not_import_execute_or_write_runtime(tmp_path, monkeypatch):
     files, binding = current_result(reference_runtime())
@@ -166,11 +166,11 @@ def test_result_classification_is_only_a_type_hint_and_never_a_patch(canonical, 
 def test_publication_verifies_format3_bytes_and_detects_corruption(canonical, tmp_path, status):
     files, _ = current_result(canonical if status == "embedded" else None)
     ref = tmp_path / "result.zip"; write_reference(ref, files)
-    publication._verify_result_bundle(ref, execution_present=False)
+    publication._verify_reference_bundle(ref, execution_present=False)
     files["runtime/runtime.json"] += b" "
     write_reference(ref, files)
     with pytest.raises(api.PatchHarborError) as caught:
-        publication._verify_result_bundle(ref, execution_present=False)
+        publication._verify_reference_bundle(ref, execution_present=False)
     assert caught.value.reason is api.FailureReason.RESULT_BUNDLE_ERROR
 
 def test_cli_reference_validation_accepts_format3(canonical, tmp_path):

@@ -8,7 +8,7 @@ import pytest
 
 from tests.handoff_support import handoff
 from patchharbor.result_bundle_publication import ResultBundlePublication, prepare_result_bundle_publication, publish_result_bundle
-from patchharbor.result_bundle_snapshot import build_result_bundle_snapshot
+from patchharbor.repository_bundle_snapshot import build_repository_bundle_snapshot
 from patchharbor import result_verification as verification
 
 from tests.run_report_support import successful_bundle_run_report
@@ -22,7 +22,7 @@ def _publish(publication: ResultBundlePublication, *, runtime=None, **options) -
     if runtime is None:
         runtime = runtime_payload(None, reason="source_not_prepared")
     report = replace(report, warnings=runtime.warnings)
-    snapshot = build_result_bundle_snapshot(base_entries=(), staged_patch=b"", unstaged_patch=b"", untracked_entries=())
+    snapshot = build_repository_bundle_snapshot(base_entries=(), staged_patch=b"", unstaged_patch=b"", untracked_entries=())
     context = _context_document(report)
     environment = {
         "marker": "patch-harbor-environment", "format_version": 3, "bundle_type": "State",

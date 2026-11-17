@@ -70,7 +70,7 @@ def test_complete_immutable_admission_under_actual_lock(host):
     assert (repo/'stage/item').read_bytes()==b'approved payload'
     assert (repo/'execution-marker').read_text()=='approved'
     assert report.result_bundle.status is api.ResultBundleStatus.CREATED
-    snapshot=api.read_result_snapshot(report.result_bundle.path)
+    snapshot=api.read_reference_snapshot(report.result_bundle.path)
     assert snapshot.primary_result.success and snapshot.context.dirty
     assert snapshot.effective.files['stage/item'].content==b'approved payload'
 
@@ -84,7 +84,7 @@ def test_only_explicit_boolean_true_accepts(host,decision):
     assert len(calls)==1 and report.primary_tool_error.kind is api.ErrorKind.ADMISSION_REJECTED
     assert report.primary_tool_error.reason is api.FailureReason.SOURCE_ERROR
     assert report.result_bundle.status is api.ResultBundleStatus.CREATED
-    snapshot=api.read_result_snapshot(report.result_bundle.path)
+    snapshot=api.read_reference_snapshot(report.result_bundle.path)
     assert not snapshot.primary_result.success and not snapshot.primary_result.entrypoint_started
 
 
@@ -202,14 +202,14 @@ def test_actual_entrypoint_failure_is_preserved(host):
     assert report.primary_result.entrypoint_exit_code==29
     assert (repo/'stage/item').read_bytes()==b'approved payload'
     assert report.result_bundle.status is api.ResultBundleStatus.CREATED
-    assert api.read_result_snapshot(report.result_bundle.path).primary_result.entrypoint_exit_code==29
+    assert api.read_reference_snapshot(report.result_bundle.path).primary_result.entrypoint_exit_code==29
 
 
 def test_result_publication_failure_keeps_actual_executed_outcome(host,monkeypatch):
     from patchharbor import result_bundle_publication as publication
     repo,_=host;path,digest,_=package(host)
     def fail(*args,**kwargs):raise OSError('injected publication failure after execution')
-    monkeypatch.setattr(publication,'_verify_result_bundle',fail)
+    monkeypatch.setattr(publication,'_verify_reference_bundle',fail)
     report=guarded(host,path,digest,lambda _:True)
     assert report.execution_present and report.primary_result.entrypoint_exit_code==0
     assert report.result_bundle.status is api.ResultBundleStatus.FAILED
@@ -263,7 +263,7 @@ raise SystemExit(report.process_exit_code)
     primary=report['primary_result']
     assert primary['kind']=='interrupted' and primary['entrypoint_started'] and primary['interrupted']
     assert primary['entrypoint_exit_code'] is None and primary['patchharbor_error_code']==130
-    snapshot=api.read_result_snapshot(report['result_bundle']['path'])
+    snapshot=api.read_reference_snapshot(report['result_bundle']['path'])
     assert snapshot.primary_result.interrupted and snapshot.primary_result.entrypoint_started
     assert (repo/'stage/item').read_bytes()==b'approved payload'
 

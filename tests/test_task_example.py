@@ -46,7 +46,7 @@ def test_example_rejects_untrusted_reference_before_output(repository, tmp_path)
     root, _ = repository
     reference = api.bundle(root)
     output = tmp_path/'must-not-exist'
-    with pytest.raises(api.ResultSnapshotError):
+    with pytest.raises(api.ReferenceSnapshotError):
         prepare_task(tmp_path/'missing-contents',reference=reference.path,
                      expected_result_sha256='0'*64,entrypoint='run.sh',output_directory=output)
     assert not output.exists()

@@ -12,7 +12,7 @@ import pytest
 from patchharbor.application import configure_bundle_suffix
 from patchharbor.errors import PatchHarborError
 from patchharbor.exchange import classify_exchange_artifact, ExchangeArtifactKind
-from patchharbor.result_bundle import create_manual_result_bundle
+from patchharbor.result_bundle import create_state_bundle
 from patchharbor_watcher.execute_boundary import delegate_to_automatic_execute
 from patchharbor_watcher.loop import SharedWatcherEventState, poll_repositories_once, WatcherPollOutcome
 from tests.platform_support import native_script, native_value, project_environment, run_cli
@@ -187,7 +187,7 @@ def test_suffix_change_during_capture_never_publishes_inconsistent_name(
         return captured
     monkeypatch.setattr(capture_module, "capture_base_bundle_entries", capture_then_change)
     with pytest.raises(PatchHarborError, match="bundle suffix changed"):
-        create_manual_result_bundle(repository, output_directory=output)
+        create_state_bundle(repository, output_directory=output)
     assert not tuple((output or exchange).glob("*_State_Bundle_*"))
 
 

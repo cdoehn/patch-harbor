@@ -32,9 +32,9 @@ from patchharbor.api_types import (
     ResultBundleResult, ResultBundleStatus, RunOperation, RunReport, RunTiming,
     RunToolError, ScriptPrepared, ScriptResult, UnregisterResult,
     TaskEntry, TaskEntryRole, TaskInspection, TaskManifest, TaskMessage,
-    TaskValidationResult, TaskValidationScope, ReferenceContext,
+    TaskValidationResult, TaskValidationScope, ReferenceContext, ReferenceBundleKind,
     TaskPackResult, RuntimeExportResult, RuntimeExportError, RuntimeExportErrorCode,
-    IntegrationCapabilities, ResultSnapshot, ResultSnapshotError, SnapshotErrorCode,
+    IntegrationCapabilities, ReferenceSnapshot, ReferenceSnapshotError, SnapshotErrorCode,
     SnapshotFile, SnapshotLayer, SnapshotRuntime,
     ExecuteLock, ExecuteLockKind, ExecuteReadiness, AutomaticExecuteResult,
     AutomaticExecuteStatus, ExchangeWatchTarget, WatchControlPaths, WatchTargets,
@@ -68,14 +68,14 @@ __all__ = [
     "configure_bundle_suffix", "configure_exchange_directory", "configuration",
     "context", "dry_run", "register", "repositories", "run_scripts", "unregister",
     "TaskEntry", "TaskEntryRole", "TaskInspection", "TaskManifest", "TaskMessage",
-    "TaskValidationResult", "TaskValidationScope", "ReferenceContext", "inspect_task", "validate_task",
+    "TaskValidationResult", "TaskValidationScope", "ReferenceContext", "ReferenceBundleKind", "inspect_task", "validate_task",
     "ExecuteLock", "ExecuteLockKind", "ExecuteReadiness", "AutomaticExecuteResult",
     "AutomaticExecuteStatus", "ExchangeWatchTarget", "WatchControlPaths", "WatchTargets",
     "watch_targets", "watch_control_paths", "execute_readiness",
     "pack_task", "TaskPackResult",
     "export_runtime", "RuntimeExportResult", "RuntimeExportError", "RuntimeExportErrorCode",
-    "IntegrationCapabilities", "ResultSnapshot", "ResultSnapshotError", "SnapshotErrorCode",
-    "SnapshotFile", "SnapshotLayer", "SnapshotRuntime", "integration_capabilities", "read_result_snapshot",
+    "IntegrationCapabilities", "ReferenceSnapshot", "ReferenceSnapshotError", "SnapshotErrorCode",
+    "SnapshotFile", "SnapshotLayer", "SnapshotRuntime", "integration_capabilities", "read_reference_snapshot",
 ]
 
 
@@ -93,16 +93,16 @@ def _sha256_argument(value: str, name: str) -> str:
     return value
 
 
-def read_result_snapshot(
+def read_reference_snapshot(
     result: PathInput, *, expected_sha256: str | None = None,
     observer: ProgressObserver | None = None,
-) -> ResultSnapshot:
+) -> ReferenceSnapshot:
     """Fully validate and reconstruct one captured Result without writes or Git."""
     path = _path(result, "result")
     digest = None if expected_sha256 is None else _sha256_argument(expected_sha256, "expected_sha256")
-    from patchharbor.result_snapshot import read_result_snapshot as _read_result_snapshot
+    from patchharbor.reference_snapshot import read_reference_snapshot as _read_reference_snapshot
     with _observe_activity(_observer(observer)):
-        return _read_result_snapshot(path, expected_sha256=digest)
+        return _read_reference_snapshot(path, expected_sha256=digest)
 
 
 def pack_task(
@@ -306,7 +306,7 @@ def bundle(
     capture_mode: str = "git", export_plan: SafeExportPlan | None = None,
     observer: ProgressObserver | None = None,
 ) -> BundleResult:
-    """Publish a manual Result Bundle, using Exchange unless output is explicit."""
+    """Publish a State Bundle, using Exchange unless output is explicit."""
     path = _path(repository, "repository")
     destination = _optional_path(output_directory, "output_directory")
     mode = _capture_mode(capture_mode)

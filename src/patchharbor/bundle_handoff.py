@@ -24,6 +24,12 @@ STATE_FILENAME_SCHEMA = "<Repository>_State_Bundle_<HHMMSS>_<MMDD>_<ID6>.zip<bun
 RESULT_FILENAME_SCHEMA = "<Repository>_Result_Bundle_<HHMMSS>_<MMDD>_<ID6>.zip<bundle_suffix>"
 
 
+def filename_schemas() -> dict[str, str]:
+    """Current display names for all three bundle roles; never binding values."""
+    return {'Task': TASK_FILENAME_SCHEMA, 'State': STATE_FILENAME_SCHEMA, 'Result': RESULT_FILENAME_SCHEMA}
+
+
+
 @dataclass(frozen=True)
 class BundleHandoff:
     """Documentation only; never a source of execution or repository identity."""
