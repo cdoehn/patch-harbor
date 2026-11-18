@@ -98,7 +98,7 @@ def activity_event(event, *, operation_kind="execute"):
     elif event.phase in ('TIMEOUT', 'INTERRUPT'):
         status = 'failure'
     elif event.phase == 'BUNDLE-ZIP':
-        # Success of one ZIP member is not success of the entire Result.
+        # Success of one ZIP member is not success of the entire reference bundle.
         status = 'running'
     elif event.phase == 'SELECT' and event.message.startswith('No eligible task'):
         code, label, status = 'no-candidate', 'Kein ausführbarer Task gefunden', 'waiting'

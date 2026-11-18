@@ -1,4 +1,4 @@
-"""Verify, synchronize, and atomically publish one Result Bundle."""
+"""Verify, synchronize, and atomically publish one reference bundle."""
 
 from __future__ import annotations
 
@@ -49,7 +49,7 @@ class ResultBundlePublication:
 
     def __post_init__(self) -> None:
         if (self.reservation_stat is None) != (self.reservation_token is None):
-            raise ValueError("Result Bundle reservation is incomplete")
+            raise ValueError("reference bundle reservation is incomplete")
 
     @property
     def reserved(self) -> bool:
@@ -68,7 +68,7 @@ class PublicationDurability:
 
 @dataclass(frozen=True)
 class PublishedResultBundle:
-    """One atomically published Result Bundle and its sync observations."""
+    """One atomically published reference bundle and its sync observations."""
 
     path: Path
     durability: PublicationDurability
@@ -115,7 +115,7 @@ def reserve_result_bundle_publication(
     )
     try:
         if path_kind(publication.final_path) is not PathKind.MISSING:
-            raise result_bundle_error("Result Bundle destination already exists")
+            raise result_bundle_error("reference bundle destination already exists")
         reservation_token = secrets.token_bytes(32)
         with publication.temporary_path.open("xb") as destination:
             destination.write(reservation_token)
@@ -125,7 +125,7 @@ def reserve_result_bundle_publication(
         raise
     except OSError as exc:
         raise result_bundle_error(
-            "cannot reserve the Result Bundle temporary path"
+            "cannot reserve the reference bundle temporary path"
         ) from exc
     return ResultBundlePublication(
         temporary_path=publication.temporary_path,
@@ -170,7 +170,7 @@ def _require_owned_temporary_file(
 ) -> None:
     if not _same_regular_file(path, expected):
         raise result_bundle_error(
-            "Result Bundle temporary file changed during publication"
+            "reference bundle temporary file changed during publication"
         )
 
 
@@ -211,11 +211,11 @@ def _verify_reference_bundle(path: Path, *, execution_present: bool,
     try:
         facts, digest = read_reference(path, expected_identity=expected_identity)
     except (PatchHarborError, OSError, RuntimeError, ValueError) as exc:
-        raise result_bundle_error(f"Result Bundle integrity verification failed: {exc}") from exc
+        raise result_bundle_error(f"reference bundle integrity verification failed: {exc}") from exc
     if not facts.handoff_present:
         raise result_bundle_error("Result publication requires passive handoff data")
     if facts.primary_result.entrypoint_started != execution_present:
-        raise result_bundle_error("Result Bundle execution state changed")
+        raise result_bundle_error("reference bundle execution state changed")
     return digest
 
 
@@ -230,7 +230,7 @@ def _publication_destination(
         if publication.reservation_stat is None:
             if path_kind(publication.temporary_path) is not PathKind.MISSING:
                 raise result_bundle_error(
-                    "Result Bundle temporary path already exists"
+                    "reference bundle temporary path already exists"
                 )
             if directory_guard is None:
                 stream = publication.temporary_path.open("xb")
@@ -252,12 +252,12 @@ def _publication_destination(
                 )
             ):
                 raise result_bundle_error(
-                    "Result Bundle temporary reservation changed"
+                    "reference bundle temporary reservation changed"
                 )
             stream.seek(0)
             if stream.read() != publication.reservation_token:
                 raise result_bundle_error(
-                    "Result Bundle temporary reservation changed"
+                    "reference bundle temporary reservation changed"
                 )
             stream.seek(0)
             stream.truncate(0)
@@ -265,7 +265,7 @@ def _publication_destination(
     except PatchHarborError:
         raise
     except OSError as exc:
-        raise result_bundle_error("cannot create the Result Bundle") from exc
+        raise result_bundle_error("cannot create the reference bundle") from exc
     finally:
         if descriptor is not None:
             os.close(descriptor)
@@ -310,7 +310,7 @@ def publish_result_bundle(
         if directory_guard is not None:
             directory_guard.verify()
         if path_kind(publication.final_path) is not PathKind.MISSING:
-            raise result_bundle_error("Result Bundle destination already exists")
+            raise result_bundle_error("reference bundle destination already exists")
 
         with _publication_destination(publication, directory_guard) as (
             destination,
@@ -365,7 +365,7 @@ def publish_result_bundle(
             ).sha256,
         )
         if final_digest != digest:
-            raise result_bundle_error("Result Bundle bytes changed before publication")
+            raise result_bundle_error("reference bundle bytes changed before publication")
         verified = True
         if before_atomic_publish is not None:
             before_atomic_publish()
@@ -395,7 +395,7 @@ def publish_result_bundle(
             exc.published_path = published_path
         raise
     except OSError as exc:
-        error = result_bundle_error("cannot publish the Result Bundle")
+        error = result_bundle_error("cannot publish the reference bundle")
         if directory_guard is not None:
             published_path = locate_published() or published_path
             error.published_path = published_path

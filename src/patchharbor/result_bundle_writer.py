@@ -52,14 +52,14 @@ def write_result_bundle(
     execution_log: bytes | None = None,
     runtime: ResultRuntimePayload | None = None,
 ) -> None:
-    """Write one captured Result Bundle to a caller-owned binary stream."""
+    """Write one captured State or Result Bundle to a caller-owned binary stream."""
     try:
         check_result_file_count(len(snapshot.base_entries), len(snapshot.untracked_entries))
     except ResultSnapshotLimitError as exc:
         raise result_bundle_error(str(exc)) from exc
     if run_report.execution_present != (execution_log is not None):
         raise result_bundle_error(
-            "Result Bundle execution state and execution log disagree"
+            "Reference bundle execution state and execution log disagree"
         )
     try:
         with zipfile.ZipFile(
@@ -114,4 +114,4 @@ def write_result_bundle(
                     executable=entry.executable,
                 )
     except (OSError, RuntimeError, ValueError, zipfile.LargeZipFile) as exc:
-        raise result_bundle_error("cannot create the Result Bundle") from exc
+        raise result_bundle_error("cannot create the reference bundle") from exc

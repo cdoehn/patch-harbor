@@ -26,7 +26,7 @@ class ResultVerificationError(PatchHarborError):
         detail = ", ".join(f"{field}={diagnostics[field]}" for field in fields)
         if diagnostics.get("verification_error_detail"):
             detail += ", verification_error_detail=" + str(diagnostics["verification_error_detail"])
-        super().__init__(f"Result Bundle integrity verification failed ({detail})",
+        super().__init__(f"reference bundle integrity verification failed ({detail})",
                          FailureReason.RESULT_BUNDLE_ERROR, error_kind=ErrorKind.RESULT_BUNDLE_ERROR)
 
 

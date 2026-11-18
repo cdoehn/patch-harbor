@@ -48,7 +48,7 @@ repository. Setters update the existing valid document atomically and preserve
 all other settings. They never initialize a missing file.
 `.patchharbor/` is excluded through Git's local `info/exclude`, not through a
 change to the project's versioned `.gitignore`. It is not committed or included
-as repository files in Result Bundles. A dot-prefixed name is hidden on Linux;
+as repository files in State or Result Bundles. A dot-prefixed name is hidden on Linux;
 PatchHarbor does not set a Windows Hidden attribute.
 
 ### Shared or separate Exchange directories
@@ -71,7 +71,7 @@ preferences, determines ownership. Automatic discovery accepts a package only
 from its target repository's configured Exchange. An explicit `execute TASK_ZIP`
 can read a package elsewhere, but still uses its manifest target's settings.
 
-The flat Exchange directory may contain Task Bundles, Result Bundles, old
+The flat Exchange directory may contain State Bundles, Task Bundles, Result Bundles, old
 packages, and unrelated files together. PatchHarbor identifies content rather
 than relying on filenames. Conservative automatic archival moves only bundles
 with complete obsolescence proofs into a direct child folder; nothing is deleted.
@@ -145,7 +145,7 @@ contains that commit in its original Git history. Explicit exchange packages
 also record this evidence, without changing explicit retry eligibility. Legacy
 records without a completion receipt remain conservatively unarchived.
 
-A Result Bundle can be archived only when it describes a successful, clean,
+A State or Result Bundle can be archived only when it describes a successful, clean,
 completed run at a strict ancestor of the current clean HEAD. Its manifest,
 context and run log must agree; every snapshot blob hash, size and mode is
 checked against the complete actual Git tree, and unexpected contents are
@@ -183,10 +183,11 @@ patchharbor configure bundle-suffix .txt
 patchharbor configure show
 ```
 
-All newly generated Result Bundles for this repository then use
-`<Repository>_Result_Bundle_<HHMMSS>_<MMDD>_<ID6>.zip.txt`, including manual `bundle`,
-automatic Execute results (success, failure, dry-run), Watcher results, and explicit
-`--output-dir` targets. There is no suffix argument on `execute` or `bundle`.
+Manual `bundle` uses
+`<Repository>_State_Bundle_<HHMMSS>_<MMDD>_<ID6>.zip.txt`.
+Execute uses `<Repository>_Result_Bundle_<HHMMSS>_<MMDD>_<ID6>.zip.txt`,
+including success, failure, dry-run and Watcher execution. The suffix also
+applies to explicit `--output-dir` targets. There is no suffix argument on `execute` or `bundle`.
 Disable it with:
 
 ```bash
@@ -207,10 +208,10 @@ Format-4 replay ledger is separate from this configuration schema and remains
 intact. Upgrade all installed PatchHarbor entrypoints together.
 
 A developer or development chat prepares the contents and entrypoint. `patchharbor pack` or `api.pack_task` creates and validates the package; see the [pack guide](pack.md).
-The new Result Bundle's `context.json` carries `bundle_suffix` as optional
+The reference bundle's `context.json` carries `bundle_suffix` as optional
 filename metadata. The matching chat instructions require the same suffix on
 `<Repository>_Task_Bundle_<HHMMSS>_<MMDD>_<ID6>.zip`. Missing metadata in older bundles
-means no suffix. After changing the setting, give the chat a fresh Result Bundle.
+means no suffix. After changing the setting, give the chat a fresh State Bundle.
 Do not put this field in `task.json`: it is not part of repository binding.
 `patchharbor context --json` keeps its existing closed schema; a standalone
 context therefore needs the naming preference supplied separately.
@@ -276,9 +277,9 @@ input. Run `patchharbor context --json` from the repository root, or
 `patchharbor context --json REPOSITORY` from elsewhere, when complete values are
 required. `register` itself deliberately has no `--json` option.
 
-The Result Bundle already contains the full repository ID, base commit, state
+The State Bundle already contains the full repository ID, base commit, state
 fingerprint, committed snapshot, staged and unstaged changes, and non-ignored
-untracked regular files. For standard chat initialization, upload that Result
+untracked regular files. For standard chat initialization, upload that State
 Bundle instead of copying either form of terminal context output. Its
 `context.json` is the authoritative source of complete repository-binding values.
 
@@ -292,16 +293,16 @@ instance identity.
 
 ## Initialize a new development chat
 
-Upload the newest Result Bundle produced by `patchharbor bundle` and the
+Upload the newest State Bundle produced by `patchharbor bundle` and the
 development request. Ask the chat to read the root `CHAT_INSTRUCTIONS.md` and
 initialize itself from that bundle. It already contains the version-matching
 contract plus a fresh local-environment section; no extra command or separate
-instructions file is required. For old bundles without embedded instructions,
-provide the version-matching `CHAT_INSTRUCTIONS.md` separately.
+instructions file is required. Only bundles of the exact current product
+version are supported; there is no migration of old references.
 
 The local repository path or Exchange path in `environment.json` helps the chat
 write commands for the development computer. These paths are informational,
-never repository selectors or additions to `task.json`. The Result Bundle
+never repository selectors or additions to `task.json`. The State Bundle
 supplies the repository identity and exact state, while local PatchHarbor
 resolves the registered path. The chat takes all
 repository-binding identifiers from the bundle's complete `context.json`, never
@@ -310,14 +311,14 @@ from shortened human-facing terminal output.
 The chat contract requires one downloadable repository-bound ZIP Task Bundle.
 Patch filenames use
 `<Repository>_Task_Bundle_<HHMMSS>_<MMDD>_<ID6>.zip`, followed by `bundle_suffix`
-from the Result Bundle when configured. After an Execute, upload the
+from the reference bundle when configured. After an Execute, upload the
 newly created Result Bundle back to the same chat. For a failed entrypoint or
 test run, that bundle contains the actual remaining repository state plus
 `logs/run.json` and, when execution started, `logs/execution.log`.
 
 ## Self-contained bundle handoff
 
-Every Result Bundle contains freshly generated root `CHAT_INSTRUCTIONS.md` and
+Every State and Result Bundle contains freshly generated root `CHAT_INSTRUCTIONS.md` and
 `environment.json`, including manual `bundle`, Execute success, failure, Dry Run,
 Watcher results, and explicit `--output-dir` targets. Both documents are verified
 and published atomically with the snapshot and logs. No sidecar is written and
@@ -360,7 +361,7 @@ fingerprints and replay identities do not gain environment-dependent fields.
 External Task packages carry `CHAT_INSTRUCTIONS.md`, `environment.json` and
 `tools/pyz_bootstrap.py` under `PATCHHARBOR_META/`. These passive resources are
 validated, excluded from repository mutation and never selected as an entrypoint.
-The corresponding Result files live at its root. Repository-owned root files in
+The corresponding reference-bundle files live at its root. Repository-owned root files in
 a Task remain payloads, so helper metadata must not be placed there.
 
 New environment format 3 binds the helper path, byte count and SHA-256; old 2.0
@@ -382,7 +383,7 @@ Termux/Android.
 ```bash
 cd /path/to/registered-repository
 patchharbor bundle
-# Upload the new Result Bundle; its chat instructions are already inside.
+# Upload the new State Bundle; its chat instructions are already inside.
 # Save the chat's one returned patch ZIP in the configured Exchange directory.
 patchharbor execute --dry-run
 patchharbor execute
@@ -505,7 +506,7 @@ An explicit patch path bypasses parameterless package selection. Its complete
 `repo_id` may resolve another registered repository even when it differs from
 the repository containing the current working directory. This is a deliberate
 user selection; all package, state-binding, path, and revalidation checks remain
-mandatory. An explicit `--output-dir` overrides only the Result Bundle
+mandatory. An explicit `--output-dir` overrides only the generated reference bundle
 destination:
 
 ```bash

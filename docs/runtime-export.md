@@ -3,7 +3,7 @@
 Every official build emits wheel, sdist and the canonical Core-PYZ, independently
 of tags. Normal wheel/pipx/venv and non-editable sdist installations contain the
 resources needed to export their own runtime. Export needs Python >=3.10 and an
-existing output directory, with no repository, Result, registration, Exchange,
+existing output directory, with no repository, reference bundle, registration, Exchange,
 Git executable, installer, network connection or build tools.
 
 ```bash
@@ -65,7 +65,7 @@ An unprepared source/editable checkout may return
 `unavailable/source_not_prepared`. Build with `scripts/build_release.py` and
 install its wheel, or use its PYZ. Export never silently builds or downloads.
 
-## Direct library use without a Result
+## Direct library use without a reference bundle
 
 Obtain the PYZ from the [release assets](release-runtime.md). Pin its full
 expected SHA-256 from a trusted approval, independently of the downloaded
@@ -97,7 +97,7 @@ x86-64 / CPython 3.10–3.14 host; check the actual capability before use.
 The runnable [consumer proof](examples/verify_release_runtime.py) verifies the
 external hash before loading public APIs. It creates only a fresh isolated
 synthetic registered repository using the neighboring fixture helper, checks
-the safe context and explicit plan boundaries, exports a safe Result, reads it
+the safe context and explicit plan boundaries, exports a safe State Bundle, reads it
 using its external hash, and verifies clean/dirty layers and unchanged source.
 It is a demonstration of the consumer's policy decision, not authorization to
 export an arbitrary real repository.

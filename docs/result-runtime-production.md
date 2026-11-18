@@ -1,9 +1,9 @@
-# PYZ in erzeugten Results
+# PYZ in State und Result Bundles
 
-Version 2 erzeugt Result-Format 4 mit Runtime-Metadaten 3; siehe
+Der aktuelle Writer erzeugt State-/Result-Format 5 mit Runtime-Metadaten 3; siehe
 [aktueller Protokollvertrag](protocol-2.md).
 Eine normale Wheel-, Source- oder sdist-Installation enthält die vorbereiteten
-Ressourcen für genau eine kanonische Core-PYZ ohne Watcher. Neue Results betten
+Ressourcen für genau eine kanonische Core-PYZ ohne Watcher. Neue Referenzbundles betten
 kein zusätzliches Runtime-Wheel ein. Der normale Installationsvertrag mit Wheel,
 sdist, CLI und separat installiertem Watcher bleibt bestehen.
 
@@ -22,9 +22,9 @@ Ressourcen an seinem beim Import festgehaltenen Producer-ID.
 
 | Befund | Ergebnis |
 |---|---|
-| Optionale Runtime fehlt, ist beschädigt oder zu groß | Vollständiges Result mit `unavailable`, solange alle Pflichtdaten nachweisbar bleiben |
+| Optionale Runtime fehlt, ist beschädigt oder zu groß | Vollständiges Referenzbundle mit `unavailable`, solange alle Pflichtdaten nachweisbar bleiben |
 | Runtime defekt, eigene Pflichtvorlage noch gültig | Begrenzte Vorlagenprüfung gegen geladenen Producer-ID, Rezept, Größe und SHA; keine behauptete Runtime-Vollvalidierung |
-| Pflichtvorlage oder Snapshot fehlt/ist unprüfbar | Echter Resultfehler und vorhandene Notfalldiagnose |
+| Pflichtvorlage oder Snapshot fehlt/ist unprüfbar | Echter Veröffentlichungsfehler und vorhandene Notfalldiagnose |
 | Schreiben, Verifikation oder Publikation scheitert | Kein fertiges Teil-ZIP; Primärergebnis, Log und letzter geprüfter Kontext bleiben erhalten |
 | Abbruch oder Programmierfehler | Keine Umdeutung in erfolgreichen Runtime-Fallback |
 
@@ -44,10 +44,10 @@ Die Self-update-Tests ersetzen eine echte isolierte Installation während Execut
 und prüfen erfolgreichen sowie fehlgeschlagenen Entrypoint mit neuem Commit.
 
 E-10 entnimmt den Bootstrap ausschließlich der eigenen Root-Anleitung des ersten
-neuen Results aus einer echten Installation. Der frische Python-only-Prozess
-packt und validiert gegen genau dieses Result. Danach führen vollständige Dateien,
+neuen State Bundles aus einer echten Installation. Der frische Python-only-Prozess
+packt und validiert gegen genau diese Referenz. Danach führen vollständige Dateien,
 Diff-Payload und gemischte Pakete einen regulären Execute im isolierten Repository
-aus. Dieselbe PYZ unterstützt Kontext, Registry/Konfiguration, Result-Erzeugung
+aus. Dieselbe PYZ unterstützt Kontext, Registry/Konfiguration, State-/Result-Erzeugung
 und den älteren `fs run`-Weg. Der installierte Watcher nutzt den gemeinsamen Core;
 Watcher-Code wird nicht in die PYZ aufgenommen.
 

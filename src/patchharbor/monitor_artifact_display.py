@@ -23,7 +23,7 @@ def artifact_lines(document, session, *, height):
         lines.insert(1, ('Verlauf aus vorhandenen Nachweisen · nicht vollständig', 'warning'))
     if selected:
         if selected.get('ambiguous_run'):
-            lines.insert(1, ('MEHRDEUTIG: mehrere unterschiedliche Results derselben Run-ID', 'warning'))
+            lines.insert(1, ('MEHRDEUTIG: mehrere unterschiedliche Referenzbundles derselben Run-ID', 'warning'))
         if selected.get('attempt_result_missing'):
             lines.insert(1, ('Result des letzten gespeicherten Versuchs fehlt im beobachteten Bestand.', 'warning'))
         if session.view == 'logs':

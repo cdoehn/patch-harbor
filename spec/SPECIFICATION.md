@@ -1,5 +1,9 @@
 # PatchHarbor – Spezifikation
 
+> **Aktuelle Weiterentwicklung auf dev:** [State / Task / Result](../docs/state-bundle.md)
+> trennt Zustandsaufnahme und Ausführungsergebnis. `bundle` erzeugt State, `execute` Result.
+> Beide sind passive Referenzen; nur Result kann einen Execute belegen.
+>
 > **Aktuelle Versionsgrenze:** [Genau eine Produktversion, keine Migration](CURRENT_PACKAGE_CONTRACT.md)
 > ersetzt sämtliche früheren Paket-, Handoff- und Replay-Kompatibilitätszusagen.
 > CLI-Aliase und der ausdrücklich ausgenommene eigenständige Script-Runner bleiben erhalten.

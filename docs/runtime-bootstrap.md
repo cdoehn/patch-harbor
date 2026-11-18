@@ -2,7 +2,7 @@
 
 The former wheel bootstrap and its installation commands below are historical.
 RF-06B removed `scripts/runtime_bootstrap.py`; those old commands are not available in this checkout. Use the reviewed PYZ bootstrap
-in `tools/pyz_bootstrap.py` and [current Result guidance](protocol-2.md).
+in `tools/pyz_bootstrap.py` and [current reference-bundle guidance](protocol-2.md).
 The uv proof now installs the normal distribution wheel and uses its Core-PYZ.
 
 
@@ -10,17 +10,17 @@ The uv proof now installs the normal distribution wheel and uses its Core-PYZ.
 
 `tools/pyz_bootstrap.py` is a reviewed example tool, not another Core validator
 or a public application subcommand. It has no import-time PatchHarbor dependency.
-Use a trusted copy of the helper and an explicitly trusted Result. A digest
+Use a trusted copy of the helper and an explicitly trusted State or Result Bundle. A digest
 copied from an unknown archive does not authenticate its sender. The current
-production writer emits Format 4 with runtime metadata 3 and exactly one
+production writer emits State/Result Format 5 with runtime metadata 3 and exactly one
 Core-PYZ when embedding succeeds. A valid `unavailable` Result instead contains
 metadata and a reason, without executable bytes. Old Result 1/2/3, old Patch
 formats and runtime wheels are historical evidence, not accepted references.
 Upgrading repository files does not restart or replace a running installation.
 
-Result snapshots support up to 250,000 stored repository files, with ten further
+State/Result snapshots support up to 250,000 stored repository files, with eleven further
 outer ZIP slots for auxiliary data. The Core reader and stdlib bootstrap accept
-single-disk ZIP64 Results needed above the classic 65,535-member boundary. The
+single-disk ZIP64 reference bundles needed above the classic 65,535-member boundary. The
 bootstrap checks ZIP64 directory counts and offsets before allocating ZIP members.
 All byte budgets and the 1,000-member inner runtime limit still execute. A producer
 or reader entry-limit failure reports the actual count and limit without retrying.
@@ -28,8 +28,8 @@ or reader entry-limit failure reports the actual count and limit without retryin
 Read-only assessment and optional single-file preparation:
 
 ```text
-python -I -S -B /trusted/tools/pyz_bootstrap.py /exchange/result.zip
-python -I -S -B /trusted/tools/pyz_bootstrap.py /exchange/result.zip --trusted-source-sha256 <full-trusted-result-sha256> --prepare-in /private/new-pyz-runtime
+python -I -S -B /trusted/tools/pyz_bootstrap.py /exchange/reference.zip
+python -I -S -B /trusted/tools/pyz_bootstrap.py /exchange/reference.zip --trusted-source-sha256 <full-trusted-reference-sha256> --prepare-in /private/new-pyz-runtime
 ```
 
 The precheck bounds archive metadata before `ZipFile` allocation, rejects unsafe
@@ -67,8 +67,8 @@ Then use the returned absolute path:
 
 ```text
 python -I -S -B /private/new-pyz-runtime/patchharbor-<version>.pyz inspect /exchange/patch.zip --json
-python -I -S -B /private/new-pyz-runtime/patchharbor-<version>.pyz validate /exchange/patch.zip --reference-bundle /exchange/result.zip --json
-python -I -S -B /private/new-pyz-runtime/patchharbor-<version>.pyz pack /private/contents --reference-bundle /exchange/result.zip --entrypoint run.sh --output-dir /private/output --json
+python -I -S -B /private/new-pyz-runtime/patchharbor-<version>.pyz validate /exchange/patch.zip --reference-bundle /exchange/reference.zip --json
+python -I -S -B /private/new-pyz-runtime/patchharbor-<version>.pyz pack /private/contents --reference-bundle /exchange/reference.zip --entrypoint run.sh --output-dir /private/output --json
 ```
 
 The actual descriptor supplies `<version>`; do not hardcode it or use an arbitrary
@@ -86,9 +86,9 @@ import. The checked path stays on `sys.path` for later lazy imports/resources.
 The resulting object is the ordinary public API, including `pack_task`.
 
 `tools/pyz_bootstrap.py` is the sole maintained program and is carried as a
-separate file beside the Result's `CHAT_INSTRUCTIONS.md`. Read the full environment
+separate file beside the reference bundle's `CHAT_INSTRUCTIONS.md`. Read the full environment
 from `environment.json`; its version-3 helper descriptor records path, size and
-SHA-256. Review origin/code before using the actual helper from that trusted Result.
+SHA-256. Review origin/code before using the actual helper from that trusted reference bundle.
 A digest carried in the same untrusted archive does not authenticate its author.
 
 `python scripts/render_chat_bootstrap.py --check` checks the helper's literal
@@ -99,12 +99,12 @@ pins its resource bytes together with the template before Execute can mutate the
 An optional runtime failure may retain independently verified mandatory resources;
 a missing or changed helper cannot silently use another installation.
 
-Current capabilities are Task `[2]`, Result `[4]` and `inspect_task`,
-`validate_task`, `pack_task`. Unknown capabilities remain invalid. Existing 2.0
-handoff pairs (environment 2) stay readable; new handoffs use environment 3.
+Current capabilities are Task `[3]`, State `[5]`, Result `[5]` and `inspect_task`,
+`validate_task`, `pack_task`. Unknown capabilities remain invalid. Only the exact
+current product version and environment 3 are accepted; no migration is performed.
 Readers unaware of environment 3 reject it explicitly. The E-10 acceptance test
-starts with the helper from an actual Result, packs and fully validates against
-the original Result, then performs regular Execute through that exact PYZ.
+starts with the helper from an actual State Bundle, packs and fully validates against
+the original reference, then performs regular Execute through that exact PYZ.
 The native snapshot check still rejects corrupt repository evidence after a
 successful descriptor-only precheck. See [the complete handoff contract](chat-handoff.md).
 

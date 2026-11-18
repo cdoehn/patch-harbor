@@ -82,7 +82,7 @@ def live_lines(document, session, *, height):
                 lines.append(('State-Bundle: ' + str(data.get('result_status', 'wird erfasst')),
                               result_semantic({**data, 'stale': selected.get('stale') or view.get('stale')})))
             else:
-                lines.append((f"{'State-Bundle' if selected['kind'] == 'bundle' else 'Entrypoint'}: {primary.get('kind', selected['phase'])} · Exit {primary.get('entrypoint_exit_code', data.get('entrypoint_exit_code', '—'))} · Result: {data.get('result_status', 'noch nicht abgeschlossen')}",
+                lines.append((f"Entrypoint: {primary.get('kind', selected['phase'])} · Exit {primary.get('entrypoint_exit_code', data.get('entrypoint_exit_code', '—'))} · Result: {data.get('result_status', 'noch nicht abgeschlossen')}",
                               result_semantic({**data, 'stale': selected.get('stale') or view.get('stale')})))
     else:
         lines.append(('Keine passende Beobachtung. Ältere Prozesse publizieren noch keinen Live-Status.', 'warning'))

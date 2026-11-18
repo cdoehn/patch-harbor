@@ -1,4 +1,4 @@
-"""Validated immutable data shared by Result Bundle manifests and ZIP writing."""
+"""Validated immutable data shared by State/Result Bundle manifests and ZIP writing."""
 
 from __future__ import annotations
 

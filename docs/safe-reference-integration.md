@@ -1,5 +1,7 @@
 # Source-safe reference integration – PatchHarbor 1.7.0
 
+> Current development uses **State Bundle** for `api.bundle`, including safe export. Use the exact current product version and the [current API contract](python-api.md); the 1.7.0 delivery and capability evidence below are historical.
+
 The implementation targets SpecRoad's separate 15.n.W integration. It does not
 complete that downstream step. The normative contract is §43 of
 [the specification](../spec/SPECIFICATION.md), together with both existing

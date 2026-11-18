@@ -172,12 +172,12 @@ def reference_member_path(raw_path: str, *, is_directory: bool = False) -> str:
     if prefix not in ("base", "untracked") or not separator or not relative:
         return normalize_bundle_path(raw_path, is_directory=is_directory)
     if is_directory:
-        _require(relative.endswith("/"), "invalid Result directory name")
+        _require(relative.endswith("/"), "invalid reference directory name")
         relative = relative[:-1]
     try:
         RepositoryRelativePath(relative.encode("utf-8"))
     except (PatchHarborError, UnicodeError) as exc:
-        raise BundlePathError("invalid Result snapshot path") from exc
+        raise BundlePathError("invalid reference snapshot path") from exc
     return prefix + "/" + relative
 
 
@@ -234,11 +234,11 @@ def reference_kind_hint(payloads: tuple[BundlePayload, ...]) -> ReferenceBundleK
 
 def read_reference_or_task_payloads(content: bytes, *,
                                   policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY) -> tuple[BundlePayload, ...]:
-    """Keep the patch profile strict; allow snapshot paths only for Result hints.
+    """Keep the patch profile strict; allow snapshot paths only for reference hints.
 
     Member type/path validation fails before any content read. Only that failure
     permits retrying with the repository namespace, never a CRC or budget error.
-    A marked Result still requires complete validation before it is evidence.
+    A marked reference still requires complete validation before it is evidence.
     """
     try:
         return read_zip_payload_bytes(content, policy=policy)
@@ -257,7 +257,7 @@ def parse_reference_payloads(payloads: tuple[BundlePayload, ...], *,
 
 def _parse_repository_payloads(payloads: tuple[BundlePayload, ...], *,
                                resource_policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY) -> ReferenceFacts:
-    """Private handoff fallback: repository evidence only, never full Result validity.
+    """Private handoff fallback: repository evidence only, never full reference validity.
 
     Outer ZIP/path/CRC limits still execute before this boundary. The original
     artifact is neither rewritten nor downgraded. Native readers and archive/
@@ -275,7 +275,7 @@ def _parse_reference_payloads(payloads: tuple[BundlePayload, ...], *,
              f"ZIP entry limit exceeded: actual={len(payloads)}, limit={resource_policy.max_zip_entries}")
     _require(all(len(raw) <= resource_policy.max_content_bytes for raw in files.values())
              and sum(len(raw) for raw in files.values()) <= resource_policy.max_zip_total_bytes,
-             "Result payload budget exceeded")
+             "Reference payload budget exceeded")
     manifest = _document(files["manifest.json"])
     try:
         require_bundle_version(manifest.get("patchharbor_version"))
@@ -364,7 +364,7 @@ def _parse_reference_payloads(payloads: tuple[BundlePayload, ...], *,
         expected_files.add("logs/execution.log")
     handoff = _handoff(files, context, run)
     _require({"environment.json", CHAT_INSTRUCTIONS_NAME} <= handoff,
-             "Result 5 requires passive handoff data")
+             "Reference format 5 requires passive handoff data")
     expected_files.update(handoff)
     runtime = None
     if verify_runtime:
@@ -442,13 +442,13 @@ def capture_reference_payloads(path: Path, *, resource_policy: ResourcePolicy = 
     publication callers; this reader does not change their separate sync/retry
     policy. In particular, it never weakens runtime validation for a pack caller.
     """
-    activity("REFERENCE", f"Read and validate explicit Result reference: {path}")
+    activity("REFERENCE", f"Read and validate explicit State/Result reference: {path}")
     try:
         try:
             # Publication must never resolve a substituted leaf symlink.
             target = path.resolve(strict=True) if expected_identity is None else path.absolute()
         except RuntimeError as exc:  # pathlib symlink loops on Python 3.12/3.13
-            raise ValueError("cannot resolve Result reference path") from exc
+            raise ValueError("cannot resolve reference path") from exc
         if target.lstat().st_size > resource_policy.max_input_artifact_bytes:
             raise FileReadLimitExceeded("reference exceeds resource limit")
         captured = read_stable_regular_file_with_sha256(
@@ -461,7 +461,7 @@ def capture_reference_payloads(path: Path, *, resource_policy: ResourcePolicy = 
     except (FileChangedDuringRead, FileSystemOperationError, UnsupportedFileTypeError,
             NotZipArchiveError, ZipPayloadError, OSError, ValueError, TypeError, KeyError,
             UnicodeError, RecursionError, OverflowError, PatchHarborError) as exc:
-        raise PatchHarborError(f"invalid Result reference {path}: {exc}", FailureReason.SOURCE_ERROR) from exc
+        raise PatchHarborError(f"invalid reference bundle {path}: {exc}", FailureReason.SOURCE_ERROR) from exc
 
 
 

@@ -1,4 +1,4 @@
-"""Resolve and revalidate the physical target of one Result Bundle."""
+"""Resolve and revalidate the physical target of one reference bundle."""
 
 from __future__ import annotations
 
@@ -43,7 +43,7 @@ class ResultBundleTarget:
     def __post_init__(self) -> None:
         if self.final_path.parent != self.directory:
             raise ValueError(
-                "Result Bundle path must be inside its target directory"
+                "reference bundle path must be inside its target directory"
             )
 
 
@@ -61,7 +61,7 @@ def _require_outside_registered_repositories(
             root_must_exist=False,
         ):
             raise result_bundle_error(
-                "Result Bundle directory overlaps a registered repository"
+                "reference bundle directory overlaps a registered repository"
             )
 
 
@@ -83,7 +83,7 @@ def _require_exchange_allowed(
 
 def _require_directory(path: Path) -> None:
     if path_kind(path) is not PathKind.DIRECTORY:
-        raise result_bundle_error("Result Bundle path is not a directory")
+        raise result_bundle_error("reference bundle path is not a directory")
 
 
 def _requested_result_directory(
@@ -157,7 +157,7 @@ def prepare_result_bundle_target(
         raise
     except (OSError, RuntimeError, ValueError) as exc:
         raise result_bundle_error(
-            "cannot create the Result Bundle directory"
+            "cannot create the reference bundle directory"
         ) from exc
 
 
@@ -169,11 +169,11 @@ def revalidate_result_bundle_target(
     try:
         paths = target.configuration_paths
         if paths is None or configuration_paths_for_id(paths.repo_id, snapshot) != paths:
-            raise configuration_error("Result Bundle target has no valid repository configuration binding")
+            raise configuration_error("reference bundle target has no valid repository configuration binding")
         current = physically_canonicalize(target.directory, must_exist=True)
         if current != target.directory:
             raise result_bundle_error(
-                "Result Bundle directory changed after validation"
+                "reference bundle directory changed after validation"
             )
         _require_directory(current)
 
@@ -183,11 +183,11 @@ def revalidate_result_bundle_target(
             )
             if configuration.exchange_directory != current:
                 raise configuration_error(
-                    "exchange directory changed during Result Bundle preparation"
+                    "exchange directory changed during reference bundle preparation"
                 )
             if configuration.bundle_suffix != target.bundle_suffix:
                 raise configuration_error(
-                    "bundle suffix changed during Result Bundle preparation"
+                    "bundle suffix changed during reference bundle preparation"
                 )
             _require_exchange_allowed(
                 current,
@@ -200,11 +200,11 @@ def revalidate_result_bundle_target(
             exchange = configuration.exchange_directory
             if suffix != target.bundle_suffix:
                 raise configuration_error(
-                    "bundle suffix changed during Result Bundle preparation"
+                    "bundle suffix changed during reference bundle preparation"
                 )
             if exchange != target.exchange_directory:
                 raise configuration_error(
-                    "exchange directory changed during Result Bundle preparation"
+                    "exchange directory changed during reference bundle preparation"
                 )
             _require_outside_registered_repositories(
                 current,
@@ -213,10 +213,10 @@ def revalidate_result_bundle_target(
             )
 
         if target.final_path.parent != current:
-            raise result_bundle_error("Result Bundle destination changed")
+            raise result_bundle_error("reference bundle destination changed")
     except PatchHarborError:
         raise
     except (OSError, RuntimeError, ValueError) as exc:
         raise result_bundle_error(
-            "cannot revalidate the Result Bundle directory"
+            "cannot revalidate the reference bundle directory"
         ) from exc

@@ -1,5 +1,7 @@
 # Result-Veröffentlichung auf CIFS
 
+> Der gemeinsame Veröffentlichungsweg gilt heute für **State Bundles** (`bundle`) und **Result Bundles** (`execute`), beide im aktuellen Format 5. Die unten datierten Nachweise behalten ihre damaligen Format- und Produktangaben.
+
 Ein Linux-Prozess kann seinen Exchange auf einer Windows-Freigabe betreiben.
 Der Client verwendet dann Linux-Dateioperationen über CIFS/SMB. Der Windows-
 Dateiserver macht daraus keinen nativen Windows-Prozess.

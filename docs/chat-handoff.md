@@ -1,6 +1,6 @@
 # Kompakte Chat-Anleitung und separater Starthelfer
 
-Der aktive Vertrag verwendet Task 3 / Result 5 und Begleitdatenformat 3.
+Der aktive Vertrag verwendet State 5 / Task 3 / Result 5 und Begleitdatenformat 3.
 Es gilt [genau eine Produktversion, keine Migration](../spec/CURRENT_PACKAGE_CONTRACT.md).
 Frühere Begleitdatenpaare werden abgelehnt.
 Leser, die Format 3 nicht kennen, lehnen es ab. Es gibt kein stilles Entfernen
@@ -8,7 +8,7 @@ der Zusatzdatei, keinen Konverter und keine Lockerung von Bindung oder Replay.
 
 ## Ablage und Validierung
 
-| Ressource | Result-ZIP | Task-ZIP |
+| Ressource | State-/Result-ZIP | Task-ZIP |
 | --- | --- | --- |
 | Anleitung | `CHAT_INSTRUCTIONS.md` | `PATCHHARBOR_META/CHAT_INSTRUCTIONS.md` |
 | Umgebung | `environment.json` | `PATCHHARBOR_META/environment.json` |
@@ -24,7 +24,7 @@ werden abgelehnt.
 
 Die Dateien sind passive Metadaten, keine Entrypoints und keine Repository-Payloads.
 Normale Root-Dateien eines Tasks sind Payloads; deshalb den Helfer dort niemals
-unter `tools/` ablegen. Im Result ist `base/tools/` separat und unverändert.
+unter `tools/` ablegen. Im Referenzbundle ist `base/tools/` separat und unverändert.
 Öffnen, Inspizieren, Validieren und Packen importieren oder starten den Helfer nicht.
 
 ## Produzent und Distribution
@@ -41,7 +41,7 @@ Source-Modus liest nur den Helfer seines eigenen geladenen Modulbaums. Keine
 Auswahl aus CWD, fremden Repositories, fremden Installationen oder dem Internet.
 
 Execute erfasst Anleitung, Helfer und Runtime vor möglichen Selbständerungen.
-Der Result-Writer verwendet diese erfassten Bytes. Scheitert nur die optionale
+Der gemeinsame Referenz-Writer verwendet diese erfassten Bytes. Scheitert nur die optionale
 Runtime, müssen erforderliche Ressourcen weiter gegen dieselbe Producer-ID und
 Recipe-Einträge nachgewiesen werden. Kein späteres Nachladen beliebiger neuer
 Bytes. Fehlende Pflichtressourcen verhindern eine unvollständige Veröffentlichung.
@@ -64,7 +64,7 @@ Kontrollzeichen in Pfaden erzeugen keine ausführbaren Beispiele.
 Die Vertrauensprüfung vor dem expliziten Start bleibt erforderlich. Ein Hash im
 selben unbekannten Paket authentifiziert niemanden. Der Standardbibliothek-Helfer
 prüft nur Runtime-Beschreibung/Artefakt; seine positive Vorprüfung ist keine native
-Vollprüfung des Results. Erst `pack`/`validate` prüfen die vollständige Referenz.
+Vollprüfung des Referenzbundles. Erst `pack`/`validate` prüfen die vollständige Referenz.
 `unavailable` und technische Startfehler bleiben aktuelle Fälle mit dokumentiertem
 sicherem Fallback, nicht eine Erlaubnis zum Umgehen ungültiger Repositorydaten.
 
@@ -76,14 +76,14 @@ inhaltlichen Prüfung; ihr Archiv wird nicht automatisch in den Prompt geladen.
 
 | Bisheriger Abschnitt | Aktuelle Stelle / Behandlung |
 | --- | --- |
-| Einleitung, Formate | Einleitung; Task 3 / Result 5 erhalten, Environment 3 ausdrücklich ergänzt |
+| Einleitung, Formate | Einleitung; State 5 / Task 3 / Result 5 erhalten, Environment 3 ausdrücklich ergänzt |
 | 1 Aufgaben, Core-Nutzung, keine Sandbox | §1; keine erfundenen APIs, keine rekursive Ausführung, kein zweiter Writer |
 | 1 POSIX-Modi/Selbstupgrade | §4 Modi; §1 privater Schritt-Core; 0600, Sonderbits, ACL-Grenzen erhalten |
 | 1 Repositorykonfiguration | §6; lokaler geschlossener Vertrag, kein globaler Fallback/Metadatenersatz |
 | 1 Exchange-/Watcher-Auswahl | §6; lokaler manueller Scope, globaler automatischer Scope, Replay und Auswahlordnung |
 | 1 Archivierung | §6; konservative Beweise, keine Löschung, frische Abschlussprüfung |
 | 1 Attempt-Recovery | §6; Beweiskette und echter Lock, Replay-Formatangabe auf aktuellen Wert 5 korrigiert |
-| 2 Eingaben | §1/§2; aktuelles vollständiges Result und vollständige Maschinenwerte |
+| 2 Eingaben | §1/§2; aktuelles vollständiges State oder Result Bundle und vollständige Maschinenwerte |
 | 3 Snapshotprüfung | §2; Base + staged + unstaged + untracked, tatsächlicher Fehlerzustand |
 | 3 Umgebung | §2 und JSON; keine erfundenen Werte, Hostdaten-Minimierung, Shell-/Kernelgrenzen |
 | 3 eingebettetes Python | `tools/pyz_bootstrap.py`; tatsächliche Datei in Bundle und Distribution |
@@ -115,7 +115,7 @@ werden weder erfunden noch aus historischen Projektabschnitten abgeleitet.
 ## Nachweise
 
 Apply führt die bestehende vollständige parallele Suite vor jedem Commit aus.
-Die ergänzten Fälle prüfen passive Task-/Result-Helfer, ungültige Deskriptoren und
+Die ergänzten Fälle prüfen passive State-/Task-/Result-Helfer, ungültige Deskriptoren und
 Inventare, fehlende Ressourcen, Einfrieren vor Selbständerung, Build-Gates,
 Wheel/sdist/PYZ, echte Python-only-Nutzung aus einem Result und drei Generationen
 nach Entfernen der ursprünglichen Buildquellen. Testausführung findet nicht im

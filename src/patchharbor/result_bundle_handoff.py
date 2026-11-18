@@ -23,7 +23,7 @@ def create_result_handoff(report: RunReport, target: ResultBundleTarget, *,
     """Use the actually resolved repository and the revalidated output target."""
     context = report.context
     if context is None:
-        raise ValueError("Result Bundle handoff requires a repository context")
+        raise ValueError("reference bundle handoff requires a repository context")
     document: dict[str, object] = {
         "marker": ENVIRONMENT_MARKER,
         "format_version": ENVIRONMENT_FORMAT_VERSION,

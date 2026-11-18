@@ -1,4 +1,4 @@
-"""Orchestrate one manual PatchHarbor Result Bundle request."""
+"""Orchestrate State capture and Result publication for Execute."""
 
 from __future__ import annotations
 
@@ -72,7 +72,7 @@ from patchharbor.reference_kind import ReferenceBundleKind, kind_for_operation
 
 @dataclass(frozen=True)
 class StateBundlePublication:
-    """One successfully created manual Result Bundle."""
+    """One successfully created State Bundle."""
 
     report: RunReport
     publication_durability: PublicationDurability

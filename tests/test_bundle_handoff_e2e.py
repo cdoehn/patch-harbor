@@ -148,7 +148,7 @@ def test_execute_failure_retry_and_dry_run_all_embed_fresh_handoff(tmp_path: Pat
     failed = run_cli(cwd, "execute", "--json", *origin, environment_overrides=environment)
     assert failed.returncode == 23, failed.stdout + failed.stderr
     doc = json.loads(failed.stdout)
-    # Execute error JSON exposes the Result Bundle path in the result as before.
+    # Execute error JSON exposes the reference bundle path in the result as before.
     result_path = Path(doc["result"]["result_bundle"]["path"])
     result_data = _read_result(result_path)
     assert result_data["repository_path"] == str(repository.resolve())

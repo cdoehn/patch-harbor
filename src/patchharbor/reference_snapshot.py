@@ -34,7 +34,7 @@ def read_reference_snapshot(path: Path, *, expected_sha256: str | None = None,
             cause = cause.__cause__
         raise ReferenceSnapshotError(code, str(exc)) from exc
     if expected_sha256 is not None and captured.sha256 != expected_sha256:
-        raise ReferenceSnapshotError(SnapshotErrorCode.DIGEST_MISMATCH, 'Result SHA-256 does not match expected bytes')
+        raise ReferenceSnapshotError(SnapshotErrorCode.DIGEST_MISMATCH, 'Reference SHA-256 does not match expected bytes')
     facts = captured.facts
     payloads = {p.relative_path: p.content for p in captured.payloads}
     # Already fully validated by the shared reader; this is projection only.
@@ -68,7 +68,7 @@ def read_reference_snapshot(path: Path, *, expected_sha256: str | None = None,
     effective = layer('effective', {**worktree.files, **untracked.files})
     runtime = facts.runtime
     if runtime is None:
-        raise RuntimeError('validated Result 5 lacks runtime facts')
+        raise RuntimeError('validated reference lacks runtime facts')
     projection = SnapshotRuntime(runtime.status, runtime.reason, runtime.version, runtime.requires_python,
         runtime.profile, runtime.content_id,
         runtime.artifact.sha256 if runtime.artifact else None,

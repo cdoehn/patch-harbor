@@ -29,7 +29,7 @@ repositories under their shared Exchange. Dirty Git state does not color the
 operational row as a failure. `g` shows Git details, including separate
 staged/unstaged/untracked counts; ignored files do not count. Last Execute evidence
 is retained history, not a claim of completeness. Old observations are marked stale.
-The current operation shows its repository, Patch/Result role, entrypoint, and
+The current operation shows its repository, State/Task/Result role, entrypoint, and
 full-identity-derived short hash. A bundle number appears only if the first
 128 KiB of the captured entrypoint has one unambiguous literal
 `PATCHHARBOR-BUNDLE-NR: NNN` value. This declared handoff number is a label, never
@@ -57,8 +57,8 @@ s reverses order, r requests refresh, ? shows help, q closes this viewer.
 `v` toggles full IDs; `g` toggles Git details in the overview. These settings are
 private to each viewer. Help also keeps the activity strip visible.
 `--plain`, `--no-color` and NO_COLOR disable colors. JSON requires --once.
-Views 3/4/5 show packages, retained history and Result logs. Tab focuses the
-artifact list; / filters names, full hashes and run IDs there. Select a Result
+Views 3/4/5 show packages, retained history and capture/execution logs. Tab focuses the
+artifact list; / filters names, full hashes and run IDs there. Select a State or Result Bundle
 then press 5 for its log; arrows scroll that log. `a` / `--archive` includes the
 configured archive. `--artifact-match` initializes the artifact filter.
 
@@ -84,7 +84,7 @@ watcher observation does not imply that an unobserved inventory has no patches.
 Shared Exchanges retain per-repository candidate identities. Latest retained
 Results are ordered by their verified run timestamps, not ZIP modification time.
 
-Views 6/7 show watcher/Execute/manual Result-bundle instances and their live log tails. Each instance
+Views 6/7 show watcher/Execute/manual State-bundle instances and their live log tails. Each instance
 has its own UUID, PID plus native process birth identity, timestamps and actual
 phase. The Execute detail shows requested and effective timeout separately; the
 effective value appears only when the interpreter really starts. Remaining time
@@ -143,7 +143,7 @@ directly. The viewer never performs retention or recovery.
 Tab cycles repository selection, artifact/instance list and scrollable detail
 text in the corresponding views. Long relation lists remain readable in the
 detail focus. Unchanged screens are not redrawn. The display separates the
-expected starting state from a Result's captured resulting state, and exposes
+expected starting state from a reference bundle's captured state, and exposes
 incomplete inventories even when the selected Result itself is valid.
 
 Implementation boundaries: `monitor_live_schema` owns the closed data contract,

@@ -131,13 +131,13 @@ and dry-run Results. It uses actual context, never the previous expected binding
 Repository snapshot paths retain the existing portable UTF-8 repository rules;
 Task Bundle paths still use the stricter ASCII contract.
 
-The shared Result reader supplies integrity-checked facts to reference validation
+The shared State/Result reader supplies integrity-checked facts to reference validation
 and to archival/recovery policy. A valid reference does not itself prove a
 successful Execute: those consumers still require a clean, completed success,
 no warnings or dry run, the appropriate expected binding and, for recovery,
 the existing receipt, local digest and Git evidence. Their conservative ZIP
 path policy is unchanged. Current writers emit format 4 with one verified Core-PYZ
-or a declared runtime-only restriction. This checkout reads Result 5 only;
+or a declared runtime-only restriction. This checkout reads State 5 and Result 5 only;
 Old Result 1/2/3 and Patch formats are rejected. Public Python names and
 integration capability versions follow the [version-2 contract](protocol-2.md);
 there are no old Python aliases. Historical producer capabilities do not
@@ -581,9 +581,9 @@ from bootstrap checks; no installation or subprocess is needed for these calls.
 Result-5 production uses the same shared Core and request-local resource capture.
 
 
-## Current Result protocol
+## Current reference-bundle protocol
 
-Only Result 5 is a valid reference. The strict reader validates every repository
+State 5 and Result 5 of the exact current product version are valid references. The strict reader validates every repository
 and runtime descriptor without importing archive code. Earlier Result formats
 are retained only as rejection/provenance fixtures. See [the 2.0 protocol](protocol-2.md).
 
@@ -747,7 +747,7 @@ or operating directory identity refuses the export. Each approved capture is
 single-state; there is no automatic retry against a newer source.
 
 Allowed operating writes are only the two PH lock files, an exclusive temporary
-ZIP in the approved output, its completed Result name, and the private diagnostic
+ZIP in the approved output, its completed State Bundle name, and the private diagnostic
 child. Output must not overlap any registered repository or PH configuration/state
 directory. All operating directory components must be real directories without
 symlinks, owned by the current user and not world-writable. Existing group modes
@@ -779,13 +779,13 @@ can leave owned lock, temporary or diagnostic files inside the advertised scope.
 `emergency_diagnostics_path` identifies preserved owned diagnostics when locatable;
 `emergency_diagnostics_failed` marks inability to write them. A hard process kill
 cannot return an exception: incomplete bytes retain a hidden `.tmp` name and must
-not be treated as a finished Result. No automatic cleanup claims are made for it.
+not be treated as a finished State Bundle. No automatic cleanup claims are made for it.
 
 If publication succeeds but cleanup fails, `SafeExportError.published_path`
-identifies the complete published Result while the call still fails. Inspect that
+identifies the complete published State Bundle while the call still fails. Inspect that
 partial outcome before retrying. Success returns the existing `BundleResult`
 (`context`, `path`, `report`, `run_id`, `publication_durability`). Hash the actual
-Result bytes externally and call `read_reference_snapshot(path, expected_sha256=...)`;
+State Bundle bytes externally and call `read_reference_snapshot(path, expected_sha256=...)`;
 compare all four binding fields with the approved context. The reader verifies
 all native inventories, hashes, sizes, paths, file types and runtime metadata.
 A self-declared hash inside the ZIP does not replace that external binding.
@@ -848,7 +848,7 @@ observations. A canonical instance ID requests that instance's bounded log tail.
 `api.watcher_observation()` creates a best-effort publisher for a watcher; call
 `update(phase=..., **facts)` with observed facts and `close()` on exit. Each
 Execute request publishes independently through the existing application boundary.
-Version 2 also observes manual Git-mode Result-bundle capture and retains up to
+Version 2 also observes manual Git-mode State-bundle capture and retains up to
 32 preceding activity records plus the current activity. Optional
 `activity_code`, `activity_status` and `activity_message` keywords to `update`
 publish factual transitions. The closed schema validates ordered sequences,

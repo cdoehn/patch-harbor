@@ -1176,7 +1176,7 @@ def test_manual_bundle_rejects_exchange_configuration_retargeted_during_capture(
     assert exit_code_for_error(captured.value) == ExitCode.RESULT_BUNDLE_ERROR
     assert captured.value.error_kind.value == "configuration_error"
     assert str(captured.value) == (
-        "exchange directory changed during Result Bundle preparation"
+        "exchange directory changed during reference bundle preparation"
     )
     assert not tuple(original_exchange.glob("*_State_Bundle_*.zip"))
     assert not tuple(alternate_exchange.glob("*_State_Bundle_*.zip"))

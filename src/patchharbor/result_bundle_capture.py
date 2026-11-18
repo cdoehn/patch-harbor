@@ -83,7 +83,7 @@ def capture_result_bundle(
     )
     if after != before or after_context != before_context:
         raise result_bundle_error(
-            "repository changed while the Result Bundle was captured"
+            "repository changed while the reference bundle was captured"
         )
 
     activity("SNAPSHOT", "Snapshot and context are consistent", "success")
