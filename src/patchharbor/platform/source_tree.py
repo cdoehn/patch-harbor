@@ -158,15 +158,15 @@ class SourceDirectory:
             if not _same_open_file_state(descriptor_metadata, current):
                 raise FileChangedDuringRead('captured-source-file-changed')
 
-    def read_file(self, name: str, expected: os.stat_result, *, max_bytes: int) -> SourceFile:
+    def read_file(self, name: str, expected: os.stat_result, *, max_bytes: int | None) -> SourceFile:
         """Read bounded bytes through the existing non-following file adapter."""
-        if expected.st_size > max_bytes:
+        if max_bytes is not None and expected.st_size > max_bytes:
             raise FileReadLimitExceeded('source file exceeds read budget')
         with self.open_file(name, expected) as (descriptor, opened):
             content=bytearray()
-            while chunk:=os.read(descriptor,min(1024*1024,max_bytes-len(content)+1)):
+            while chunk:=os.read(descriptor,(1024*1024 if max_bytes is None else min(1024*1024,max_bytes-len(content)+1))):
                 content.extend(chunk)
-                if len(content)>max_bytes:
+                if max_bytes is not None and len(content)>max_bytes:
                     raise FileReadLimitExceeded('source file grew beyond read budget')
             if len(content)!=opened.st_size:
                 raise FileChangedDuringRead('source-file-size-changed')

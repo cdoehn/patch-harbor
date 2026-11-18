@@ -261,9 +261,10 @@ def _add_package_commands(commands) -> None:
             help=f"{name} one explicit patch package without executing it",
             description=(
                 "Check an explicit package without execution or publication. "
-                "Validate can additionally compare one explicit repository or Result reference."
+                "Validate can additionally compare one explicit repository or State/Result reference."
             ),
         )
+        _add_bundle_force(package_parser)
         package_parser.add_argument("task_zip", type=_explicit_package_path, metavar="TASK_ZIP")
         package_parser.add_argument("--json", action="store_true", dest="json_output",
                                     help="write the version-3 machine-readable result")
@@ -274,8 +275,9 @@ def _add_package_commands(commands) -> None:
 
     pack_parser = commands.add_parser(
         'pack', help='create and validate a patch package from explicit prepared contents',
-        description='Pack selected contents against a Result reference; never execute or replace a target.',
+        description='Pack selected contents against a State/Result reference; never execute or replace a target.',
     )
+    _add_bundle_force(pack_parser)
     pack_parser.add_argument('content_directory', type=_explicit_package_path, metavar='CONTENT_DIRECTORY')
     pack_parser.add_argument('--reference-bundle', required=True, type=_explicit_package_path, metavar='REFERENCE_ZIP')
     pack_parser.add_argument('--entrypoint', required=True, type=_pack_entrypoint, metavar='PACKAGE_PATH')
@@ -302,6 +304,7 @@ def _add_bundle_execute_commands(commands) -> None:
             "State Bundles include fresh chat handoff and local environment data, contain no Git history and may contain secrets."
         ),
     )
+    _add_bundle_force(bundle_parser)
     bundle_parser.add_argument(
         "repository",
         type=Path,
@@ -379,6 +382,7 @@ def _add_bundle_execute_commands(commands) -> None:
         action="store_true",
         help=argparse.SUPPRESS,
     )
+    _add_bundle_force(execute_parser)
     execute_parser.add_argument(
         "task_zip",
         type=Path,
@@ -522,3 +526,8 @@ def _build_parser() -> argparse.ArgumentParser:
     monitor.add_argument('--json', action='store_true', dest='json_output')
     _add_fs_commands(commands)
     return parser
+
+
+def _add_bundle_force(parser) -> None:
+    parser.add_argument('--force', action='store_true',
+        help='bypass bundle byte and file-count limits for this command; all integrity, path and repository checks still apply')

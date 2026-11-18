@@ -14,6 +14,8 @@ The full contract and examples live in docs/python-api.md.
 """
 from __future__ import annotations
 
+from patchharbor.bundle_limits import bundle_size_scope as _bundle_size_scope
+
 import math
 from collections.abc import Mapping
 import os
@@ -96,45 +98,49 @@ def _sha256_argument(value: str, name: str) -> str:
 def read_reference_snapshot(
     result: PathInput, *, expected_sha256: str | None = None,
     observer: ProgressObserver | None = None,
+    force: bool = False,
 ) -> ReferenceSnapshot:
-    """Fully validate and reconstruct one captured Result without writes or Git."""
-    path = _path(result, "result")
-    digest = None if expected_sha256 is None else _sha256_argument(expected_sha256, "expected_sha256")
-    from patchharbor.reference_snapshot import read_reference_snapshot as _read_reference_snapshot
-    with _observe_activity(_observer(observer)):
-        return _read_reference_snapshot(path, expected_sha256=digest)
+    """Fully validate and reconstruct one captured State or Result Bundle without writes or Git."""
+    with _bundle_size_scope(force):
+        path = _path(result, "result")
+        digest = None if expected_sha256 is None else _sha256_argument(expected_sha256, "expected_sha256")
+        from patchharbor.reference_snapshot import read_reference_snapshot as _read_reference_snapshot
+        with _observe_activity(_observer(observer)):
+            return _read_reference_snapshot(path, expected_sha256=digest)
 
 
 def pack_task(
     content_directory: PathInput, *, reference_bundle: PathInput, entrypoint: str,
     output: PathInput | None = None, output_directory: PathInput | None = None,
     modes: Mapping[str,int] | None = None, observer: ProgressObserver | None = None,
+    force: bool = False,
 ) -> TaskPackResult:
-    """Pack explicit contents and a verified Result without applying or replacing.
+    """Pack explicit contents and a verified reference bundle without applying or replacing.
 
     Exactly one output choice is required. Success retains its complete evidence
     even if optional cleanup of an owned temporary name produces warnings.
     """
-    if (output is None)==(output_directory is None):
-        raise ValueError('exactly one of output and output_directory is required')
-    contents=_path(content_directory,'content_directory')
-    reference=_path(reference_bundle,'reference_bundle')
-    destination=_optional_path(output,'output')
-    directory=_optional_path(output_directory,'output_directory')
-    if not isinstance(entrypoint,str):
-        raise TypeError('entrypoint must be text')
-    if not entrypoint:
-        raise ValueError('entrypoint must be nonempty')
-    if modes is not None and not isinstance(modes,Mapping):
-        raise TypeError('modes must be a mapping or None')
-    requested=dict(modes or {})
-    if any(not isinstance(key,str) or type(value) is not int for key,value in requested.items()):
-        raise TypeError('modes require string paths and integer values, not bool')
-    selected_observer=_observer(observer)
-    from patchharbor.task_pack import pack_task as _pack_task
-    with _observe_activity(selected_observer):
-        return _pack_task(contents,reference_bundle=reference,entrypoint=entrypoint,
-                           output=destination,output_directory=directory,modes=requested)
+    with _bundle_size_scope(force):
+        if (output is None)==(output_directory is None):
+            raise ValueError('exactly one of output and output_directory is required')
+        contents=_path(content_directory,'content_directory')
+        reference=_path(reference_bundle,'reference_bundle')
+        destination=_optional_path(output,'output')
+        directory=_optional_path(output_directory,'output_directory')
+        if not isinstance(entrypoint,str):
+            raise TypeError('entrypoint must be text')
+        if not entrypoint:
+            raise ValueError('entrypoint must be nonempty')
+        if modes is not None and not isinstance(modes,Mapping):
+            raise TypeError('modes must be a mapping or None')
+        requested=dict(modes or {})
+        if any(not isinstance(key,str) or type(value) is not int for key,value in requested.items()):
+            raise TypeError('modes require string paths and integer values, not bool')
+        selected_observer=_observer(observer)
+        from patchharbor.task_pack import pack_task as _pack_task
+        with _observe_activity(selected_observer):
+            return _pack_task(contents,reference_bundle=reference,entrypoint=entrypoint,
+                               output=destination,output_directory=directory,modes=requested)
 
 
 def _path(value: PathInput, name: str) -> Path:
@@ -305,22 +311,24 @@ def bundle(
     repository: PathInput = ".", *, output_directory: PathInput | None = None,
     capture_mode: str = "git", export_plan: SafeExportPlan | None = None,
     observer: ProgressObserver | None = None,
+    force: bool = False,
 ) -> BundleResult:
     """Publish a State Bundle, using Exchange unless output is explicit."""
-    path = _path(repository, "repository")
-    destination = _optional_path(output_directory, "output_directory")
-    mode = _capture_mode(capture_mode)
-    if mode == 'safe' and not isinstance(export_plan, SafeExportPlan):
-        raise TypeError('safe bundle requires a SafeExportPlan')
-    if mode == 'git' and export_plan is not None:
-        raise ValueError('export_plan requires capture_mode=safe')
-    with _observe_activity(_observer(observer)):
-        if mode == 'safe':
-            from patchharbor.safe_export import export_reference
-            result = export_reference(path, plan=export_plan, output_directory=destination)
-        else:
-            result = _application.bundle_repository(path, output_directory=destination)
-        return BundleResult(result.report)
+    with _bundle_size_scope(force):
+        path = _path(repository, "repository")
+        destination = _optional_path(output_directory, "output_directory")
+        mode = _capture_mode(capture_mode)
+        if mode == 'safe' and not isinstance(export_plan, SafeExportPlan):
+            raise TypeError('safe bundle requires a SafeExportPlan')
+        if mode == 'git' and export_plan is not None:
+            raise ValueError('export_plan requires capture_mode=safe')
+        with _observe_activity(_observer(observer)):
+            if mode == 'safe':
+                from patchharbor.safe_export import export_reference
+                result = export_reference(path, plan=export_plan, output_directory=destination)
+            else:
+                result = _application.bundle_repository(path, output_directory=destination)
+            return BundleResult(result.report)
 
 
 def _inspection_arguments(
@@ -337,32 +345,36 @@ def _inspection_arguments(
 
 def inspect_task(
     task: PathInput, *, observer: ProgressObserver | None = None,
+    force: bool = False,
 ) -> TaskInspection:
     """Inspect one explicit package without Git, registration, shell lookup or writes."""
-    path, actual_observer = _inspection_arguments(task, observer)
-    with _observe_activity(actual_observer):
-        return _application.inspect_task(path)
+    with _bundle_size_scope(force):
+        path, actual_observer = _inspection_arguments(task, observer)
+        with _observe_activity(actual_observer):
+            return _application.inspect_task(path)
 
 
 def validate_task(
     task: PathInput, *, repository: PathInput | None = None,
     reference_bundle: PathInput | None = None, observer: ProgressObserver | None = None,
+    force: bool = False,
 ) -> TaskValidationResult:
-    """Validate a package, optionally bound to one explicit repository or Result."""
-    if repository is not None and reference_bundle is not None:
-        raise ValueError("repository and reference_bundle are mutually exclusive")
-    path = _path(task, "task")
-    target = _optional_path(repository, "repository")
-    reference = _optional_path(reference_bundle, "reference_bundle")
-    actual_observer = _observer(observer)
-    try:
-        anchor = Path.cwd() if any(p is not None and not p.is_absolute() for p in (path, target, reference)) else None
-        path, target, reference = tuple(None if p is None else p if p.is_absolute() else anchor / p
-                                        for p in (path, target, reference))
-    except (OSError, UnicodeError) as exc:
-        raise PatchHarborError("cannot anchor validation input paths: " + str(exc), FailureReason.SOURCE_ERROR) from exc
-    with _observe_activity(actual_observer):
-        return _application.validate_task(path, repository=target, reference_bundle=reference)
+    """Validate a package, optionally bound to one explicit repository or reference bundle."""
+    with _bundle_size_scope(force):
+        if repository is not None and reference_bundle is not None:
+            raise ValueError("repository and reference_bundle are mutually exclusive")
+        path = _path(task, "task")
+        target = _optional_path(repository, "repository")
+        reference = _optional_path(reference_bundle, "reference_bundle")
+        actual_observer = _observer(observer)
+        try:
+            anchor = Path.cwd() if any(p is not None and not p.is_absolute() for p in (path, target, reference)) else None
+            path, target, reference = tuple(None if p is None else p if p.is_absolute() else anchor / p
+                                            for p in (path, target, reference))
+        except (OSError, UnicodeError) as exc:
+            raise PatchHarborError("cannot anchor validation input paths: " + str(exc), FailureReason.SOURCE_ERROR) from exc
+        with _observe_activity(actual_observer):
+            return _application.validate_task(path, repository=target, reference_bundle=reference)
 
 
 def execute(
@@ -370,6 +382,7 @@ def execute(
     dry_run: bool = False, output_directory: PathInput | None = None,
     timeout: float = DEFAULT_TIMEOUT_SECONDS, output: OutputStreams | None = None,
     observer: ProgressObserver | None = None,
+    force: bool = False,
 ) -> RunReport:
     """Execute one bound package, or discover the latest manual-retry candidate.
 
@@ -379,19 +392,20 @@ repository as well is rejected instead of silently ignoring a target constraint.
 Dry-run preserves the existing safety checks and Result-Bundle generation, but
 never writes payloads, runs the entrypoint, consumes replay or archives bundles.
     """
-    if task is not None and repository is not None:
-        raise ValueError("repository scopes discovery only; do not combine it with task")
-    if not isinstance(dry_run, bool):
-        raise TypeError("dry_run must be boolean")
-    path = _optional_path(task, "task")
-    directory = _optional_path(repository, "repository")
-    destination = _optional_path(output_directory, "output_directory")
-    seconds, targets = _timeout(timeout), _output(output)
-    with _observe_activity(_observer(observer)):
-        return _application.run_execute_path(
-            path, dry_run=dry_run, output_directory=destination,
-            timeout_seconds=seconds, output=targets, current_directory=directory,
-        )
+    with _bundle_size_scope(force):
+        if task is not None and repository is not None:
+            raise ValueError("repository scopes discovery only; do not combine it with task")
+        if not isinstance(dry_run, bool):
+            raise TypeError("dry_run must be boolean")
+        path = _optional_path(task, "task")
+        directory = _optional_path(repository, "repository")
+        destination = _optional_path(output_directory, "output_directory")
+        seconds, targets = _timeout(timeout), _output(output)
+        with _observe_activity(_observer(observer)):
+            return _application.run_execute_path(
+                path, dry_run=dry_run, output_directory=destination,
+                timeout_seconds=seconds, output=targets, current_directory=directory,
+            )
 
 
 
@@ -400,6 +414,7 @@ def execute_guarded(
     admission: AdmissionCallback, output_directory: PathInput | None = None,
     timeout: float = DEFAULT_TIMEOUT_SECONDS, output: OutputStreams | None = None,
     observer: ProgressObserver | None = None,
+    force: bool = False,
 ) -> RunReport:
     """Execute the captured package only after explicit trusted host admission.
 
@@ -408,28 +423,29 @@ with immutable complete package bytes and the bound repository context.
 Only True accepts; denial/errors return the normal failure report. This is
 host code, not a sandbox. Existing diagnostic/Result effects remain possible.
     """
-    path = _path(task, "task")
-    target = _path(expected_repository, "expected_repository")
-    digest = _sha256_argument(expected_sha256, "expected_sha256")
-    if not callable(admission):
-        raise TypeError("admission must be callable")
-    destination = _optional_path(output_directory, "output_directory")
-    seconds, targets = _timeout(timeout), _output(output)
-    with _observe_activity(_observer(observer)):
-        return _application.run_guarded_execute_path(path, expected_sha256=digest,
-            expected_repository=target, admission=admission, output_directory=destination,
-            timeout_seconds=seconds, output=targets)
+    with _bundle_size_scope(force):
+        path = _path(task, "task")
+        target = _path(expected_repository, "expected_repository")
+        digest = _sha256_argument(expected_sha256, "expected_sha256")
+        if not callable(admission):
+            raise TypeError("admission must be callable")
+        destination = _optional_path(output_directory, "output_directory")
+        seconds, targets = _timeout(timeout), _output(output)
+        with _observe_activity(_observer(observer)):
+            return _application.run_guarded_execute_path(path, expected_sha256=digest,
+                expected_repository=target, admission=admission, output_directory=destination,
+                timeout_seconds=seconds, output=targets)
 
 
 def dry_run(
     task: PathInput | None = None, *, repository: PathInput | None = None,
     output_directory: PathInput | None = None, output: OutputStreams | None = None,
-    observer: ProgressObserver | None = None,
+    observer: ProgressObserver | None = None, force: bool = False,
 ) -> RunReport:
     """Validate via the same Execute boundary without executing the task."""
     return execute(
         task, repository=repository, dry_run=True, output_directory=output_directory,
-        output=output, observer=observer,
+        output=output, observer=observer, force=force,
     )
 
 
@@ -456,7 +472,7 @@ fail closed. The report's automatic field describes progress without messages.
         raise TypeError("exchanges must be a tuple of ExchangeWatchTarget or None")
     destination = _optional_path(output_directory, "output_directory")
     seconds, targets = _timeout(timeout), _output(output)
-    with _observe_activity(_observer(observer)):
+    with _bundle_size_scope(False), _observe_activity(_observer(observer)):
         return _application.run_execute_path(
             None, automatic=True, dry_run=dry_run, output_directory=destination,
             timeout_seconds=seconds, output=targets, exchanges=exchanges,

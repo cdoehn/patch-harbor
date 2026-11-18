@@ -1,6 +1,8 @@
 """Pure target metadata and bounded standard-ZIP construction for packing."""
 from __future__ import annotations
 
+from patchharbor.bundle_limits import exceeds_bundle_limit
+
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import PurePosixPath, PureWindowsPath
@@ -96,7 +98,7 @@ def prepare_metadata(reference: CapturedReference, package_id: UUID,
         filename_timezone='UTC',
     )
     raw = serialize_json_document(document).encode('utf-8')
-    if len(raw) > MAX_HANDOFF_ENTRY_BYTES:
+    if exceeds_bundle_limit(len(raw), MAX_HANDOFF_ENTRY_BYTES):
         raise _failure('environment exceeds handoff budget', FailureReason.SOURCE_ERROR)
     return PackMetadata(package_id, created_at, filename, raw, warnings)
 
@@ -112,7 +114,7 @@ class _BoundedOutput:
         self.stream, self.maximum = stream, maximum
 
     def write(self, data: bytes) -> int:
-        if self.stream.tell() + len(data) > self.maximum:
+        if exceeds_bundle_limit(self.stream.tell() + len(data), self.maximum):
             raise _failure('compressed ZIP exceeds artifact budget', FailureReason.SOURCE_ERROR)
         count = self.stream.write(data)
         if count != len(data):
@@ -150,9 +152,9 @@ def prepare_candidate(sources: CapturedSources,
     entries = [(file.relative_path, file.content, file.unix_mode) for file in sources.files]
     entries.append(('task.json', serialize_json_document(manifest).encode('utf-8'), 0o644))
     entries.extend((path, content, 0o644) for path, content in handoff.entries(task=True))
-    if (len(entries) > resource_policy.max_zip_entries
-            or any(len(content) > resource_policy.max_content_bytes for _, content, _ in entries)
-            or sum(len(content) for _, content, _ in entries) > resource_policy.max_zip_total_bytes):
+    if (exceeds_bundle_limit(len(entries), resource_policy.max_zip_entries)
+            or any(exceeds_bundle_limit(len(content), resource_policy.max_content_bytes) for _, content, _ in entries)
+            or exceeds_bundle_limit(sum(len(content) for _, content, _ in entries), resource_policy.max_zip_total_bytes)):
         raise _failure('generated package exceeds ZIP content budget', FailureReason.SOURCE_ERROR)
     return PackCandidate(tuple(sorted(entries)),
                          tuple(dict.fromkeys((*sources.warnings, *metadata.warnings))))
@@ -161,7 +163,7 @@ def prepare_candidate(sources: CapturedSources,
 def write_prepared_candidate(stream: BinaryIO, candidate: PackCandidate, *,
                              resource_policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY) -> None:
     with ZipFile(_BoundedOutput(stream, resource_policy.max_input_artifact_bytes), 'w',
-                 compression=ZIP_DEFLATED, compresslevel=6, allowZip64=False) as archive:
+                 compression=ZIP_DEFLATED, compresslevel=6, allowZip64=True) as archive:
         for path, content, mode in candidate.entries:
             info = ZipInfo(path, (1980, 1, 1, 0, 0, 0))
             info.create_system = 3

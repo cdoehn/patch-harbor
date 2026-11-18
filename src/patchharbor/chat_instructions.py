@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from patchharbor.bundle_limits import exceeds_bundle_limit
+
 import json
 from hashlib import sha256
 from pathlib import Path
@@ -53,7 +55,7 @@ def load_chat_template() -> str:
         else:
             path = _template_path()
             raw = read_directory_resource(path.parent, path.name, MAX_HANDOFF_ENTRY_BYTES)
-        if not raw or len(raw) > MAX_HANDOFF_ENTRY_BYTES or raw.startswith(b"\xef\xbb\xbf"):
+        if not raw or exceeds_bundle_limit(len(raw), MAX_HANDOFF_ENTRY_BYTES) or raw.startswith(b"\xef\xbb\xbf"):
             raise ValueError("invalid template size or encoding")
         return _normalize_line_endings(raw.decode("utf-8"))
     except (OSError, UnicodeError, ValueError, FileReadLimitExceeded,
@@ -145,7 +147,7 @@ def render_chat_handoff(
         "\nDas konfigurierte Suffix bleibt unverändert hinter .zip.\n\n---\n\n" + contract
     ).encode("utf-8")
     environment = encode_environment(document)
-    if len(generated) > MAX_HANDOFF_ENTRY_BYTES or len(environment) > MAX_HANDOFF_ENTRY_BYTES:
+    if exceeds_bundle_limit(len(generated), MAX_HANDOFF_ENTRY_BYTES) or exceeds_bundle_limit(len(environment), MAX_HANDOFF_ENTRY_BYTES):
         raise result_bundle_error("generated chat handoff exceeds its size limit") from FileReadLimitExceeded(
             "generated handoff exceeds its size limit"
         )

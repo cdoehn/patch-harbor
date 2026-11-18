@@ -79,6 +79,9 @@ def main(
     ):
         parser.error("internal --automatic mode does not accept TASK_ZIP")
 
+    if args.command == "execute" and args.automatic and args.force:
+        parser.error("--force is only available for explicit manual commands")
+
     if (
         args.command == "configure"
         and args.configure_command == "exchange-directory"
@@ -135,20 +138,20 @@ def main(
 
     if args.command in ("inspect", "validate"):
         return _package_command(
-            args.command, args.task_zip, json_output=args.json_output,
+            args.command, args.task_zip, json_output=args.json_output, force=args.force,
             repository=getattr(args, "repository", None),
             reference_bundle=getattr(args, "reference_bundle", None), **presentation,
         )
 
     if args.command == "bundle":
         return _bundle_command(
-            args.repository, output_directory=args.output_dir,
+            args.repository, output_directory=args.output_dir, force=args.force,
             json_output=args.json_output, **presentation,
         )
 
     if args.command == "execute":
         return _execute_command(
-            args.task_zip, dry_run=args.dry_run, timeout_seconds=args.timeout,
+            args.task_zip, dry_run=args.dry_run, timeout_seconds=args.timeout, force=args.force,
             output_directory=args.output_dir, json_output=args.json_output,
             automatic=args.automatic, **presentation,
         )

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from patchharbor.bundle_limits import exceeds_bundle_limit
+
 from dataclasses import dataclass
 from io import BytesIO, DEFAULT_BUFFER_SIZE
 from pathlib import Path
@@ -79,7 +81,7 @@ class _ZipReadBudget:
         self,
         entries: list[zipfile.ZipInfo],
     ) -> None:
-        if len(entries) > self.policy.max_zip_entries:
+        if exceeds_bundle_limit(len(entries), self.policy.max_zip_entries):
             raise ZipResourceLimitError(
                 f"ZIP entry limit exceeded: actual={len(entries)}, limit={self.policy.max_zip_entries}",
                 resource="zip_entries", actual=len(entries), limit=self.policy.max_zip_entries,
@@ -87,13 +89,13 @@ class _ZipReadBudget:
 
         declared_total = 0
         for entry in entries:
-            if entry.file_size > self.policy.max_content_bytes:
+            if exceeds_bundle_limit(entry.file_size, self.policy.max_content_bytes):
                 raise ZipResourceLimitError(
                     f"entry {entry.orig_filename!r} exceeds "
                     f"{self.policy.max_content_bytes} bytes"
                 )
             declared_total += entry.file_size
-            if declared_total > self.policy.max_zip_total_bytes:
+            if exceeds_bundle_limit(declared_total, self.policy.max_zip_total_bytes):
                 raise ZipResourceLimitError(
                     "uncompressed data exceeds "
                     f"{self.policy.max_zip_total_bytes} bytes"
@@ -112,12 +114,12 @@ class _ZipReadBudget:
                 while chunk := stream.read(DEFAULT_BUFFER_SIZE):
                     entry_bytes_read += len(chunk)
                     self.total_bytes_read += len(chunk)
-                    if entry_bytes_read > self.policy.max_content_bytes:
+                    if exceeds_bundle_limit(entry_bytes_read, self.policy.max_content_bytes):
                         raise ZipResourceLimitError(
                             f"entry {member.relative_path!r} exceeds "
                             f"{self.policy.max_content_bytes} bytes"
                         )
-                    if self.total_bytes_read > self.policy.max_zip_total_bytes:
+                    if exceeds_bundle_limit(self.total_bytes_read, self.policy.max_zip_total_bytes):
                         raise ZipResourceLimitError(
                             "uncompressed data exceeds "
                             f"{self.policy.max_zip_total_bytes} bytes"
@@ -152,7 +154,7 @@ def _validate_input_artifact(path: Path, policy: ResourcePolicy) -> None:
         raise ZipArchiveReadError(describe_os_error(exc)) from exc
     if not stat.S_ISREG(metadata.st_mode):
         raise ZipArchiveReadError("not a regular file")
-    if metadata.st_size > policy.max_input_artifact_bytes:
+    if exceeds_bundle_limit(metadata.st_size, policy.max_input_artifact_bytes):
         raise ZipResourceLimitError(
             "input artifact exceeds "
             f"{policy.max_input_artifact_bytes} bytes"
@@ -160,7 +162,7 @@ def _validate_input_artifact(path: Path, policy: ResourcePolicy) -> None:
 
 
 def _validate_input_bytes(content: bytes, policy: ResourcePolicy) -> None:
-    if len(content) > policy.max_input_artifact_bytes:
+    if exceeds_bundle_limit(len(content), policy.max_input_artifact_bytes):
         raise ZipResourceLimitError(
             "input artifact exceeds "
             f"{policy.max_input_artifact_bytes} bytes"

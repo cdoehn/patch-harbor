@@ -1,8 +1,8 @@
 # State Bundle – WRC-Weiterentwicklung auf dev
 
-**Plan-ID:** PH-STATE · **Bundle:** 123 · **Stand:** 18. November 2026.
+**Plan-ID:** PH-STATE · **Bundle:** 124 · **Stand:** 18. November 2026.
 **Basis:** veröffentlichtes 2.0.1, Commit `90452415be3d0e522730ad22f07c0be28453734d`.
-**Auftrag:** sechs verbleibende WRC-Commits einschließlich Größen-Override; drei Commits sind bereits abgeschlossen.
+**Auftrag:** drei verbleibende FORCE-WRC-Commits; alle sechs State-Bundle-Commits sind abgeschlossen.
 Apply ist ausdrücklich beauftragt. Keine Veröffentlichung, Versionsanhebung, Tags oder Pushes.
 Dieser Quellplan belegt Vorbereitung; tatsächliche Commits und Tests belegen erst
 die späteren Execute-Berichte. In Development ausschließlich statische Analyse.
@@ -22,7 +22,7 @@ Die gemeinsame Snapshotverarbeitung wird nicht dupliziert. Es gibt keine
 Migration alter Pakete oder API-Kompatibilitätsschicht. CLI-Aliase bleiben bestehen.
 Historische Release-Dokumente beschreiben weiterhin die damalige Version.
 
-## Sechs aufeinanderfolgende Quellstände
+## Neun aufeinanderfolgende Quellstände
 
 | Schritt | WRC | Inhalt |
 | --- | --- | --- |
@@ -32,6 +32,10 @@ Historische Release-Dokumente beschreiben weiterhin die damalige Version.
 | STATE-02.W | Work | CLI, JSON, Hilfe, Fortschritt und Monitor zeigen den passenden Bundle-Typ. |
 | STATE-02.R | Right | Anleitung, Spezifikation und Chat-Vertrag an den tatsächlichen Start-/Fortsetzungsablauf binden. |
 | STATE-02.C | Clean | Aktuelle Beispiele, Kommentare und Terminologie abschließend bereinigen; historische Nachweise erhalten. |
+
+| FORCE-01.W | Work | Explizites `--force` hebt Größen- und Mengengrenzen bei Erzeugung, Lesen und Execute pro Aufruf auf. |
+| FORCE-01.R | Right | Standardgrenzen, vollständigen Ablauf, Integrität und isolierte Freigabe absichern. |
+| FORCE-01.C | Clean | CLI/API/Bootstrap-Anleitung und Grenzvertrag vereinheitlichen; statischen Gesamtnachweis festhalten. |
 
 Jeder Stand muss für sich funktionieren. Right-Commits härten die Fähigkeit;
 sie legitimieren keine absichtlich unvollständigen oder unsicheren Work-Stände.
@@ -43,7 +47,7 @@ tatsächlichen Zustand gebunden. Ein Draft reserviert oder konsumiert keine Refe
 
 ## Quellfortschritt
 
-Vorbereiteter Stand: **STATE-02.C**. Apply- und Testnachweis: **ausstehend**.
+Vorbereiteter Stand: **FORCE-01.W**. Apply- und Testnachweis: **ausstehend**.
 
 ## Reparatur nach Execute 121
 
@@ -73,3 +77,24 @@ des uncommitteten STATE-02.W-Stands, auf HEAD
 Bundle 123 setzt dort fort; die drei vorhandenen Commits bleiben erhalten.
 Vor jedem weiteren Commit läuft erneut die vollständige Suite in Apply
 mit `--workers auto`. Für Bundle 123 liegt hier noch kein Testnachweis vor.
+
+## Fortsetzung nach Execute 123
+
+Die sechs STATE-Schritte wurden jeweils nach erfolgreicher vollständiger
+Apply-Suite committed. Der letzte ist `00d2fb310fc7297ece0f090a55e6d918e4c3ad4f`.
+FORCE-01.W stoppte vor dem Commit: 4.006 bestanden, sechs fehlgeschlagen,
+16 übersprungen. Ausgangspunkt der Reparatur ist das verifizierte Result
+`833e9eec-2db1-44ed-b9f8-9135c2daf4ff` samt uncommittetem FORCE-Work-Stand.
+
+Der stabile Hash-Dateileser erlaubt nun ausdrücklich `None` für unbegrenzte
+Inhaltsübernahme. SHA-256, Dateiidentität, Mutationsprüfung und ein separat
+angegebenes Lesebudget bleiben wirksam; die vorhandenen Verhaltenstests
+decken nun auch diesen Modus ab. CLI-/API-Vertragstests enthalten den
+expliziten `force=False`-Parameter. Die isolierte Build-Testvorbereitung
+enthält auch `bundle_limits.py` und prüft dessen Fehlen ohne fremden Fallback.
+
+Alle drei verbleibenden FORCE-Quellstände enthalten diese Reparaturen
+und sämtliche vorherigen Korrekturen. Bestehende Commits werden nicht
+wiederholt. Vor jedem weiteren Commit vollständige Apply-Suite, Workers
+auto ohne zusätzliche Grenze. In Dev nur statische Prüfung. Kein Push,
+Tag oder Release. Der neue Apply-Erfolg ist hier noch nicht behauptet.

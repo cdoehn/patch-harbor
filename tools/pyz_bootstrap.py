@@ -5,6 +5,9 @@ archive does not establish trust. No inspection here executes bundled code.
 """
 from __future__ import annotations
 
+from contextlib import contextmanager
+from contextvars import ContextVar
+
 import argparse
 from contextlib import ExitStack
 from dataclasses import dataclass, field
@@ -57,6 +60,25 @@ VERSION = re.compile(r'[0-9]+(?:\.[0-9]+)*(?:(?:a|b|rc)[0-9]+)?(?:\.post[0-9]+)?
 class BootstrapUnavailable(RuntimeError):
     """A technical/trust prerequisite is absent; no native success is claimed."""
 
+
+
+_FORCE = ContextVar('bootstrap_bundle_size_override', default=False)
+
+@contextmanager
+def _size_scope(force=False):
+    if type(force) is not bool:
+        raise TypeError('force must be boolean')
+    token = _FORCE.set(force)
+    try:
+        yield
+    finally:
+        _FORCE.reset(token)
+
+def _within_limit(actual, maximum):
+    return _FORCE.get() or actual <= maximum
+
+def _read_size(maximum):
+    return -1 if _FORCE.get() else maximum + 1
 
 def _require(condition, message):
     if not condition:
@@ -197,12 +219,12 @@ def _capture(path, maximum):
         with os.fdopen(descriptor, 'rb') as stream:
             descriptor = None
             before = _descriptor_info(stream.fileno())
-            _require(_regular(before) and before.st_size <= maximum, 'file type or size limit')
+            _require(_regular(before) and _within_limit(before.st_size, maximum), 'file type or size limit')
             _require(_state(initial) == _state(before), 'input changed before capture')
-            raw = stream.read(maximum + 1)
+            raw = stream.read(_read_size(maximum))
             after = _descriptor_info(stream.fileno())
             final = path.lstat()
-            _require(_regular(after) and _regular(final) and len(raw) <= maximum
+            _require(_regular(after) and _regular(final) and _within_limit(len(raw), maximum)
                      and before.st_ctime_ns == after.st_ctime_ns
                      and _state(initial) == _state(before) == _state(after) == _state(final),
                      'input changed during capture')
@@ -239,7 +261,7 @@ def _directory_budget(raw, *, maximum=None):
                  'inconsistent ZIP64 directory facts')
         count, disk_count, size, offset = z_count, z_disk_count, z_size, z_offset
         directory_end = record_offset
-    _require(disk_count == count and 0 < count <= maximum,
+    _require(disk_count == count and 0 < count and _within_limit(count, maximum),
              f'ZIP entry limit exceeded: actual={count}, limit={maximum}')
     _require(offset + size == directory_end,
              'ZIP directory boundary mismatch')
@@ -254,7 +276,7 @@ def _directory_budget(raw, *, maximum=None):
 
 def _members(archive):
     infos = archive.infolist()
-    _require(len(infos) <= MAX_ENTRIES,
+    _require(_within_limit(len(infos), MAX_ENTRIES),
              f'ZIP entry limit exceeded: actual={len(infos)}, limit={MAX_ENTRIES}')
     names = set()
     for info in infos:
@@ -271,17 +293,17 @@ def _members(archive):
                  and not info.external_attr & 0x10 and not info.flag_bits & 1,
                  'special/encrypted ZIP member')
         _require(info.compress_type in (ZIP_STORED, ZIP_DEFLATED)
-                 and 0 <= info.file_size <= MAX_INPUT, 'unsupported ZIP compression or file size')
-    _require(sum(info.file_size for info in infos) <= MAX_TOTAL, 'ZIP expanded byte budget')
+                 and 0 <= info.file_size and _within_limit(info.file_size, MAX_INPUT), 'unsupported ZIP compression or file size')
+    _require(_within_limit(sum(info.file_size for info in infos), MAX_TOTAL), 'ZIP expanded byte budget')
     return names
 
 
 def _read(archive, name, maximum):
     info = archive.getinfo(name)
-    _require(info.file_size <= maximum, 'member exceeds byte budget')
+    _require(_within_limit(info.file_size, maximum), 'member exceeds byte budget')
     with archive.open(info) as stream:
-        raw = stream.read(maximum+1)
-    _require(len(raw) == info.file_size <= maximum, 'member size mismatch')
+        raw = stream.read(_read_size(maximum))
+    _require(len(raw) == info.file_size and _within_limit(len(raw), maximum), 'member size mismatch')
     return raw
 
 
@@ -295,7 +317,7 @@ def _descriptor(value, *, artifact=False):
 
 
 def _checked(archive, descriptor, maximum):
-    _require(descriptor['size'] <= maximum, 'descriptor byte budget')
+    _require(_within_limit(descriptor['size'], maximum), 'descriptor byte budget')
     raw = _read(archive, descriptor['path'], maximum)
     _require(len(raw) == descriptor['size'] and sha256(raw).hexdigest() == descriptor['sha256'],
              'descriptor bytes/hash mismatch')
@@ -355,12 +377,12 @@ def _pyz_precheck(raw, expected, remaining=MAX_INNER_TOTAL):
     This is still not native validation of the surrounding repository Result.
     Its separate outer and inner budgets must both hold before code can run.
     """
-    _require(0 < len(raw) <= MAX_PYZ, 'PYZ artifact byte budget')
+    _require(0 < len(raw) and _within_limit(len(raw), MAX_PYZ), 'PYZ artifact byte budget')
     _directory_budget(raw, maximum=MAX_INNER_ENTRIES)
     with ZipFile(BytesIO(raw)) as archive:
         names = _members(archive)
         infos = archive.infolist()
-        _require(sum(i.file_size for i in infos) <= min(MAX_INNER_TOTAL, remaining), 'shared PYZ byte budget')
+        _require(_within_limit(sum(i.file_size for i in infos), min(MAX_INNER_TOTAL, remaining)), 'shared PYZ byte budget')
         _require(not archive.comment and [i.filename for i in infos] == sorted(names), 'noncanonical PYZ order')
         offset = 0
         for info in infos:
@@ -444,89 +466,90 @@ class PyzAssessment:
     full_reference_valid: bool = False
 
 
-def assess(reference, *, trusted_source_sha256=None):
-    """Check the selected Result-4 runtime descriptors before any code import."""
-    path = Path(reference).absolute()
-    raw = _capture(path, MAX_INPUT)
-    digest = sha256(raw).hexdigest()
-    if trusted_source_sha256 is not None:
-        _require(type(trusted_source_sha256) is str and HEX.fullmatch(trusted_source_sha256)
-                 and digest == trusted_source_sha256, 'trusted Result digest mismatch')
-    _directory_budget(raw)
-    with ZipFile(BytesIO(raw)) as archive:
-        names = _members(archive)
-        manifest = _json(_read(archive, 'manifest.json', MAX_INPUT))
-        _require(manifest.get('marker') in ('patch-harbor-state-bundle', 'patch-harbor-result-bundle')
-                 and type(manifest.get('format_version')) is int, 'not a supported Result')
-        _require(manifest['format_version'] == 5, 'unsupported Result version')
-        _require(type(manifest.get('patchharbor_version')) is str
-                 and manifest['patchharbor_version'] == PATCHHARBOR_VERSION,
-                 'unsupported PatchHarbor package version; expected ' + PATCHHARBOR_VERSION)
-        run = _json(_read(archive, 'logs/run.json', MAX_METADATA))
-        expected_operation = 'bundle' if manifest['marker'] == 'patch-harbor-state-bundle' else 'execute'
-        _require(run.get('operation') == expected_operation, 'reference kind and operation disagree')
-        runtime = manifest.get('runtime')
-        _require(type(runtime) is dict and set(runtime) == {'status','reason','metadata','artifact'},
-                 'outer runtime schema')
-        metadata_descriptor = _descriptor(runtime['metadata'])
-        _require(metadata_descriptor['path'] == 'runtime/runtime.json', 'runtime metadata path')
-        metadata = _json(_checked(archive, metadata_descriptor, MAX_METADATA))
-        _require(set(metadata) == METADATA_FIELDS and metadata.get('marker') == 'patch-harbor-runtime'
-                 and type(metadata.get('format_version')) is int and metadata['format_version'] == 3
-                 and metadata.get('distribution') == 'patchharbor', 'runtime metadata identity')
-        _require(metadata.get('status') == runtime['status'] and metadata.get('reason') == runtime['reason']
-                 and metadata.get('artifact') == runtime['artifact'], 'runtime descriptor disagreement')
-        runtime_names = {name for name in names if name.startswith('runtime/')}
-        version, requires = metadata.get('version'), metadata.get('requires_python')
-        _require(version == PATCHHARBOR_VERSION, 'runtime and package product versions differ')
-        _require(version is None or (type(version) is str and VERSION.fullmatch(version)), 'runtime version profile')
-        if requires is not None:
+def assess(reference, *, trusted_source_sha256=None, force=False):
+    """Check the selected State/Result runtime descriptors before any code import."""
+    with _size_scope(force):
+        path = Path(reference).absolute()
+        raw = _capture(path, MAX_INPUT)
+        digest = sha256(raw).hexdigest()
+        if trusted_source_sha256 is not None:
+            _require(type(trusted_source_sha256) is str and HEX.fullmatch(trusted_source_sha256)
+                     and digest == trusted_source_sha256, 'trusted Result digest mismatch')
+        _directory_budget(raw)
+        with ZipFile(BytesIO(raw)) as archive:
+            names = _members(archive)
+            manifest = _json(_read(archive, 'manifest.json', MAX_INPUT))
+            _require(manifest.get('marker') in ('patch-harbor-state-bundle', 'patch-harbor-result-bundle')
+                     and type(manifest.get('format_version')) is int, 'not a supported Result')
+            _require(manifest['format_version'] == 5, 'unsupported Result version')
+            _require(type(manifest.get('patchharbor_version')) is str
+                     and manifest['patchharbor_version'] == PATCHHARBOR_VERSION,
+                     'unsupported PatchHarbor package version; expected ' + PATCHHARBOR_VERSION)
+            run = _json(_read(archive, 'logs/run.json', MAX_METADATA))
+            expected_operation = 'bundle' if manifest['marker'] == 'patch-harbor-state-bundle' else 'execute'
+            _require(run.get('operation') == expected_operation, 'reference kind and operation disagree')
+            runtime = manifest.get('runtime')
+            _require(type(runtime) is dict and set(runtime) == {'status','reason','metadata','artifact'},
+                     'outer runtime schema')
+            metadata_descriptor = _descriptor(runtime['metadata'])
+            _require(metadata_descriptor['path'] == 'runtime/runtime.json', 'runtime metadata path')
+            metadata = _json(_checked(archive, metadata_descriptor, MAX_METADATA))
+            _require(set(metadata) == METADATA_FIELDS and metadata.get('marker') == 'patch-harbor-runtime'
+                     and type(metadata.get('format_version')) is int and metadata['format_version'] == 3
+                     and metadata.get('distribution') == 'patchharbor', 'runtime metadata identity')
+            _require(metadata.get('status') == runtime['status'] and metadata.get('reason') == runtime['reason']
+                     and metadata.get('artifact') == runtime['artifact'], 'runtime descriptor disagreement')
+            runtime_names = {name for name in names if name.startswith('runtime/')}
+            version, requires = metadata.get('version'), metadata.get('requires_python')
+            _require(version == PATCHHARBOR_VERSION, 'runtime and package product versions differ')
+            _require(version is None or (type(version) is str and VERSION.fullmatch(version)), 'runtime version profile')
+            if requires is not None:
+                _minimum(requires)
+            if runtime['status'] == 'unavailable':
+                _require(runtime['artifact'] is None and type(runtime['reason']) is str
+                         and runtime['reason'] in {'source_not_prepared','source_changed','artifact_missing',
+                                                   'artifact_mismatch','artifact_corrupt','artifact_unsupported',
+                                                   'resource_limit','read_error'}
+                         and runtime_names == {'runtime/runtime.json'}
+                         and all(metadata[key] is None for key in ('artifact','profile','content_id',
+                             'content_id_algorithm','runtime_dependencies','provenance','capabilities')),
+                         'invalid unavailable runtime')
+                raise BootstrapUnavailable('runtime unavailable: ' + runtime['reason'])
+            _require(runtime['status'] == 'embedded' and runtime['reason'] is None, 'runtime status')
+            artifact = _descriptor(runtime['artifact'], artifact=True)
+            _descriptor(metadata['artifact'], artifact=True)
+            _require(type(version) is str and VERSION.fullmatch(version), 'runtime version profile')
             _minimum(requires)
-        if runtime['status'] == 'unavailable':
-            _require(runtime['artifact'] is None and type(runtime['reason']) is str
-                     and runtime['reason'] in {'source_not_prepared','source_changed','artifact_missing',
-                                               'artifact_mismatch','artifact_corrupt','artifact_unsupported',
-                                               'resource_limit','read_error'}
-                     and runtime_names == {'runtime/runtime.json'}
-                     and all(metadata[key] is None for key in ('artifact','profile','content_id',
-                         'content_id_algorithm','runtime_dependencies','provenance','capabilities')),
-                     'invalid unavailable runtime')
-            raise BootstrapUnavailable('runtime unavailable: ' + runtime['reason'])
-        _require(runtime['status'] == 'embedded' and runtime['reason'] is None, 'runtime status')
-        artifact = _descriptor(runtime['artifact'], artifact=True)
-        _descriptor(metadata['artifact'], artifact=True)
-        _require(type(version) is str and VERSION.fullmatch(version), 'runtime version profile')
-        _minimum(requires)
-        name = 'patchharbor-' + version + '.pyz'
-        _require(artifact['path'] == 'runtime/' + name
-                 and runtime_names == {'runtime/runtime.json', artifact['path']}, 'runtime member selection')
-        _require(metadata.get('profile') == 'patchharbor-core-no-watcher-v1'
-                 and metadata.get('content_id_algorithm') == 'patchharbor-pyz-content-v1'
-                 and type(metadata.get('content_id')) is str and HEX.fullmatch(metadata['content_id']),
-                 'unsupported PYZ profile or Python requirement')
-        capabilities = metadata['capabilities']
-        _require(type(capabilities) is dict and set(capabilities) == {'operations','task_formats','result_formats','state_formats'}
-                 and capabilities['operations'] == list(OPERATIONS),
-                 'unsupported runtime capabilities')
-        for key, expected in (('task_formats', TASK_FORMATS), ('result_formats', RESULT_FORMATS), ('state_formats', STATE_FORMATS)):
-            values = capabilities[key]
-            _require(type(values) is list and all(type(v) is int for v in values)
-                     and values == list(expected), 'unsupported runtime read versions')
-        provenance = metadata['provenance']
-        _require(metadata['runtime_dependencies'] == [] and type(provenance) is dict
-                 and set(provenance) == {'mode','source_commit','recipe_format_version'}
-                 and provenance['mode'] == 'canonical_resources'
-                 and type(provenance['recipe_format_version']) is int and provenance['recipe_format_version'] == 1,
-                 'unsupported runtime provenance')
-        commit = provenance['source_commit']
-        _require(commit is None or (type(commit) is str and re.fullmatch(r'[0-9a-f]{40}|[0-9a-f]{64}',commit)),
-                 'invalid runtime source commit')
-        artifact_bytes = _checked(archive, artifact, MAX_PYZ)
-        _pyz_precheck(artifact_bytes, dict(version=version, requires_python=requires,
-                      content_id=metadata['content_id'], source_commit=commit),
-                      MAX_TOTAL - sum(i.file_size for i in archive.infolist()))
-    return PyzAssessment(path, digest, name, artifact['sha256'], version, requires, artifact_bytes,
-                         trusted_source_sha256 is not None)
+            name = 'patchharbor-' + version + '.pyz'
+            _require(artifact['path'] == 'runtime/' + name
+                     and runtime_names == {'runtime/runtime.json', artifact['path']}, 'runtime member selection')
+            _require(metadata.get('profile') == 'patchharbor-core-no-watcher-v1'
+                     and metadata.get('content_id_algorithm') == 'patchharbor-pyz-content-v1'
+                     and type(metadata.get('content_id')) is str and HEX.fullmatch(metadata['content_id']),
+                     'unsupported PYZ profile or Python requirement')
+            capabilities = metadata['capabilities']
+            _require(type(capabilities) is dict and set(capabilities) == {'operations','task_formats','result_formats','state_formats'}
+                     and capabilities['operations'] == list(OPERATIONS),
+                     'unsupported runtime capabilities')
+            for key, expected in (('task_formats', TASK_FORMATS), ('result_formats', RESULT_FORMATS), ('state_formats', STATE_FORMATS)):
+                values = capabilities[key]
+                _require(type(values) is list and all(type(v) is int for v in values)
+                         and values == list(expected), 'unsupported runtime read versions')
+            provenance = metadata['provenance']
+            _require(metadata['runtime_dependencies'] == [] and type(provenance) is dict
+                     and set(provenance) == {'mode','source_commit','recipe_format_version'}
+                     and provenance['mode'] == 'canonical_resources'
+                     and type(provenance['recipe_format_version']) is int and provenance['recipe_format_version'] == 1,
+                     'unsupported runtime provenance')
+            commit = provenance['source_commit']
+            _require(commit is None or (type(commit) is str and re.fullmatch(r'[0-9a-f]{40}|[0-9a-f]{64}',commit)),
+                     'invalid runtime source commit')
+            artifact_bytes = _checked(archive, artifact, MAX_PYZ)
+            _pyz_precheck(artifact_bytes, dict(version=version, requires_python=requires,
+                          content_id=metadata['content_id'], source_commit=commit),
+                          MAX_TOTAL - sum(i.file_size for i in archive.infolist()))
+        return PyzAssessment(path, digest, name, artifact['sha256'], version, requires, artifact_bytes,
+                             trusted_source_sha256 is not None)
 
 
 @dataclass(frozen=True)
@@ -604,31 +627,32 @@ def _windows_create_private_directory(path: Path) -> None:
             raise ctypes.WinError(ctypes.get_last_error())
 
 
-def prepare(assessment, workspace):
+def prepare(assessment, workspace, *, force=False):
     """Copy exactly one verified artifact into a new private directory; no install."""
-    if not assessment.source_trusted:
-        raise BootstrapUnavailable('runtime source is not trusted')
-    minimum = _minimum(assessment.requires_python)
-    if sys.version_info < minimum:
-        raise BootstrapUnavailable('Python %d.%d or newer is required by this artifact' % minimum)
-    _require(sha256(assessment.pyz_bytes).hexdigest() == assessment.artifact_sha256
-             and 0 < len(assessment.pyz_bytes) <= MAX_PYZ, 'captured PYZ bytes changed')
-    _require(assessment.artifact_name == 'patchharbor-' + assessment.version + '.pyz'
-             and VERSION.fullmatch(assessment.version), 'artifact name changed')
-    _pyz_precheck(assessment.pyz_bytes, dict(version=assessment.version, requires_python=assessment.requires_python))
-    workspace = Path(workspace).absolute()
-    parents = _parent_states(workspace)
-    if os.name == 'nt':
-        _windows_create_private_directory(workspace)
-    else:
-        workspace.mkdir(mode=0o700)  # existing destinations and symlinks are refused
-    _require(_parent_states(workspace) == parents, 'workspace parent changed during creation')
-    output = workspace/assessment.artifact_name
-    with output.open('xb') as stream:
-        stream.write(assessment.pyz_bytes); stream.flush(); os.fsync(stream.fileno())
-    _require(sha256(_capture(output, MAX_PYZ)).hexdigest() == assessment.artifact_sha256,
-             'prepared artifact changed')
-    return PreparedPyz(assessment, output)
+    with _size_scope(force):
+        if not assessment.source_trusted:
+            raise BootstrapUnavailable('runtime source is not trusted')
+        minimum = _minimum(assessment.requires_python)
+        if sys.version_info < minimum:
+            raise BootstrapUnavailable('Python %d.%d or newer is required by this artifact' % minimum)
+        _require(sha256(assessment.pyz_bytes).hexdigest() == assessment.artifact_sha256
+                 and 0 < len(assessment.pyz_bytes) and _within_limit(len(assessment.pyz_bytes), MAX_PYZ), 'captured PYZ bytes changed')
+        _require(assessment.artifact_name == 'patchharbor-' + assessment.version + '.pyz'
+                 and VERSION.fullmatch(assessment.version), 'artifact name changed')
+        _pyz_precheck(assessment.pyz_bytes, dict(version=assessment.version, requires_python=assessment.requires_python))
+        workspace = Path(workspace).absolute()
+        parents = _parent_states(workspace)
+        if os.name == 'nt':
+            _windows_create_private_directory(workspace)
+        else:
+            workspace.mkdir(mode=0o700)  # existing destinations and symlinks are refused
+        _require(_parent_states(workspace) == parents, 'workspace parent changed during creation')
+        output = workspace/assessment.artifact_name
+        with output.open('xb') as stream:
+            stream.write(assessment.pyz_bytes); stream.flush(); os.fsync(stream.fileno())
+        _require(sha256(_capture(output, MAX_PYZ)).hexdigest() == assessment.artifact_sha256,
+                 'prepared artifact changed')
+        return PreparedPyz(assessment, output)
 
 
 def _check_loaded_origin(path):
@@ -641,36 +665,37 @@ def _check_loaded_origin(path):
                 raise BootstrapUnavailable('another PatchHarbor origin is already loaded; use a fresh process')
 
 
-def import_api(prepared):
+def import_api(prepared, *, force=False):
     """Explicit in-process use; retain the checked path for later lazy imports."""
-    assessment, path = prepared.assessment, prepared.path
-    minimum = _minimum(assessment.requires_python)
-    if sys.version_info < minimum:
-        raise BootstrapUnavailable('Python %d.%d or newer is required by this artifact' % minimum)
-    if not assessment.source_trusted:
-        raise BootstrapUnavailable('runtime source is not trusted')
-    _require(sha256(_capture(path, MAX_PYZ)).hexdigest() == assessment.artifact_sha256,
-             'prepared PYZ changed before import')
-    _pyz_precheck(assessment.pyz_bytes, dict(version=assessment.version, requires_python=assessment.requires_python))
-    _check_loaded_origin(path)
-    if not sys.path or sys.path[0] != str(path):
-        sys.path.insert(0, str(path))
-    # Do not pop modules or remove this path on error: partial imports are not a
-    # safe in-process version switch either. A failed import needs a fresh process.
-    api = importlib.import_module('patchharbor.api')
-    _check_loaded_origin(path)
-    package = sys.modules['patchharbor']
-    _require(package.__version__ == assessment.version, 'imported runtime version differs')
-    _require(all(callable(getattr(api, name, None)) for name in
-                 ('inspect_task','validate_task','pack_task')), 'missing required public API')
-    from patchharbor.pyz_artifact import PyzProvider
-    # The imported Core now checks its complete canonical resources. This still
-    # does not declare the original repository snapshot fully validated.
-    captured = PyzProvider().capture()
-    _require(captured.artifact is not None
-             and captured.artifact.pyz_sha256 == assessment.artifact_sha256,
-             'imported producer does not match the selected PYZ')
-    return api
+    with _size_scope(force):
+        assessment, path = prepared.assessment, prepared.path
+        minimum = _minimum(assessment.requires_python)
+        if sys.version_info < minimum:
+            raise BootstrapUnavailable('Python %d.%d or newer is required by this artifact' % minimum)
+        if not assessment.source_trusted:
+            raise BootstrapUnavailable('runtime source is not trusted')
+        _require(sha256(_capture(path, MAX_PYZ)).hexdigest() == assessment.artifact_sha256,
+                 'prepared PYZ changed before import')
+        _pyz_precheck(assessment.pyz_bytes, dict(version=assessment.version, requires_python=assessment.requires_python))
+        _check_loaded_origin(path)
+        if not sys.path or sys.path[0] != str(path):
+            sys.path.insert(0, str(path))
+        # Do not pop modules or remove this path on error: partial imports are not a
+        # safe in-process version switch either. A failed import needs a fresh process.
+        api = importlib.import_module('patchharbor.api')
+        _check_loaded_origin(path)
+        package = sys.modules['patchharbor']
+        _require(package.__version__ == assessment.version, 'imported runtime version differs')
+        _require(all(callable(getattr(api, name, None)) for name in
+                     ('inspect_task','validate_task','pack_task')), 'missing required public API')
+        from patchharbor.pyz_artifact import PyzProvider
+        # The imported Core now checks its complete canonical resources. This still
+        # does not declare the original repository snapshot fully validated.
+        captured = PyzProvider().capture()
+        _require(captured.artifact is not None
+                 and captured.artifact.pyz_sha256 == assessment.artifact_sha256,
+                 'imported producer does not match the selected PYZ')
+        return api
 
 
 def main(argv=None):
@@ -678,14 +703,15 @@ def main(argv=None):
     parser.add_argument('reference', type=Path)
     parser.add_argument('--trusted-source-sha256')
     parser.add_argument('--prepare-in', type=Path)
+    parser.add_argument('--force', action='store_true', help='bypass bundle size/count limits; preserve all integrity and trust checks')
     args = parser.parse_args(argv)
-    assessment = assess(args.reference, trusted_source_sha256=args.trusted_source_sha256)
+    assessment = assess(args.reference, trusted_source_sha256=args.trusted_source_sha256, force=args.force)
     result = dict(scope=assessment.scope, full_reference_valid=False,
                   reference_sha256=assessment.reference_sha256, source_trusted=assessment.source_trusted,
                   artifact_sha256=assessment.artifact_sha256, version=assessment.version,
                   requires_python=assessment.requires_python)
     if args.prepare_in is not None:
-        prepared = prepare(assessment, args.prepare_in)
+        prepared = prepare(assessment, args.prepare_in, force=args.force)
         result['path'] = str(prepared.path)
         result['command_prefix'] = [sys.executable, '-I', '-S', '-B', str(prepared.path)]
     print(json.dumps(result))

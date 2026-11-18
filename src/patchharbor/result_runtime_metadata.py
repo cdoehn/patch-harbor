@@ -1,6 +1,8 @@
 """Closed Result runtime descriptors shared by the Wheel and PYZ profiles."""
 from __future__ import annotations
 
+from patchharbor.bundle_limits import exceeds_bundle_limit
+
 from dataclasses import dataclass
 
 from .runtime_profile import SHA256_PATTERN, sha256
@@ -26,7 +28,7 @@ def read_descriptor(value: object, *, path: str, limit: int, files: dict[str, by
     require_metadata(type(value) is dict and set(value) == {"path", "size", "sha256"},
              "invalid runtime descriptor schema")
     require_metadata(value["path"] == path and type(value["size"]) is int
-             and 0 <= value["size"] <= limit and type(value["sha256"]) is str
+             and (0 <= value["size"] and not exceeds_bundle_limit(value["size"], limit)) and type(value["sha256"]) is str
              and SHA256_PATTERN.fullmatch(value["sha256"]) is not None, "invalid runtime descriptor")
     raw = files[path]
     require_metadata(len(raw) == value["size"] and sha256(raw) == value["sha256"],

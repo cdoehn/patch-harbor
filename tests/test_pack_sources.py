@@ -178,12 +178,12 @@ def test_limits_are_enforced_before_reading_file_contents(contents,monkeypatch,l
 
 def test_exact_file_and_scan_budgets_include_generated_entries_and_directories(contents,monkeypatch):
     (contents/'empty').mkdir();monkeypatch.setattr(sources,'MAX_SCAN_NODES',3)
-    result=capture_sources(contents,'run.sh',resource_policy=replace(DEFAULT_RESOURCE_POLICY,max_zip_entries=4))
+    result=capture_sources(contents,'run.sh',resource_policy=replace(DEFAULT_RESOURCE_POLICY,max_zip_entries=5))
     assert len(result.files)==1 and result.empty_directories==1
 
 
-def test_real_thousand_entry_boundary_reserves_all_three_generated_files(contents, monkeypatch):
-    for number in range(996):
+def test_real_thousand_entry_boundary_reserves_all_four_generated_files(contents, monkeypatch):
+    for number in range(995):
         (contents / f'payload-{number}').write_bytes(b'')
     policy = replace(DEFAULT_RESOURCE_POLICY, max_zip_entries=1_000)
     captured = capture_sources(contents, 'run.sh', resource_policy=policy)

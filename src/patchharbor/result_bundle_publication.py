@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from patchharbor.bundle_limits import bundle_read_limit
+
 from patchharbor.reference_kind import ReferenceBundleKind, kind_for_operation
 
 from contextlib import contextmanager
@@ -361,7 +363,7 @@ def publish_result_bundle(
             lambda: read_stable_regular_file_with_sha256(
                 publication.temporary_path, retained_content_limit=1,
                 allow_path_identity_fallback=True, expected_identity=owned_stat,
-                max_bytes=DEFAULT_RESOURCE_POLICY.max_input_artifact_bytes,
+                max_bytes=bundle_read_limit(DEFAULT_RESOURCE_POLICY.max_input_artifact_bytes),
             ).sha256,
         )
         if final_digest != digest:

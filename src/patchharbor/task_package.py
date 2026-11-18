@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+from patchharbor.bundle_limits import bundle_read_limit
+
+from patchharbor.bundle_limits import exceeds_bundle_limit
+
 from dataclasses import dataclass
 import os
 from pathlib import Path
@@ -148,12 +152,12 @@ def resolve_task_bundle(
     activity("OPEN", f"Open explicit patch and capture stable content with SHA-256: {path}")
     try:
         target = path.resolve(strict=True) if expected_identity is None else path
-        if target.lstat().st_size > resource_policy.max_input_artifact_bytes:
+        if exceeds_bundle_limit(target.lstat().st_size, resource_policy.max_input_artifact_bytes):
             raise _unsafe_task_zip(path, "input artifact exceeds the resource limit")
         owned = ({} if expected_identity is None else
-                 {'expected_identity': expected_identity, 'max_bytes': resource_policy.max_input_artifact_bytes})
+                 {'expected_identity': expected_identity, 'max_bytes': bundle_read_limit(resource_policy.max_input_artifact_bytes)})
         captured = read_stable_regular_file_with_sha256(
-            target, retained_content_limit=resource_policy.max_input_artifact_bytes,
+            target, retained_content_limit=bundle_read_limit(resource_policy.max_input_artifact_bytes),
             allow_path_identity_fallback=expected_identity is None, **owned,
         )
         if captured.content is None:

@@ -82,8 +82,11 @@ def test_valid_execution_facts_are_never_promoted_to_success(tmp_path,kind,dirty
 
 def test_public_signature_types_capabilities_and_argument_failures(tmp_path):
     signature=inspect.signature(api.read_reference_snapshot)
-    assert list(signature.parameters)==['result','expected_sha256','observer']
+    assert list(signature.parameters)==['result','expected_sha256','observer','force']
     assert typing.get_type_hints(api.read_reference_snapshot)['return'] is api.ReferenceSnapshot
+    assert signature.parameters['force'].kind is inspect.Parameter.KEYWORD_ONLY
+    assert signature.parameters['force'].default is False
+    assert typing.get_type_hints(api.read_reference_snapshot)['force'] is bool
     assert {'ReferenceSnapshot','SnapshotLayer','SnapshotFile','SnapshotRuntime','ReferenceSnapshotError','SnapshotErrorCode'}<=set(api.__all__)
     capability=api.integration_capabilities()
     assert capability.contract_version==capability.snapshot_contract_version==2

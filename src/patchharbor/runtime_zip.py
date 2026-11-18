@@ -1,4 +1,6 @@
 """Bounded canonical runtime ZIP metadata, for the Core-PYZ."""
+
+from .bundle_limits import exceeds_bundle_limit
 import struct
 
 
@@ -19,7 +21,7 @@ def bounded_directory(raw: bytes, policy, *, max_entries: int = 1000) -> int:
     signature, disk, directory_disk, disk_count, count, size, offset, comment = struct.unpack_from(
         "<4s4H2IH", raw, end)
     _require(signature == b"PK\x05\x06" and disk == directory_disk == comment == 0
-             and disk_count == count and 0 < count <= min(max_entries, policy.max_zip_entries),
+             and disk_count == count and (0 < count and not exceeds_bundle_limit(count, min(max_entries, policy.max_zip_entries))),
              "unsupported runtime ZIP directory or entry budget")
     _require(offset + size == end and count * 47 <= size <= count * (46 + 512),
              "runtime ZIP directory budget or bounds exceeded")

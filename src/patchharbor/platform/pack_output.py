@@ -168,7 +168,7 @@ class OwnedPackFile:
         os.fsync(self.descriptor)
         sync_directory_best_effort(self.directory.path)
 
-    def verify_hash(self,expected: str,maximum: int) -> None:
+    def verify_hash(self,expected: str,maximum: int | None) -> None:
         self.require_owned()
         before=capture_descriptor_metadata(self.descriptor)
         captured=read_stable_regular_file_with_sha256(

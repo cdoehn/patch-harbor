@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from patchharbor.bundle_limits import exceeds_bundle_limit
+
 from dataclasses import dataclass
 import json
 from hashlib import sha256
@@ -58,7 +60,7 @@ def validate_bootstrap(document: dict, raw: bytes | None) -> None:
     """Check passive helper integrity; this does not authenticate its author."""
     handoff_names(document)
     descriptor = document.get("bootstrap")
-    if (raw is None or not raw or len(raw) > MAX_HANDOFF_ENTRY_BYTES
+    if (raw is None or not raw or exceeds_bundle_limit(len(raw), MAX_HANDOFF_ENTRY_BYTES)
             or raw.startswith(b"\xef\xbb\xbf") or type(descriptor) is not dict
             or set(descriptor) != {"path", "size", "sha256"}
             or descriptor.get("path") != BOOTSTRAP_NAME
@@ -102,7 +104,7 @@ def split_task_handoff(
     content = {item.relative_path: item.content for item in metadata}
     try:
         for raw in content.values():
-            if not raw or len(raw) > MAX_HANDOFF_ENTRY_BYTES or raw.startswith(b"\xef\xbb\xbf"):
+            if not raw or exceeds_bundle_limit(len(raw), MAX_HANDOFF_ENTRY_BYTES) or raw.startswith(b"\xef\xbb\xbf"):
                 raise ValueError("invalid handoff size or encoding")
             raw.decode("utf-8")
         environment = json.loads(

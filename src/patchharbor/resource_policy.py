@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from patchharbor.bundle_limits import exceeds_bundle_limit
+
 from dataclasses import dataclass
 
 
@@ -25,7 +27,7 @@ class ResultSnapshotLimitError(ValueError):
 
 def check_result_file_count(base_count: int, untracked_count: int) -> None:
     actual = base_count + untracked_count
-    if actual > MAX_RESULT_FILES:
+    if exceeds_bundle_limit(actual, MAX_RESULT_FILES):
         raise ResultSnapshotLimitError(actual)
 
 

@@ -1,6 +1,8 @@
 """Public snapshot projection on the complete, once-captured State/Result reader."""
 from __future__ import annotations
 
+from patchharbor.bundle_limits import exceeds_bundle_limit
+
 from pathlib import Path
 
 from patchharbor.errors import FailureReason, PatchHarborError
@@ -63,7 +65,7 @@ def read_reference_snapshot(path: Path, *, expected_sha256: str | None = None,
         raise ReferenceSnapshotError(SnapshotErrorCode.INVALID_PATCH, 'invalid reconstruction syntax') from exc
     if untracked.files.keys() & (index.files.keys() | worktree.files.keys()):
         raise ReferenceSnapshotError(SnapshotErrorCode.PATH_COLLISION, 'untracked file collides with a tracked path')
-    if len(worktree.files) + len(untracked.files) > MAX_RESULT_FILES:
+    if exceeds_bundle_limit(len(worktree.files) + len(untracked.files), MAX_RESULT_FILES):
         raise ReferenceSnapshotError(SnapshotErrorCode.RESOURCE_LIMIT, 'too many effective snapshot files')
     effective = layer('effective', {**worktree.files, **untracked.files})
     runtime = facts.runtime

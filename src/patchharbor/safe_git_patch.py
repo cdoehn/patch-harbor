@@ -1,6 +1,8 @@
 """Native full-index Git literal patches from already captured immutable bytes."""
 from __future__ import annotations
 
+from patchharbor.bundle_limits import exceeds_bundle_limit
+
 import base64
 import hashlib
 from io import BytesIO
@@ -22,7 +24,7 @@ def _oid(raw: bytes, algorithm: str) -> bytes:
 
 
 def _literal(raw: bytes) -> bytes:
-    if len(raw) > DEFAULT_RESOURCE_POLICY.max_content_bytes:
+    if exceeds_bundle_limit(len(raw), DEFAULT_RESOURCE_POLICY.max_content_bytes):
         raise SafeExportError(SafeExportErrorCode.RESOURCE_LIMIT, 'safe delta content exceeds file budget')
     data = zlib.compress(raw)
     output = BytesIO()
@@ -59,6 +61,6 @@ def literal_patch(before: dict[bytes, tuple[bytes, bytes]],
         if old is not None and new is not None and old[0] == new[0]:
             output.write(b' ' + old[0])
         output.write(b'\nGIT binary patch\n' + _literal(new_raw) + _literal(old_raw))
-        if output.tell() > DEFAULT_RESOURCE_POLICY.max_content_bytes:
+        if exceeds_bundle_limit(output.tell(), DEFAULT_RESOURCE_POLICY.max_content_bytes):
             raise SafeExportError(SafeExportErrorCode.RESOURCE_LIMIT, 'safe delta exceeds content budget')
     return output.getvalue()

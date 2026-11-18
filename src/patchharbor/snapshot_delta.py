@@ -1,6 +1,8 @@
 """Execute the producer's full-index Git diff syntax exactly to immutable trees."""
 from __future__ import annotations
 
+from patchharbor.bundle_limits import exceeds_bundle_limit
+
 import hashlib
 from io import BytesIO
 import re
@@ -113,7 +115,7 @@ def file_value(path: str, mode: str, raw: bytes, algorithm: GitObjectFormat) -> 
 
 
 def layer(name: str, files: dict[str, SnapshotFile]) -> SnapshotLayer:
-    if len(files) > MAX_RESULT_FILES:
+    if exceeds_bundle_limit(len(files), MAX_RESULT_FILES):
         raise ReferenceSnapshotError(SnapshotErrorCode.RESOURCE_LIMIT, 'snapshot layer has too many files')
     try:
         paths = validate_repository_paths(p.encode('utf-8') for p in files)
@@ -291,6 +293,6 @@ def apply_patch(previous: SnapshotLayer, patch: bytes, name: str,
             files[path] = file_value(path, new_mode, raw, algorithm)
         # Adds may sort before deletes. Bound the temporary union while allowing
         # a valid final layer at its file-count ceiling. layer() checks the result.
-        if len(files) > MAX_RESULT_FILES + len(previous.files):
+        if exceeds_bundle_limit(len(files), MAX_RESULT_FILES + len(previous.files)):
             raise ReferenceSnapshotError(SnapshotErrorCode.RESOURCE_LIMIT, 'too many reconstructed files')
     return layer(name, files)

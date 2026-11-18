@@ -1,6 +1,8 @@
 """Strict bounded Git binary-patch decoding, without a Git dependency."""
 from __future__ import annotations
 
+from patchharbor.bundle_limits import exceeds_bundle_limit
+
 import base64
 from io import BytesIO
 import re
@@ -96,7 +98,7 @@ def read_block(stream: BytesIO, original: bytes, budget: SnapshotBudget) -> byte
             raise invalid('invalid binary base85 data') from exc
         if any(decoded[count:]):
             raise invalid('nonzero binary base85 padding')
-        if len(encoded) + count > budget.policy.max_content_bytes:
+        if exceeds_bundle_limit(len(encoded) + count, budget.policy.max_content_bytes):
             raise ReferenceSnapshotError(SnapshotErrorCode.RESOURCE_LIMIT, 'compressed binary block exceeds limit')
         encoded.extend(decoded[:count])
     try:

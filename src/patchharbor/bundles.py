@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+from patchharbor.bundle_limits import bundle_read_size
+
+from patchharbor.bundle_limits import exceeds_bundle_limit
+
 from patchharbor.progress import activity
 
 from patchharbor.errors import FailureReason, PatchHarborError
@@ -84,7 +88,7 @@ def _artifact_warnings(
         current_size = artifact.path.stat().st_size
     except OSError as exc:
         raise _artifact_source_error(artifact, describe_os_error(exc)) from exc
-    if current_size > policy.max_input_artifact_bytes:
+    if exceeds_bundle_limit(current_size, policy.max_input_artifact_bytes):
         raise _artifact_limit_error(artifact, policy)
     warning = policy.large_content_warning("input artifact", current_size)
     return () if warning is None else (warning,)
@@ -97,10 +101,10 @@ def _read_direct_artifact(
     activity("OPEN", f"Read possible direct script: {artifact.display_name}")
     try:
         with artifact.path.open("rb") as stream:
-            raw_content = stream.read(policy.max_input_artifact_bytes + 1)
+            raw_content = stream.read(bundle_read_size(policy.max_input_artifact_bytes))
     except OSError as exc:
         raise _artifact_source_error(artifact, describe_os_error(exc)) from exc
-    if len(raw_content) > policy.max_input_artifact_bytes:
+    if exceeds_bundle_limit(len(raw_content), policy.max_input_artifact_bytes):
         raise _artifact_limit_error(artifact, policy)
     return raw_content
 

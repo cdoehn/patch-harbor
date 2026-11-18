@@ -220,8 +220,11 @@ def test_result_publication_failure_keeps_actual_executed_outcome(host,monkeypat
 
 def test_signatures_are_explicit_and_old_execute_contract_unchanged(host):
     repo,_=host;path,digest,_=package(host)
-    assert list(inspect.signature(api.execute_guarded).parameters)==['task','expected_sha256','expected_repository','admission','output_directory','timeout','output','observer']
+    assert list(inspect.signature(api.execute_guarded).parameters)==['task','expected_sha256','expected_repository','admission','output_directory','timeout','output','observer','force']
     assert typing.get_type_hints(api.execute_guarded)['return'] is api.RunReport
+    force=inspect.signature(api.execute_guarded).parameters['force']
+    assert force.kind is inspect.Parameter.KEYWORD_ONLY and force.default is False
+    assert typing.get_type_hints(api.execute_guarded)['force'] is bool
     assert api.integration_capabilities().guarded_execute_contract_version==2
     with pytest.raises(ValueError):api.execute(path,repository=repo)
     for changes in ({'expected_sha256':'short'},{'admission':None},{'expected_repository':b'bytes'}):

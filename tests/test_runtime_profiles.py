@@ -39,7 +39,7 @@ assert 'patchharbor_watcher' not in sys.modules
 
 
 @pytest.mark.parametrize('missing', [None, 'runtime_profile.py', 'runtime_pyz.py',
-                                     'runtime_zip.py'])
+                                     'runtime_zip.py', 'bundle_limits.py'])
 def test_current_build_uses_only_anchored_data_helpers(tmp_path, missing):
     # Deliberately omit both legacy readers and the package initializer. The
     # current builder must work with just its own finite data helpers, and must
@@ -47,7 +47,7 @@ def test_current_build_uses_only_anchored_data_helpers(tmp_path, missing):
     root = tmp_path / 'anchored'
     package = root / 'src' / 'patchharbor'
     package.mkdir(parents=True)
-    for name in ('runtime_profile.py', 'runtime_pyz.py', 'runtime_zip.py'):
+    for name in ('runtime_profile.py', 'runtime_pyz.py', 'runtime_zip.py', 'bundle_limits.py'):
         if name != missing:
             shutil.copyfile(PROJECT_ROOT / 'src/patchharbor' / name, package / name)
     payload = inputs()
@@ -55,7 +55,7 @@ def test_current_build_uses_only_anchored_data_helpers(tmp_path, missing):
     foreign = tmp_path / 'foreign'
     (foreign / 'patchharbor').mkdir(parents=True)
     (foreign / 'patchharbor/__init__.py').write_text("raise AssertionError('foreign package executed')\n")
-    for name in ('runtime_profile.py', 'runtime_pyz.py', 'runtime_zip.py'):
+    for name in ('runtime_profile.py', 'runtime_pyz.py', 'runtime_zip.py', 'bundle_limits.py'):
         (foreign / 'patchharbor' / name).write_text("raise AssertionError('foreign helper executed')\n")
     before = {p.relative_to(tmp_path): p.read_bytes() for p in tmp_path.rglob('*') if p.is_file()}
     program = '''

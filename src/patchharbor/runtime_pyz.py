@@ -6,6 +6,8 @@ in a private package namespace, without importing an installed PatchHarbor.
 """
 from __future__ import annotations
 
+from .bundle_limits import exceeds_bundle_limit
+
 from dataclasses import dataclass
 from io import BytesIO
 import json
@@ -98,7 +100,7 @@ def _path(value: object) -> str:
 
 
 def parse_recipe(raw: bytes) -> PyzRecipe:
-    if len(raw) > MAX_RECIPE_BYTES:
+    if exceeds_bundle_limit(len(raw), MAX_RECIPE_BYTES):
         raise RuntimeLimitError('PYZ recipe exceeds budget')
     try:
         doc = json.loads(raw.decode('utf-8'), object_pairs_hook=_unique, parse_constant=_constant)
@@ -116,7 +118,7 @@ def parse_recipe(raw: bytes) -> PyzRecipe:
              'invalid PYZ source provenance')
     _require(type(doc['content_id']) is str and _HEX.fullmatch(doc['content_id']) is not None, 'invalid PYZ content ID')
     _require(type(doc['entries']) is list, 'invalid PYZ inventory')
-    if len(doc['entries']) + 1 > MAX_ENTRIES:
+    if exceeds_bundle_limit(len(doc['entries']) + 1, MAX_ENTRIES):
         raise RuntimeLimitError('PYZ inventory exceeds budget')
     entries, names, directories = [], set(), {}
     total = len(raw)
@@ -134,7 +136,7 @@ def parse_recipe(raw: bytes) -> PyzRecipe:
         _require(type(size) is int and size >= 0 and type(digest) is str and _HEX.fullmatch(digest) is not None,
                  'invalid PYZ size or digest')
         total += size
-        if total > MAX_CONTENT_BYTES:
+        if exceeds_bundle_limit(total, MAX_CONTENT_BYTES):
             raise RuntimeLimitError('PYZ content exceeds budget')
         entries.append(RuntimeEntry(name, source, size, digest))
     _require([e.path for e in entries] == sorted(e.path for e in entries), 'noncanonical PYZ inventory order')
@@ -196,7 +198,7 @@ def materialize(recipe: PyzRecipe, read: Callable[[str, int], bytes]) -> bytes:
     _require(parse_recipe(recipe.data) == recipe, 'PYZ recipe value differs from bytes')
     sizes = [(e.path, e.size) for e in recipe.entries] + [(RECIPE_PATH, len(recipe.data))]
     total = 22 + sum(size + 76 + 2 * len(name) for name, size in sizes)
-    if total > MAX_PYZ_BYTES or sum(size for _, size in sizes) > MAX_CONTENT_BYTES:
+    if exceeds_bundle_limit(total, MAX_PYZ_BYTES) or exceeds_bundle_limit(sum(size for _, size in sizes), MAX_CONTENT_BYTES):
         raise RuntimeLimitError('PYZ artifact budget exceeded')
     payloads, sources = {}, {}
     for entry in recipe.entries:
@@ -212,7 +214,8 @@ def materialize(recipe: PyzRecipe, read: Callable[[str, int], bytes]) -> bytes:
              'PYZ entrypoint/resource/requirement mismatch')
     for name in sorted((RESOURCES - {MAIN_PATH}) & payloads.keys()):
         raw = payloads[name]
-        _require(0 < len(raw) <= 128 * 1024 and not raw.startswith(b'\xef\xbb\xbf'), 'invalid PYZ document resource')
+        _require(0 < len(raw) and not exceeds_bundle_limit(len(raw), 128 * 1024)
+                 and not raw.startswith(b'\xef\xbb\xbf'), 'invalid PYZ document resource')
         try: raw.decode('utf-8')
         except UnicodeError as exc: raise RuntimeDataError('invalid PYZ resource encoding') from exc
     payloads[RECIPE_PATH] = recipe.data
@@ -231,7 +234,7 @@ def materialize(recipe: PyzRecipe, read: Callable[[str, int], bytes]) -> bytes:
 
 def read_pyz(raw: bytes, *, policy, remaining_bytes: int) -> PyzRecipe:
     """Validate a bounded archive as data, including its complete canonical bytes."""
-    if len(raw) > MAX_PYZ_BYTES:
+    if exceeds_bundle_limit(len(raw), MAX_PYZ_BYTES):
         raise RuntimeLimitError('PYZ artifact exceeds budget')
     try:
         count = bounded_directory(raw, policy, max_entries=MAX_ENTRIES)
@@ -241,8 +244,8 @@ def read_pyz(raw: bytes, *, policy, remaining_bytes: int) -> PyzRecipe:
         with ZipFile(BytesIO(raw)) as archive:
             infos = archive.infolist()
             _require(len(infos) == count and len({i.filename for i in infos}) == count, 'invalid PYZ directory')
-            if (sum(i.file_size for i in infos) > min(MAX_CONTENT_BYTES, remaining_bytes)
-                    or any(i.file_size > policy.max_content_bytes for i in infos)):
+            if (exceeds_bundle_limit(sum(i.file_size for i in infos), min(MAX_CONTENT_BYTES, remaining_bytes))
+                    or any(exceeds_bundle_limit(i.file_size, policy.max_content_bytes) for i in infos)):
                 raise RuntimeLimitError('shared PYZ content budget exceeded')
             offset = 0
             for info in infos:
@@ -258,7 +261,7 @@ def read_pyz(raw: bytes, *, policy, remaining_bytes: int) -> PyzRecipe:
                 _require(raw[offset:offset + len(header)] == header, 'inconsistent PYZ local header')
                 offset += len(header) + info.file_size
             recipe_info = archive.getinfo(RECIPE_PATH)
-            if recipe_info.file_size > MAX_RECIPE_BYTES:
+            if exceeds_bundle_limit(recipe_info.file_size, MAX_RECIPE_BYTES):
                 raise RuntimeLimitError('PYZ recipe exceeds budget')
             recipe = parse_recipe(archive.read(recipe_info))
             expected = {e.path: e.size for e in recipe.entries}

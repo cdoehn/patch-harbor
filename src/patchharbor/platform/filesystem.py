@@ -324,8 +324,9 @@ def _read_stable_regular_file(
     flags |= getattr(os, "O_BINARY", 0)
     flags |= getattr(os, "O_CLOEXEC", 0)
     flags |= getattr(os, "O_NOFOLLOW", 0)
-    if max_bytes is not None:
-        flags |= getattr(os, "O_NONBLOCK", 0)
+    # A regular-file read must not block on a FIFO substituted before open,
+    # including when the caller explicitly lifts the byte budget.
+    flags |= getattr(os, "O_NONBLOCK", 0)
 
     descriptor: int | None = None
     try:
@@ -439,12 +440,15 @@ def read_stable_regular_file_bounded(path: Path, *, max_bytes: int) -> StableReg
 def read_stable_regular_file_with_sha256(
     path: Path,
     *,
-    retained_content_limit: int,
+    retained_content_limit: int | None,
     allow_path_identity_fallback: bool = False,
     expected_identity: os.stat_result | None = None,
     max_bytes: int | None = None,
 ) -> StableRegularFileHash:
-    """Hash a stable regular file while bounding retained in-memory content.
+    """Hash a stable file; None explicitly retains all content without a byte cap.
+
+    A separate max_bytes budget still applies when supplied. Neither option
+    disables regular-file, ownership, or mutation checks.
 
     The opt-in fallback accepts matching type, size, and mtime when a virtual
     filesystem does not expose comparable path and descriptor identities. It
@@ -453,12 +457,12 @@ def read_stable_regular_file_with_sha256(
     """
     if max_bytes is not None and (type(max_bytes) is not int or max_bytes < 0):
         raise ValueError("max_bytes must be a non-negative integer")
-    if (
+    if retained_content_limit is not None and (
         isinstance(retained_content_limit, bool)
         or not isinstance(retained_content_limit, int)
         or retained_content_limit <= 0
     ):
-        raise ValueError("retained_content_limit must be a positive integer")
+        raise ValueError("retained_content_limit must be a positive integer or None")
     content, executable, size, mtime_ns, digest = _read_stable_regular_file(
         path,
         retained_content_limit=retained_content_limit,

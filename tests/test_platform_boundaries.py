@@ -116,8 +116,9 @@ def test_stable_hash_reader_can_fallback_when_path_identity_is_unreliable(
     assert snapshot.sha256 == sha256(content).hexdigest()
 
 
+@pytest.mark.parametrize("retention_limit", [None, 16])
 def test_stable_hash_reader_bounds_retained_content_but_hashes_all_bytes(
-    tmp_path: Path,
+    tmp_path: Path, retention_limit: int | None,
 ) -> None:
     target = tmp_path / "large.bin"
     content = b"0123456789abcdef"
@@ -125,7 +126,7 @@ def test_stable_hash_reader_bounds_retained_content_but_hashes_all_bytes(
 
     retained = read_stable_regular_file_with_sha256(
         target,
-        retained_content_limit=len(content),
+        retained_content_limit=retention_limit,
     )
     discarded = read_stable_regular_file_with_sha256(
         target,

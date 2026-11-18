@@ -1,6 +1,12 @@
 """Synchronous pack orchestration with a single confirmed publication boundary."""
 from __future__ import annotations
 
+from patchharbor.bundle_limits import bundle_read_limit
+
+from patchharbor.bundle_limits import read_bundle_file as read_stable_regular_file_bounded
+
+from patchharbor.bundle_limits import exceeds_bundle_limit
+
 from dataclasses import replace
 from datetime import datetime, timezone
 from hashlib import sha256
@@ -20,7 +26,7 @@ from patchharbor.task_inspection import validate_task_against_reference
 from patchharbor.platform.file_handles import open_regular_nofollow
 from patchharbor.platform.filesystem import (
     FileChangedDuringRead, FileReadLimitExceeded, UnsupportedFileTypeError,
-    read_stable_regular_file_bounded, _same_open_file_state, _same_path_and_open_file_state,
+     _same_open_file_state, _same_path_and_open_file_state,
     capture_descriptor_metadata,
 )
 from patchharbor.platform.pack_output import open_output_directory
@@ -54,7 +60,7 @@ def capture_pack_template(*, with_bootstrap: bool = False) -> str | tuple[str, b
             raise FileReadLimitExceeded('own runtime resource budget exceeded')
         else:
             raise OSError('own canonical resources unavailable: '+str(provision.reason))
-        if len(raw)>MAX_HANDOFF_ENTRY_BYTES:
+        if exceeds_bundle_limit(len(raw), MAX_HANDOFF_ENTRY_BYTES):
             raise FileReadLimitExceeded('own template exceeds handoff budget')
         if not raw or raw.startswith(b'\xef\xbb\xbf'):
             raise ValueError('empty or BOM-prefixed canonical template')
@@ -140,7 +146,7 @@ def pack_task(content_directory: Path, *, reference_bundle: Path, entrypoint: st
                                 or not _same_open_file_state(reference_metadata, capture_descriptor_metadata(reference_descriptor))):
                             raise FileChangedDuringRead('reference changed before pack finalization')
                         owned.verify_hash(validation.inspection.package_sha256,
-                                          DEFAULT_RESOURCE_POLICY.max_input_artifact_bytes)
+                                          bundle_read_limit(DEFAULT_RESOURCE_POLICY.max_input_artifact_bytes))
                         # No required reference I/O remains after publication.
                         descriptor, reference_descriptor = reference_descriptor, None
                         os.close(descriptor)

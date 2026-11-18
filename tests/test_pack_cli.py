@@ -27,19 +27,21 @@ def invoke(args, stdout=None, stderr=None):
     return code, stdout, stderr
 
 
-def test_cli_uses_public_api_once_with_exact_mode_mapping(request_files, monkeypatch):
+@pytest.mark.parametrize('force', [False, True])
+def test_cli_uses_public_api_once_with_exact_mode_mapping(request_files, monkeypatch, force):
     seen = []
     class Routed(RuntimeError): pass
     def routed(*a, **k):
         seen.append((a, k)); raise Routed()
     monkeypatch.setattr(api, 'pack_task', routed)
-    with pytest.raises(Routed): invoke(arguments(request_files, '--mode', 'binary=0755', '--json'))
+    extra = ('--force',) if force else ()
+    with pytest.raises(Routed): invoke(arguments(request_files, '--mode', 'binary=0755', '--json', *extra))
     assert len(seen) == 1
     positional, options = seen[0]
     assert positional == (request_files[0],)
     assert options == {'reference_bundle': request_files[1], 'entrypoint': 'run.sh',
                        'output': None, 'output_directory': request_files[2],
-                       'modes': {'binary': 0o755}, 'observer': None}
+                       'modes': {'binary': 0o755}, 'observer': None} | ({'force': True} if force else {})
 
 
 def test_actual_cli_json_has_complete_reference_validation_and_published_hash(request_files):
@@ -95,7 +97,7 @@ def test_duplicate_mode_path_is_not_last_value_wins(request_files):
     assert caught.value.code == 2
 
 
-@pytest.mark.parametrize('option', ['--repository', '--force', '--overwrite', '--skip-validation',
+@pytest.mark.parametrize('option', ['--repository', '--overwrite', '--skip-validation',
                                    '--no-validate', '--execute', '--no-handoff', '--repo-id'])
 def test_no_unsafe_or_implicit_pack_options(request_files, option):
     with pytest.raises(SystemExit) as caught: invoke(arguments(request_files, option))

@@ -1,6 +1,10 @@
 """Read complete State/Result reference facts without imposing archival success policy."""
 from __future__ import annotations
 
+from patchharbor.bundle_limits import bundle_read_limit
+
+from patchharbor.bundle_limits import exceeds_bundle_limit
+
 from dataclasses import dataclass
 from datetime import datetime
 import hashlib
@@ -190,7 +194,7 @@ def _handoff(files: dict[str, bytes], context: dict, run: dict) -> set[str]:
     validate_bootstrap(environment, files.get(BOOTSTRAP_NAME))
     for name in names:
         raw = files[name]
-        _require(bool(raw) and len(raw) <= MAX_HANDOFF_ENTRY_BYTES and not raw.startswith(b"\xef\xbb\xbf"),
+        _require(bool(raw) and not exceeds_bundle_limit(len(raw), MAX_HANDOFF_ENTRY_BYTES) and not raw.startswith(b"\xef\xbb\xbf"),
                  "invalid result handoff")
         raw.decode("utf-8")
     environment = _document(files["environment.json"])
@@ -271,10 +275,10 @@ def _parse_reference_payloads(payloads: tuple[BundlePayload, ...], *,
     files = {entry.relative_path: entry.content for entry in payloads}
     modes = {entry.relative_path: entry.unix_mode for entry in payloads}
     _require(len(files) == len(payloads), "duplicate result members")
-    _require(len(payloads) <= resource_policy.max_zip_entries,
+    _require(not exceeds_bundle_limit(len(payloads), resource_policy.max_zip_entries),
              f"ZIP entry limit exceeded: actual={len(payloads)}, limit={resource_policy.max_zip_entries}")
-    _require(all(len(raw) <= resource_policy.max_content_bytes for raw in files.values())
-             and sum(len(raw) for raw in files.values()) <= resource_policy.max_zip_total_bytes,
+    _require(all(not exceeds_bundle_limit(len(raw), resource_policy.max_content_bytes) for raw in files.values())
+             and not exceeds_bundle_limit(sum(len(raw) for raw in files.values()), resource_policy.max_zip_total_bytes),
              "Reference payload budget exceeded")
     manifest = _document(files["manifest.json"])
     try:
@@ -449,11 +453,11 @@ def capture_reference_payloads(path: Path, *, resource_policy: ResourcePolicy = 
             target = path.resolve(strict=True) if expected_identity is None else path.absolute()
         except RuntimeError as exc:  # pathlib symlink loops on Python 3.12/3.13
             raise ValueError("cannot resolve reference path") from exc
-        if target.lstat().st_size > resource_policy.max_input_artifact_bytes:
+        if exceeds_bundle_limit(target.lstat().st_size, resource_policy.max_input_artifact_bytes):
             raise FileReadLimitExceeded("reference exceeds resource limit")
         captured = read_stable_regular_file_with_sha256(
-            target, retained_content_limit=resource_policy.max_input_artifact_bytes, allow_path_identity_fallback=True,
-            expected_identity=expected_identity, max_bytes=resource_policy.max_input_artifact_bytes)
+            target, retained_content_limit=bundle_read_limit(resource_policy.max_input_artifact_bytes), allow_path_identity_fallback=True,
+            expected_identity=expected_identity, max_bytes=bundle_read_limit(resource_policy.max_input_artifact_bytes))
         _require(captured.content is not None, "reference exceeds resource limit")
         payloads = read_zip_payload_bytes(captured.content, policy=resource_policy, path_normalizer=reference_member_path)
         facts = parse_reference_payloads(payloads, resource_policy=resource_policy)

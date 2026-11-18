@@ -109,7 +109,8 @@ def adjusted(info, **changes):
 
 @pytest.mark.parametrize("category", ["initial-open-state-mismatch", "current-path-state-mismatch",
     "descriptor-state-changed", "final-path-state-mismatch", "size-mismatch", "path-missing"])
-def test_stable_reader_reports_actual_mismatch_without_weakening_checks(tmp_path, monkeypatch, category):
+@pytest.mark.parametrize("retention_limit", [100, None])
+def test_stable_reader_reports_actual_mismatch_without_weakening_checks(tmp_path, monkeypatch, category, retention_limit):
     path = tmp_path / "file"
     path.write_bytes(b"unchanged")
     original_path = filesystem._inspect_path_without_following
@@ -140,13 +141,14 @@ def test_stable_reader_reports_actual_mismatch_without_weakening_checks(tmp_path
     monkeypatch.setattr(filesystem, "_inspect_path_without_following", inspect)
     monkeypatch.setattr(filesystem.os, "fstat", fstat)
     with pytest.raises(filesystem.FileChangedDuringRead) as caught:
-        filesystem.read_stable_regular_file_with_sha256(path, retained_content_limit=100,
+        filesystem.read_stable_regular_file_with_sha256(path, retained_content_limit=retention_limit,
                                                       allow_path_identity_fallback=True)
     assert caught.value.category == category
     assert all(type(value) is int for metadata in caught.value.metadata.values() for value in metadata.values())
 
 
-def test_owned_reader_bounds_actual_bytes_even_if_size_metadata_lags(tmp_path, monkeypatch):
+@pytest.mark.parametrize("retention_limit", [10, None])
+def test_owned_reader_bounds_actual_bytes_even_if_size_metadata_lags(tmp_path, monkeypatch, retention_limit):
     path = tmp_path / "file"
     path.write_bytes(b"a" * 100)
     identity = path.stat()
@@ -156,5 +158,5 @@ def test_owned_reader_bounds_actual_bytes_even_if_size_metadata_lags(tmp_path, m
                         lambda target: adjusted(original_path(target), st_size=1))
     monkeypatch.setattr(filesystem.os, "fstat", lambda fd: adjusted(original_fstat(fd), st_size=1))
     with pytest.raises(filesystem.FileReadLimitExceeded):
-        filesystem.read_stable_regular_file_with_sha256(path, retained_content_limit=10,
+        filesystem.read_stable_regular_file_with_sha256(path, retained_content_limit=retention_limit,
             expected_identity=identity, max_bytes=10, allow_path_identity_fallback=True)

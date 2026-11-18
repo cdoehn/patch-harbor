@@ -5,6 +5,10 @@ categories; the public pack engine consumes this immutable capture.
 """
 from __future__ import annotations
 
+from patchharbor.bundle_limits import bundle_read_limit
+
+from patchharbor.bundle_limits import exceeds_bundle_limit
+
 from collections.abc import Mapping
 from dataclasses import dataclass
 import os
@@ -23,7 +27,7 @@ from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY, ResourcePolicy
 
 
 MAX_SCAN_NODES=10_000
-GENERATED_ENTRIES=3  # task.json and the two passive handoff files
+GENERATED_ENTRIES=4  # task.json and the three passive handoff files
 
 
 def resolve_output_target(output: Path, *, contents_root: Path) -> Path:
@@ -99,7 +103,7 @@ def _inventory(root: SourceDirectory, policy: ResourcePolicy,
         with directory.entries() as iterator:
             for child in iterator:
                 nodes+=1
-                if nodes>MAX_SCAN_NODES:
+                if exceeds_bundle_limit(nodes, MAX_SCAN_NODES):
                     raise ValueError('pack scan node budget exceeded')
                 metadata=directory.child_stat(child.name)
                 is_directory=stat.S_ISDIR(metadata.st_mode)
@@ -116,9 +120,9 @@ def _inventory(root: SourceDirectory, policy: ResourcePolicy,
                 entries.append(entry);children.append(entry)
                 if not is_directory:
                     file_count+=1;declared_bytes+=metadata.st_size
-                    if (file_count+GENERATED_ENTRIES>policy.max_zip_entries
-                            or metadata.st_size>policy.max_content_bytes
-                            or declared_bytes>policy.max_zip_total_bytes):
+                    if (exceeds_bundle_limit(file_count+GENERATED_ENTRIES, policy.max_zip_entries)
+                            or exceeds_bundle_limit(metadata.st_size, policy.max_content_bytes)
+                            or exceeds_bundle_limit(declared_bytes, policy.max_zip_total_bytes)):
                         raise ValueError('pack source budget exceeded')
                     if descriptor_states is not None and path in descriptor_states:
                         directory.revalidate_file(child.name,metadata,descriptor_states[path])
@@ -183,8 +187,8 @@ def capture_sources(contents: Path, entrypoint: str, *, modes: Mapping[str,int] 
                         with current.child(name,entry.metadata) as child:
                             capture(child,entry.path)
                     else:
-                        captured_file=current.read_file(name,entry.metadata,max_bytes=min(
-                            resource_policy.max_content_bytes,resource_policy.max_zip_total_bytes-total))
+                        captured_file=current.read_file(name,entry.metadata,max_bytes=bundle_read_limit(min(
+                            resource_policy.max_content_bytes,resource_policy.max_zip_total_bytes-total)))
                         content=captured_file.content
                         descriptor_states.append((entry.path,captured_file.descriptor_metadata))
                         total+=len(content)

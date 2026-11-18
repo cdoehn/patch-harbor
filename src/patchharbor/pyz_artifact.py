@@ -1,6 +1,10 @@
 """Request-owned, installation-free capture of the loaded PYZ producer profile."""
 from __future__ import annotations
 
+from patchharbor.bundle_limits import bundle_read_size
+
+from patchharbor.bundle_limits import exceeds_bundle_limit
+
 from dataclasses import dataclass
 from io import BytesIO
 from threading import Lock
@@ -103,13 +107,13 @@ class PyzProvider:
                     def read(member, maximum):
                         info = archive.getinfo(member)
                         if (info.filename != info.orig_filename or info.is_dir()
-                                or info.file_size > maximum or info.compress_type != ZIP_STORED
+                                or exceeds_bundle_limit(info.file_size, maximum) or info.compress_type != ZIP_STORED
                                 or info.file_size != info.compress_size or info.flag_bits
                                 or info.external_attr != 0o100644 << 16):
                             raise RuntimeDataError('invalid own ZIP template resource')
                         with archive.open(info) as stream:
-                            data = stream.read(maximum + 1)
-                        if len(data) != info.file_size or len(data) > maximum:
+                            data = stream.read(bundle_read_size(maximum))
+                        if len(data) != info.file_size or exceeds_bundle_limit(len(data), maximum):
                             raise RuntimeDataError('own ZIP template size mismatch')
                         return data
                     return self._checked_template(read, name)
@@ -126,7 +130,7 @@ class PyzProvider:
         entry = next((item for item in recipe.entries if item.path == name), None)
         if entry is None:
             raise RuntimeDataError('required helper missing from pinned recipe')
-        if not 0 < entry.size <= 128 * 1024:
+        if not (0 < entry.size and not exceeds_bundle_limit(entry.size, 128 * 1024)):
             raise RuntimeLimitError('required template exceeds document budget')
         raw = read(entry.source, entry.size)
         if len(raw) != entry.size or sha256(raw) != entry.sha256:

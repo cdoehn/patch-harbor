@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from patchharbor.bundle_limits import bundle_read_limit
+
 from dataclasses import dataclass
 from enum import Enum
 from hashlib import sha256
@@ -124,7 +126,7 @@ def _read_exchange_file(
         stable_file = read_stable_regular_file_with_sha256(
             path,
             retained_content_limit=(
-                resource_policy.max_input_artifact_bytes
+                bundle_read_limit(resource_policy.max_input_artifact_bytes)
                 if retained_content_limit is None
                 else retained_content_limit
             ),

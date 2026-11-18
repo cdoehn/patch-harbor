@@ -31,10 +31,12 @@ def fail(reason, call):
 def test_pack_api_has_exact_typed_signature():
     signature = inspect.signature(api.pack_task)
     assert list(signature.parameters) == ['content_directory', 'reference_bundle', 'entrypoint',
-                                          'output', 'output_directory', 'modes', 'observer']
+                                          'output', 'output_directory', 'modes', 'observer', 'force']
     assert signature.parameters['content_directory'].kind is inspect.Parameter.POSITIONAL_OR_KEYWORD
     assert all(p.kind is inspect.Parameter.KEYWORD_ONLY for p in list(signature.parameters.values())[1:])
     assert set(typing.get_type_hints(api.pack_task)) == set(signature.parameters) | {'return'}
+    assert signature.parameters['force'].default is False
+    assert typing.get_type_hints(api.pack_task)['force'] is bool
     assert {'pack_task', 'TaskPackResult'} <= set(api.__all__)
 
 

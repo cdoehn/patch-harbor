@@ -29,6 +29,7 @@ MAX_WHEEL_BYTES = 512 * 1024  # Standalone helper packaging measured 475382 B in
 RELEASE_VERSION = "2.0.1"
 EXPECTED_RUNTIME_FILES = {
     "patchharbor/reference_kind.py",
+    "patchharbor/bundle_limits.py",
     'patchharbor/application_monitor.py',
     'patchharbor/application_monitor_artifacts.py',
     'patchharbor/cli_monitor.py',

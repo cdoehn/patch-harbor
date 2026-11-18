@@ -1,6 +1,8 @@
 """Bound reconstructed allocations independently of compressed archive sizes."""
 from __future__ import annotations
 
+from patchharbor.bundle_limits import exceeds_bundle_limit
+
 from dataclasses import dataclass
 from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY, ResourcePolicy
 from patchharbor.snapshot_types import ReferenceSnapshotError, SnapshotErrorCode
@@ -12,13 +14,13 @@ class SnapshotBudget:
     allocated: int = 0
 
     def require_file(self, size: int) -> None:
-        if size < 0 or size > self.policy.max_content_bytes:
+        if size < 0 or exceeds_bundle_limit(size, self.policy.max_content_bytes):
             raise ReferenceSnapshotError(SnapshotErrorCode.RESOURCE_LIMIT,
                                       f'reconstructed content size {size} exceeds {self.policy.max_content_bytes}')
 
     def require(self, size: int) -> None:
         self.require_file(size)
-        if self.allocated + size > self.policy.max_zip_total_bytes:
+        if exceeds_bundle_limit(self.allocated + size, self.policy.max_zip_total_bytes):
             raise ReferenceSnapshotError(SnapshotErrorCode.RESOURCE_LIMIT,
                                       f'reconstruction allocation exceeds {self.policy.max_zip_total_bytes}')
 

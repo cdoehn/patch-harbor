@@ -1,6 +1,8 @@
 """Pin producer-owned runtime and template bytes before an Execute can mutate them."""
 from __future__ import annotations
 
+from patchharbor.bundle_limits import exceeds_bundle_limit
+
 from dataclasses import dataclass
 from hashlib import sha256
 from io import BytesIO
@@ -150,6 +152,6 @@ def runtime_fits(
     if execution_log is not None:
         contents.append(execution_log)
     contents.extend(raw for _, raw in runtime.entries())
-    return (len(contents) <= policy.max_zip_entries
-            and all(len(raw) <= policy.max_content_bytes for raw in contents)
-            and sum(len(raw) for raw in contents) + runtime.inner_content_bytes <= policy.max_zip_total_bytes)
+    return (not exceeds_bundle_limit(len(contents), policy.max_zip_entries)
+            and all(not exceeds_bundle_limit(len(raw), policy.max_content_bytes) for raw in contents)
+            and not exceeds_bundle_limit(sum(len(raw) for raw in contents) + runtime.inner_content_bytes, policy.max_zip_total_bytes))
