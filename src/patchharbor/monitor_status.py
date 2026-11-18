@@ -54,7 +54,7 @@ def operation(row, full=False):
     if value.activity.code == 'no-candidate':
         return 'Exchange-Prüfung'
     if value.kind == 'bundle':
-        return 'Result-Bundle · Lauf ' + short_id(value.run_id, full)
+        return 'State-Bundle · Lauf ' + short_id(value.run_id, full)
     label = package_label(dict(bundle_number=value.bundle_number,
         task_sha256=value.task_sha256, task_path=value.task_path), full)
     return 'Result zu ' + label if value.producing_result else label

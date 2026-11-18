@@ -40,7 +40,7 @@ def _world(tmp_path):
 def _bundle(repository, environment):
     completed = run_cli(repository, "bundle", "--json", environment_overrides=environment)
     assert completed.returncode == 0, completed.stderr
-    return Path(json.loads(completed.stdout)["result"]["result_bundle_path"])
+    return Path(json.loads(completed.stdout)["result"]["state_bundle_path"])
 
 
 def _advance(repository, message="next state"):

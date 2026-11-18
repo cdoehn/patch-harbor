@@ -53,7 +53,7 @@ PHASES = {
     'INTERRUPT': ('entrypoint', 'Entrypoint unterbrochen'),
     'BUNDLE': ('result-capture', 'Result-Bundle wird vorbereitet'),
     'SNAPSHOT': ('result-capture', 'Repository-Zustand für Result wird erfasst'),
-    'RESULT-ZIP': ('result-write', 'Result-Bundle wird geschrieben'),
+    'BUNDLE-ZIP': ('result-write', 'Result-Bundle wird geschrieben'),
     'VERIFY': ('result-verify', 'Result-Bundle wird geprüft'),
     'PUBLISH': ('result-publish', 'Result-Bundle wird veröffentlicht'),
     'RECOVERY': ('recovery', 'Nachweise früherer Versuche werden geprüft'),
@@ -82,7 +82,7 @@ def record_activity(document, code, status, message, stamp):
                                 code=code, status=status, message=message)
 
 
-def activity_event(event):
+def activity_event(event, *, operation_kind="execute"):
     """Consume Core's structured events, never arbitrary process output."""
     if event.phase not in PHASES or event.level == 'detail':
         return None
@@ -97,7 +97,7 @@ def activity_event(event):
             status = 'running'
     elif event.phase in ('TIMEOUT', 'INTERRUPT'):
         status = 'failure'
-    elif event.phase == 'RESULT-ZIP':
+    elif event.phase == 'BUNDLE-ZIP':
         # Success of one ZIP member is not success of the entire Result.
         status = 'running'
     elif event.phase == 'SELECT' and event.message.startswith('No eligible task'):
@@ -114,4 +114,6 @@ def activity_event(event):
         label = 'Repository-Bindung stimmt nicht überein'
     elif status == 'success':
         label = label.replace('wird ', '').replace('werden ', '')
+    if operation_kind == 'bundle' and code.startswith('result-'):
+        label = label.replace('Result', 'State')
     return code, status, label

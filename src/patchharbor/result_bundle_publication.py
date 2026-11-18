@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from patchharbor.reference_kind import ReferenceBundleKind
+from patchharbor.reference_kind import ReferenceBundleKind, kind_for_operation
 
 from contextlib import contextmanager
 from collections.abc import Callable
@@ -380,7 +380,7 @@ def publish_result_bundle(
         directory_after_replace = sync_directory_best_effort(
             publication.final_path.parent
         )
-        activity("PUBLISH", f"Result Bundle published: {publication.final_path}", "success")
+        activity("PUBLISH", f"{kind_for_operation(run_report.operation).label} Bundle published: {publication.final_path}", "success")
         return PublishedResultBundle(
             path=publication.final_path,
             durability=PublicationDurability(

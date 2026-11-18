@@ -16,7 +16,9 @@ def artifact_lines(document, session, *, height):
             primary = row.get('primary_result', {})
             status = primary.get('kind') or row.get('replay_status') or row['kind']
             exit_code = primary.get('entrypoint_exit_code')
-            lines.append((f"{'>' if row is selected else ' '} {row['name']} · {status} · Exit {exit_code if exit_code is not None else '—'} · {'ARCHIV' if row['archived'] else 'Exchange'}", 'unknown' if view.get('stale') else result_semantic(row)))
+            label = {'state_bundle': 'State Bundle', 'result_bundle': 'Result Bundle', 'task_bundle': 'Task Bundle'}.get(row['kind'], row['kind'])
+            outcome = 'Zustand erfasst' if row['kind'] == 'state_bundle' else f"{status} · Exit {exit_code if exit_code is not None else '—'}"
+            lines.append((f"{'>' if row is selected else ' '} {label} · {row['name']} · {outcome} · {'ARCHIV' if row['archived'] else 'Exchange'}", 'unknown' if view.get('stale') else result_semantic(row)))
     if session.view == 'history':
         lines.insert(1, ('Verlauf aus vorhandenen Nachweisen · nicht vollständig', 'warning'))
     if selected:
@@ -40,7 +42,7 @@ def artifact_lines(document, session, *, height):
             if selected['kind'] == 'task_bundle':
                 lines.append((selected['eligibility'], 'warning'))
                 for digest in selected.get('source_candidates', []):
-                    lines.append(('Passender Ausgangs-Result-Hash: ' + digest, ''))
+                    lines.append(('Passender Referenz-Hash: ' + digest, ''))
                 for digest in selected.get('result_links', []):
                     lines.append(('Zugehöriger Result-Hash: ' + digest, ''))
                 lines.append((f"Passende Ausgangszustände: {len(selected.get('source_candidates', []))} (kein eindeutiger Ursprung) · Result-Nachweise: {len(selected.get('result_links', []))}", ''))
@@ -49,8 +51,8 @@ def artifact_lines(document, session, *, height):
             else:
                 context = selected.get('context', {})
                 if context:
-                    lines.append(('Result-Zustand: ' + context['base_commit'] + ' / ' + context['state_fingerprint'], ''))
-                lines.append((f"Run: {selected.get('run_id')} · {'DRY-RUN / Validierung' if selected.get('dry_run') else selected.get('operation', '—')} · Result: {selected.get('result_status', 'unbekannt')}", result_semantic({**selected, 'stale': view.get('stale')})))
+                    lines.append((('State-Zustand: ' if selected['kind'] == 'state_bundle' else 'Result-Zustand: ') + context['base_commit'] + ' / ' + context['state_fingerprint'], ''))
+                lines.append((f"Run: {selected.get('run_id')} · {'DRY-RUN / Validierung' if selected.get('dry_run') else selected.get('operation', '—')} · Veröffentlichung: {selected.get('result_status', 'unbekannt')}", result_semantic({**selected, 'stale': view.get('stale')})))
                 if selected.get('task_sha256'):
                     lines.append(('Task: ' + selected['task_sha256'], ''))
             if selected.get('error'):

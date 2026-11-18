@@ -47,7 +47,7 @@ def test_register_configure_bundle_workflow_from_subdirectory(repository, tmp_pa
         assert changed.returncode == 0, changed.stderr
     result = run_cli(nested, "bundle", "--json")
     assert result.returncode == 0, result.stderr
-    bundle = Path(json.loads(result.stdout)["result"]["result_bundle_path"])
+    bundle = Path(json.loads(result.stdout)["result"]["state_bundle_path"])
     assert bundle.parent == exchange and bundle.name.endswith(".zip.txt")
     with zipfile.ZipFile(bundle) as archive:
         environment = json.loads(archive.read("environment.json"))

@@ -974,7 +974,7 @@ class RunReport:
             "process_exit_code": self.process_exit_code,
         }
 
-    def manual_bundle_result(self) -> dict[str, object]:
+    def state_bundle_result(self) -> dict[str, object]:
         """Return the closed successful ``bundle --json`` result object."""
         if (
             self.operation is not RunOperation.BUNDLE
@@ -993,8 +993,8 @@ class RunReport:
             "base_commit": str(self.context.base_commit),
             "state_fingerprint": self.context.state_fingerprint,
             "fingerprint_algorithm": self.context.fingerprint_algorithm,
-            "result_bundle_status": self.result_bundle.status_text,
-            "result_bundle_path": physical_absolute_path_text(
+            "state_bundle_status": self.result_bundle.status_text,
+            "state_bundle_path": physical_absolute_path_text(
                 self.result_bundle.path
             ),
             "emergency_diagnostics_path": physical_absolute_path_text(

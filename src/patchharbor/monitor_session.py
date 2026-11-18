@@ -66,7 +66,7 @@ class MonitorSession:
         rows = document.get('bundle_view', {}).get('artifacts', [])
         return sorted((r for r in rows if self.artifact_match.casefold() in
                        ' '.join(str(r.get(k) or '') for k in ('name', 'sha256', 'repo_id', 'run_id')).casefold()
-                       and (self.view != 'logs' or r['kind'] == 'result_bundle')
+                       and (self.view != 'logs' or r['kind'] in ('state_bundle', 'result_bundle'))
                        and (self.view != 'history' or (r.get('repo_id') == self.repository_id
                             and (r.get('run_id') or r.get('attempt_result_missing'))))),
                       key=lambda r: (r.get('mtime_ns', 0), r['path']), reverse=not self.descending)

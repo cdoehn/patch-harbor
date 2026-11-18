@@ -74,7 +74,7 @@ def test_run_report_drives_persisted_and_bundle_json_results(tmp_path: Path) -> 
     )
 
     persisted = report.as_run_document()
-    completion = report.manual_bundle_result()
+    completion = report.state_bundle_result()
 
     assert set(persisted) == {
         "run_id",
@@ -116,8 +116,8 @@ def test_run_report_drives_persisted_and_bundle_json_results(tmp_path: Path) -> 
         "base_commit",
         "state_fingerprint",
         "fingerprint_algorithm",
-        "result_bundle_status",
-        "result_bundle_path",
+        "state_bundle_status",
+        "state_bundle_path",
         "emergency_diagnostics_path",
     }
 
@@ -127,9 +127,9 @@ def test_run_report_drives_persisted_and_bundle_json_results(tmp_path: Path) -> 
     assert persisted["base_commit"] == completion["base_commit"]
     assert persisted["state_fingerprint"] == completion["state_fingerprint"]
     assert persisted["fingerprint_algorithm"] == completion["fingerprint_algorithm"]
-    assert persisted["result_bundle"]["status"] == completion["result_bundle_status"]
+    assert persisted["result_bundle"]["status"] == completion["state_bundle_status"]
     assert persisted["execution_present"] is False
-    assert completion["result_bundle_path"] == str(bundle_path.resolve())
+    assert completion["state_bundle_path"] == str(bundle_path.resolve())
     json.dumps(persisted, allow_nan=False)
     json.dumps(completion, allow_nan=False)
 

@@ -68,7 +68,7 @@ def test_bundle_and_clear_use_persisted_suffix_across_processes(tmp_path: Path, 
     assert "bundle_suffix: .txt" in shown.stdout
     first = run_cli(repository, "bundle", "--json", *arguments, environment_overrides=environment)
     assert first.returncode == 0, first.stderr
-    first_path = Path(json.loads(first.stdout)["result"]["result_bundle_path"])
+    first_path = Path(json.loads(first.stdout)["result"]["state_bundle_path"])
     assert first_path.parent == output.resolve()
     _assert_result(first_path, ".txt", kind="State")
     cleared = run_cli(repository, "configure", "bundle-suffix", "--clear", environment_overrides=environment)
@@ -76,7 +76,7 @@ def test_bundle_and_clear_use_persisted_suffix_across_processes(tmp_path: Path, 
     assert "bundle_suffix: \n" in cleared.stdout
     second = run_cli(repository, "bundle", "--json", *arguments, environment_overrides=environment)
     assert second.returncode == 0, second.stderr
-    _assert_result(Path(json.loads(second.stdout)["result"]["result_bundle_path"]), "", kind="State")
+    _assert_result(Path(json.loads(second.stdout)["result"]["state_bundle_path"]), "", kind="State")
     assert first_path.exists()  # Never retroactively rename existing bundles.
 
 
@@ -123,7 +123,7 @@ def test_suffix_metadata_does_not_change_state_binding_or_cli_json_schema(tmp_pa
     assert after["output_version"] == 1
     assert after["result"] == before
     bundle = run_cli(repository, "bundle", "--json", environment_overrides=environment)
-    full_context = _assert_result(Path(json.loads(bundle.stdout)["result"]["result_bundle_path"]), ".txt", kind="State")
+    full_context = _assert_result(Path(json.loads(bundle.stdout)["result"]["state_bundle_path"]), ".txt", kind="State")
     for key in ("repo_id", "base_commit", "state_fingerprint", "fingerprint_algorithm"):
         assert full_context[key] == before[key]
 

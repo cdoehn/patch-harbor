@@ -111,7 +111,7 @@ print(json.dumps({'patch':str(packed.path),'pyz':str(prepared.path),'sha256':pac
         assert (repo/'entrypoint-proof').read_bytes()==b'payloads-before-entrypoint'
         followup=tmp_path/'followup';followup.mkdir()
         fresh=command('bundle',repo,'--output-dir',followup)
-        assert read_reference(Path(fresh['result_bundle_path']))[0].runtime.artifact.sha256==facts.runtime.artifact.sha256
+        assert read_reference(Path(fresh['state_bundle_path']))[0].runtime.artifact.sha256==facts.runtime.artifact.sha256
         legacy=tmp_path/native_value('legacy.sh','legacy.ps1')
         legacy.write_text(native_python_script("from pathlib import Path; Path('fs-run-proof').write_bytes(b'legacy-core')"))
         _run([*prefix,'fs','run',str(legacy)],repo,environment)

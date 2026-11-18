@@ -316,7 +316,7 @@ def test_manual_bundle_json_completion_matches_persisted_run_report(
         "error",
         "process_exit_code",
     }
-    assert envelope["output_version"] == 1
+    assert envelope["output_version"] == 2
     assert envelope["command"] == "bundle"
     assert envelope["success"] is True
     assert envelope["error"] is None
@@ -330,14 +330,14 @@ def test_manual_bundle_json_completion_matches_persisted_run_report(
         "base_commit",
         "state_fingerprint",
         "fingerprint_algorithm",
-        "result_bundle_status",
-        "result_bundle_path",
+        "state_bundle_status",
+        "state_bundle_path",
         "emergency_diagnostics_path",
     }
     assert result["repository_path"] == str(repository.resolve())
-    assert result["result_bundle_status"] == "created"
+    assert result["state_bundle_status"] == "created"
     assert result["emergency_diagnostics_path"] is None
-    result_path = Path(result["result_bundle_path"])
+    result_path = Path(result["state_bundle_path"])
     assert result_path.is_absolute()
     assert result_path.is_file()
 
@@ -378,7 +378,7 @@ def test_manual_bundle_structured_outputs_do_not_capture_secret_environment(
 
     assert completed.returncode == 0
     assert secret not in completed.stdout
-    result_path = Path(json.loads(completed.stdout)["result"]["result_bundle_path"])
+    result_path = Path(json.loads(completed.stdout)["result"]["state_bundle_path"])
     with zipfile.ZipFile(result_path) as archive:
         assert secret.encode("utf-8") not in archive.read("logs/run.json")
 

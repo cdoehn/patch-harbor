@@ -834,7 +834,7 @@ def test_release_distributions_run_after_pipx_installation(tmp_path: Path) -> No
             environment=runtime_environment,
         )
     )
-    manual_bundle = Path(str(manual_result["result_bundle_path"]))
+    manual_bundle = Path(str(manual_result["state_bundle_path"]))
     assert manual_bundle.parent == exchange_directory.resolve()
     assert manual_bundle.is_file()
     with zipfile.ZipFile(manual_bundle) as archive:

@@ -256,7 +256,7 @@ def test_windows_user_paths_json_and_repository_lock_are_native(
     )
     assert bundled.returncode == 0
     bundle_document = json.loads(bundled.stdout)
-    bundle_path = Path(bundle_document["result"]["result_bundle_path"])
+    bundle_path = Path(bundle_document["result"]["state_bundle_path"])
     assert bundle_path.parent.resolve() == (tmp_path / "benutzer-ä" / "exchange").resolve()
     assert bundle_path.is_file()
     assert json.loads(local_configuration.read_text(encoding="utf-8")) == stored_configuration

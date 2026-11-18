@@ -162,7 +162,7 @@ def test_cli_settings_stay_local_through_bundle_with_unicode_paths(
 
     bundled = run_cli(child, "bundle", "--json", environment_overrides=environment)
     assert bundled.returncode == 0, bundled.stderr
-    bundle_path = Path(json.loads(bundled.stdout)["result"]["result_bundle_path"])
+    bundle_path = Path(json.loads(bundled.stdout)["result"]["state_bundle_path"])
     assert normalized_path(bundle_path.parent) == normalized_path(exchange)
     assert bundle_path.name.endswith(".zip.txt")
     with zipfile.ZipFile(bundle_path) as archive:

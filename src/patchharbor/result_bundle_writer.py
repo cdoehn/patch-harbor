@@ -33,12 +33,12 @@ def _write_entry(
     *,
     executable: bool = False,
 ) -> None:
-    activity("RESULT-ZIP", f"Write member: {name} ({len(content)} bytes)")
+    activity("BUNDLE-ZIP", f"Write member: {name} ({len(content)} bytes)")
     archive.writestr(
         _zip_info(name, executable=executable),
         content,
     )
-    activity("RESULT-ZIP", f"Written: {name}", "success")
+    activity("BUNDLE-ZIP", f"Written: {name}", "success")
 
 
 def write_result_bundle(

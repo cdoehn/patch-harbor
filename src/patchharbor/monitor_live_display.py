@@ -64,12 +64,12 @@ def live_lines(document, session, *, height):
         else:
             lines += [(operation(selected, session.full_identifiers), 'title'),
                       ('Repository: ' + str(data.get('repository_path') or data.get('repo_id') or 'noch unbekannt'), ''),
-                      ('Entrypoint: ' + str(data.get('entrypoint_name') or '—'), ''),
                       ('Run: ' + str(data.get('run_id')), ''),
-                      ('Task: ' + str(data.get('task_sha256')), ''),
-                      (f"Ursprung: {data.get('origin')} · {'DRY-RUN' if data.get('dry_run') else 'Execute'}", '')]
+                      (f"Ursprung: {data.get('origin')} · {'State Bundle' if selected['kind'] == 'bundle' else 'DRY-RUN' if data.get('dry_run') else 'Execute'}", '')]
             timeout = data.get('effective_timeout_seconds')
             if selected['kind'] == 'execute':
+                lines += [('Entrypoint: ' + str(data.get('entrypoint_name') or '—'), ''),
+                          ('Task: ' + str(data.get('task_sha256')), '')]
                 lines.append(('Wirksamer Entrypoint-Timeout: ' + (duration(timeout) if timeout is not None else 'noch nicht gestartet'), 'unknown'))
             if live(selected, document) and timeout is not None and data.get('process_state') is None:
                 started = datetime.fromisoformat(data['entrypoint_started_at'].replace('Z', '+00:00'))
@@ -78,8 +78,11 @@ def live_lines(document, session, *, height):
             primary = data.get('primary_result') or {}
             if activity(selected)['code'] == 'no-candidate' or data.get('automatic_status') == 'locked':
                 lines.append((activity(selected)['message'], 'waiting'))
+            elif selected['kind'] == 'bundle':
+                lines.append(('State-Bundle: ' + str(data.get('result_status', 'wird erfasst')),
+                              result_semantic({**data, 'stale': selected.get('stale') or view.get('stale')})))
             else:
-                lines.append((f"{'Result-Bundle' if selected['kind'] == 'bundle' else 'Entrypoint'}: {primary.get('kind', selected['phase'])} · Exit {primary.get('entrypoint_exit_code', data.get('entrypoint_exit_code', '—'))} · Result: {data.get('result_status', 'noch nicht abgeschlossen')}",
+                lines.append((f"{'State-Bundle' if selected['kind'] == 'bundle' else 'Entrypoint'}: {primary.get('kind', selected['phase'])} · Exit {primary.get('entrypoint_exit_code', data.get('entrypoint_exit_code', '—'))} · Result: {data.get('result_status', 'noch nicht abgeschlossen')}",
                               result_semantic({**data, 'stale': selected.get('stale') or view.get('stale')})))
     else:
         lines.append(('Keine passende Beobachtung. Ältere Prozesse publizieren noch keinen Live-Status.', 'warning'))

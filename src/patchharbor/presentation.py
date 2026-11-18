@@ -31,7 +31,7 @@ _COLORS = {
 # Per-file successes are still technical details. Severity alone must not turn
 # hundreds of ZIP/Git/file operations into normal-mode records.
 _DETAIL_PHASES = frozenset({
-    "GIT", "ZIP", "RESULT-ZIP", "OPEN", "SHA256", "FILE", "WRITE", "TARGET",
+    "GIT", "ZIP", "BUNDLE-ZIP", "OPEN", "SHA256", "FILE", "WRITE", "TARGET",
     "MKDIR", "MANIFEST", "HANDOFF", "PREPARE", "IDENTIFY", "CACHE", "STATE",
     "RESERVE", "VERIFY", "SYNC", "RECEIPT", "LOCK", "TASK", "MATCH", "REPLAY",
 })
@@ -43,7 +43,7 @@ _COMPACT_RESULTS = frozenset({
 _WORK_LABELS = {
     "GIT": ("STATE", "Check repository state"),
     "ZIP": ("PACKAGE", "Inspect package contents"),
-    "RESULT-ZIP": ("RESULT", "Write Result Bundle"),
+    "BUNDLE-ZIP": ("RESULT", "Write Result Bundle"),
     "WRITE": ("PAYLOAD", "Write payload files"),
     "TARGET": ("PAYLOAD", "Validate payload targets"),
     "OPEN": ("INPUT", "Read and identify input"),

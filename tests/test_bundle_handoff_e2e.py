@@ -23,7 +23,7 @@ pytestmark = pytest.mark.e2e
 def _bundle(repository: Path, environment: dict[str, str], *arguments: str):
     completed = run_cli(repository, "bundle", "--json", *arguments, environment_overrides=environment)
     assert completed.returncode == 0, completed.stderr + completed.stdout
-    path = Path(json.loads(completed.stdout)["result"]["result_bundle_path"])
+    path = Path(json.loads(completed.stdout)["result"]["state_bundle_path"])
     return path, _read_result(path)
 
 

@@ -69,7 +69,7 @@ def test_configuration_error_keeps_status_and_emits_no_success_result(
 @pytest.mark.parametrize(('arguments', 'function', 'command', 'version'), [
     (['registry', 'list'], 'repositories', 'registry.list', 1),
     (['context', 'repo'], 'context', 'context', 1),
-    (['bundle', 'repo'], 'bundle', 'bundle', 1),
+    (['bundle', 'repo'], 'bundle', 'bundle', 2),
     (['inspect', 'patch.zip'], 'inspect_task', 'inspect', 4),
     (['validate', 'patch.zip'], 'validate_task', 'validate', 4),
 ])

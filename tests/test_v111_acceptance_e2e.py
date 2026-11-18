@@ -132,7 +132,7 @@ def test_v111_acceptance_complete_repository_workflow(tmp_path: Path) -> None:
     )
     assert manual.returncode == 0
     manual_envelope = json.loads(manual.stdout)
-    manual_bundle = Path(manual_envelope["result"]["result_bundle_path"])
+    manual_bundle = Path(manual_envelope["result"]["state_bundle_path"])
     assert manual_bundle.parent == _exchange_directory(environment).resolve()
     assert manual_bundle.is_file()
     with zipfile.ZipFile(manual_bundle) as archive:

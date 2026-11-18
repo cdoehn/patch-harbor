@@ -1,8 +1,8 @@
 # State Bundle – WRC-Weiterentwicklung auf dev
 
-**Plan-ID:** PH-STATE · **Bundle:** 122 · **Stand:** 17. November 2026.
+**Plan-ID:** PH-STATE · **Bundle:** 123 · **Stand:** 18. November 2026.
 **Basis:** veröffentlichtes 2.0.1, Commit `90452415be3d0e522730ad22f07c0be28453734d`.
-**Auftrag:** neun WRC-Commits einschließlich Größen-Override in einem reparierten Task-Bundle.
+**Auftrag:** sechs verbleibende WRC-Commits einschließlich Größen-Override; drei Commits sind bereits abgeschlossen.
 Apply ist ausdrücklich beauftragt. Keine Veröffentlichung, Versionsanhebung, Tags oder Pushes.
 Dieser Quellplan belegt Vorbereitung; tatsächliche Commits und Tests belegen erst
 die späteren Execute-Berichte. In Development ausschließlich statische Analyse.
@@ -43,7 +43,7 @@ tatsächlichen Zustand gebunden. Ein Draft reserviert oder konsumiert keine Refe
 
 ## Quellfortschritt
 
-Vorbereiteter Stand: **STATE-01.C**. Apply- und Testnachweis: **ausstehend**.
+Vorbereiteter Stand: **STATE-02.W**. Apply- und Testnachweis: **ausstehend**.
 
 ## Reparatur nach Execute 121
 
@@ -57,3 +57,19 @@ auch um `bundle_limits.py`. Alle nachfolgenden Quellstände enthalten dieselben
 Korrekturen. Der erste Commit umfasst den bereits angewandten Work-Stand samt
 Reparatur; er entsteht erst nach erfolgreichem vollständigem Apply-Gate.
 Dieses Dokument behauptet keinen bereits bestandenen Reparaturlauf.
+
+## Fortsetzung nach Execute 122
+
+STATE-01.W, STATE-01.R und STATE-01.C sind nach jeweils erfolgreichem
+vollständigem Apply-Testlauf committed: `66009da`, `8981f4f`, `53382b1`.
+Der vierte Schritt STATE-02.W stoppte vor dem Commit: 3.999 bestanden,
+ein Test fehlgeschlagen, 16 übersprungen. Seine JSON-Fehlerfall-Erwartung
+wird auf die bereits eingeführte Bundle-Ausgabeversion 2 berichtigt.
+Alle sechs verbleibenden Quellstände enthalten diese Korrektur und
+behalten die Reparaturen aus Bundle 122 bei. Ausgangspunkt ist dessen
+verifiziertes Result `e9ccb080-b638-4419-8abd-44cecff6772b`, einschließlich
+des uncommitteten STATE-02.W-Stands, auf HEAD
+`53382b1fbdd91c16036c41cbb50207411063e3a6`.
+Bundle 123 setzt dort fort; die drei vorhandenen Commits bleiben erhalten.
+Vor jedem weiteren Commit läuft erneut die vollständige Suite in Apply
+mit `--workers auto`. Für Bundle 123 liegt hier noch kein Testnachweis vor.

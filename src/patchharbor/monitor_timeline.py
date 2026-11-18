@@ -74,6 +74,8 @@ def forecast(row, document, now=None):
         labels = ('Bei passender Bindung: Dateien übernehmen', 'Danach: Entrypoint starten')
     else:
         return [unknown, unknown]
+    if row['kind'] == 'bundle':
+        labels = tuple(label.replace('Result', 'State') for label in labels)
     return [('Voraussichtlich: ' + label, 'future') for label in labels]
 
 

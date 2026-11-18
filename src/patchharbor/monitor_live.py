@@ -69,7 +69,7 @@ class Publication:
     def event(self, event):
         if isinstance(event, ActivityEvent):
             self.update(phase=event.phase, message=event.message[:1024])
-            item = activity_event(event)
+            item = activity_event(event, operation_kind=self.document["kind"])
             if item is not None:
                 code, status, message = item
                 self.update(activity_code=code, activity_status=status, activity_message=message)
@@ -90,7 +90,7 @@ class Publication:
         try:
             automatic = report.automatic.status.value if report.automatic is not None else None
             code, status = 'completed', 'success' if report.success else 'failure'
-            message = ('Result-Bundle' if self.document['kind'] == 'bundle' else 'Execute') + (' erfolgreich abgeschlossen' if report.success else ' fehlgeschlagen')
+            message = ('State-Bundle' if self.document['kind'] == 'bundle' else 'Execute') + (' erfolgreich abgeschlossen' if report.success else ' fehlgeschlagen')
             if automatic == 'no_candidate':
                 code, status, message = 'no-candidate', 'waiting', 'Kein ausführbarer Task gefunden'
             elif automatic == 'locked':
@@ -206,7 +206,7 @@ def bundle_observation(session, repository):
             yield publication
     except Exception as exc:
         publication.update(phase='completed', activity_code='completed', activity_status='failure',
-                           activity_message='Result-Bundle fehlgeschlagen', last_error=str(exc)[:1024])
+                           activity_message='State-Bundle fehlgeschlagen', last_error=str(exc)[:1024])
         raise
     finally:
         _current.reset(token)

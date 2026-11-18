@@ -62,7 +62,7 @@ class MonitorDetails:
                               {'repository': key[0], 'include_archive': key[1]}, force)
         document = {**document, 'bundle_view': artifacts}
         artifact = session.selected_artifact(document)
-        if session.view == 'logs' and artifact and artifact['kind'] == 'result_bundle' and not artifact.get('error'):
+        if session.view == 'logs' and artifact and artifact['kind'] in ('state_bundle', 'result_bundle') and not artifact.get('error'):
             log = self._tick('log', (artifact['path'], artifact['sha256']), 'monitor_log',
                              {'path': artifact['path'], 'expected_sha256': artifact['sha256']}, force)
             document['log_view'] = log
@@ -88,6 +88,6 @@ def attach_once(document, session, timeout):
         document['bundle_view'] = query_api('monitor_artifacts',
             {'repository': selected['repo_id'], 'include_archive': session.include_archive}, timeout)
         row = session.selected_artifact(document)
-        if session.view == 'logs' and row and row['kind'] == 'result_bundle' and not row.get('error'):
+        if session.view == 'logs' and row and row['kind'] in ('state_bundle', 'result_bundle') and not row.get('error'):
             document['log_view'] = query_api('monitor_log', {'path': row['path'], 'expected_sha256': row['sha256']}, timeout)
     return document

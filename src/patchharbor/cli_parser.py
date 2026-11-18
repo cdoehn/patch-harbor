@@ -116,7 +116,7 @@ def _add_configuration_commands(commands) -> None:
         help="set or clear the persistent filename suffix for all bundles",
         description=(
             "Append SUFFIX literally after .zip for every new bundle, including "
-            "automatic Result Bundles and explicit output directories. "
+            "State Bundles, automatic Result Bundles and explicit output directories. "
             "ZIP contents and package validation are unchanged. "
             "Example: patchharbor configure bundle-suffix .txt"
         ),
@@ -227,7 +227,7 @@ def _add_repository_commands(commands) -> None:
         help="describe one registered repository state",
         description=(
             "Print a human-readable repository summary without creating a "
-            "Result Bundle. Long technical identifiers are shortened to six "
+            "State or Result Bundle. Long technical identifiers are shortened to six "
             "characters plus an ellipsis."
         ),
         epilog=(
@@ -270,14 +270,14 @@ def _add_package_commands(commands) -> None:
         if name == "validate":
             binding = package_parser.add_mutually_exclusive_group()
             binding.add_argument("--repository", type=_explicit_package_path, metavar="REPOSITORY")
-            binding.add_argument("--reference-bundle", type=_explicit_package_path, metavar="RESULT_ZIP")
+            binding.add_argument("--reference-bundle", type=_explicit_package_path, metavar="REFERENCE_ZIP")
 
     pack_parser = commands.add_parser(
         'pack', help='create and validate a patch package from explicit prepared contents',
         description='Pack selected contents against a Result reference; never execute or replace a target.',
     )
     pack_parser.add_argument('content_directory', type=_explicit_package_path, metavar='CONTENT_DIRECTORY')
-    pack_parser.add_argument('--reference-bundle', required=True, type=_explicit_package_path, metavar='RESULT_ZIP')
+    pack_parser.add_argument('--reference-bundle', required=True, type=_explicit_package_path, metavar='REFERENCE_ZIP')
     pack_parser.add_argument('--entrypoint', required=True, type=_pack_entrypoint, metavar='PACKAGE_PATH')
     pack_target = pack_parser.add_mutually_exclusive_group(required=True)
     pack_target.add_argument('--output', type=_explicit_package_path, metavar='TASK_ZIP')
@@ -290,7 +290,7 @@ def _add_package_commands(commands) -> None:
 def _add_bundle_execute_commands(commands) -> None:
     bundle_parser = commands.add_parser(
         "bundle",
-        help="create a Result Bundle for one registered repository",
+        help="create a State Bundle for one registered repository",
         description=(
             "Capture the complete current repository state: the base commit, "
             "staged and unstaged changes, and non-ignored untracked regular "
@@ -299,7 +299,7 @@ def _add_bundle_execute_commands(commands) -> None:
         epilog=(
             "Without --output-dir, publish in the configured Exchange "
             "directory. The configured bundle suffix is appended after .zip. "
-            "Result Bundles include fresh chat handoff and local environment data, contain no Git history and may contain secrets."
+            "State Bundles include fresh chat handoff and local environment data, contain no Git history and may contain secrets."
         ),
     )
     bundle_parser.add_argument(
@@ -472,7 +472,7 @@ def _build_parser() -> argparse.ArgumentParser:
         prog="patchharbor",
         description=(
             "Register local Git repository instances, exchange complete "
-            "Result Bundles, and validate or execute repository-bound ZIP "
+            "State Bundles, and validate or execute repository-bound ZIP "
             "patch packages. The separate 'fs run' command executes "
             "explicit scripts and ZIP ScriptBundles."
         ),

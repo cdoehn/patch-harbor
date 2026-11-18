@@ -285,7 +285,7 @@ def _bundle_command(
             )
     except PatchHarborError as exc:
         exit_code = _write_command_error(
-            "bundle", exc, json_output=json_output, stdout=stdout, stderr=stderr,
+            "bundle", exc, json_output=json_output, stdout=stdout, stderr=stderr, output_version=2,
         )
         _write_emergency_diagnostics_notice(
             exc.emergency_diagnostics_path,
@@ -298,15 +298,15 @@ def _bundle_command(
         _write_json_document(
             _json_envelope(
                 "bundle",
-                result=result.report.manual_bundle_result(),
+                result=result.report.state_bundle_result(),
                 error=None,
-                process_exit_code=0,
+                process_exit_code=0, output_version=2,
             ),
             stdout,
         )
     else:
         print(f"run_id: {shorten_identifier(result.run_id)}", file=stdout)
-        print(f"result_bundle_path: {result.path}", file=stdout)
+        print(f"State Bundle created: {result.path}", file=stdout)
     return 0
 
 
