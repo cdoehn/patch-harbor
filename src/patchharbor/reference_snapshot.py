@@ -1,10 +1,10 @@
 """Public snapshot projection on the complete, once-captured State/Result reader."""
 from __future__ import annotations
 
-from patchharbor.bundle_limits import exceeds_bundle_limit
 
 from pathlib import Path
 
+from patchharbor.bundle_limits import exceeds_bundle_limit
 from patchharbor.errors import FailureReason, PatchHarborError
 from patchharbor.bundle_paths import BundlePathError
 from patchharbor.json_document import parse_json_document

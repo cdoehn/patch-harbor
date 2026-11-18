@@ -19,7 +19,8 @@ Environment 3 verlangt genau diesen relativen Helferdeskriptor:
 Die Größe ist die Bytezahl, kein Boolean; der Hash ist SHA-256 über die exakten
 Helferbytes. Zusätzliche/fehlende reservierte Dateien, falsche Großschreibung,
 abweichende Pfade, ungültige UTF-8-/BOM-/Größenwerte oder falsche Hashes sind Fehler.
-Je Begleitdatei gelten höchstens 128 KiB. Task-Metadaten dürfen vollständig fehlen; teilweise oder ältere Begleitdaten
+Je Begleitdatei gelten standardmäßig höchstens 128 KiB; die explizite
+[Größenfreigabe](bundle-size-limits.md) hebt nur dieses Ressourcenbudget auf. Task-Metadaten dürfen vollständig fehlen; teilweise oder ältere Begleitdaten
 werden abgelehnt.
 
 Die Dateien sind passive Metadaten, keine Entrypoints und keine Repository-Payloads.

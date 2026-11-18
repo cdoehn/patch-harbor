@@ -44,6 +44,12 @@ Ein State bescheinigt nur seine eigene Zustandserfassung. Es beweist keinen
 früheren Execute, keine Tests und keinen Commit. Auch ein Result nach Fehler oder
 Dry-Run bleibt ein Result; es wird nicht zum State umetikettiert.
 
+## Große Zustandsaufnahmen
+
+`patchharbor bundle --force` hebt die Ressourcenbudgets dieses Aufrufs auf.
+Das Lesen und Verarbeiten großer Referenzen benötigt jeweils erneut `--force`;
+siehe [Größenfreigabe](bundle-size-limits.md).
+
 ## Technischer Vertrag
 
 State und Result verwenden Snapshotformat 5 mit unterschiedlichen Markern:

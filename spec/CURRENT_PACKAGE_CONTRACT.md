@@ -94,6 +94,16 @@ Interne Namen für Task-Ausführung, Starter, Worker, Testhelfer und Testfälle
 verwenden `execute`. Fachliche Git-Operationen wie `git apply` behalten ihren
 Namen. Python 3.10/3.11 und native Windows-Unterstützung bleiben erhalten.
 
+## Explizite Ressourcenfreigabe
+
+Der manuelle CLI-Schalter `--force` und das boolesche API-Schlüsselwort
+`force=True` heben ausschließlich Byte-/Mengengrenzen des jeweiligen Aufrufs auf.
+Sie stammen niemals aus Paketdaten oder Konfiguration. Der
+[Größenvertrag](../docs/bundle-size-limits.md) gilt für Erzeugung, Referenzlesen,
+Pack, Validierung und manuelles Execute samt Result-Veröffentlichung.
+Version, Format, Hashes, Pfade, Bindung, Replay und Locks bleiben unverändert.
+Watcher und automatisches Execute behalten ihre Standardgrenzen.
+
 ## Nachweise
 
 Historische erfolgreiche Ausführungsmatrizen und eingefrorene alte PYZs sind

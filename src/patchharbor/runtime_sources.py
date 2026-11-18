@@ -1,12 +1,12 @@
 """Read only the executing distribution's directory or canonical ZIP resources."""
 from __future__ import annotations
 
-from patchharbor.bundle_limits import read_bundle_file as read_stable_regular_file_bounded
 
 from dataclasses import dataclass
 from pathlib import Path
 from zipimport import zipimporter
 
+from patchharbor.bundle_limits import read_bundle_file as read_stable_regular_file_bounded
 from patchharbor.platform.filesystem import (
     PathKind, path_kind,
 )

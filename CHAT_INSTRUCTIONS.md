@@ -109,7 +109,7 @@ demselben unbekannten ZIP authentifiziert dessen Autor nicht.
 
 Nach Vertrauen und Prüfung genau diese Datei in ein privates Arbeitsverzeichnis
 außerhalb des Snapshots übernehmen. Kein `extractall`, kein Fremdhelfer aus CWD,
-anderen Repositories oder dem Netz. Originalresult und vollständigen SHA-256
+anderen Repositories oder dem Netz. Originalreferenz und vollständigen SHA-256
 aus dem vertrauenswürdigen Übergabeweg beibehalten.
 
 ```text
@@ -271,7 +271,7 @@ verwendet werden; niemals eine alte generierte Anleitung als statische Vorlage.
 
 Core validiert die reservierte Struktur, führt sie nicht aus und schreibt sie
 nicht ins Repository. Keine weiteren Dateien/Entrypoints im reservierten Namensraum.
-Je Datei höchstens 128 KiB, nicht leer, UTF-8 ohne BOM; JSON ohne doppelte Schlüssel
+Je Datei standardmäßig höchstens 128 KiB, nicht leer, UTF-8 ohne BOM; JSON ohne doppelte Schlüssel
 oder nicht endliche Zahlen. Task 3 darf ohne Begleitdaten vorliegen. Wenn Begleitdaten vorhanden sind,
 ist ausschließlich Format 3 mit vollständigem Helfer zulässig. Fehlende neue Helfer nicht durch fremden Code ersetzen.
 
@@ -279,6 +279,15 @@ Alle übrigen sicheren regulären Dateien sind Payloads: Core schreibt sie vor d
 Entrypoint bytegenau an den relativen Zielpfad. Archive werden nicht rekursiv als
 Task-Bundles geöffnet. Nur erforderliche Dateien aufnehmen, unerwartete Änderungen
 vor dem Commit ausschließen.
+
+**Große Bundles:** Bei bewusst gewählter Größenfreigabe unterstützt jeder
+Befehl separat `--force`: `bundle`, `pack`, `inspect`, `validate`, manuelles
+`execute` und der separate PYZ-Starthelfer; in der Python-API `force=True`.
+Das hebt Byte-, Datei-, Eintrags- und Scanbudgets dieses Aufrufs auf, auch beim
+Lesen der Referenz und beim Result-Schreiben. Keine dauerhafte Einstellung, keine
+Übernahme aus Paketdaten, kein Force für Watcher/automatisches Execute. Integrität,
+Version, Pfade, Bindung, Locks und Replay bleiben verbindlich. RAM und Plattenplatz
+müssen verfügbar sein; ein großes Paket braucht die Freigabe auch beim Empfänger.
 
 ZIP-Pfade: relativ, `/` als Separator, ASCII-Buchstaben/Ziffern/`._-`; höchstens
 128 Zeichen je Segment und 512 insgesamt. Verboten: absolute/Laufwerks-/UNC-/

@@ -1,7 +1,6 @@
 """Pin producer-owned runtime and template bytes before an Execute can mutate them."""
 from __future__ import annotations
 
-from patchharbor.bundle_limits import exceeds_bundle_limit
 
 from dataclasses import dataclass
 from hashlib import sha256
@@ -9,6 +8,7 @@ from io import BytesIO
 from typing import TYPE_CHECKING
 from zipfile import ZipFile
 
+from patchharbor.bundle_limits import exceeds_bundle_limit
 from patchharbor import __version__
 from patchharbor.chat_instructions import load_chat_template, load_bootstrap
 from patchharbor.errors import PatchHarborError, result_bundle_error

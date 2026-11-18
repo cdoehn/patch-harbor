@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from patchharbor.bundle_limits import exceeds_bundle_limit
 
 from dataclasses import dataclass
 from io import BytesIO, DEFAULT_BUFFER_SIZE
@@ -26,6 +25,7 @@ except ImportError:
 else:
     _LZMA_ERRORS = (lzma.LZMAError,)
 
+from patchharbor.bundle_limits import exceeds_bundle_limit
 from patchharbor.progress import activity
 
 from patchharbor.bundle_paths import (

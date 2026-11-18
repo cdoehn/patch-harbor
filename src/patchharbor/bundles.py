@@ -2,10 +2,8 @@
 
 from __future__ import annotations
 
-from patchharbor.bundle_limits import bundle_read_size
 
-from patchharbor.bundle_limits import exceeds_bundle_limit
-
+from patchharbor.bundle_limits import bundle_read_size, exceeds_bundle_limit
 from patchharbor.progress import activity
 
 from patchharbor.errors import FailureReason, PatchHarborError

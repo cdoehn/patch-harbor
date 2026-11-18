@@ -1,7 +1,7 @@
 """Bounded canonical runtime ZIP metadata, for the Core-PYZ."""
 
-from .bundle_limits import exceeds_bundle_limit
 import struct
+from .bundle_limits import exceeds_bundle_limit
 
 
 def _require(condition: bool, message: str) -> None:

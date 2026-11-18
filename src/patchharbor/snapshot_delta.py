@@ -1,13 +1,13 @@
 """Execute the producer's full-index Git diff syntax exactly to immutable trees."""
 from __future__ import annotations
 
-from patchharbor.bundle_limits import exceeds_bundle_limit
 
 import hashlib
 from io import BytesIO
 import re
 from types import MappingProxyType
 
+from patchharbor.bundle_limits import exceeds_bundle_limit
 from patchharbor.errors import PatchHarborError
 from patchharbor.models import GitObjectFormat, GitObjectId
 from patchharbor.repository_paths import RepositoryRelativePath, validate_repository_paths

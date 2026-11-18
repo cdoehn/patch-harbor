@@ -1,13 +1,13 @@
 """Strict bounded Git binary-patch decoding, without a Git dependency."""
 from __future__ import annotations
 
-from patchharbor.bundle_limits import exceeds_bundle_limit
 
 import base64
 from io import BytesIO
 import re
 import zlib
 
+from patchharbor.bundle_limits import exceeds_bundle_limit
 from patchharbor.snapshot_budget import SnapshotBudget
 from patchharbor.snapshot_types import ReferenceSnapshotError, SnapshotErrorCode
 

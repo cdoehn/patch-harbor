@@ -1,15 +1,13 @@
 """Request-owned, installation-free capture of the loaded PYZ producer profile."""
 from __future__ import annotations
 
-from patchharbor.bundle_limits import bundle_read_size
-
-from patchharbor.bundle_limits import exceeds_bundle_limit
 
 from dataclasses import dataclass
 from io import BytesIO
 from threading import Lock
 from zipfile import BadZipFile, ZIP_STORED, ZipFile
 
+from patchharbor.bundle_limits import bundle_read_size, exceeds_bundle_limit
 from patchharbor import __version__, _pyz_resource_id
 from patchharbor.platform.filesystem import (
     FileChangedDuringRead, FileReadLimitExceeded, UnsupportedFileTypeError,

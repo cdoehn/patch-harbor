@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from patchharbor.bundle_limits import exceeds_bundle_limit
 
 from dataclasses import dataclass
 import json
 from hashlib import sha256
 
+from patchharbor.bundle_limits import exceeds_bundle_limit
 from patchharbor.errors import task_bundle_error
 from patchharbor.json_document import serialize_json_document
 from patchharbor.models import BundlePayload
@@ -29,7 +29,6 @@ RESULT_FILENAME_SCHEMA = "<Repository>_Result_Bundle_<HHMMSS>_<MMDD>_<ID6>.zip<b
 def filename_schemas() -> dict[str, str]:
     """Current display names for all three bundle roles; never binding values."""
     return {'Task': TASK_FILENAME_SCHEMA, 'State': STATE_FILENAME_SCHEMA, 'Result': RESULT_FILENAME_SCHEMA}
-
 
 
 @dataclass(frozen=True)

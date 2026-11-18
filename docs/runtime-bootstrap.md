@@ -22,7 +22,7 @@ State/Result snapshots support up to 250,000 stored repository files, with eleve
 outer ZIP slots for auxiliary data. The Core reader and stdlib bootstrap accept
 single-disk ZIP64 reference bundles needed above the classic 65,535-member boundary. The
 bootstrap checks ZIP64 directory counts and offsets before allocating ZIP members.
-All byte budgets and the 1,000-member inner runtime limit still execute. A producer
+Without `--force`, byte budgets and the 1,000-member inner runtime limit still apply. A producer
 or reader entry-limit failure reports the actual count and limit without retrying.
 
 Read-only assessment and optional single-file preparation:
@@ -55,8 +55,8 @@ These checks add no retry,
 identity fallback or exception to the trusted digest requirement.
 
 The standard build uses the exact closed requirement `>=3.10`.
-The current data validator and helper also recognize the existing closed
-`>=3.12` recipe variant; this does not restore old Result formats. Unknown variants are not inferred from a product version. No original
+The current data validator and helper accept only the current closed
+`>=3.10` recipe variant; older profiles are not migrated. Unknown variants are not inferred from a product version. No original
 artifact is relabeled. Unknown requirements and rehashed mixed variants remain
 invalid. Native 3.10/3.11 acceptance remains a separate gate.
 A new private directory is required. On Windows it is created atomically with
@@ -107,6 +107,14 @@ starts with the helper from an actual State Bundle, packs and fully validates ag
 the original reference, then performs regular Execute through that exact PYZ.
 The native snapshot check still rejects corrupt repository evidence after a
 successful descriptor-only precheck. See [the complete handoff contract](chat-handoff.md).
+
+## Explicit size override
+
+The current helper accepts `--force` for one assessment/preparation. In Python,
+pass `force=True` separately to `assess`, `prepare`, and `import_api` as needed.
+The native Core operations still require their own `force=True` / `--force`.
+Trust, identity and descriptor checks remain mandatory; see
+[bundle size limits](bundle-size-limits.md).
 
 ## Historical legacy wheel bootstrap
 

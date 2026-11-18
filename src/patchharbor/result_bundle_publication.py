@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from patchharbor.bundle_limits import bundle_read_limit
 
+from patchharbor.bundle_limits import bundle_read_limit
 from patchharbor.reference_kind import ReferenceBundleKind, kind_for_operation
 
 from contextlib import contextmanager

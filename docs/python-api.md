@@ -581,6 +581,15 @@ from bootstrap checks; no installation or subprocess is needed for these calls.
 Result-5 production uses the same shared Core and request-local resource capture.
 
 
+## Explicit bundle size override
+
+`bundle`, `pack_task`, `inspect_task`, `validate_task`, `read_reference_snapshot`,
+`execute`, `execute_guarded` and `dry_run` accept keyword-only `force=False`.
+Only the boolean `True` lifts byte and item-count budgets for that request.
+All structural, digest, source-identity, version and repository checks remain.
+Automatic Execute and monitor observations retain their limits. See the
+[complete CLI/API/bootstrap contract](bundle-size-limits.md).
+
 ## Current reference-bundle protocol
 
 State 5 and Result 5 of the exact current product version are valid references. The strict reader validates every repository

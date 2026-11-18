@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from patchharbor.bundle_limits import exceeds_bundle_limit
 
 import json
 from hashlib import sha256
@@ -10,6 +9,7 @@ from pathlib import Path
 import shlex
 from zipimport import zipimporter
 
+from patchharbor.bundle_limits import exceeds_bundle_limit
 from patchharbor.bundle_handoff import (
     BundleHandoff, BOOTSTRAP_NAME, validate_bootstrap,
     CHAT_INSTRUCTIONS_NAME,

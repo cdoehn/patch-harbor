@@ -6,7 +6,6 @@ in a private package namespace, without importing an installed PatchHarbor.
 """
 from __future__ import annotations
 
-from .bundle_limits import exceeds_bundle_limit
 
 from dataclasses import dataclass
 from io import BytesIO
@@ -15,6 +14,7 @@ import re
 from typing import Callable, Mapping
 from zipfile import BadZipFile, ZIP_STORED, ZipFile, ZipInfo
 
+from .bundle_limits import exceeds_bundle_limit
 from .runtime_profile import (
     RuntimeDataError, RuntimeLimitError, RuntimeEntry, recipe_json, sha256,
     require_recipe as _require, unique_recipe_object as _unique,

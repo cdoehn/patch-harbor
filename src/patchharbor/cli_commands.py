@@ -92,14 +92,20 @@ def _package_command(
             color_enabled=not no_color, plain=force_plain, verbose=verbose,
         ) as console:
             if command == "inspect":
-                info = api.inspect_task(path, observer=_progress_observer(console), **({"force": True} if force else {}),)
+                info = api.inspect_task(
+                    path, observer=_progress_observer(console),
+                    **({"force": True} if force else {}),
+                )
             else:
                 options = {}
                 if repository is not None:
                     options["repository"] = repository
                 if reference_bundle is not None:
                     options["reference_bundle"] = reference_bundle
-                report = api.validate_task(path, **options, observer=_progress_observer(console), **({"force": True} if force else {}),)
+                report = api.validate_task(
+                    path, **options, observer=_progress_observer(console),
+                    **({"force": True} if force else {}),
+                )
                 info = report.inspection
     except PatchHarborError as exc:
         return _write_command_error(
@@ -285,7 +291,8 @@ def _bundle_command(
             result = api.bundle(
                 path or Path.cwd(), output_directory=output_directory,
                 observer=_progress_observer(console),
-            **({"force": True} if force else {}),)
+                **({"force": True} if force else {}),
+            )
     except PatchHarborError as exc:
         exit_code = _write_command_error(
             "bundle", exc, json_output=json_output, stdout=stdout, stderr=stderr, output_version=2,
@@ -356,7 +363,8 @@ def _execute_command(
                     path, dry_run=dry_run, timeout=timeout_seconds,
                     output_directory=output_directory, output=output,
                     observer=_progress_observer(console),
-                **({"force": True} if force else {}),)
+                    **({"force": True} if force else {}),
+                )
         except OSError as exc:
             operation = (
                 "cannot render terminal console"

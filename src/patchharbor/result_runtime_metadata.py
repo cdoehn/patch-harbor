@@ -1,10 +1,10 @@
 """Closed Result runtime descriptors shared by the Wheel and PYZ profiles."""
 from __future__ import annotations
 
-from patchharbor.bundle_limits import exceeds_bundle_limit
 
 from dataclasses import dataclass
 
+from patchharbor.bundle_limits import exceeds_bundle_limit
 from .runtime_profile import SHA256_PATTERN, sha256
 
 

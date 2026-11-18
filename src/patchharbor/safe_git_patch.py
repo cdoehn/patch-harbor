@@ -1,13 +1,13 @@
 """Native full-index Git literal patches from already captured immutable bytes."""
 from __future__ import annotations
 
-from patchharbor.bundle_limits import exceeds_bundle_limit
 
 import base64
 import hashlib
 from io import BytesIO
 import zlib
 
+from patchharbor.bundle_limits import exceeds_bundle_limit
 from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY
 from patchharbor.safe_export_types import SafeExportError, SafeExportErrorCode
 

@@ -101,9 +101,9 @@ Pack startet selbst keinen Watcher und hat keinen impliziten Exchange-Ausgabeort
 
 ## Grenzen und Nachweise
 
-Die Inhaltsaufnahme ist auf 10.000 Dateisystemknoten (Dateien und Verzeichnisse)
+Ohne `--force` ist die Inhaltsaufnahme auf 10.000 Dateisystemknoten (Dateien und Verzeichnisse)
 begrenzt. Daneben gilt die gemeinsame äußere ZIP-Grenze von 250.011 Einträgen,
-einschließlich der drei generierten Dateien; sie hebt die engere Scan-Grenze
+einschließlich der vier generierten Dateien; sie hebt die engere Scan-Grenze
 nicht auf. Es gelten weiterhin 256 MiB je Inhalt/fertigem ZIP und 512 MiB
 unkomprimiert. Die State-/Result-Referenz darf bis zu 250.000 Base-/Untracked-Dateien
 zusammen enthalten; ihre innere Runtime bleibt auf 1.000 Einträge begrenzt.
@@ -111,6 +111,11 @@ Handoff-Dateien dürfen je 128 KiB erreichen. Links, Reparse-Punkte, Sonderdatei
 unsichere Archivpfade und case-ambige Kollisionen werden abgelehnt. Bekannte Änderungen
 führen ohne Neuaufnahme zum Abbruch; ein beliebig parallel manipulierter Baum wird
 nicht als atomarer Snapshot versprochen.
+
+`pack --force` hebt diese Ressourcenbudgets für den Aufruf einschließlich seiner
+Referenz auf. Nachfolgende Leser und Execute benötigen bei großen Paketen jeweils
+ihre eigene Freigabe. Pfade, Größen-/Hash-Konsistenz und Bindung bleiben geprüft.
+Siehe [Größenfreigabe](bundle-size-limits.md).
 
 `TaskPackResult` enthält endgültigen Pfad, Paket-ID, Erzeugungszeit, vollständige
 Referenzvalidierung, Hashes, Größe und Warnungen. Das bestätigt Paketformat und

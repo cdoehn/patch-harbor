@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from patchharbor.bundle_limits import bundle_read_limit
 
 from dataclasses import dataclass
 from enum import Enum
@@ -11,6 +10,7 @@ import os
 from pathlib import Path
 import stat
 
+from patchharbor.bundle_limits import bundle_read_limit
 from patchharbor.progress import activity
 
 from patchharbor.bundle_names import is_browser_temporary_name
@@ -39,8 +39,6 @@ from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY, ResourcePolicy
 from patchharbor.user_paths import RegistrationUserPaths
 from patchharbor.reference_reader import reference_kind_hint, read_reference_or_task_payloads
 from patchharbor.zip_payloads import ZipPayloadError
-
-
 
 
 class ExchangeScanError(RuntimeError):

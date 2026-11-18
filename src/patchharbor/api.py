@@ -14,7 +14,6 @@ The full contract and examples live in docs/python-api.md.
 """
 from __future__ import annotations
 
-from patchharbor.bundle_limits import bundle_size_scope as _bundle_size_scope
 
 import math
 from collections.abc import Mapping
@@ -22,6 +21,7 @@ import os
 from pathlib import Path
 from typing import TextIO
 
+from patchharbor.bundle_limits import bundle_size_scope as _bundle_size_scope
 import patchharbor.application as _application
 from patchharbor.api_types import (
     ActivityEvent, BundleResult, CandidateSelector, ConfigurationResult,
@@ -79,7 +79,6 @@ __all__ = [
     "IntegrationCapabilities", "ReferenceSnapshot", "ReferenceSnapshotError", "SnapshotErrorCode",
     "SnapshotFile", "SnapshotLayer", "SnapshotRuntime", "integration_capabilities", "read_reference_snapshot",
 ]
-
 
 
 def integration_capabilities() -> IntegrationCapabilities:
@@ -406,7 +405,6 @@ never writes payloads, runs the entrypoint, consumes replay or archives bundles.
                 path, dry_run=dry_run, output_directory=destination,
                 timeout_seconds=seconds, output=targets, current_directory=directory,
             )
-
 
 
 def execute_guarded(

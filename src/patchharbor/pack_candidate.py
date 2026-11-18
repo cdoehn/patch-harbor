@@ -1,7 +1,6 @@
 """Pure target metadata and bounded standard-ZIP construction for packing."""
 from __future__ import annotations
 
-from patchharbor.bundle_limits import exceeds_bundle_limit
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -12,6 +11,7 @@ from typing import BinaryIO
 from uuid import UUID
 from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
 
+from patchharbor.bundle_limits import exceeds_bundle_limit
 from patchharbor import __version__
 from patchharbor.bundle_handoff import (
     ENVIRONMENT_FORMAT_VERSION, ENVIRONMENT_MARKER, MAX_HANDOFF_ENTRY_BYTES,
@@ -170,7 +170,6 @@ def write_prepared_candidate(stream: BinaryIO, candidate: PackCandidate, *,
             info.compress_type = ZIP_DEFLATED
             info.external_attr = (stat.S_IFREG | mode) << 16
             archive.writestr(info, content, compress_type=ZIP_DEFLATED, compresslevel=6)
-
 
 
 def write_candidate(stream: BinaryIO, sources: CapturedSources,

@@ -1,11 +1,6 @@
 """Synchronous pack orchestration with a single confirmed publication boundary."""
 from __future__ import annotations
 
-from patchharbor.bundle_limits import bundle_read_limit
-
-from patchharbor.bundle_limits import read_bundle_file as read_stable_regular_file_bounded
-
-from patchharbor.bundle_limits import exceeds_bundle_limit
 
 from dataclasses import replace
 from datetime import datetime, timezone
@@ -14,6 +9,11 @@ import os
 from pathlib import Path
 from uuid import uuid4
 
+from patchharbor.bundle_limits import (
+    bundle_read_limit,
+    exceeds_bundle_limit,
+    read_bundle_file as read_stable_regular_file_bounded,
+)
 from patchharbor.compat import add_exception_note
 
 from patchharbor.pyz_artifact import PyzProvider, own_pyz_profile_present
@@ -33,7 +33,6 @@ from patchharbor.platform.pack_output import open_output_directory
 from patchharbor.progress import activity
 from patchharbor.reference_reader import capture_reference
 from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY
-
 
 
 def _error(message: str, reason: FailureReason, exc: BaseException) -> PatchHarborError:

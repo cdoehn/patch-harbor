@@ -84,6 +84,9 @@ in State and Result Bundles, not the installed watcher. See
 [installation and safe updates](docs/install-and-update.md), especially if a
 watcher is already running. Updating repository files alone does not upgrade it.
 
+For very large repositories or tasks, explicitly use `--force` on each bundle
+command. See [bundle size limits and the override](docs/bundle-size-limits.md).
+
 ## Quick start
 
 Use a local Git repository with an existing committed `HEAD`. Choose an Exchange

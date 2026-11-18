@@ -5,9 +5,6 @@ categories; the public pack engine consumes this immutable capture.
 """
 from __future__ import annotations
 
-from patchharbor.bundle_limits import bundle_read_limit
-
-from patchharbor.bundle_limits import exceeds_bundle_limit
 
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -15,6 +12,7 @@ import os
 from pathlib import Path
 import stat
 
+from patchharbor.bundle_limits import bundle_read_limit, exceeds_bundle_limit
 from patchharbor.bundle_paths import normalize_bundle_path, validate_bundle_member_paths
 from patchharbor.errors import FailureReason, PatchHarborError, task_bundle_error
 from patchharbor.models import BundlePayload

@@ -1,9 +1,6 @@
 """Read complete State/Result reference facts without imposing archival success policy."""
 from __future__ import annotations
 
-from patchharbor.bundle_limits import bundle_read_limit
-
-from patchharbor.bundle_limits import exceeds_bundle_limit
 
 from dataclasses import dataclass
 from datetime import datetime
@@ -13,6 +10,7 @@ import os
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from uuid import UUID
 
+from patchharbor.bundle_limits import bundle_read_limit, exceeds_bundle_limit
 from patchharbor import __version__
 from patchharbor.bundle_version import require_bundle_version
 from patchharbor.bundle_handoff import (
@@ -466,7 +464,6 @@ def capture_reference_payloads(path: Path, *, resource_policy: ResourcePolicy = 
             NotZipArchiveError, ZipPayloadError, OSError, ValueError, TypeError, KeyError,
             UnicodeError, RecursionError, OverflowError, PatchHarborError) as exc:
         raise PatchHarborError(f"invalid reference bundle {path}: {exc}", FailureReason.SOURCE_ERROR) from exc
-
 
 
 def capture_reference(path: Path, *, resource_policy: ResourcePolicy = DEFAULT_RESOURCE_POLICY,

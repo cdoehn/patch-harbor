@@ -1,9 +1,9 @@
 """Bound reconstructed allocations independently of compressed archive sizes."""
 from __future__ import annotations
 
-from patchharbor.bundle_limits import exceeds_bundle_limit
 
 from dataclasses import dataclass
+from patchharbor.bundle_limits import exceeds_bundle_limit
 from patchharbor.resource_policy import DEFAULT_RESOURCE_POLICY, ResourcePolicy
 from patchharbor.snapshot_types import ReferenceSnapshotError, SnapshotErrorCode
 

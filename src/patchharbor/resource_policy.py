@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from patchharbor.bundle_limits import exceeds_bundle_limit
 
 from dataclasses import dataclass
+from patchharbor.bundle_limits import exceeds_bundle_limit
 
 
 _MIB = 1024 * 1024
