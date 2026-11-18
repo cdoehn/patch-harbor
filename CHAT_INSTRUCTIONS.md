@@ -1,4 +1,4 @@
-# PatchHarbor – Entwicklungsauftrag aus einem Result Bundle
+# PatchHarbor – Entwicklungsauftrag aus einem Referenzbundle
 
 Diese Anleitung gilt für PatchHarbor ab 2.0.0. Der Chat entwickelt am geprüften
 Snapshot; der lokale Core prüft die Bindung und führt genau einen Entrypoint aus.
@@ -7,13 +7,14 @@ Aktuelle ausdrückliche Nutzeranweisungen haben Vorrang vor dieser Vorlage.
 | Vertrag | Gültiger Wert |
 | --- | --- |
 | Task | Marker `patch-harbor-task-bundle`, Format 3 |
-| Result | Marker `patch-harbor-result-bundle`, Format 5 |
+| State | Marker `patch-harbor-state-bundle`, Format 5, Operation `bundle` |
+| Result | Marker `patch-harbor-result-bundle`, Format 5, Operation `execute` |
 | Runtime-Metadaten | Format 3, Core-PYZ ohne Watcher |
 | Begleitdaten | `patch-harbor-environment`, Format 3 mit separatem Helfer |
 | Fingerprint | `patchharbor-state-v1` |
 | Entrypoint-Pflichtmarker | `# PATCHHARBOR` |
 
-Task und Result müssen `patchharbor_version` exakt passend zum ausführenden
+Task und Referenzbundle müssen `patchharbor_version` exakt passend zum ausführenden
 Werkzeug tragen und das aktuelle Format verwenden. Keine Migration, Konvertierung
 oder Leser für ältere/neue Versionen. Nur Begleitdatenformat 3 ist zulässig.
 Produktversion und Formatnummer werden unabhängig geprüft.
@@ -21,10 +22,25 @@ Vor-2.0-Bundles und alte Python-API-Namen sind kein Ersatzweg. `apply` ist ein
 deprecated CLI-Alias für `execute` mit Hinweis auf stderr. ScriptBundle und
 der eigenständige Skriptrunner bleiben ausdrücklich nicht versionsgebunden.
 
+## State, Task und Result
+
+`patchharbor bundle` erzeugt ein **State Bundle**: den aktuellen Arbeitsstand für
+den Einstieg oder eine erneute Übernahme nach verlorenem Chat-Arbeitsverzeichnis.
+Nach `execute` entsteht ein **Result Bundle** mit tatsächlichem Zustand und
+Ausführungsbericht, auch bei Fehlern oder Dry-Run. Beide heißen hier
+**Referenzbundle** und können die geprüfte Grundlage des nächsten Task sein.
+Ein **Task Bundle** enthält den zustandsgebundenen Auftrag und seinen Entrypoint.
+
+State und Result nach Marker, Operation und `environment.json.bundle_type`
+unterscheiden. Dateinamen sind keine Typ- oder Bindungsbeweise. Ein State belegt
+keine frühere Ausführung, keinen Commit und kein Testergebnis. Es stellt keine
+Chat-Erinnerung, Git-Historie oder virtuelle Umgebung wieder her. Bei verlorener
+Arbeitsgrundlage ein frisches State aus dem tatsächlichen Repository anfordern.
+
 ## 1. Eingaben, Zuständigkeit und feste Grenzen
 
-Benötigt werden diese Anleitung, das aktuelle Result der konkreten registrierten
-Repository-Instanz und der Nutzerauftrag. Ohne ausreichend vollständiges Result:
+Benötigt werden diese Anleitung, das aktuelle Referenzbundle der konkreten registrierten
+Repository-Instanz und der Nutzerauftrag. Ohne ausreichend vollständiges Referenzbundle:
 `REPOSITORY_STATE_INCOMPLETE`; kein Task-Bundle aus Gesprächserinnerung erzeugen.
 Ein ausnahmsweise separat übergebener Kontext muss `patchharbor context --json`
 sein. Keine vollständigen Kennungen aus verkürzten Terminalanzeigen rekonstruieren.
@@ -33,8 +49,8 @@ Die vier vollständigen Bindungswerte kommen aus `context.json`: `repo_id`,
 `base_commit`, `state_fingerprint`, `fingerprint_algorithm`. Zielpfade aus
 `environment.json`, Dateinamen, Bundle-Nummern und UI-Präfixe ersetzen sie nie.
 
-- Core: sichere Pakete, Registry-/Zustandsprüfung, Payload-Ausbringung,
-  Entrypoint, stdout/stderr, Exit-Code, Zeit, Abbruch, Toolfehler und Result.
+- Core: sichere Pakete, Registry-/Zustandsprüfung, State-Erzeugung, Payload-Ausbringung,
+  Entrypoint, stdout/stderr, Exit-Code, Zeit, Abbruch, Toolfehler und Result nach Execute.
 - Watcher: optionaler dauerhafter Auslöser derselben Core-Operationen.
 - Chat/vertrauenswürdiger Entrypoint: beauftragte Änderungen, fachliche Tests,
   Commitfolge, Plan und Ergebnisbewertung nach den Zielprojektregeln.
@@ -52,9 +68,9 @@ und keine Umgehung von Sicherheitsprüfungen. Fehlende allgemeine Infrastruktur
 bevorzugt als eigenen geprüften Core-Schritt ergänzen. Beim Selbstupgrade den
 Writer aus einer privaten Kopie des jeweiligen Schritt-Cores verwenden.
 
-## 2. Result und Umgebung vollständig prüfen
+## 2. Referenzbundle und Umgebung vollständig prüfen
 
-Neue Resultate enthalten im ZIP-Root `CHAT_INSTRUCTIONS.md`, `environment.json`
+Neue Referenzbundles enthalten im ZIP-Root `CHAT_INSTRUCTIONS.md`, `environment.json`
 und `tools/pyz_bootstrap.py`. Ein solches Bundle plus Auftrag genügt. Dateien unter
 `base/` sind unveränderte Repository-Inhalte; insbesondere `base/tools/` und
 `base/CHAT_INSTRUCTIONS.md` sind nicht die generierten Begleitressourcen.
@@ -78,7 +94,7 @@ Vor Änderungen auswerten:
    unklarer Ausführung zusätzlich `logs/execution.log`.
 
 Der effektive Zustand ist **Base + staged Patch + unstaged Patch + untracked**.
-Das Result enthält keine Git-Historie und keine ignorierten Dateien. Zwingend
+Das Referenzbundle enthält keine Git-Historie und keine ignorierten Dateien. Zwingend
 benötigte fehlende Inhalte führen zu `REPOSITORY_STATE_INCOMPLETE`. Ein fehlgeschlagener
 Entrypoint kann Dateien und Commits hinterlassen haben: am tatsächlichen Zustand
 weiterarbeiten, niemals eine Rückabwicklung unterstellen.
@@ -87,7 +103,7 @@ weiterarbeiten, niemals eine Rückabwicklung unterstellen.
 
 Der Helfer liegt neben dieser Anleitung unter `tools/pyz_bootstrap.py`; sein
 vollständiger Code wird nicht zusätzlich im Prompt eingebettet. Vor Ausführung
-Herkunft des Results und Helfercode prüfen. Der Deskriptor `bootstrap` in
+Herkunft des Referenzbundles und Helfercode prüfen. Der Deskriptor `bootstrap` in
 `environment.json` nennt relativen Pfad, Bytezahl und SHA-256. Ein Hash aus
 demselben unbekannten ZIP authentifiziert dessen Autor nicht.
 
@@ -97,7 +113,7 @@ anderen Repositories oder dem Netz. Originalresult und vollständigen SHA-256
 aus dem vertrauenswürdigen Übergabeweg beibehalten.
 
 ```text
-python -I -S -B /privat/tools/pyz_bootstrap.py /absolut/result.zip --trusted-source-sha256 VOLLSTAENDIGER_SHA256 --prepare-in /privat/neues-runtime-verzeichnis
+python -I -S -B /privat/tools/pyz_bootstrap.py /absolut/reference.zip --trusted-source-sha256 VOLLSTAENDIGER_SHA256 --prepare-in /privat/neues-runtime-verzeichnis
 ```
 
 Python >=3.10 genügt; keine Installation, kein pip/venv/Build/Download und keine
@@ -105,17 +121,17 @@ Python >=3.10 genügt; keine Installation, kein pip/venv/Build/Download und kein
 Runtime-Daten ohne Core-Import und bereitet exakt die enthaltene PYZ vor.
 Sein JSON nennt `path`, `command_prefix`, Runtime-Hash,
 `scope=runtime_descriptor_precheck` und bewusst `full_reference_valid=false`.
-Der Vorcheck ersetzt keine vollständige native Result-/Snapshot-Prüfung.
+Der Vorcheck ersetzt keine vollständige native Referenzbundle-/Snapshot-Prüfung.
 
 Den tatsächlich zurückgegebenen absoluten PYZ-Pfad verwenden:
 
 ```text
-python -I -S -B /privat/patchharbor-VERSION.pyz pack /absolut/contents --reference-bundle /absolut/result.zip --entrypoint run.sh --output-dir /absolut/output --json
+python -I -S -B /privat/patchharbor-VERSION.pyz pack /absolut/contents --reference-bundle /absolut/reference.zip --entrypoint run.sh --output-dir /absolut/output --json
 python -I -S -B /privat/patchharbor-VERSION.pyz inspect /absolut/task.zip --json
-python -I -S -B /privat/patchharbor-VERSION.pyz validate /absolut/task.zip --reference-bundle /absolut/result.zip --json
+python -I -S -B /privat/patchharbor-VERSION.pyz validate /absolut/task.zip --reference-bundle /absolut/reference.zip --json
 ```
 
-`pack` muss dasselbe Result vollständig prüfen; `validate` muss `scope=reference`,
+`pack` muss dasselbe Referenzbundle vollständig prüfen; `validate` muss `scope=reference`,
 `binding_matches=true` und dessen vollständigen SHA bestätigen. Fachliche
 Ablehnungen niemals durch einen schwächeren Weg umgehen.
 
@@ -137,7 +153,7 @@ weiterarbeiten. Fehlende native Nachweise ausdrücklich nennen.
 
 Bei allein defektem Runtime-Zusatz die äußere ZIP-Sicherheit, Pflichtdaten,
 Snapshot-Inventare/Blob-IDs/Hashes, Kontext und Run-Konsistenz separat nachweisen.
-Originalbytes und Result-SHA behalten; keine Reparatur, Konvertierung oder
+Originalbytes und Referenzbundle-SHA behalten; keine Reparatur, Konvertierung oder
 Umdeklaration zum alten Format. Das ist keine erfolgreiche native Vollvalidierung;
 `pack` akzeptiert keine schwächere Referenz. Ungültige Repositorydaten, unsichere
 Pfade oder falsche Bindung blockieren weiterhin. Kein künstliches `git init` aus
@@ -147,7 +163,7 @@ Pfade oder falsche Bindung blockieren weiterhin. Kein künstliches `git init` au
 
 Aktuelle Nutzeranweisungen, verfügbare `AGENTS.md` und verbindlich referenzierte
 Entwicklungs-/Testregeln mit Snapshot, Plan und Spec abgleichen. Ignorierte lokale
-Regeln fehlen möglicherweise im Result; nicht erfinden. Historische PatchHarbor-
+Regeln fehlen möglicherweise im Referenzbundle; nicht erfinden. Historische PatchHarbor-
 Projektstände stehen in `docs/history/chat-instructions-before-standalone-helper.md`
 des PatchHarbor-Repositorys und gelten nicht als aktuelle Zielprojektregeln.
 
@@ -198,7 +214,7 @@ auftragsbezogene Prüfumfang und die Auswertung tatsächlicher Änderungen bleib
 ## 4. Ein Task-Bundle vorbereiten und prüfen
 
 Bei nutzbarer Runtime `pack`/`api.pack_task` verwenden: bewusst vorbereiteter
-Inhaltsordner, genau das geprüfte Result, ein Entrypoint, expliziter vorhandener
+Inhaltsordner, genau das geprüfte Referenzbundle, ein Entrypoint, expliziter vorhandener
 Ausgabeordner außerhalb der Inhalte. Pack erzeugt Manifest und frische Begleitdaten,
 validiert die geschriebenen Bytes und führt keine Tests, Skripte oder Commits aus.
 Auch ein technisch erforderlicher manueller Weg muss denselben Vertrag erfüllen.
@@ -207,12 +223,12 @@ Genau eine kanonische herunterladbare ZIP erzeugen: keine parallele Shell-Datei,
 zweite Patchvariante oder alternative manuelle Änderungsanleitung. Namensschema:
 `<Repository>_Task_Bundle_<HHMMSS>_<MMDD>_<ID6>.zip<bundle_suffix>`.
 UTC, Monat/Tag ohne Jahr; ID6 sind die ersten sechs Zeichen der Paket-UUID ohne
-Auslassungszeichen. Bei Results steht `Result` statt `Task`, ID6 stammt aus der Run-ID.
+Auslassungszeichen. Bei Referenzbundles steht `Referenzbundle` statt `Task`, ID6 stammt aus der Run-ID.
 
-Suffix unverändert aus Result-`context.json`; fehlend/leer bedeutet kein Suffix.
+Suffix unverändert aus Referenzbundle-`context.json`; fehlend/leer bedeutet kein Suffix.
 `.txt` ergibt z. B. `repo_Task_Bundle_181530_0908_abcdef.zip.txt`. Upload-Endungen
 sind keine Quelle. `configure bundle-suffix .txt` bzw. `--clear` im Zielrepository,
-danach frisches Result. Kein zusätzlicher Schalter bei execute/bundle, kein
+danach frisches Referenzbundle. Kein zusätzlicher Schalter bei execute/bundle, kein
 Suffixfeld in `task.json`; bei separatem Kontext die Präferenz gesondert übergeben,
 sonst kein Suffix. Das geschlossene Kontext-CLI-Schema bleibt unverändert.
 
@@ -246,7 +262,7 @@ Neue Tasks führen diese passiven Dateien unter `PATCHHARBOR_META/`:
 Der Helfer gehört niemals als Root-`tools/`-Payload ins Zielrepository.
 
 Der erzeugende Core liefert seine zusammenpassenden Vorlage und Helferdatei.
-Zielumgebung und `captured_at` aus dem jüngsten Result übernehmen; nicht als neue
+Zielumgebung und `captured_at` aus dem jüngsten Referenzbundle übernehmen; nicht als neue
 Hostprüfung ausgeben. `bundle_type: Task`, neuer `bundle_filename`, exakte
 `repository_context`-Bindung, unbekannte Werte `null`. Begleitdatenformat 3
 enthält `bootstrap: {path, size, sha256}` für den relativen Helferpfad.
@@ -281,7 +297,7 @@ abgedeckt; keine Unix-ACL-Emulation auf Windows.
 
 Grenzen: Warning oberhalb 10 MiB pro Inhalt; maximal 256 MiB pro Eingabeartefakt/
 ZIP-Eintrag, 512 MiB unkomprimierte Gesamtdaten, 250.011 äußere ZIP-Einträge.
-Result maximal 250.000 Base-/Untracked-Dateien plus elf Begleiteinträge;
+Referenzbundle maximal 250.000 Base-/Untracked-Dateien plus elf Begleiteinträge;
 innere Runtime-Archive maximal 1.000 Einträge. Sicherheitsprüfungen nicht lockern.
 
 ## 5. Tests, Commits und Auswertung
@@ -314,7 +330,7 @@ PATCHHARBOR-BUNDLE-NR: <NNN> | APPLIED SUCCESSFULLY
 Nie bei Fehler oder Teilerfolg; spätere Core-Resultmeldungen sind erlaubt.
 Vor Execute nur geplante Tests/Commits nennen. Danach Run-/Execution-Log,
 Kontext, Snapshot und geordnete Commitfolge prüfen. Unterscheiden: Gesamterfolg,
-Teilerfolg, Entrypoint-/Testfehler, Toolfehler, Result-Erzeugungsfehler,
+Teilerfolg, Entrypoint-/Testfehler, Toolfehler, Referenzbundle-Erzeugungsfehler,
 Ablehnung vor Mutation. Nachgewiesene Kennungen, Messages und Planpositionen nennen.
 Bei Fehler: Ursache, tatsächlicher Zustand, vorhandene Commits, uncommitteter
 Schritt und nächster sinnvoller FIX-/OFF-PLAN-Schritt.
@@ -363,19 +379,19 @@ darf ein anderes registriertes Repository über dessen `repo_id` auswählen.
 Archivierung verschiebt nur vollständig geprüfte, nachweislich überholte eigene
 Bundles direkt ins konfigurierte Exchange-Unterverzeichnis; leerer Archivname
 deaktiviert sie. Task: erfolgreicher Replay-Beleg mit Abschlusscommit in aktueller
-Historie. Result: vollständiger sauberer Erfolgssnapshot eines echten Vorfahren
+Historie. Referenzbundle: vollständiger sauberer Erfolgssnapshot eines echten Vorfahren
 des aktuellen sauberen HEAD. Fehlende Beweise, aktueller/fremder/unklarer Inhalt:
 liegen lassen. Alter/Name genügen nicht. Dry-Run archiviert nichts; explizit
 gewählten Task vor Ausführung unangetastet lassen. Keine eigene pauschale
 Archivierung; abschließende State-/Git-Prüfung auch bei optimierten Scans frisch.
 
-Execute-Result verknüpft `task_sha256`, `run_id`, `repo_id`, erwartete Bindung,
+Execute-Referenzbundle verknüpft `task_sha256`, `run_id`, `repo_id`, erwartete Bindung,
 optional `completed_commit`. Replay-Format 5 hält `attempt_run_id` und vor
 Veröffentlichung verankerte `result_sha256`. `attempted -> succeeded` nur bei
 vollständig passendem Erfolg, sauberem Git-Nachweis und echtem freiem Repo-Lock.
 Alte Ledgerbelege ohne Nachweise unverändert erhalten; Hashes sind keine Signatur.
 
-Fehlender screen-Socket/Result, `attempted` oder dirty Tree beweisen keinen Abbruch.
+Fehlender screen-Socket/Referenzbundle, `attempted` oder dirty Tree beweisen keinen Abbruch.
 Vor manueller Recovery echten Lock-/Prozesszustand prüfen und Änderungen sichern.
 Keine Restore-/Reset-/Locklösch-Aktion aufgrund dieser Symptome allein. Recovery
 setzt keine Repository-Dateien zurück; alle SHA-Werte vollständig verwenden.

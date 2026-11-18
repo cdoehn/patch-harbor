@@ -6,7 +6,7 @@ Dokumentation ihrer damaligen Stände und aktivieren keine alten Leser.
 
 ## Versionsbindung
 
-PatchHarbor verarbeitet TaskBundles und ResultBundles ausschließlich für die
+PatchHarbor verarbeitet State-, Task- und Result-Bundles ausschließlich für die
 eigene Produktversion und im jeweils aktuellen Format. `patchharbor_version`
 ist ein verpflichtendes Zeichenkettenfeld in `task.json` und `manifest.json`.
 Es muss exakt der Version des ausführenden Werkzeugs entsprechen, einschließlich
@@ -19,7 +19,7 @@ heben eine abweichende Produktversion nicht auf. Dieselbe Produktversion
 berechtigt nicht zur Verwendung eines abgelösten Formats.
 
 Task-Erkennung, Inspect, Validate, Pack mit Referenz, Execute, automatische
-Watcher-Auswahl, Result-/Snapshot-Leser und Starthelfer dürfen die Grenze nicht
+Watcher-Auswahl, Referenz-/Snapshot-Leser und Starthelfer dürfen die Grenze nicht
 umgehen. Eine unpassende Version wird vor Entrypoint-Start und Veränderungen
 am Zielrepository abgelehnt. Der Monitor zeigt den Versionskonflikt an.
 Bloße Dateityperkennung ist kein Validierungs- oder Ausführungsnachweis.
@@ -29,20 +29,39 @@ Bloße Dateityperkennung ist kein Validierungs- oder Ausführungsnachweis.
 | Bestandteil | Einziger unterstützter Vertrag |
 | --- | --- |
 | TaskBundle | Format 3, acht Pflichtfelder einschließlich `patchharbor_version` |
+| StateBundle | Format 5, Marker `patch-harbor-state-bundle`, Operation `bundle` |
 | ResultBundle | Format 5, verpflichtende `patchharbor_version` |
 | Environment | Format 3, separater Helfer mit Pfad, Größe und SHA-256 |
-| Runtime-Metadaten | Format 3; `task_formats: [3]`, `result_formats: [5]` |
+| Runtime-Metadaten | Format 3; `task_formats: [3]`, `state_formats: [5]`, `result_formats: [5]` |
 | Pack / Inspect / Validate JSON | Ausgabeversion 4 |
+| Bundle JSON | Ausgabeversion 2, `state_bundle_path` und `state_bundle_status` |
 | Execute JSON | Ausgabeversion 2 |
 | Replay-Ablage | Schema 5; keine Leser für Schema 1–4 |
 | Core-PYZ | Ein aktuelles Profil mit Python-Untergrenze 3.10 und Pflichthelfer |
 
 Runtime-Metadaten und eingebettete PYZ müssen dieselbe Produktversion wie das
-Result und das verarbeitende Werkzeug tragen. Auch `runtime unavailable` hat
+State oder Result und das verarbeitende Werkzeug tragen. Auch `runtime unavailable` hat
 eine bekannte Produktversion; fehlende Runtime-Bytes verhindern diesen
 Versionsvergleich nicht. Der eigenständig verteilte Starthelfer trägt seine
 Version als beim Build geprüfte Konstante. Seine Vorprüfung führt keine
-beschriebene Runtime aus und ersetzt keine vollständige native Resultprüfung.
+beschriebene Runtime aus und ersetzt keine vollständige native Referenzprüfung.
+
+## Eindeutige Paketrollen
+
+State und Result sind passive Repository-Referenzen mit derselben vollständigen
+Snapshotstruktur. State trägt `patch-harbor-state-bundle`, Operation `bundle` und
+Begleittyp `State`; Result trägt `patch-harbor-result-bundle`, Operation `execute`
+und Begleittyp `Result`. Die drei Angaben müssen übereinstimmen. Auch ein
+Dry-Run oder eine abgelehnte/fehlgeschlagene Ausführung bleibt ein Result.
+Nur Task ist ausführbar. State enthält weder Entrypoint-Ausführung noch eine
+Task-/Commit-Receipt und kann keinen Replay-Versuch als erfolgreich bestätigen.
+
+`bundle` behält seinen CLI-Namen; `--json` liefert den State-Pfad und den Status
+seiner Veröffentlichung. `api.read_reference_snapshot` liest beide Referenzarten
+als `ReferenceSnapshot` mit `bundle_kind: ReferenceBundleKind`. Fehler heißen
+`ReferenceSnapshotError`; `SnapshotErrorCode.INVALID_REFERENCE` bezeichnet eine
+ungültige Referenz. Es gibt keine alten API-Aliase. Aktuelle interne gemeinsame
+Leser heißen `reference_reader`; Repository-Dateien werden nur einmal erfasst.
 
 ## Keine Migration
 
@@ -57,7 +76,7 @@ aktuelles Registry-, Konfigurations- oder Zustandsschema kann weiterverwendet
 werden; das ist keine Migration. Lockidentitäten und vollständige
 Repository-Bindungen bleiben unverändert.
 
-Nach einem Werkzeugwechsel wird für weitere Tasks ein neues Result direkt aus
+Nach einem Werkzeugwechsel wird für weitere Tasks ein neues State Bundle direkt aus
 dem tatsächlichen Repository erzeugt: `patchharbor bundle REPOSITORY`. Alte
 Resultdateien werden dafür nicht konvertiert. Eine erforderliche frische
 Entwicklungsumgebung wird ausdrücklich initialisiert; Replay-Nachweise werden
@@ -69,7 +88,7 @@ nicht automatisch gelöscht.
 denselben aktuellen Execute-Pfad und akzeptiert keine alten Pakete.
 `api.run_scripts`, `patchharbor fs run` und ScriptBundle bleiben als eigenständiger,
 deprecated Skriptweg erhalten. Dieser ausdrücklich ausgenommene Weg ist nicht
-produktversionsgebunden und ist kein alternativer Task-/Result-Leser.
+produktversionsgebunden und ist kein alternativer State-/Task-/Result-Leser.
 
 Interne Namen für Task-Ausführung, Starter, Worker, Testhelfer und Testfälle
 verwenden `execute`. Fachliche Git-Operationen wie `git apply` behalten ihren

@@ -9,10 +9,10 @@
 
 PatchHarbor connects an assistant running elsewhere with a repository on your
 Linux or Windows machine. Send the assistant a repository snapshot as a
-**Result Bundle**; receive a **Task Bundle** containing code changes and an
+**State Bundle**; receive a **Task Bundle** containing code changes and an
 entrypoint. PatchHarbor checks the bundle against the intended repository state,
-executes it locally, and returns updated files and execution logs for the next
-iteration.
+executes it locally, and returns a **Result Bundle** with updated files and
+execution logs for the next iteration.
 
 Use it when your coding assistant cannot access the repository directly, or when
 you want an explicit, reviewable handoff between development and execution.
@@ -23,11 +23,15 @@ The entrypoint defines the project's tests, commits and optional push.
 
 ## How it works
 
-1. **Export:** Run `patchharbor bundle` to capture the repository in a Result Bundle.
+1. **Export:** Run `patchharbor bundle` to capture the repository in a State Bundle.
 2. **Develop:** Give that bundle to the assistant so it can inspect the actual files and prepare changes.
-3. **Transfer:** Pack a Task Bundle bound to that Result and place the verified ZIP in the local Exchange directory.
+3. **Transfer:** Pack a Task Bundle bound to that reference and place the verified ZIP in the local Exchange directory.
 4. **Execute:** Run `patchharbor execute`, or let the watcher validate the bundle, write its payloads and run its entrypoint.
 5. **Review:** Read the new Result Bundle and execution log before starting the next iteration.
+
+A State Bundle can also refresh the assistant's working basis after a restart or
+lost workspace. It captures the current repository, not an earlier chat session,
+virtual environment or a missing Execute receipt. See [State, Task and Result](docs/state-bundle.md).
 
 ## What you get
 
@@ -35,19 +39,20 @@ The entrypoint defines the project's tests, commits and optional push.
 - **Useful feedback:** Result Bundles contain repository snapshots, changes and execution diagnostics.
 - **Manual or watched execution:** Use filesystem notifications or explicit polling for CIFS and other mounts without reliable notifications.
 - **Live visibility:** `patchharbor monitor` displays repository and Exchange activity, a five-line event history, active entrypoints and bundle numbers in a read-only terminal UI.
-- **Portable runtime:** Results normally include a Core-PYZ that compatible Python environments can use without installing PatchHarbor. The watcher comes with the full installation.
+- **Portable runtime:** State and Result Bundles normally include a Core-PYZ that compatible Python environments can use without installing PatchHarbor. The watcher comes with the full installation.
 - **Python integration:** The public API supports verified snapshot reading, bundle creation and guarded execution for host applications.
 
 ### Version and compatibility
 
-This source tree is **PatchHarbor 2.0.1**. The release badge links to the latest
+This is the **dev continuation after PatchHarbor 2.0.1**. The State Bundle
+changes are development work; the product version is raised only for a release. The release badge links to the latest
 published GitHub release; it is not a test-status badge for this checkout.
 See the [2.0.1 release notes](docs/release-2.0.1.md) and the
 [integration guide](docs/version-2-integration.md) before upgrading.
 
-Task and Result Bundles must match the exact product version of the tool
+State, Task and Result Bundles must match the exact product version of the tool
 processing them. Older packages are not migrated. After updating the tool,
-run `patchharbor bundle` in the repository to start from a fresh Result.
+run `patchharbor bundle` in the repository to start from a fresh State Bundle.
 
 PatchHarbor requires **CPython 3.10+**. Official builds provide a wheel, sdist and
 Core-PYZ, with a runtime manifest and checksums for complete releases. See
@@ -75,7 +80,7 @@ The wheel path is an artifact you obtain and verify; this command does not assum
 that any version has been published on a package index. **pipx is optional**:
 a dedicated virtual environment is another installation route. Wheel and sdist
 remain supported for normal installations; the PYZ replaces the runtime embedded
-in new Results, not the installed watcher. See
+in State and Result Bundles, not the installed watcher. See
 [installation and safe updates](docs/install-and-update.md), especially if a
 watcher is already running. Updating repository files alone does not upgrade it.
 
@@ -265,7 +270,8 @@ chosen output directory. If its safe filesystem primitives are unsupported,
 it fails instead of falling back to an unsafe copy. Choose one canonical final
 ZIP and preserve its bytes and full SHA-256 during handoff.
 
-Result names follow `<Repository>_Result_Bundle_<HHMMSS>_<MMDD>_<ID6>.zip`; patch names
+State names follow `<Repository>_State_Bundle_<HHMMSS>_<MMDD>_<ID6>.zip`.
+Execute Result names use `_Result_Bundle_` in the same schema; Task names
 follow `<Repository>_Task_Bundle_<HHMMSS>_<MMDD>_<ID6>.zip` (UTC). Filenames are not
 repository-binding evidence. To use a transport suffix such as `.zip.txt`:
 
@@ -275,20 +281,20 @@ patchharbor configure bundle-suffix --clear
 ```
 
 These are alternative settings, applied from the registered repository. The
-`bundle_suffix` is naming metadata in a fresh Result's `context.json`, not a field
+`bundle_suffix` is naming metadata in a fresh reference's `context.json`, not a field
 in `task.json`. Content remains ZIP. Old and new names may coexist.
 
 ## Snapshots, limits and errors
 
-Results contain a full base snapshot **without Git history**, staged/unstaged
+State and Result Bundles contain a full base snapshot **without Git history**, staged/unstaged
 deltas and non-ignored untracked regular files. `.git`, local `.patchharbor`
-metadata and ignored untracked files are excluded. Review Results before sharing:
+metadata and ignored untracked files are excluded. Review reference bundles before sharing:
 there is no general secret detector.
 
 | Resource | Limit |
 | --- | --- |
-| Stored repository files in one Result (base + untracked) | 250,000 |
-| Outer ZIP entries, including auxiliary data | 250,010 |
+| Stored repository files in one State or Result Bundle (base + untracked) | 250,000 |
+| Outer ZIP entries, including auxiliary data | 250,011 |
 | Input ZIP and each expanded outer member | 256 MiB each |
 | Total expanded content, including inspected inner runtime content | 512 MiB |
 | Pack contents scan (files and directories) | 10,000 nodes |

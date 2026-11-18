@@ -1,7 +1,7 @@
 # Integration mit PatchHarbor 2.0
 
 Version 2 verwendet Task-Bundles (Format 3), Execute-Berichte (JSON-Version 2)
-und Result-Bundles (Format 5). Ein bisheriges Result wird nicht durch Umbenennen
+sowie State- und Result-Bundles (Snapshotformat 5). Ein bisheriges Result wird nicht durch Umbenennen
 zu einem gültigen neuen Result. Die Installation oder der Import aktualisiert
 keine andere Anwendung, keinen laufenden Watcher und keine gespeicherten Pins.
 
@@ -15,16 +15,16 @@ keine andere Anwendung, keinen laufenden Watcher und keine gespeicherten Pins.
 | CLI `patchharbor apply` | `patchharbor execute`; `apply` ist nur ein veralteter CLI-Alias |
 
 Nach einer bewusst vorgenommenen Installation erzeugt `patchharbor bundle REPO`
-ein frisches Result 5 direkt aus dem tatsächlichen Repository. Dafür ist kein
+ein frisches State Bundle direkt aus dem tatsächlichen Repository. Dafür ist kein
 altes Result nötig. Die üblichen Registrierungs-, Exchange- und Sperrprüfungen
 gelten weiterhin. Ein schmutziger Stand wird als solcher erfasst.
 
-Der Verbraucher prüft die vollständige SHA-256 dieses Results aus seiner
-vertrauenswürdigen Übergabe. Der im Result enthaltene ausführbare Bootstrap
+Der Verbraucher prüft die vollständige SHA-256 dieser Referenz aus seiner
+vertrauenswürdigen Übergabe. Der in State oder Result enthaltene ausführbare Bootstrap
 prüft zunächst den Runtime-Deskriptor und bereitet die zugehörige Core-PYZ lokal
-vor. Diese Vorprüfung ersetzt nicht die vollständige native Result-Prüfung beim
+vor. Diese Vorprüfung ersetzt nicht die vollständige native Referenzprüfung beim
 Packen. `api.pack_task(..., reference_bundle=result)` und
-`api.validate_task(..., reference_bundle=result)` binden an genau dieses Result.
+`api.validate_task(..., reference_bundle=result)` binden an genau diese State- oder Result-Referenz.
 Die Core-PYZ benötigt keinen Watcher, keine Paketinstallation und keinen Download.
 
 Eine erfolgreiche Diagnoseausführung muss keinen Commit erzeugen. Das nächste
@@ -54,12 +54,12 @@ Das benötigt keine inotify-Ereignisse und eignet sich für entsprechende
 CIFS-Mounts. Publikations- und Sperrprüfungen bleiben erforderlich. Eine
 Konfigurationsänderung alleine beweist keine neue Dienstlaufzeit.
 
-Result-/Task-Suffixe gehören zur Repositorykonfiguration. Beispielsweise kann
+State-/Task-/Result-Suffixe gehören zur Repositorykonfiguration. Beispielsweise kann
 `patchharbor configure bundle-suffix .txt` eine zusätzliche Dateiendung erzeugen;
 zum Packen, Prüfen und Execute immer den tatsächlich zurückgegebenen Pfad
 verwenden. Suffixe ersetzen weder ZIP-Inhalt noch Hash- oder Formatprüfung.
 
-Das ausführbare [Vorbereitungsbeispiel](examples/prepare_task.py) prüft ein Result
+Das ausführbare [Vorbereitungsbeispiel](examples/prepare_task.py) prüft ein State oder Result
 mit einer extern vertrauenswürdig erhaltenen vollständigen SHA-256 und erzeugt
 eine native Task-ZIP in einem privaten, nicht überwachten Ausgabeverzeichnis.
 Es führt keine Payload aus. Der Benutzer überträgt anschließend genau diese

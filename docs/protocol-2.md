@@ -9,9 +9,11 @@ es gibt keinen Konverter und keine alten Python-API-Aliase.
 | Grenze | Aktueller Vertrag |
 | --- | --- |
 | Task | `task.json`, Marker `patch-harbor-task-bundle`, Format 3 |
+| State | `manifest.json`, Marker `patch-harbor-state-bundle`, Format 5, Operation `bundle` |
 | Result | `manifest.json`, Marker `patch-harbor-result-bundle`, Format 5 |
-| Environment | Marker `patch-harbor-environment`, Format 3 mit separatem Helfer, `bundle_type: Task` bzw. `Result`, `filename_schemas.Task` |
-| Runtime-Metadaten | Format 3, `task_formats: [3]`, `result_formats: [5]`, Operationen `inspect_task`, `validate_task`, `pack_task` |
+| Environment | Marker `patch-harbor-environment`, Format 3 mit separatem Helfer, `bundle_type: State`, `Task` oder `Result`, alle drei `filename_schemas` |
+| Runtime-Metadaten | Format 3, `task_formats: [3]`, `state_formats: [5]`, `result_formats: [5]`, Operationen `inspect_task`, `validate_task`, `pack_task` |
+| Bundle JSON | `output_version: 2`, `state_bundle_status`, `state_bundle_path` |
 | Execute JSON | `output_version: 2`, `command: execute` |
 | Pack / Inspect / Validate JSON | `output_version: 4` |
 | Integration / Snapshot / Guarded Execute | Je Vertrag 2; `guarded_execute_contract_version` |
@@ -22,7 +24,7 @@ es gibt keinen Konverter und keine alten Python-API-Aliase.
 Task enthält genau die acht Felder `marker`, `format_version`, `patchharbor_version`, `repo_id`,
 `base_commit`, `state_fingerprint`, `fingerprint_algorithm`, `entrypoint`.
 Vollständige Kennungen sind Maschineninput. Ein Task mit zusätzlichem altem
-`patch.json` oder Result-`manifest.json` wird als gemischtes Paket abgelehnt.
+`patch.json` oder State-/Result-`manifest.json` wird als gemischtes Paket abgelehnt.
 Ein Umbenennen der ZIP ändert weder Format noch Bindung.
 
 `api.pack_task`, `api.inspect_task` und `api.validate_task` liefern unveränderliche
@@ -38,6 +40,10 @@ veralteter CLI-Alias mit einem Hinweis auf stderr und identischer Verarbeitung,
 identischen Sicherheitsprüfungen und demselben JSON-Vertrag. Er akzeptiert
 keine alten Pakete. Python besitzt keinen entsprechenden Alias.
 
+State entsteht durch `patchharbor bundle`. Sein frischer Zustand ist für Start
+und erneute Übernahme geeignet, ohne vorherigen Task. State und Result können
+beide an `--reference-bundle` übergeben werden; Dateinamen ersetzen keine Prüfung.
+
 Result verbindet eine bekannte Task-Ausführung über `task_sha256` mit den
 vollständigen geprüften Eingabebytes. `logs/run.json` beschreibt `operation:
 execute`, den tatsächlichen Entrypoint-Ausgang und unabhängig davon die
@@ -46,7 +52,7 @@ Result-Publikation. Ein erfolgreicher Entrypoint behauptet keinen Commit.
 Commit nicht über den vorhandenen Nachweis belegt ist. Teilfortschritt bei
 Fehler, Timeout oder Abbruch bleibt sichtbar; es gibt keinen globalen Rollback.
 
-Automatische Namen enthalten `_Task_Bundle_` beziehungsweise `_Result_Bundle_`.
+Automatische Namen enthalten `_State_Bundle_`, `_Task_Bundle_` beziehungsweise `_Result_Bundle_`.
 Explizite zulässige Ausgabedateinamen bleiben erhalten. Suffix-, No-clobber-,
 Pfad-, Hash-, ZIP-Budget-, Registry-, Replay- und Lockprüfungen gelten weiter.
 Die physischen Lockidentitäten werden durch neue Python-Typnamen nicht verändert.
@@ -58,8 +64,8 @@ behalten ihre fachlich richtigen Namen. Die PYZ-Rezeptversion und das Core-Profi
 ohne Watcher bleiben unverändert.
 
 Die Begleitressourcen sind in [Chat-Handoff](chat-handoff.md) festgelegt.
-Neue Resultate tragen `tools/pyz_bootstrap.py` im Root; Tasks ausschließlich unter
+State und Result tragen `tools/pyz_bootstrap.py` im Root; Tasks ausschließlich unter
 `PATCHHARBOR_META/tools/pyz_bootstrap.py`. Begleitdatenformat 3 hat einen Pflicht-
 Deskriptor `bootstrap: {path, size, sha256}`. Hashprüfung authentifiziert keinen
-Absender. Frühere Begleitdatenpaare werden abgelehnt. Task 3 und Result 5
+Absender. Frühere Begleitdatenpaare werden abgelehnt. Task 3 sowie State und Result 5
 tragen die exakte Produktversion; Replay-Schema 5 bleibt unverändert.

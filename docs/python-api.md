@@ -5,7 +5,7 @@ namespace; implementation modules remain internal. This document describes
 PatchHarbor 2.0.1 and its Task/Execute/Result API. There is no Python API
 backwards-compatibility requirement. The independent `ScriptBundle` runner
 remains available through the deprecated `api.run_scripts` operation.
-Task and Result Bundles require the exact product version and current
+State, Task and Result Bundles require the exact product version and current
 formats; see the [package contract](../spec/CURRENT_PACKAGE_CONTRACT.md).
 Additional enum values or diagnostic event wording must not be treated as an
 exhaustive state machine. Private modules and undocumented helpers remain free
@@ -587,7 +587,14 @@ Only Result 5 is a valid reference. The strict reader validates every repository
 and runtime descriptor without importing archive code. Earlier Result formats
 are retained only as rejection/provenance fixtures. See [the 2.0 protocol](protocol-2.md).
 
-## Verified Result snapshots (integration contract 2)
+## Verified State and Result snapshots (integration contract 2)
+
+`api.bundle` creates a State Bundle, including safe capture. `api.execute`
+returns a Result Bundle, including failed or dry-run attempts. Both are accepted
+by `read_reference_snapshot`, `pack_task` and reference-based `validate_task`.
+`snapshot.bundle_kind` is `ReferenceBundleKind.STATE` or `.RESULT`; filenames
+never determine that value. A State carries no Execute receipt.
+
 
 `api.integration_capabilities()` returns immutable contract-version fields.
 Check `snapshot_contract_version == 2` before calling

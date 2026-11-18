@@ -34,8 +34,9 @@ def test_canonical_contract_can_be_loaded_and_rendered_without_execution(monkeyp
     assert {k: v for k, v in json.loads(handoff.environment).items() if k != "bootstrap"} == document
 
 
-def test_documented_patch_manifest_validates_against_a_real_reference(tmp_path, monkeypatch) -> None:
-    files, binding = reference_entries()
+@pytest.mark.parametrize("kind", ["bundle", "success", "failure", "dry_run"])
+def test_documented_patch_manifest_validates_against_a_real_reference(tmp_path, monkeypatch, kind) -> None:
+    files, binding = reference_entries(kind=kind)
     reference = tmp_path / 'reference.zip'
     write_reference(reference, files)
     expected = {'binding': binding, 'sha256': hashlib.sha256(reference.read_bytes()).hexdigest()}
